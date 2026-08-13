@@ -36,6 +36,34 @@ py_test(
 )
 
 py_test(
+    name = "test_mongo_toolchain",
+    srcs = ["test_mongo_toolchain.py"],
+    data = ["//bazel:bazelisk"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:mongo_toolchain",
+    ],
+)
+
+py_test(
+    name = "test_gdb_utils",
+    srcs = ["test_gdb_utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/gdb:all_python_files",
+    ],
+)
+
+py_test(
+    name = "test_optimizer_printers",
+    srcs = ["test_optimizer_printers.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/gdb:all_python_files",
+    ],
+)
+
+py_test(
     name = "test_activate_task",
     srcs = ["test_activate_task.py"],
     visibility = ["//visibility:public"],
@@ -59,6 +87,33 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_local_rbe_container_url",
+    srcs = ["test_local_rbe_container_url.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:local_rbe_container_url",
+    ],
+)
+
+py_test(
+    name = "test_podman_recovery",
+    srcs = ["test_podman_recovery.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:podman_recovery",
+    ],
+)
+
+py_test(
+    name = "test_prepare_podman_for_bazel",
+    srcs = ["test_prepare_podman_for_bazel.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:prepare_podman_for_bazel",
     ],
 )
 

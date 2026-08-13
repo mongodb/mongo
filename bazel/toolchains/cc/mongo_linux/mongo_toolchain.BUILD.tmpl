@@ -2,7 +2,11 @@
 
 load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
-load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
+load(
+    "@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_tool_paths.bzl",
+    "get_mongo_toolchain_tool_paths",
+)
+load("@{toolchain_repo_name}//:mongo_toolchain_flags.bzl",
     "CLANG_INCLUDE_DIRS",
     "COMMON_BINDIRS",
     "COMMON_BUILTIN_INCLUDE_DIRECTORIES",
@@ -196,7 +200,17 @@ IS_DEBUG_BUILD = select({
     "@//conditions:default": False,
 })
 
-MOLD_BIN_DIR = "./external/mongo_toolchain_{version}/" + MOLD_MAP["{arch}"]["bin_dir"]
+LIBVOIDSTAR = select({
+    "@//bazel/config:use_libvoidstar_enabled": "@libvoidstar//:libvoidstar",
+    "@//conditions:default": None,
+})
+
+LIBVOIDSTAR_FILES = select({
+    "@//bazel/config:use_libvoidstar_enabled": ["@libvoidstar//:libvoidstar"],
+    "@//conditions:default": [],
+})
+
+MOLD_BIN_DIR = "./external/{toolchain_repo_name}/" + MOLD_MAP["{arch}"]["bin_dir"]
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
 
@@ -227,6 +241,38 @@ filegroup(
     }){sysroot_all_files}
 )
 
+filegroup(
+    name = "llvm_readelf",
+    srcs = ["{version}/bin/llvm-readelf"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "llvm_objcopy",
+    srcs = ["{version}/bin/llvm-objcopy"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "gcc_pretty_printers",
+    srcs = glob(["stow/gcc-{version}/share/gcc-*/python/**/*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "llvm_runtime",
+    srcs = glob([
+        "stow/llvm-{version}/lib/libLLVM.so*",
+        "stow/libedit-{version}/lib/libedit.so*",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "linker_files",
+    srcs = [":all_files"] + LIBVOIDSTAR_FILES,
+)
+
 feature_attrs = get_common_features_attrs()
 
 mongo_linux_cc_toolchain_config(
@@ -242,26 +288,11 @@ mongo_linux_cc_toolchain_config(
     cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
     extra_ldflags = LINK_FLAGS,
     includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
-    tool_paths = {
-        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
-        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
-        # we have to conditionally set the value pointed to by `gcc`.
-        "gcc": "{version}/bin/gcc",
-        "g++": "{version}/bin/g++",
-        "cpp": "{version}/bin/cpp",
-        "ar": "{version}/bin/ar",
-        "nm": "{version}/bin/llvm-nm",
-        "ld": "{version}/bin/ld",
-        "as": "{version}/bin/as",
-        "dwp": "{version}/bin/dwp",
-        "objcopy": "{version}/bin/llvm-objcopy",
-        "objdump": "{version}/bin/objdump",
-        "strip": "{version}/bin/strip",
-        "gcov": "{version}/bin/gcov",
-        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
-    },
+    tool_paths = get_mongo_toolchain_tool_paths("{version}", "gcc"),
+    toolchain_repo_name = "{toolchain_repo_name}",
     toolchain_identifier = "gcc_toolchain",
     verbose = True,
+    libvoidstar = LIBVOIDSTAR,
     linkstatic = LINKSTATIC_ENABLED,
     shared_archive = SHARED_ARCHIVE_ENABLED,
     dwarf_version = DWARF_VERSION,
@@ -308,29 +339,11 @@ mongo_linux_cc_toolchain_config(
     # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
     # will have include_next chains going backwards from the intended order.
     includes = COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES + CLANG_INCLUDE_DIRS,
-    tool_paths = {
-        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
-        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
-        # we have to conditionally set the value pointed to by `gcc`.
-        # TODO(SERVER-87211): The two lines below are using the absolute path to help clang find the sanitizer .a
-        # files. Switch these to the {version}/bin/* paths once EngFlow fixes the issue where symlinks are fully resolved
-        # when copied to the remote execution system.
-        "gcc": "{version}/bin/clang",
-        "g++": "stow/llvm-{version}/bin/clang++",
-        "cpp": "{version}/bin/cpp",
-        "ar": "{version}/bin/ar",
-        "nm": "{version}/bin/llvm-nm",
-        "ld": "{version}/bin/ld",
-        "as": "{version}/bin/as",
-        "dwp": "{version}/bin/llvm-dwp",
-        "objcopy": "{version}/bin/llvm-objcopy",
-        "objdump": "{version}/bin/objdump",
-        "strip": "{version}/bin/strip",
-        "gcov": "{version}/bin/llvm-profdata",
-        "llvm-cov": "{version}/bin/llvm-cov",
-    },
+    tool_paths = get_mongo_toolchain_tool_paths("{version}", "clang"),
+    toolchain_repo_name = "{toolchain_repo_name}",
     toolchain_identifier = "clang_toolchain",
     verbose = True,
+    libvoidstar = LIBVOIDSTAR,
     linkstatic = LINKSTATIC_ENABLED,
     shared_archive = SHARED_ARCHIVE_ENABLED,
     dwarf_version = DWARF_VERSION,
@@ -371,7 +384,7 @@ cc_toolchain(
     ar_files = ":all_files",
     compiler_files = ":all_files",
     dwp_files = ":all_files",
-    linker_files = ":all_files",
+    linker_files = ":linker_files",
     objcopy_files = ":all_files",
     strip_files = ":all_files",
     toolchain_config = select({
@@ -384,13 +397,15 @@ toolchain(
     name = "mongo_toolchain",
     exec_compatible_with = [
         "@platforms//os:linux",
-        "@platforms//cpu:{bazel_toolchain_cpu}",
+        "@platforms//cpu:{exec_bazel_toolchain_cpu}",
         "@//bazel/platforms:use_mongo_toolchain",
+        {exec_distro_constraint}
     ],
     target_compatible_with = [
         "@platforms//os:linux",
-        "@platforms//cpu:{bazel_toolchain_cpu}",
-        "@//bazel/platforms:use_mongo_toolchain",
+        "@platforms//cpu:{target_bazel_toolchain_cpu}",
+        "{mongo_toolchain_constraint}",
+        {target_distro_constraint}
     ],
     target_settings = [
         "@//bazel/config:mongo_toolchain_{version}",

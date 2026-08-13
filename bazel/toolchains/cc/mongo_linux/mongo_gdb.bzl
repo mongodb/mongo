@@ -208,8 +208,14 @@ filegroup(
     srcs = glob([
         "%s/**",
         "stow/gdb-%s/**",
-        "stow/python3-%s/**",
+        "stow/python313-%s/**",
     ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "gdb_binary",
+    srcs = ["%s/bin/gdb"],
     visibility = ["//visibility:public"],
 )
 
@@ -252,6 +258,7 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 """ % (
+            ctx.attr.version,
             ctx.attr.version,
             ctx.attr.version,
             ctx.attr.version,

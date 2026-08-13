@@ -6,3 +6,6 @@ filters:
   - "mongo_config_header.py":
     approvers:
       - 10gen/server-programmability
+  - "mongo_config_header_test.py":
+    approvers:
+      - 10gen/devprod-build

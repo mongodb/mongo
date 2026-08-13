@@ -92,7 +92,11 @@ ADDITIONAL_PACKAGES["debian:10"]="
 libfl2
 "
 
-ADDITIONAL_PACKAGES["opensuse/leap:15.2"]="
+ADDITIONAL_PACKAGES["debian:12"]="
+libncurses6
+"
+
+ADDITIONAL_PACKAGES["opensuse/leap:15.5"]="
 libfl2
 "
 
@@ -134,7 +138,7 @@ IMAGE_DIRS["debian:10"]="debian10"
 IMAGE_DIRS["debian:12"]="debian12"
 IMAGE_DIRS["redhat/ubi8:8.9"]="rhel89"
 IMAGE_DIRS["redhat/ubi9:9.3"]="rhel93"
-IMAGE_DIRS["opensuse/leap:15.2"]="suse"
+IMAGE_DIRS["opensuse/leap:15.5"]="suse"
 IMAGE_DIRS["ubuntu:18.04"]="ubuntu18"
 IMAGE_DIRS["ubuntu:20.04"]="ubuntu20"
 IMAGE_DIRS["ubuntu:22.04"]="ubuntu22"

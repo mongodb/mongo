@@ -111,18 +111,18 @@ def _fetch_bazel_toolchain(version: str) -> None:
         )
 
 
-def _get_bazel_execroot() -> Path:
+def _get_bazel_output_base() -> Path:
     try:
-        execroot_str = _execute_bazel(["info", "execution_root"])
+        output_base_str = _execute_bazel(["info", "output_base"])
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
-            f"Couldn't find bazel execroot: `{e.cmd}` exited with code {e.returncode}"
+            f"Couldn't find bazel output base: `{e.cmd}` exited with code {e.returncode}"
         )
-    return Path(execroot_str)
+    return Path(output_base_str)
 
 
 def _get_bazel_toolchain_path(version: str) -> Path:
-    return _get_bazel_execroot() / "external" / f"mongo_toolchain_{version}" / version
+    return _get_bazel_output_base() / "external" / f"mongo_toolchain_{version}" / version
 
 
 def _get_toolchain_from_path(path: str | Path) -> MongoToolchain:

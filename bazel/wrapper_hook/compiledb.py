@@ -2,7 +2,6 @@ import errno
 import json
 import os
 import pathlib
-import platform
 import re
 import shutil
 import subprocess
@@ -24,6 +23,8 @@ from buildscripts.setup_clang_tidy import PLUGIN_CANDIDATES, materialize_clang_t
 
 COMPILEDB_START_TIME = time.monotonic()
 COMPILEDB_POSTHOOK_STATE = REPO_ROOT / ".compiledb" / "posthook_state.json"
+# tools/bazel sets this to a path unique to the current wrapper invocation.
+COMPILEDB_POSTHOOK_STATE_ENV = "MONGO_COMPILEDB_POSTHOOK_STATE"
 COMPILEDB_BUILD_TAG_FILTERS = "--build_tag_filters=mongo_compiledb"
 COMPILEDB_REQUIRED_OUTPUT_REGEX = (
     r".*(_virtual_includes|_virtual_imports)/.*"
@@ -36,6 +37,12 @@ SETUP_CLANG_TIDY_BUILD_TARGETS = [
     "//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks",
 ]
 _WINDOWS_SYMLINKS_AVAILABLE = None
+
+
+def _compiledb_posthook_state_path():
+    return pathlib.Path(
+        os.environ.get(COMPILEDB_POSTHOOK_STATE_ENV) or str(COMPILEDB_POSTHOOK_STATE)
+    )
 
 
 def _should_passthrough_target_name(target_name):
@@ -196,8 +203,9 @@ def _run_build_command(cmd):
 
 
 def clear_compiledb_posthook_state():
+    state_path = _compiledb_posthook_state_path()
     try:
-        os.remove(COMPILEDB_POSTHOOK_STATE)
+        os.remove(state_path)
     except OSError:
         pass
 
@@ -388,13 +396,14 @@ def prepare_compiledb_posthook_args(
     persistent_compdb,
     enterprise,
     atlas,
+    build_args=None,
     compiledb_targets=None,
-    extra_build_targets=None,
     setup_clang_tidy=False,
 ):
     startup_args = list(startup_args)
-    compiledb_targets = list(compiledb_targets or build_targets)
-    extra_build_targets = list(extra_build_targets or [])
+    compiledb_targets = (
+        list(build_targets) if compiledb_targets is None else list(compiledb_targets)
+    )
     owns_buildevents_path = False
     existing_output_base = next(
         (arg.split("=", 1)[1] for arg in startup_args if arg.startswith("--output_base=")),
@@ -417,6 +426,7 @@ def prepare_compiledb_posthook_args(
         if existing_symlink_prefix:
             symlink_prefix = pathlib.Path(existing_symlink_prefix)
 
+    requested_build_flags = list(build_flags)
     _, compiledb_config = _compiledb_build_settings(enterprise, atlas, log_default=True)
     build_flags = _resolve_compiledb_flags(compiledb_config, requested_build_flags=build_flags)
 
@@ -442,8 +452,9 @@ def prepare_compiledb_posthook_args(
         owns_buildevents_path = True
         build_flags.append(f"--build_event_json_file={buildevents_path}")
 
-    os.makedirs(COMPILEDB_POSTHOOK_STATE.parent, exist_ok=True)
-    with open(COMPILEDB_POSTHOOK_STATE, "w", encoding="utf-8") as state_file:
+    state_path = _compiledb_posthook_state_path()
+    os.makedirs(state_path.parent, exist_ok=True)
+    with open(state_path, "w", encoding="utf-8") as state_file:
         json.dump(
             {
                 "start_time": time.monotonic(),
@@ -460,7 +471,21 @@ def prepare_compiledb_posthook_args(
             state_file,
         )
 
-    return startup_args + [command] + build_flags + build_targets + extra_build_targets
+    if build_args is None:
+        ordered_build_args = build_flags + build_targets
+    else:
+        requested_build_flags = [
+            arg for arg in requested_build_flags if not arg.startswith("--remote_download_regex=")
+        ]
+        ordered_build_args = [
+            arg for arg in build_args if not arg.startswith("--remote_download_regex=")
+        ]
+        # _resolve_compiledb_flags preserves the requested flags and appends the
+        # compiledb-specific defaults. Keep the requested arguments interleaved
+        # with targets, then append only those generated flags.
+        ordered_build_args.extend(build_flags[len(requested_build_flags) :])
+
+    return startup_args + [command] + ordered_build_args
 
 
 def _artifact_exec_path(artifact, path_fragment_map):
@@ -550,12 +575,39 @@ def _windows_symlinks_available():
     return _WINDOWS_SYMLINKS_AVAILABLE
 
 
+def _copy_if_changed(src, dst):
+    try:
+        src_stat = os.stat(src)
+        dst_stat = os.stat(dst)
+    except FileNotFoundError:
+        return shutil.copy2(src, dst)
+
+    if (src_stat.st_size, src_stat.st_mtime_ns) == (dst_stat.st_size, dst_stat.st_mtime_ns):
+        with open(src, "rb") as src_file, open(dst, "rb") as dst_file:
+            while True:
+                src_chunk = src_file.read(1024 * 1024)
+                dst_chunk = dst_file.read(1024 * 1024)
+                if src_chunk != dst_chunk:
+                    break
+                if not src_chunk:
+                    return dst
+
+    return shutil.copy2(src, dst)
+
+
 def _copy_path(src, dst):
     if src.is_dir():
-        shutil.copytree(src, dst, dirs_exist_ok=True)
+        shutil.copytree(src, dst, dirs_exist_ok=True, copy_function=_copy_if_changed)
     else:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+
+
+def _paths_are_same(path, other):
+    try:
+        return path.samefile(other)
+    except OSError:
+        return path.resolve(strict=False) == other.resolve(strict=False)
 
 
 def materialize_execroot_external_symlinks(output_base):
@@ -582,11 +634,17 @@ def materialize_execroot_external_symlinks(output_base):
         if os.path.lexists(link):
             if use_symlinks and link.is_symlink() and os.readlink(link) == link_target:
                 continue
-            if not use_symlinks and not link.is_symlink():
+            if not use_symlinks and (link.is_symlink() or link.is_junction()):
+                if _paths_are_same(link, repo):
+                    continue
+                _remove_existing_path(link)
+                updated += 1
+            elif not use_symlinks and link.is_dir():
                 _copy_path(repo, link)
                 continue
-            _remove_existing_path(link)
-            updated += 1
+            else:
+                _remove_existing_path(link)
+                updated += 1
         else:
             created += 1
 
@@ -951,7 +1009,7 @@ def _generate_compiledb_via_aspect(
                 _run_build_command(tidy_build_cmd)
             except RuntimeError:
                 _log_progress(
-                    "Warning: failed to build clang-tidy targets; " "skipping clang-tidy IDE setup."
+                    "Warning: failed to build clang-tidy targets; skipping clang-tidy IDE setup."
                 )
                 setup_clang_tidy = False
         if setup_clang_tidy:
@@ -980,15 +1038,26 @@ def _generate_compiledb_via_aspect(
 def finalize_compiledb_posthook(bazel_bin, enterprise, atlas):
     global COMPILEDB_START_TIME
 
-    if platform.system() == "Windows":
-        return
-    if not COMPILEDB_POSTHOOK_STATE.exists():
+    state_path = _compiledb_posthook_state_path()
+    if not state_path.exists():
         return
 
-    with open(COMPILEDB_POSTHOOK_STATE, "r", encoding="utf-8") as state_file:
+    with open(state_path, "r", encoding="utf-8") as state_file:
         state = json.load(state_file)
 
     COMPILEDB_START_TIME = state.get("start_time", COMPILEDB_START_TIME)
+
+    # If Bazel failed before writing the BEP, there is nothing for the post-hook to
+    # process. This is common when the wrapper cannot launch the requested build tool;
+    # preserve the original Bazel failure instead of replacing it with a traceback here.
+    buildevents_path = state.get("buildevents_path")
+    if buildevents_path and not os.path.exists(buildevents_path):
+        _log_progress(
+            "Skipping compiledb post-hook because Bazel did not produce "
+            f"the build event file: {buildevents_path}"
+        )
+        clear_compiledb_posthook_state()
+        return
 
     try:
         _generate_compiledb_via_aspect(

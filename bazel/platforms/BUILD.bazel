@@ -20,6 +20,13 @@ constraint_value(
     constraint_setting = ":native_toolchain",
 )
 
+constraint_setting(name = "mongo_linux_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_linux_cross_toolchain",
+    constraint_setting = ":mongo_linux_cross_toolchain",
+)
+
 constraint_setting(name = "distro")
 
 [
@@ -83,6 +90,25 @@ constraint_value(
     constraint_setting = ":mongo_windows_toolchain_config",
 )
 
+constraint_setting(name = "mongo_windows_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_windows_cross_toolchain",
+    constraint_setting = ":mongo_windows_cross_toolchain",
+)
+
+constraint_setting(name = "mongo_apple_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_native_apple_toolchain",
+    constraint_setting = ":mongo_apple_cross_toolchain",
+)
+
+constraint_value(
+    name = "use_mongo_apple_cross_toolchain",
+    constraint_setting = ":mongo_apple_cross_toolchain",
+)
+
 platform(
     name = "windows_amd64",
     constraint_values = [
@@ -92,10 +118,28 @@ platform(
 )
 
 platform(
+    name = "windows_x86_64_cross",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        ":use_mongo_windows_cross_toolchain",
+    ],
+)
+
+config_setting(
+    name = "windows_cross",
+    constraint_values = [
+        "@platforms//os:windows",
+        ":use_mongo_windows_cross_toolchain",
+    ],
+)
+
+platform(
     name = "macos_arm64",
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
+        ":use_mongo_native_apple_toolchain",
     ],
 )
 
@@ -104,6 +148,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
+        ":use_mongo_native_apple_toolchain",
     ],
 )
 
@@ -115,6 +160,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
+        ":use_mongo_apple_cross_toolchain",
     ],
 )
 
@@ -123,6 +169,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
+        ":use_mongo_apple_cross_toolchain",
     ],
 )
 
@@ -202,6 +249,26 @@ platform(
     ],
 )
 
+[
+    platform(
+        name = distro + "_" + arch + "_cross",
+        constraint_values = [
+            "@platforms//cpu:" + arch,
+            "@platforms//os:linux",
+            ":use_mongo_linux_cross_toolchain",
+            ":" + distro,
+        ],
+    )
+    for distro in [
+        "rhel8",
+        "rhel9",
+    ]
+    for arch in [
+        "ppc64le",
+        "s390x",
+    ]
+]
+
 # WASM platform for WebAssembly compilation
 platform(
     name = "wasm32",
@@ -211,12 +278,18 @@ platform(
     ],
 )
 
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 py_binary(
     name = "remote_execution_containers_generator",
     srcs = ["remote_execution_containers_generator.py"],
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "remote_execution_containers_generator_test",
+    srcs = ["remote_execution_containers_generator_test.py"],
+    data = ["remote_execution_containers_generator.py"],
 )
 
 exports_files([

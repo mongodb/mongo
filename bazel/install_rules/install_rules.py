@@ -1,8 +1,21 @@
 import argparse
+import contextlib
 import json
 import os
 import shutil
+import tempfile
 import time
+from collections.abc import Iterator
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 parser = argparse.ArgumentParser()
 
@@ -31,11 +44,141 @@ if os.path.exists(args.install_dir):
 os.makedirs(args.install_dir, exist_ok=True)
 
 
-install_link = args.install_dir + "/../install"
+def _configuration_name(install_dir):
+    """Return Bazel's output configuration from a bazel-out path."""
+    components = os.path.normpath(install_dir).split(os.sep)
+    for index in range(len(components) - 2):
+        if components[index] == "bazel-out" and components[index + 2] == "bin":
+            return components[index + 1]
+    raise RuntimeError(
+        f"install directory does not contain a Bazel output configuration: {install_dir}"
+    )
+
+
+shared_install_root = os.environ.get("MONGO_BAZEL_SHARED_INSTALL_DIR")
+if shared_install_root:
+    # The output base is shared by all Bazel configurations. Keep the writable install trees
+    # separate just as the default install_link (args.install_dir/../install) is.
+    install_link = os.path.join(shared_install_root, _configuration_name(args.install_dir))
+else:
+    install_link = args.install_dir + "/../install"
 os.makedirs(install_link, exist_ok=True)
+shared_install_lock = install_link + ".lock"
 
 
-def install(src, install_type, is_rename=False):
+@contextlib.contextmanager
+def _exclusive_file_lock(lock_path: str) -> Iterator[None]:
+    """Serialize mutations to the shared install tree on Unix and Windows."""
+    with open(lock_path, "a+b") as lock_file:
+        if fcntl is not None:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            return
+
+        if msvcrt is not None:
+            lock_file.seek(0, os.SEEK_END)
+            if lock_file.tell() == 0:
+                lock_file.write(b"\0")
+                lock_file.flush()
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            return
+
+        # All supported host platforms provide one of the locking APIs above.
+        yield
+
+
+def _copy_file_atomically(src: str, dst: str) -> None:
+    """Copy a file to dst without exposing a partially copied shared install file."""
+    destination_dir = os.path.dirname(dst)
+    temporary_fd, temporary_dst = tempfile.mkstemp(
+        dir=destination_dir,
+        prefix=f".{os.path.basename(dst)}.",
+    )
+    os.close(temporary_fd)
+    try:
+        shutil.copyfile(src, temporary_dst)
+        shutil.copymode(src, temporary_dst)
+        os.replace(temporary_dst, dst)
+    finally:
+        try:
+            os.unlink(temporary_dst)
+        except FileNotFoundError:
+            pass
+
+
+def _install_destination(src: str, dst: str, is_shared: bool) -> None:
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if args.install_mode == "hardlink":
+        destination_is_different = False
+        if os.path.exists(dst):
+            try:
+                destination_is_different = not os.path.samefile(src, dst)
+            except FileNotFoundError:
+                # Another install action may have removed the shared destination
+                # between exists() and samefile().
+                pass
+        if destination_is_different:
+            try:
+                if os.path.isdir(dst):
+                    shutil.rmtree(dst)
+                else:
+                    os.chmod(dst, 0o755)
+                    os.unlink(dst)
+            except FileNotFoundError as exc:
+                if is_shared:
+                    # if multiple installs are requested at once and happen
+                    # to install the same file, it is ambiguous
+                    # when one should be linked into the general install dir
+                    # so we pass on exceptions
+                    pass
+                else:
+                    raise exc
+            except OSError as exc:
+                if exc.strerror == "Directory not empty":
+                    print("Encountered OSError: Directory not empty. Retrying...")
+                    time.sleep(1)
+                    shutil.rmtree(dst)
+                else:
+                    raise exc
+        if not os.path.exists(dst):
+            try:
+                if os.path.isdir(src):
+                    for root, _, files in os.walk(src):
+                        for name in files:
+                            source_file = os.path.join(root, name)
+                            dest_dir = os.path.dirname(os.path.join(root, name)).replace(src, dst)
+                            if not os.path.exists(dest_dir):
+                                os.makedirs(dest_dir)
+                            _copy_file_atomically(source_file, os.path.join(dest_dir, name))
+                else:
+                    try:
+                        os.link(src, dst)
+                    # If you try hardlinking across drives link will fail
+                    except OSError:
+                        _copy_file_atomically(src, dst)
+            except FileExistsError as exc:
+                if is_shared:
+                    # if multiple installs are requested at once and happen
+                    # to install the same file, it is ambiguous
+                    # when one should be linked into the general install dir
+                    # so we pass on exceptions
+                    pass
+                else:
+                    raise exc
+    else:
+        raise Exception("Only hardlink mode is currently implemented.")
+
+
+def install(src: str, install_type: str, is_rename: bool = False) -> str:
     if is_rename:
         install_dst = os.path.join(args.install_dir, install_type)
         link_dst = os.path.join(install_link, install_type)
@@ -49,71 +192,12 @@ def install(src, install_type, is_rename=False):
         install_dst = install_dst.replace("_with_debug.dwp", ".dwp")
         link_dst = link_dst.replace("_with_debug.dwp", ".dwp")
 
-    for dst in [install_dst, link_dst]:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if args.install_mode == "hardlink":
-            if os.path.exists(dst) and not os.path.samefile(src, dst):
-                try:
-                    if os.path.isdir(dst):
-                        shutil.rmtree(dst)
-                    else:
-                        os.chmod(dst, 0o755)
-                        os.unlink(dst)
-                except FileNotFoundError as exc:
-                    if link_dst == dst:
-                        # if multiple installs are requested at once and happen
-                        # to install the same file, it is ambiguous
-                        # when one should be linked into the general install dir
-                        # so we pass on exceptions
-                        pass
-                    else:
-                        raise exc
-                except OSError as exc:
-                    if exc.strerror == "Directory not empty":
-                        print("Encountered OSError: Directory not empty. Retrying...")
-                        time.sleep(1)
-                        shutil.rmtree(dst)
-                    else:
-                        raise exc
-            if not os.path.exists(dst):
-                try:
-                    if os.path.isdir(src):
-                        for root, _, files in os.walk(src):
-                            for name in files:
-                                dest_dir = os.path.dirname(os.path.join(root, name)).replace(
-                                    src, dst
-                                )
-                                if not os.path.exists(dest_dir):
-                                    os.makedirs(dest_dir)
-                                try:
-                                    os.link(os.path.join(root, name), os.path.join(dest_dir, name))
-                                except OSError as exc:
-                                    if exc.strerror == "Invalid argument":
-                                        print("Encountered OSError: Invalid argument. Retrying...")
-                                        time.sleep(1)
-                                        os.link(
-                                            os.path.join(root, name), os.path.join(dest_dir, name)
-                                        )
-                    else:
-                        try:
-                            os.link(src, dst)
-                        # If you try hardlinking across drives link will fail
-                        except OSError:
-                            try:
-                                shutil.copy(src, dst)
-                            except shutil.SameFileError:
-                                pass
-                except FileExistsError as exc:
-                    if link_dst == dst:
-                        # if multiple installs are requested at once and happen
-                        # to install the same file, it is ambiguous
-                        # when one should be linked into the general install dir
-                        # so we pass on exceptions
-                        pass
-                    else:
-                        raise exc
-        else:
-            raise Exception("Only hardlink mode is currently implemented.")
+    # The action-specific output can be installed in parallel. Only the shared
+    # convenience tree needs serialization, including directory replacement and
+    # the complete copy of a directory such as a dSYM bundle.
+    _install_destination(src, install_dst, is_shared=False)
+    with _exclusive_file_lock(shared_install_lock):
+        _install_destination(src, link_dst, is_shared=True)
 
     return install_dst
 

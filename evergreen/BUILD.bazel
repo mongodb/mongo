@@ -17,6 +17,12 @@ py_test(
     ],
 )
 
+py_test(
+    name = "record_mongodb_server_version_test",
+    srcs = ["record_mongodb_server_version_test.py"],
+    data = ["record_mongodb_server_version.sh"],
+)
+
 sh_binary(
     name = "wiki_page_minimized_agg_query_fuzzer",
     srcs = ["wiki_page_minimized_agg_query_fuzzer.sh"],

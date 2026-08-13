@@ -9,6 +9,10 @@
 REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
 
+if [[ "${MONGO_BAZEL_IN_HERMETIC_CONTAINER:-}" == "1" ]]; then
+  exec "$bazel_real" "$@"
+fi
+
 # 90% of the time, prefer downloading from the direct URL before trying the
 # Remote Asset API (experimental_remote_downloader).  This lets us benefit
 # off of the added redundancy of the remote downloader while reducing traffic
@@ -76,9 +80,114 @@ if [[ "$OSTYPE" == "linux"* ]]; then
   os="linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   os="macos"
+elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win32"* ]]; then
+  os="windows"
 else
   os="unknown"
 fi
+
+# Container integration is currently supported only on Linux. Keep macOS and
+# Windows on native Bazel even when a user's environment or a cross-platform
+# config opts into hermetic containers; this also prevents the wrapper from
+# attempting to start Docker on those platforms.
+if [[ "$os" == "macos" || "$os" == "windows" ]]; then
+  export MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
+fi
+
+python_works() {
+  local candidate="$1"
+  [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || return 1
+  "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)' >/dev/null 2>&1
+}
+
+find_repo_python() {
+  local candidate
+  for candidate in "$REPO_ROOT/python3-venv/bin/python" "$REPO_ROOT/python3-venv/Scripts/python.exe"; do
+    if python_works "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+find_local_python() {
+  local candidate
+  if candidate=$(find_repo_python); then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    candidate=$(command -v python3)
+    if python_works "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  fi
+
+  if command -v python >/dev/null 2>&1; then
+    candidate=$(command -v python)
+    if python_works "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+run_native_bazel() {
+  local real_bazel="$1"
+  shift
+
+  local -a direct_args=()
+  local arg
+  local strategy_added=0
+  for arg in "$@"; do
+    direct_args+=("$arg")
+    if [[ "$strategy_added" == 0 && "$arg" == "$current_bazel_command" ]]; then
+      case "$current_bazel_command" in
+        build|coverage|run|test)
+          # MongoInstallRule publishes bazel-bin/install as an intentional side
+          # effect. Native action sandboxes would discard that convenience tree.
+          direct_args+=("--strategy=MongoInstallRule=local")
+          ;;
+      esac
+      strategy_added=1
+    fi
+  done
+
+  "$real_bazel" "${direct_args[@]}"
+}
+
+run_final_bazel() {
+  local real_bazel="$1"
+  shift
+
+  if [[ "$os" != "linux" && "$os" != "macos" && "$os" != "windows" ]]; then
+    "$real_bazel" "$@"
+    return $?
+  fi
+
+  case "$(printf '%s' "${MONGO_BAZEL_USE_HERMETIC_CONTAINER:-}" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off)
+      run_native_bazel "$real_bazel" "$@"
+      return $?
+      ;;
+  esac
+
+  local hermetic_container_python="${python:-}"
+  if ! python_works "$hermetic_container_python"; then
+    if ! hermetic_container_python=$(find_local_python); then
+      echo "ERROR: Python 3.13 or newer is required to launch hermetic_container; refusing to run build tools natively. Set MONGO_BAZEL_USE_HERMETIC_CONTAINER=0 to explicitly opt out." >&2
+      return 1
+    fi
+  fi
+
+  "$hermetic_container_python" "$REPO_ROOT/bazel/wrapper_hook/hermetic_container_integration.py" "$real_bazel" "$@"
+}
 
 ARCH=$(uname -m)
 if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
@@ -140,8 +249,9 @@ fi
 
 
 if [ "$skip_python" == "0" ]; then
-  # known list of commands to skip
-  skip_commands=("clean" "version" "shutdown" "info")
+  # Commands that do not need wrapper setup. clean and shutdown must go through
+  # run_final_bazel so container lifecycle handling can run.
+  skip_commands=("version" "info")
 
   for command in "${skip_commands[@]}"
   do
@@ -153,8 +263,9 @@ if [ "$skip_python" == "0" ]; then
 fi
 
 if [ "$skip_python" == "1" ]; then  
-  # Fast path: no wrapper output, run Bazel directly to terminal  
-  exec "$bazel_real" "$@"  
+  # Fast path: no Python, wrapper output, or container setup is required.
+  "$bazel_real" "$@"
+  exit $?
 fi  
 
 wrapper_output_all=0
@@ -229,16 +340,22 @@ else
   fi
 fi
 
+if ! python_works "$python"; then
+  if ! python=$(find_repo_python); then
+    python=""
+  fi
+fi
+
 # if no python use bazel to install one
-if [[ "$python" = "" ]] || [ ! -f $python ]; then
+if [[ "$python" = "" ]]; then
   >&2 echo "python prereq missing, using bazel to install python..."
   >&2 $bazel_real build --bes_backend= --bes_results_url= --workspace_status_command= @py_host//:all 
   if [[ $? != 0 ]]; then
     >&2 $bazel_real build --config=local --workspace_status_command= @py_host//:all 
     if [[ $? != 0 ]]; then
       if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
-        >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
-        "$bazel_real" "$@"
+        >&2 echo "wrapper script failed to install python! falling back to final bazel call..."
+        run_final_bazel "$bazel_real" "$@"
         exit $?
       else
         exit $?
@@ -248,8 +365,14 @@ if [[ "$python" = "" ]] || [ ! -f $python ]; then
 fi
 
 # update python location if it was missing and we had to install it
-if [[ "$python" = "" ]] || [ ! -f $python ]; then
+if [[ "$python" = "" ]]; then
   python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
+fi
+if ! python_works "$python"; then
+  if ! python=$(find_local_python); then
+    >&2 echo "wrapper script failed to find a host-compatible python"
+    exit 1
+  fi
 fi
 
 run_bazel_command() {
@@ -258,7 +381,7 @@ run_bazel_command() {
   if [[ "$current_bazel_command" == "query" ]]; then
     "$python" "$REPO_ROOT/bazel/wrapper_hook/query_failure_diagnostic.py" "$bazel_real" "$@"
   else
-    "$bazel_real" "$@"
+    run_final_bazel "$bazel_real" "$@"
   fi
 }
 
@@ -278,9 +401,14 @@ fi
 
 rm -f /tmp/mongo_autocomplete_plus_targets
 MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
+export MONGO_COMPILEDB_POSTHOOK_STATE="${MONGO_BAZEL_WRAPPER_ARGS}.compiledb"
 
+# A fresh wrapper-hook environment invokes uv_sync.sh -f.  That script uses
+# PYTHON3 to create python3-venv, so keep it on the Bazel-managed Python
+# rather than falling back to a system interpreter that may lack ensurepip.
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
+PYTHON3="$python" \
 >&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
 exit_code=$?
 # Linter fails preempt bazel run.
@@ -318,7 +446,7 @@ fi
 
 if [[ $autocomplete_query == 1 ]]; then  
   plus_targets=$(</tmp/mongo_autocomplete_plus_targets)  
-  query_output=$("${new_args[@]@Q}")  
+  query_output=$(run_final_bazel "$bazel_real" "${new_args[@]}")
   if [[ "$wrapper_redirect_output" == "1" ]]; then
       echo $query_output $plus_targets | tr " " "\n" >&3
   else
@@ -332,10 +460,24 @@ else
   fi
 
   bazel_exit_code=0
+  hermetic_container_symlink_marker=""
+  if [[ -z "${MONGO_HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS:-}" ]]; then
+    hermetic_container_symlink_marker=$(mktemp)
+    export MONGO_HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS="$hermetic_container_symlink_marker"
+  fi
   if [[ ${#new_args[@]} -ne 0 ]]; then
     run_bazel_command "${new_args[@]}"
     bazel_exit_code=$?
   fi
-  ( >&2 $python $REPO_ROOT/bazel/wrapper_hook/post_bazel_hook.py $bazel_real )  
+  # The post-hook is best effort; its exit status must not replace Bazel's result.
+  # `clean --expunge` removes the Bazel-managed Python toolchain used to launch
+  # this wrapper. The post-hook has no useful work after a clean and would fail
+  # when invoked with that now-deleted interpreter.
+  if [[ "$current_bazel_command" != "clean" ]]; then
+    ( >&2 $python $REPO_ROOT/bazel/wrapper_hook/post_bazel_hook.py $bazel_real )
+  fi
+  if [[ -n "$hermetic_container_symlink_marker" ]]; then
+    rm -f "$hermetic_container_symlink_marker"
+  fi
   exit $bazel_exit_code  
 fi 

@@ -12,6 +12,7 @@ py_library(
         "engflow_check.py",
         "generate_common_bes_bazelrc.py",
         "git_age_check.py",
+        "hermetic_container_integration.py",
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
@@ -23,6 +24,7 @@ py_library(
     ],
     data = [
         "bazel_commands.commands",
+        "//bazel/toolchains/cc/mongo_linux:linux_container_action_wrapper.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -39,6 +41,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":flag_sync",
+        ":wrapper_hook",
     ],
 )
 
@@ -62,6 +65,23 @@ py_test(
 )
 
 py_test(
+    name = "hermetic_container_integration_test",
+    srcs = [
+        "hermetic_container_integration_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
     name = "install_modules_test",
     srcs = [
         "install_modules_test.py",
@@ -76,6 +96,17 @@ py_test(
     name = "query_failure_diagnostic_test",
     srcs = [
         "query_failure_diagnostic_test.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "compiledb_test",
+    srcs = [
+        "compiledb_test.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

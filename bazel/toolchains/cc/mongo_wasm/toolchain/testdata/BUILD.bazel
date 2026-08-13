@@ -1,0 +1,25 @@
+load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
+
+package(default_visibility = ["//visibility:private"])
+
+cc_library(
+    name = "wasi_compile_library",
+    srcs = ["wasi_compile_fixture.cpp"],
+)
+
+wasm_cc_binary(
+    name = "wasi_compile_binary",
+    out = "wasi_compile_fixture.wasm",
+    linkopts = [
+        "-mexec-model=reactor",
+        "-Wl,--no-entry",
+    ],
+    deps = [":wasi_compile_library"],
+)
+
+sh_test(
+    name = "wasi_compile_test",
+    srcs = ["wasi_compile_test.sh"],
+    args = ["$(rootpath :wasi_compile_binary)"],
+    data = [":wasi_compile_binary"],
+)

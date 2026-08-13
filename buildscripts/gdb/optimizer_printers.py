@@ -8,7 +8,7 @@ import gdb
 import gdb.printing
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-from buildscripts.gdb.mongo_utils import lookup_type
+from buildscripts.gdb.mongo_utils import lookup_symbol, lookup_type
 
 ABT_NS = "mongo::abt"
 CBR_NS = "mongo::cost_based_ranker"
@@ -19,6 +19,13 @@ operator_indent_level = 0
 
 def strip_namespace(value):
     return str(value).split("::")[-1]
+
+
+def _format_sbe_printed_value(printed_value):
+    """Extract the value from printTagAndVal while preserving GDB string quoting."""
+    if printed_value.startswith('"') and printed_value.endswith('"'):
+        printed_value = printed_value[1:-1]
+    return '"{}"'.format(printed_value.split(", val: ", 1)[1])
 
 
 class StrongStringAliasPrinter(object):
@@ -184,12 +191,18 @@ class ConstantPrinter(object):
 
     @staticmethod
     def print_sbe_value(tag, value):
-        value_print_fn = "mongo::sbe::value::print"
-        (print_fn_symbol, _) = gdb.lookup_symbol(value_print_fn)
-        if print_fn_symbol is None:
+        value_print_fn = "mongo::sbe::value::printTagAndVal"
+        print_fn = lookup_symbol(
+            value_print_fn,
+            "std::string (*)(unsigned char, unsigned long)",
+            function_signatures=(
+                f"{value_print_fn}(mongo::sbe::value::TypeTags, mongo::sbe::value::Value)",
+                f"{value_print_fn}(mongo::sbe::value::TypeTags, unsigned long)",
+            ),
+        )
+        if print_fn is None:
             raise gdb.GdbError("Could not find pretty print function: " + value_print_fn)
-        print_fn = print_fn_symbol.value()
-        return print_fn(tag, value)
+        return _format_sbe_printed_value(str(print_fn(tag, value)))
 
     def to_string(self):
         return "Constant[{}]".format(

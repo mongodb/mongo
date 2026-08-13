@@ -9,6 +9,7 @@ def mongo_pretty_printer_test_impl(ctx):
     short_name = split_name[-1]
 
     final_output_directory = "bazel-bin/install/bin/"
+    final_gdb_directory = "bazel-bin/install/lib/gdb-toolchain"
 
     runnable_binary = None
     for file in ctx.attr.test_binary.files.to_list():
@@ -24,6 +25,15 @@ def mongo_pretty_printer_test_impl(ctx):
     launcher_output = ctx.actions.declare_file(pretty_printer_directory + "pretty_printer_test_launcher_" + short_name + ".py")
 
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+    gdb = ctx.attr._gdb[DefaultInfo]
+    gdb_files = depset(
+        direct = [ctx.file._gdb],
+        transitive = [
+            gdb.default_runfiles.files,
+            ctx.attr._gdb_toolchain_files.files,
+            ctx.attr._mongo_toolchain_files.files,
+        ],
+    )
 
     inputs = depset(transitive = [
         ctx.attr._pretty_printer_creation_script.files,
@@ -31,6 +41,7 @@ def mongo_pretty_printer_test_impl(ctx):
         ctx.attr._pip_requirements_script.files,
         ctx.attr._pretty_printer_launcher_infile.files,
         python.files,
+        gdb_files,
     ])
     outputs = [launcher_output, script_output]
 
@@ -44,8 +55,11 @@ def mongo_pretty_printer_test_impl(ctx):
             "--pip-requirements-script=" + ctx.file._pip_requirements_script.path,
             "--pretty-printer-output=" + script_output.path,
             "--pretty-printer-launcher-infile=" + ctx.file._pretty_printer_launcher_infile.path,
-            # TODO have a way to get to gdb from inside bazel
-            "--gdb-path=" + "/opt/mongodbtoolchain/v4/bin/gdb",
+            # The pretty-printer launcher is installed outside Bazel's runfiles tree. Package
+            # the GDB runtime with the install and use paths relative to the final install tree.
+            "--gdb-path=" + final_gdb_directory + "/v5/bin/gdb",
+            "--mongo-toolchain-readelf=" + final_gdb_directory + "/v5/bin/llvm-readelf",
+            "--mongo-toolchain-objcopy=" + final_gdb_directory + "/v5/bin/llvm-objcopy",
             # This is due to us being dependent on the final location of installed binaries - ideally we don't do this and run the tests
             # in place and not from another directory
             "--final-binary-path=" + final_output_directory + runnable_binary.basename,
@@ -55,7 +69,12 @@ def mongo_pretty_printer_test_impl(ctx):
         mnemonic = "MongoPrettyPrinterTestCreation",
     )
 
-    default_provider = DefaultInfo(executable = launcher_output, files = depset(outputs))
+    runfiles = ctx.runfiles(files = outputs, transitive_files = gdb_files)
+    default_provider = DefaultInfo(
+        executable = launcher_output,
+        files = depset(outputs),
+        runfiles = runfiles,
+    )
     test_binary_provider = TestBinaryInfo(test_binaries = depset([launcher_output]))
     return [default_provider, test_binary_provider]
 
@@ -64,8 +83,31 @@ mongo_pretty_printer_test = rule(
     attrs = {
         "test_script": attr.label(allow_single_file = True),
         "test_binary": attr.label(),
-        # TODO have a way to get to gdb from inside bazel
-        #"_gdb": attr.label(allow_single_file = True, default = "//:gdb"),
+        "_gdb": attr.label(
+            allow_single_file = True,
+            default = "@gdb_v5//:gdb_binary",
+            cfg = "exec",
+        ),
+        "_gdb_toolchain_files": attr.label(
+            allow_files = True,
+            default = "//:gdb_toolchain_files",
+            cfg = "exec",
+        ),
+        "_mongo_toolchain_files": attr.label(
+            allow_files = True,
+            default = "//:toolchain_files",
+            cfg = "exec",
+        ),
+        "_mongo_toolchain_readelf": attr.label(
+            allow_single_file = True,
+            default = "@mongo_toolchain_v5//:llvm_readelf",
+            cfg = "exec",
+        ),
+        "_mongo_toolchain_objcopy": attr.label(
+            allow_single_file = True,
+            default = "@mongo_toolchain_v5//:llvm_objcopy",
+            cfg = "exec",
+        ),
         "_pretty_printer_creation_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:pretty_printer_test_creator.py"),
         "_pip_requirements_script": attr.label(allow_single_file = True, default = "//buildscripts:pip_requirements.py"),
         "_pretty_printer_launcher_infile": attr.label(allow_single_file = True, default = "//src/mongo/util:pretty_printer_test_launcher.py.in"),

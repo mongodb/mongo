@@ -880,6 +880,59 @@ selects.config_setting_group(
     ],
 )
 
+# IDL generation
+# ==========
+
+bool_flag(
+    name = "idl_use_linux_python",
+    build_setting_default = False,
+)
+
+string_flag(
+    name = "macos_cross_linux_python_arch",
+    build_setting_default = "aarch64",
+    values = [
+        "aarch64",
+        "x86_64",
+    ],
+)
+
+config_setting(
+    name = "macos_cross_linux_python_x86_64",
+    flag_values = {
+        ":macos_cross_linux_python_arch": "x86_64",
+    },
+)
+
+bool_flag(
+    name = "macos_cross_local_container_actions",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "macos_cross_local_container_actions_enabled",
+    flag_values = {
+        "//bazel/config:macos_cross_local_container_actions": "True",
+    },
+)
+
+bool_flag(
+    name = "windows_cross_local_container_actions",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "windows_cross_local_container_actions_enabled",
+    flag_values = {
+        "//bazel/config:windows_cross_local_container_actions": "True",
+    },
+)
+
+string_flag(
+    name = "windows_cross_host_path",
+    build_setting_default = "",
+)
+
 # --------------------------------------
 # linker options
 # --------------------------------------
@@ -3116,6 +3169,23 @@ config_setting(
     name = "use_sasl_client_enabled",
     flag_values = {
         "//bazel/config:use_sasl_client": "True",
+    },
+)
+
+# --------------------------------------
+# libvoidstar
+# --------------------------------------
+
+bool_flag(
+    name = "use_libvoidstar",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_libvoidstar_enabled",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {
+        "//bazel/config:use_libvoidstar": "True",
     },
 )
 

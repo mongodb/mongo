@@ -288,7 +288,7 @@ std::string print(const std::pair<TypeTags, Value>& value) {
     return stream;
 }
 
-std::string printTagAndVal(const TypeTags tag, const Value value) {
+MONGO_COMPILER_USED std::string printTagAndVal(const TypeTags tag, const Value value) {
     return printTagAndVal(std::pair<TypeTags, Value>{tag, value});
 }
 

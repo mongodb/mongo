@@ -32,6 +32,14 @@ set "VT_SCRIPT=%TEMP%\bazel_vt_%RANDOM%.ps1"
 del "%VT_SCRIPT%" >nul 2>&1
 
 set REPO_ROOT=%~dp0..
+if not defined USERPROFILE if defined HOMEDRIVE if defined HOMEPATH set "USERPROFILE=%HOMEDRIVE%%HOMEPATH%"
+if not defined USERPROFILE if defined USERNAME set "USERPROFILE=C:\Users\%USERNAME%"
+if not defined USERPROFILE set "USERPROFILE=C:\Users\Administrator"
+if not defined HOME set "HOME=%USERPROFILE%"
+if not defined APPDATA set "APPDATA=%USERPROFILE%\AppData\Roaming"
+if not defined LOCALAPPDATA set "LOCALAPPDATA=%USERPROFILE%\AppData\Local"
+if not exist "%APPDATA%" mkdir "%APPDATA%" >nul 2>&1
+if not exist "%LOCALAPPDATA%" mkdir "%LOCALAPPDATA%" >nul 2>&1
 
 echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
@@ -76,7 +84,7 @@ if !skip_python!=="0" if !current_bazel_command!=="info" set skip_python="1"
 
 if !skip_python!=="1" (
     "%BAZEL_REAL%" %*
-    exit /b %ERRORLEVEL%
+    exit /b !ERRORLEVEL!
 )
 
 rem === Set up logging for SLOW_PATH (equivalent to bash SLOW_PATH=1) ===
@@ -111,6 +119,7 @@ set "python="
 if exist "%REPO_ROOT%\bazel-%cur_dir%" (
     call :find_pyhon
 )
+if defined python if not exist "!python!" set "python="
 
 if not defined python (
     (
@@ -123,7 +132,7 @@ if not defined python (
                     call :cleanup_logfile
                     exit /b !ERRORLEVEL!
                 )
-                echo wrapper script failed to install python! falling back to normal bazel call...
+                echo wrapper script failed to install python; retrying the final native Bazel invocation...
                 "%BAZEL_REAL%" %*
                 set "fallback_exit=!ERRORLEVEL!"
                 call :cleanup_logfile
@@ -143,9 +152,10 @@ rem After install, locate python again
 if not defined python (
     call :find_pyhon
 )
+if defined python if not exist "!python!" set "python="
 
 rem extra safety: bail if still not found
-if not defined python if not exist "!python!" (
+if not defined python (
     echo %ESC%[1;31mERROR:%ESC%[0m Could not locate wrapper Python interpreter. 1>&2
     call :cleanup_logfile
     exit /b 1
@@ -153,13 +163,48 @@ if not defined python if not exist "!python!" (
 
 rem === Call Python wrapper, log to file ===
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
+set "MONGO_COMPILEDB_POSTHOOK_STATE=%MONGO_BAZEL_WRAPPER_ARGS%.compiledb"
 echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
 
 rem Print info message to terminal (equivalent to bash echo to FD 4)
 echo %ESC%[0;32mINFO:%ESC%[0m running wrapper hook... 1>&2
 
+set "hook_python="
+if exist "%REPO_ROOT%\python3-venv\Scripts\python.exe" set "hook_python=%REPO_ROOT%\python3-venv\Scripts\python.exe"
+if not defined hook_python if exist "%REPO_ROOT%\python3-venv\bin\python" set "hook_python=%REPO_ROOT%\python3-venv\bin\python"
+if defined hook_python (
+    "!hook_python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 set "hook_python="
+)
+if not defined hook_python if defined python (
+    "!python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+    if !ERRORLEVEL! EQU 0 set "hook_python=!python!"
+)
+if not defined hook_python (
+    for %%P in (python3.exe python3 python.exe python py.exe) do (
+        where %%P >nul 2>&1
+        if !ERRORLEVEL! EQU 0 if not defined hook_python (
+            %%P -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+            if !ERRORLEVEL! EQU 0 set "hook_python=%%P"
+        )
+    )
+)
+if not defined hook_python (
+    call :copy_pyhost_python
+    if defined copied_python set "hook_python=!copied_python!"
+)
+if defined hook_python (
+    "!hook_python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 set "hook_python="
+)
+if not defined hook_python (
+    echo %ESC%[1;31mERROR:%ESC%[0m Python 3.13 or newer is required to run the Bazel wrapper. 1>&2
+    call :cleanup_logfile
+    exit /b 1
+)
+
 (
-    "%python%" %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
+    "!hook_python!" %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
 ) >> "%LOGFILE%" 2>&1
 if !ERRORLEVEL! NEQ 0 (
     echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
@@ -203,13 +248,13 @@ if %exit_code% NEQ 0 (
         call :cleanup_logfile
         exit /b %exit_code%
     )
-    echo wrapper script failed! falling back to normal bazel call... 1>&2  
+    echo wrapper script failed; retrying the final native Bazel invocation... 1>&2
     if "!is_query_command!"=="1" (
         "%python%" "%REPO_ROOT%\bazel\wrapper_hook\query_failure_diagnostic.py" "%BAZEL_REAL%" %*
     ) else (
         "%BAZEL_REAL%" %*
     )
-    set "fallback_exit=%ERRORLEVEL%"
+    set "fallback_exit=!ERRORLEVEL!"
     call :cleanup_logfile
     exit /b %fallback_exit%
 )
@@ -233,9 +278,17 @@ rem Add the same targeted cquery hint as the Unix wrapper for legacy query failu
 if "!is_query_command!"=="1" (
     "%python%" "%REPO_ROOT%\bazel\wrapper_hook\query_failure_diagnostic.py" "%BAZEL_REAL%" !new_args!
 ) else (
+    rem Windows builds are native-only. Container integration is intentionally not
+    rem invoked from this wrapper.
     "%BAZEL_REAL%" !new_args!
 )
-set "bazel_exit=%ERRORLEVEL%"
+set "bazel_exit=!ERRORLEVEL!"
+rem Windows did not run the post-hook before compiledb support was added. Keep
+rem its flag-sync behavior unchanged while still running the local post-hook.
+set "NO_FLAG_SYNC=1"
+"!hook_python!" "%REPO_ROOT%\bazel\wrapper_hook\post_bazel_hook.py" "%BAZEL_REAL%" 1>&2
+set "posthook_exit=%ERRORLEVEL%"
+if "!bazel_exit!"=="0" set "bazel_exit=!posthook_exit!"
 call :cleanup_logfile
 exit /b %bazel_exit%
 
@@ -252,3 +305,18 @@ exit /b 0
 :cleanup_logfile
 if defined LOGFILE if exist "!LOGFILE!" del "!LOGFILE!" >nul 2>&1
 goto :eof
+
+:copy_pyhost_python
+set "copied_python="
+if not defined python exit /b 1
+if not exist "!python!" exit /b 1
+for %%I in ("!python!") do set "pyhost_dist=%%~dpI."
+set "wrapper_python_dir=%REPO_ROOT%\.tmp\bazel\wrapper-python"
+if not exist "!wrapper_python_dir!\python.exe" (
+    mkdir "!wrapper_python_dir!" >nul 2>&1
+    robocopy "!pyhost_dist!" "!wrapper_python_dir!" /MIR >nul
+    if !ERRORLEVEL! GEQ 8 exit /b !ERRORLEVEL!
+)
+if exist "!wrapper_python_dir!\python.exe" set "copied_python=!wrapper_python_dir!\python.exe"
+if not defined copied_python exit /b 1
+exit /b 0

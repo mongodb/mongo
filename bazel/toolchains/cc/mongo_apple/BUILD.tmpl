@@ -97,6 +97,7 @@ feature_attrs = get_common_features_attrs()
         target_compatible_with = [
             "@platforms//os:macos",
             "@platforms//cpu:" + cpu,
+            "@//bazel/platforms:use_mongo_native_apple_toolchain",
         ],
         toolchain = "@mongo_apple_toolchain//:cc-compiler-" + arch,
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",

@@ -7,6 +7,7 @@ module while those scripts are sourced by .gdbinit.
 
 import re
 import sys
+from collections.abc import Sequence
 
 import gdb
 
@@ -38,6 +39,158 @@ def lookup_type(gdb_type_str: str) -> gdb.Type:
         exceptions.append(exc)
 
     raise gdb.error("Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions]))
+
+
+def lookup_symbol(
+    gdb_symbol_str: str,
+    function_pointer_type: str | None = None,
+    *,
+    function_signatures: Sequence[str] = (),
+) -> gdb.Symbol | gdb.Value | None:
+    """Look up a symbol in the current context and then in each loaded objfile.
+
+    ``gdb.lookup_symbol`` does not always search symbols from dynamically loaded
+    shared libraries.  Looking up the symbol on each objfile provides a fallback
+    for symbols which are visible to GDB's CLI but not to the global Python API.
+    The CLI fallback also handles non-debugging symbols, including C++ symbols
+    whose demangled name contains an ABI tag such as ``[abi:cxx11]``.
+
+    If ``function_pointer_type`` is provided, the result is cast to that function
+    pointer type and dereferenced. This makes stripped function symbols callable
+    when GDB has no debug information from which to infer their return type.
+
+    ``function_signatures`` can be provided for a function which is present only
+    in the binary's minimal symbol table. In that case, ``info address`` can
+    locate the symbol even when ``info functions`` cannot. Each signature should
+    be specific enough to select the desired overload. Multiple spellings allow
+    for GDB output that either preserves or resolves C++ typedefs.
+    """
+
+    def cast_function_symbol(symbol):
+        if function_pointer_type is None:
+            return symbol
+
+        symbol_value = getattr(symbol, "value", None)
+        if callable(symbol_value):
+            symbol_value = symbol_value()
+        else:
+            symbol_value = symbol
+
+        # A value resolved from an exact C++ expression already has the
+        # function's ABI-correct type, including its return type. In
+        # particular, do not force GDB to resolve ``std::string`` again: that
+        # can fail when split DWARF contains skeleton units that this GDB
+        # version cannot process.
+        symbol_type = getattr(symbol_value, "type", None)
+        if getattr(symbol_type, "code", None) == getattr(gdb, "TYPE_CODE_FUNC", None):
+            return symbol_value
+
+        pointer_type = gdb.parse_and_eval(f"({function_pointer_type})0").type
+        return symbol_value.cast(pointer_type).dereference()
+
+    def cast_function_address(address: int):
+        if function_pointer_type is None:
+            return gdb.Value(address)
+
+        pointer_type = gdb.parse_and_eval(f"({function_pointer_type})0").type
+        return gdb.Value(address).cast(pointer_type).dereference()
+
+    try:
+        symbol, _ = gdb.lookup_symbol(gdb_symbol_str)
+    except gdb.error:
+        symbol = None
+    if symbol is not None:
+        try:
+            return cast_function_symbol(symbol)
+        except gdb.error:
+            # Looking up a symbol and evaluating its value exercise different
+            # DWARF paths. A split-DWARF error while evaluating the symbol must
+            # not prevent the address-based fallbacks below.
+            pass
+
+    for objfile in gdb.objfiles():
+        try:
+            symbol = objfile.lookup_global_symbol(gdb_symbol_str)
+        except gdb.error:
+            # Some GDB versions reject split-DWARF skeleton units while using
+            # the Python symbol APIs. Keep going because the CLI symbol table
+            # queries below can still resolve the function's address.
+            continue
+        if symbol is not None:
+            try:
+                return cast_function_symbol(symbol)
+            except gdb.error:
+                continue
+
+    for function_signature in function_signatures:
+        try:
+            address_info = gdb.execute(
+                "info address " + function_signature,
+                to_string=True,
+            )
+        except gdb.error:
+            continue
+
+        # GDB uses "is at 0x..." for minimal symbols and "is a function at
+        # address 0x..." when debug information describes the function.
+        match = re.search(r"\bat(?: address)?\s+(0x[0-9a-fA-F]+)\b", address_info)
+        if match is not None:
+            try:
+                return cast_function_address(int(match.group(1), 16))
+            except gdb.error:
+                if function_pointer_type is not None:
+                    # The address identifies the overload, but constructing a
+                    # synthetic pointer type may fail when GDB cannot resolve
+                    # split-DWARF type information. Ask GDB to evaluate the
+                    # exact signature instead; this gives us the function's
+                    # native, ABI-correct type.
+                    try:
+                        function = gdb.parse_and_eval("'" + function_signature + "'")
+                        return cast_function_symbol(function)
+                    except gdb.error:
+                        pass
+
+    try:
+        functions = gdb.execute(
+            "info functions -q " + gdb_symbol_str,
+            to_string=True,
+        )
+    except gdb.error:
+        return None
+
+    for line in functions.splitlines():
+        match = re.match(r"\s*(0x[0-9a-fA-F]+)\s+(.+?)\s*$", line)
+        if match is None:
+            continue
+
+        address = int(match.group(1), 16)
+        candidate = match.group(2).removesuffix("@plt").removesuffix(";")
+        normalized_candidate = re.sub(r"\[abi:[^\]]+\]", "", candidate)
+        if not normalized_candidate.startswith(gdb_symbol_str + "("):
+            continue
+
+        if function_pointer_type is not None:
+            # Prefer the exact spelling from GDB. This preserves ABI tags such
+            # as ``[abi:cxx11]`` and lets GDB return a typed function value
+            # without requiring a second lookup of its return type. Keep the
+            # normalized spelling for GDB versions that do not accept ABI tags
+            # in expressions.
+            for expression in (candidate, normalized_candidate):
+                try:
+                    function = gdb.parse_and_eval("'" + expression + "'")
+                    return cast_function_symbol(function)
+                except gdb.error:
+                    continue
+
+        try:
+            # Use the address printed by GDB rather than asking it to resolve the
+            # demangled overload again. The latter can fail for ABI-tagged C++
+            # names even though ``info functions`` found the symbol.
+            return cast_function_address(address)
+        except gdb.error:
+            continue
+
+    return None
 
 
 def get_thread_id():

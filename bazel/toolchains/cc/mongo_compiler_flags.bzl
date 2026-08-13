@@ -46,5 +46,10 @@ def get_copts(name, package_name, copts = []):
 
 MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS
 
+LIBVOIDSTAR_INPUTS = select({
+    "//bazel/config:use_libvoidstar_enabled": ["@libvoidstar//:libvoidstar"],
+    "//conditions:default": [],
+})
+
 def get_linkopts(package_name, linkopts = []):
     return MONGO_GLOBAL_LINKFLAGS + linkopts

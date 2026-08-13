@@ -1,7 +1,12 @@
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchains")
+load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_mongo_linux_cross_toolchains_legacy")
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchains")
 
 setup_mongo_toolchains()
+
+# WORKSPACE is still needed by explicitly legacy, non-Bzlmod builds. The
+# loaded macro skips this setup when the Bzlmod extension owns the repositories.
+setup_mongo_linux_cross_toolchains_legacy()
 
 setup_gdb_toolchains()
 

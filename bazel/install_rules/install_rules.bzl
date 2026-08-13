@@ -47,6 +47,7 @@ MongoInstallInfo = provider(
         "deps_files": "Install rule file describing the files installed for passing to script",
         "test_file": "File containing list of installed tests",
         "src_map": "contents of the dep file for use in rules",
+        "source_files": "Original source files referenced by transitive install depfiles",
     },
 )
 
@@ -418,10 +419,25 @@ def mongo_install_rule_impl(ctx):
 
     input_deps.append(deps_file)
 
+    source_files = depset(direct = test_files + dwps, transitive = [
+        f.files
+        for f in ctx.attr.srcs
+    ] + [
+        r.files
+        for r in ctx.attr.root_files.keys()
+    ] + [
+        i.files
+        for i in ctx.attr.include_files.keys()
+    ] + [
+        dep[MongoInstallInfo].source_files
+        for dep in ctx.attr.deps
+    ])
+
     inputs = depset(direct = input_deps, transitive = [
         ctx.attr._install_script.files,
         python.files,
-    ] + [f.files for f in ctx.attr.srcs] + [r.files for r in ctx.attr.root_files.keys()] + [i.files for i in ctx.attr.include_files.keys()] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps] + [depset(dwps)])
+        source_files,
+    ] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps])
 
     if outputs:
         ctx.actions.run(
@@ -436,9 +452,7 @@ def mongo_install_rule_impl(ctx):
             mnemonic = "MongoInstallRule",
             execution_requirements = {
                 "no-cache": "1",
-                "no-sandbox": "1",
                 "no-remote": "1",
-                "local": "1",
             },
         )
 
@@ -464,6 +478,7 @@ def mongo_install_rule_impl(ctx):
             deps_files = depset([deps_file], transitive = [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps]),
             test_file = installed_test_list_file,
             src_map = depset([json_out.to_json()]),
+            source_files = source_files,
         ),
     ]
 

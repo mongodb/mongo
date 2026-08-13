@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import random
@@ -163,6 +164,32 @@ def setup_pythonpath():
     os.environ["PYTHONPATH"] = new_pythonpath
 
 
+def resolve_deps_path() -> str | None:
+    """Return the binary dependency path list for this resmoke test."""
+
+    deps_path_map_file = os.environ.get("DEPS_PATH_MAP_FILE")
+    test_target = os.environ.get("TEST_TARGET")
+    if deps_path_map_file and test_target:
+        with open(deps_path_map_file, "r", encoding="utf-8") as file:
+            deps_path_map = json.load(file)
+        deps_path = deps_path_map.get(test_target)
+        if deps_path:
+            return deps_path
+
+    return os.environ.get("DEPS_PATH")
+
+
+def add_deps_path_to_path():
+    deps_path = resolve_deps_path()
+    if not deps_path:
+        return
+
+    os.environ["DEPS_PATH"] = deps_path
+    os.environ["PATH"] += os.pathsep + os.pathsep.join(
+        [os.path.dirname(os.path.abspath(path)) for path in deps_path.split(":")]
+    )
+
+
 class ResmokeShimContext:
     def __init__(self):
         self.links = []
@@ -312,13 +339,7 @@ if __name__ == "__main__":
     add_multiversion_exclude_tags(resmoke_args)
     inject_config_fuzz_seed(resmoke_args)
 
-    # Add each dep binary's directory to PATH. DEPS_PATH is set when running via Bazel
-    # without a pre-installed dist-test tree (i.e. not installed_dist_test_enabled).
-    deps_paths = [p for p in (os.environ.get("DEPS_PATH") or "").split(":") if p]
-    if deps_paths:
-        os.environ["PATH"] += os.pathsep + os.pathsep.join(
-            os.path.dirname(os.path.abspath(p)) for p in deps_paths
-        )
+    add_deps_path_to_path()
 
     ctx = ResmokeShimContext()
     ctx.create_short_symlinks()

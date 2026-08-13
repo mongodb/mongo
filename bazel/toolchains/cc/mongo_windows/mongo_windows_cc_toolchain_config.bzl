@@ -848,7 +848,7 @@ def _impl(ctx):
                                 # called lock that takes a mutex when one meant to create a guard object
                                 # called lock on the stack.
                                 "/we4930",
-                            ],
+                            ] + ctx.attr.default_compile_flags,
                         ),
                     ],
                 ),

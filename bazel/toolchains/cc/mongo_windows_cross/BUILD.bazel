@@ -1,0 +1,30 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "BUILD.tmpl",
+    "mongo_windows_cross_toolchain.bzl",
+    "write_case_insensitive_vfs.py",
+    "windows_cross_action_wrapper.py",
+])
+
+sh_binary(
+    name = "windows_cross_action_wrapper_sh",
+    srcs = ["windows_cross_action_wrapper.py"],
+)
+
+py_binary(
+    name = "windows_cross_action_wrapper",
+    srcs = ["windows_cross_action_wrapper.py"],
+    main = "windows_cross_action_wrapper.py",
+)
+
+py_test(
+    name = "write_case_insensitive_vfs_test",
+    srcs = [
+        "write_case_insensitive_vfs.py",
+        "write_case_insensitive_vfs_test.py",
+    ],
+    main = "write_case_insensitive_vfs_test.py",
+)

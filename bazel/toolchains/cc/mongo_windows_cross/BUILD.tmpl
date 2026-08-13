@@ -1,0 +1,284 @@
+"""Build file for Windows cross-compilation from Linux."""
+
+package(default_visibility = ["//visibility:public"])
+
+load(
+    "@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl",
+    "mongo_windows_cc_toolchain_config",
+)
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load(
+    "@//bazel/toolchains/cc:mongo_toolchain_selects.bzl",
+    "WARNINGS_AS_ERRORS_ENABLED",
+)
+
+SMALLER_BINARY = select({
+    "@//bazel/config:msvc_opt": True,
+    "//conditions:default": False,
+})
+
+OPT_DEBUG = select({
+    "@//bazel/config:windows_opt_debug": True,
+    "//conditions:default": False,
+})
+
+OPT_OFF = select({
+    "@//bazel/config:windows_opt_off": True,
+    "//conditions:default": False,
+})
+
+OPT_ON = select({
+    "@//bazel/config:windows_opt_on": True,
+    "//conditions:default": False,
+})
+
+OPT_SIZE = select({
+    "@//bazel/config:windows_opt_size": True,
+    "//conditions:default": False,
+})
+
+DBG = select({
+    "@//bazel/config:windows_dbg_enabled": True,
+    "//conditions:default": False,
+})
+
+DEBUG_SYMBOLS = select({
+    "@//bazel/config:windows_debug_symbols_enabled": True,
+    "//conditions:default": False,
+})
+
+DEFAULT_LINK_FLAGS = [
+    "/MACHINE:X64",
+    "/NODEFAULTLIB:library",
+    "/LIBPATH:external/windows_sasl/lib",
+    "/LARGEADDRESSAWARE",
+] + %{lib_path_flags} + [
+    "bcrypt.lib",
+    "Dnsapi.lib",
+    "Crypt32.lib",
+    "Version.lib",
+    "Winmm.lib",
+    "Iphlpapi.lib",
+    "Pdh.lib",
+    "kernel32.lib",
+    "shell32.lib",
+    "ws2_32.lib",
+    "DbgHelp.lib",
+    "Psapi.lib",
+    "Secur32.lib",
+]
+
+filegroup(
+    name = "compiler_files",
+    srcs = glob([
+        "include/**",
+        "case_insensitive_vfs.yaml",
+        "runtime_libs/**",
+        "sysroot/msvc/include/**",
+        "sysroot/msvc/atlmfc/include/**",
+        "sysroot/winsdk/include/**",
+        "tools/clang",
+        "tools/clang++",
+        "tools/clang-cl",
+    ]),
+)
+
+filegroup(
+    name = "linker_files",
+    srcs = glob([
+        "lib/**",
+        "lib_aliases/**",
+        "sysroot/msvc/lib/**",
+        "sysroot/msvc/atlmfc/lib/**",
+        "sysroot/winsdk/lib/**",
+        "tools/lld-link",
+    ]),
+)
+
+filegroup(
+    name = "ar_files",
+    srcs = ["tools/llvm-lib"],
+)
+
+filegroup(
+    name = "rc_files",
+    srcs = ["tools/llvm-rc"],
+)
+
+filegroup(
+    name = "all_files",
+    srcs = [
+        ":ar_files",
+        ":compiler_files",
+        ":linker_files",
+        ":rc_files",
+    ],
+)
+
+filegroup(
+    name = "wrapper_files",
+    srcs = glob(["wrappers/*"]),
+)
+
+filegroup(
+    name = "all_files_with_wrappers",
+    srcs = [
+        ":all_files",
+        ":wrapper_files",
+    ],
+)
+
+exports_files(["tools/llvm-rc"])
+
+alias(
+    name = "rc",
+    actual = "tools/llvm-rc",
+)
+
+mongo_windows_cc_toolchain_config(
+    name = "cc_windows_cross_toolchain_config",
+    abi_libc_version = "msvcrt",
+    abi_version = "windows_x86_64",
+    archiver_flags = ["/MACHINE:X64"],
+    compiler = "clang-cl",
+    cpu = "x64_windows",
+    cxx_builtin_include_directories = %{include_dirs},
+    dbg_mode_debug_flag = "/DEBUG",
+    default_compile_flags = [
+        "-Xclang",
+        "-ivfsoverlay",
+        "-Xclang",
+        "%{execroot_prefix}/case_insensitive_vfs.yaml",
+        "-Wno-unused-command-line-argument",
+        "-Wno-unused-local-typedef",
+        "-Wno-unused-function",
+        "/clang:-Wno-unused-local-typedef",
+        "/clang:-Wno-unused-function",
+    ],
+    default_link_flags = DEFAULT_LINK_FLAGS,
+    fastbuild_mode_debug_flag = "/DEBUG",
+    host_system_name = "linux",
+    msvc_cl_path = "tools/clang-cl",
+    msvc_env_include = ";".join(%{include_dirs}),
+    msvc_env_lib = "%{lib_env}",
+    msvc_env_path = "%{execroot_prefix}/tools",
+    msvc_env_tmp = "/tmp",
+    msvc_lib_path = "tools/llvm-lib",
+    msvc_link_path = "tools/lld-link",
+    msvc_ml_path = "tools/clang-cl",
+    opt_debug = OPT_DEBUG,
+    opt_off = OPT_OFF,
+    opt_on = OPT_ON,
+    opt_size = OPT_SIZE,
+    dbg = DBG,
+    debug_symbols = DEBUG_SYMBOLS,
+    global_defines = MONGO_GLOBAL_DEFINES,
+    smaller_binary = SMALLER_BINARY,
+    supports_parse_showincludes = True,
+    target_libc = "msvcrt",
+    target_system_name = "windows",
+    tool_paths = {
+        "ar": "tools/llvm-lib",
+        "cpp": "tools/clang-cl",
+        "gcc": "tools/clang-cl",
+        "gcov": "tools/clang-cl",
+        "ld": "tools/lld-link",
+        "ml": "tools/clang-cl",
+        "nm": "tools/clang-cl",
+        "objcopy": "tools/clang-cl",
+        "objdump": "tools/clang-cl",
+        "strip": "tools/clang-cl",
+    },
+    toolchain_identifier = "windows_cross_clang_x86_64",
+    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+)
+
+mongo_windows_cc_toolchain_config(
+    name = "cc_windows_cross_host_wrapper_toolchain_config",
+    abi_libc_version = "msvcrt",
+    abi_version = "windows_x86_64",
+    archiver_flags = ["/MACHINE:X64"],
+    compiler = "clang-cl",
+    cpu = "x64_windows",
+    cxx_builtin_include_directories = %{include_dirs},
+    dbg_mode_debug_flag = "/DEBUG",
+    default_compile_flags = [
+        "-Xclang",
+        "-ivfsoverlay",
+        "-Xclang",
+        "%{execroot_prefix}/case_insensitive_vfs.yaml",
+        "-Wno-unused-command-line-argument",
+        "-Wno-unused-local-typedef",
+        "-Wno-unused-function",
+        "/clang:-Wno-unused-local-typedef",
+        "/clang:-Wno-unused-function",
+    ],
+    default_link_flags = DEFAULT_LINK_FLAGS,
+    fastbuild_mode_debug_flag = "/DEBUG",
+    host_system_name = "windows",
+    msvc_cl_path = "wrappers/clang-cl",
+    msvc_env_include = ";".join(%{include_dirs}),
+    msvc_env_lib = "%{lib_env}",
+    msvc_env_path = "%{execroot_prefix}/wrappers;%{execroot_prefix}/tools",
+    msvc_env_tmp = "/tmp",
+    msvc_lib_path = "wrappers/llvm-lib",
+    msvc_link_path = "wrappers/lld-link",
+    msvc_ml_path = "wrappers/clang-cl",
+    opt_debug = OPT_DEBUG,
+    opt_off = OPT_OFF,
+    opt_on = OPT_ON,
+    opt_size = OPT_SIZE,
+    dbg = DBG,
+    debug_symbols = DEBUG_SYMBOLS,
+    global_defines = MONGO_GLOBAL_DEFINES,
+    smaller_binary = SMALLER_BINARY,
+    supports_parse_showincludes = True,
+    target_libc = "msvcrt",
+    target_system_name = "windows",
+    tool_paths = {
+        "ar": "wrappers/llvm-lib",
+        "cpp": "wrappers/clang-cl",
+        "gcc": "wrappers/clang-cl",
+        "gcov": "wrappers/clang-cl",
+        "ld": "wrappers/lld-link",
+        "ml": "wrappers/clang-cl",
+        "nm": "wrappers/clang-cl",
+        "objcopy": "wrappers/clang-cl",
+        "objdump": "wrappers/clang-cl",
+        "strip": "wrappers/clang-cl",
+    },
+    toolchain_identifier = "windows_cross_clang_host_wrapper_x86_64",
+    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+)
+
+cc_toolchain(
+    name = "cc-compiler-windows_x86_64",
+    all_files = ":all_files",
+    ar_files = ":ar_files",
+    as_files = ":compiler_files",
+    compiler_files = ":compiler_files",
+    dwp_files = ":all_files",
+    linker_files = ":linker_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    supports_header_parsing = 1,
+    supports_param_files = 1,
+    toolchain_config = ":cc_windows_cross_toolchain_config",
+    toolchain_identifier = "windows_cross_clang_x86_64",
+)
+
+cc_toolchain(
+    name = "cc-compiler-windows_x86_64-host-wrapper",
+    all_files = ":all_files_with_wrappers",
+    ar_files = ":all_files_with_wrappers",
+    as_files = ":all_files_with_wrappers",
+    compiler_files = ":all_files_with_wrappers",
+    dwp_files = ":all_files_with_wrappers",
+    linker_files = ":all_files_with_wrappers",
+    objcopy_files = ":all_files_with_wrappers",
+    strip_files = ":all_files_with_wrappers",
+    supports_header_parsing = 1,
+    supports_param_files = 1,
+    toolchain_config = ":cc_windows_cross_host_wrapper_toolchain_config",
+    toolchain_identifier = "windows_cross_clang_host_wrapper_x86_64",
+)

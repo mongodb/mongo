@@ -1,6 +1,15 @@
 load("//bazel:utils.bzl", "write_target")
 load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_python//python:defs.bzl", "py_binary")
+
+def _python_action_env(ctx, python_path):
+    env = {"PYTHONPATH": python_path}
+    env.update(py_action_env_windows_dll_path(ctx))
+    windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
+    if windows_cross_host_path:
+        env["PATH"] = windows_cross_host_path
+    return env
 
 def render_template_impl(ctx):
     expanded_args = [
@@ -10,8 +19,7 @@ def render_template_impl(ctx):
 
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = {"PYTHONPATH": runfiles_package_dir}
-    env.update(py_action_env_windows_dll_path(ctx))
+    env = _python_action_env(ctx, runfiles_package_dir)
 
     ctx.actions.run(
         executable = ctx.executable.python_binary,
@@ -20,6 +28,7 @@ def render_template_impl(ctx):
         arguments = expanded_args,
         env = env,
         mnemonic = "TemplateRenderer",
+        use_default_shell_env = True,
     )
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]
@@ -41,6 +50,9 @@ render_template_rule = rule(
         "python_binary": attr.label(
             executable = True,
             cfg = "exec",
+        ),
+        "_windows_cross_host_path": attr.label(
+            default = "//bazel/config:windows_cross_host_path",
         ),
     },
     toolchains = ["@rules_python//python:toolchain_type"],
@@ -73,8 +85,7 @@ def render_templates_impl(ctx):
 
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = {"PYTHONPATH": runfiles_package_dir}
-    env.update(py_action_env_windows_dll_path(ctx))
+    env = _python_action_env(ctx, runfiles_package_dir)
 
     ctx.actions.run(
         executable = ctx.executable.python_binary,
@@ -83,6 +94,7 @@ def render_templates_impl(ctx):
         arguments = expanded_args,
         env = env,
         mnemonic = "TemplateRenderer",
+        use_default_shell_env = True,
     )
 
     return [DefaultInfo(files = depset(ctx.outputs.outputs))]
@@ -104,6 +116,9 @@ render_templates_rule = rule(
         "python_binary": attr.label(
             executable = True,
             cfg = "exec",
+        ),
+        "_windows_cross_host_path": attr.label(
+            default = "//bazel/config:windows_cross_host_path",
         ),
     },
     toolchains = ["@rules_python//python:toolchain_type"],

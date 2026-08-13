@@ -79,6 +79,43 @@ _config_fuzz_seed_file = rule(
     doc = "Generates a seed file for config fuzzer suites. When --//bazel/resmoke:config_fuzz_seed is empty (default), derives the seed from BUILD_TIMESTAMP and the suite name in volatile-status so all shards share the same seed. When set, writes that value verbatim.",
 )
 
+def _historic_runtime_impl(ctx):
+    output = ctx.outputs.out
+    args = ctx.actions.args()
+    args.add("--suite", ctx.attr.suite)
+    args.add("--volatile-status", ctx.version_file.path)
+    args.add("--output", output.path)
+
+    ctx.actions.run(
+        executable = ctx.executable._downloader,
+        arguments = [args],
+        inputs = [ctx.version_file],
+        tools = [ctx.attr._downloader[DefaultInfo].files_to_run],
+        outputs = [output],
+        mnemonic = "HistoricRuntime",
+        execution_requirements = {
+            "no-cache": "1",
+            "no-remote": "1",
+            "requires-network": "1",
+        },
+        use_default_shell_env = True,
+    )
+
+    return [DefaultInfo(files = depset([output]))]
+
+_historic_runtime = rule(
+    implementation = _historic_runtime_impl,
+    attrs = {
+        "out": attr.output(mandatory = True),
+        "suite": attr.string(mandatory = True),
+        "_downloader": attr.label(
+            default = Label("//bazel/resmoke:download_historic_runtimes"),
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
+
 def _collect_python_imports_impl(ctx):
     """Collects Python imports from data dependencies to build PYTHONPATH."""
     python_imports = []
@@ -108,6 +145,40 @@ _collect_python_imports = rule(
         ),
     },
     doc = "Helper rule to collect Python imports from data dependencies",
+)
+
+def _resmoke_deps_path_impl(ctx):
+    paths = []
+    for dep in ctx.attr.deps:
+        files_to_run = dep[DefaultInfo].files_to_run
+        if files_to_run.executable:
+            paths.append(files_to_run.executable.path)
+            continue
+
+        files = dep[DefaultInfo].files.to_list()
+        if len(files) != 1:
+            fail(
+                "%s must produce exactly one file for resmoke DEPS_PATH, got %d" %
+                (dep.label, len(files)),
+            )
+        paths.append(files[0].path)
+
+    output = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(
+        output = output,
+        content = "\n".join(paths) + "\n" if paths else "",
+    )
+    return [DefaultInfo(files = depset([output]))]
+
+_resmoke_deps_path = rule(
+    implementation = _resmoke_deps_path_impl,
+    attrs = {
+        "deps": attr.label_list(
+            allow_files = True,
+            doc = "Binary dependencies whose configured executable paths should be passed to resmoke.",
+        ),
+    },
+    doc = "Writes configured resmoke binary dependency paths for host-side cross-hermetic_container execution.",
 )
 
 def _resmoke_config_impl(ctx):
@@ -356,14 +427,14 @@ def resmoke_suite_test(
     )
 
     historic_runtimes = name + "_historic_runtimes"
-    native.genrule(
+
+    # Runtime data comes from S3, so it cannot run on RBE. It is still build
+    # work rather than test execution: route this distinct mnemonic to the
+    # local pinned container through Bazel's persistent-container strategy.
+    _historic_runtime(
         name = historic_runtimes,
-        srcs = [],
-        outs = [historic_runtimes + ".json"],
-        cmd = "$(location //bazel/resmoke:download_historic_runtimes) --suite=//{pkg}:{name} --volatile-status=bazel-out/volatile-status.txt --output=$@".format(pkg = native.package_name(), name = name),
-        tools = ["//bazel/resmoke:download_historic_runtimes"],
-        stamp = True,
-        tags = ["no-remote", "external", "no-cache"],
+        out = historic_runtimes + ".json",
+        suite = "//{pkg}:{name}".format(pkg = native.package_name(), name = name),
     )
 
     # Collect Python imports from data dependencies
@@ -415,6 +486,17 @@ def resmoke_suite_test(
         ],
         "//conditions:default": [],
     })
+
+    deps_path = ":".join(["$(location %s)" % dep for dep in deps])
+    deps_path_file = name + "_resmoke_deps_path"
+    _resmoke_deps_path(
+        name = deps_path_file,
+        deps = deps,
+        tags = [
+            "manual",
+            "resmoke_deps_path",
+        ],
+    )
 
     default_data = _DEFAULT_PYTHON_DATA + [
         generated_config,
@@ -603,7 +685,11 @@ def resmoke_suite_test(
     py_binary(
         name = name + "_bin",
         srcs = [resmoke_shim],
-        data = data_attr,
+        data = data_attr + select({
+            "//bazel/resmoke:installed_dist_test_enabled": [],
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
+            "//conditions:default": [":%s" % deps_path_file],
+        }),
         deps = [
             resmoke,
             "//buildscripts:bazel_local_resources",

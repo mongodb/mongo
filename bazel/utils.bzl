@@ -158,57 +158,36 @@ def get_toolchain_subs(ctx):
 
     distro = get_host_distro_major_version(ctx)
 
-    if os != "linux":
-        substitutions = {
-            "{platforms_arch}": "arm64",
-            "{bazel_toolchain_cpu}": arch,
+    def _toolchain_substitutions(platforms_arch, bazel_toolchain_cpu, arch, distro):
+        return {
+            "{platforms_arch}": platforms_arch,
+            "{bazel_toolchain_cpu}": bazel_toolchain_cpu,
+            "{exec_bazel_toolchain_cpu}": bazel_toolchain_cpu,
+            "{target_bazel_toolchain_cpu}": bazel_toolchain_cpu,
+            "{mongo_toolchain_constraint}": "@//bazel/platforms:use_mongo_toolchain",
+            "{exec_distro_constraint}": "",
+            "{target_distro_constraint}": "",
+            "{toolchain_repo_name}": "mongo_toolchain_{version}".format(version = version),
             "{arch}": arch,
             "{version}": version,
             "{distro}": distro,
         }
+
+    if os != "linux":
+        substitutions = _toolchain_substitutions("arm64", arch, arch, distro)
         generate_noop_toolchain(ctx, substitutions)
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
 
     if arch == "aarch64":
-        substitutions = {
-            "{platforms_arch}": "arm64",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-            "{distro}": distro,
-        }
+        substitutions = _toolchain_substitutions("arm64", arch, arch, distro)
     elif arch == "x86_64":
-        substitutions = {
-            "{platforms_arch}": "x86_64",
-            "{bazel_toolchain_cpu}": "x86_64",
-            "{arch}": arch,
-            "{version}": version,
-            "{distro}": distro,
-        }
+        substitutions = _toolchain_substitutions("x86_64", "x86_64", arch, distro)
     elif arch == "ppc64le":
-        substitutions = {
-            "{platforms_arch}": "ppc64le",
-            "{bazel_toolchain_cpu}": "ppc64le",
-            "{arch}": arch,
-            "{version}": version,
-            "{distro}": distro,
-        }
+        substitutions = _toolchain_substitutions("ppc64le", "ppc64le", arch, distro)
     elif arch == "s390x":
-        substitutions = {
-            "{platforms_arch}": "s390x",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-            "{distro}": distro,
-        }
+        substitutions = _toolchain_substitutions("s390x", arch, arch, distro)
     else:
-        substitutions = {
-            "{platforms_arch}": "none",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-            "{distro}": distro,
-        }
+        substitutions = _toolchain_substitutions("none", arch, arch, distro)
         generate_noop_toolchain(ctx, substitutions)
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
 

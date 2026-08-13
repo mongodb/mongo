@@ -1,0 +1,3 @@
+load(":compiledb_aspect_test.bzl", "is_msvc_compiler_test")
+
+is_msvc_compiler_test(name = "compiledb_aspect_test")

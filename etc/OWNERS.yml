@@ -53,6 +53,9 @@ filters:
   - "set_up_workstation.sh":
     approvers:
       - 10gen/devprod-build
+  - "set_up_workstation_test.py":
+    approvers:
+      - 10gen/devprod-build
   - "tsan.suppressions":
     approvers:
       - 10gen/devprod-build

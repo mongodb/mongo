@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load(":mongo_toolchain_flags_test.bzl", "mongo_toolchain_flags_test_suite")
 
 py_library(
     name = "gdb_python_version_check",
@@ -18,8 +19,27 @@ py_test(
     ],
 )
 
+exports_files(
+    [
+        "linux_container_action_wrapper.py",
+        "mongo_toolchain_version_v5.bzl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "linux_container_action_wrapper_test",
+    srcs = [
+        "linux_container_action_wrapper.py",
+        "linux_container_action_wrapper_test.py",
+    ],
+    main = "linux_container_action_wrapper_test.py",
+)
+
 py_binary(
     name = "mongo_toolchain_version_generator",
     srcs = ["mongo_toolchain_version_generator.py"],
     visibility = ["//visibility:public"],
 )
+
+mongo_toolchain_flags_test_suite(name = "mongo_toolchain_flags_test")

@@ -563,6 +563,21 @@ py_library(
     data = [
         "//bazel/platforms:remote_execution_containers.bzl",
     ],
+    visibility = ["//buildscripts/tests:__pkg__"],
+)
+
+py_binary(
+    name = "podman_recovery",
+    srcs = ["podman_recovery.py"],
+    main = "podman_recovery.py",
+    visibility = ["//buildscripts/tests:__pkg__"],
+)
+
+py_binary(
+    name = "prepare_podman_for_bazel",
+    srcs = ["prepare_podman_for_bazel.py"],
+    main = "prepare_podman_for_bazel.py",
+    visibility = ["//buildscripts/tests:__pkg__"],
 )
 
 py_binary(

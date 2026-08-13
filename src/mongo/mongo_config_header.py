@@ -43,12 +43,18 @@ def compile_check(source_text: str) -> bool:
             *CompilerSettings.compiler_args.split(" "),
         ]
         log_check(" ".join(command[:-1] + [source_text]))
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            env={**os.environ.copy(), **CompilerSettings.env_vars},
-        )
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                env={**os.environ.copy(), **CompilerSettings.env_vars},
+            )
+        except OSError as exc:
+            log_check(f"failed to run compiler: {exc}")
+            if temp:
+                os.unlink(temp.name)
+            raise
     else:
         command = [
             CompilerSettings.compiler_path,
@@ -59,13 +65,17 @@ def compile_check(source_text: str) -> bool:
             "-",
         ]
         log_check(" ".join(command + [source_text]))
-        result = subprocess.run(
-            command,
-            input=source_text,
-            capture_output=True,
-            text=True,
-            env={**os.environ.copy(), **CompilerSettings.env_vars},
-        )
+        try:
+            result = subprocess.run(
+                command,
+                input=source_text,
+                capture_output=True,
+                text=True,
+                env={**os.environ.copy(), **CompilerSettings.env_vars},
+            )
+        except OSError as exc:
+            log_check(f"failed to run compiler: {exc}")
+            raise
     if result.returncode != 0:
         log_check(f"stdout:\n{result.stdout}")
         log_check(f"stderr:\n{result.stderr}")

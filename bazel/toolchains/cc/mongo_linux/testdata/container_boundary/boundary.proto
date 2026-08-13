@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package mongo.container_boundary;
+
+message BoundaryMessage {
+  string value = 1;
+}

@@ -1,7 +1,20 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
+
+py_library(
+    name = "mongo_config_header_lib",
+    srcs = ["mongo_config_header.py"],
+    imports = ["."],
+)
+
+py_test(
+    name = "mongo_config_header_test",
+    srcs = ["mongo_config_header_test.py"],
+    deps = [":mongo_config_header_lib"],
+)
 
 generate_config_header(
     name = "mongo_config_header",

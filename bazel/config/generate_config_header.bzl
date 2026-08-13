@@ -1,5 +1,6 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
 load("//bazel:utils.bzl", "write_target")
@@ -27,6 +28,35 @@ def _strip_sysroot_flags(flags):
             continue
         result.append(flag)
     return result
+
+def _target_platform_arch(ctx):
+    is_macos = ctx.target_platform_has_constraint(ctx.attr._macos_constraint[platform_common.ConstraintValueInfo])
+    arch_constraints = [
+        (ctx.attr._x86_64_constraint, "x86_64"),
+        (ctx.attr._aarch64_constraint, "aarch64"),
+        # platform.machine() reports arm64 on macOS and aarch64 on Linux.
+        # Preserve that platform-specific spelling in build metadata.
+        (ctx.attr._arm64_constraint, "arm64" if is_macos else "aarch64"),
+        (ctx.attr._ppc64le_constraint, "ppc64le"),
+        (ctx.attr._s390x_constraint, "s390x"),
+        (ctx.attr._wasm32_constraint, "wasm32"),
+    ]
+    for constraint, arch in arch_constraints:
+        if ctx.target_platform_has_constraint(constraint[platform_common.ConstraintValueInfo]):
+            return arch
+    fail("Unable to determine target architecture from the target platform")
+
+def _target_platform_os(ctx):
+    os_constraints = [
+        (ctx.attr._linux_constraint, "linux"),
+        (ctx.attr._macos_constraint, "macOS"),
+        (ctx.attr._windows_constraint, "windows"),
+        (ctx.attr._wasi_constraint, "wasi"),
+    ]
+    for constraint, os_name in os_constraints:
+        if ctx.target_platform_has_constraint(constraint[platform_common.ConstraintValueInfo]):
+            return os_name
+    fail("Unable to determine target operating system from the target platform")
 
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
@@ -80,6 +110,14 @@ def generate_config_header_impl(ctx):
         variables = compile_variables,
     )
 
+    # Native Windows py_binary launchers need the Python DLL directory on
+    # PATH. Windows cross actions instead need the explicitly configured
+    # host path, which takes precedence when cross mode is enabled.
+    action_env = py_action_env_windows_dll_path(ctx)
+    windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
+    if windows_cross_host_path:
+        action_env["PATH"] = windows_cross_host_path
+
     expanded_extra_definitions = {}
     for key, val in ctx.attr.extra_definitions.items():
         # Bazel throws an error if you try to call this on a location var
@@ -92,6 +130,16 @@ def generate_config_header_impl(ctx):
         "compile_variables": " ".join(compiler_flags + ctx.attr.cpp_opts),
         "linkflags": " ".join(link_flags + ctx.attr.cpp_linkflags),
         "cpp_defines": " ".join(ctx.attr.cpp_defines),
+    }
+
+    # Config-header actions execute on the execution platform, which may differ from the
+    # target platform for cross-compilation. Pass the target values explicitly so generators
+    # do not accidentally embed execution-worker metadata.
+    target_arch = _target_platform_arch(ctx)
+    expanded_extra_definitions |= {
+        "MONGO_DISTARCH": target_arch,
+        "TARGET_ARCH": target_arch,
+        "TARGET_OS": _target_platform_os(ctx),
     }
 
     additional_inputs = []
@@ -133,10 +181,8 @@ def generate_config_header_impl(ctx):
                         "--env-vars",
                         json.encode(env_flags | {"SDKROOT": ctx.attr._sdkroot[sdkroot_provider].path}),
                     ],
-        # Windows-only: put the Python toolchain's dist/ dir on PATH so the
-        # py_binary launcher.exe can LoadLibrary python313.dll at start.
-        # No-op on Linux/macOS.
-        env = py_action_env_windows_dll_path(ctx),
+        env = action_env,
+        use_default_shell_env = True,
     )
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]
@@ -185,6 +231,17 @@ generate_config_header_rule = rule(
         ),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_sdkroot": attr.label(default = "//bazel/config:sdkroot"),
+        "_windows_cross_host_path": attr.label(default = "//bazel/config:windows_cross_host_path"),
+        "_linux_constraint": attr.label(default = "@platforms//os:linux"),
+        "_macos_constraint": attr.label(default = "@platforms//os:macos"),
+        "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+        "_wasi_constraint": attr.label(default = "@platforms//os:wasi"),
+        "_x86_64_constraint": attr.label(default = "@platforms//cpu:x86_64"),
+        "_aarch64_constraint": attr.label(default = "@platforms//cpu:aarch64"),
+        "_arm64_constraint": attr.label(default = "@platforms//cpu:arm64"),
+        "_ppc64le_constraint": attr.label(default = "@platforms//cpu:ppc64le"),
+        "_s390x_constraint": attr.label(default = "@platforms//cpu:s390x"),
+        "_wasm32_constraint": attr.label(default = "@platforms//cpu:wasm32"),
     },
     fragments = ["cpp"],
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type", "@rules_python//python:toolchain_type"],

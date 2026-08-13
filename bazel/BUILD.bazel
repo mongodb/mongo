@@ -1,11 +1,12 @@
 load("//bazel/uv:defs.bzl", "dependency")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
 # Expose script for external usage through bazel.
 exports_files([
+    "hermetic_container/hermetic_container.py",
     "install_rules.py",
     "run_under_working_dir.sh",
 ])
@@ -41,6 +42,13 @@ py_binary(
     srcs = ["gpg_signer.py"],
     main = "gpg_signer.py",
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "gpg_signer_test",
+    srcs = ["gpg_signer_test.py"],
+    data = ["gpg_signer.py"],
+    main = "gpg_signer_test.py",
 )
 
 filegroup(

@@ -1,3 +1,6 @@
+load("@rules_python//python:defs.bzl", "py_test")
+load(":install_rules_test.bzl", "install_rules_test_suite")
+
 package(default_visibility = ["//visibility:public"])
 
 # Expose script for external usage through bazel.
@@ -11,4 +14,27 @@ sh_test(
     name = "install_mongodbtoolchain_test",
     srcs = ["install_mongodbtoolchain_test.sh"],
     data = ["install_mongodbtoolchain.sh"],
+)
+
+sh_test(
+    name = "gdb_toolchain_folder_test",
+    srcs = ["gdb_toolchain_folder_test.sh"],
+    data = ["//:gdb_toolchain_folder"],
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
+install_rules_test_suite(name = "install_rules_analysis_test")
+
+py_test(
+    name = "install_rules_script_test",
+    srcs = ["install_rules_script_test.py"],
+    data = ["install_rules.py"],
+)
+
+test_suite(
+    name = "install_rules_test",
+    tests = [
+        ":install_rules_analysis_test",
+        ":install_rules_script_test",
+    ],
 )

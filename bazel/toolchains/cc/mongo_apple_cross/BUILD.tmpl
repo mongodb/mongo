@@ -75,6 +75,19 @@ filegroup(
 )
 
 filegroup(
+    name = "wrapper_files",
+    srcs = glob(["wrappers/*"]),
+)
+
+filegroup(
+    name = "all_files_with_wrappers",
+    srcs = [
+        ":all_files",
+        ":wrapper_files",
+    ],
+)
+
+filegroup(
     name = "empty",
     srcs = [],
 )
@@ -97,6 +110,25 @@ feature_attrs = get_common_features_attrs()
         supports_param_files = 1,
         toolchain_config = "cross_llvm_" + arch,
         toolchain_identifier = "apple_cross_clang_toolchain_" + arch,
+    )
+    for arch, cpu in get_supported_apple_cross_archs().items()
+]
+
+[
+    cc_toolchain(
+        name = "cc-compiler-apple-cross-host-wrapper-" + arch,
+        all_files = ":all_files_with_wrappers",
+        ar_files = ":all_files_with_wrappers",
+        as_files = ":all_files_with_wrappers",
+        compiler_files = ":all_files_with_wrappers",
+        dwp_files = ":all_files_with_wrappers",
+        linker_files = ":all_files_with_wrappers",
+        objcopy_files = ":all_files_with_wrappers",
+        strip_files = ":all_files_with_wrappers",
+        supports_header_parsing = 1,
+        supports_param_files = 1,
+        toolchain_config = "cross_llvm_host_wrapper_" + arch,
+        toolchain_identifier = "apple_cross_clang_host_wrapper_toolchain_" + arch,
     )
     for arch, cpu in get_supported_apple_cross_archs().items()
 ]
@@ -128,6 +160,46 @@ feature_attrs = get_common_features_attrs()
             "objcopy": "tools/llvm-objcopy",
             "objdump": "tools/llvm-objdump",
             "strip": "tools/llvm-strip",
+        },
+        optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+        debug_level = DEBUG_LEVEL,
+        supports_start_end_lib = False,
+        internal_thin_lto_enabled = INTERNAL_THIN_LTO_ENABLED,
+        coverage_enabled = COVERAGE_ENABLED,
+        compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
+        warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+        linkstatic = LINKSTATIC_ENABLED,
+        global_defines = MONGO_GLOBAL_DEFINES,
+    )
+    for arch, cpu in get_supported_apple_cross_archs().items()
+]
+
+[
+    mongo_apple_cross_cc_toolchain_config(
+        name = "cross_llvm_host_wrapper_" + arch,
+        cpu = cpu,
+        compiler = "clang",
+        toolchain_identifier = "apple_cross_clang_host_wrapper_toolchain_" + arch,
+        target_libc = "macosx",
+        abi_version = arch,
+        abi_libc_version = arch,
+        llvm_version = "%{llvm_version}",
+        min_macos_version = "%{min_macos_version}",
+        execroot_prefix = "%{execroot_prefix}",
+        tool_paths = {
+            "ar": "wrappers/llvm-ar",
+            "cpp": "wrappers/clang-cpp",
+            "ld": "wrappers/ld.lld",
+            "dwp": "wrappers/llvm-dwp",
+            "gcc": "wrappers/clang",
+            "g++": "wrappers/clang++",
+            "gcov": "wrappers/llvm-profdata",
+            "llvm-cov": "wrappers/llvm-cov",
+            "llvm-profdata": "wrappers/llvm-profdata",
+            "nm": "wrappers/llvm-nm",
+            "objcopy": "wrappers/llvm-objcopy",
+            "objdump": "wrappers/llvm-objdump",
+            "strip": "wrappers/llvm-strip",
         },
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
         debug_level = DEBUG_LEVEL,

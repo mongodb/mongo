@@ -220,6 +220,14 @@ def _compiler_path(cc_toolchain):
         return compiler.path
     return compiler
 
+def is_msvc_compiler(compiler):
+    return (
+        compiler.endswith("cl.exe") or
+        compiler.endswith("/cl") or
+        compiler.endswith("\\cl") or
+        compiler.endswith("clang-cl")
+    )
+
 def _should_materialize_artifact(path):
     return path.startswith("bazel-out/")
 
@@ -428,7 +436,7 @@ def _compiledb_aspect_impl(target, ctx):
         cpp_user_compile_flags,
     )
     compiler = _compiler_path(cc_toolchain)
-    is_msvc = compiler.endswith("cl.exe") or compiler.endswith("/cl") or compiler.endswith("\\cl.exe")
+    is_msvc = is_msvc_compiler(compiler)
     c_toolchain_flags = None
     cpp_toolchain_flags = None
     outputs = []

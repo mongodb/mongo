@@ -23,7 +23,7 @@ load(
     "get_common_features",
 )
 load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "DEFINES")
-load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl", "CLANG_RESOURCE_DIR")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl", "clang_resource_dir")
 
 all_non_assembly_compile_actions = [
     ACTION_NAMES.c_compile,
@@ -1080,6 +1080,20 @@ def _impl(ctx):
         ],
     )
 
+    libvoidstar_feature = feature(
+        name = "libvoidstar",
+        enabled = ctx.file.libvoidstar != None,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions + lto_index_actions,
+                flag_groups = [flag_group(flags = [
+                    "-L{}".format(ctx.file.libvoidstar.dirname),
+                    "-lvoidstar",
+                ])],
+            ),
+        ] if ctx.file.libvoidstar != None else [],
+    )
+
     pthread_feature = feature(
         name = "pthread",
         enabled = True,
@@ -1149,7 +1163,7 @@ def _impl(ctx):
                 actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
-                        flags = ["-resource-dir=" + CLANG_RESOURCE_DIR],
+                        flags = ["-resource-dir=" + clang_resource_dir(ctx.attr.toolchain_repo_name)],
                     ),
                 ],
             ),
@@ -1168,7 +1182,7 @@ def _impl(ctx):
     # Some of the linux versions are missing libatomic.so.1. When using mold, prefer the copy in the
     # mongo toolchain rather than relying on one being installed on the host.
     mold_linker_env_entries = [
-        env_entry(key = "LD_LIBRARY_PATH", value = "external/mongo_toolchain_v5/stow/gcc-v5/lib64/"),
+        env_entry(key = "LD_LIBRARY_PATH", value = "external/{}/stow/gcc-v5/lib64/".format(ctx.attr.toolchain_repo_name)),
     ] if ctx.attr.hermetic else []
 
     default_linker_lld_feature = feature(
@@ -2215,6 +2229,7 @@ def _impl(ctx):
         linker_lld_feature,
         linker_mold_feature,
         extra_ldflags_feature,
+        libvoidstar_feature,
         disable_warnings_for_third_party_libraries_clang_feature,
         disable_warnings_for_third_party_libraries_gcc_feature,
     ]
@@ -2254,6 +2269,7 @@ mongo_linux_cc_toolchain_config = rule(
         "compiler": attr.string(mandatory = True),
         "dbg": attr.bool(mandatory = True),
         "linker": attr.string(mandatory = True),
+        "libvoidstar": attr.label(allow_single_file = True),
         "mold_bin_dir": attr.string(mandatory = False),
         "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
@@ -2263,6 +2279,7 @@ mongo_linux_cc_toolchain_config = rule(
         "cpp_includes": attr.string_list(mandatory = False),
         "bin_dirs": attr.string_list(mandatory = False),
         "tool_paths": attr.string_dict(mandatory = True),
+        "toolchain_repo_name": attr.string(mandatory = True),
         "toolchain_identifier": attr.string(mandatory = True),
         "verbose": attr.bool(mandatory = False),
         "linkstatic": attr.bool(mandatory = True),

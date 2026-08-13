@@ -42,7 +42,9 @@ def tool_to_path(tool, compiler_path):
         elif os.path.basename(compiler_path) == "wrapped_clang":
             return os.path.join(os.path.dirname(compiler_path), "wrapped_clang_pp")
         else:
-            return
+            # Some compilers, such as clang-cl, use the same executable for C
+            # and C++ sources.
+            return compiler_path
 
 
 def get_toolchain_ver(tool, compiler_path, env_vars):
@@ -57,31 +59,37 @@ def get_toolchain_ver(tool, compiler_path, env_vars):
         or compiler_path.endswith("wrapped_clang_pp")
         or compiler_path.endswith("wrapped_clang")
     ):
-        proc = subprocess.run(
-            f"{tool} --version",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            universal_newlines=True,
-            env=env_vars,
-            check=True,
-            shell=True,
-            text=True,
-        )
-        verstr = proc.stdout
+        try:
+            proc = subprocess.run(
+                f"{tool} --version",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                universal_newlines=True,
+                env=env_vars,
+                check=True,
+                shell=True,
+                text=True,
+            )
+            verstr = proc.stdout
+        except (OSError, subprocess.CalledProcessError):
+            pass
     elif compiler_path.endswith("cl"):
-        proc = subprocess.run(
-            tool,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-            universal_newlines=True,
-            env=env_vars,
-            check=True,
-            shell=True,
-            text=True,
-        )
-        verstr = proc.stderr
+        try:
+            proc = subprocess.run(
+                tool,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+                universal_newlines=True,
+                env=env_vars,
+                check=True,
+                shell=True,
+                text=True,
+            )
+            verstr = proc.stderr
+        except (OSError, subprocess.CalledProcessError):
+            pass
 
     return f"{tool}: {verstr}"
 
@@ -95,6 +103,10 @@ def get_toolchain_ver(tool, compiler_path, env_vars):
 #   inVersion: <bool> : should it be included in --version output
 # The `value` field will be passed to bazel
 def default_buildinfo_environment_data(compiler_path, extra_definitions, env_vars):
+    target_arch = (extra_definitions.get("TARGET_ARCH") or platform.machine()).lower()
+    distarch = (extra_definitions.get("MONGO_DISTARCH") or target_arch).lower()
+    target_os = extra_definitions.get("TARGET_OS") or get_running_os_name()
+
     data = (
         (
             "distmod",
@@ -104,7 +116,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions, env_var
         ),
         (
             "distarch",
-            platform.machine().lower(),
+            distarch,
             True,
             True,
         ),
@@ -140,13 +152,13 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions, env_var
         ),
         (
             "target_arch",
-            platform.machine().lower(),
+            target_arch,
             True,
             True,
         ),
         (
             "target_os",
-            get_running_os_name(),
+            target_os,
             True,
             False,
         ),

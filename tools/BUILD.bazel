@@ -1,0 +1,16 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "bazel",
+    "bazel.bat",
+])
+
+sh_test(
+    name = "bazel_wrapper_test",
+    srcs = ["bazel_wrapper_test.sh"],
+    data = [
+        "bazel",
+        "bazel.bat",
+        "//bazel/wrapper_hook:bazel_commands.commands",
+    ],
+)

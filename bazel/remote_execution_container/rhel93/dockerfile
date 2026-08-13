@@ -18,13 +18,13 @@ RUN yum check-update || true && \
     yum install -y \
         cyrus-sasl-devel-2.1.27-22.el9 \
         cyrus-sasl-gssapi-2.1.27-22.el9 \
-        glibc-devel-2.34-231.el9_7.10 \
-        krb5-devel-1.21.1-8.el9_6 \
-        libcurl-devel-7.76.1-35.el9_7.3 \
+        glibc-devel-2.34-274.el9_8 \
+        krb5-devel-1.21.1-10.el9_8 \
+        libcurl-devel-7.76.1-40.el9 \
         openldap-devel-2.6.8-4.el9 \
-        openssl-devel-3.5.1-7.el9_7 \
+        openssl-devel-3.5.5-6.el9_8 \
         procps-ng-3.3.17-14.el9 \
-        systemtap-sdt-devel-5.3-3.el9 \
+        systemtap-sdt-devel-5.4-4.el9 \
         zip-3.0-35.el9 \
     && yum clean all && rm -rf /var/cache/yum/*
 

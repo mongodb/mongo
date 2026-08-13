@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import sys
@@ -11,6 +12,78 @@ import validate_compile_commands as validator
 
 
 class ValidateCompileCommandsTest(unittest.TestCase):
+    def test_validation_output_dir_uses_workspace_when_writable(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            with mock.patch.dict(os.environ, {}, clear=True):
+                output_dir = validator._validation_output_dir(workspace_dir)
+
+        self.assertEqual(output_dir, os.path.join(workspace_dir, ".validate_compile_commands_out"))
+
+    def test_validation_output_dir_falls_back_when_workspace_is_read_only(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            fallback_dir = "/tmp/validate_compile_commands_out"
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with mock.patch.object(
+                    validator.os,
+                    "makedirs",
+                    side_effect=OSError(errno.EROFS, "read-only file system"),
+                ):
+                    with mock.patch.object(
+                        validator.tempfile, "mkdtemp", return_value=fallback_dir
+                    ):
+                        output_dir = validator._validation_output_dir(workspace_dir)
+
+        self.assertEqual(output_dir, fallback_dir)
+
+    def test_validation_output_dir_uses_container_shared_install_mount(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            shared_install_dir = os.path.join(temp_dir, "shared-install")
+            with mock.patch.dict(
+                os.environ,
+                {validator.CONTAINER_SHARED_INSTALL_ENV: shared_install_dir},
+                clear=True,
+            ):
+                output_dir = validator._validation_output_dir(temp_dir)
+
+        self.assertEqual(
+            output_dir,
+            os.path.join(shared_install_dir, "validate_compile_commands_out"),
+        )
+
+    def test_validation_output_dir_infers_container_shared_install_mount(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_base = os.path.join(temp_dir, "bazel-output")
+            shared_install_dir = output_base + validator.CONTAINER_SHARED_INSTALL_SUFFIX
+            os.makedirs(shared_install_dir)
+            compdb_path = os.path.join(temp_dir, "compile_commands.json")
+            with open(compdb_path, "w", encoding="utf-8") as compdb:
+                json.dump(
+                    [
+                        {
+                            "directory": temp_dir,
+                            "file": "src/mongo/example.cpp",
+                            "arguments": ["clang++", "-c", "example.cpp"],
+                            "output": os.path.join(
+                                output_base,
+                                "execroot",
+                                "_main",
+                                "bazel-out",
+                                "aarch64-fastbuild",
+                                "example.o",
+                            ),
+                        }
+                    ],
+                    compdb,
+                )
+
+            with mock.patch.dict(os.environ, {}, clear=True):
+                output_dir = validator._validation_output_dir(temp_dir, compdb_path)
+
+        self.assertEqual(
+            output_dir,
+            os.path.join(shared_install_dir, "validate_compile_commands_out"),
+        )
+
     def test_validate_clang_tidy_setup_skips_unsupported_platforms(self):
         with tempfile.TemporaryDirectory() as workspace_dir:
             with mock.patch.object(

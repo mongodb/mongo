@@ -692,6 +692,18 @@ generate_config_header(
     template = "version_impl.tpl.cpp",
 )
 
+py_library(
+    name = "version_constants_gen_lib",
+    srcs = ["version_constants_gen.py"],
+    imports = ["."],
+)
+
+py_test(
+    name = "version_constants_gen_test",
+    srcs = ["version_constants_gen_test.py"],
+    deps = [":version_constants_gen_lib"],
+)
+
 generate_config_header(
     name = "rc_constants_gen",
     checks = "//src/mongo/util:version_constants_gen.py",

@@ -4,15 +4,58 @@ Wrapper python script to launch the pretty_printer_test_py program
 with the standard input set to the test file readtest_input.
 """
 
-import subprocess
+import glob
 import os
 import shlex
+import subprocess
+
 verbose = @VERBOSE@
 test_script = r'@pretty_printer_test_py@'
 test_args = @test_args@
-gdb_path = '@gdb_path@'
-args = [
-    gdb_path,
+
+
+def resolve_bazel_path(path):
+    candidates = [
+        path,
+        os.path.join(os.getcwd(), "..", path),
+    ]
+    if path.startswith("external/"):
+        candidates.extend(glob.glob(os.path.join(os.getcwd(), "bazel-out", "*", "bin", path)))
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return os.path.abspath(candidate)
+
+    return None
+
+
+gdb_path = resolve_bazel_path('@gdb_path@')
+using_bazel_gdb = gdb_path is not None
+if not using_bazel_gdb:
+    gdb_path = '/opt/mongodbtoolchain/v5/bin/gdb'
+
+mongo_toolchain_readelf = resolve_bazel_path(r'@mongo_toolchain_readelf@')
+mongo_toolchain_objcopy = resolve_bazel_path(r'@mongo_toolchain_objcopy@')
+if mongo_toolchain_readelf is None:
+    mongo_toolchain_readelf = '/opt/mongodbtoolchain/v5/bin/llvm-readelf'
+if mongo_toolchain_objcopy is None:
+    mongo_toolchain_objcopy = '/opt/mongodbtoolchain/v5/bin/llvm-objcopy'
+
+if using_bazel_gdb:
+    gdb_root = os.path.normpath(os.path.join(
+        os.path.dirname(gdb_path), "..", ".."
+    ))
+    gdb_prefix = os.path.join(gdb_root, "v5")
+    gdb_home = os.path.join(gdb_root, "stow", "gdb-v5")
+    python_home = os.path.join(gdb_root, "stow", "python313-v5")
+    mongo_toolchain_root = os.path.normpath(os.path.join(
+        os.path.dirname(mongo_toolchain_readelf), "..", ".."
+    ))
+
+args = [gdb_path]
+if using_bazel_gdb:
+    args += ['--data-directory', os.path.join(gdb_home, 'share', 'gdb')]
+args += [
     '-nx',
     '-batch',
     '-ex',
@@ -27,6 +70,27 @@ if verbose:
 # We assume we are running from project root, and require modules buried in the src directory
 python_env = os.environ.copy()
 python_env['PYTHONPATH'] = os.getcwd() + os.pathsep + python_env.get('PYTHONPATH', "")
+if using_bazel_gdb:
+    python_env['PYTHONHOME'] = python_home
+    python_env['MONGO_GDB_PYTHON'] = os.path.join(python_home, 'bin', 'python3')
+    python_env['PYTHONPATH'] = os.path.join(python_home, "lib", "python3.13") + os.pathsep + python_env['PYTHONPATH']
+    python_env['LD_LIBRARY_PATH'] = os.pathsep.join([
+        os.path.join(python_home, "lib"),
+        os.path.join(python_home, "lib64"),
+        os.path.join(gdb_prefix, "lib"),
+        os.path.join(gdb_home, "lib"),
+        os.path.join(mongo_toolchain_root, "stow", "llvm-v5", "lib"),
+        os.path.join(mongo_toolchain_root, "stow", "libedit-v5", "lib"),
+        python_env.get('LD_LIBRARY_PATH', ""),
+    ])
+    python_env['MONGO_GDB_PP_DIR'] = os.path.join(mongo_toolchain_root, "stow", "gcc-v5", "share")
+else:
+    python_env['MONGO_GDB_PP_DIR'] = '/opt/mongodbtoolchain/v5/share'
+python_env['MONGO_GDB_READELF'] = mongo_toolchain_readelf
+python_env['MONGO_GDB_OBJCOPY'] = mongo_toolchain_objcopy
+python_env['READELF'] = mongo_toolchain_readelf
+python_env['OBJCOPY'] = mongo_toolchain_objcopy
+python_env['GDB'] = gdb_path
 
 proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                       env=python_env)

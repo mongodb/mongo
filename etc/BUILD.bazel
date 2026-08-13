@@ -1,6 +1,13 @@
 load("//bazel:mongo_src_rules.bzl", "symlink")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
+
+py_test(
+    name = "set_up_workstation_test",
+    srcs = ["set_up_workstation_test.py"],
+    data = ["set_up_workstation.sh"],
+)
 
 exports_files([
     "lsan.suppressions",

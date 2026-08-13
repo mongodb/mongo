@@ -1,5 +1,6 @@
 import argparse
 import concurrent.futures
+import errno
 import hashlib
 import heapq
 import json
@@ -15,6 +16,8 @@ from typing import Any, Iterator
 
 STANDARD_COMPILE_COMMAND_KEYS = frozenset({"arguments", "command", "directory", "file", "output"})
 COMPILEDB_GENERATION_TARGETS = ["compiledb", "install-wiredtiger"]
+CONTAINER_SHARED_INSTALL_ENV = "MONGO_BAZEL_SHARED_INSTALL_DIR"
+CONTAINER_SHARED_INSTALL_SUFFIX = "-mongo-shared-install"
 MONGO_TIDY_PLUGIN_CANDIDATES = frozenset(
     [
         "libmongo_tidy_checks.so",
@@ -37,6 +40,95 @@ def _get_workspace_dir() -> str:
         "This script must be run through bazel. "
         "Please run 'bazel run //evergreen:validate_compile_commands' instead."
     )
+
+
+def _probe_writable_output_dir(path: str) -> str | None:
+    """Return ``path`` when it can be created and written, otherwise ``None``."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        probe_fd, probe_path = tempfile.mkstemp(
+            prefix=".validate_compile_commands_probe-", dir=path
+        )
+        os.close(probe_fd)
+        os.unlink(probe_path)
+    except OSError as exc:
+        if exc.errno not in (errno.EACCES, errno.EROFS):
+            raise
+        return None
+    return path
+
+
+def _compiledb_shared_install_dir(compdb_path: str) -> str | None:
+    """Infer the writable persistent-container mount from a compile database entry.
+
+    Compiler commands contain output paths below Bazel's ``<output base>/execroot``.
+    The Linux persistent-container strategy mounts the sibling
+    ``<output base>-mongo-shared-install`` read-write in the compiler container, while
+    the source tree and ordinary output base are read-only. Using that sibling for
+    validation outputs keeps the host-side replay and the container-side compiler in
+    the same filesystem view.
+    """
+    try:
+        entries = _iter_compiledb_entries(compdb_path)
+        for entry in entries:
+            output = entry.get("output")
+            if not isinstance(output, str):
+                continue
+            normalized = output.replace("\\", "/")
+            marker = "/execroot/"
+            if marker not in normalized:
+                continue
+            output_base = normalized.split(marker, 1)[0]
+            if not output_base:
+                continue
+            return output_base + CONTAINER_SHARED_INSTALL_SUFFIX
+    except (OSError, ValueError, TypeError):
+        return None
+    return None
+
+
+def _validation_output_dir(workspace_dir: str, compdb_path: str | None = None) -> str:
+    """Return a writable directory for temporary compiler outputs.
+
+    The source workspace can be mounted read-only by hermetic build containers. Keep the
+    historical workspace-local directory when it is writable, but fall back to the process
+    temporary directory when the mount rejects writes.
+    """
+    configured_dir = os.environ.get("VALIDATE_COMPILE_COMMANDS_OUT_DIR")
+    if configured_dir is not None:
+        os.makedirs(configured_dir, exist_ok=True)
+        return configured_dir
+
+    # When the validator itself is running in a persistent action container, the
+    # wrapper publishes this read-write mount explicitly. Prefer it over the source
+    # workspace so compilers launched from the validator see the same writable path.
+    shared_install_dir = os.environ.get(CONTAINER_SHARED_INSTALL_ENV)
+    if shared_install_dir:
+        writable = _probe_writable_output_dir(
+            os.path.join(shared_install_dir, "validate_compile_commands_out")
+        )
+        if writable is not None:
+            return writable
+
+    # ``bazel run`` executes the validator on the host, while each replayed compiler
+    # command is routed through the persistent container. In that mode the container
+    # environment is not inherited by the validator, so infer the shared mount from
+    # the output paths recorded in compile_commands.json.
+    if compdb_path is not None:
+        inferred_shared_install_dir = _compiledb_shared_install_dir(compdb_path)
+        if inferred_shared_install_dir:
+            writable = _probe_writable_output_dir(
+                os.path.join(inferred_shared_install_dir, "validate_compile_commands_out")
+            )
+            if writable is not None:
+                return writable
+
+    workspace_output_dir = os.path.join(workspace_dir, ".validate_compile_commands_out")
+    writable = _probe_writable_output_dir(workspace_output_dir)
+    if writable is not None:
+        return writable
+
+    return tempfile.mkdtemp(prefix="validate_compile_commands_out-")
 
 
 def _ensure_compiledb_exists(compdb_path: str) -> None:
@@ -812,11 +904,7 @@ def main() -> int:
     else:
         print(f"Selected {len(selected)} compile_commands entries for validation.", flush=True)
 
-    out_root = os.environ.get(
-        "VALIDATE_COMPILE_COMMANDS_OUT_DIR",
-        os.path.join(workspace_dir, ".validate_compile_commands_out"),
-    )
-    os.makedirs(out_root, exist_ok=True)
+    out_root = _validation_output_dir(workspace_dir, compdb_path)
 
     def _prep_entry(entry: dict[str, Any]) -> tuple[str, str, list[str]]:
         args = entry.get("arguments")

@@ -442,6 +442,40 @@ register_toolchains(
     "@mongo_apple_cross_toolchain//...",
 )
 
+setup_mongo_windows_cross_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows_cross:mongo_windows_cross_toolchain.bzl", "setup_mongo_windows_cross_toolchain_extension")
+use_repo(setup_mongo_windows_cross_toolchains_extension, "mongo_windows_cross_toolchain", "mongo_windows_cross_toolchain_files")
+
+register_toolchains(
+    "@mongo_windows_cross_toolchain//...",
+)
+
+setup_mongo_linux_cross_toolchains_extension = use_extension(
+    "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+    "setup_mongo_linux_cross_toolchains_extension",
+)
+use_repo(
+    setup_mongo_linux_cross_toolchains_extension,
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64",
+)
+
+register_toolchains(
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_toolchain",
+)
+
 setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
 use_repo(
     setup_mongo_python_toolchains,
@@ -477,6 +511,10 @@ setup_evergreen_variables(name = "evergreen_variables")
 external_auth_aws_setup = use_repo_rule("//bazel/repository_rules:external_auth_aws_setup.bzl", "external_auth_aws_setup")
 
 external_auth_aws_setup(name = "external_auth_aws_setup")
+
+setup_libvoidstar = use_repo_rule("//bazel/repository_rules:libvoidstar.bzl", "setup_libvoidstar")
+
+setup_libvoidstar(name = "libvoidstar")
 
 setup_pgo_data = use_repo_rule("//bazel/repository_rules:pgo_data.bzl", "setup_pgo_data")
 
@@ -841,6 +879,16 @@ lock_import.import_uv(
 lock_import.package(
     name = "markdown-it-py",
     ignore_dependencies = ["mdit-py-plugins"],
+    repo = "pypi",
+)
+
+# The published ct3 wheels contain precompiled bytecode under
+# Cheetah/Macros/__pycache__. Besides being non-portable, installer rejects
+# wheel-provided __pycache__ contents as a security risk. Keep the upstream
+# wheel usable while excluding only those generated files at install time.
+lock_import.package(
+    name = "ct3",
+    install_exclude_globs = ["**/__pycache__/**"],
     repo = "pypi",
 )
 

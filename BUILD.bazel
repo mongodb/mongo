@@ -8,6 +8,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/install_rules:bolt.bzl", "bolt_instrument")
+load("//bazel/install_rules:copy_files_to_directory.bzl", "copy_files_to_directory")
 load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchain_aliases")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
@@ -340,6 +341,26 @@ copy_to_directory(
     ],
 )
 
+copy_files_to_directory(
+    name = "gdb_toolchain_folder",
+    srcs = [
+        "@gdb_v5//:all_files",
+        "@mongo_toolchain_v5//:gcc_pretty_printers",
+        "@mongo_toolchain_v5//:llvm_objcopy",
+        "@mongo_toolchain_v5//:llvm_readelf",
+        "@mongo_toolchain_v5//:llvm_runtime",
+    ],
+    out = "gdb-toolchain",
+    repository_names = [
+        "gdb_v5",
+        "mongo_toolchain_v5",
+    ],
+    tags = [
+        "local",
+        "no-cache",
+    ],
+)
+
 # This sets up targets for install-dist-test and archive-dist-test
 mongo_install(
     name = "dist-test",
@@ -389,6 +410,7 @@ mongo_install(
     },
     root_files = select({
         "@platforms//os:linux": {
+            "//:gdb_toolchain_folder": "lib",
             "//src/mongo/db/extension/test_examples:extension_options_configs": "etc/mongo/extensions",
             "//x509:generate_main_certificates": "bin/x509",
         },

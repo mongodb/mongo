@@ -17,6 +17,9 @@ from bazel.wrapper_hook.compiledb import (
     generate_compiledb,
     prepare_compiledb_posthook_args,
 )
+from bazel.wrapper_hook.hermetic_container_integration import (
+    CROSS_HOST_FLAGS_WITH_SEPARATE_VALUE,
+)
 from bazel.wrapper_hook.lint import run_rules_lint
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
@@ -27,6 +30,39 @@ class BinAndSourceIncompatible(Exception):
 
 class DuplicateSourceNames(Exception):
     pass
+
+
+COMPILEDB_FLAGS_WITH_SEPARATE_VALUE = CROSS_HOST_FLAGS_WITH_SEPARATE_VALUE | frozenset(
+    {
+        "-c",
+        "--aspects",
+        "--build_tag_filters",
+        "--compiler",
+        "--conlyopt",
+        "--copt",
+        "--cxxopt",
+        "--features",
+        "--host_cpu",
+        "--host_conlyopt",
+        "--host_copt",
+        "--host_cxxopt",
+        "--host_linkopt",
+        "--javacopt",
+        "--java_language_version",
+        "--java_runtime_version",
+        "--linkopt",
+        "--output_filter",
+        "--profile",
+        "--run_under",
+        "--strategy",
+        "--test_arg",
+        "--test_env",
+        "--test_filter",
+        "--test_output",
+        "--test_tag_filters",
+        "--test_timeout",
+    }
+)
 
 
 def get_buildozer_output(autocomplete_query):
@@ -108,15 +144,19 @@ def _read_target_pattern_file(path):
 def _parse_targets_and_flags(args, replacements, compiledb_targets, compiledb_only_targets):
     build_flags = []
     build_targets = []
+    build_args = []
     target_pattern_file = None
     parsing_targets = True
-    expect_target_pattern_file_arg = False
+    expected_value_option = None
+    separate_value_options = COMPILEDB_FLAGS_WITH_SEPARATE_VALUE
 
     for arg in args:
-        if expect_target_pattern_file_arg:
-            target_pattern_file = arg
+        if expected_value_option is not None:
             build_flags.append(arg)
-            expect_target_pattern_file_arg = False
+            build_args.append(arg)
+            if expected_value_option == "--target_pattern_file":
+                target_pattern_file = arg
+            expected_value_option = None
             continue
         if arg == "--":
             parsing_targets = False
@@ -124,21 +164,24 @@ def _parse_targets_and_flags(args, replacements, compiledb_targets, compiledb_on
         if arg in replacements:
             continue
         if parsing_targets and arg.startswith("-"):
-            if arg == "--target_pattern_file":
+            if arg in separate_value_options:
                 build_flags.append(arg)
-                expect_target_pattern_file_arg = True
+                build_args.append(arg)
+                expected_value_option = arg
                 continue
             if arg.startswith("--target_pattern_file="):
                 target_pattern_file = arg.split("=", 1)[1]
             if arg == "--config=compiledb-aspect":
                 arg = "--config=compiledb"
             build_flags.append(arg)
+            build_args.append(arg)
         elif parsing_targets:
             if arg in compiledb_targets or arg in compiledb_only_targets:
                 continue
             build_targets.append(arg)
+            build_args.append(arg)
 
-    return build_flags, build_targets, target_pattern_file
+    return build_flags, build_targets, target_pattern_file, build_args
 
 
 def swap_default_config(
@@ -233,7 +276,7 @@ def test_runner_interface(
     config_mode = None
     user_specified_config = False
     for index, arg in enumerate(args):
-        if index > 0 and args[index - 1] == "--config":
+        if index > 0 and args[index - 1] in ("--config", "-c"):
             continue
         if arg in compiledb_targets:
             compiledb_target = True
@@ -261,7 +304,9 @@ def test_runner_interface(
         config_value = None
         if arg.startswith("--config="):
             config_value = arg.split("=", 1)[1]
-        elif arg == "--config" and index + 1 < len(args):
+        elif arg.startswith("-c="):
+            config_value = arg.split("=", 1)[1]
+        elif arg in ("--config", "-c") and index + 1 < len(args):
             config_value = args[index + 1]
         if config_value is not None:
             user_specified_config = True
@@ -307,13 +352,57 @@ def test_runner_interface(
     parsed_build_targets = None
     parsed_target_pattern_file = None
     if current_bazel_command == "build" and compiledb_target:
-        parsed_build_flags, parsed_build_targets, parsed_target_pattern_file = (
-            _parse_targets_and_flags(
-                args[command_index + 1 :], replacements, compiledb_targets, compiledb_only_targets
-            )
+        (
+            parsed_build_flags,
+            parsed_build_targets,
+            parsed_target_pattern_file,
+            parsed_build_args,
+        ) = _parse_targets_and_flags(
+            args[command_index + 1 :], replacements, compiledb_targets, compiledb_only_targets
         )
 
     if compiledb_target:
+        if current_bazel_command == "build":
+            compiledb_requested_targets = list(parsed_build_targets or [])
+            if parsed_target_pattern_file and os.path.isfile(parsed_target_pattern_file):
+                compiledb_requested_targets.extend(
+                    _read_target_pattern_file(parsed_target_pattern_file)
+                )
+
+            if compiledb_target_scope:
+                original_build_targets = set(parsed_build_targets)
+                parsed_build_targets = [compiledb_target_scope]
+                compiledb_requested_targets = [compiledb_target_scope]
+                scoped_build_args = []
+                scope_inserted = False
+                for arg in parsed_build_args:
+                    if arg in original_build_targets:
+                        if not scope_inserted:
+                            scoped_build_args.append(compiledb_target_scope)
+                            scope_inserted = True
+                        continue
+                    scoped_build_args.append(arg)
+                if not scope_inserted:
+                    scoped_build_args.append(compiledb_target_scope)
+                parsed_build_args = scoped_build_args
+            elif not parsed_build_targets and not parsed_target_pattern_file:
+                parsed_build_targets = [os.environ.get("MONGO_COMPILEDB_TARGET_SCOPE", "//src/...")]
+                parsed_build_args.append(parsed_build_targets[0])
+
+            return prepare_compiledb_posthook_args(
+                bazel_bin=args[0],
+                startup_args=startup_args,
+                command=current_bazel_command,
+                build_flags=parsed_build_flags or [],
+                build_targets=parsed_build_targets,
+                build_args=parsed_build_args,
+                persistent_compdb=persistent_compdb,
+                enterprise=enterprise,
+                atlas=atlas,
+                compiledb_targets=compiledb_requested_targets,
+                setup_clang_tidy=setup_clang_tidy,
+            )
+
         generate_compiledb(
             args[0],
             persistent_compdb,
@@ -323,12 +412,6 @@ def test_runner_interface(
             setup_clang_tidy=setup_clang_tidy,
             startup_args=startup_args,
         )
-        if (
-            current_bazel_command == "build"
-            and not parsed_build_targets
-            and not parsed_target_pattern_file
-        ):
-            return []
 
     if lint_target:
         for lint_arg in lint_targets:
@@ -345,9 +428,12 @@ def test_runner_interface(
         )
 
     if compiledb_config and not compiledb_target and current_bazel_command == "build":
-        parsed_build_flags, parsed_build_targets, parsed_target_pattern_file = (
-            _parse_targets_and_flags(args[command_index + 1 :], {}, [], [])
-        )
+        (
+            parsed_build_flags,
+            parsed_build_targets,
+            parsed_target_pattern_file,
+            parsed_build_args,
+        ) = _parse_targets_and_flags(args[command_index + 1 :], {}, [], [])
 
         posthook_targets = list(parsed_build_targets)
         if parsed_target_pattern_file and os.path.isfile(parsed_target_pattern_file):
@@ -360,6 +446,7 @@ def test_runner_interface(
             command=current_bazel_command,
             build_flags=parsed_build_flags,
             build_targets=parsed_build_targets,
+            build_args=parsed_build_args,
             persistent_compdb=persistent_compdb,
             enterprise=enterprise,
             atlas=atlas,

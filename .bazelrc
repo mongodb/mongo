@@ -516,6 +516,7 @@ common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # Example command lines:
 # CC=gcc-14 CXX=g++-14 bazel build --config=opt --config=native_toolchain --compiler_type=gcc install-dist-test
 # CC=clang-19 CXX=clang++-19 bazel build --config=opt_profiled --config=native_toolchain --compiler_type=clang install-dist-test
+# The Bazel wrapper hook treats this config as a native-build opt-out from Linux action containers.
 common:native_toolchain --repo_env=USE_NATIVE_TOOLCHAIN=1
 common:native_toolchain --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0
 # Even if we use the native toolchain, we only support mold and lld as linkers
@@ -765,10 +766,78 @@ build:macos-cross-arm64 --platforms=//bazel/platforms:macos_arm64_cross
 # libstd.a and fails with duplicate-symbol errors. Fall back to the c-based
 # allocator shim for macOS cross links.
 build:macos-cross-arm64 --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=false
+common:macos-cross-arm64 --remote_download_outputs=toplevel
+common:macos-cross-arm64 --remote_download_regex=.*\.(dylib|a|dSYM|plist|json|txt|tar|tgz|gz|zip)$
 
 # Cross-compile for macOS x86_64
 build:macos-cross-x86_64 --platforms=//bazel/platforms:macos_x86_64_cross
 build:macos-cross-x86_64 --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=false
+common:macos-cross-x86_64 --remote_download_outputs=toplevel
+common:macos-cross-x86_64 --remote_download_regex=.*\.(dylib|a|dSYM|plist|json|txt|tar|tgz|gz|zip)$
+
+# Cross-compile for Windows x86_64 from a Linux hermetic_container/RBE execution environment.
+# The resulting binaries are Windows artifacts and can be run from the host after
+# the build downloads top-level outputs.
+common:windows-cross-x86_64 --platforms=//bazel/platforms:windows_x86_64_cross
+common:windows-cross-x86_64 --//bazel/config:compiler_type=msvc
+common:windows-cross-x86_64 --//bazel/config:linker=auto
+common:windows-cross-x86_64 --//bazel/config:linkstatic=True
+common:windows-cross-x86_64 --//bazel/config:skip_archive=False
+common:windows-cross-x86_64 --//bazel/config:build_atlas=False
+common:windows-cross-x86_64 --fission=no
+common:windows-cross-x86_64 --//bazel/config:create_dwp=False
+common:windows-cross-x86_64 --//bazel/config:compress_debug_compile=False
+common:windows-cross-x86_64 --remote_download_outputs=toplevel
+common:windows-cross-x86_64 --remote_download_regex=.*\.(exe|dll|lib|pdb|res|manifest|json|txt)$
+
+# Cross-compile Linux s390x/ppc64le from the host Bazel process while compile
+# and link actions execute on Linux x86_64/aarch64 RBE workers. The actual
+# cross compiler archives are configured by the mongo_linux_cross toolchain
+# repository rule.
+common:linux-s390x-cross-rbe --config=linux-s390x-rhel9-cross-rbe
+common:linux-ppc64le-cross-rbe --config=linux-ppc64le-rhel9-cross-rbe
+common:linux-s390x-cross-rbe-arm64 --config=linux-s390x-rhel9-cross-rbe-arm64
+common:linux-ppc64le-cross-rbe-arm64 --config=linux-ppc64le-rhel9-cross-rbe-arm64
+
+common:linux-s390x-rhel8-cross-rbe --platforms=//bazel/platforms:rhel8_s390x_cross
+common:linux-s390x-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64
+common:linux-s390x-rhel8-cross-rbe --remote_download_outputs=toplevel
+common:linux-s390x-rhel8-cross-rbe --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-s390x-rhel9-cross-rbe --platforms=//bazel/platforms:rhel9_s390x_cross
+common:linux-s390x-rhel9-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64
+common:linux-s390x-rhel9-cross-rbe --remote_download_outputs=toplevel
+common:linux-s390x-rhel9-cross-rbe --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-ppc64le-rhel8-cross-rbe --platforms=//bazel/platforms:rhel8_ppc64le_cross
+common:linux-ppc64le-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64
+common:linux-ppc64le-rhel8-cross-rbe --remote_download_outputs=toplevel
+common:linux-ppc64le-rhel8-cross-rbe --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-ppc64le-rhel9-cross-rbe --platforms=//bazel/platforms:rhel9_ppc64le_cross
+common:linux-ppc64le-rhel9-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64
+common:linux-ppc64le-rhel9-cross-rbe --remote_download_outputs=toplevel
+common:linux-ppc64le-rhel9-cross-rbe --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-s390x-rhel8-cross-rbe-arm64 --platforms=//bazel/platforms:rhel8_s390x_cross
+common:linux-s390x-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+common:linux-s390x-rhel8-cross-rbe-arm64 --remote_download_outputs=toplevel
+common:linux-s390x-rhel8-cross-rbe-arm64 --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-s390x-rhel9-cross-rbe-arm64 --platforms=//bazel/platforms:rhel9_s390x_cross
+common:linux-s390x-rhel9-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+common:linux-s390x-rhel9-cross-rbe-arm64 --remote_download_outputs=toplevel
+common:linux-s390x-rhel9-cross-rbe-arm64 --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --platforms=//bazel/platforms:rhel8_ppc64le_cross
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --remote_download_outputs=toplevel
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
+
+common:linux-ppc64le-rhel9-cross-rbe-arm64 --platforms=//bazel/platforms:rhel9_ppc64le_cross
+common:linux-ppc64le-rhel9-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+common:linux-ppc64le-rhel9-cross-rbe-arm64 --remote_download_outputs=toplevel
+common:linux-ppc64le-rhel9-cross-rbe-arm64 --remote_download_regex=.*\.(so|a|debug|dwp|json|txt|tar|tgz|gz|zip)$
 
 # This should always be at the bottom because any platform specific configs should always be applied if possible
 common --enable_platform_specific_config=true

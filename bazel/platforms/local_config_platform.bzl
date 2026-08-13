@@ -25,11 +25,19 @@ def _setup_local_config_platform(ctx):
     arch_constraint = ARCH_TO_PLATFORM_MAP[toolchain_arch]
 
     constraints = [os_constraint, arch_constraint]
+    if os == "macos":
+        constraints.append("@//bazel/platforms:use_mongo_native_apple_toolchain")
 
     # So Starlark doesn't throw an indentation error when this gets injected.
     constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
 
-    distro = get_host_distro_major_version(ctx)
+    # Keep the execution platform in sync with the image used by the wrapper. These
+    # values are declared in the repository rule's environ list below so changing an
+    # override also regenerates the platform and its action identity.
+    distro = (
+        ctx.os.environ.get("MONGO_HERMETIC_CONTAINER_DISTRO") or
+        get_host_distro_major_version(ctx)
+    )
     arch = toolchain_arch
     if arch == "x86_64":
         arch = "amd64"
@@ -56,7 +64,10 @@ def _setup_local_config_platform(ctx):
     elif distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
         constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
         constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
-        container_url = REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
+        container_url = (
+            ctx.os.environ.get("MONGO_HERMETIC_CONTAINER_IMAGE") or
+            REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
+        )
         web_url = REMOTE_EXECUTION_CONTAINERS[distro]["web-url"]
         dockerfile = REMOTE_EXECUTION_CONTAINERS[distro]["dockerfile"]
         print("Local host platform is configured to use this container if doing remote execution: {} built from {}".format(web_url, dockerfile))
@@ -126,5 +137,9 @@ setup_local_config_platform = repository_rule(
             doc = "Template modeling the builtin local config platform constraints file.",
         ),
     },
-    environ = ["USE_NATIVE_TOOLCHAIN"],
+    environ = [
+        "MONGO_HERMETIC_CONTAINER_DISTRO",
+        "MONGO_HERMETIC_CONTAINER_IMAGE",
+        "USE_NATIVE_TOOLCHAIN",
+    ],
 )

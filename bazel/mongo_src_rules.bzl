@@ -8,6 +8,7 @@ load(
 )
 load(
     "//bazel/toolchains/cc:mongo_compiler_flags.bzl",
+    "LIBVOIDSTAR_INPUTS",
     "get_copts",
     "get_linkopts",
 )
@@ -235,7 +236,7 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/valgrind:headers",
 ]
 
-MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
+MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + LIBVOIDSTAR_INPUTS
 
 def hex32(val):
     """Returns zero-padded 8-character lowercase hex string of 32-bit hash."""
@@ -994,7 +995,36 @@ def idl_generator_impl(ctx):
     gen_source = ctx.actions.declare_file(base + "_gen.cpp")
     gen_header = ctx.actions.declare_file(base + "_gen.h")
 
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+    use_macos_local_container = ctx.attr._macos_cross_local_container_actions[BuildSettingInfo].value
+    use_windows_local_container = ctx.attr._windows_cross_local_container_actions[BuildSettingInfo].value
+    use_linux_python = (
+        ctx.attr._idl_use_linux_python[BuildSettingInfo].value or
+        use_macos_local_container or
+        use_windows_local_container
+    )
+    if use_linux_python:
+        linux_python_interpreter = ctx.attr._linux_aarch64_python_interpreter
+        linux_python_files = ctx.attr._linux_aarch64_python_files
+        if ctx.attr._macos_cross_linux_python_arch[BuildSettingInfo].value == "x86_64":
+            linux_python_interpreter = ctx.attr._linux_x86_64_python_interpreter
+            linux_python_files = ctx.attr._linux_x86_64_python_files
+
+        linux_python_interpreters = linux_python_interpreter.files.to_list()
+        if len(linux_python_interpreters) != 1:
+            fail("Linux Python runtime was requested for IDL generation but is not available")
+        python_interpreter = linux_python_interpreters[0].path
+        python_files = linux_python_files.files
+        if use_windows_local_container:
+            python_interpreter = python_interpreter.replace("\\", "/")
+            for python_file in python_files.to_list():
+                if python_file.basename.startswith("python3.") and not python_file.basename.endswith("-config"):
+                    python_interpreter = python_file.path.replace("\\", "/")
+                    break
+    else:
+        python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+        python_interpreter = python.interpreter.path
+        python_files = python.files
+
     dep_depsets = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]
 
     # Transitive headers from deps + explicit hdrs attr
@@ -1014,31 +1044,44 @@ def idl_generator_impl(ctx):
     inputs = depset(transitive = [
         ctx.attr.src.files,
         ctx.attr.idlc.files,
-        python.files,
+        python_files,
     ] + dep_depsets + py_depsets)
 
     include_directives = ["--include", "src"]
     if "src/mongo/db/modules/enterprise/src" in ctx.attr.src.files.to_list()[0].path:
         include_directives += ["--include", "src/mongo/db/modules/enterprise/src"]
 
+    idlc_arguments = [
+        "buildscripts/idl/idlc.py",
+        "--base_dir",
+        ctx.bin_dir.path + "/src",
+        "--target_arch",
+        ctx.var["TARGET_CPU"],
+        "--header",
+        gen_header.path,
+        "--output",
+        gen_source.path,
+        ctx.attr.src.files.to_list()[0].path,
+    ] + include_directives
+
+    if use_macos_local_container:
+        action_wrapper = ctx.executable._macos_cross_action_wrapper
+    else:
+        action_wrapper = None
+
+    if use_windows_local_container:
+        python_path_value = ":".join([path.replace("\\", "/") for path in python_path])
+    else:
+        python_path_value = ctx.configuration.host_path_separator.join(python_path)
+
     ctx.actions.run(
-        executable = python.interpreter.path,
+        executable = action_wrapper if use_macos_local_container else python_interpreter,
         outputs = [gen_source, gen_header],
         inputs = inputs,
-        arguments = [
-            "buildscripts/idl/idlc.py",
-            "--base_dir",
-            ctx.bin_dir.path + "/src",
-            "--target_arch",
-            ctx.var["TARGET_CPU"],
-            "--header",
-            gen_header.path,
-            "--output",
-            gen_source.path,
-            ctx.attr.src.files.to_list()[0].path,
-        ] + include_directives,
+        arguments = ([python_interpreter] if use_macos_local_container else []) + idlc_arguments,
         mnemonic = "IdlcGenerator",
-        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
+        env = {"PYTHONPATH": python_path_value},
+        use_default_shell_env = use_macos_local_container,
     )
 
     # Depsets we’ll publish
@@ -1111,6 +1154,35 @@ idl_generator_rule = rule(
             doc = "Dependent headers required by this IDL target",
             allow_files = True,
             default = [],
+        ),
+        "_idl_use_linux_python": attr.label(
+            default = "//bazel/config:idl_use_linux_python",
+        ),
+        "_macos_cross_local_container_actions": attr.label(
+            default = "//bazel/config:macos_cross_local_container_actions",
+        ),
+        "_windows_cross_local_container_actions": attr.label(
+            default = "//bazel/config:windows_cross_local_container_actions",
+        ),
+        "_macos_cross_linux_python_arch": attr.label(
+            default = "//bazel/config:macos_cross_linux_python_arch",
+        ),
+        "_macos_cross_action_wrapper": attr.label(
+            default = "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper_sh",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_linux_aarch64_python_files": attr.label(
+            default = "@py_linux_arm64//:files",
+        ),
+        "_linux_aarch64_python_interpreter": attr.label(
+            default = "@py_linux_arm64//:interpreter",
+        ),
+        "_linux_x86_64_python_files": attr.label(
+            default = "@py_linux_x86_64//:files",
+        ),
+        "_linux_x86_64_python_interpreter": attr.label(
+            default = "@py_linux_x86_64//:interpreter",
         ),
     },
     outputs = {
@@ -1705,6 +1777,7 @@ def windows_rc(name, src, manifest_in = None, icon = None):
         src = src,
         resources = resources,
         rc = select({
+            "//bazel/platforms:windows_cross": "@mongo_windows_cross_toolchain_files//:rc",
             "@platforms//os:windows": "@mongo_windows_toolchain//:rc",
             "//conditions:default": None,
         }),
@@ -1712,8 +1785,10 @@ def windows_rc(name, src, manifest_in = None, icon = None):
     )
 
 def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
+    compile_data = kwargs.pop("compile_data", []) + LIBVOIDSTAR_INPUTS
     rust_library(
         name = name,
+        compile_data = compile_data,
         rustc_flags = rustc_flags,
         target_compatible_with = target_compatible_with,
         **kwargs
@@ -1727,8 +1802,10 @@ def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kw
     )
 
 def mongo_rust_shared_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
+    compile_data = kwargs.pop("compile_data", []) + LIBVOIDSTAR_INPUTS
     rust_shared_library(
         name = name,
+        compile_data = compile_data,
         rustc_flags = rustc_flags,
         target_compatible_with = target_compatible_with,
         **kwargs

@@ -1,0 +1,91 @@
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_proc_macro", "rust_shared_library", "rust_test")
+load("//bazel/config:python_genrule.bzl", "python_genrule")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "libvoidstar_cc_link_fixture",
+    srcs = ["libvoidstar_link_fixture.cc"],
+    tags = ["manual"],
+)
+
+genrule(
+    name = "libvoidstar_tool_runtime_fixture",
+    outs = ["libvoidstar_tool_runtime_fixture.txt"],
+    cmd = "$(location :libvoidstar_cc_link_fixture) && touch $@",
+    tools = [":libvoidstar_cc_link_fixture"],
+)
+
+rust_shared_library(
+    name = "libvoidstar_rust_link_fixture",
+    srcs = ["libvoidstar_link_fixture.rs"],
+    edition = "2024",
+    tags = ["manual"],
+)
+
+rust_proc_macro(
+    name = "boundary_macro",
+    srcs = ["boundary_macro.rs"],
+    edition = "2024",
+)
+
+cargo_build_script(
+    name = "boundary_build_script",
+    srcs = ["build.rs"],
+    edition = "2024",
+    use_default_shell_env = 1,
+)
+
+rust_library(
+    name = "boundary_lib",
+    srcs = ["lib.rs"],
+    edition = "2024",
+    proc_macro_deps = [":boundary_macro"],
+    deps = [":boundary_build_script"],
+)
+
+rust_test(
+    name = "boundary_rust_test",
+    crate = ":boundary_lib",
+    edition = "2024",
+)
+
+python_genrule(
+    name = "generated_python_input",
+    srcs = ["generator_input.txt"],
+    cmd = [
+        "$(location generator_input.txt)",
+        "$(location generated_python_input.txt)",
+    ],
+    outputs = ["generated_python_input.txt"],
+    python_file = "generate.py",
+)
+
+proto_library(
+    name = "boundary_proto",
+    srcs = ["boundary.proto"],
+)
+
+cc_proto_library(
+    name = "boundary_proto_cc",
+    deps = [":boundary_proto"],
+)
+
+filegroup(
+    name = "build_fixture",
+    srcs = [
+        ":boundary_lib",
+        ":boundary_proto_cc",
+        ":generated_python_input",
+        ":libvoidstar_tool_runtime_fixture",
+    ],
+)
+
+sh_binary(
+    name = "run_boundary_test",
+    srcs = ["run_boundary_test.sh"],
+)

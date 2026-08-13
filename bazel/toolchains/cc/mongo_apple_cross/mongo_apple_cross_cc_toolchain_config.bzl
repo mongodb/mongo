@@ -194,12 +194,6 @@ def _impl(ctx):
         "-B" + prefix + "/tools",
         "-fuse-ld=lld",
         "-Wl,-platform_version,macos," + ctx.attr.min_macos_version + ",14.0",
-        # Force-load all members of static libraries. This is required because
-        # MongoDB uses MONGO_INITIALIZER registrations via static constructors
-        # that have no direct symbol references - without this, ld64 drops the
-        # object files containing them. The GNU ld equivalent is --whole-archive
-        # but ld64 mode doesn't support positional wrapping; -all_load is global.
-        "-Wl,-all_load",
     ]
 
     # Feature definitions
@@ -587,11 +581,22 @@ def _impl(ctx):
                                 flags = ["%{libraries_to_link.name}"],
                             ),
                             flag_group(
+                                flag_groups = [
+                                    flag_group(
+                                        flags = ["%{libraries_to_link.name}"],
+                                        expand_if_false = "libraries_to_link.is_whole_archive",
+                                    ),
+                                    flag_group(
+                                        # ld64.lld does not support positional
+                                        # --whole-archive wrapping in Mach-O mode.
+                                        flags = ["-Wl,-force_load,%{libraries_to_link.name}"],
+                                        expand_if_true = "libraries_to_link.is_whole_archive",
+                                    ),
+                                ],
                                 expand_if_equal = variable_with_value(
                                     name = "libraries_to_link.type",
                                     value = "static_library",
                                 ),
-                                flags = ["%{libraries_to_link.name}"],
                             ),
                             flag_group(
                                 expand_if_equal = variable_with_value(
@@ -646,6 +651,19 @@ def _impl(ctx):
         ],
     )
 
+    disable_warnings_for_third_party_libraries_clang_feature = feature(
+        name = "disable_warnings_for_third_party_libraries_clang",
+        enabled = ctx.attr.compiler == "clang",
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-character-conversion",
+                ])],
+            ),
+        ],
+    )
+
     # Collect all features. get_common_features() supplies the per-warning
     # -Wno-* suppressions (unused-function, defaulted-function-deleted,
     # unused-private-field, etc.), the warnings_as_errors_compile feature
@@ -683,6 +701,7 @@ def _impl(ctx):
         macos_fsized_deallocation_feature,
     ] + get_common_features(ctx) + [
         user_compile_flags_feature,
+        disable_warnings_for_third_party_libraries_clang_feature,
     ] + ([supports_start_end_lib_feature] if ctx.attr.supports_start_end_lib else [])
 
     # Artifact name patterns for macOS

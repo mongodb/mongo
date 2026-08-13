@@ -242,7 +242,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%bazel_features_deps": {
       "general": {
-        "bzlTransitiveDigest": "I5PaojsBKW1HVmcYHwU0ZOQyD8u+fglp9ZhNyuH4pT4=",
+        "bzlTransitiveDigest": "0Ls83w+99VX3FWHqU5lq38/OKk0eyea+/nKnrX+KqKU=",
         "usagesDigest": "c91kQ0HotoA1cfwWU4KaqCoQU7lT6pGi6XPGIiMGkb0=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -353,7 +353,7 @@
     },
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "I5PaojsBKW1HVmcYHwU0ZOQyD8u+fglp9ZhNyuH4pT4=",
+        "bzlTransitiveDigest": "0Ls83w+99VX3FWHqU5lq38/OKk0eyea+/nKnrX+KqKU=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -541,7 +541,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl%setup_mongo_apple_cross_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "0i1efTsqX+QAW3/VcIkiaihfsl1MV7TqwG6iLosnXGU=",
+        "bzlTransitiveDigest": "QN0Pu/Oax6Tbwp2j7Zndu7aYs6VOFYyq7Vse6xS+NOE=",
         "usagesDigest": "EVkQddf0MbwFmuJ26u4/NZd4P4Z0AhChzItbpAItozs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -567,6 +567,106 @@
         ]
       }
     },
+    "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%setup_mongo_linux_cross_toolchains_extension": {
+      "general": {
+        "bzlTransitiveDigest": "i8veTyvh0WxS989tuTeSdfJR9nPzs1u9+FUjGWDPrIc=",
+        "usagesDigest": "B9JdMmagXv+H97m1bCwaGiKktIVCPGeH/qokO4Hpx1A=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel8",
+              "target_arch": "ppc64le",
+              "exec_distro": "rhel9",
+              "exec_arch": "x86_64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel8",
+              "target_arch": "ppc64le",
+              "exec_distro": "rhel9",
+              "exec_arch": "aarch64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel8",
+              "target_arch": "s390x",
+              "exec_distro": "rhel9",
+              "exec_arch": "x86_64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel8",
+              "target_arch": "s390x",
+              "exec_distro": "rhel9",
+              "exec_arch": "aarch64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel9",
+              "target_arch": "ppc64le",
+              "exec_distro": "rhel9",
+              "exec_arch": "x86_64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel9",
+              "target_arch": "ppc64le",
+              "exec_distro": "rhel9",
+              "exec_arch": "aarch64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel9",
+              "target_arch": "s390x",
+              "exec_distro": "rhel9",
+              "exec_arch": "x86_64",
+              "version": "v5"
+            }
+          },
+          "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+            "ruleClassName": "linux_cross_toolchain_download",
+            "attributes": {
+              "target_distro": "rhel9",
+              "target_arch": "s390x",
+              "exec_distro": "rhel9",
+              "exec_arch": "aarch64",
+              "version": "v5"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
     "//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl%setup_mongo_windows_toolchain_extension": {
       "general": {
         "bzlTransitiveDigest": "dTkPBS74jWiliNeqZtye2TPIbqNdPymmbroA6UepKwA=",
@@ -584,9 +684,31 @@
         "recordedRepoMappingEntries": []
       }
     },
+    "//bazel/toolchains/cc/mongo_windows_cross:mongo_windows_cross_toolchain.bzl%setup_mongo_windows_cross_toolchain_extension": {
+      "general": {
+        "bzlTransitiveDigest": "7PmOkG2My2Q/l/T+krcuC/aTX17BhlCeX4ltPhQsMeM=",
+        "usagesDigest": "Q3T0kD3kSIYNhLPohzGt7/euFUDb446e/rpGRj2NIOE=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "mongo_windows_cross_toolchain": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_windows_cross:mongo_windows_cross_toolchain.bzl",
+            "ruleClassName": "mongo_windows_cross_toolchain_config",
+            "attributes": {}
+          },
+          "mongo_windows_cross_toolchain_files": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_windows_cross:mongo_windows_cross_toolchain.bzl",
+            "ruleClassName": "mongo_windows_cross_toolchain_files_config",
+            "attributes": {}
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
     "@@aspect_rules_js~//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "YMJUe8DU8qDDcHmvJdpEGGvEGkYh8nCyUJVF05x9VXo=",
+        "bzlTransitiveDigest": "yCOX0U/rCq7NFwa6xH2mrp6iA5th/2mAT7LYUlO1IUE=",
         "usagesDigest": "nreWOSoW3keGlKdHpT5drUTOjHwIzGpp1haLECAZ4dM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1800,7 +1922,7 @@
     },
     "@@rules_rust~//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "FuJ/TGdQCenBGOw6gz0NZUWEGiKz/HaSqxa9KiDdG/Y=",
+        "bzlTransitiveDigest": "si5U05jYATo2YClEd/Qjc9krMvoc1ztYVTMnak3MyBg=",
         "usagesDigest": "jdsFFevZIrOcSfuuZxyovS/wXbhPLIa/eBqyNOiTP98=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

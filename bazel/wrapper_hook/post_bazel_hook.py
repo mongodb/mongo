@@ -1,4 +1,4 @@
-# Hook to be called around bazel invocation time. Does not run on Windows.
+# Hook to be called after a Bazel invocation.
 import os
 import pathlib
 import sys
@@ -17,6 +17,9 @@ def main():
 
     from bazel.wrapper_hook.compiledb import finalize_compiledb_posthook
     from bazel.wrapper_hook.flag_sync import sync_flags
+    from bazel.wrapper_hook.hermetic_container_integration import (
+        restore_hermetic_container_convenience_symlinks_from_env,
+    )
 
     if os.environ.get("NO_FLAG_SYNC") is None:
         if os.environ.get("CI") is None:
@@ -27,6 +30,7 @@ def main():
     enterprise = (REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise").exists()
     atlas = (REPO_ROOT / "src" / "mongo" / "db" / "modules" / "atlas").exists()
     finalize_compiledb_posthook(sys.argv[1], enterprise=enterprise, atlas=atlas)
+    restore_hermetic_container_convenience_symlinks_from_env()
 
 
 if __name__ == "__main__":
