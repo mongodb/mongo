@@ -435,8 +435,16 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
+        BSONObjBuilder args;
+        for (const auto& elem : _args) {
+            if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+                args.append(elem);
+            } else {
+                ctx->appendLiteral(args, elem.fieldName(), elem);
+            }
+        }
+        return BSON(_name << args.obj());
     }
 
     BSONObj toBsonForLog() const override {
@@ -480,7 +488,7 @@ public:
     }
 
     BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
+        return BSON(_name << _args);
     }
 
     BSONObj toBsonForLog() const override {

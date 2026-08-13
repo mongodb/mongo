@@ -189,7 +189,9 @@ public:
     }
 
     BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
-        return BSONObj();
+        BSONObjBuilder args;
+        ctx->appendLiteral(args, "algorithm", BSON("algorithm" << _algorithm).firstElement());
+        return BSON(kMetricsStageName << args.obj());
     }
 
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
