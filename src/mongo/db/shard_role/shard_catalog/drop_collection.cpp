@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/index_builds/abort.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -185,49 +186,56 @@ StatusWith<timeseries::CollectionOrViewAcquisitionPlusTimeseriesView> _abortInde
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    // Set by the re-locking callback below if the collection went away, or if this node can no
+    // longer drop it, while the locks were released to abort index builds.
+    boost::optional<Status> abandoned;
 
-    while (true) {
-        Status status = _checkReplState(opCtx, locks->target.getCollectionPtr(), startingNss);
-        if (!status.isOK()) {
-            return status;
-        } else if (!locks->target.collectionExists()) {
-            return StatusWith(std::move(*locks));
-        }
-
-        // Check if any index builds are in progress. If so, we need to abort the index builders.
-        if (!indexBuildsCoord->inProgForCollection(locks->target.getCollection().uuid())) {
-            break;
-        }
-
-        // Save a copy of the namespace before yielding our locks.
-        const NamespaceString collectionNs = locks->target.nss();
-        const UUID collectionUUID = locks->target.getCollection().uuid();
-
-        // Release locks before aborting index builds. The helper will acquire locks on our behalf.
-        locks = boost::none;
-
-        // Send the abort signal to any active index builds on the collection. This waits until all
-        // aborted index builds complete.
-        indexBuildsCoord->abortCollectionIndexBuilds(
-            opCtx,
-            collectionNs,
-            collectionUUID,
-            str::stream() << "Collection " << toStringForLogging(collectionNs) << "("
-                          << collectionUUID << ") is being dropped");
-
-        // Abandon the snapshot as the index catalog will compare the in-memory state to the
-        // disk state, which may have changed when we released the collection lock temporarily.
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-        // Take an exclusive lock to finish the collection drop.
-        locks.emplace(timeseries::acquireCollectionOrViewPlusTimeseriesView(
-            opCtx,
-            CollectionOrViewAcquisitionRequest::fromOpCtx(
-                opCtx, startingNss, expectedUUID, AcquisitionPrerequisites::kWrite)));
+    Status status = _checkReplState(opCtx, locks->target.getCollectionPtr(), startingNss);
+    if (!status.isOK()) {
+        return status;
     }
 
-    invariant(locks->target.getCollectionPtr()->getIndexCatalog()->numIndexesInProgress() == 0);
+    NamespaceString ns = locks->target.nss();
+    UUID collectionUUID = locks->target.getCollection().uuid();
+
+    index_builds::abort(
+        opCtx,
+        ns,
+        collectionUUID,
+        str::stream() << "Collection " << toStringForLogging(ns) << "(" << collectionUUID
+                      << ") is being dropped",
+        /*unlock=*/[&] { locks = boost::none; },
+        /*lock=*/
+        [&] {
+            // Abandon the snapshot as the index catalog will compare the in-memory state to
+            // the disk state, which may have changed while the collection lock was released.
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+            // Take an exclusive lock to finish the collection drop.
+            locks.emplace(timeseries::acquireCollectionOrViewPlusTimeseriesView(
+                opCtx,
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, startingNss, expectedUUID, AcquisitionPrerequisites::kWrite)));
+
+            auto replStatus = _checkReplState(opCtx, locks->target.getCollectionPtr(), startingNss);
+            if (!replStatus.isOK()) {
+                abandoned = replStatus;
+                return false;
+            }
+            if (!locks->target.collectionExists()) {
+                // Someone else dropped the collection, nothing left to do.
+                abandoned = Status::OK();
+                return false;
+            }
+            return true;
+        });
+
+    if (abandoned && !abandoned->isOK()) {
+        return *abandoned;
+    }
+
+    invariant(!locks->target.collectionExists() ||
+              locks->target.getCollectionPtr()->getIndexCatalog()->numIndexesInProgress() == 0);
 
     return StatusWith(std::move(*locks));
 }
