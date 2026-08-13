@@ -6,6 +6,15 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -812,6 +821,158 @@ DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateRidOnNonRridCollection, "11454701") {
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOpWithRid));
     BSONObjBuilder resultBuilder;
     (void)applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder);
+}
+
+/**
+ * Fixture for the apply-side authorization helpers in repl::detail. Installs a controllable
+ * AuthorizationSessionForTest on the test client and registers a collection so its UUID resolves in
+ * the catalog.
+ */
+class ApplyOpsUUIDAuthTest : public ServiceContextMongoDTest {
+protected:
+    ApplyOpsUUIDAuthTest() : ServiceContextMongoDTest(Options{}.setAuthObjects(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+
+        auto* service = getServiceContext();
+        ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
+
+        _opCtx = cc().makeOperationContext();
+        createOplog(_opCtx.get());
+        ASSERT_OK(
+            ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
+
+        // Install an AuthorizationSessionForTest on the client so that
+        // AuthorizationSession::get(client) returns a session whose privileges we control via
+        // assumePrivilegesForDB().
+        auto* client = _opCtx->getClient();
+        auth::AuthorizationBackendInterface::set(
+            client->getService(), std::make_unique<auth::AuthorizationBackendMock>());
+        auto authzSession = std::make_unique<AuthorizationSessionForTest>(
+            std::make_unique<AuthzSessionExternalStateMock>(client), client);
+        _authzSession = authzSession.get();
+        AuthorizationSession::set(client, std::move(authzSession));
+
+        // Register a collection so its UUID resolves to '_nss'.
+        _storage = std::make_unique<StorageInterfaceImpl>();
+        CollectionOptions options;
+        options.uuid = _collUUID;
+        ASSERT_OK(_storage->createCollection(_opCtx.get(), _nss, options));
+    }
+
+    void tearDown() override {
+        _storage.reset();
+        _opCtx.reset();
+        ServiceContextMongoDTest::tearDown();
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    // Builds a command ('c') oplog entry targeting the given (optional) UUID with command body
+    // 'oField'.
+    OplogEntry makeCommandOplogEntry(boost::optional<UUID> uuid, const BSONObj& oField) {
+        return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
+                                  OpTypeEnum::kCommand,        // op type
+                                  _nss.getCommandNS(),         // namespace
+                                  uuid,                        // uuid
+                                  boost::none,                 // fromMigrate
+                                  boost::none,                 // checkExistenceForDiffInsert
+                                  boost::none,                 // versionContext
+                                  OplogEntry::kOplogVersion,   // version
+                                  oField,                      // o
+                                  boost::none,                 // o2
+                                  OperationSessionInfo(),      // sessionInfo
+                                  boost::none,                 // upsert
+                                  Date_t(),                    // wall clock time
+                                  {},                          // statement ids
+                                  boost::none,  // optime of previous write within same transaction
+                                  boost::none,  // pre-image optime
+                                  boost::none,  // post-image optime
+                                  boost::none,  // ShardId of resharding recipient
+                                  boost::none,  // _id
+                                  boost::none)};  // needsRetryImage
+    }
+
+    // Asserts that the helper denies 'cmdType' on '_nss' before any privileges are granted, then
+    // permits it once 'neededActions' are granted on '_nss'.
+    void runIsAuthorizedCase(OplogEntry::CommandType cmdType, ActionSet neededActions) {
+        ASSERT_FALSE(detail::isAuthorizedForUUIDTargetedCommand(_authzSession, cmdType, _nss));
+        _authzSession->assumePrivilegesForDB(
+            Privilege(ResourcePattern::forExactNamespace(_nss), std::move(neededActions)),
+            _nss.dbName());
+        ASSERT_TRUE(detail::isAuthorizedForUUIDTargetedCommand(_authzSession, cmdType, _nss));
+    }
+
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    const UUID _collUUID = UUID::gen();
+    AuthorizationSessionForTest* _authzSession = nullptr;
+    ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<StorageInterface> _storage;
+};
+
+// ---- isAuthorizedForUUIDTargetedCommand ----
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedReturnsTrueWhenNoAuthorizationSession) {
+    ASSERT_TRUE(
+        detail::isAuthorizedForUUIDTargetedCommand(nullptr, OplogEntry::CommandType::kDrop, _nss));
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedReturnsTrueForUnexpectedCommandType) {
+    // A command type the helper does not target is authorized even without any granted privileges.
+    ASSERT_TRUE(detail::isAuthorizedForUUIDTargetedCommand(
+        _authzSession, OplogEntry::CommandType::kCreate, _nss));
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedForDrop) {
+    runIsAuthorizedCase(OplogEntry::CommandType::kDrop, ActionSet{ActionType::dropCollection});
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedForDropIndexes) {
+    runIsAuthorizedCase(OplogEntry::CommandType::kDropIndexes, ActionSet{ActionType::dropIndex});
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedForCollMod) {
+    runIsAuthorizedCase(OplogEntry::CommandType::kCollMod, ActionSet{ActionType::collMod});
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedForRenameCollection) {
+    runIsAuthorizedCase(OplogEntry::CommandType::kRenameCollection,
+                        ActionSet{ActionType::find, ActionType::dropCollection});
+}
+
+// ---- checkAuthForUUIDTargetedCommand ----
+
+TEST_F(ApplyOpsUUIDAuthTest, CheckAuthDoesNotThrowWhenOpHasNoUUID) {
+    auto entry = makeCommandOplogEntry(boost::none, BSON("drop" << "placeholder"));
+    ASSERT_DOES_NOT_THROW(detail::checkAuthForUUIDTargetedCommand(opCtx(), entry));
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, CheckAuthDoesNotThrowForNonTargetedCommand) {
+    auto entry = makeCommandOplogEntry(_collUUID, BSON("create" << "placeholder"));
+    ASSERT_DOES_NOT_THROW(detail::checkAuthForUUIDTargetedCommand(opCtx(), entry));
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, CheckAuthDoesNotThrowWhenUUIDDoesNotResolve) {
+    auto entry = makeCommandOplogEntry(UUID::gen(), BSON("drop" << "placeholder"));
+    ASSERT_DOES_NOT_THROW(detail::checkAuthForUUIDTargetedCommand(opCtx(), entry));
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, CheckAuthThrowsUnauthorizedWhenNotAuthorizedForResolvedCollection) {
+    auto entry = makeCommandOplogEntry(_collUUID, BSON("drop" << "placeholder"));
+    ASSERT_THROWS_CODE(detail::checkAuthForUUIDTargetedCommand(opCtx(), entry),
+                       DBException,
+                       ErrorCodes::Unauthorized);
+}
+
+TEST_F(ApplyOpsUUIDAuthTest, CheckAuthSucceedsWhenAuthorizedForResolvedCollection) {
+    _authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::dropCollection),
+        _nss.dbName());
+    auto entry = makeCommandOplogEntry(_collUUID, BSON("drop" << "placeholder"));
+    ASSERT_DOES_NOT_THROW(detail::checkAuthForUUIDTargetedCommand(opCtx(), entry));
 }
 
 }  // namespace

@@ -7,6 +7,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/oplog_key_entry_handler.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -32,12 +35,14 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -50,6 +55,78 @@ namespace {
 
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
+
+}  // namespace
+
+namespace detail {
+
+// The DDL command ops whose applyOps execution resolves the target collection from the op's UUID
+// rather than from the collection named in the command body.
+constexpr std::array kUUIDTargetedDDLCommands{
+    OplogEntry::CommandType::kDrop,
+    OplogEntry::CommandType::kDropIndexes,
+    OplogEntry::CommandType::kCollMod,
+    OplogEntry::CommandType::kRenameCollection,
+};
+
+bool isAuthorizedForUUIDTargetedCommand(AuthorizationSession* authSession,
+                                        OplogEntry::CommandType cmdType,
+                                        const NamespaceString& nss) {
+    if (!authSession) {
+        return true;
+    }
+    switch (cmdType) {
+        case OplogEntry::CommandType::kDrop:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+        case OplogEntry::CommandType::kDropIndexes:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropIndex);
+        case OplogEntry::CommandType::kCollMod:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::collMod);
+        case OplogEntry::CommandType::kRenameCollection: {
+            // Mirror the source-side requirements of renameCollection authorization: the caller
+            // must be able to read the source and either drop it (cross-database rename) or rename
+            // within its database.
+            const bool canReadSource =
+                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::find);
+            const bool canDropSource =
+                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+            const bool canRenameInDb = authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(nss.dbName()), ActionType::renameCollectionSameDB);
+            return canReadSource && (canDropSource || canRenameInDb);
+        }
+        default:
+            return true;
+    }
+}
+
+void checkAuthForUUIDTargetedCommand(OperationContext* opCtx, const OplogEntry& entry) {
+    const auto cmdType = entry.getCommandType();
+    if (!entry.getUuid() ||
+        !std::any_of(kUUIDTargetedDDLCommands.begin(),
+                     kUUIDTargetedDDLCommands.end(),
+                     [&](auto command) { return command == cmdType; })) {
+        return;
+    }
+
+    const auto nssFromUUID =
+        CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *entry.getUuid());
+    if (!nssFromUUID) {
+        return;
+    }
+
+    auto* authSession = AuthorizationSession::get(opCtx->getClient());
+    uassert(ErrorCodes::Unauthorized,
+            fmt::format("not authorized to run '{}' against the collection '{}' that the applyOps "
+                        "ui '{}' resolves to",
+                        entry.getObject().firstElement().fieldNameStringData(),
+                        nssFromUUID->toStringForErrorMsg(),
+                        entry.getUuid()->toString()),
+            isAuthorizedForUUIDTargetedCommand(authSession, cmdType, *nssFromUUID));
+}
+
+}  // namespace detail
+
+namespace {
 
 Status _applyOps(OperationContext* opCtx,
                  const ApplyOpsCommandInfo& info,
@@ -153,6 +230,10 @@ Status _applyOps(OperationContext* opCtx,
                                 uassertStatusOK(applyCommand_inlock(
                                     opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                                 return Status::OK();
+                            }
+
+                            if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
+                                detail::checkAuthForUUIDTargetedCommand(opCtx, entry);
                             }
                             uassertStatusOK(applyCommand_inlock(
                                 opCtx, ApplierOperation{&entry}, oplogApplicationMode));
