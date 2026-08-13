@@ -3,28 +3,14 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2d7fbf85-c8b6-4f90-9966-70da88224a36",
-  "version": 14,
+  "version": 15,
   "metadata": {
-    "timestamp": "2026-08-09T18:08:16Z",
+    "timestamp": "2026-08-13T08:05:10Z",
     "lifecycles": [
       {
         "phase": "pre-build"
       }
     ],
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.1098"
-        }
-      ]
-    },
-    "supplier": {
-      "name": "MongoDB, Inc.",
-      "url": [
-        "https://mongodb.com"
-      ]
-    },
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@master",
@@ -70,6 +56,20 @@
         {
           "url": "https://github.com/mongodb/mongo",
           "type": "vcs"
+        }
+      ]
+    },
+    "supplier": {
+      "name": "MongoDB, Inc.",
+      "url": [
+        "https://mongodb.com"
+      ]
+    },
+    "tools": {
+      "services": [
+        {
+          "name": "Endor Labs Inc",
+          "version": "v1.7.1104"
         }
       ]
     }
@@ -142,7 +142,7 @@
       "group": "intel",
       "name": "Intel\u00ae Decimal Floating-Point Math Library",
       "version": "2.0.1",
-      "description": "A software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
+      "description": "A a software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
       "scope": "required",
       "licenses": [
         {
@@ -662,52 +662,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-      "supplier": {
-        "name": "The Cyrus Project",
-        "url": [
-          "https://www.cyrusimap.org/overview/who_is_cyrus.html",
-          "https://www.cyrusimap.org/sasl/"
-        ]
-      },
-      "author": "The Cyrus Team",
-      "group": "cyrus",
-      "name": "Cyrus SASL",
-      "version": "2.1.28",
-      "description": "Simple Authentication and Security Layer (SASL) is a specification that describes how authentication mechanisms can be plugged into an application protocol on the wire. Cyrus SASL is an implementation of SASL that makes it easy for application developers to integrate authentication mechanisms into their application in a generic way.",
-      "scope": "optional",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-Attribution-HPND-disclaimer"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 1998-2003 Carnegie Mellon University. All rights reserved.",
-      "cpe": "cpe:2.3:a:cyrus:sasl:2.1.28:*:*:*:*:*:*:*",
-      "purl": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-      "externalReferences": [
-        {
-          "url": "https://github.com/cyrusimap/cyrus-sasl.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/sasl"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
       "author": "David Anderson",
       "group": "davea42",
@@ -1097,7 +1051,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/googletest@v1.17.0",
+      "bom-ref": "pkg:github/google/googletest@1.17.0",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1119,7 +1073,7 @@
       ],
       "copyright": "Copyright 2008, Google Inc. All rights reserved.",
       "cpe": "cpe:2.3:a:google:google_test:1.17.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/googletest@v1.17.0",
+      "purl": "pkg:github/google/googletest@1.17.0",
       "externalReferences": [
         {
           "url": "https://github.com/google/googletest.git",
@@ -1264,7 +1218,7 @@
       "purl": "pkg:github/google/snappy@1.1.10",
       "externalReferences": [
         {
-          "url": "https://github.com/google/snappy.git",
+          "url": "https://github.com/google/tcmalloc.git",
           "type": "distribution"
         }
       ],
@@ -1362,7 +1316,7 @@
           "https://opensource.google/"
         ]
       },
-      "author": "gperftools Project",
+      "author": "gpertools Project",
       "group": "google.opensource",
       "name": "gperftools",
       "version": "2.9.1",
@@ -1636,7 +1590,7 @@
       "name": "Prometheus Client Library for Modern C++",
       "version": "1.2.2",
       "description": "This library aims to enable Metrics-Driven Development for C++ services. It implements the Prometheus Data Model, a powerful abstraction on which to collect and expose metrics.",
-      "scope": "required",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
@@ -2020,14 +1974,14 @@
       },
       "author": "OpenJS Foundation",
       "group": "nodejs",
-      "name": "node GetStringWidth function",
+      "name": "node",
       "version": "22.1.0",
       "description": "A modified version of the GetStringWidth function from Node.js, originating from the https://github.com/joyent/node repository.",
-      "scope": "required",
+      "scope": "excluded",
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "ISC"
           }
         }
       ],
@@ -2046,12 +2000,7 @@
           }
         ]
       },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ]
+      "properties": []
     },
     {
       "type": "library",
@@ -2661,6 +2610,12 @@
   ],
   "dependencies": [
     {
+      "ref": "pkg:github/mongodb/mongo-c-driver@2.3.0",
+      "dependsOn": [
+        "pkg:github/madler/zlib@1.3.2"
+      ]
+    },
+    {
       "ref": "pkg:github/mongodb/mongo@master",
       "dependsOn": [
         "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
@@ -2675,8 +2630,6 @@
         "pkg:github/boostorg/boost@boost-1.88.0",
         "pkg:github/c-ares/c-ares@cares-1_27_0",
         "pkg:github/chriskohlhoff/asio@asio-1-34-2",
-        "pkg:github/cyan4973/xxhash@v0.8.3",
-        "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
         "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
         "pkg:github/dcleblanc/safeint@3.0.28a",
         "pkg:github/derickr/timelib@2022.13",
@@ -2685,7 +2638,7 @@
         "pkg:github/fmtlib/fmt@11.2.0",
         "pkg:github/google/benchmark@v1.5.2",
         "pkg:github/google/fuzztest@2025-07-28",
-        "pkg:github/google/googletest@v1.17.0",
+        "pkg:github/google/googletest@1.17.0",
         "pkg:github/google/re2@2025-08-05",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
@@ -2705,7 +2658,6 @@
         "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
         "pkg:github/protocolbuffers/protobuf@v6.31.1",
-        "pkg:github/jupp0r/prometheus-cpp@v1.2.2",
         "pkg:github/rnpgp/rnp@v0.18.1",
         "pkg:github/roaringbitmap/croaring@v3.0.1",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
@@ -2715,12 +2667,6 @@
         "pkg:github/wiredtiger/wiredtiger@12.0.0",
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0"
-      ]
-    },
-    {
-      "ref": "pkg:github/mongodb/mongo-c-driver@2.3.0",
-      "dependsOn": [
-        "pkg:github/madler/zlib@1.3.2"
       ]
     },
     {
@@ -2783,10 +2729,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
       "dependsOn": []
     },
@@ -2819,7 +2761,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/googletest@v1.17.0",
+      "ref": "pkg:github/google/googletest@1.17.0",
       "dependsOn": []
     },
     {

@@ -31,7 +31,6 @@ a notice will be included in
 | [c-ares]                                             | MIT                                            | 1.27.0                                   |                      | ✗                               |
 | [cpptrace]                                           | MIT                                            | 1.0.3                                    |                      |                                 |
 | [CRoaring]                                           | Apache-2.0 OR MIT                              | 3.0.1                                    |                      | ✗                               |
-| [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
 | [folly]                                              | Apache-2.0                                     | 2025.04.21.00                            |                      | ✗                               |
 | [fuzztest]                                           | BSD-3-Clause, Apache-2.0, HPND                 | 2025-07-28                               |                      |                                 |
@@ -51,11 +50,11 @@ a notice will be included in
 | [Mozilla Firefox ESR]                                | MPL-2.0                                        | 140.11.0esr                              |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
-| [node GetStringWidth function]                       | MIT                                            | 22.1.0                                   |                      | ✗                               |
+| [node]                                               | ISC                                            | 22.1.0                                   |                      |                                 |
 | [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.24.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
-| [Prometheus Client Library for Modern C++]           | MIT                                            | 1.2.2                                    |                      | ✗                               |
+| [Prometheus Client Library for Modern C++]           | MIT                                            | 1.2.2                                    |                      |                                 |
 | [Protobuf]                                           | BSD-3-Clause                                   | 6.31.1                                   |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                                            | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                                     | 0.5.0                                    |                      |                                 |
@@ -80,7 +79,6 @@ a notice will be included in
 [Asio C++ Library]: https://github.com/chriskohlhoff/asio.git
 [Boost C++ Libraries]: https://github.com/boostorg/boost.git
 [CRoaring]: https://github.com/roaringbitmap/croaring.git
-[Cyrus SASL]: https://github.com/cyrusimap/cyrus-sasl.git
 [ICU4C - International Components for Unicode C/C++]: https://github.com/unicode-org/icu.git
 [Intel® Decimal Floating-Point Math Library]: https://www.netlib.org/misc/intel/
 [JSON Schema Store]: https://github.com/schemastore/schemastore.git
@@ -112,7 +110,7 @@ a notice will be included in
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
 [nlohmann/json]: https://github.com/nlohmann/json.git
-[node GetStringWidth function]: https://nodejs.org/
+[node]: https://nodejs.org/
 [opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp.git
 [opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
 [pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
@@ -121,13 +119,29 @@ a notice will be included in
 [rnp]: https://github.com/rnpgp/rnp
 [s2n-tls TLS library]: https://github.com/aws/s2n-tls.git
 [siphash]: https://github.com/veorq/siphash/
-[snappy]: https://github.com/google/snappy.git
+[snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git
 [timelib]: https://github.com/derickr/timelib.git
 [valgrind.h]: https://sourceware.org/git/valgrind.git
 [xxHash]: https://github.com/Cyan4973/xxHash.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+
+## WiredTiger Vendored Test Libraries
+
+The following libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+| Name                           |
+| ------------------------------ |
+| pkg:pypi/concurrencytest@0.1.2 |
+| pkg:pypi/discover@0.4.0        |
+| pkg:pypi/extras@0.0.3          |
+| pkg:pypi/iso8601@2.1.0         |
+| pkg:pypi/python-subunit@1.4.4  |
+| pkg:pypi/testscenarios@0.4     |
+| pkg:pypi/testtools@2.7.1       |
 
 ## Dynamically Linked Libraries
 
@@ -161,6 +175,10 @@ of these libraries' license in a file named
    header file which is licensed under a BSD license. This BSD licensed header is the only
    file from Valgrind which is vendored and consumed by MongoDB.
 
-2. <a id="note_ssl" href="#ref_ssl">^</a>
+2. <a id="note_wt" href="#ref_wt">^</a>
+   WiredTiger is maintained by MongoDB in a separate repository. As a part of our
+   development process, we periodically ingest the latest snapshot of that repository.
+
+3. <a id="note_ssl" href="#ref_ssl">^</a>
    OpenSSL is only shipped as a dependency of the MongoDB tools written in Go. The MongoDB
    shell and server binaries use Windows' cryptography APIs.
