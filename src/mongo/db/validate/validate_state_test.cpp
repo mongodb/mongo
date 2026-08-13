@@ -4,11 +4,12 @@
 #include "mongo/db/validate/validate_state.h"
 
 #include "mongo/db/repl/local_oplog_info.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -38,6 +39,17 @@ public:
                                    ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
+// Creates the replicated fast count backing stores as container idents.
+void createReplicatedFastCountContainers(OperationContext* opCtx) {
+    ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/false));
+}
+
 }  // namespace
 
 TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegacySizeStorer) {
@@ -47,15 +59,15 @@ TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegacySizeStorer) {
 };
 
 TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsBoth) {
-    ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                         operationContext()));
+    // TODO SERVER-126250: Remove the guard once the collection branch is gone.
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    createReplicatedFastCountContainers(operationContext());
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::both);
 };
 
 TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsReplicated) {
-    ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                         operationContext()));
+    createReplicatedFastCountContainers(operationContext());
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()),
               FastCountType::replicated);
@@ -148,6 +160,12 @@ public:
                   : Options().setPersistenceProvider(
                         std::make_unique<replicated_fast_count::test_helpers::
                                              ReplicatedFastCountTestPersistenceProvider>())) {}
+
+protected:
+    // The hasSizeStorer params use the default persistence provider, which would otherwise choose
+    // the collection branch in shouldUseReplicatedFastCountContainers().
+    // TODO SERVER-126250: Remove the guard once the collection branch is gone.
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
@@ -160,8 +178,7 @@ TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
     }
 
     if (p.createRfcCollection) {
-        ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                             operationContext()));
+        createReplicatedFastCountContainers(operationContext());
     }
 
     ValidateState validateState(operationContext(), kNss, kValidationOptions);

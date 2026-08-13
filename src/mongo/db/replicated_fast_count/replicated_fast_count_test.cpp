@@ -547,20 +547,6 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
         applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
-TEST_F(ReplicatedFastCountCollectionOnlyTest, StartupFailsIfFastCountCollectionNotPresent) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-
-    {
-        repl::UnreplicatedWritesBlock uwb(_opCtx);
-        ASSERT_OK(
-            storageInterface()->dropCollection(_opCtx,
-                                               NamespaceString::makeGlobalConfigCollection(
-                                                   NamespaceString::kReplicatedFastCountStore)));
-    }
-
-    ASSERT_THROWS_CODE(_fastCountManager->startup(_opCtx), DBException, 11718600);
-}
-
 TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 

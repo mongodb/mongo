@@ -120,7 +120,7 @@ public:
      *
      * This runs after _sizeCountStore is initialized so it can use the SizeCountStore API directly
      * to read the fast count metadata + timestamp.
-     * TODO (SERVER-128586): Can this be consolidated with initializeMetadata?
+     * TODO (SERVER-133305): Can this be consolidated with initializeMetadata?
      */
     void finalizeMetadataFromInitialSync(OperationContext* opCtx);
 

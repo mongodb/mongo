@@ -27,29 +27,6 @@ public:
                                    ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
-// A persistence provider that reports both shouldUseReplicatedFastCount() and
-// mustUseContainerWrites() as true.
-// TODO(SERVER-126250): The shared test helper currently only flips shouldUseReplicatedFastCount()
-// so we override it here.
-class ListCollectionsFastCountProvider
-    : public replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider {
-public:
-    bool shouldUseReplicatedFastCount() const override {
-        return true;
-    }
-
-    bool mustUseContainerWrites() const override {
-        return true;
-    }
-};
-
-class IsReplicatedFastCountListCollectionsWithProviderTest : public CatalogTestFixture {
-public:
-    IsReplicatedFastCountListCollectionsWithProviderTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<ListCollectionsFastCountProvider>())) {}
-};
-
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     EXPECT_FALSE(isReplicatedFastCountEnabled(operationContext()));
@@ -197,7 +174,7 @@ TEST_F(IsReplicatedFastCountEnabledTest,
 
 // The following tests verify that listCollections fast count emission is gated solely on the
 // feature flags and is NOT enabled by persistence provider traits.
-TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ListCollectionsDisabledWithProviderWhenBothFlagsOff) {
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
@@ -246,14 +223,14 @@ TEST_F(IsReplicatedFastCountEnabledTest, ContainersExplicitFCVOverloadRespectsDi
                                                         multiversion::GenericFCV::kLatest));
 }
 
-TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ListCollectionsDisabledWithProviderWhenOnlyReplicatedFastCountOn) {
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
-TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ListCollectionsDisabledWithProviderWhenOnlyContainerWritesOn) {
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
@@ -262,7 +239,7 @@ TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
 
 // Sanity check: with the provider present and both flags on, emission is still enabled (the
 // provider neither enables nor disables the feature on its own).
-TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ListCollectionsEnabledWithProviderWhenBothFlagsOn) {
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);

@@ -104,12 +104,6 @@ void ReplicatedFastCountManager::initializeContainerStores(
 }
 
 void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
-    if (!_sizeCountStore->usesContainers()) {
-        massert(11718600,
-                "Expected fastcount collection to exist on startup",
-                acquireFastCountCollectionForRead(opCtx).has_value());
-    }
-
     const UUID oplogUuid = [&] {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
         const auto& oplogColl = oplogRead.getCollection();
