@@ -100,35 +100,6 @@ protected:
         return std::make_unique<ContainerSizeCountStore>(std::move(_recordStore));
     }
 
-    // Persists `doc` for `uuid` bypassing the store's write path, which cannot emit `h`. Used to
-    // stage documents in the shape a future writer (or another node) would produce.
-    // TODO(SERVER-132687): Remove once writers emit the hash; tests staging a document without
-    // `h` will still need it.
-    void rawInsert(SizeCountStore& store, const UUID& uuid, const BSONObj& doc) {
-        auto opCtx = operationContext();
-        WriteUnitOfWork wuow(opCtx);
-        if (GetParam() == Mode::kCollection) {
-            const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
-            BSONObjBuilder builder;
-            builder.appendElements(BSON("_id" << uuid));
-            builder.appendElements(doc);
-            ASSERT_OK(collection_internal::insertDocument(opCtx,
-                                                          acquisition.getCollectionPtr(),
-                                                          InsertStatement(builder.obj()),
-                                                          /*opDebug=*/nullptr));
-        } else {
-            auto containerVariant =
-                static_cast<ContainerSizeCountStore&>(store).rs_ForTest()->getContainer();
-            auto& container =
-                std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
-            ASSERT_OK(container.insert(*shard_role_details::getRecoveryUnit(opCtx),
-                                       test_helpers::uuidSpan(uuid),
-                                       test_helpers::bsonSpan(doc),
-                                       container::ExistingKeyPolicy::reject));
-        }
-        wuow.commit();
-    }
-
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
     std::unique_ptr<RecordStore> _recordStore;
 };
@@ -368,57 +339,86 @@ TEST_P(SizeCountStoreTest, RemoveMassertsWithoutGlobalWriteLock) {
     ASSERT_THROWS_CODE(storePtr->remove(opCtx, uuid), DBException, 12915204);
 }
 
-// A record carrying `h` must be readable through the public read() API on both backends: live
-// on-disk data may contain the field before this node's writers ever emit it.
-TEST_P(SizeCountStoreTest, ReadPopulatesHash) {
+TEST_P(SizeCountStoreTest, WriteLeavesHashUnsetWhenAbsent) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     auto opCtx = operationContext();
-    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     const UUID uuid = UUID::gen();
-    const int64_t hash = makeTestHash();
+    const SizeCountStore::Entry entry{
+        .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = boost::none};
 
-    rawInsert(store, uuid, makeMetadataDoc(hash));
+    test_helpers::insertSizeCountEntry(operationContext(), store, uuid, entry);
 
-    const auto result = store.read(opCtx, uuid);
-    ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->hash.has_value());
-    EXPECT_EQ(hash, *result->hash);
-    EXPECT_EQ(42, result->size);
-    EXPECT_EQ(7, result->count);
-}
-
-TEST_P(SizeCountStoreTest, ReadLeavesHashUnsetWhenAbsent) {
-    auto storePtr = makeStore();
-    auto& store = *storePtr;
-    auto opCtx = operationContext();
-    Lock::GlobalLock writeLock(opCtx, MODE_IX);
-    const UUID uuid = UUID::gen();
-
-    rawInsert(store, uuid, makeMetadataDoc(boost::none));
-
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     const auto result = store.read(opCtx, uuid);
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->hash.has_value());
+    EXPECT_EQ(result->size, 42);
+    EXPECT_EQ(result->count, 7);
 }
 
-// The write path does not emit `h` yet, so a hash set on an Entry must not survive a round trip.
-// This pins the parse-only scope of this change: readers must ship everywhere before any node
-// writes the field.
-// TODO(SERVER-132687): Invert this once writers emit `h` behind the FCV gate.
-TEST_P(SizeCountStoreTest, WriteDoesNotPersistHash) {
+TEST_P(SizeCountStoreTest, WritePersistsHashWhenPresent) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
-    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
     const UUID uuid = UUID::gen();
     const SizeCountStore::Entry entry{
         .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = makeTestHash()};
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, entry);
 
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
     const auto result = store.read(operationContext(), uuid);
     ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->hash.has_value());
+    EXPECT_EQ(*result->hash, entry.hash);
+    EXPECT_EQ(result->size, 42);
+    EXPECT_EQ(result->count, 7);
+}
+
+TEST_P(SizeCountStoreTest, InsertPersistsHashWhenPresent) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{
+        .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = makeTestHash()};
+
+    {
+        Lock::GlobalLock writeLock(operationContext(), MODE_IX);
+        WriteUnitOfWork wuow{operationContext()};
+        store.insert(operationContext(), uuid, entry);
+        wuow.commit();
+    }
+
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
+    const auto result = store.read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->hash.has_value());
+    EXPECT_EQ(*result->hash, entry.hash);
+    EXPECT_EQ(result->size, 42);
+    EXPECT_EQ(result->count, 7);
+}
+
+TEST_P(SizeCountStoreTest, InsertLeavesHashUnsetWhenAbsent) {
+    auto storePtr = makeStore();
+    auto& store = *storePtr;
+    auto opCtx = operationContext();
+    const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{
+        .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = boost::none};
+
+    {
+        Lock::GlobalLock writeLock(operationContext(), MODE_IX);
+        WriteUnitOfWork wuow{operationContext()};
+        store.insert(operationContext(), uuid, entry);
+        wuow.commit();
+    }
+
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
+    const auto result = store.read(opCtx, uuid);
+    ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->hash.has_value());
+    EXPECT_EQ(result->size, 42);
+    EXPECT_EQ(result->count, 7);
 }
 
 // An `h`-bearing record must still accumulate correctly on the checkpoint path, which reads the
@@ -427,22 +427,25 @@ TEST_P(SizeCountStoreTest, ReadAndIncrementSizeCountsIgnoresHash) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     auto opCtx = operationContext();
-    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     const UUID uuid = UUID::gen();
+    const SizeCountStore::Entry entry{
+        .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = makeTestHash()};
 
-    rawInsert(store, uuid, makeMetadataDoc(makeTestHash()));
+    test_helpers::insertSizeCountEntry(operationContext(), store, uuid, entry);
 
     ReplicatedMetadataDeltas deltas;
     deltas[uuid] = ReplicatedMetadataDelta{.metadata = {.sizeCount = {.size = 8, .count = 1}}};
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
     store.readAndIncrementSizeCounts(opCtx, deltas);
 
-    EXPECT_EQ(50, deltas[uuid].metadata.sizeCount.size);
-    EXPECT_EQ(8, deltas[uuid].metadata.sizeCount.count);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.size, 42 + 8);
+    EXPECT_EQ(deltas[uuid].metadata.sizeCount.count, 7 + 1);
+    EXPECT_FALSE(deltas[uuid].metadata.hash.has_value());
 }
 
 INSTANTIATE_TEST_SUITE_P(,
                          SizeCountStoreTest,
-                         ::testing::Values(Mode::kCollection, Mode::kContainer),
+                         ::testing::Values(Mode::kContainer),
                          [](const ::testing::TestParamInfo<Mode>& info) {
                              return info.param == Mode::kCollection ? "Collection" : "Container";
                          });

@@ -95,12 +95,16 @@ public:
 
     /**
      * Upserts `entry` into the store. `entry` will overwrite any pre-existing document for `uuid`.
+     *
+     * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
      */
     virtual void write(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
 
     /**
      * Inserts `entry` into the store. If an entry for `uuid` already exists, this operation will
      * throw a DBException.
+     *
+     * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
      */
     virtual void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
 

@@ -20,8 +20,14 @@ namespace mongo::replicated_fast_count {
 namespace {
 
 BSONObj entryToContainerValue(const SizeCountStore::Entry& entry) {
-    return BSON(kValidAsOfKey << entry.timestamp << kMetadataKey
-                              << BSON(kCountKey << entry.count << kSizeKey << entry.size));
+    BSONObjBuilder builder;
+    builder.append(kCountKey, entry.count);
+    builder.append(kSizeKey, entry.size);
+    if (entry.hash) {
+        builder.append(kHashKey, *entry.hash);
+    }
+    const BSONObj metadata = builder.obj();
+    return BSON(kValidAsOfKey << entry.timestamp << kMetadataKey << metadata);
 }
 
 std::span<const char> bsonToSpan(const BSONObj& obj) {
