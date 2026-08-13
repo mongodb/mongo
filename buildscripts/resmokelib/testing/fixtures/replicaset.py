@@ -471,19 +471,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                         )
                     time.sleep(_SET_FCV_RETRY_INTERVAL_SECS)
 
-            # Force a checkpoint on the primary past the FCV transition before any mixed-version
-            # node joins. A node that initial syncs copies the sync source's last checkpoint; if
-            # that checkpoint predates the FCV transition it crashes because it observes an FCV
-            # state inconsistent with its binary.
-            #
-            # Skipped on disaggregated storage: `replSetGetStatus` there reports
-            # `lastStableRecoveryTimestamp` as a null Timestamp unconditionally, so the field is
-            # always present but never advances and the wait below would run to its deadline.
-            # TODO(SERVER-119066): Remove when no longer necessary.
-            if not disagg_enabled:
-                fcv_optime = get_last_optime(client, self.fixturelib)
-                self._force_checkpoint_past_optime(client, fcv_optime)
-
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
             # command.
@@ -812,90 +799,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     )
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
-
-    def _await_stable_timestamp_advanced(self, client, ts, deadline):
-        """Wait until the primary's in-memory stable timestamp advances to at least 'ts'.
-
-        The stable timestamp (readConcernMajorityOpTime) advancing past 'ts' means a checkpoint
-        taken now would include it.
-        """
-        self.logger.info(
-            "forceCheckpointPastOpTime: waiting for stable timestamp to advance past %s on %s.",
-            ts,
-            client.address,
-        )
-        while True:
-            if time.time() >= deadline:
-                raise self.fixturelib.ServerFailure(
-                    "Timed out waiting for stable timestamp to advance past %s on %s."
-                    % (ts, client.address)
-                )
-            status = client.admin.command("replSetGetStatus")
-            # readConcernMajorityOpTime is omitted from replSetGetStatus until a majority commit
-            # point exists, so it may be missing during startup/transition.
-            rcmaj_optime = status.get("optimes", {}).get("readConcernMajorityOpTime")
-            stable_ts = rcmaj_optime.get("ts") if rcmaj_optime else None
-            if stable_ts and stable_ts >= ts:
-                return
-            time.sleep(0.1)
-
-    def _force_checkpoint_past_optime(self, client, optime):
-        """Force the primary to take a checkpoint whose recovery timestamp is past 'optime'."""
-        if isinstance(optime, bson.Timestamp):
-            # PV0 bare Timestamp — no stable timestamp concept; nothing to checkpoint.
-            self.logger.info(
-                "forceCheckpointPastOpTime: optime is a bare Timestamp (PV0), skipping checkpoint."
-            )
-            return
-        ts = optime.get("ts")
-        if not ts or ts == bson.Timestamp(0, 0):
-            self.logger.info(
-                "forceCheckpointPastOpTime: no timestamp in optime, skipping checkpoint."
-            )
-            return
-
-        # A missing `lastStableRecoveryTimestamp` field indicates the storage engine does not
-        # support "recover to a stable timestamp". In that case there is no persisted checkpoint
-        # for an initial-syncing node to copy, so there is nothing to force and both waits below
-        # would otherwise spin until the deadline. (Mirrors _await_stable_recovery_timestamp.)
-        if "lastStableRecoveryTimestamp" not in client.admin.command("replSetGetStatus"):
-            self.logger.info(
-                "forceCheckpointPastOpTime: storage engine does not support "
-                "recover-to-stable-timestamp; skipping checkpoint on %s.",
-                client.address,
-            )
-            return
-
-        deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
-        self._await_stable_timestamp_advanced(client, ts, deadline)
-
-        self.logger.info(
-            "forceCheckpointPastOpTime: forcing checkpoint via fsync on %s.",
-            client.address,
-        )
-        client.admin.command({"fsync": 1})
-
-        self.logger.info(
-            "forceCheckpointPastOpTime: waiting for checkpoint to advance past %s on %s.",
-            ts,
-            client.address,
-        )
-        while True:
-            if time.time() >= deadline:
-                raise self.fixturelib.ServerFailure(
-                    "Timed out waiting for checkpoint to advance past %s on %s."
-                    % (ts, client.address)
-                )
-            status = client.admin.command("replSetGetStatus")
-            last_stable_recovery_ts = status.get("lastStableRecoveryTimestamp", None)
-            if last_stable_recovery_ts and last_stable_recovery_ts >= ts:
-                self.logger.info(
-                    "forceCheckpointPastOpTime: checkpoint past %s confirmed on %s.",
-                    ts,
-                    client.address,
-                )
-                break
-            time.sleep(0.1)
 
     def _should_await_newly_added_removals_longer(self, client):
         """
