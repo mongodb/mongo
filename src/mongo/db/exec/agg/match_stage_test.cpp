@@ -202,19 +202,6 @@ TEST_F(MatchStageTest, DisposeReleasesBufferMemory) {
     ASSERT_EQ(operationInUseBytes(getOpCtx()), 0);
 }
 
-MATCHER_P(DocumentsEq, expectDocs, "") {
-    const auto actualDocs = arg;
-    auto cmp = [](auto expectDocs, auto actualDocs) {
-        for (size_t i = 0; i < expectDocs.size() && i < actualDocs.size(); i++) {
-            if (DocumentComparator().evaluate(expectDocs[i] != actualDocs[i])) {
-                return false;
-            }
-        }
-        return expectDocs.size() == actualDocs.size();
-    };
-    return cmp(expectDocs, actualDocs);
-}
-
 TEST_F(MatchStageTest, ExprOperatorCanEvaluateMetaExpression) {
     auto docWithStreamMeta = [](auto docarg, auto sortKey) {
         MutableDocument doc{Document(docarg)};
