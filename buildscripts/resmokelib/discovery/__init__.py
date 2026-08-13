@@ -141,6 +141,24 @@ class DiscoveryPlugin(PluginInterface):
                 "Include tests tagged with features that are in fully_disabled_feature_flags.yml."
             ),
         )
+        parser.add_argument(
+            "--tagFile",
+            action="append",
+            dest="tag_files",
+            metavar="TAG_FILES",
+            help="One or more YAML files that associate tests and tags.",
+        )
+        parser.add_argument(
+            "--excludeWithAnyTags",
+            action="append",
+            dest="exclude_with_any_tags",
+            metavar="TAG1,TAG2",
+            help=(
+                "Comma separated list of tags. Any jstest that contains any of the"
+                " specified tags will be excluded from the discovered tests. Resmoke also"
+                " implicitly excludes tests with the globally-defined excluded tag."
+            ),
+        )
 
         parser = subparsers.add_parser(
             SUITECONFIG_SUBCOMMAND, help="Display configuration of a test suite."

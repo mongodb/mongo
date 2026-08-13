@@ -109,6 +109,8 @@ parameters:
     description: "path to this file"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
+  - key: use_tss_staging
+    description: "Set to true to ask the staging test selection deployment instead of production"
   - key: runtime_params_json
     description: 'JSON of runtime params (e.g. {"enable_linux_perf":true}) to enable on-CPU profiling on benchmark tasks.'
   - key: message_filter_plugin_release_version

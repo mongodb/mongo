@@ -289,6 +289,7 @@ class TestRunner(Subcommand):
 
             for suite in suites:
                 self._interrupted = self._run_suite(suite)
+                self._fail_on_test_selection_error(suite)
                 if self._interrupted or (suite.options.fail_fast and suite.return_code != 0):
                     self._log_resmoke_summary(suites)
                     self.exit(suite.return_code)
@@ -872,6 +873,20 @@ class TestRunner(Subcommand):
         )
 
     @TRACER.start_as_current_span("run.__init__._execute_suite")
+    def _fail_on_test_selection_error(self, suite: Suite):
+        """Fail the run if the suite's test selection file was unusable.
+
+        The tests have already run by this point -- a broken selection step costs coverage
+        nothing, because the suite falls back to running everything -- but it must not pass
+        quietly, or selection could stay broken indefinitely while builds look green.
+        """
+        if not suite.tss_selection_error:
+            return
+        self._resmoke_logger.error(
+            "Failing %s: %s", suite.get_display_name(), suite.tss_selection_error
+        )
+        suite.return_code = max(suite.return_code or 0, 2)
+
     def _execute_suite(self, suite: Suite) -> bool:
         """Execute a suite and return True if interrupted, False otherwise."""
         execute_suite_span = trace.get_current_span()
@@ -2008,6 +2023,15 @@ class RunPlugin(PluginInterface):
             "--historicTestRuntimes",
             dest="historic_test_runtimes",
             help='JSON containing historic test runtime, like [{"test_name": test.js, "avg_duration_pass": 1.4}]',
+        )
+        parser.add_argument(
+            "--tssTestList",
+            dest="tss_test_list",
+            help=(
+                "YAML file holding the tests Evergreen's test selection service chose for this"
+                " suite, produced at build time. When the file records a successful selection,"
+                " it is used instead of calling the selection endpoint from here."
+            ),
         )
         parser.add_argument(
             "--mongoVersionFile",

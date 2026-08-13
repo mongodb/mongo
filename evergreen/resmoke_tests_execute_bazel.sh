@@ -107,18 +107,16 @@ build_ci_flags() {
         ci_flags+=" --test_arg=--skipSymbolization"
     fi
 
-    if [ -n "${enable_evergreen_api_test_selection}" ]; then
-        ci_flags+=" --test_arg=--enableEvergreenApiTestSelection=${enable_evergreen_api_test_selection}"
-    # If no parameter present, check the project setting
-    elif [ "${is_test_selection_enabled}" == true ]; then
-        ci_flags+=" --test_arg=--enableEvergreenApiTestSelection=${is_test_selection_enabled}"
+    # Test selection is applied ahead of the tests by the per-suite test list targets, which ask
+    # the service which tests to keep while the suites are still being built. Resmoke itself is not
+    # asked to select (it reads the resulting file), so the gate lives here, where the patch and
+    # project settings are known. Strategies are passed through verbatim from the same patch
+    # parameter the non-bazel flow uses; empty means resmoke's own default.
+    tss_enabled="${enable_evergreen_api_test_selection:-${is_test_selection_enabled}}"
+    if [[ "$tss_enabled" == "true" && "${is_patch}" == "true" ]]; then
+        ci_flags+=" --//bazel/resmoke:enable_test_selection=True"
+        ci_flags+=" --//bazel/resmoke:test_selection_strategies=${test_selection_strategies_array}"
     fi
-
-    # Split comma separated list of strategies
-    IFS=',' read -a strategies <<<"$test_selection_strategies_array"
-    for strategy in "${strategies[@]}"; do
-        ci_flags+=" --test_arg=--evergreenTestSelectionStrategy=${strategy}"
-    done
 
     # Add each test flag from test_flags expansion as --test_arg
     if [ -n "${test_flags:-}" ]; then

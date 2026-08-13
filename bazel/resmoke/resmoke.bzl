@@ -8,6 +8,33 @@ load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
 
+def _tss_settings_file_impl(ctx):
+    """Materializes the test selection build settings so a genrule can read them.
+
+    genrules cannot read build settings, so the values are written to a file the test-list genrule
+    takes as an input: first line whether selection is enabled, second line the strategies.
+    """
+    settings_file = ctx.actions.declare_file(ctx.label.name + ".txt")
+    enabled = ctx.attr._enable_flag[BuildSettingInfo].value
+    strategies = ctx.attr._strategies_flag[BuildSettingInfo].value
+    ctx.actions.write(settings_file, "{}\n{}\n".format("true" if enabled else "false", strategies))
+    return [DefaultInfo(files = depset([settings_file]))]
+
+tss_settings_file = rule(
+    implementation = _tss_settings_file_impl,
+    attrs = {
+        "_enable_flag": attr.label(
+            default = "//bazel/resmoke:enable_test_selection",
+            providers = [BuildSettingInfo],
+        ),
+        "_strategies_flag": attr.label(
+            default = "//bazel/resmoke:test_selection_strategies",
+            providers = [BuildSettingInfo],
+        ),
+    },
+    doc = "Writes the test selection build settings to a file for the test list genrule.",
+)
+
 def _config_fuzz_seed_file_impl(ctx):
     seed_file = ctx.actions.declare_file(ctx.label.name + ".txt")
     fixed_seed = ctx.attr._seed_flag[BuildSettingInfo].value
@@ -479,9 +506,40 @@ def resmoke_suite_test(
         for dep in multiversion_deps
     ]
 
+    # The list of tests this suite will run, for Evergreen's Test Selection Services (TSS).
+    # Nothing consumes it yet. Discovery is given the same tag files as the test action below so
+    # the list matches what the suite would really run.
+    tss_test_list = name + "_tss_test_list"
+    native.genrule(
+        name = tss_test_list,
+        srcs = [generated_config, "//bazel/resmoke:tss_settings"] + srcs + multiversion_exclude_tags,
+        outs = [tss_test_list + ".yml"],
+        cmd = ("$(location //bazel/resmoke:generate_tss_test_list) --suite=$(location {config}) " +
+               "--label=//{pkg}:{name} --output=$@ --volatile-status=bazel-out/volatile-status.txt " +
+               "--selection-settings=$(location //bazel/resmoke:tss_settings)").format(
+            config = native.package_relative_label(generated_config),
+            pkg = native.package_name(),
+            name = name,
+        ) + "".join([
+            " --tagFile=$(location %s)" % native.package_relative_label(tag)
+            for tag in multiversion_exclude_tags
+        ]),
+        stamp = True,
+        tools = ["//bazel/resmoke:generate_tss_test_list"],
+        # Must run on the Evergreen host, not a remote worker: a later step will call the
+        # Test Selection Services API from here (required Mesh),
+        # which needs the host's credentials and network. no-sandbox
+        # because resmoke's selector resolves test files by globbing the working directory, so a
+        # sandbox with incomplete inputs would yield a silently short list rather than an error.
+        tags = ["no-remote", "external", "no-cache", "no-sandbox"],
+    )
+
     # Data that is always safe for cquery (no C++ toolchain needed): auto-derived srcs,
-    # default resmoke infrastructure, multiversion artifacts, and the config fuzz seed file.
-    cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags + seed_target_data
+    # default resmoke infrastructure, multiversion artifacts, the config fuzz seed file, and the
+    # TSS test list. The test list is not read by the test yet, but it has to be reachable from
+    # the test target to get built at all: CI builds with --build_tests_only, which skips
+    # targets nothing depends on.
+    cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags + seed_target_data + [":" + tss_test_list]
 
     # If this suite's only multiversion dep is last-continuous, it is a
     # dedicated last-continuous suite.  Mark it incompatible when
@@ -518,6 +576,7 @@ def resmoke_suite_test(
         "--archiveLimitMb=500",
         "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
         "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
+        "--tssTestList=$(location :%s)" % tss_test_list,
         "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
     ] + [
         "--multiversionDir=$(location %s)" % native.package_relative_label(dep)

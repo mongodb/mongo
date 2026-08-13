@@ -1,6 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
 load("//bazel/uv:defs.bzl", "dependency")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("//bazel/resmoke:resmoke.bzl", "tss_settings_file")
 
 genrule(
     name = "resmoke_mongo_version",
@@ -164,11 +165,99 @@ string_flag(
     visibility = ["//visibility:public"],
 )
 
+# Whether to ask test selection which tests to keep. Off by default: each suite's test list is
+# still generated, but the service is not called. Set by evergreen/resmoke_tests_execute_bazel.sh,
+# which knows whether this is a patch build and whether the project has test selection enabled.
+bool_flag(
+    name = "enable_test_selection",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# Comma separated test selection strategies, from the ${test_selection_strategies_array} patch
+# parameter -- the same input the non-bazel resmoke flow uses. Empty means "the default", which is
+# resmoke's DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY, so both flows agree. Valid values come from
+# the service's StrategyEnum: ExcludeManuallyQuarantined, Existential, NotFailing, NotPassing,
+# Optimistic, StartsWithT.
+string_flag(
+    name = "test_selection_strategies",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+# The test selection settings are the same for every suite, so every suite's test list genrule
+# reads this one file rather than materializing its own copy of the flags.
+tss_settings_file(
+    name = "tss_settings",
+    visibility = ["//visibility:public"],
+)
+
 py_binary(
     name = "download_historic_runtimes",
     srcs = ["download_historic_runtimes.py"],
     main = "download_historic_runtimes.py",
     visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_tss_test_list",
+    srcs = ["generate_tss_test_list.py"],
+    # resmoke resolves its config directory from resmokelib's own __file__, which lands in the
+    # runfiles tree rather than the execroot, so the suite and matrix-suite YAML has to be here
+    # too or suite lookup fails on the missing matrix_suites/mappings directory.
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    main = "generate_tss_test_list.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:resmoke",
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "oauthlib",
+            group = "core",
+        ),
+        dependency(
+            "requests-oauthlib",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
+    name = "generate_tss_test_list_test",
+    srcs = [
+        "generate_tss_test_list.py",
+        "generate_tss_test_list_test.py",
+    ],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    main = "generate_tss_test_list_test.py",
+    deps = [
+        "//buildscripts:resmoke",
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "oauthlib",
+            group = "core",
+        ),
+        dependency(
+            "requests-oauthlib",
+            group = "core",
+        ),
+    ],
 )
 
 py_binary(

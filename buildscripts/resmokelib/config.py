@@ -141,6 +141,7 @@ DEFAULTS = {
     "shard_index": None,
     "shell_conn_string": None,
     "historic_test_runtimes": None,
+    "tss_test_list": None,
     "shell_port": None,
     "shuffle": None,
     "stagger_jobs": None,
@@ -787,6 +788,14 @@ SHARD_INDEX = None
 
 # JSON containing historic test runtimes
 HISTORIC_TEST_RUNTIMES = None
+
+# YAML file of tests chosen for this suite by Evergreen's test selection service, generated at
+# build time. Used in place of calling the selection endpoint from inside the suite.
+TSS_TEST_LIST = None
+
+# Strategies used when test selection is enabled but none were named. Shared with the bazel path,
+# which asks the same service with the same strategies (bazel/resmoke/generate_tss_test_list.py).
+DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY = ["ExcludeManuallyQuarantined"]
 
 # Shell debug options
 JSDBG = None

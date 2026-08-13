@@ -3,3 +3,8 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-test-infrastructure
+  # The test selection list generator, co-owned with the team that owns the service it talks to.
+  - "generate_tss_test_list*.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+      - 10gen/devprod-services-integrations

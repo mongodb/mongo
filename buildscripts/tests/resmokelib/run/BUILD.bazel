@@ -52,3 +52,15 @@ py_test(
         "//buildscripts/resmokelib",
     ],
 )
+
+py_test(
+    name = "test_fail_on_test_selection_error",
+    srcs = [
+        "__init__.py",
+        "test_fail_on_test_selection_error.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)

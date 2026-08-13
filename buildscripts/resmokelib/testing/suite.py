@@ -10,6 +10,8 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any, Optional
 
+import yaml
+
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
 from buildscripts.resmokelib import suitesconfig
@@ -88,6 +90,9 @@ class Suite(object):
 
         self.return_code = None  # Set by the executor.
         self._tss_skipped_tests: list[str] = []
+        # Set when the build-time test selection file was unusable. The suite still runs every
+        # test, but the run is failed afterwards so the breakage is not silent.
+        self.tss_selection_error: Optional[str] = None
 
         self._suite_start_time = None
         self._suite_end_time = None
@@ -147,6 +152,154 @@ class Suite(object):
             )
         return suite_root
 
+    def _apply_pregenerated_test_selection(self, tests: list[str]) -> tuple[list[str], list[str]]:
+        """Return (tests to run, tests excluded) according to the build-time selection file.
+
+        Never drops tests on error: a file that could not be read, or one recording that
+        generating it failed, leaves the test list untouched so the suite runs everything. That
+        is not treated as success though -- tss_selection_error is set, and the run fails once
+        the tests have finished, so a broken selection step is loud rather than a silent
+        degradation. A file recording that selection was simply not asked for is not an error.
+        """
+        try:
+            with open(_config.TSS_TEST_LIST) as test_list_file:
+                test_list = yaml.safe_load(test_list_file) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            self.tss_selection_error = (
+                f"Could not read the test selection file {_config.TSS_TEST_LIST}: {exc}"
+            )
+            loggers.ROOT_EXECUTOR_LOGGER.error(
+                "%s. Running all %d tests; this run will be failed.",
+                self.tss_selection_error,
+                len(tests),
+            )
+            return tests, []
+
+        status = test_list.get("status")
+        if status == "failed":
+            self.tss_selection_error = (
+                f"Generating the test selection file {_config.TSS_TEST_LIST} failed, see the"
+                " build log for the suite's test list target"
+            )
+            loggers.ROOT_EXECUTOR_LOGGER.error(
+                "%s. Running all %d tests; this run will be failed.",
+                self.tss_selection_error,
+                len(tests),
+            )
+            return tests, []
+
+        if status != "selected":
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                "Test selection did not run for this suite, running all %d tests", len(tests)
+            )
+            return tests, []
+
+        # Intersect so selection can only ever shrink the list the selector produced.
+        selected = set(test_list.get("tests", []))
+        keep = [test for test in tests if test in selected]
+        excluded = [test for test in tests if test not in selected]
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            "Test selection reduced this suite from %d to %d tests", len(tests), len(keep)
+        )
+        return keep, excluded
+
+    def _apply_test_selection(self, tests: list[str]) -> tuple[list[str], list[str]]:
+        """Return (tests to run, tests excluded by test selection).
+
+        Test selection reaches a suite one of two ways. Under bazel it has already happened at
+        build time and the answer is in a file; otherwise the selection service is asked from
+        here. Either way it can only shrink the list, and returning ([], ...) unchanged when it
+        does not apply keeps the caller's filtering and grouping in one place.
+        """
+        if not tests:
+            return tests, []
+
+        # Under bazel the suite's test list was sent while the suite was being built and the
+        # result written to a file. Use it rather than asking again from here, which would mean
+        # one call per shard of every suite, all asking the same question.
+        if _config.TSS_TEST_LIST:
+            return self._apply_pregenerated_test_selection(tests)
+
+        if not _config.EVERGREEN_TASK_ID or not _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+            return tests, []
+
+        if not _config.EVERGREEN_PATCH_BUILD:
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                "Skipping test selection services: not a patch build (only enabled for patch builds)"
+            )
+            return tests, []
+
+        return self._apply_evergreen_api_test_selection(tests)
+
+    def _apply_evergreen_api_test_selection(self, tests: list[str]) -> tuple[list[str], list[str]]:
+        """Return (tests to run, tests excluded) by asking Evergreen's select-tests endpoint."""
+        try:
+            evg_api = evergreen_conn.get_evergreen_api()
+        except RuntimeError:
+            loggers.ROOT_EXECUTOR_LOGGER.warning(
+                "Failed to create Evergreen API client. Evergreen test selection will be skipped even if it was enabled."
+            )
+            return tests, []
+
+        test_selection_strategy = (
+            _config.EVERGREEN_TEST_SELECTION_STRATEGY
+            if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
+            else _config.DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY
+        )
+        request = {
+            "project_id": str(_config.EVERGREEN_PROJECT_NAME),
+            "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
+            "requester": str(_config.EVERGREEN_REQUESTER),
+            "task_id": str(_config.EVERGREEN_TASK_ID),
+            "task_name": str(_config.EVERGREEN_TASK_NAME),
+            "tests": tests,
+            "strategies": test_selection_strategy,
+        }
+
+        # future thread is async
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            execution = executor.submit(evg_api.select_tests, **request)
+            try:
+                result = execution.result(timeout=60)
+                # if execution does not time out, checks for if result is in proper format to parse
+                if not isinstance(result, dict):
+                    loggers.ROOT_EXECUTOR_LOGGER.info(f"Unexpected response type:{result}")
+                    return tests, []
+                if "tests" not in result:
+                    loggers.ROOT_EXECUTOR_LOGGER.info(
+                        "Tests key not in results, cannot properly parse what tests to use in Evergreen"
+                    )
+                    return tests, []
+
+            # for if selecting tests via the test selection strategy takes too long
+            except TimeoutError:
+                loggers.ROOT_EXECUTOR_LOGGER.info("TSS took too long or never finished")
+                return tests, []
+            except Exception as exc:
+                loggers.ROOT_EXECUTOR_LOGGER.info(
+                    f"Failure using the select tests evergreen endpoint with the following request:\n{request}\nException: {exc}",
+                    exc_info=True,
+                )
+                return tests, []
+
+        evergreen_filtered_tests_set = set(result["tests"])
+        # Intersect with the tag-filtered list so that TSS can only reduce the set of tests to
+        # run, never expand it. Without this, TSS could return tests that were excluded by the
+        # resource_intensive tag split, causing the same test to run in both the
+        # resource-intensive suite and the normal suite.
+        tss_selected = [t for t in tests if t in evergreen_filtered_tests_set]
+        evergreen_excluded_tests = [t for t in tests if t not in evergreen_filtered_tests_set]
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
+        )
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"to test after the test selection strategy was applied: {tss_selected}"
+        )
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"to exclude the following tests: {evergreen_excluded_tests}"
+        )
+        return tss_selected, evergreen_excluded_tests
+
     def _get_tests_for_kind(self, test_kind) -> tuple[list[any], list[str]]:
         """Return the tests to run and those that were excluded, based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()
@@ -165,92 +318,9 @@ class Suite(object):
         if loggers.ROOT_EXECUTOR_LOGGER is None:
             loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
 
-        is_patch_build = _config.EVERGREEN_PATCH_BUILD
-
-        use_test_selection = _config.ENABLE_EVERGREEN_API_TEST_SELECTION and is_patch_build
-
-        if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
-            if not is_patch_build:
-                loggers.ROOT_EXECUTOR_LOGGER.info(
-                    "Skipping test selection services: not a patch build (only enabled for patch builds)"
-                )
-
-        # Apply Evergreen API test selection if:
-        # 1. We have tests to filter
-        # 2. We're running in Evergreen
-        # 3. Test selection is enabled (patch build AND feature enabled)
-        if tests and _config.EVERGREEN_TASK_ID and use_test_selection:
-            try:
-                evg_api = evergreen_conn.get_evergreen_api()
-            except RuntimeError:
-                loggers.ROOT_EXECUTOR_LOGGER.warning(
-                    "Failed to create Evergreen API client. Evergreen test selection will be skipped even if it was enabled."
-                )
-            else:
-                test_selection_strategy = (
-                    _config.EVERGREEN_TEST_SELECTION_STRATEGY
-                    if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
-                    else ["ExcludeManuallyQuarantined"]
-                )
-                request = {
-                    "project_id": str(_config.EVERGREEN_PROJECT_NAME),
-                    "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
-                    "requester": str(_config.EVERGREEN_REQUESTER),
-                    "task_id": str(_config.EVERGREEN_TASK_ID),
-                    "task_name": str(_config.EVERGREEN_TASK_NAME),
-                    "tests": tests,
-                    "strategies": test_selection_strategy,
-                }
-
-                # future thread is async
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    select_tests_succeeds_flag = True
-                    execution = executor.submit(evg_api.select_tests, **request)
-                    try:
-                        result = execution.result(timeout=60)
-                        # if execution does not time out, checks for if result is in proper format to parse
-                        if not isinstance(result, dict):
-                            loggers.ROOT_EXECUTOR_LOGGER.info(f"Unexpected response type:{result}")
-                            select_tests_succeeds_flag = False
-                        if "tests" not in result:
-                            loggers.ROOT_EXECUTOR_LOGGER.info(
-                                "Tests key not in results, cannot properly parse what tests to use in Evergreen"
-                            )
-                            select_tests_succeeds_flag = False
-
-                    # for if selecting tests via the test selection strategy takes too long
-                    except TimeoutError:
-                        loggers.ROOT_EXECUTOR_LOGGER.info("TSS took too long or never finished")
-                        select_tests_succeeds_flag = False
-                    except Exception as exc:
-                        loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"Failure using the select tests evergreen endpoint with the following request:\n{request}\nException: {exc}",
-                            exc_info=True,
-                        )
-                        select_tests_succeeds_flag = False
-
-                    # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
-                    if select_tests_succeeds_flag and use_test_selection:
-                        evergreen_filtered_tests_set = set(result["tests"])
-                        # Intersect with the tag-filtered list so that TSS can only reduce
-                        # the set of tests to run, never expand it. Without this, TSS could
-                        # return tests that were excluded by the resource_intensive tag split,
-                        # causing the same test to run in both the resource-intensive suite
-                        # and the normal suite.
-                        tss_selected = [t for t in tests if t in evergreen_filtered_tests_set]
-                        evergreen_excluded_tests = set(tests) - evergreen_filtered_tests_set
-                        loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
-                        )
-                        loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"to test after the test selection strategy was applied: {tss_selected}"
-                        )
-                        loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"to exclude the following tests: {evergreen_excluded_tests}"
-                        )
-                        self._tss_skipped_tests = list(evergreen_excluded_tests)
-                        excluded.extend(evergreen_excluded_tests)
-                        tests = tss_selected
+        tests, tss_excluded = self._apply_test_selection(tests)
+        self._tss_skipped_tests = tss_excluded
+        excluded.extend(tss_excluded)
 
         tests = self.filter_tests_for_shard(tests, _config.SHARD_COUNT, _config.SHARD_INDEX)
 
