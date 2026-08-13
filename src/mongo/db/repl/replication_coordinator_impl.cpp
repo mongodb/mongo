@@ -1296,6 +1296,10 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
                                     << " because we are in the middle of running an election");
     }
 
+    // Record whether we are leaving the STARTUP2 state and therefore need to update our stable
+    // timestamp, as this is skipped in STARTUP2 state.
+    const bool leavingStartup2 = _getMemberState().startup2() && newState.recovering();
+
     _topCoord->setFollowerMode(newState.s);
 
     if (_getMemberState().secondary() && newState == MemberState::RS_ROLLBACK) {
@@ -1305,6 +1309,13 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
     }
 
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
+
+    // After transitioning out of STARTUP2, but while we still have the lock, update the stable
+    // timestamp.
+    if (leavingStartup2) {
+        _setStableTimestampForStorage(lk);
+    }
+
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     return Status::OK();

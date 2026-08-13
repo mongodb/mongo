@@ -7479,6 +7479,44 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotAfterClearingCommittedSnapshot) {
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 
+// Test that when leaving STARTUP2 state, we update the committed snapshot opTime which was skipped
+// during initial sync.
+TEST_F(ReplCoordTest, AdvanceCommittedSnapshotWhenLeavingStartup2WithACommitPointAlreadyAtTip) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id" << "mySet"
+                                  << "version" << 2 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "node1:12345")
+                                                << BSON("_id" << 1 << "host"
+                                                              << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_EQUALS(MemberState::RS_STARTUP2, getReplCoord()->getMemberState().s);
+
+    // Set state as if initial sync has applied up to the tip of the sync source's oplog.
+    const auto oplogTip = OpTime(Timestamp(100, 100), 100);
+    const auto wallTime = Date_t() + Seconds(100);
+    replCoordSetMyLastWrittenOpTime(oplogTip, wallTime);
+    replCoordSetMyLastAppliedOpTime(oplogTip, wallTime);
+    replCoordSetMyLastDurableOpTime(oplogTip, wallTime);
+    getStorageInterface()->allDurableTimestamp = oplogTip.getTimestamp();
+
+    // Simulate advancing the commit point while in STARTUP2 state.
+    getReplCoord()->advanceCommitPoint({oplogTip, wallTime}, true /* fromSyncSource */);
+    ASSERT_EQUALS(oplogTip, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime())
+        << "the committed snapshot is expected to be skipped while in STARTUP2";
+
+    // Initial sync completes and the node leaves STARTUP2 with its commit point already at the tip.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // We should update the committed snapshot time that we skipped during initial sync.
+    ASSERT_EQUALS(oplogTip, getReplCoord()->getCurrentCommittedSnapshotOpTime())
+        << "leaving STARTUP2 must install the committed snapshot that was skipped while in "
+           "STARTUP2";
+}
+
 TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
     init("mySet");
 
