@@ -372,18 +372,17 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             repl_config["settings"]["heartbeatTimeoutSecs"] = 1
             repl_config["settings"]["catchUpTimeoutMillis"] = 0
 
-        disagg_enabled = (
-            self.nodes[0]
-            .get_mongod_options()
-            .get("set_parameters", {})
-            .get("disaggregatedStorageEnabled", False)
-        )
-
         if self.use_auto_bootstrap_procedure:
             # Auto-bootstrap already initiates automatically on the first node, but we still need
             # to apply the requested repl_config settings using reconfig.
             self._reconfig_repl_set(client, repl_config)
         else:
+            disagg_enabled = (
+                self.nodes[0]
+                .get_mongod_options()
+                .get("set_parameters", {})
+                .get("disaggregatedStorageEnabled", False)
+            )
             if not disagg_enabled:
                 self.logger.info("Issuing replSetInitiate command: %s", repl_config)
                 self._initiate_repl_set(client, repl_config)
