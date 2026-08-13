@@ -340,6 +340,68 @@ class TestTssSession(unittest.TestCase):
         self.assertIn("aus4k4jv00hWjNnps297", kwargs["token_url"])
 
 
+class TestIsSelectable(unittest.TestCase):
+    """Some suites have no test files for selection to reason about."""
+
+    def _write(self, contents):
+        with tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False) as suite_file:
+            suite_file.write(contents)
+        self.addCleanup(os.unlink, suite_file.name)
+        return suite_file.name
+
+    def test_a_suite_of_files_is_selectable(self):
+        path = self._write(yaml.safe_dump({"test_kind": "js_test", "selector": {"roots": []}}))
+        self.assertTrue(under_test.is_selectable(path))
+
+    def test_a_mongos_test_suite_is_not(self):
+        # resmoke hands back the selector config as the single test case, not a list of files.
+        path = self._write(yaml.safe_dump({"test_kind": "mongos_test", "selector": {"test": ""}}))
+        self.assertFalse(under_test.is_selectable(path))
+
+    def test_an_unreadable_config_is_left_to_discovery_to_report(self):
+        self.assertTrue(under_test.is_selectable("/nonexistent/suite.yml"))
+
+    def test_valid_yaml_that_is_not_a_mapping_is_left_to_discovery_to_report(self):
+        # A crash here would escape main()'s fail-open handling and leave the genrule with no
+        # output file at all, which is worse than letting discovery report the bad suite.
+        for contents in ("[]\n", "- one\n- two\n", "just a scalar\n", "\n"):
+            with self.subTest(contents=contents):
+                self.assertTrue(under_test.is_selectable(self._write(contents)))
+
+
+class TestMongosTestSuiteIsSkipped(unittest.TestCase):
+    def test_writes_a_disabled_file_without_running_discovery(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = os.path.join(tmpdir, "tests.yml")
+            suite = os.path.join(tmpdir, "mongos_test.yml")
+            pathlib.Path(suite).write_text(yaml.safe_dump({"test_kind": "mongos_test"}))
+            argv = [
+                "generate_tss_test_list.py",
+                "--suite",
+                suite,
+                "--label",
+                "//src/mongo/s:mongos_test",
+                "--output",
+                output,
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(under_test, "discover_tests") as discover,
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                under_test.main()
+            discover.assert_not_called()
+            with open(output) as written:
+                self.assertEqual(
+                    {
+                        "suite": "//src/mongo/s:mongos_test",
+                        "status": "disabled",
+                        "tests": [],
+                    },
+                    yaml.safe_load(written),
+                )
+
+
 class TestReadSelectionSettings(unittest.TestCase):
     """Enable and strategies come from the build settings file written by _tss_settings_file."""
 

@@ -67,10 +67,35 @@ TSS_STRATEGIES = (
     "StartsWithT",
 )
 
+# Test kinds whose "tests" are not file names, so there is nothing for selection to work with.
+UNSELECTABLE_TEST_KINDS = ("mongos_test",)
+
 # Selection endpoint on the TSS service. The trailing slash matters: without it the service
 # answers with a redirect that adds it, which is a wasted round trip at best and, through the
 # corp hostnames, pointed at a closed port.
 TSS_SELECT_PATH = "/api/test_selection/select_tests/"
+
+
+def is_selectable(suite_path: str) -> bool:
+    """Return whether the suite's tests are named files that selection can reason about.
+
+    A mongos_test suite has no test files: resmoke treats the selector config itself as the
+    single test case (see Suite._get_tests_for_kind), so discovery has nothing to list and the
+    service has nothing to choose between.
+    """
+    try:
+        with open(suite_path) as suite_file:
+            config = yaml.safe_load(suite_file)
+    except (OSError, yaml.YAMLError):
+        # Let discovery report the problem rather than second-guessing it here.
+        return True
+    if not isinstance(config, dict):
+        # Valid YAML, but not a suite: a list or a scalar has no test_kind to inspect. Same
+        # reasoning as an unreadable file -- discovery describes the problem far better than a
+        # crash in this pre-check would, and crashing here would skip the fail-open handling
+        # around discovery entirely and leave the genrule with no output file at all.
+        return True
+    return config.get("test_kind") not in UNSELECTABLE_TEST_KINDS
 
 
 def discover_tests(suite: str, tag_files: list[str], exclude_with_any_tags: list[str]) -> list[str]:
@@ -368,6 +393,17 @@ def main():
     args = parser.parse_args()
 
     suite = args.label or args.suite
+
+    if not is_selectable(args.suite):
+        print(
+            f"Skipping test selection for {suite}: its tests are not files, so there is nothing "
+            f"to select between. Wrote {args.output}.",
+            file=sys.stderr,
+        )
+        with open(args.output, "w") as output:
+            yaml.safe_dump({"suite": suite, "status": "disabled", "tests": []}, output)
+        return
+
     failed = False
     try:
         tests = discover_tests(args.suite, args.tag_files, args.exclude_with_any_tags)
