@@ -103,6 +103,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/timeseries/write/timeseries_insert_after_update.js
     - jstests/core/timeseries/write/timeseries_closed_update_delete.js
+    - jstests/core/timeseries/write/timeseries_write_jsonschema_non_object.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
     - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
     - jstests/core/index/express.js
