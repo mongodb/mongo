@@ -1924,7 +1924,8 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertIn("docker info", stderr.getvalue())
         self.assertIn("podman info", stderr.getvalue())
         self.assertIn("refusing to run build tools natively", stderr.getvalue())
-        self.assertIn("MONGO_LINUX_CONTAINER_ACTIONS=0", stderr.getvalue())
+        self.assertIn("MONGO_BAZEL_USE_HERMETIC_CONTAINER environment variable", stderr.getvalue())
+        self.assertIn("MONGO_BAZEL_USE_HERMETIC_CONTAINER=0", stderr.getvalue())
         run_direct.assert_not_called()
 
     def test_image_pull_failure_fails_closed(self):

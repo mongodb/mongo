@@ -5309,7 +5309,8 @@ def run_hermetic_container(
                 f"No usable Linux container runtime is available{detail}. Install Docker Engine "
                 "(recommended) or Podman and ensure the current user can access it. Verify with "
                 "`docker info` or `podman info`; refusing to run build tools natively. To "
-                f"intentionally build natively, set {LINUX_CONTAINER_ACTIONS_ENV}=0."
+                "intentionally build natively, set the MONGO_BAZEL_USE_HERMETIC_CONTAINER "
+                "environment variable to 0 (`MONGO_BAZEL_USE_HERMETIC_CONTAINER=0`)."
             )
             return 1
 
