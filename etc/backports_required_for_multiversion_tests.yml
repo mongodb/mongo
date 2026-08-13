@@ -63,6 +63,8 @@ last-patch:
       ticket: SERVER-131540
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js
       ticket: SERVER-127745
+    - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
+      ticket: SERVER-130544
   suites: null
 last-continuous:
   all:
@@ -100,6 +102,8 @@ last-continuous:
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
       ticket: SERVER-133282
+    - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
+      ticket: SERVER-130544
   suites: null
 last-lts:
   all:
@@ -139,4 +143,6 @@ last-lts:
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
       ticket: SERVER-133282
+    - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
+      ticket: SERVER-130544
   suites: null
