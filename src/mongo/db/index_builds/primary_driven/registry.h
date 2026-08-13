@@ -37,6 +37,8 @@ public:
 
     void clear();
 
+    bool contains(const UUID& buildUUID) const;
+
     std::vector<std::pair<UUID, Entry>> all() const;
 
 private:

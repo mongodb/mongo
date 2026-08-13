@@ -272,6 +272,14 @@ Status abort(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
+    if (!_registry(opCtx->getServiceContext()).contains(buildUUID)) {
+        LOGV2(13344300,
+              "Index build: already deregistered, nothing to abort",
+              "buildUUID"_attr = buildUUID,
+              "collectionUUID"_attr = collectionUUID);
+        return Status::OK();
+    }
+
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);

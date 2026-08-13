@@ -28,6 +28,11 @@ void Registry::clear() {
     _entries.clear();
 }
 
+bool Registry::contains(const UUID& buildUUID) const {
+    std::lock_guard lock{_mutex};
+    return _entries.contains(buildUUID);
+}
+
 std::vector<std::pair<UUID, Registry::Entry>> Registry::all() const {
     std::lock_guard lock{_mutex};
     std::vector<std::pair<UUID, Entry>> entries;

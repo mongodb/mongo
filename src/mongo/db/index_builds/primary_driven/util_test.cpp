@@ -371,6 +371,36 @@ TEST_F(UtilTest, Abort) {
     EXPECT_FALSE(args.isTimeseries);
 }
 
+TEST_F(UtilTest, AbortSkipsAlreadyAbortedBuild) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b"});
+    Status cause{ErrorCodes::IndexBuildAborted, "abort"};
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(
+        start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+
+    // The build is gone, so the second abort has nothing of its own to drop.
+    {
+        auto coll =
+            acquireCollectionMaybeLockFree(operationContext(),
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               operationContext(),
+                                               {ns.dbName(), collUUID},
+                                               AcquisitionPrerequisites::OperationType::kRead));
+        for (auto&& index : indexes) {
+            EXPECT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+                operationContext(), index.getIndexName(), IndexCatalog::InclusionPolicy::kAll));
+        }
+    }
+
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+}
+
 TEST_F(UtilTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
     auto buildUUID = UUID::gen();
     auto indexes = makeIndexes({"a"});
