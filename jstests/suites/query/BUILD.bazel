@@ -21,7 +21,7 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
         "aggregation",
         "ci-release-critical",
@@ -41,7 +41,7 @@ resmoke_suite_test(
         "//jstests/libs:authTestsKey",
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "aggregation",
         "auth",
@@ -89,7 +89,7 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 8,
+    shard_count = 6,
     tags = [
         "aggregation",
         "ci-release-critical",

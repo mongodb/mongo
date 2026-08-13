@@ -17,7 +17,6 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 resmoke_suite_test(
     name = "concurrency_replication_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_primary_driven_index_builds.yml",
-    shard_count = 4,
     tags = [
         "ci-release-critical",
         "common",
@@ -41,7 +40,6 @@ resmoke_suite_test(
     name = "concurrency_sharded_replication_primary_driven_index_builds",
     size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_primary_driven_index_builds.yml",
-    shard_count = 4,
     tags = [
         "ci-release-critical",
         "common",
@@ -83,7 +81,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_passthrough_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/retryable_writes_jscore_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 10,
     tags = [
         "ci-default",
         "primary_driven_index_builds",
@@ -98,7 +96,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 4,
     tags = [
         "ci-default",
         "primary_driven_index_builds",
@@ -114,7 +112,7 @@ resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_primary_driven_index_builds",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 15,
     tags = [
         "ci-default",
         "jscore",
@@ -138,7 +136,6 @@ resmoke_suite_test(
     resmoke_args = [
         "--fastCheckParameters={\"numRuns\":25,\"seed\":42}",
     ],
-    shard_count = 4,
     tags = [
         "ci-default",
     ],
@@ -151,7 +148,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "v1index_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/v1index_jscore_passthrough.yml",
-    shard_count = 50,
+    shard_count = 13,
     tags = [
         "ci-default",
     ],

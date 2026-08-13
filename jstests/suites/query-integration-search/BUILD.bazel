@@ -21,7 +21,6 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/mongotmock/lib",
     ],
-    shard_count = 50,
     tags = [
         "ci-release-critical",
     ],
@@ -74,7 +73,6 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/mongotmock/lib",
     ],
-    shard_count = 50,
     tags = [
         "ci-release-critical",
     ],
@@ -105,7 +103,7 @@ resmoke_suite_test(
         "//jstests/with_mongot/search_mocked/lib:all_javascript_files",
         "//x509:generate_main_certificates",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
         "ci-release-critical",
         "search_community_mongotmock",
@@ -304,7 +302,7 @@ resmoke_suite_test(
         "//jstests/with_mongot/mongotmock/lib",
         "//jstests/with_mongot/search_mocked:all_javascript_files",
     ],
-    shard_count = 8,
+    shard_count = 3,
     tags = [
         "ci-release-critical",
     ],

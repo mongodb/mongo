@@ -18,7 +18,7 @@ resmoke_suite_test(
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 15,
+    shard_count = 3,
     tags = [
         "ci-release-critical",
         "common",

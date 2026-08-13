@@ -19,7 +19,6 @@ resmoke_suite_test(
     name = "causally_consistent_jscore_txns_passthrough",
     config = "//buildscripts/resmokeconfig:suites/causally_consistent_jscore_txns_passthrough.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "causally_consistent",
         "ci-release-critical",
@@ -41,7 +40,7 @@ resmoke_suite_test(
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_replication_multi_stmt_txn.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 20,
+    shard_count = 5,
     tags = [
         "ci-release-critical",
         "common",
@@ -66,7 +65,6 @@ resmoke_suite_test(
     name = "sharded_collections_txns_uninitialized_fcv_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/sharded_collections_txns_uninitialized_fcv_jscore_passthrough.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "ci-release-critical",
         "initsync",
@@ -133,7 +131,6 @@ resmoke_suite_test(
     name = "replica_sets_large_txns_format_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_large_txns_format_jscore_passthrough.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 8,
     tags = [
         "ci-release-critical",
         "incompatible_debug_mode",
@@ -159,7 +156,6 @@ resmoke_suite_test(
     name = "sharded_causally_consistent_jscore_txns_passthrough",
     config = "//buildscripts/resmokeconfig:suites/sharded_causally_consistent_jscore_txns_passthrough.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "causally_consistent",
         "ci-release-critical",
@@ -182,7 +178,6 @@ resmoke_suite_test(
     name = "sharded_collections_causally_consistent_jscore_txns_passthrough",
     config = "//buildscripts/resmokeconfig:suites/sharded_collections_causally_consistent_jscore_txns_passthrough.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "causally_consistent",
         "ci-release-critical",
@@ -205,7 +200,6 @@ resmoke_suite_test(
     name = "sharded_jscore_txns",
     config = "//buildscripts/resmokeconfig:suites/sharded_jscore_txns.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "ci-release-critical",
         "jscore",
@@ -227,7 +221,6 @@ resmoke_suite_test(
     name = "sharded_jscore_txns_sharded_collections",
     config = "//buildscripts/resmokeconfig:suites/sharded_jscore_txns_sharded_collections.yml",
     data = ["//jstests/core/libs:raw_operation_utils.js"],
-    shard_count = 4,
     tags = [
         "ci-release-critical",
         "jscore",

@@ -105,7 +105,7 @@ resmoke_suite_test(
         "//jstests/ssl/libs",
         "//x509:generate_main_certificates",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "ci-release-critical",
         "encrypt",
@@ -125,7 +125,7 @@ resmoke_suite_test(
     data = CORE_DATA + [
         "//jstests/libs:authTestsKey",
     ],
-    shard_count = 10,
+    shard_count = 5,
     tags = [
         "auth",
         "ci-release-critical",
@@ -291,7 +291,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "fle2_sharding",
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding.yml",
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "ci-release-critical",
         "encrypt",
@@ -311,7 +311,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "fle2_sharding_high_cardinality",
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding_high_cardinality.yml",
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "ci-release-critical",
         "encrypt",
@@ -331,7 +331,7 @@ resmoke_suite_test(
     name = "aggregation_ese",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_ese.yml",
-    shard_count = 50,
+    shard_count = 3,
     tags = [
         "aggregation",
         "ci-release-critical",
@@ -353,7 +353,7 @@ resmoke_suite_test(
     name = "aggregation_ese_gcm",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_ese_gcm.yml",
-    shard_count = 50,
+    shard_count = 3,
     tags = [
         "aggregation",
         "ci-release-critical",
@@ -375,7 +375,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_ese",
     config = "//buildscripts/resmokeconfig:suites/core_ese.yml",
-    shard_count = 50,
+    shard_count = 5,
     tags = [
         "ci-release-critical",
         "encrypt",
@@ -395,7 +395,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml",
-    shard_count = 50,
+    shard_count = 5,
     tags = [
         "ci-release-critical",
         "encrypt",

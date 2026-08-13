@@ -21,7 +21,7 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "aggregation",
         "ci-release-critical",
@@ -40,7 +40,7 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "aggregation",
         "ci-release-critical",
@@ -59,7 +59,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_repeat_queries_multiplan_single_solutions",
     config = "//buildscripts/resmokeconfig:suites/aggregation_repeat_queries_multiplan_single_solutions.yml",
-    shard_count = 8,
+    shard_count = 2,
     tags = ["ci-default"],
     deps = [
         "//src/mongo/db:mongod",
@@ -70,7 +70,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "identity_views_passthrough",
     config = "//buildscripts/resmokeconfig:suites/identity_views_passthrough.yml",
-    shard_count = 8,
+    shard_count = 4,
     tags = ["ci-default"],
     deps = [
         "//src/mongo/db:mongod",
@@ -81,7 +81,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_cost_choice_aggregation_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_aggregation_passthrough.yml",
-    shard_count = 8,
+    shard_count = 2,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -95,7 +95,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_cost_choice_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -109,7 +109,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_no_multiplanning_results_aggregation_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_aggregation_passthrough.yml",
-    shard_count = 8,
+    shard_count = 2,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -123,7 +123,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_no_multiplanning_results_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -207,7 +207,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_repeat_queries_always_replan.yml",
-    shard_count = 8,
+    shard_count = 3,
     tags = [
         "aggregation",
         "ci-default",
@@ -228,7 +228,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_repeat_queries_always_replan.yml",
-    shard_count = 8,
+    shard_count = 5,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
@@ -248,7 +248,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_wildcard_indexes",
     config = "//buildscripts/resmokeconfig:suites/core_wildcard_indexes.yml",
-    shard_count = 50,
+    shard_count = 7,
     tags = [
         "ci-default",
         "jscore",

@@ -20,7 +20,7 @@ resmoke_suite_test(
     name = "concurrency_replication_execution_control_with_prioritization",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_execution_control_with_prioritization.yml",
-    shard_count = 50,
+    shard_count = 20,
     tags = [
         "ci-default",
         "common",
@@ -43,7 +43,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_ingress_request_rate_limiter",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_ingress_request_rate_limiter.yml",
-    shard_count = 50,
+    shard_count = 6,
     tags = [
         "ci-default",
         "jscore",
@@ -152,7 +152,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_with_dynamic_execution_control",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_dynamic_execution_control.yml",
-    shard_count = 50,
+    shard_count = 16,
     tags = [
         "ci-default",
         "execution_control_with_prioritization",

@@ -71,7 +71,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_heap_profiling",
     config = "//buildscripts/resmokeconfig:suites/core_heap_profiling.yml",
-    shard_count = 50,
+    shard_count = 6,
     tags = [
         "ci-default",
         "jscore",
