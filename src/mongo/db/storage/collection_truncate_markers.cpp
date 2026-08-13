@@ -205,8 +205,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
     CollectionIterator& collectionIterator,
     int64_t minBytesPerMarker,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    int64_t startTime,
     TickSource* tickSource) {
-    auto startTime = curTimeMicros64();
     const int64_t numRecordsTotal = collectionIterator.numRecords();
     LOGV2_INFO(7393212,
                "Scanning collection to determine where to place markers for truncation",
@@ -270,65 +270,88 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         MarkersCreationMethod::Scanning};
 }
 
-
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersBySampling(
     OperationContext* opCtx,
     CollectionIterator& collectionIterator,
-    int64_t estimatedRecordsPerMarker,
-    int64_t estimatedBytesPerMarker,
+    int64_t minBytesPerMarker,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    bool allowFallbackScanning,
+    int64_t startTime,
     TickSource* tickSource) {
-    auto startTime = curTimeMicros64();
+    invariant(minBytesPerMarker > 0);
+
+    // Use the collection's average record size to estimate the number of records in each marker,
+    // and thus estimate the combined size of the records.
+    int64_t numRecords = collectionIterator.numRecords();
+    int64_t dataSize = collectionIterator.dataSize();
+
+    auto fallbackOnFailure = [&](std::string_view reason) -> InitialSetOfMarkers {
+        int64_t numRecords = collectionIterator.numRecords();
+        int64_t dataSize = collectionIterator.dataSize();
+        LOGV2_WARNING(13283605,
+                      "Failed to sample collection for initial truncation markers",
+                      "reason"_attr = reason,
+                      "fallbackMethod"_attr = allowFallbackScanning
+                          ? toString(MarkersCreationMethod::Scanning)
+                          : toString(MarkersCreationMethod::EmptyCollection),
+                      "uuid"_attr = collectionIterator.getRecordStore()->uuid(),
+                      "numRecords"_attr = numRecords,
+                      "dataSize"_attr = dataSize);
+        collectionIterator.reset(opCtx);
+        if (allowFallbackScanning) {
+            return CollectionTruncateMarkers::createMarkersByScanning(
+                opCtx,
+                collectionIterator,
+                minBytesPerMarker,
+                std::move(getRecordIdAndWallTime),
+                startTime,
+                tickSource);
+        } else {
+            // If scanning is disabled, start with a single partial marker that contains the initial
+            // size/count of records. These values will be accumulated into a real marker once new
+            // records are written. These initial values may be incorrect (since we usually hit this
+            // path on an incorrect size storer), but will be corrected once the first marker is
+            // truncated off. Call numRecords() and dataSize() to get the most recent values in case
+            // this failure happens some time after the initial values are captured.
+            auto duration = Microseconds{static_cast<int64_t>(curTimeMicros64() - startTime)};
+            return CollectionTruncateMarkers::InitialSetOfMarkers{
+                {}, numRecords, dataSize, duration, MarkersCreationMethod::EmptyCollection};
+        }
+    };
+
+    if (numRecords <= 0 || dataSize <= 0) {
+        // A mismatch on these indicates that the collection is likely empty or something is wrong
+        // with the size/count. Fall back to another method.
+        return fallbackOnFailure("Collection size or count returned 0");
+    }
+
 
     LOGV2_INFO(7393210,
                "Sampling the collection to determine where to place markers for truncation",
                "uuid"_attr = collectionIterator.getRecordStore()->uuid());
     RecordId earliestRecordId, latestRecordId;
 
+    auto getRecord = [&](bool forward) {
+        auto rs = collectionIterator.getRecordStore();
+        return rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward)->next();
+    };
+
     {
-        auto record = [&] {
-            const bool forward = true;
-            auto rs = collectionIterator.getRecordStore();
-            return rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward)
-                ->next();
-        }();
+        auto record = getRecord(true);
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the collection just in
-            // case.
-            LOGV2(7393209,
-                  "Failed to determine the earliest recordId, falling back to scanning the "
-                  "collection",
-                  "uuid"_attr = collectionIterator.getRecordStore()->uuid());
-            return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx,
-                collectionIterator,
-                estimatedBytesPerMarker,
-                std::move(getRecordIdAndWallTime));
+            // The collection is probably empty, so fall back to another method just in case.
+            return fallbackOnFailure("Failed to determine the earliest recordId");
         }
         earliestRecordId = record->id;
     }
 
     {
-        auto record = [&] {
-            const bool forward = false;
-            auto rs = collectionIterator.getRecordStore();
-            return rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward)
-                ->next();
-        }();
+        auto record = getRecord(false);
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the collection just in
-            // case.
-            LOGV2(
-                7393208,
-                "Failed to determine the latest recordId, falling back to scanning the collection",
-                "uuid"_attr = collectionIterator.getRecordStore()->uuid());
-            return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx,
-                collectionIterator,
-                estimatedBytesPerMarker,
-                std::move(getRecordIdAndWallTime));
+            // The collection is probably empty, so fall back to another method just in case.
+            return fallbackOnFailure("Failed to determine the latest recordId");
         }
         latestRecordId = record->id;
     }
@@ -339,19 +362,23 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
           "from"_attr = earliestRecordId,
           "to"_attr = latestRecordId);
 
-    int64_t wholeMarkers = collectionIterator.numRecords() / estimatedRecordsPerMarker;
+    double avgRecordSize = double(dataSize) / double(numRecords);
+
+    // These values will be stored as the size/count of each marker
+    const int64_t estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
+    const int64_t estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
+
+    int64_t wholeMarkers = numRecords / estimatedRecordsPerMarker;
     // We don't use the wholeMarkers variable here due to integer division not being associative.
     // For example, 10 * (47500 / 28700) = 10, but (10 * 47500) / 28700 = 16.
-    int64_t numSamples =
-        (CollectionTruncateMarkers::kRandomSamplesPerMarker * collectionIterator.numRecords()) /
-        estimatedRecordsPerMarker;
+    int64_t numSamples = (kRandomSamplesPerMarker * numRecords) / estimatedRecordsPerMarker;
 
     LOGV2(7393216,
           "Taking samples and assuming each collection section contains equal amounts",
           "uuid"_attr = collectionIterator.getRecordStore()->uuid(),
           "numSamples"_attr = numSamples,
-          "containsNumRecords"_attr = estimatedRecordsPerMarker,
-          "containsNumBytes"_attr = estimatedBytesPerMarker);
+          "estimatedRecordsPerMarker"_attr = estimatedRecordsPerMarker,
+          "estimatedBytesPerMarker"_attr = estimatedBytesPerMarker);
 
     // Divide the collection into 'wholeMarkers' logical sections, with each section containing
     // approximately 'estimatedRecordsPerMarker'. Do so by oversampling the collection, sorting the
@@ -365,17 +392,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         auto nextRandom = collectionIterator.getNextRandom();
         if (!nextRandom) {
             // getNextRandom() returns nullopt on an empty collection, so either the size storer was
-            // wrong or something modified the collection concurrently (which we do in tests). The
-            // collection is probably empty, but fall back to scanning the collection just in case.
-            LOGV2(7393206,
-                  "Failed to get enough random samples, falling back to scanning the collection",
-                  "uuid"_attr = collectionIterator.getRecordStore()->uuid());
-            collectionIterator.reset(opCtx);
-            return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx,
-                collectionIterator,
-                estimatedBytesPerMarker,
-                std::move(getRecordIdAndWallTime));
+            // wrong or something modified the collection concurrently (which we do in tests).
+            return fallbackOnFailure("Failed to get enough random samples");
         }
         const auto [rId, doc] = *nextRandom;
         auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
@@ -402,6 +420,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
           "uuid"_attr = collectionIterator.getRecordStore()->uuid());
 
     std::deque<Marker> markers;
+
     for (int i = 1; i <= wholeMarkers; ++i) {
         // Use every (kRandomSamplesPerMarker)th sample, starting with the
         // (kRandomSamplesPerMarker - 1)th, as the last record for each marker.
@@ -418,7 +437,9 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         markers.emplace_back(estimatedRecordsPerMarker, estimatedBytesPerMarker, id, wallTime);
     }
 
-    // Account for the partially filled chunk.
+    // Account for the partially filled chunk. Reading numRecords() and dataSize() here results in
+    // the size and count of any records that were written during the traversal being included in
+    // the partial marker.
     auto currentRecords =
         collectionIterator.numRecords() - estimatedRecordsPerMarker * wholeMarkers;
     auto currentBytes = collectionIterator.dataSize() - estimatedBytesPerMarker * wholeMarkers;
@@ -436,8 +457,9 @@ CollectionTruncateMarkers::computeInitialCreationMethod(
     int64_t numRecords,
     int64_t dataSize,
     int64_t minBytesPerMarker,
-    bool forceScanning,
+    MarkersCreationPolicy policy,
     boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
+
     // Don't calculate markers if this is a new collection. This is to prevent standalones from
     // attempting to get a forward scanning cursor on an explicit create of the collection. These
     // values can be wrong. The assumption is that if they are both observed to be zero, there must
@@ -446,9 +468,24 @@ CollectionTruncateMarkers::computeInitialCreationMethod(
         return MarkersCreationMethod::EmptyCollection;
     }
 
-    // Force scanning if the slow collection scanning flag is enabled or if required by the caller.
-    if (forceScanning || gUseSlowCollectionTruncateMarkerScanning) {
+    // Force scanning if the slow collection scanning flag is set, overriding the policy.
+    if (gUseSlowCollectionTruncateMarkerScanning) {
+        LOGV2_WARNING(13283606,
+                      "Running intentionally slow collection scan to generate initial truncate "
+                      "markers. Any other configuration that may disable scanning is ignored.",
+                      "policy"_attr = policy == MarkersCreationPolicy::kSampleOnly
+                          ? "SampleOnly"
+                          : (policy == MarkersCreationPolicy::kScanOnly ? "ScanOnly" : "Auto"),
+                      "numRecords"_attr = numRecords,
+                      "dataSize"_attr = dataSize);
         return MarkersCreationMethod::Scanning;
+    }
+
+    // If a specific method is required by the caller, use it.
+    if (policy == MarkersCreationPolicy::kScanOnly) {
+        return MarkersCreationMethod::Scanning;
+    } else if (policy == MarkersCreationPolicy::kSampleOnly) {
+        return MarkersCreationMethod::Sampling;
     }
 
     // Only use sampling to estimate where to place the collection markers if the number of samples
@@ -476,8 +513,8 @@ CollectionTruncateMarkers::createFromCollectionIterator(
     OperationContext* opCtx,
     CollectionIterator& collectionIterator,
     int64_t minBytesPerMarker,
-    bool forceScanning,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    MarkersCreationPolicy policy,
     boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
 
     long long numRecords = collectionIterator.numRecords();
@@ -489,8 +526,9 @@ CollectionTruncateMarkers::createFromCollectionIterator(
           "dataSize"_attr = dataSize);
 
     auto creationMethod = CollectionTruncateMarkers::computeInitialCreationMethod(
-        numRecords, dataSize, minBytesPerMarker, forceScanning, numberOfMarkersToKeepForOplog);
+        numRecords, dataSize, minBytesPerMarker, policy, numberOfMarkersToKeepForOplog);
 
+    auto startTime = curTimeMicros64();
     switch (creationMethod) {
         case MarkersCreationMethod::EmptyCollection:
             // Don't calculate markers if this is a new collection. This is to prevent standalones
@@ -502,21 +540,20 @@ CollectionTruncateMarkers::createFromCollectionIterator(
                 {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
         case MarkersCreationMethod::Scanning:
             return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx, collectionIterator, minBytesPerMarker, std::move(getRecordIdAndWallTime));
+                opCtx,
+                collectionIterator,
+                minBytesPerMarker,
+                std::move(getRecordIdAndWallTime),
+                startTime);
         default: {
-            // Use the collection's average record size to estimate the number of records in each
-            // marker,
-            // and thus estimate the combined size of the records.
-            double avgRecordSize = double(dataSize) / double(numRecords);
-            double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
-            double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
-
+            bool allowScanning = policy != MarkersCreationPolicy::kSampleOnly;
             return CollectionTruncateMarkers::createMarkersBySampling(
                 opCtx,
                 collectionIterator,
-                (int64_t)estimatedRecordsPerMarker,
-                (int64_t)estimatedBytesPerMarker,
-                std::move(getRecordIdAndWallTime));
+                minBytesPerMarker,
+                std::move(getRecordIdAndWallTime),
+                allowScanning,
+                startTime);
         }
     }
 }

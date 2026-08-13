@@ -162,6 +162,11 @@ public:
                   "StubPersistenceProvider::supportsOplogSampling() method not implemented");
     }
 
+    bool supportsOplogScanning() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsOplogScanning() method not implemented");
+    }
+
     bool supportsWriteConcernOptions(
         const WriteConcernOptions& writeConcernOptions) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,

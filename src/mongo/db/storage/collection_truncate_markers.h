@@ -77,6 +77,10 @@ public:
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling, InProgress };
 
+    // Constrains which creation methods may be selected for the initial set of markers.
+    // 'kAuto' lets the heuristics pick between scanning and sampling.
+    enum class MarkersCreationPolicy { kAuto, kScanOnly, kSampleOnly };
+
     CollectionTruncateMarkers(std::deque<Marker> markers,
                               int64_t leftoverRecordsCount,
                               int64_t leftoverRecordsBytes,
@@ -158,16 +162,15 @@ public:
 
     /**
      * Given the estimated collection 'dataSize' and 'numRecords', along with a target
-     * 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
-     * creation method), computes the initial creation method to try for the initialization.
+     * 'minBytesPerMarker', computes the initial creation method to try for the initialization.
      *
      * It's possible the initial creation method is not the actual creation method. However, it will
      * be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
      * are really far off, sampling may default back to scanning later on.
      *
-     * 'forceScanning' picks 'Scanning' unconditionally, bypassing the size-based heuristic. This
-     * should be used in cases where random sampling is unsupported. The server parameter
-     * 'gUseSlowCollectionTruncateMarkerScanning' has the same effect for every call site.
+     * 'policy' constrains which creation methods may be selected. The server parameter
+     * 'gUseSlowCollectionTruncateMarkerScanning' forces scanning for every callsite, overriding
+     * 'policy'.
      *
      * 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
      * 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
@@ -177,7 +180,7 @@ public:
         int64_t numRecords,
         int64_t dataSize,
         int64_t minBytesPerMarker,
-        bool forceScanning,
+        MarkersCreationPolicy policy = MarkersCreationPolicy::kAuto,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     /**
@@ -236,8 +239,8 @@ public:
         OperationContext* opCtx,
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
-        bool forceScanning,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        MarkersCreationPolicy policy = MarkersCreationPolicy::kAuto,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     // Creates the initial set of markers by fully scanning the collection. The set of markers
@@ -247,6 +250,7 @@ public:
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        int64_t startTime,
         TickSource* tickSource = globalSystemTickSource());
 
     // Creates the initial set of markers by sampling the collection. The set of markers
@@ -255,9 +259,10 @@ public:
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
         CollectionIterator& collIterator,
-        int64_t estimatedRecordsPerMarker,
-        int64_t estimatedBytesPerMarker,
+        int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        bool allowFallbackScanning,
+        int64_t startTime,
         TickSource* tickSource = globalSystemTickSource());
 
     void setMinBytesPerMarker(int64_t size);

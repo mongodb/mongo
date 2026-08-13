@@ -144,9 +144,10 @@ public:
     bool supportsAsyncOplogMarkerGeneration() const override;
 
     /*
-     * We can support oplog sampling.
+     * We can support scanning and sampling the oplog.
      */
     bool supportsOplogSampling() const override;
+    bool supportsOplogScanning() const override;
 
     bool supportsWriteConcernOptions(const WriteConcernOptions& writeConcernOptions) const override;
 

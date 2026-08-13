@@ -146,6 +146,10 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsOplogScanning() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::supportsWriteConcernOptions(
     const WriteConcernOptions& writeConcernOptions) const {
     return true;

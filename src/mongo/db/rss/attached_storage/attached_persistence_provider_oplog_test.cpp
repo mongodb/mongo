@@ -30,5 +30,10 @@ TEST(AttachedPersistenceProviderTest, SupportsOplogSampling) {
     ASSERT_TRUE(provider.supportsOplogSampling());
 }
 
+TEST(AttachedPersistenceProviderTest, SupportsOplogScanning) {
+    rss::AttachedPersistenceProvider provider;
+    ASSERT_TRUE(provider.supportsOplogScanning());
+}
+
 }  // namespace
 }  // namespace mongo

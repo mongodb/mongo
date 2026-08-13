@@ -10,8 +10,6 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 
-#include <algorithm>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::oplog_truncation {
@@ -29,19 +27,22 @@ bool checkOplogTruncationBounds(OperationContext* opCtx,
     }
     auto firstRecordId = firstRecordSeekable.get().id;
 
-    LOGV2_INFO(7420100,
-               "Assessing oplog truncation bounds",
-               "firstRecordId"_attr = firstRecordId,
-               "lastRecord"_attr = marker.lastRecord,
-               "numRecords"_attr = marker.records,
-               "numBytes"_attr = marker.bytes);
+    LOGV2_DEBUG(7420100,
+                1,
+                "Assessing oplog truncation bounds",
+                "firstRecordId"_attr = firstRecordId,
+                "lastRecord"_attr = marker.lastRecord,
+                "numRecords"_attr = marker.records,
+                "numBytes"_attr = marker.bytes);
 
     // The first record in the oplog should be within the truncate range.
     if (firstRecordId > marker.lastRecord) {
         LOGV2_WARNING(7420101,
-                      "First oplog record is not in truncation range",
+                      "First oplog record is after truncation range",
                       "firstRecord"_attr = firstRecordId,
-                      "truncateRangeLastRecord"_attr = marker.lastRecord);
+                      "lastRecord"_attr = marker.lastRecord,
+                      "numRecords"_attr = marker.records,
+                      "numBytes"_attr = marker.bytes);
     }
 
     // It is necessary that there exists a record after the truncate marker but before
@@ -50,18 +51,23 @@ bool checkOplogTruncationBounds(OperationContext* opCtx,
     auto nextRecordAfterTruncateMarker =
         seekableCursor->seek(marker.lastRecord, SeekableRecordCursor::BoundInclusion::kExclude);
     if (!nextRecordAfterTruncateMarker) {
-        LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
+        LOGV2(5140900,
+              "Assessed oplog truncation bound: Cannot truncate entire oplog",
+              "firstRecord"_attr = firstRecordId,
+              "lastRecord"_attr = marker.lastRecord,
+              "numRecords"_attr = marker.records,
+              "numBytes"_attr = marker.bytes);
         return false;
     }
 
     if (nextRecordAfterTruncateMarker->id > mayTruncateUpTo) {
-        LOGV2_DEBUG(5140901,
-                    0,
-                    "Cannot truncate as there are no oplog entries after the truncate "
-                    "marker but "
-                    "before the truncate-up-to point",
-                    "nextRecord"_attr = nextRecordAfterTruncateMarker->id,
-                    "mayTruncateUpTo"_attr = mayTruncateUpTo);
+        LOGV2(5140901,
+              "Assessed oplog truncation bound: Cannot truncate, there are no oplog entries after "
+              "the marker but before the truncate-up-to point",
+              "firstRecord"_attr = firstRecordId,
+              "lastRecord"_attr = marker.lastRecord,
+              "nextRecordAfterMarker"_attr = nextRecordAfterTruncateMarker->id,
+              "mayTruncateUpTo"_attr = mayTruncateUpTo);
         return false;
     }
     return true;

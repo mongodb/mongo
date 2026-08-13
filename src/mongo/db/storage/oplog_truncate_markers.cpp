@@ -43,11 +43,26 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     bool asyncGenerationEnabled = provider.supportsAsyncOplogMarkerGeneration();
     bool samplingEnabled = provider.supportsOplogSampling();
+    bool scanningEnabled = provider.supportsOplogScanning();
+
+    tassert(13283601,
+            "The persistence provider must allow either scanning or sampling as an initial marker "
+            "generation method.",
+            samplingEnabled || scanningEnabled);
+
+    auto policy = CollectionTruncateMarkers::MarkersCreationPolicy::kAuto;
+    if (!samplingEnabled) {
+        policy = CollectionTruncateMarkers::MarkersCreationPolicy::kScanOnly;
+    } else if (!scanningEnabled) {
+        policy = CollectionTruncateMarkers::MarkersCreationPolicy::kSampleOnly;
+    }
 
     LOGV2(10621000,
           "Beginning initial marker creation.",
-          "Async generation"_attr = asyncGenerationEnabled,
-          "Sampling enabled"_attr = samplingEnabled);
+          "asyncGenerationEnabled"_attr = asyncGenerationEnabled,
+          "samplingEnabled"_attr = samplingEnabled,
+          "scanningEnabled"_attr = scanningEnabled);
+
     long long maxSize = rs.oplog()->getMaxSize();
     invariant(maxSize > 0);
     invariant(rs.keyFormat() == KeyFormat::Long);
@@ -90,7 +105,6 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
         opCtx,
         *iterator,
         minBytesPerTruncateMarker,
-        !samplingEnabled,
         [](const Record& record) {
             BSONObj obj = record.data.toBson();
             auto wallTime = obj.hasField(repl::DurableOplogEntry::kWallClockTimeFieldName)
@@ -98,6 +112,7 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
                 : obj[repl::DurableOplogEntry::kTimestampFieldName].timestampTime();
             return RecordIdAndWallTime(record.id, wallTime);
         },
+        policy,
         numTruncateMarkersToKeep);
     LOGV2(22382,
           "Record store oplog processing finished",

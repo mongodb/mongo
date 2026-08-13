@@ -688,7 +688,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
                                                                        false);
 
     unittest::ServerParameterGuard minMarkerCountController("minOplogTruncationPoints", 30);
-    unittest::ServerParameterGuard maxMarkerCountController("maxOplogTruncationPointsAfterStartup",
+    unittest::ServerParameterGuard maxMarkerCountController("maxOplogTruncationPointsDuringStartup",
                                                             30);
 
     auto opCtx = getOperationContext();

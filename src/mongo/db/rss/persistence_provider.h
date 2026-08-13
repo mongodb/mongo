@@ -185,6 +185,12 @@ public:
      */
     virtual bool supportsOplogSampling() const = 0;
 
+    /**
+     * If true, the provider supports a full collection scan over the oplog collection when
+     * initializing truncation markers.
+     */
+    virtual bool supportsOplogScanning() const = 0;
+
     virtual bool supportsWriteConcernOptions(
         const WriteConcernOptions& writeConcernOptions) const = 0;
 

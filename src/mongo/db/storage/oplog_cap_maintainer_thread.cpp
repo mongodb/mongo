@@ -82,22 +82,21 @@ public:
             // In certain modes, like read-only, no truncate markers are created.
             if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
                 auto method = truncateMarkers->getMarkersCreationMethod();
-                if (method == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
-                    builder.append("totalTimeProcessingMicros",
-                                   truncateMarkers->getCreationProcessingTime().count());
-                    builder.append("processingMethod", "sampling");
-                } else if (method == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
+                if (method == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
                     invariant(truncateMarkers->getCreationProcessingTime().count() == 0);
                     builder.append("totalTimeProcessingMicros", -1);
                     builder.append("processingMethod", "in progress");
-                } else if (method ==
-                           CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {
-                    builder.append("totalTimeProcessingMicros", -1);
-                    builder.append("processingMethod", "empty collection");
                 } else {
                     builder.append("totalTimeProcessingMicros",
                                    truncateMarkers->getCreationProcessingTime().count());
-                    builder.append("processingMethod", "scanning");
+                    if (method == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
+                        builder.append("processingMethod", "sampling");
+                    } else if (method ==
+                               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {
+                        builder.append("processingMethod", "empty collection");
+                    } else {
+                        builder.append("processingMethod", "scanning");
+                    }
                 }
                 builder.appendNumber("truncateMarkersCount",
                                      static_cast<long long>(truncateMarkers->numMarkers()));
@@ -223,9 +222,10 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
-        LOGV2(10621107,
-              "Looking for excess documents to delete",
-              "oplogSizeBytes"_attr = rs->dataSize());
+        LOGV2_DEBUG(10621107,
+                    2,
+                    "Looking for excess documents to delete",
+                    "oplogSizeBytes"_attr = rs->dataSize());
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
@@ -236,6 +236,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         // Oplog went away or we timed out waiting for oplog space to reclaim.
         return false;
     }
+
+    LOGV2(13283603, "Oplog collection may have excess truncation markers, attempting truncation");
 
     {
         // Oplog state could have changed while yielding. Reacquire global lock

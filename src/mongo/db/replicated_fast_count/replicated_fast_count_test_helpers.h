@@ -100,6 +100,10 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
+    bool supportsOplogScanning() const override {
+        return true;
+    }
+
     bool supportsWriteConcernOptions(const WriteConcernOptions&) const override {
         return true;
     }

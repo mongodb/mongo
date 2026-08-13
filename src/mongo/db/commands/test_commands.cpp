@@ -404,6 +404,7 @@ public:
     BOOL_FIELD_BUILDER_FN(supportsPersistentOplogCapMaintainerThread)        \
     BOOL_FIELD_BUILDER_FN(supportsAsyncOplogMarkerGeneration)                \
     BOOL_FIELD_BUILDER_FN(supportsOplogSampling)                             \
+    BOOL_FIELD_BUILDER_FN(supportsOplogScanning)                             \
     BOOL_FIELD_BUILDER_FN(supportsPreservingPreparedTxnInPreciseCheckpoints) \
     BOOL_FIELD_BUILDER_FN(supportsTableLogging)                              \
     BOOL_FIELD_BUILDER_FN(supportsUnstableCheckpoints)                       \
