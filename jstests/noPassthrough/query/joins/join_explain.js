@@ -42,6 +42,8 @@ assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 // Runs the pipeline, and asserts that the join optimizer was used and that estimate information is
 // present in the explain output.
 function runTest(pipeline, expectRejected) {
+    // Ensure stable on-disk sizes.
+    assert.commandWorked(db.adminCommand({fsync: 1}));
     const explain = coll1.explain().aggregate(pipeline);
 
     const queryPlanner = getQueryPlanner(explain);

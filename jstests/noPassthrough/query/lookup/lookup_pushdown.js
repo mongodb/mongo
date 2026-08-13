@@ -1042,6 +1042,8 @@ MongoRunner.stopMongod(conn);
 
     assert.commandWorked(lcoll.insert({a: 1}));
     assert.commandWorked(fcoll.insert([{a: 1}, {a: 1}]));
+    // Ensure stable on-disk sizes.
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
     // The foreign collection is very small and first verifies that the HJ is chosen under the
     // default query knob values.

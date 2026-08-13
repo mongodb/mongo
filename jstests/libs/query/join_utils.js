@@ -155,6 +155,40 @@ export function assertAllJoinsUseMethod(explain, expectedMethod) {
 }
 
 /**
+ * Hooks 'actionFun' to run before the body of 'prototype[funName]'.
+ * 'actionFun' receives the same args as the wrapped function.
+ * Returns a cleanup function which restores the original 'funName'.
+ */
+function insertBeforeHook(prototype, funName, actionFun) {
+    const originalFun = prototype[funName];
+    assert.eq(typeof originalFun, "function");
+    prototype[funName] = function (...args) {
+        actionFun.call(this, ...args);
+        return originalFun.call(this, ...args);
+    };
+    return () => {
+        prototype[funName] = originalFun;
+    };
+}
+
+/**
+ * Hooks fsync before relevant commands run, ensuring stable on-disk size when join-opt runs.
+ * Returns a cleanup function which removes the hooks.
+ */
+function hookFsyncForJoinOpt() {
+    const fsync = function () {
+        assert.commandWorked(this.getDB().adminCommand({fsync: 1}));
+    };
+    const unhookAggregate = insertBeforeHook(DBCollection.prototype, "aggregate", fsync);
+    const unhookExplain = insertBeforeHook(DBCollection.prototype, "explain", fsync);
+
+    return () => {
+        unhookAggregate();
+        unhookExplain();
+    };
+}
+
+/**
  * Restores join-opt parameters to state before test.
  */
 export function joinTestWrapper(db, testFun) {
@@ -178,9 +212,11 @@ export function joinTestWrapper(db, testFun) {
     delete params.ok;
     delete params.operationTime;
 
+    const unhookFsync = hookFsyncForJoinOpt();
     try {
         testFun();
     } finally {
+        unhookFsync();
         assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
     }
 }
