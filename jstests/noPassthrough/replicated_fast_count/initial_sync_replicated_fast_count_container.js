@@ -13,7 +13,6 @@
  *   requires_replication,
  *   requires_persistence,
  *   requires_fsync,
- *   requires_fcv_90,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

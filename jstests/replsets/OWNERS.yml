@@ -60,6 +60,3 @@ filters:
   - "v2_delta_oplog_entries.js":
     approvers:
       - 10gen/query-execution
-  - "*replicated_fast_count*":
-    approvers:
-      - 10gen/server-replicated-size-and-count
