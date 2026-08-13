@@ -386,6 +386,11 @@ feature_flags:
         cpp_varname: gFeatureFlagEnableSchemaEpochs
         default: false
         fcv_gated: false
+    featureFlagPipelinedOplogApplier:
+        description: "Enable pipelined oplog applier."
+        cpp_varname: gFeatureFlagPipelinedOplogApplier
+        default: false
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
