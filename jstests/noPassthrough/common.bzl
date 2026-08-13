@@ -23,6 +23,7 @@ NO_PASSTHROUGH_DATA = [
     "//jstests/libs/config_files:set_verbosity.json",
     "//jstests/libs/query:change_stream_metrics_util.js",
     "//jstests/multiVersion/libs:all_subpackage_javascript_files",
+    "//jstests/noPassthrough/libs:forged_sasl_mech_peer",
     "//jstests/noPassthrough/libs:max_conns_config.yaml",
     "//jstests/noPassthrough/libs:max_conns_config_no_admin_threads.yaml",
     "//jstests/noPassthrough/libs:max_conns_override_config.yaml",
