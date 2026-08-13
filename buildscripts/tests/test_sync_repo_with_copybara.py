@@ -56,6 +56,14 @@ EVERGREEN_EXPANSIONS_PATHS = (Path("../expansions.yml"), Path("expansions.yml"))
 GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED: bool | None = None
 
 
+@unittest.skipUnless(
+    sys.platform == "linux",
+    "Copybara unit tests are only run on Linux.",
+)
+class CopybaraTestCase(unittest.TestCase):
+    """Base class for Copybara unit tests."""
+
+
 def get_current_evergreen_build_variant() -> str | None:
     for key in EVERGREEN_BUILD_VARIANT_ENV_KEYS:
         if value := os.environ.get(key):
@@ -306,7 +314,7 @@ def expected_copybara_config_rev_parse_fragment() -> str:
     return f"rev-parse {quoted_ref}"
 
 
-class TestRunCommand(unittest.TestCase):
+class TestRunCommand(CopybaraTestCase):
     def test_run_command_can_suppress_success_output(self):
         process = MagicMock()
         process.stdout = MagicMock()
@@ -408,7 +416,7 @@ class TestRunCommand(unittest.TestCase):
         self.assertEqual(mock_popen.call_args.kwargs["stderr"], subprocess.PIPE)
 
 
-class TestSourceCommitParsing(unittest.TestCase):
+class TestSourceCommitParsing(CopybaraTestCase):
     def test_parse_source_commit_log_handles_git_record_newlines(self):
         output = (
             "commit1\0Author One <one@example.com>\0"
@@ -436,7 +444,7 @@ class TestSourceCommitParsing(unittest.TestCase):
         )
 
 
-class TestGitOriginRevIdParsing(unittest.TestCase):
+class TestGitOriginRevIdParsing(CopybaraTestCase):
     def test_extract_git_origin_rev_id_returns_none_without_trailer(self):
         self.assertIsNone(sync_repo_with_copybara.extract_git_origin_rev_id("subject\n\nbody"))
 
@@ -458,11 +466,7 @@ class TestGitOriginRevIdParsing(unittest.TestCase):
         )
 
 
-@unittest.skipIf(
-    sys.platform == "win32" or sys.platform == "darwin",
-    reason="No need to run this unittest on windows or macos",
-)
-class TestBranchFunctions(unittest.TestCase):
+class TestBranchFunctions(CopybaraTestCase):
     @staticmethod
     def create_mock_repo_git_config(mongodb_mongo_dir, config_content):
         """
@@ -2208,7 +2212,7 @@ class TestBranchFunctions(unittest.TestCase):
             self.fail(f"{test_name}: FAIL!")
 
 
-class TestReleaseTagHelpers(unittest.TestCase):
+class TestReleaseTagHelpers(CopybaraTestCase):
     def test_parse_release_tag_request_maps_public_branch(self):
         self.assertEqual(
             sync_repo_with_copybara.parse_release_tag_request("r8.2.7"),
@@ -2502,7 +2506,7 @@ def write_base_copybara_config(
     )
 
 
-class TestSkyExclusionChecks(unittest.TestCase):
+class TestSkyExclusionChecks(CopybaraTestCase):
     def test_extract_sky_excluded_patterns(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
@@ -2746,7 +2750,7 @@ class TestSkyExclusionChecks(unittest.TestCase):
                 )
 
 
-class TestCopybaraConfigHelpers(unittest.TestCase):
+class TestCopybaraConfigHelpers(CopybaraTestCase):
     def test_build_copybara_config_uses_test_branch_prefix(self):
         config = sync_repo_with_copybara.build_copybara_config(
             workflow="test",
@@ -3246,7 +3250,7 @@ class TestCopybaraConfigHelpers(unittest.TestCase):
         mock_check_destination_branch_exists.assert_called_once_with(prepared.copybara_config)
 
 
-class TestCopybaraConfigAndTestWorkflowHelpers(unittest.TestCase):
+class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
     def test_get_test_workflow_base_branch_override_reads_sky_variable(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
@@ -4116,7 +4120,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(unittest.TestCase):
         )
 
 
-class TestTestReleaseTagPublishing(unittest.TestCase):
+class TestTestReleaseTagPublishing(CopybaraTestCase):
     @patch("buildscripts.copybara.sync_repo_with_copybara.shutil.rmtree")
     @patch(
         "buildscripts.copybara.sync_repo_with_copybara.tempfile.mkdtemp",
@@ -4202,7 +4206,7 @@ class TestTestReleaseTagPublishing(unittest.TestCase):
         mock_rmtree.assert_called_once_with(destination_repo_dir, ignore_errors=True)
 
 
-class TestMainWorkflow(unittest.TestCase):
+class TestMainWorkflow(CopybaraTestCase):
     @patch(
         "buildscripts.copybara.sync_repo_with_copybara.ensure_generated_copybara_evergreen_is_current"
     )
@@ -6773,7 +6777,7 @@ class TestMainWorkflow(unittest.TestCase):
             self.assertEqual(bundle.branch_to_fragment["v8.2"], fragment_dir / "v8_2.sky")
 
 
-class TestGenerateCopybaraEvergreen(unittest.TestCase):
+class TestGenerateCopybaraEvergreen(CopybaraTestCase):
     @staticmethod
     def write_fragment(root: Path, filename: str, contents: str) -> None:
         fragment_path = root / sync_repo_with_copybara.COPYBARA_CONFIG_DIRECTORY / filename
@@ -6926,7 +6930,7 @@ class TestGenerateCopybaraEvergreen(unittest.TestCase):
         mock_check_generated.assert_called_once_with(Path("/repo"))
 
 
-class TestValidateSyncConfig(unittest.TestCase):
+class TestValidateSyncConfig(CopybaraTestCase):
     @patch("buildscripts.copybara.sync_repo_with_copybara.check_branch_top_level_paths_are_labeled")
     @patch("buildscripts.copybara.sync_repo_with_copybara.list_top_level_paths_for_remote_ref")
     def test_uses_pinned_source_ref_for_top_level_validation(
@@ -6971,7 +6975,7 @@ class TestValidateSyncConfig(unittest.TestCase):
         )
 
 
-class TestEnsureCopybaraSourceRefSupport(unittest.TestCase):
+class TestEnsureCopybaraSourceRefSupport(CopybaraTestCase):
     """Verify that ensure_copybara_source_ref_support correctly injects or preserves source_refs."""
 
     def _make_config_without_source_refs(self) -> str:
@@ -7140,7 +7144,7 @@ class TestEnsureCopybaraSourceRefSupport(unittest.TestCase):
             sync_repo_with_copybara.ensure_copybara_source_ref_support(contents, Path("test.sky"))
 
 
-class TestValidatePreviewExclusions(unittest.TestCase):
+class TestValidatePreviewExclusions(CopybaraTestCase):
     """Verify dry-run output validation catches forbidden files."""
 
     def _make_sync_with_preview(
@@ -7294,7 +7298,7 @@ class TestValidatePreviewExclusions(unittest.TestCase):
             sync_repo_with_copybara.validate_preview_exclusions(sync)
 
 
-class TestShellQuote(unittest.TestCase):
+class TestShellQuote(CopybaraTestCase):
     """Verify shell quoting used by string commands."""
 
     def test_windows_shell_quote_uses_cmd_compatible_quotes(self):
@@ -7316,7 +7320,7 @@ class TestShellQuote(unittest.TestCase):
             )
 
 
-class TestRedactSecrets(unittest.TestCase):
+class TestRedactSecrets(CopybaraTestCase):
     """Verify token redaction in log output."""
 
     def test_redacts_known_tokens(self):
@@ -7418,7 +7422,7 @@ class TestRedactSecrets(unittest.TestCase):
         self.assertNotIn("https://x-access-token:{token}@github.com", stdout.getvalue())
 
 
-class TestExtractSkyExcludedPatternsRejectsDuplicates(unittest.TestCase):
+class TestExtractSkyExcludedPatternsRejectsDuplicates(CopybaraTestCase):
     """Verify that duplicate common_files_to_exclude definitions are rejected."""
 
     def test_rejects_multiple_common_files_to_exclude_definitions(self):
@@ -7464,7 +7468,7 @@ class TestExtractSkyExcludedPatternsRejectsDuplicates(unittest.TestCase):
             self.assertIn("src/mongo/db/modules/**", patterns)
 
 
-class TestMatchesExcludedPattern(unittest.TestCase):
+class TestMatchesExcludedPattern(CopybaraTestCase):
     """Verify path matching logic for excluded patterns."""
 
     def test_directory_pattern_matches_files_in_subtree(self):
@@ -7513,7 +7517,7 @@ class TestMatchesExcludedPattern(unittest.TestCase):
         )
 
 
-class TestCanonicalizeExcludedPattern(unittest.TestCase):
+class TestCanonicalizeExcludedPattern(CopybaraTestCase):
     """Verify pattern normalization for preview exclusion matching."""
 
     def test_trailing_slash_becomes_directory_pattern(self):
@@ -7547,7 +7551,7 @@ class TestCanonicalizeExcludedPattern(unittest.TestCase):
             sync_repo_with_copybara.canonicalize_excluded_pattern("/")
 
 
-class TestAssembleCopybaraConfig(unittest.TestCase):
+class TestAssembleCopybaraConfig(CopybaraTestCase):
     """Verify that base config and fragments are correctly concatenated."""
 
     def test_combines_base_and_single_fragment(self):
@@ -7601,7 +7605,7 @@ class TestAssembleCopybaraConfig(unittest.TestCase):
             self.assertTrue(output.read_text().endswith("\n"))
 
 
-class TestParseBranchList(unittest.TestCase):
+class TestParseBranchList(CopybaraTestCase):
     """Verify edge-case handling for comma-separated branch parsing."""
 
     def test_returns_empty_for_none(self):
@@ -7641,7 +7645,7 @@ class TestParseBranchList(unittest.TestCase):
         )
 
 
-class TestRealCopybaraSkyConfiguration(unittest.TestCase):
+class TestRealCopybaraSkyConfiguration(CopybaraTestCase):
     """Integration tests for the checked-in Copybara config files."""
 
     REAL_COPYBARA_ROOT = Path(__file__).resolve().parents[2]
@@ -7776,7 +7780,7 @@ class TestRealCopybaraSkyConfiguration(unittest.TestCase):
         self.assertIn("copybara_branches: ${copybara_branches|master}", generated_contents)
 
 
-class TestEvergreenProjectGuardVariantSelection(unittest.TestCase):
+class TestEvergreenProjectGuardVariantSelection(CopybaraTestCase):
     def test_runs_when_build_variant_is_unknown(self):
         with (
             patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
@@ -7856,7 +7860,7 @@ class TestEvergreenProjectGuardVariantSelection(unittest.TestCase):
     skip_copybara_project_guard_tests_on_non_copybara_variant(),
     "Copybara Evergreen project guard is only relevant on Copybara build variants",
 )
-class TestEvergreenProjectGuard(unittest.TestCase):
+class TestEvergreenProjectGuard(CopybaraTestCase):
     def test_passes_for_expected_master_project(self):
         sync_repo_with_copybara.ensure_expected_evergreen_project(
             {"project": sync_repo_with_copybara.EXPECTED_EVERGREEN_PROJECT}
@@ -7873,7 +7877,7 @@ class TestEvergreenProjectGuard(unittest.TestCase):
             )
 
 
-class TestHotfixTaskActivation(unittest.TestCase):
+class TestHotfixTaskActivation(CopybaraTestCase):
     def test_get_hotfix_branches_for_release(self):
         hotfix_branches = sync_repo_with_copybara.get_hotfix_branches_for_release(
             "v8.2",

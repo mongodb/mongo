@@ -28,6 +28,7 @@ py_test(
         "//buildscripts/copybara:copybara_config_files",
         "//etc:evergreen_yml_components/copybara/copybara_gen.yml",
     ],
+    target_compatible_with = ["@platforms//os:linux"],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/copybara",
