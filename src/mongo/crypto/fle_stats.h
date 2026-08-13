@@ -170,18 +170,6 @@ public:
 
     EmuBinaryTracker makeEmuBinaryTracker();
 
-    void updateCompactionStats(const CompactStats& stats) {
-        stdx::lock_guard<Mutex> lock(_compactMutex);
-        FLEStatsUtil::accumulateStats(_compactStats.getEsc(), stats.getEsc());
-        FLEStatsUtil::accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
-    }
-
-    void updateCleanupStats(const CleanupStats& stats) {
-        stdx::lock_guard<Mutex> lock(_cleanupMutex);
-        FLEStatsUtil::accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
-        FLEStatsUtil::accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());
-    }
-
     void updateStatsOnRegisterCollection(const NamespaceString& nss,
                                          const EncryptedFieldConfig& efc);
     void updateStatsOnDeregisterCollection(const NamespaceString& nss,
@@ -205,12 +193,6 @@ private:
     AtomicWord<long long> emuBinaryCalls;
     AtomicWord<long long> emuBinarySuboperation;
     AtomicWord<long long> emuBinaryTotalMillis;
-
-    mutable Mutex _compactMutex = MONGO_MAKE_LATCH("FLECompactStats::_mutex");
-    CompactStats _compactStats;
-
-    mutable Mutex _cleanupMutex = MONGO_MAKE_LATCH("FLECleanupStats::_mutex");
-    CleanupStats _cleanupStats;
 
     // Tracks and reports statistics about how many collections in the catalog use each of the
     // Queryable Encryption index types, and how many collections use unindexed encryption.
