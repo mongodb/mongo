@@ -69,6 +69,7 @@ executor:
           \         \"Rollback\"]}\n"
         ingressRequestRateLimiterEnabled: true
         reshardingMinimumOperationDurationMillis: 0
+        reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis: 5000
         shardRetryTokenBucketCapacity: 1073741823
         useBatchedDeletesForRangeDeletion: true
     mongos_options:
