@@ -1543,13 +1543,18 @@ export class ReplSetTest {
                 );
                 config.version = this.getReplSetConfigFromNode().version;
 
-                // Force the checkpoint NOW, while the set is still single-node and before the
-                // reconfig adds any mixed-version nodes, so the only possible sync source is
-                // checkpointed past the FCV transition. Target the primary explicitly rather than
-                // going through forceCheckpointPastFCVTransition(): the remaining nodes are started
-                // but not yet in the config, so replSetGetStatus on them would fail.
-                const primary = this.getPrimary();
-                this.forceCheckpointPastOpTime(_getLastOpTime(this, primary), [primary]);
+                // Record the optime of the FCV transition. At this point the set is still a single
+                // node, so this is the primary's last applied optime.
+                const fcvOpTime = _getLastOpTime(this, this.getPrimary());
+
+                // Force a checkpoint on the primary NOW, while the set is still single-node and
+                // before the reconfig adds any mixed-version nodes. A last-lts/last-continuous node
+                // that joins and initial syncs from this primary copies the primary's last
+                // checkpoint. If that checkpoint predates the FCV transition the new node crashes
+                // early in initial sync because it observes an FCV state inconsistent with its
+                // binary. Forcing the checkpoint here, on the only sync source at this point,
+                // closes that window.
+                this.forceCheckpointPastOpTime(fcvOpTime, [this.getPrimary()]);
             });
         }
 
@@ -2420,25 +2425,6 @@ export class ReplSetTest {
             opTime,
             nodes: nodes.map((n) => n.host),
         });
-    }
-
-    /**
-     * Forces a checkpoint on every data-bearing member past the last applied optime of 'node' (the
-     * primary by default).
-     *
-     * Call this after transitioning the FCV and before adding a node running an older binary
-     * version. The new node initial syncs its sync source's last checkpoint; if that checkpoint
-     * predates the FCV transition, the new node crashes early in initial sync because it observes
-     * an FCV state its binary cannot interpret. ReplSetTest.initiate() does this automatically for
-     * sets declared mixed-version up front, so tests only need to call it when they perform the FCV
-     * transition themselves.
-     *
-     * All members are checkpointed, not just 'node': initial sync picks its sync source from any
-     * member that is ahead of it, and chaining settings do not constrain that choice, so a
-     * secondary still holding a pre-transition checkpoint would reproduce the same crash.
-     */
-    forceCheckpointPastFCVTransition(node = this.getPrimary()) {
-        this.forceCheckpointPastOpTime(_getLastOpTime(this, node));
     }
 
     // Wait until the optime of the specified type reaches the primary or the targetNode's last
