@@ -244,7 +244,6 @@ protected:
             return false;
         }
         switch (tag) {
-            case value::TypeTags::NumberDecimal:
             case value::TypeTags::StringBig:
             case value::TypeTags::Array:
             case value::TypeTags::ArraySet:
