@@ -237,12 +237,31 @@ public:
         _numInvalidDocuments = numInvalidDocuments;
     }
 
+    long long incrementNumInvalidDocuments(long long increment = 1) {
+        _numInvalidDocuments = _numInvalidDocuments.value_or(0) + increment;
+        return *_numInvalidDocuments;
+    }
+
     void setNumNonCompliantDocuments(long long numNonCompliantDocuments) {
         _numNonCompliantDocuments = numNonCompliantDocuments;
     }
 
+    long long incrementNumNonCompliantDocuments(long long increment = 1) {
+        _numNonCompliantDocuments = _numNonCompliantDocuments.value_or(0) + increment;
+        return *_numNonCompliantDocuments;
+    }
+
     void setNumRecords(long long numRecords) {
         _numRecords = numRecords;
+    }
+
+    long long incrementNumRecords(long long increment = 1) {
+        _numRecords = _numRecords.value_or(0) + increment;
+        return *_numRecords;
+    }
+
+    boost::optional<long long> getNumRecords() const {
+        return _numRecords;
     }
 
     const std::set<Timestamp>& getRecordTimestamps() const {

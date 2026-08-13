@@ -241,19 +241,59 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
     }
 }
 
+/**
+ * Helper for validating collection's fast count and fast size against the totals accumulated by a
+ * complete record store traversal.
+ */
+void _validateFastCountAndSize(OperationContext* opCtx,
+                               const collection_validation::ValidateState& validateState,
+                               const Collection& coll,
+                               int64_t numRecords,
+                               int64_t dataSizeTotal,
+                               ValidateResults& results) {
+    const collection_validation::FastCountType fastCountType =
+        validateState.getDetectedFastCountType(opCtx);
+    if (validateState.shouldEnforceFastCount(opCtx, fastCountType)) {
+        if (const auto fastCount = coll.latestSizeCount(opCtx).count; fastCount != numRecords) {
+            results.addError(
+                fmt::format("fast count ({}) does not match number of "
+                            "records ({}) for collection '{}' with fast count store type '{}'",
+                            fastCount,
+                            numRecords,
+                            coll.ns().toStringForErrorMsg(),
+                            toString(fastCountType)));
+        }
+    }
+
+    if (validateState.shouldEnforceFastSize(opCtx, fastCountType)) {
+        if (const auto fastSize = coll.latestSizeCount(opCtx).size; fastSize != dataSizeTotal) {
+            results.addError(
+                fmt::format("fast size ({}) does not match data size ({}) "
+                            "for collection '{}' with fast count store type '{}'",
+                            fastSize,
+                            dataSizeTotal,
+                            coll.ns().toStringForErrorMsg(),
+                            toString(fastCountType)));
+        }
+    }
+}
+
 }  // namespace
 
 auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
-                                     const RecordId& recordId,
-                                     const RecordData& record,
-                                     long long& nNonCompliantDocuments,
-                                     long long& nInvalidDocuments,
-                                     ValidateResults* results,
+                                     const Record& record,
+                                     ValidateResults& results,
+                                     KeyStringIndexConsistency& keyStringIndexConsistency,
                                      std::span<const IndexCatalogEntry*> indexCatalogEntries,
-                                     ValidationVersion validationVersion) -> ValidateRecordResult {
+                                     ValidationVersion validationVersion) const
+    -> ValidateRecordResult {
+    bool compliantDocument{true};
+    bool validDocument{true};
     {
-        const Status bsonValidationStatus = validateBSON(
-            record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
+        const Status bsonValidationStatus = validateBSON(record.data.data(),
+                                                         record.data.size(),
+                                                         _validateState->getBSONValidateMode(),
+                                                         validationVersion);
 
         if (!bsonValidationStatus.isOK()) {
             bool includeReason{false};
@@ -262,10 +302,10 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     LOGV2_WARNING_OPTIONS(6825900,
                                           {logv2::LogTruncation::Disabled},
                                           "Document is not conformant to BSON specifications",
-                                          "recordId"_attr = recordId,
+                                          "recordId"_attr = record.id,
                                           "reason"_attr = bsonValidationStatus);
-                    ++nNonCompliantDocuments;
-                    results->addWarning(kBSONValidationNonConformantReason);
+                    compliantDocument = false;
+                    results.addWarning(kBSONValidationNonConformantReason);
                     break;
                 case ErrorCodes::InvalidBSONColumn:
                     // For these cases, include the reason with the validation results, the
@@ -277,7 +317,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     LOGV2_ERROR_OPTIONS(12395400,
                                         {logv2::LogTruncation::Disabled},
                                         "Error occurred during BSON validation",
-                                        "recordId"_attr = recordId,
+                                        "recordId"_attr = record.id,
                                         "reason"_attr = bsonValidationStatus);
                     return {.status = bsonValidationStatus,
                             .errorMessage = fmt::format(
@@ -286,7 +326,9 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                 "with log id 12395400",
                                 ErrorCodes::errorString(bsonValidationStatus.code()),
                                 includeReason ? fmt::format(": {}", bsonValidationStatus.reason())
-                                              : std::string(""))};
+                                              : std::string("")),
+                            .compliantDocument = compliantDocument,
+                            .validDocument = validDocument};
             }
         } else if (!_validateState->nss().isOplog()) {
             // Additionally check size if the BSON object is compliant. Do not run this check on the
@@ -295,57 +337,61 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
             const auto objSizeLimit = _validateState->nss().isOnInternalDb()
                 ? BSONObjMaxInternalSize
                 : BSONObjMaxUserSize;
-            Status sizeValidationStatus = record.toBson().validateBSONObjSize(objSizeLimit);
+            Status sizeValidationStatus = record.data.toBson().validateBSONObjSize(objSizeLimit);
 
             if (!sizeValidationStatus.isOK()) {
                 if (sizeValidationStatus.code() == ErrorCodes::BSONObjectTooLarge) {
                     LOGV2_ERROR_OPTIONS(10869900,
                                         {logv2::LogTruncation::Disabled},
                                         "Document BSON object is too large.",
-                                        "recordId"_attr = recordId,
+                                        "recordId"_attr = record.id,
                                         "ns"_attr = _validateState->nss(),
                                         "reason"_attr = sizeValidationStatus);
-                    ++nInvalidDocuments;
-                    results->addError(kBSONValidationObjectTooLargeReason,
-                                      /*stopValidation=*/false);
+                    validDocument = false;
+                    results.addError(kBSONValidationObjectTooLargeReason,
+                                     /*stopValidation=*/false);
                 } else {
+                    // Error is not related to BSON size limitations.
                     return {.status = sizeValidationStatus,
-                            .errorMessage =
-                                boost::none};  // Error is not related to BSON size limitations
+                            .errorMessage = boost::none,
+                            .compliantDocument = compliantDocument,
+                            .validDocument = validDocument};
                 }
             }
         }
     }
 
-    const BSONObj recordBson = record.toBson();
+    const BSONObj recordBson = record.data.toBson();
 
     if (MONGO_unlikely(_validateState->logDiagnostics())) {
-        LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
+        LOGV2(4666601, "[validate]", "recordId"_attr = record.id, "recordData"_attr = recordBson);
     }
 
     const CollectionPtr& coll = _validateState->getCollection();
     if (coll->isClustered()) {
         _validateClusteredCollectionRecordId(opCtx,
-                                             recordId,
+                                             record.id,
                                              recordBson,
                                              coll->getClusteredInfo()->getIndexSpec(),
                                              coll->getDefaultCollator(),
-                                             results);
+                                             &results);
     }
-
-    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     for (const auto* indexEntry : indexCatalogEntries) {
         if ((indexEntry->descriptor()->isPartial() &&
              !exec::matcher::matchesBSON(indexEntry->getFilterExpression(), recordBson)) ||
-            !results->getIndexValidateResult(indexEntry->descriptor()->indexName())
+            !results.getIndexValidateResult(indexEntry->descriptor()->indexName())
                  .continueValidation()) {
             continue;
         }
 
-        this->traverseRecord(opCtx, coll, indexEntry, recordId, recordBson, results);
+        keyStringIndexConsistency.traverseRecord(
+            opCtx, coll, indexEntry, record.id, recordBson, &results);
     }
-    return {.status = Status::OK(), .dataSize = recordBson.objsize()};
+    return {.status = Status::OK(),
+            .dataSize = recordBson.objsize(),
+            .compliantDocument = compliantDocument,
+            .validDocument = validDocument};
 }
 
 size_t collection_validation::getNumberOfAdditionalCharactersForHashDrillDown(
@@ -508,28 +554,9 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
 }
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
-                                          ValidateResults* results,
+                                          ValidateResults& results,
                                           ValidationVersion validationVersion) {
-    _numRecords = 0;  // need to reset it because this function can be called more than once.
-    long long dataSizeTotal = 0;
-    long long interruptIntervalNumBytes = 0;
-    long long nInvalid = 0;
-    long long nNonCompliantDocuments = 0;
-    long long numCorruptRecordsSizeBytes = 0;
-
-    ON_BLOCK_EXIT([&]() {
-        results->setNumInvalidDocuments(nInvalid);
-        results->setNumNonCompliantDocuments(nNonCompliantDocuments);
-        results->setNumRecords(_numRecords);
-        {
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            _progress.get(lk)->finished();
-        }
-    });
-
-    RecordId prevRecordId;
-
-    // In case validation occurs twice and the progress meter persists after index traversal
+    // In case validation occurs twice and the progress meter persists after index traversal.
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
         if (_progress.get(lk) && _progress.get(lk)->isActive()) {
@@ -539,347 +566,397 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     // Because the progress meter is intended as an approximation, it's sufficient to get the number
     // of records when we begin traversing, even if this number may deviate from the final number.
-    const auto& coll = _validateState->getCollection();
+    const CollectionPtr& coll = _validateState->getCollection();
     const char* curopMessage = "Validate: scanning documents";
     const auto totalRecords = coll->getRecordStore()->numRecords();
-    const auto rs = coll->getRecordStore();
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
+    ON_BLOCK_EXIT([&]() {
+        std::unique_lock<Client> lk(*opCtx->getClient());
+        _progress.get(lk)->finished();
+    });
 
-    // Place an empty hash in the results to override later. This result will only be used
-    // for empty collections.
-    if (_validateState->isCollHashValidation()) {
-        results->setCollectionHash(SHA256Block::computeHash({}));
-    }
+    // A single traversal covers the whole record store, so there is nothing to merge yet. Once the
+    // record store is split into slices traversed in parallel, the per-slice results will instead
+    // be combined with ValidateResults::merge() and KeyStringIndexConsistency::merge().
+    auto implResults =
+        traverseRecordStoreImpl(opCtx,
+                                results,
+                                _keyBasedIndexConsistency,
+                                {.beginRecordId = _validateState->getFirstRecordId()},
+                                _progress,
+                                validationVersion);
+
+    // Adopt the traversal's output even if it failed part-way through, so that whatever was
+    // accumulated before the failure is still reported to the caller.
+    results = std::move(implResults.validateResults);
+    _keyBasedIndexConsistency = std::move(implResults.keyStringIndexConsistency);
+    _numRecords = results.getNumRecords().value_or(0);
+    const int64_t dataSizeTotal = implResults.dataSizeTotal;
+    uassertStatusOK(implResults.status);
 
     if (_validateState->getFirstRecordId().isNull()) {
-        // The record store is empty if the first RecordId isn't initialized.
+        // The record store is empty if the first RecordId isn't initialized. The collection-level
+        // checks below all require the totals from a real traversal, so skip them entirely rather
+        // than run them against zeroed counters.
         return;
     }
 
-    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
-        _validateState->getTraverseRecordStoreCursor();
-
-    // Accumulates each record's SHA256 block as they are XORed together. Starts off
-    // zeroed out.
-    SHA256Block accumulatedBlock;
-    accumulatedBlock.xorInline(accumulatedBlock);
-    bool revealHashedIds = _validateState->getRevealHashedIds().has_value();
-    stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds;
-    if (revealHashedIds) {
-        for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
-            revealedIds[hashPrefix] = {};
-        }
+    if (results.getNumRemovedCorruptRecords() > 0) {
+        results.addWarning(
+            fmt::format("Removed {} invalid documents.", results.getNumRemovedCorruptRecords()));
     }
 
-    // Acquire index catalog entries once to avoid repeated findIndexByIdent() per document.
-    static constexpr size_t kStackAllocatedSize{8};
-    boost::container::small_vector<const IndexCatalogEntry*, kStackAllocatedSize> indexEntries;
-    const auto& indexIdents = _validateState->getIndexIdents();
-    indexEntries.reserve(indexIdents.size());
-    for (const auto& indexIdent : indexIdents) {
-        indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
-    }
-
-    for (auto record =
-             traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
-         record;
-         record = traverseRecordStoreCursor->next(opCtx)) {
-        {
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            _progress.get(lk)->hit();
-        }
-        ++_numRecords;
-        auto dataSize = record->data.size();
-        interruptIntervalNumBytes += dataSize;
-        dataSizeTotal += dataSize;
-        const auto [validateRecordStatus, validatedSize, maybeValidateRecordErrorMessage] =
-            validateRecord(opCtx,
-                           record->id,
-                           record->data,
-                           nNonCompliantDocuments,
-                           nInvalid,
-                           results,
-                           indexEntries,
-                           validationVersion);
-
-        if (_validateState->isCollHashValidation()) {
-            SHA256Block block = SHA256Block::computeHash(
-                {ConstDataRange(record->data.data(), record->data.size())});
-            accumulatedBlock.xorInline(block);
-            if (revealHashedIds) {
-                const auto idField = record->data.toBson()["_id"];
-                auto idBlock = SHA256Block::computeHash(
-                    {ConstDataRange(idField.value(), idField.valuesize())});
-                for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
-                    if (idBlock.toHexString().starts_with(hashPrefix)) {
-                        revealedIds[hashPrefix].push_back(idField.wrap());
-                    }
-                }
-            }
-        }
-
-        // Log the out-of-order entries as errors.
-        //
-        // Validate uses a DataCorruptionDetectionMode::kLogAndContinue mode such that data
-        // corruption errors are logged without throwing, so certain checks must be duplicated here
-        // as well.
-        if ((prevRecordId.isValid() && prevRecordId > record->id) ||
-            MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
-            results->addError(kOutOfOrderDocumentError);
-        }
-
-        // validatedSize = dataSize is not a general requirement as some storage engines may use
-        // padding, but we still require that they return the unpadded record data.
-        if (!validateRecordStatus.isOK() || validatedSize != dataSize) {
-            // If status is not okay, dataSize is not reliable.
-            if (!validateRecordStatus.isOK()) {
-                LOGV2_OPTIONS(4835001,
-                              {logv2::LogTruncation::Disabled},
-                              "Document corruption details - Document validation failed with error",
-                              "recordId"_attr = record->id,
-                              "error"_attr = validateRecordStatus);
-            } else {
-                LOGV2_OPTIONS(
-                    4835002,
-                    {logv2::LogTruncation::Disabled},
-                    "Document corruption details - Document validation failure; size mismatch",
-                    "recordId"_attr = record->id,
-                    "validatedBytes"_attr = validatedSize,
-                    "recordBytes"_attr = dataSize);
-            }
-
-            if (_validateState->fixErrors()) {
-                WriteUnitOfWork wunit(opCtx);
-                rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
-                wunit.commit();
-                results->setRepaired(true);
-                results->addNumRemovedCorruptRecords(1);
-                _numRecords--;
-            } else {
-                // If this is not set up to repair and remove the corrupt records, the error
-                // returned from record Validation should be logged if it exists.
-                if (!validateRecordStatus.isOK()) {
-                    results->addError(
-                        maybeValidateRecordErrorMessage.value_or(kInvalidDocumentError));
-                }
-                numCorruptRecordsSizeBytes += record->id.memUsage();
-                if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
-                    results->addCorruptRecord(record->id);
-                } else {
-                    results->addWarning(kNotEnoughSpaceToReportCorruptionWarning);
-                }
-
-                nInvalid++;
-            }
-        } else {
-            // If the document is not corrupted, validate the document against this collection's
-            // schema validator. Don't treat invalid documents as errors since documents can bypass
-            // document validation when being inserted or updated.
-            const auto [checkValidationResult, schemaValidationStatus] =
-                coll->checkValidation(opCtx, record->data.toBson());
-
-            // Timeseries collections are a special case. The schema is required and all violations
-            // will be logged as errors instead.
-            const bool isTimeseries = coll->getTimeseriesOptions().has_value();
-
-            switch (checkValidationResult.result) {
-                case Collection::SchemaValidationResult::kPass:
-                    if (isTimeseries) {
-                        // Timeseries documents checks cannot be run if schema validation fails.
-                        const BSONObj recordBson = record->data.toBson();
-
-                        // Checks for time-series collection consistency.
-                        const auto timeseriesValidationResult =
-                            collection_validation::validateTimeSeriesBucketRecord(
-                                opCtx, *_validateState, coll, recordBson, *results);
-                        // This log id should be kept in sync with the associated warning messages
-                        // that are returned to the client.
-                        switch (timeseriesValidationResult.result) {
-                            case collection_validation::TimeseriesValidationResult::kValid:
-                                break;
-                            // We should not add data-annotated error strings to the set, since
-                            // bucket-specific data can greatly increase the number of unique
-                            // error strings stored; this set is not intended to scale with the
-                            // number of documents. Bucket-specific data should instead be
-                            // logged above.
-
-                            // The following result cases are logged as warnings
-                            case collection_validation::TimeseriesValidationResult::
-                                kV3WithOrderedTime:
-                                LOGV2_WARNING_OPTIONS(
-                                    12351700,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Document is not compliant with time-series specifications",
-                                    logAttrs(coll->ns()),
-                                    "recordId"_attr = record->id,
-                                    "record"_attr = record->data.toBson(),
-                                    "reason"_attr = timeseriesValidationResult.reason);
-                                ++nNonCompliantDocuments;
-                                results->addWarning(
-                                    collection_validation::describeTimeseriesValidationResult(
-                                        timeseriesValidationResult.result));
-                                break;
-
-                            // All remaining result cases are errors
-                            default:
-                                LOGV2_ERROR_OPTIONS(
-                                    6698300,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Document is not compliant with time-series specifications",
-                                    logAttrs(coll->ns()),
-                                    "recordId"_attr = record->id,
-                                    "record"_attr = record->data.toBson(),
-                                    "reason"_attr = timeseriesValidationResult.reason);
-                                ++nNonCompliantDocuments;
-                                results->addError(
-                                    collection_validation::describeTimeseriesValidationResult(
-                                        timeseriesValidationResult.result));
-                        }
-                        const auto containsMixedSchemaDataResponse =
-                            coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
-                        if (!containsMixedSchemaDataResponse.isOK() &&
-                            results->addError(
-                                collection_validation::kMalformedMinMaxTimeseriesBucket)) {
-                            LOGV2_WARNING_OPTIONS(
-                                8469900,
-                                {logv2::LogTruncation::Disabled},
-                                collection_validation::kMalformedMinMaxTimeseriesBucket,
-                                logAttrs(coll->ns()),
-                                "recordId"_attr = record->id,
-                                "record"_attr = record->data.toBson(),
-                                "error"_attr = containsMixedSchemaDataResponse.getStatus());
-                        } else if (containsMixedSchemaDataResponse.isOK() &&
-                                   containsMixedSchemaDataResponse.getValue()) {
-                            const bool mixedSchemaAllowed =
-                                coll->getTimeseriesMixedSchemaBucketsState()
-                                    .canStoreMixedSchemaBucketsSafely();
-                            if (mixedSchemaAllowed &&
-                                results->addWarning(
-                                    collection_validation::kExpectedMixedSchemaTimeseriesWarning)) {
-                                LOGV2_WARNING_OPTIONS(
-                                    8469901,
-                                    {logv2::LogTruncation::Disabled},
-                                    collection_validation::kExpectedMixedSchemaTimeseriesWarning,
-                                    logAttrs(coll->ns()),
-                                    "recordId"_attr = record->id);
-                            } else if (!mixedSchemaAllowed &&
-                                       results->addError(
-                                           collection_validation::
-                                               kUnexpectedMixedSchemaTimeseriesError)) {
-                                const auto& controlField =
-                                    recordBson.getField(timeseries::kBucketControlFieldName).Obj();
-                                const int count = controlField.getIntField(
-                                    timeseries::kBucketControlCountFieldName);
-                                LOGV2_WARNING_OPTIONS(
-                                    8469902,
-                                    {logv2::LogTruncation::Disabled},
-                                    collection_validation::kUnexpectedMixedSchemaTimeseriesError,
-                                    logAttrs(coll->ns()),
-                                    "recordId"_attr = record->id,
-                                    "record"_attr = record->data.toBson(),
-                                    "objSize"_attr = recordBson.objsize(),
-                                    "measurementCount"_attr = count);
-                            }
-                        }
-                    }
-                    break;
-                case Collection::SchemaValidationResult::kWarn:
-                case Collection::SchemaValidationResult::kError:
-                case Collection::SchemaValidationResult::kErrorAndLog: {
-                    // Non-kPass results indicate a schema validation failure. Do not add
-                    // data-annotated strings to the set, since per-document data can greatly
-                    // increase the number of unique strings stored; this set is not intended
-                    // to scale with the number of documents. Document-specific data is logged.
-                    ++nNonCompliantDocuments;
-                    const char* description =
-                        _describeDocumentValidationResult(checkValidationResult);
-                    if (isTimeseries) {
-                        LOGV2_WARNING_OPTIONS(11634800,
-                                              {logv2::LogTruncation::Disabled},
-                                              "Time-series bucket document is not compliant with "
-                                              "time-series specifications",
-                                              logAttrs(coll->ns()),
-                                              "recordId"_attr = record->id,
-                                              "collectionUUID"_attr = coll->uuid(),
-                                              "record"_attr = record->data.toBson(),
-                                              "reason"_attr = description);
-                        results->addError(description);
-                    } else {
-                        LOGV2_WARNING_OPTIONS(
-                            5363500,
-                            {logv2::LogTruncation::Disabled},
-                            "Document is not compliant with the collection's schema",
-                            logAttrs(coll->ns()),
-                            "recordId"_attr = record->id,
-                            "reason"_attr = description);
-                        results->addWarning(description);
-                    }
-                    break;
-                }
-            }
-        }
-
-        prevRecordId = record->id;
-
-        if (_numRecords % KeyStringIndexConsistency::kInterruptIntervalNumRecords == 0 ||
-            interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
-            // Periodically checks for interrupts and yields.
-            opCtx->checkForInterrupt();
-            _validateState->yieldCursors(opCtx);
-
-            if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
-                interruptIntervalNumBytes = 0;
-            }
-        }
-    }
-
-    if (_validateState->isCollHashValidation()) {
-        results->setCollectionHash(accumulatedBlock);
-        if (revealHashedIds) {
-            results->setRevealedIds(std::move(revealedIds));
-        }
-    }
-
-    if (results->getNumRemovedCorruptRecords() > 0) {
-        results->addWarning(str::stream() << "Removed " << results->getNumRemovedCorruptRecords()
-                                          << " invalid documents.");
-    }
-
-    const collection_validation::FastCountType fastCountType =
-        _validateState->getDetectedFastCountType(opCtx);
-    if (_validateState->shouldEnforceFastCount(opCtx, fastCountType)) {
-        if (const auto fastCount = coll->latestSizeCount(opCtx).count; fastCount != _numRecords) {
-            results->addError(
-                fmt::format("fast count ({}) does not match number of "
-                            "records ({}) for collection '{}' with fast count store type '{}'",
-                            fastCount,
-                            _numRecords,
-                            coll->ns().toStringForErrorMsg(),
-                            toString(fastCountType)));
-        }
-    }
-
-    if (_validateState->shouldEnforceFastSize(opCtx, fastCountType)) {
-        if (const auto fastSize = coll->latestSizeCount(opCtx).size; fastSize != dataSizeTotal) {
-            results->addError(
-                fmt::format("fast size ({}) does not match data size ({}) "
-                            "for collection '{}' with fast count store type '{}'",
-                            fastSize,
-                            dataSizeTotal,
-                            coll->ns().toStringForErrorMsg(),
-                            toString(fastCountType)));
-        }
-    }
+    _validateFastCountAndSize(
+        opCtx, *_validateState, *coll.get(), _numRecords, dataSizeTotal, results);
 
     // TODO(SERVER-119193): Add condition for the fastCountType being valid.
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
-    if (results->isValid() && !_validateState->isBackground()) {
+    if (results.isValid() && !_validateState->isBackground()) {
         coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
+}
+
+auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
+                                              const ValidateResults& baseResults,
+                                              const KeyStringIndexConsistency& baseConsistency,
+                                              TraverseRecordStoreOptions opts,
+                                              ProgressMeterHolder& progress,
+                                              ValidationVersion validationVersion) const
+    -> TraverseRecordStoreResults {
+    // The traversal accumulates onto copies of the caller's state; the caller decides what to do
+    // with them once the traversal returns.
+    TraverseRecordStoreResults results{.validateResults = baseResults,
+                                       .keyStringIndexConsistency = baseConsistency};
+    auto& validateResults = results.validateResults;
+
+    // These counters describe this traversal alone, so they always start from zero even when the
+    // base results carried values over from a previous traversal.
+    validateResults.setNumRecords(0);
+    validateResults.setNumInvalidDocuments(0);
+    validateResults.setNumNonCompliantDocuments(0);
+
+    int64_t interruptIntervalNumBytes = 0;
+    int64_t numCorruptRecordsSizeBytes = 0;
+
+    // Place an empty hash in the results to override later. This result will only be used
+    // for empty collections.
+    if (_validateState->isCollHashValidation()) {
+        validateResults.setCollectionHash(SHA256Block::computeHash({}));
+    }
+
+    if (opts.beginRecordId.isNull()) {
+        // The record store is empty if the first RecordId isn't initialized.
+        return results;
+    }
+
+    const auto& coll = _validateState->getCollection();
+    const auto rs = coll->getRecordStore();
+
+    // This initializes to a null RecordId.
+    RecordId prevRecordId;
+
+    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
+        _validateState->getTraverseRecordStoreCursor();
+
+    try {
+        // Accumulates each record's SHA256 block as they are XORed together. Starts off
+        // zeroed out.
+        SHA256Block accumulatedBlock;
+        accumulatedBlock.xorInline(accumulatedBlock);
+        bool revealHashedIds = _validateState->getRevealHashedIds().has_value();
+        stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds;
+        if (revealHashedIds) {
+            for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+                revealedIds[hashPrefix] = {};
+            }
+        }
+
+        // Acquire index catalog entries once to avoid repeated findIndexByIdent() per document.
+        static constexpr size_t kStackAllocatedSize{8};
+        boost::container::small_vector<const IndexCatalogEntry*, kStackAllocatedSize> indexEntries;
+        const auto& indexIdents = _validateState->getIndexIdents();
+        indexEntries.reserve(indexIdents.size());
+        for (const auto& indexIdent : indexIdents) {
+            indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
+        }
+
+        for (auto record = traverseRecordStoreCursor->seekExact(opCtx, opts.beginRecordId);
+             record && record->id != opts.endRecordId;
+             record = traverseRecordStoreCursor->next(opCtx)) {
+            {
+                std::unique_lock<Client> lk(*opCtx->getClient());
+                progress.get(lk)->hit();
+            }
+            validateResults.incrementNumRecords(1);
+            const auto dataSize = record->data.size();
+            interruptIntervalNumBytes += dataSize;
+            results.dataSizeTotal += dataSize;
+            const auto [validateRecordStatus,
+                        validatedSize,
+                        maybeValidateRecordErrorMessage,
+                        compliantDocument,
+                        validDocument] = validateRecord(opCtx,
+                                                        record.value(),
+                                                        validateResults,
+                                                        results.keyStringIndexConsistency,
+                                                        indexEntries,
+                                                        validationVersion);
+            validateResults.incrementNumNonCompliantDocuments(compliantDocument ? 0 : 1);
+            validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
+
+            if (_validateState->isCollHashValidation()) {
+                const SHA256Block block = SHA256Block::computeHash(
+                    {ConstDataRange(record->data.data(), record->data.size())});
+                accumulatedBlock.xorInline(block);
+                if (revealHashedIds) {
+                    const auto idField = record->data.toBson()["_id"];
+                    const auto idBlock = SHA256Block::computeHash(
+                        {ConstDataRange(idField.value(), idField.valuesize())});
+                    for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+                        if (idBlock.toHexString().starts_with(hashPrefix)) {
+                            revealedIds[hashPrefix].push_back(idField.wrap());
+                        }
+                    }
+                }
+            }
+
+            // Log the out-of-order entries as errors.
+            //
+            // Validate uses a DataCorruptionDetectionMode::kLogAndContinue mode such that data
+            // corruption errors are logged without throwing, so certain checks must be duplicated
+            // here as well.
+            if ((prevRecordId.isValid() && prevRecordId > record->id) ||
+                MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
+                validateResults.addError(kOutOfOrderDocumentError);
+            }
+
+            // validatedSize = dataSize is not a general requirement as some storage engines may use
+            // padding, but we still require that they return the unpadded record data.
+            if (!validateRecordStatus.isOK() || validatedSize != dataSize) {
+                // If status is not okay, dataSize is not reliable.
+                if (!validateRecordStatus.isOK()) {
+                    LOGV2_OPTIONS(
+                        4835001,
+                        {logv2::LogTruncation::Disabled},
+                        "Document corruption details - Document validation failed with error",
+                        "recordId"_attr = record->id,
+                        "error"_attr = validateRecordStatus);
+                } else {
+                    LOGV2_OPTIONS(
+                        4835002,
+                        {logv2::LogTruncation::Disabled},
+                        "Document corruption details - Document validation failure; size mismatch",
+                        "recordId"_attr = record->id,
+                        "validatedBytes"_attr = validatedSize,
+                        "recordBytes"_attr = dataSize);
+                }
+
+                if (_validateState->fixErrors()) {
+                    WriteUnitOfWork wunit(opCtx);
+                    rs->deleteRecord(
+                        opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+                    wunit.commit();
+                    validateResults.setRepaired(true);
+                    validateResults.addNumRemovedCorruptRecords(1);
+                    validateResults.incrementNumRecords(-1);
+                } else {
+                    // If this is not set up to repair and remove the corrupt records, the error
+                    // returned from record Validation should be logged if it exists.
+                    if (!validateRecordStatus.isOK()) {
+                        validateResults.addError(
+                            maybeValidateRecordErrorMessage.value_or(kInvalidDocumentError));
+                    }
+                    numCorruptRecordsSizeBytes += record->id.memUsage();
+                    if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
+                        validateResults.addCorruptRecord(record->id);
+                    } else {
+                        validateResults.addWarning(kNotEnoughSpaceToReportCorruptionWarning);
+                    }
+
+                    validateResults.incrementNumInvalidDocuments(1);
+                }
+            } else {
+                // If the document is not corrupted, validate the document against this collection's
+                // schema validator. Don't treat invalid documents as errors since documents can
+                // bypass document validation when being inserted or updated.
+                const auto [checkValidationResult, schemaValidationStatus] =
+                    coll->checkValidation(opCtx, record->data.toBson());
+
+                // Timeseries collections are a special case. The schema is required and all
+                // violations will be logged as errors instead.
+                const bool isTimeseries = coll->getTimeseriesOptions().has_value();
+
+                switch (checkValidationResult.result) {
+                    case Collection::SchemaValidationResult::kPass:
+                        if (isTimeseries) {
+                            // Timeseries documents checks cannot be run if schema validation fails.
+                            const BSONObj recordBson = record->data.toBson();
+
+                            // Checks for time-series collection consistency.
+                            const auto timeseriesValidationResult =
+                                collection_validation::validateTimeSeriesBucketRecord(
+                                    opCtx, *_validateState, coll, recordBson, validateResults);
+                            // This log id should be kept in sync with the associated warning
+                            // messages that are returned to the client.
+                            switch (timeseriesValidationResult.result) {
+                                case collection_validation::TimeseriesValidationResult::kValid:
+                                    break;
+                                // We should not add data-annotated error strings to the set, since
+                                // bucket-specific data can greatly increase the number of unique
+                                // error strings stored; this set is not intended to scale with the
+                                // number of documents. Bucket-specific data should instead be
+                                // logged above.
+
+                                // The following result cases are logged as warnings
+                                case collection_validation::TimeseriesValidationResult::
+                                    kV3WithOrderedTime:
+                                    LOGV2_WARNING_OPTIONS(
+                                        12351700,
+                                        {logv2::LogTruncation::Disabled},
+                                        "Document is not compliant with time-series specifications",
+                                        logAttrs(coll->ns()),
+                                        "recordId"_attr = record->id,
+                                        "record"_attr = record->data.toBson(),
+                                        "reason"_attr = timeseriesValidationResult.reason);
+                                    validateResults.incrementNumNonCompliantDocuments(1);
+                                    validateResults.addWarning(
+                                        collection_validation::describeTimeseriesValidationResult(
+                                            timeseriesValidationResult.result));
+                                    break;
+
+                                // All remaining result cases are errors
+                                default:
+                                    LOGV2_ERROR_OPTIONS(
+                                        6698300,
+                                        {logv2::LogTruncation::Disabled},
+                                        "Document is not compliant with time-series specifications",
+                                        logAttrs(coll->ns()),
+                                        "recordId"_attr = record->id,
+                                        "record"_attr = record->data.toBson(),
+                                        "reason"_attr = timeseriesValidationResult.reason);
+                                    validateResults.incrementNumNonCompliantDocuments(1);
+                                    validateResults.addError(
+                                        collection_validation::describeTimeseriesValidationResult(
+                                            timeseriesValidationResult.result));
+                            }
+                            const auto containsMixedSchemaDataResponse =
+                                coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
+                            if (!containsMixedSchemaDataResponse.isOK() &&
+                                validateResults.addError(
+                                    collection_validation::kMalformedMinMaxTimeseriesBucket)) {
+                                LOGV2_WARNING_OPTIONS(
+                                    8469900,
+                                    {logv2::LogTruncation::Disabled},
+                                    collection_validation::kMalformedMinMaxTimeseriesBucket,
+                                    logAttrs(coll->ns()),
+                                    "recordId"_attr = record->id,
+                                    "record"_attr = record->data.toBson(),
+                                    "error"_attr = containsMixedSchemaDataResponse.getStatus());
+                            } else if (containsMixedSchemaDataResponse.isOK() &&
+                                       containsMixedSchemaDataResponse.getValue()) {
+                                const bool mixedSchemaAllowed =
+                                    coll->getTimeseriesMixedSchemaBucketsState()
+                                        .canStoreMixedSchemaBucketsSafely();
+                                if (mixedSchemaAllowed &&
+                                    validateResults.addWarning(
+                                        collection_validation::
+                                            kExpectedMixedSchemaTimeseriesWarning)) {
+                                    LOGV2_WARNING_OPTIONS(8469901,
+                                                          {logv2::LogTruncation::Disabled},
+                                                          collection_validation::
+                                                              kExpectedMixedSchemaTimeseriesWarning,
+                                                          logAttrs(coll->ns()),
+                                                          "recordId"_attr = record->id);
+                                } else if (!mixedSchemaAllowed &&
+                                           validateResults.addError(
+                                               collection_validation::
+                                                   kUnexpectedMixedSchemaTimeseriesError)) {
+                                    const auto& controlField =
+                                        recordBson.getField(timeseries::kBucketControlFieldName)
+                                            .Obj();
+                                    const int count = controlField.getIntField(
+                                        timeseries::kBucketControlCountFieldName);
+                                    LOGV2_WARNING_OPTIONS(8469902,
+                                                          {logv2::LogTruncation::Disabled},
+                                                          collection_validation::
+                                                              kUnexpectedMixedSchemaTimeseriesError,
+                                                          logAttrs(coll->ns()),
+                                                          "recordId"_attr = record->id,
+                                                          "record"_attr = record->data.toBson(),
+                                                          "objSize"_attr = recordBson.objsize(),
+                                                          "measurementCount"_attr = count);
+                                }
+                            }
+                        }
+                        break;
+                    case Collection::SchemaValidationResult::kWarn:
+                    case Collection::SchemaValidationResult::kError:
+                    case Collection::SchemaValidationResult::kErrorAndLog: {
+                        // Non-kPass results indicate a schema validation failure. Do not add
+                        // data-annotated strings to the set, since per-document data can greatly
+                        // increase the number of unique strings stored; this set is not intended
+                        // to scale with the number of documents. Document-specific data is logged.
+                        validateResults.incrementNumNonCompliantDocuments(1);
+                        const char* description =
+                            _describeDocumentValidationResult(checkValidationResult);
+                        if (isTimeseries) {
+                            LOGV2_WARNING_OPTIONS(
+                                11634800,
+                                {logv2::LogTruncation::Disabled},
+                                "Time-series bucket document is not compliant with "
+                                "time-series specifications",
+                                logAttrs(coll->ns()),
+                                "recordId"_attr = record->id,
+                                "collectionUUID"_attr = coll->uuid(),
+                                "record"_attr = record->data.toBson(),
+                                "reason"_attr = description);
+                            validateResults.addError(description);
+                        } else {
+                            LOGV2_WARNING_OPTIONS(
+                                5363500,
+                                {logv2::LogTruncation::Disabled},
+                                "Document is not compliant with the collection's schema",
+                                logAttrs(coll->ns()),
+                                "recordId"_attr = record->id,
+                                "reason"_attr = description);
+                            validateResults.addWarning(description);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            prevRecordId = record->id;
+
+            if (validateResults.getNumRecords().value_or(0) %
+                        KeyStringIndexConsistency::kInterruptIntervalNumRecords ==
+                    0 ||
+                interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
+                // Periodically checks for interrupts and yields.
+                opCtx->checkForInterrupt();
+                _validateState->yieldCursors(opCtx);
+
+                if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
+                    interruptIntervalNumBytes = 0;
+                }
+            }
+        }
+
+        if (_validateState->isCollHashValidation()) {
+            validateResults.setCollectionHash(accumulatedBlock);
+            if (revealHashedIds) {
+                validateResults.setRevealedIds(std::move(revealedIds));
+            }
+        }
+    } catch (const DBException& e) {
+        results.status = e.toStatus();
+    }
+
+    return results;
 }
 
 void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
@@ -910,15 +987,6 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     if (numTraversedKeys) {
         *numTraversedKeys = numKeys;
     }
-}
-
-void ValidateAdaptor::traverseRecord(OperationContext* opCtx,
-                                     const CollectionPtr& coll,
-                                     const IndexCatalogEntry* index,
-                                     const RecordId& recordId,
-                                     const BSONObj& record,
-                                     ValidateResults* results) {
-    _keyBasedIndexConsistency.traverseRecord(opCtx, coll, index, recordId, record, results);
 }
 
 void ValidateAdaptor::setSecondPhase() {

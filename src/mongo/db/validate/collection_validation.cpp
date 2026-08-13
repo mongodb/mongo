@@ -199,7 +199,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         // sound enough to validate
         tempValidateResults.getIndexResultsMap() = result->getIndexResultsMap();
         indexValidator->traverseRecordStore(
-            opCtx, &tempValidateResults, validateState->validationVersion());
+            opCtx, tempValidateResults, validateState->validationVersion());
     }
 
     LOGV2_OPTIONS(
@@ -1069,7 +1069,7 @@ Status validate(OperationContext* opCtx,
                 "traversal is not yet implemented; falling back to serial traversal");
         }
 
-        indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
+        indexValidator.traverseRecordStore(opCtx, *results, validateState.validationVersion());
 
         if (validateState.isCollHashValidation()) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);

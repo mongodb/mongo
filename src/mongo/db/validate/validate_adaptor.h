@@ -11,6 +11,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
@@ -60,27 +61,84 @@ public:
         Status status{Status::OK()};
         int dataSize{0};
         boost::optional<std::string> errorMessage{boost::none};
+        // Whether the record conforms to BSON specifications, and whether it is a valid document
+        // (e.g. within the BSON object size limit). Reported back rather than accumulated on the
+        // adaptor so that the caller owns the counters.
+        bool compliantDocument{true};
+        bool validDocument{true};
     };
     /**
      * Validates the record data and traverses through its key set to keep track of the index
      * consistency. Returns the status from the record validation, and if a specific error was added
      * during record validation, returns that error as well.
+     *
+     * Errors and per-index results are recorded on 'results', and document keys are accumulated on
+     * 'keyStringIndexConsistency'; neither the adaptor's own results nor its own index consistency
+     * state are touched.
      */
     auto validateRecord(OperationContext* opCtx,
-                        const RecordId& recordId,
-                        const RecordData& record,
-                        long long& nNonCompliantDocuments,
-                        long long& nInvalidDocuments,
-                        ValidateResults* results,
+                        const Record& record,
+                        ValidateResults& results,
+                        KeyStringIndexConsistency& keyStringIndexConsistency,
                         std::span<const IndexCatalogEntry*> indexCatalogEntries,
-                        ValidationVersion validationVersion = currentValidationVersion)
+                        ValidationVersion validationVersion = currentValidationVersion) const
         -> ValidateRecordResult;
+
+    /**
+     * Options describing the slice of the record store that a single traversal should cover.
+     *
+     * 'beginRecordId' is inclusive and 'endRecordId' is exclusive; a null 'endRecordId' means
+     * "traverse to the end of the record store".
+     */
+    struct TraverseRecordStoreOptions {
+        RecordId beginRecordId;
+        RecordId endRecordId;
+    };
+
+    /**
+     * The accumulated output of traversing one slice of the record store. Every field is
+     * self-contained so that results for disjoint slices can be combined via
+     * ValidateResults::merge() and KeyStringIndexConsistency::merge() (SERVER-128593) once the
+     * traversal is parallelized in SERVER-127596.
+     *
+     * 'status' carries any exception thrown mid-traversal. The results accumulated up to that point
+     * are still returned so that the caller can report partial progress before rethrowing.
+     */
+    struct TraverseRecordStoreResults {
+        Status status = Status::OK();
+        int64_t dataSizeTotal{0};
+        ValidateResults validateResults;
+        KeyStringIndexConsistency keyStringIndexConsistency;
+    };
+
+    /**
+     * Traverses one slice of the record store, retrieving every record in the slice and going
+     * through its document key set to keep track of the index consistency during a validation.
+     *
+     * This does not mutate any adaptor state: the traversal starts from copies of 'baseResults' and
+     * 'baseConsistency' and returns them, mutated, to the caller. 'progress' is the one exception,
+     * being purely a reporting side channel.
+     *
+     * TODO(SERVER-127596): Swap 'progress' for the ConcurrentProgressMeterHolder
+     * whose hit() is lock-free. The current ProgressMeterHolder requires the client
+     * lock to be taken once per record, which becomes contended as soon as slices are
+     * traversed in parallel.
+     */
+    [[nodiscard]] auto traverseRecordStoreImpl(OperationContext* opCtx,
+                                               const ValidateResults& baseResults,
+                                               const KeyStringIndexConsistency& baseConsistency,
+                                               TraverseRecordStoreOptions opts,
+                                               ProgressMeterHolder& progress,
+                                               ValidationVersion validationVersion) const
+        -> TraverseRecordStoreResults;
+
     /**
      * Traverses the record store to retrieve every record and go through its document key
-     * set to keep track of the index consistency during a validation.
+     * set to keep track of the index consistency during a validation. Runs the collection-level
+     * checks (fast count and fast size) that require the totals from a complete traversal.
      */
     void traverseRecordStore(OperationContext* opCtx,
-                             ValidateResults* results,
+                             ValidateResults& results,
                              ValidationVersion validationVersion);
     /**
      * Computes the hash of the collection's local catalog idents and sets it in 'results'.
@@ -103,16 +161,6 @@ public:
                        const IndexCatalogEntry* index,
                        int64_t* numTraversedKeys,
                        ValidateResults* results);
-
-    /**
-     * Traverses a record on the underlying index consistency objects.
-     */
-    void traverseRecord(OperationContext* opCtx,
-                        const CollectionPtr& coll,
-                        const IndexCatalogEntry* index,
-                        const RecordId& recordId,
-                        const BSONObj& record,
-                        ValidateResults* results);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously
