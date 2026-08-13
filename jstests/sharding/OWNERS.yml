@@ -206,9 +206,6 @@ filters:
   - "replicate_record_ids_collection_migration.js":
     approvers:
       - 10gen/server-collection-write-path
-  - "heal_config_shards_on_fcv_upgrade.js":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "printShardingStatus.js":
     approvers:
       - 10gen/server-catalog-and-routing
