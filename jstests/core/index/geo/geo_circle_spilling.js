@@ -13,7 +13,11 @@
 //   does_not_support_transactions
 // ]
 
-import {getExecutionStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {
+    getExecutionStages,
+    getPlanStages,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -73,7 +77,7 @@ function assertNearStageThrowsMemoryLimit(coll) {
     // running the query.
     try {
         const explain = coll.find(nearPredicate).explain("queryPlanner");
-        const foundStages = getPlanStages(explain.queryPlanner.winningPlan, "GEO_NEAR_2DSPHERE");
+        const foundStages = getPlanStages(getWinningPlanFromExplain(explain), "GEO_NEAR_2DSPHERE");
         assert.gt(foundStages.length, 0, "No GEO_NEAR_2DSPHERE stages found: " + tojson(explain));
     } catch (e) {
         assert.eq(

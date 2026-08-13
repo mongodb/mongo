@@ -41,8 +41,6 @@ function assertIfQueryIsCovered(query, projection, isCovered, hint) {
     const explain = cursor.explain();
     assert.commandWorked(explain);
 
-    assert(explain.hasOwnProperty("queryPlanner"), tojson(explain));
-    assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
     const winningPlan = getWinningPlanFromExplain(explain);
     if (isCovered) {
         assert(

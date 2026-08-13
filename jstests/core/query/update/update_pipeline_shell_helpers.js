@@ -15,7 +15,11 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 // Make sure that the test collection is empty before starting the test.
 const testColl = db[jsTestName()];
@@ -105,9 +109,9 @@ assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 {
     let explain = testColl.explain("queryPlanner").update({_id: 2}, [{$set: {y: 999}}]);
     // post 8.0, EXPRESS will handle update-by-id
-    if (!planHasStage(db, explain.queryPlanner.winningPlan, "EXPRESS_UPDATE")) {
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "IDHACK"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+    if (!planHasStage(db, getWinningPlanFromExplain(explain), "EXPRESS_UPDATE")) {
+        assert(planHasStage(db, getWinningPlanFromExplain(explain), "IDHACK"));
+        assert(planHasStage(db, getWinningPlanFromExplain(explain), "UPDATE"));
     }
 
     // Run explain with execution-level verbosity.
@@ -132,8 +136,8 @@ assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 // contain the shard key.
 if (!FixtureHelpers.isMongos(db)) {
     let explain = testColl.explain("queryPlanner").update({a: 2}, [{$set: {y: 999}}]);
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+    assert(planHasStage(db, getWinningPlanFromExplain(explain), "COLLSCAN"));
+    assert(planHasStage(db, getWinningPlanFromExplain(explain), "UPDATE"));
 
     // Run explain with execution-level verbosity.
     explain = testColl.explain("executionStats").update({a: 2}, [{$set: {y: 999}}]);
