@@ -362,45 +362,59 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
 
         const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
 
+        // Reduce wait time between passes to speed up test.
+        const originalTtlMonitorSleepSecs = assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({setParameter: 1, ttlMonitorSleepSecs: 1}),
+        ).was;
+
         // Pause the TTL monitor so it doesn't run during setup.
         const pauseTtl = configureFailPoint(this.replicaSetPrimary, "hangTTLMonitorBetweenPasses");
-        pauseTtl.wait();
+        try {
+            pauseTtl.wait();
 
-        // Insert an already-expired document and create a TTL index with expireAfterSeconds: 0.
-        assert.commandWorked(testColl.insert({_id: 1, createdAt: new Date(0)}));
-        assert.commandWorked(testColl.createIndex({createdAt: 1}, {expireAfterSeconds: 0}));
+            // Insert an already-expired document and create a TTL index with expireAfterSeconds: 0.
+            assert.commandWorked(testColl.insert({_id: 1, createdAt: new Date(0)}));
+            assert.commandWorked(testColl.createIndex({createdAt: 1}, {expireAfterSeconds: 0}));
 
-        // Enable write block with allowDeletions: false and let TTL run — document should not be reaped.
-        enableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            false /* allowDeletions */,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        runTTLMonitor();
-        assert.eq(
-            1,
-            testColl.count(),
-            "TTL should not have reaped the document while deletions are blocked",
-        );
+            // Enable write block with allowDeletions: false and let TTL run — document should not be reaped.
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            runTTLMonitor();
+            assert.eq(
+                1,
+                testColl.count(),
+                "TTL should not have reaped the document while deletions are blocked",
+            );
 
-        // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        enableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            true /* allowDeletions */,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        runTTLMonitor();
-        assert.eq(
-            0,
-            testColl.count(),
-            "TTL should have reaped the document when allowDeletions is true",
-        );
-
-        pauseTtl.off();
+            // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
+            disableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                true /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            runTTLMonitor();
+            assert.eq(
+                0,
+                testColl.count(),
+                "TTL should have reaped the document when allowDeletions is true",
+            );
+        } finally {
+            // Ensure the TTL monitor isn't left hung if an assertion above throws.
+            pauseTtl.off();
+            assert.commandWorked(
+                this.replicaSetPrimaryAdminDB.runCommand({
+                    setParameter: 1,
+                    ttlMonitorSleepSecs: originalTtlMonitorSleepSecs,
+                }),
+            );
+        }
     });
 
     it("Test that DDLs are not blocked by replica set write block", function () {
