@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import re
 from bisect import bisect_left, bisect_right
-from typing import NamedTuple, Optional
+from typing import Callable, NamedTuple, Optional
 
 import structlog
 import yaml
 from packaging.version import Version
 from pydantic import BaseModel, Field
 
+from buildscripts.resmokelib.multiversion.previous_release_tag import (
+    find_previous_release_tag,
+)
+
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
+RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+(?:-.+)?$")
 LOGGER = structlog.getLogger(__name__)
 
 
@@ -191,18 +196,34 @@ class MongoReleases(BaseModel):
         return [Version(eol) for eol in self.eol_versions]
 
 
+_UNRESOLVED = object()
+
+
 class MultiversionService:
     """A service for working with multiversion information."""
 
-    def __init__(self, mongo_version: MongoVersion, mongo_releases: MongoReleases) -> None:
+    def __init__(
+        self,
+        mongo_version: MongoVersion,
+        mongo_releases: MongoReleases,
+        last_patch_resolver: Optional[Callable[[str], Optional[str]]] = None,
+    ) -> None:
         """
         Initialize the service.
 
         :param mongo_version: Contents of the Mongo Version file.
         :param mongo_releases: Contents of the Mongo Releases file.
+        :param last_patch_resolver: Callable taking a tag glob pattern and
+          returning the last patch release tag, or None. Defaults to
+          ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake
+          to avoid invoking git.
         """
         self.mongo_version = mongo_version
         self.mongo_releases = mongo_releases
+        self.last_patch_resolver = last_patch_resolver or (
+            lambda tag_pattern: find_previous_release_tag("HEAD", tag_pattern=tag_pattern)
+        )
+        self._last_patch_cache: object = _UNRESOLVED
 
     def calculate_version_constants(self) -> VersionConstantValues:
         """Calculate multiversion constants from data files."""
@@ -233,3 +254,41 @@ class MultiversionService:
             fcvs_less_than_latest=fcvs_less_than_latest,
             eols=eols,
         )
+
+    def get_last_patch_version(self) -> Optional[str]:
+        """Get the last patch version (e.g. '8.3.1' or '8.3.1-rc1010').
+
+        Resolved lazily on first call by walking git tags, then memoized for
+        the lifetime of the service. Returns ``None`` if no matching tag
+        exists or the resolver fails (e.g. no git, malformed tag).
+        """
+        # Cached `None` is a valid resolved value, so we use a sentinel to
+        # distinguish it from "not computed yet".
+        if self._last_patch_cache is _UNRESOLVED:
+            self._last_patch_cache = self._resolve_last_patch()
+        return self._last_patch_cache  # type: ignore[return-value]
+
+    def get_last_patch_fcv(self) -> Optional[str]:
+        """Get the FCV derived from the last patch tag (e.g. '8.3')."""
+        last_patch = self.get_last_patch_version()
+        if last_patch is None:
+            return None
+        major, minor, _ = last_patch.split(".", 2)
+        return f"{major}.{minor}"
+
+    def _resolve_last_patch(self) -> Optional[str]:
+        latest = self.mongo_version.get_version()
+        tag_pattern = f"r{latest.major}.{latest.minor}.*"
+        try:
+            last_patch_tag = self.last_patch_resolver(tag_pattern)
+        except Exception as exc:
+            LOGGER.info("Failed to resolve last patch tag", tag_pattern=tag_pattern, error=exc)
+            return None
+        if not last_patch_tag:
+            return None
+        if not RELEASE_TAG_RE.match(last_patch_tag):
+            LOGGER.info(
+                "Unrecognized format for last patch tag", tag=last_patch_tag, pattern=tag_pattern
+            )
+            return None
+        return last_patch_tag[1:]
