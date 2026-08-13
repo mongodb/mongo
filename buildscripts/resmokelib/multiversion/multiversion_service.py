@@ -14,10 +14,13 @@ from pydantic import BaseModel, Field
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.multiversion.previous_release_tag import (
     find_previous_release_tag,
+    list_release_tags,
 )
 
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
 RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+(?:-.+)?$")
+# Same, but final (GA) only: `r8.0.29`, not `r8.0.28-rc0` or `r8.0.13-s8-0`.
+FINAL_RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+$")
 LOGGER = structlog.getLogger(__name__)
 
 
@@ -188,6 +191,7 @@ class MultiversionService:
         mongo_version: MongoVersion,
         mongo_releases: MongoReleases,
         last_patch_resolver: Optional[Callable[[str], Optional[str]]] = None,
+        release_tag_lister: Optional[Callable[[str], list[str]]] = None,
     ) -> None:
         """
         Initialize the service.
@@ -198,12 +202,16 @@ class MultiversionService:
           returning the last patch release tag, or None. Defaults to
           ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake
           to avoid invoking git.
+        :param release_tag_lister: Callable taking a tag glob and returning the matching
+          tags. Defaults to reading them from the repository. Tests can inject a fake to
+          avoid invoking git.
         """
         self.mongo_version = mongo_version
         self.mongo_releases = mongo_releases
         self.last_patch_resolver = last_patch_resolver or (
             lambda tag_pattern: find_previous_release_tag("HEAD", tag_pattern=tag_pattern)
         )
+        self.release_tag_lister = release_tag_lister or list_release_tags
         self._last_patch_cache: object = _UNRESOLVED
         self._version_constants: Optional[VersionConstantValues] = None
 
@@ -264,9 +272,13 @@ class MultiversionService:
         major, minor, _ = last_patch.split(".", 2)
         return f"{major}.{minor}"
 
-    def _resolve_last_patch(self) -> Optional[str]:
+    def _current_series_tag_pattern(self) -> str:
+        """Return a git tag glob matching every tag in the current release series."""
         latest = self.mongo_version.get_version()
-        tag_pattern = f"r{latest.major}.{latest.minor}.*"
+        return f"r{latest.major}.{latest.minor}.*"
+
+    def _resolve_last_patch(self) -> Optional[str]:
+        tag_pattern = self._current_series_tag_pattern()
         try:
             last_patch_tag = self.last_patch_resolver(tag_pattern)
         except Exception as exc:
@@ -280,6 +292,41 @@ class MultiversionService:
             )
             return None
         return last_patch_tag[1:]
+
+    def has_released_patch_version(self) -> bool:
+        """Return whether this release series has ever shipped a final (GA) release.
+
+        Used to decide whether to offer LAST_PATCH at all: last-patch means upgrading
+        from the previous patch release of the same series, so it is meaningless before
+        the series releases -- every `r9.0.*` tag is an alpha or rc until 9.0.1 ships.
+
+        This answers only "has the series released?", not "is this build downloadable":
+        a tag can exist with no published binary (r8.0.27, r8.3.5), which
+        db-contrib-tool already handles by stepping down to the newest reachable
+        candidate.
+
+        Ambiguity returns True, since silently dropping coverage is worse than a
+        download failure.
+        """
+        tag_pattern = self._current_series_tag_pattern()
+        try:
+            tags = self.release_tag_lister(tag_pattern)
+        except Exception as exc:
+            LOGGER.warning("Could not list release tags", tag_pattern=tag_pattern, error=str(exc))
+            return True
+
+        if not tags:
+            LOGGER.warning("No release tags found; assuming released", tag_pattern=tag_pattern)
+            return True
+
+        if not any(FINAL_RELEASE_TAG_RE.match(tag) for tag in tags):
+            LOGGER.info(
+                "Series has no final release yet; skipping last-patch",
+                tag_pattern=tag_pattern,
+                tags_seen=len(tags),
+            )
+            return False
+        return True
 
     def get_binary_name_for_version(self, version: str, base_name: str) -> str:
         """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.

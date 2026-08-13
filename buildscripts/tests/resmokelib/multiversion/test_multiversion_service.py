@@ -296,6 +296,62 @@ class TestLastPatchOnMultiversionService(TestCase):
         self.assertEqual(calls, ["r6.0.*"])
 
 
+class TestHasReleasedPatchVersion(TestCase):
+    # Decides whether LAST_PATCH is offered by default. Skipping is only correct on
+    # positive evidence that the series has not released; anything ambiguous must fall
+    # through to True so the problem surfaces downstream instead of silently dropping
+    # coverage.
+
+    def _make_service(self, lister):
+        return under_test.MultiversionService(
+            mongo_version=under_test.MongoVersion(mongo_version="9.0"),
+            mongo_releases=under_test.MongoReleases(
+                **{
+                    "featureCompatibilityVersions": ["8.0", "9.0", "100.0"],
+                    "longTermSupportReleases": ["8.0"],
+                    "eolVersions": [],
+                }
+            ),
+            release_tag_lister=lister,
+        )
+
+    def test_series_with_a_ga_release(self):
+        service = self._make_service(lambda _p: ["r9.0.1", "r9.0.1-rc0", "r9.0.0"])
+        self.assertTrue(service.has_released_patch_version())
+
+    def test_series_with_only_prereleases(self):
+        # The v9.0 case today: tags exist, none of them final.
+        service = self._make_service(lambda _p: ["r9.0.0-rc1018", "r9.0.0-rc0", "r9.0.0-alpha2"])
+        self.assertFalse(service.has_released_patch_version())
+
+    def test_special_build_tags_are_not_ga(self):
+        # e.g. r8.0.13-s8-0 -- a special build, not a patch release.
+        service = self._make_service(lambda _p: ["r9.0.0-s8-0", "r9.0.0-rc0"])
+        self.assertFalse(service.has_released_patch_version())
+
+    def test_no_tags_at_all_is_treated_as_ambiguous(self):
+        # Not a real branch state: even a brand-new series has alphas. More likely the
+        # shallow clone did not restore tags, so do not skip on it.
+        service = self._make_service(lambda _p: [])
+        self.assertTrue(service.has_released_patch_version())
+
+    def test_lister_failure_is_treated_as_ambiguous(self):
+        def lister(_p):
+            raise RuntimeError("git is unhappy")
+
+        self.assertTrue(self._make_service(lister).has_released_patch_version())
+
+    def test_lister_receives_pattern_for_current_series(self):
+        captured = []
+
+        def lister(pattern):
+            captured.append(pattern)
+            return ["r9.0.1"]
+
+        self._make_service(lister).has_released_patch_version()
+        self.assertEqual(captured, ["r9.0.*"])
+
+
 class TestGetOldVersions(TestCase):
     def _make_service(self, fcvs, lts, eols):
         return under_test.MultiversionService(

@@ -6,7 +6,7 @@ from typing import Optional
 import yaml
 from pydantic import BaseModel
 
-from buildscripts.resmokelib import configure_resmoke
+from buildscripts.resmokelib import config, configure_resmoke
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 MULTIVERSION_SUBCOMMAND = "multiversion-config"
@@ -72,8 +72,17 @@ class MultiversionConfigSubcommand(Subcommand):
             multiversion_service.get_last_patch_version() if include_last_patch else None
         )
         last_patch_fcv = multiversion_service.get_last_patch_fcv() if include_last_patch else None
+        # Offer last-patch by default only where the series has actually released, so a
+        # new series turns it on by itself with no config change. A variant can still opt
+        # in via the `last_versions` expansion, which replaces this list rather than
+        # extending it -- that is how the disagg suites test against Atlas DSC release
+        # candidates, which are not GA releases.
+        last_versions = multiversion_service.get_last_versions()
+        if multiversion_service.has_released_patch_version():
+            last_versions.append(config.MultiversionOptions.LAST_PATCH)
+
         return MultiversionConfig(
-            last_versions=multiversion_service.get_last_versions(),
+            last_versions=last_versions,
             requires_fcv_tag=version_constants.get_fcv_tag_list(),
             requires_fcv_tag_lts=version_constants.get_lts_fcv_tag_list(),
             requires_fcv_tag_continuous=version_constants.get_continuous_fcv_tag_list(),

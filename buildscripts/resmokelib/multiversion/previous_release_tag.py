@@ -46,6 +46,13 @@ def _list_candidate_tags(repo: Repo, pattern: str) -> list[str]:
     return [line for line in stdout.splitlines() if line]
 
 
+def list_release_tags(
+    pattern: str = DEFAULT_TAG_PATTERN, *, repo_root: Optional[str] = None
+) -> list[str]:
+    """List tags matching ``pattern``, newest first."""
+    return _list_candidate_tags(Repo(repo_root), pattern)
+
+
 def find_previous_release_tag(
     target_commit_ref: str = "HEAD",
     *,
