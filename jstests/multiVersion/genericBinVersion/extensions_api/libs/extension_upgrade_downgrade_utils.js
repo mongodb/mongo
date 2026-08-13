@@ -13,7 +13,10 @@ import {
     getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
-const fooStageUnrecognizedErrCode = 40324;
+// In 9.0+, featureFlagExtensionsAPI is enabled by default, so the stub parser throws 10918500
+// ("extension is not available") when the extension is not loaded. On backports, it throws 40324
+// ("unrecognized stage").
+const fooStageUnrecognizedErrCodes = [40324, 10918500];
 const fooParseErrorCodes = [11165101];
 
 const collName = jsTestName();
@@ -128,7 +131,7 @@ function assertFooViewCreationRejected(primaryConn) {
     db[viewName].drop();
     assert.commandFailedWithCode(
         db.createView(viewName, collName, [{$testFoo: {}}]),
-        fooStageUnrecognizedErrCode,
+        fooStageUnrecognizedErrCodes,
     );
 }
 
@@ -222,12 +225,10 @@ export function assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed(primar
     // other times validates locally first (fails).
     const db = getDB(primaryConn);
     db[viewName].drop();
-    const createViewResult = db.createView(viewName, collName, [{$testFoo: {}}]);
     // Either outcome is acceptable in this mixed-version state.
-    assert(
-        createViewResult["ok"] === 1 || createViewResult.code === fooStageUnrecognizedErrCode,
-        "Expected view creation to either succeed or fail with unrecognized stage error, got: " +
-            tojson(createViewResult),
+    assert.commandWorkedOrFailedWithCode(
+        db.createView(viewName, collName, [{$testFoo: {}}]),
+        fooStageUnrecognizedErrCodes,
     );
     assertLegacyVectorSearchUsed(primaryConn);
     assertLegacyVectorSearchInUnionWithUsed(primaryConn);
