@@ -698,6 +698,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());
+        tassert(13286900, "must have an operation context", opCtx);
         s->registerOperation(opCtx);
     }
 

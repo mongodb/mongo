@@ -525,19 +525,27 @@ std::string WasmtimeImplScope::getError() {
 }
 
 void WasmtimeImplScope::registerOperation(OperationContext* opCtx) {
-    _opCtx.store(opCtx, std::memory_order_release);
-    if (auto* engine = getGlobalScriptEngine()) {
-        static_cast<WasmtimeScriptEngine*>(engine)->registerOperation(
-            opCtx, this, [this] { _opCtx.store(nullptr, std::memory_order_release); });
+    tassert(13286901, "must have an operation context", opCtx);
+    auto* engine = dynamic_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
+    if (!engine) {
+        // Store no pointer when there is no WASM engine to register with. This avoids dangling
+        // '_opCtx', since the cleanup for each scope's operation context happens inside the
+        // destructor of 'WasmtimeScopeRegistry' which exists inside the engine.
+        return;
     }
+
+    _opCtx.store(opCtx, std::memory_order_release);
+    engine->registerOperation(
+        opCtx, this, [this] { _opCtx.store(nullptr, std::memory_order_release); });
 }
+
 void WasmtimeImplScope::unregisterOperation() {
     // Atomically take ownership of _opCtx so we call engine->unregisterOperation() exactly once,
     // even if the onTeardown callback races with us from the OperationContext's destructor.
     auto* opCtx = _opCtx.exchange(nullptr, std::memory_order_acq_rel);
     if (opCtx) {
-        if (auto* engine = getGlobalScriptEngine()) {
-            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(opCtx, this);
+        if (auto* engine = dynamic_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine())) {
+            engine->unregisterOperation(opCtx, this);
         }
     }
 }
