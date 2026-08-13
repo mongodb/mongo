@@ -246,7 +246,7 @@ struct __wt_checkpoint_reconcile_threads {
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
-extern WT_TXN_SNAPSHOT *__wt_ckpt_eviction_snap_current(WT_SESSION_IMPL *session)
+extern WT_CKPT_EVICTION_SNAP *__wt_ckpt_eviction_snap_current(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_checkpoint_verbose_timer_started(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

@@ -2506,6 +2506,8 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: number of leaf pages visited",
   "checkpoint: number of pages reconciled",
   "checkpoint: number of pages reconciled by checkpoint parallel worker threads",
+  "checkpoint: number of pages whose reconciliation was skipped because eviction already "
+  "reconciled them under the checkpoint snapshot",
   "checkpoint: prepare currently running",
   "checkpoint: prepare max time (msecs)",
   "checkpoint: prepare min time (msecs)",
@@ -2659,6 +2661,7 @@ static const char *const __stats_connection_desc[] = {
   "disagg: most recently delivered checkpoint metadata LSN",
   "disagg: new file metadata entries inserted during checkpoint pick-up",
   "disagg: pick up checkpoint most recent time (msecs)",
+  "disagg: pick up checkpoint time at startup (msecs)",
   "disagg: role leader",
   "disagg: snapshots rebuilt after racing a checkpoint pick-up or role change",
   "disagg: stable tombstone encoding mode: 0 not yet determined, 1 legacy escaped, 2 unescaped",
@@ -3022,6 +3025,7 @@ static const char *const __stats_connection_desc[] = {
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
   "thread-state: active filesystem write calls",
+  "thread-yield: application thread eviction used the published checkpoint snapshot for visibility",
   "thread-yield: application thread operations waiting for cache",
   "thread-yield: application thread operations waiting for interruptible cache eviction",
   "thread-yield: application thread operations waiting for mandatory cache eviction",
@@ -3625,6 +3629,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->checkpoint_pages_visited_leaf = 0;
     stats->checkpoint_pages_reconciled = 0;
     stats->checkpoint_parallel_pages_reconciled = 0;
+    stats->checkpoint_pages_reconciliation_skipped_evict_snapshot = 0;
     /* not clearing checkpoint_prep_running */
     /* not clearing checkpoint_prep_max */
     /* not clearing checkpoint_prep_min */
@@ -3775,6 +3780,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing disagg_checkpoint_delivered_lsn */
     stats->disagg_pick_up_file_meta_inserted = 0;
     stats->disagg_pick_up_checkpoint_time = 0;
+    stats->disagg_pick_up_checkpoint_time_startup = 0;
     stats->disagg_role_leader = 0;
     stats->disagg_snapshot_rebuild = 0;
     /* not clearing disagg_stable_tombstone_encoding */
@@ -4131,6 +4137,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing thread_fsync_active */
     /* not clearing thread_read_active */
     /* not clearing thread_write_active */
+    stats->application_evict_checkpoint_snapshot = 0;
     stats->application_cache_ops = 0;
     stats->application_cache_interruptible_ops = 0;
     stats->application_cache_uninterruptible_ops = 0;
@@ -4851,6 +4858,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_pages_reconciled += WT_STAT_CONN_READ(from, checkpoint_pages_reconciled);
     to->checkpoint_parallel_pages_reconciled +=
       WT_STAT_CONN_READ(from, checkpoint_parallel_pages_reconciled);
+    to->checkpoint_pages_reconciliation_skipped_evict_snapshot +=
+      WT_STAT_CONN_READ(from, checkpoint_pages_reconciliation_skipped_evict_snapshot);
     to->checkpoint_prep_running += WT_STAT_CONN_READ(from, checkpoint_prep_running);
     to->checkpoint_prep_max += WT_STAT_CONN_READ(from, checkpoint_prep_max);
     to->checkpoint_prep_min += WT_STAT_CONN_READ(from, checkpoint_prep_min);
@@ -5017,6 +5026,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->disagg_pick_up_file_meta_inserted +=
       WT_STAT_CONN_READ(from, disagg_pick_up_file_meta_inserted);
     to->disagg_pick_up_checkpoint_time += WT_STAT_CONN_READ(from, disagg_pick_up_checkpoint_time);
+    to->disagg_pick_up_checkpoint_time_startup +=
+      WT_STAT_CONN_READ(from, disagg_pick_up_checkpoint_time_startup);
     to->disagg_role_leader += WT_STAT_CONN_READ(from, disagg_role_leader);
     to->disagg_snapshot_rebuild += WT_STAT_CONN_READ(from, disagg_snapshot_rebuild);
     to->disagg_stable_tombstone_encoding +=
@@ -5490,6 +5501,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->thread_fsync_active += WT_STAT_CONN_READ(from, thread_fsync_active);
     to->thread_read_active += WT_STAT_CONN_READ(from, thread_read_active);
     to->thread_write_active += WT_STAT_CONN_READ(from, thread_write_active);
+    to->application_evict_checkpoint_snapshot +=
+      WT_STAT_CONN_READ(from, application_evict_checkpoint_snapshot);
     to->application_cache_ops += WT_STAT_CONN_READ(from, application_cache_ops);
     to->application_cache_interruptible_ops +=
       WT_STAT_CONN_READ(from, application_cache_interruptible_ops);

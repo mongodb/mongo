@@ -873,6 +873,7 @@ struct __wt_connection_stats {
     int64_t checkpoint_pages_visited_leaf;
     int64_t checkpoint_pages_reconciled;
     int64_t checkpoint_parallel_pages_reconciled;
+    int64_t checkpoint_pages_reconciliation_skipped_evict_snapshot;
     int64_t checkpoint_prep_running;
     int64_t checkpoint_prep_max;
     int64_t checkpoint_prep_min;
@@ -1023,6 +1024,7 @@ struct __wt_connection_stats {
     int64_t disagg_checkpoint_delivered_lsn;
     int64_t disagg_pick_up_file_meta_inserted;
     int64_t disagg_pick_up_checkpoint_time;
+    int64_t disagg_pick_up_checkpoint_time_startup;
     int64_t disagg_role_leader;
     int64_t disagg_snapshot_rebuild;
     int64_t disagg_stable_tombstone_encoding;
@@ -1379,6 +1381,7 @@ struct __wt_connection_stats {
     int64_t thread_fsync_active;
     int64_t thread_read_active;
     int64_t thread_write_active;
+    int64_t application_evict_checkpoint_snapshot;
     int64_t application_cache_ops;
     int64_t application_cache_interruptible_ops;
     int64_t application_cache_uninterruptible_ops;

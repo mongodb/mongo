@@ -132,8 +132,9 @@ TEST_CASE("Checkpoint eviction snapshot: the reader sees the published buffer's 
 
     uint32_t snap_idx = publish(session, 100);
 
-    WT_TXN_SNAPSHOT *snap = __wt_ckpt_eviction_snap_current(session);
-    REQUIRE(snap == &conn->ckpt_eviction_snap[snap_idx].snap);
+    WT_CKPT_EVICTION_SNAP *buf = __wt_ckpt_eviction_snap_current(session);
+    REQUIRE(buf == &conn->ckpt_eviction_snap[snap_idx]);
+    WT_TXN_SNAPSHOT *snap = &buf->snap;
     REQUIRE(snap->snap_min == 100);
     REQUIRE(snap->snap_max == 200);
 }

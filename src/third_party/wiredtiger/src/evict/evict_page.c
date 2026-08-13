@@ -11,7 +11,6 @@
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static bool __evict_page_victim_cache_eligible(WT_SESSION_IMPL *, WT_REF *);
-static bool __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *);
 static int __evict_reconcile(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
 
@@ -1213,14 +1212,73 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 }
 
 /*
- * __evict_precise_ckpt_copy_snapshot --
- *     Copy the published checkpoint snapshot into the session's transaction snapshot so that
- *     reconciliation can use it for precise checkpoint eviction visibility. Returns false if the
- *     running checkpoint has not published a snapshot.
+ * What eviction owes the transaction once reconciliation is done. Every value but NONE reconciles
+ * under read-committed isolation.
+ */
+typedef enum {
+    WT_EVICT_SNAP_NONE,    /* No snapshot was set up: reconcile with the caller's visibility. */
+    WT_EVICT_SNAP_APP,     /* The application thread's own snapshot: nothing to undo. */
+    WT_EVICT_SNAP_RELEASE, /* A snapshot eviction acquired or copied: release it. */
+    WT_EVICT_SNAP_RESTORE  /* A snapshot displacing the application's: restore the original. */
+} WT_EVICT_SNAPSHOT_STATE;
+
+/*
+ * __evict_ckpt_snapshot_required --
+ *     Return true if precise checkpoint requires eviction of this tree to be bounded by the running
+ *     checkpoint's visibility.
+ */
+static WT_INLINE bool
+__evict_ckpt_snapshot_required(WT_SESSION_IMPL *session)
+{
+    return (F_ISSET(S2C(session), WT_CONN_PRECISE_CHECKPOINT) &&
+      !__wt_btree_stays_in_memory(S2BT(session)));
+}
+
+/*
+ * __evict_ckpt_snapshot_usable --
+ *     Return true if the published checkpoint snapshot is a visibility bound for this tree. The
+ *     metadata trees are not covered by it.
+ */
+static WT_INLINE bool
+__evict_ckpt_snapshot_usable(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
+    return (__evict_ckpt_snapshot_required(session) && !WT_IS_METADATA(btree->dhandle) &&
+      !WT_IS_DISAGG_META(btree->dhandle));
+}
+
+/*
+ * __evict_ckpt_snapshot_bound --
+ *     Return true if the published checkpoint snapshot bounds what this tree may write. It does so
+ *     until the checkpoint has visited the tree, and for disaggregated storage until the checkpoint
+ *     completes: nothing newer than the checkpoint may be evicted before then.
+ */
+static WT_INLINE bool
+__evict_ckpt_snapshot_bound(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
+    return (__wt_atomic_load_uint64_acquire(&btree->checkpoint_gen) <
+        __wt_gen(session, WT_GEN_CHECKPOINT) ||
+      (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+        __wt_atomic_load_bool_v_relaxed(&S2C(session)->txn_global.checkpoint_running)));
+}
+
+/*
+ * __evict_ckpt_snapshot_copy --
+ *     Copy the running checkpoint's published snapshot into the session's transaction snapshot so
+ *     that reconciliation can use it for precise checkpoint eviction visibility. Returns false if
+ *     the running checkpoint has not published a snapshot.
  */
 static bool
-__evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
+__evict_ckpt_snapshot_copy(WT_SESSION_IMPL *session)
 {
+    WT_CKPT_EVICTION_SNAP *buf;
     WT_TXN_SNAPSHOT *snap;
     bool copied;
 
@@ -1233,13 +1291,16 @@ __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
      */
     WT_ENTER_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
     /* Take the buffer only when the checkpoint that published it is the one still running. */
-    if ((snap = __wt_ckpt_eviction_snap_current(session)) != NULL) {
+    if ((buf = __wt_ckpt_eviction_snap_current(session)) != NULL) {
+        snap = &buf->snap;
         session->txn->snapshot_data.snap_min = snap->snap_min;
         session->txn->snapshot_data.snap_max = snap->snap_max;
         session->txn->snapshot_data.snapshot_count = snap->snapshot_count;
         if (snap->snapshot_count > 0)
             memcpy(session->txn->snapshot_data.snapshot, snap->snapshot,
               snap->snapshot_count * sizeof(snap->snapshot[0]));
+        /* Stamp the page with the checkpoint that published the snapshot it is reconciled under. */
+        session->txn->ckpt_snap_gen = __wt_atomic_load_uint64_relaxed(&buf->gen);
         F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
         copied = true;
     } else
@@ -1247,6 +1308,166 @@ __evict_precise_ckpt_copy_snapshot(WT_SESSION_IMPL *session)
     WT_LEAVE_GENERATION(session, WT_GEN_HAS_CKPT_SNAPSHOT);
 
     return (copied);
+}
+
+/*
+ * __evict_snapshot_teardown --
+ *     Undo the snapshot setup eviction did for reconciliation.
+ */
+static void
+__evict_snapshot_teardown(WT_SESSION_IMPL *session, WT_EVICT_SNAPSHOT_STATE snap_state)
+{
+    /* Restoring the saved snapshot overwrites the one eviction read under. */
+    if (snap_state == WT_EVICT_SNAP_RESTORE)
+        __wt_txn_snapshot_release_and_restore(session);
+    else if (snap_state == WT_EVICT_SNAP_RELEASE)
+        __wt_txn_release_snapshot(session);
+
+    /* Reconciliation has taken its copy of the stamp, clear it. */
+    session->txn->ckpt_snap_gen = WT_CKPT_SNAP_GEN_NONE;
+}
+
+/*
+ * __evict_snapshot_evict_thread --
+ *     Set up the snapshot an eviction thread reconciles under.
+ */
+static WT_EVICT_SNAPSHOT_STATE
+__evict_snapshot_evict_thread(WT_SESSION_IMPL *session, uint32_t *flagsp)
+{
+    /*
+     * Precise checkpoint bounds what may be written for a tree the checkpoint hasn't finished with:
+     * read under the checkpoint's snapshot, or under no snapshot at all if it has not published one
+     * we can use.
+     */
+    if (__evict_ckpt_snapshot_required(session) && __evict_ckpt_snapshot_bound(session)) {
+        if (__evict_ckpt_snapshot_usable(session) && __evict_ckpt_snapshot_copy(session))
+            return (WT_EVICT_SNAP_RELEASE);
+
+        FLD_SET(*flagsp, WT_REC_VISIBLE_NO_SNAPSHOT);
+        return (WT_EVICT_SNAP_NONE);
+    }
+
+    /*
+     * Eviction threads do not need to pin anything in the cache. We have an exclusive lock for the
+     * page being evicted so we are sure that the page will always be there while it is being
+     * processed. Therefore, we use snapshot API that doesn't publish shared IDs to the outside
+     * world.
+     */
+    __wt_txn_bump_snapshot(session);
+    return (WT_EVICT_SNAP_RELEASE);
+}
+
+/*
+ * __evict_snapshot_app --
+ *     Set up the application thread's own snapshot for reconciliation to read under.
+ */
+static int
+__evict_snapshot_app(
+  WT_SESSION_IMPL *session, uint32_t *flagsp, WT_EVICT_SNAPSHOT_STATE *snap_statep)
+{
+    /*
+     * If we couldn't make progress with the existing snapshot, save it and refresh to acquire a new
+     * one, restoring the original once eviction is done.
+     */
+    if (F_ISSET(session->txn, WT_TXN_REFRESH_SNAPSHOT)) {
+        WT_RET(__wt_txn_snapshot_save_and_refresh(session));
+        WT_STAT_CONN_INCR(session, application_evict_snapshot_refreshed);
+        *snap_statep = WT_EVICT_SNAP_RESTORE;
+    } else
+        *snap_statep = WT_EVICT_SNAP_APP;
+
+    FLD_SET(*flagsp, WT_REC_APP_EVICTION_SNAPSHOT);
+
+    return (0);
+}
+
+/*
+ * __evict_snapshot_app_ckpt --
+ *     Set up the published checkpoint snapshot for an application thread's reconciliation to read
+ *     under, so that checkpoint can skip re-reconciling the page later.
+ */
+static int
+__evict_snapshot_app_ckpt(
+  WT_SESSION_IMPL *session, uint32_t *flagsp, WT_EVICT_SNAPSHOT_STATE *snap_statep)
+{
+    bool displaced;
+
+    *snap_statep = WT_EVICT_SNAP_NONE;
+
+    if (!__evict_ckpt_snapshot_bound(session)) {
+        FLD_SET(*flagsp, WT_REC_VISIBLE_NO_SNAPSHOT);
+        return (0);
+    }
+
+    /* Preserve the application's own snapshot while we use the checkpoint's. */
+    displaced = F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT);
+    if (displaced)
+        WT_RET(__wt_txn_snapshot_save(session));
+
+    if (!__evict_ckpt_snapshot_copy(session)) {
+        /*
+         * Saving swapped in an empty snapshot buffer while leaving the count behind, so put the
+         * application's own snapshot back rather than leaving that mismatch in place.
+         */
+        if (displaced)
+            __wt_txn_snapshot_release_and_restore(session);
+        FLD_SET(*flagsp, WT_REC_VISIBLE_NO_SNAPSHOT);
+        return (0);
+    }
+
+    WT_STAT_CONN_INCR(session, application_evict_checkpoint_snapshot);
+    FLD_SET(*flagsp, WT_REC_APP_EVICTION_CKPT_SNAPSHOT);
+    *snap_statep = displaced ? WT_EVICT_SNAP_RESTORE : WT_EVICT_SNAP_RELEASE;
+
+    return (0);
+}
+
+/*
+ * __evict_snapshot_setup --
+ *     Set up the visibility snapshot reconciliation will use for this eviction, telling the caller
+ *     what teardown owes the transaction afterwards.
+ */
+static int
+__evict_snapshot_setup(
+  WT_SESSION_IMPL *session, uint32_t *flagsp, WT_EVICT_SNAPSHOT_STATE *snap_statep)
+{
+    bool app_thread;
+
+    *snap_statep = WT_EVICT_SNAP_NONE;
+    session->txn->ckpt_snap_gen = WT_CKPT_SNAP_GEN_NONE;
+
+    /* Only an application thread evicting its own data brings a snapshot worth reading under. */
+    app_thread = !F_ISSET(session, WT_SESSION_EVICTION | WT_SESSION_INTERNAL) &&
+      !WT_IS_METADATA(session->dhandle);
+
+    if (F_ISSET(session, WT_SESSION_EVICTION))
+        *snap_statep = __evict_snapshot_evict_thread(session, flagsp);
+    /*
+     * Without precise checkpoint the application thread's own snapshot is the bound. A transaction
+     * in the final stages of commit or rollback has already released it; reconciling without a
+     * snapshot then keeps detecting the last running transaction's updates simple.
+     */
+    else if (app_thread && !F_ISSET(S2C(session), WT_CONN_PRECISE_CHECKPOINT) &&
+      F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+        WT_RET(__evict_snapshot_app(session, flagsp, snap_statep));
+    /*
+     * Under precise checkpoint the application thread must read under the checkpoint's snapshot
+     * instead of its own. Only disaggregated storage does so for now.
+     */
+    else if (app_thread && F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
+      __evict_ckpt_snapshot_usable(session))
+        WT_RET(__evict_snapshot_app_ckpt(session, flagsp, snap_statep));
+    /* Checkpoint reads under the snapshot it already holds, anything else has no bound. */
+    else if (!WT_SESSION_BTREE_SYNC(session))
+        FLD_SET(*flagsp, WT_REC_VISIBLE_NO_SNAPSHOT);
+
+    WT_ASSERT(session,
+      FLD_ISSET(*flagsp, WT_REC_VISIBLE_NO_SNAPSHOT) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+
+    /* We should not be trying to evict using a checkpoint-cursor transaction. */
+    WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
+
+    return (0);
 }
 
 /*
@@ -1260,9 +1481,9 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_EVICT *evict;
+    WT_EVICT_SNAPSHOT_STATE snap_state;
     uint32_t flags;
-    bool closing, is_application_thread_snapshot_refreshed, is_eviction_thread,
-      use_snapshot_for_app_thread;
+    bool closing;
 
     btree = S2BT(session);
     conn = S2C(session);
@@ -1270,7 +1491,6 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
 
     evict = conn->evict;
-    is_application_thread_snapshot_refreshed = false;
 
     /*
      * Urgent eviction and forced eviction want two different behaviors for inefficient update
@@ -1338,82 +1558,16 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     }
 
     /*
-     * Acquire a snapshot if coming through the eviction thread route. Also, if we have entered
-     * eviction through application threads then we save the existing snapshot and refresh to
-     * acquire a new snapshot, once the application threads are done with eviction then we switch
-     * back the snapshot to its original. Avoid using snapshots when application transactions are in
-     * the final stages of commit or rollback as they have already released the snapshot. Otherwise,
-     * it becomes harder in the later part of the code to detect updates that belonged to the last
-     * running application transaction.
-     */
-    use_snapshot_for_app_thread = !F_ISSET(session, WT_SESSION_INTERNAL) &&
-      !WT_IS_METADATA(session->dhandle) && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT) &&
-      !F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT);
-    is_eviction_thread = F_ISSET(session, WT_SESSION_EVICTION);
-
-    /* Make sure that both conditions above are not true at the same time. */
-    WT_ASSERT(session, !use_snapshot_for_app_thread || !is_eviction_thread);
-
-    /*
      * If checkpoint is running concurrently, set the checkpoint running flag and we will abort the
      * eviction if we detect any updates without timestamps.
      */
     if (__wt_atomic_load_bool_v_relaxed(&conn->txn_global.checkpoint_running))
         LF_SET(WT_REC_CHECKPOINT_RUNNING);
 
-    /* Eviction thread doing eviction. */
-    if (is_eviction_thread) {
-        /*
-         * Eviction threads do not need to pin anything in the cache. We have an exclusive lock for
-         * the page being evicted so we are sure that the page will always be there while it is
-         * being processed. Therefore, we use snapshot API that doesn't publish shared IDs to the
-         * outside world.
-         */
-        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && !__wt_btree_stays_in_memory(btree)) {
-            uint64_t btree_ckpt_gen, ckpt_gen;
-            /*
-             * If precise checkpoint is configured, only evict the updates that visible to the
-             * ongoing checkpoint for trees haven't been visited by the checkpoint.
-             */
-            btree_ckpt_gen = __wt_atomic_load_uint64_acquire(&btree->checkpoint_gen);
-            ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
-            if (btree_ckpt_gen < ckpt_gen) {
-                if (WT_IS_METADATA(btree->dhandle) || WT_IS_DISAGG_META(btree->dhandle) ||
-                  !__evict_precise_ckpt_copy_snapshot(session))
-                    LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
-            } else
-                __wt_txn_bump_snapshot(session);
-        } else
-            __wt_txn_bump_snapshot(session);
-    } else if (use_snapshot_for_app_thread) {
-        /*
-         * If we couldn't make progress with the application thread's existing snapshot, save the
-         * existing snapshot and refresh to acquire a new one. Then try eviction again. Once the
-         * application threads are done with eviction, the application thread's snapshot is switched
-         * back to the original.
-         */
-        if (F_ISSET(session->txn, WT_TXN_REFRESH_SNAPSHOT)) {
-            WT_RET(__wt_txn_snapshot_save_and_refresh(session));
-            is_application_thread_snapshot_refreshed = true;
-            WT_STAT_CONN_INCR(session, application_evict_snapshot_refreshed);
-        }
+    WT_RET(__evict_snapshot_setup(session, &flags, &snap_state));
 
-        LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
-    } else if (!WT_SESSION_BTREE_SYNC(session))
-        LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
-
-    WT_ASSERT(
-      session, LF_ISSET(WT_REC_VISIBLE_NO_SNAPSHOT) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
-
-    /* We should not be trying to evict using a checkpoint-cursor transaction. */
-    WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
-
-    /*
-     * Reconcile the page. Force read-committed isolation level if we are using snapshots for
-     * eviction workers or application threads.
-     */
-    if ((is_eviction_thread && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) ||
-      use_snapshot_for_app_thread)
+    /* Force read-committed isolation if we set up a snapshot to reconcile under. */
+    if (snap_state != WT_EVICT_SNAP_NONE)
         WT_WITH_TXN_ISOLATION(
           session, WT_ISO_READ_COMMITTED, ret = __wt_reconcile(session, ref, NULL, flags));
     else
@@ -1422,10 +1576,8 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     if (ret != 0)
         WT_STAT_CONN_INCR(session, eviction_fail_in_reconciliation);
 
-    if (is_eviction_thread && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
-        __wt_txn_release_snapshot(session);
-    else if (is_application_thread_snapshot_refreshed)
-        __wt_txn_snapshot_release_and_restore(session);
+    /* Tear down the snapshot we set up. */
+    __evict_snapshot_teardown(session, snap_state);
 
     WT_RET(ret);
 

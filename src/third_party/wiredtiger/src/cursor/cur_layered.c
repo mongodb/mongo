@@ -444,6 +444,46 @@ __clayered_op_init(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op, uint32_t f
 }
 
 /*
+ * __clayered_assert_role_change --
+ *     Assert the role-change invariants: a step-up requires an unpositioned cursor (ingest drains
+ *     under the position) and no spanning snapshot (it cannot be consistent with the drained and
+ *     adopted stable content); a step-down requires only writes to be unpositioned, since the
+ *     stable tree after it matches the step-down checkpoint.
+ */
+static WT_INLINE void
+__clayered_assert_role_change(
+  WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode, WTI_CLAYERED_ROLE role, uint32_t flags)
+{
+    WT_SESSION_IMPL *session = CUR2S(clayered);
+    WT_TXN *txn = session->txn;
+
+    /* Only the diagnostic step-up assertion consumes the role. */
+    WT_UNUSED(role);
+
+    if (LF_ISSET(CLAYERED_ENTER_STEP_UP))
+        WT_ASSERT_ALWAYS(session, !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT),
+          "All the cursors should be left unpositioned before a step-up.");
+    else if (LF_ISSET(CLAYERED_ENTER_STEP_DOWN))
+        WT_ASSERT_ALWAYS(session,
+          !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) || mode != WTI_CLAYERED_MODE_WRITE,
+          "Write cursors should be left unpositioned before a step-down.");
+
+    /* Skip snapshots that recorded no role era (a checkpoint's bumped snapshot). */
+    if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || __wt_session_gen(session, WT_GEN_DISAGG_ROLE) == 0)
+        return;
+
+    /*
+     * Tolerate one generation: a step-down span is legal, and an operation racing a transition can
+     * observe the generation bump before the published role. Two or more means a spanned step-up.
+     */
+    WT_ASSERT(session,
+      __wt_gen(session, WT_GEN_DISAGG_ROLE) - __wt_session_gen(session, WT_GEN_DISAGG_ROLE) <= 1);
+
+    /* A snapshot established on a follower must not be used on a leader: a step-up span. */
+    WT_ASSERT(session, txn->disagg_role_leader || role != WTI_CLAYERED_ROLE_LEADER);
+}
+
+/*
  * __clayered_enter --
  *     Start an operation on a layered cursor.
  */
@@ -457,25 +497,14 @@ __clayered_enter(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode, WTI_CL
       WTI_CLAYERED_ROLE_FOLLOWER;
     uint32_t flags = __clayered_enter_flags(clayered, mode, role);
 
+    __clayered_assert_role_change(clayered, mode, role, flags);
+
     /*
      * largest_key is exempt: it ignores visibility by contract and always consults ingest, so its
      * result does not depend on the transaction.
      */
     if (mode != WTI_CLAYERED_MODE_LARGEST_KEY)
         WT_RET(__wt_txn_stepdown_straddler_check(session, mode == WTI_CLAYERED_MODE_WRITE));
-
-    /*
-     * Reads may stay positioned across a planned step-down: the stable tree after the step-down
-     * matches the step-down checkpoint. A step-up drains ingest under the position, so both require
-     * an unpositioned cursor.
-     */
-    if (LF_ISSET(CLAYERED_ENTER_STEP_UP))
-        WT_ASSERT_ALWAYS(session, !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT),
-          "All the cursors should be left unpositioned before a step-up.");
-    else if (LF_ISSET(CLAYERED_ENTER_STEP_DOWN))
-        WT_ASSERT_ALWAYS(session,
-          !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) || mode != WTI_CLAYERED_MODE_WRITE,
-          "Write cursors should be left unpositioned before a step-down.");
 
     /*
      * FIXME-WT-15058: When inside a read committed isolation, the file cursor code expects to
@@ -1190,11 +1219,6 @@ __clayered_update_stable(WTI_CURSOR_LAYERED *clayered, uint32_t flags, WTI_CLAYE
          *
          * The second case of reopening the stable table is when we want to open a new checkpoint on
          * a follower to evict more entries from the ingest table.
-         *
-         * FIXME-WT-14545: What is not checked here is the possibility that a step down and step up
-         * have both occurred since the last check. We don't have a way to detect that (or its
-         * opposite) at the moment. If we did, we'd want to issue a rollback if the stable cursor
-         * has any changes.
          */
         WT_RET(__clayered_reopen_stable(session, clayered, role));
         clayered->stable_checkpoint_meta_lsn = conn_lsn;

@@ -793,9 +793,11 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
         *first_txn_updp = upd;
 
         /*
-         * Special handling for application threads evicting their own updates.
+         * Special handling for application threads evicting their own updates, whether reconciling
+         * under their own snapshot or the checkpoint's.
          */
-        if (!is_hs_page && F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT) &&
+        if (!is_hs_page &&
+          F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT | WT_REC_APP_EVICTION_CKPT_SNAPSHOT) &&
           session_txnid != WT_TXN_NONE && txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
@@ -1074,8 +1076,8 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
             *first_txn_updp = upd;
 
         /* Special handling for application threads evicting their own updates. */
-        if (F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT) && session_txnid != WT_TXN_NONE &&
-          upd->txnid == session_txnid) {
+        if (F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT | WT_REC_APP_EVICTION_CKPT_SNAPSHOT) &&
+          session_txnid != WT_TXN_NONE && upd->txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
             continue;

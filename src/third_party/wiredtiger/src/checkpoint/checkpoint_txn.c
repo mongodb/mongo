@@ -1297,9 +1297,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
         if (count > 0)
             memcpy(dst->snapshot, src->snapshot, count * sizeof(src->snapshot[0]));
 
-#ifdef HAVE_DIAGNOSTIC
         __wt_atomic_store_uint64_relaxed(&buf->gen, __wt_gen(session, WT_GEN_CHECKPOINT));
-#endif
         __wt_atomic_store_uint32_relaxed(&conn->ckpt_eviction_snap_idx, new_idx);
 
         /*
@@ -1709,12 +1707,14 @@ __checkpoint_log_stage(WT_SESSION_IMPL *session, uint32_t log_flags)
 
 /*
  * __wt_ckpt_eviction_snap_current --
- *     Return the snapshot the running checkpoint published, else NULL. Callers must hold the
- *     checkpoint snapshot generation across this call and any use of the result.
+ *     Return the buffer the running checkpoint published, else NULL. The buffer carries both the
+ *     snapshot and the generation identifying the checkpoint that published it. Callers must hold
+ *     the checkpoint snapshot generation across this call and any use of the result.
  */
-WT_TXN_SNAPSHOT *
+WT_CKPT_EVICTION_SNAP *
 __wt_ckpt_eviction_snap_current(WT_SESSION_IMPL *session)
 {
+    WT_CKPT_EVICTION_SNAP *buf;
     WT_CONNECTION_IMPL *conn;
     uint32_t snap_idx;
 #ifdef HAVE_DIAGNOSTIC
@@ -1748,10 +1748,10 @@ __wt_ckpt_eviction_snap_current(WT_SESSION_IMPL *session)
      * snapshot.
      */
     snap_idx = __wt_atomic_load_uint32_relaxed(&conn->ckpt_eviction_snap_idx);
-    WT_ASSERT(session,
-      __wt_atomic_load_uint64_relaxed(&conn->ckpt_eviction_snap[snap_idx].gen) >= ckpt_gen);
+    buf = &conn->ckpt_eviction_snap[snap_idx];
+    WT_ASSERT(session, __wt_atomic_load_uint64_relaxed(&buf->gen) >= ckpt_gen);
 
-    return (&conn->ckpt_eviction_snap[snap_idx].snap);
+    return (buf);
 }
 
 /*

@@ -1762,6 +1762,8 @@ __disagg_pick_up_checkpoint(
     /* Log the completion of the checkpoint pick-up. */
     __wt_timer_evaluate_ms(session, &pickup_timer, &pickup_elapsed_ms);
     WT_STAT_CONN_SET(session, disagg_pick_up_checkpoint_time, pickup_elapsed_ms);
+    if (is_startup)
+        WT_STAT_CONN_SET(session, disagg_pick_up_checkpoint_time_startup, pickup_elapsed_ms);
     __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Finished picking up disaggregated storage checkpoint: metadata_lsn=%" PRIu64 " in %" PRIu64
       "ms",

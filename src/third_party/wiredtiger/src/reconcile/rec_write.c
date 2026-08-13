@@ -557,6 +557,7 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
      * reconciliation.
      */
     mod->rec_pinned_stable_timestamp = r->rec_start_pinned_stable_ts;
+    mod->rec_ckpt_snap_gen = r->rec_ckpt_snap_gen;
     mod->rec_prune_timestamp = r->rec_prune_timestamp;
 
     /* Track the page's most recent LSN. */
@@ -795,6 +796,16 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
         r->rec_start_pinned_stable_ts = __wt_txn_pinned_stable_timestamp(session);
     else
         r->rec_start_pinned_stable_ts = WT_TS_NONE;
+
+    /*
+     * Remember the checkpoint snapshot identity only when eviction reconciles under the published
+     * checkpoint snapshot. Any other reconciliation clears the page's stamp.
+     */
+    if (LF_ISSET(WT_REC_EVICT) && F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
+      F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+        r->rec_ckpt_snap_gen = session->txn->ckpt_snap_gen;
+    else
+        r->rec_ckpt_snap_gen = WT_CKPT_SNAP_GEN_NONE;
 
     if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
         r->rec_prune_timestamp = __wt_atomic_load_uint64_relaxed(&btree->prune_timestamp);

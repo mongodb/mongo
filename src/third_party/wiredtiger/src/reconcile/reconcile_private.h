@@ -175,6 +175,12 @@ struct __wti_reconcile {
     /* Track the pinned stable timestamp at the time reconciliation started. */
     wt_timestamp_t rec_start_pinned_stable_ts;
 
+    /*
+     * When eviction is reconciling under the published checkpoint snapshot, the identity of that
+     * snapshot; otherwise WT_CKPT_SNAP_GEN_NONE.
+     */
+    uint64_t rec_ckpt_snap_gen;
+
     /* Track the prune timestamp at the time reconciliation started. */
     wt_timestamp_t rec_prune_timestamp;
 

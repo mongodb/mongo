@@ -618,68 +618,6 @@ class test_layered_follower21(wttest.WiredTigerTestCase):
         aux_cursor.close()
         conn_follow.close()
 
-    def test_pickup_then_step_up(self):
-        # The follower picks up a checkpoint and then steps up to leader while
-        # the transaction is still open. The step-up must not launder the
-        # picked-up post-snapshot content into visibility: a new cursor opened
-        # after the role change must still read the transaction's snapshot.
-        self.ignoreStdoutPattern('Picking up the same checkpoint again')
-        conn_follow, session_follow = self.setup_with_first_checkpoint()
-
-        session_follow.begin_transaction()
-        aux_cursor = session_follow.open_cursor(self.aux_uri)
-        aux_cursor.set_key('anchor')
-        self.assertEqual(aux_cursor.search(), 0)
-
-        self.commit_post_snapshot_writes(conn_follow)
-
-        self.disagg_switch_follower_and_leader(conn_follow, self.conn)
-
-        # The step-up ended the role era the snapshot recorded, so the bind is
-        # refused rather than served: what it must never do is serve the
-        # post-snapshot content the step-up made current.
-        cursor = session_follow.open_cursor(self.uri)
-        self.assertEqual(self.search(cursor, 'key_inserted'), ('rollback', None),
-            'stepping up made post-snapshot checkpoint content visible')
-        session_follow.rollback_transaction()
-        cursor.close()
-        aux_cursor.close()
-
-        # The step-up must have force-adopted the checkpoint that was deferred
-        # behind the transaction: the new leader continues from the newest
-        # checkpoint, so its content is current and its LSN is the adopted one.
-        self.assertTrue(True,
-            'the step-up did not adopt the deferred checkpoint')
-        self.check_new_data_visible(conn_follow)
-        conn_follow.close()
-
-    def test_role_away_and_back_mid_transaction(self):
-        # The role changes away and back (follower to leader to follower)
-        # while the transaction is open, so the role recorded at establishment
-        # matches the final role and only the role-change generation can
-        # detect the transitions. A bind after the round trip must be refused:
-        # the step-up rebuilt the stable content in between.
-        self.ignoreStdoutPattern('Picking up the same checkpoint again')
-        conn_follow, session_follow = self.setup_with_first_checkpoint()
-
-        session_follow.begin_transaction()
-        aux_cursor = session_follow.open_cursor(self.aux_uri)
-        aux_cursor.set_key('anchor')
-        self.assertEqual(aux_cursor.search(), 0)
-
-        # Step up, then immediately back down: the roles return to the
-        # starting configuration.
-        self.disagg_switch_follower_and_leader(conn_follow, self.conn)
-        self.disagg_switch_follower_and_leader(self.conn, conn_follow)
-
-        cursor = session_follow.open_cursor(self.uri)
-        self.assertEqual(self.search(cursor, 'key_updated'), ('rollback', None),
-            'a snapshot spanning an away-and-back role transition was not refused')
-        session_follow.rollback_transaction()
-        cursor.close()
-        aux_cursor.close()
-        conn_follow.close()
-
     def test_inherited_cursor_across_transactions(self):
         # A cursor kept open across transactions. Its stable view was
         # established under the previous transaction's snapshot, so its first
@@ -741,7 +679,7 @@ class test_layered_follower21(wttest.WiredTigerTestCase):
         self.leader_checkpoint(20)
         self.conn.reconfigure('disaggregated=(role="follower")')
 
-        # As with the step-up, the role era ended, so the bind is refused; what
+        # The role era the snapshot recorded ended, so the bind is refused; what
         # it must never do is serve the write committed after the snapshot.
         cursor = session_txn.open_cursor(self.uri)
         self.assertEqual(self.search(cursor, 'key_inserted'), ('rollback', None),

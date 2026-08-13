@@ -222,7 +222,8 @@ done:
 /*
  * __txn_snapshot_record_disagg --
  *     Record the disaggregated state a snapshot about to be built is consistent with: the role, the
- *     role-change generation, and (on a follower) the pinned checkpoint generation.
+ *     role-change generation, and (on an untimestamped follower snapshot) the pinned checkpoint
+ *     generation.
  */
 static WT_INLINE void
 __txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
@@ -244,11 +245,12 @@ __txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
       __wt_atomic_load_bool_acquire(&conn->layered_table_manager.leader);
 
     /*
-     * Only a follower pins a checkpoint: its stable binds compare against the pin. A leader's
-     * stable table is written with local transaction ids and needs no pin, and its own checkpoints
-     * advance the checkpoint generation, so pinning would rebuild every snapshot that overlaps a
-     * checkpoint completion. A snapshot from before a step-down is left unpinned and refused if it
-     * binds checkpoint content afterwards.
+     * Only an untimestamped follower snapshot pins a checkpoint: its stable binds compare against
+     * the pin. A leader's stable table is written with local transaction ids and needs no pin, and
+     * its own checkpoints advance the checkpoint generation, so pinning would rebuild every
+     * snapshot that overlaps a checkpoint completion. A timestamped reader stays consistent through
+     * the history store, so pinning would only defer adoptions behind it. A snapshot from before a
+     * step-down is left unpinned and refused if it binds checkpoint content afterwards.
      *
      * The checkpoint generation is the newest checkpoint delivered plus one, advanced when the
      * metadata arrives, even before its adoption completes: arrival implies its content is already
@@ -259,7 +261,7 @@ __txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
      * with a delivery's generation advance: a delivery either observes the pin published here, or
      * the validation after the build observes the delivery and retries.
      */
-    if (!session->txn->disagg_role_leader)
+    if (!F_ISSET(session->txn, WT_TXN_SHARED_TS_READ) && !session->txn->disagg_role_leader)
         __wt_session_gen_enter(session, WT_GEN_DISAGG_CKPT);
 }
 
@@ -280,6 +282,9 @@ __txn_snapshot_validate_disagg(WT_SESSION_IMPL *session)
         session->txn->disagg_role_leader)
         return (false);
     if (session->txn->disagg_role_leader)
+        return (true);
+    /* A timestamped reader pins no checkpoint, leaving nothing further to validate. */
+    if (__wt_session_gen(session, WT_GEN_DISAGG_CKPT) == 0)
         return (true);
     return (__wt_gen(session, WT_GEN_DISAGG_CKPT) == __wt_session_gen(session, WT_GEN_DISAGG_CKPT));
 }
@@ -309,11 +314,11 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
      * validate it afterwards, retrying the build on a change: the retried snapshot postdates the
      * change, so the transaction reads consistently instead of being refused at its first stable
      * open. Loading before and validating after brackets the snapshot, so it can never pin state
-     * that changed after it was built. Timestamped readers are excluded: they stay consistent
-     * through the history store regardless of which checkpoint they read.
+     * that changed after it was built. A timestamped reader records the role era only: the history
+     * store keeps it consistent across checkpoints, so it pins nothing, but layered operations
+     * still assert it does not span a step-up.
      */
-    record_disagg = update_shared_state && __wt_conn_is_disagg(session) &&
-      txn_shared->read_timestamp == WT_TS_NONE;
+    record_disagg = update_shared_state && __wt_conn_is_disagg(session);
 
     /* Fast path if we already have the current snapshot. */
     if ((snapshot_gen = __wt_session_gen(session, WT_GEN_HAS_SNAPSHOT)) != 0) {
@@ -467,11 +472,12 @@ __wt_txn_bump_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_snapshot_save_and_refresh --
- *     Save the existing snapshot and allocate a new snapshot.
+ * __wt_txn_snapshot_save --
+ *     Save the existing snapshot, leaving the transaction with a snapshot buffer of its own for the
+ *     caller to populate.
  */
 int
-__wt_txn_snapshot_save_and_refresh(WT_SESSION_IMPL *session)
+__wt_txn_snapshot_save(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     WT_TXN *txn;
@@ -490,9 +496,6 @@ __wt_txn_snapshot_save_and_refresh(WT_SESSION_IMPL *session)
     /* Swap the snapshot pointers. */
     __txn_swap_snapshot(&txn->snapshot_data.snapshot, &txn->backup_snapshot_data->snapshot);
 
-    /* Get the snapshot without publishing the shared ids. */
-    __wt_txn_bump_snapshot(session);
-
 err:
     /* Free the backup_snapshot_data if the memory allocation of the underlying snapshot has failed.
      */
@@ -500,6 +503,21 @@ err:
         __wt_free(session, txn->backup_snapshot_data);
 
     return (ret);
+}
+
+/*
+ * __wt_txn_snapshot_save_and_refresh --
+ *     Save the existing snapshot and allocate a new snapshot.
+ */
+int
+__wt_txn_snapshot_save_and_refresh(WT_SESSION_IMPL *session)
+{
+    WT_RET(__wt_txn_snapshot_save(session));
+
+    /* Get the snapshot without publishing the shared ids. */
+    __wt_txn_bump_snapshot(session);
+
+    return (0);
 }
 
 /*
