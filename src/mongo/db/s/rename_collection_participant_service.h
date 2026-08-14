@@ -59,6 +59,8 @@
 
 namespace mongo {
 
+struct RenameCollectionOptions;
+
 class RenameCollectionParticipantService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "RenameCollectionParticipantService"_sd;
@@ -155,6 +157,15 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
 
 private:
+    friend class RenameCollectionParticipantServiceTest;
+
+    static void _renameOrDropTarget(OperationContext* opCtx,
+                                    const NamespaceString& fromNss,
+                                    const NamespaceString& toNss,
+                                    const RenameCollectionOptions& options,
+                                    const UUID& sourceUUID,
+                                    const boost::optional<UUID>& targetUUID);
+
     RenameCollectionParticipantDocument _doc;
     const RenameCollectionRequest _request;
 
