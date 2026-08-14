@@ -24,6 +24,9 @@ filters:
   - "sbe*":
     approvers:
       - 10gen/query-execution-sbe
+  - "deferred_engine_ifr_plan_cache.js":
+    approvers:
+      - 10gen/query-execution
   - "match_expression_optimization_failpoint.js":
     approvers:
       - 10gen/query-optimization
