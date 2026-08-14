@@ -43,6 +43,8 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db:metrics_filtering_util",
+        "//src/mongo/db:metrics_policy_manager",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
         "//src/mongo/util:buildinfo",

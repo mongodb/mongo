@@ -5,6 +5,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/buildinfo.h"
 
@@ -64,7 +65,15 @@ BuildInfo CmdBuildInfoCommon::Invocation::typedRun(OperationContext* opCtx) {
     invariant(mode == BuildInfoAuthModeEnum::kRequiresAuth ||
               mode == BuildInfoAuthModeEnum::kAllowedPreAuth ||
               mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth);
-    return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
+    auto info = checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
+    if (auto&& mgr = MetricsPolicyManager::get(opCtx);
+        mgr.requiresFiltering(opCtx, MetricsCategoryEnum::kBuildInfo, /*forceFiltered=*/false)) {
+        BSONObjBuilder bob;
+        metrics_filtering_util::appendPaths(
+            bob, info.toBSON(), mgr.getAllowlistMatcher(MetricsCategoryEnum::kBuildInfo));
+        info = BuildInfo::parseOwned(bob.obj());
+    }
+    return info;
 }
 
 }  // namespace mongo

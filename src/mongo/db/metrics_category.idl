@@ -14,3 +14,4 @@ enums:
             kReplSetGetStatus: "replSetGetStatus"
             kCollStats: "collStats"
             kDbStats: "dbStats"
+            kBuildInfo: "buildInfo"
