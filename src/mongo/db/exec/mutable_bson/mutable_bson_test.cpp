@@ -3478,4 +3478,75 @@ DEATH_TEST_REGEX(MutableBsonSerialize, PoisonDocument, "Invariant failure") {
     doc.getObject();
 }
 
+// Builds an object whose only element claims a size that makes it end exactly at the end of the
+// buffer, swallowing the byte a well-formed object reserves for its terminal EOO.
+//
+// When an element's rep is created, only where the element *begins* is validated, so nothing
+// rejects an element whose claimed extent reaches exactly to objsize. The address
+// resolveRightSibling() then derives for the next element, 'elt.rawdata() + elt.size()', is one
+// byte past the end of the buffer, which its bound check rejects.
+//
+// The allocation carries one spare trailing byte set to zero. The BSONObj still reports the smaller
+// objsize from its header, so that byte lies outside the object while remaining inside the
+// allocation, which makes the byte read past the end deterministic rather than being whatever the
+// allocator happened to leave there. Without the bound check in resolveRightSibling(), the
+// BSONElement constructed at that address would look like a terminal EOO, the '!rightElt.eoo()'
+// early exit would be taken, and the walk would report "no right sibling" with the corruption
+// entirely unreported.
+BSONObj makeObjWithElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << "x");
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    // Layout: [int32 objsize][0x02 type]['a', 0x00][int32 strlen]['x', 0x00][EOO]
+    // Growing 'strlen' by one makes the string absorb the terminal EOO.
+    constexpr int kStrLenOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 1, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
+// Documents the arithmetic above, so a later change to BSON's layout or to the corruption cannot
+// silently stop exercising the intended path.
+TEST(MutableBsonOutOfBounds, ElementEndingAtBufferEndIsAcceptedAtRepCreation) {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+    const BSONElement elt = poison.firstElement();
+
+    const auto offset = elt.rawdata() - poison.objdata();
+    ASSERT_EQ(offset, 4);
+    // The element begins inside the object, which is all that rep creation validates; its claimed
+    // extent swallowing the terminal EOO is not detectable from the start position alone.
+    ASSERT_EQ(offset + elt.size(), poison.objsize());
+    // Yet the address resolveRightSibling() derives is outside the object.
+    ASSERT_EQ(elt.rawdata() + elt.size(), poison.objdata() + poison.objsize());
+}
+
+// Guards against the bound checks being written so that they reject a legitimate walk ending on the
+// terminal EOO, which is how every rightward walk terminates.
+TEST(MutableBsonOutOfBounds, WalkToTerminalEooIsStillAllowed) {
+    BSONObj valid = BSON("a" << "x" << "b" << "y");
+
+    mmb::Document doc(valid);
+    int seen = 0;
+    for (auto child = doc.root().leftChild(); child.ok(); child = child.rightSibling()) {
+        ++seen;
+    }
+    ASSERT_EQ(seen, 2);
+}
+
+// Check for the exact message in resolveRightSibling().
+DEATH_TEST_REGEX(MutableBsonOutOfBoundsDeath,
+                 RightSiblingBoundCheckCatchesReadPastEndOfBuffer,
+                 "right sibling begins outside its backing BSONObj") {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto child = doc.root().leftChild();
+    ASSERT_TRUE(child.ok());
+    child.rightSibling();
+}
+
 }  // namespace

@@ -496,11 +496,11 @@ TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsElementOverrunningO
 
 DEATH_TEST_REGEX(ExpressUpdateMalformedRecord,
                  MalformedFetchedRecordTripsUpdateInPlaceInvariant,
-                 R"(offset \+ elementSize <= object\.objsize\(\))") {
+                 "mutable bson right sibling begins outside its backing BSONObj") {
     // Deterministic repro of the crash: a record whose string element length overruns objsize (as
-    // from a torn disagg page read) trips the getElementOffset() invariant once the update
-    // machinery builds an in-place mutablebson::Document over it. The boundary validation added in
-    // this change (see the AssertFetchedRecordIsValidBson* tests) rejects it before this point.
+    // from a torn disagg page read) trips a mutablebson bound check once the update machinery
+    // builds an in-place mutablebson::Document over it. The corrupt extent is detected in
+    // resolveRightSibling(), at the point where an address is first derived from the bad size.
     BSONObj obj = BSON("a" << "hello");
 
     auto buffer = std::make_unique<char[]>(obj.objsize());

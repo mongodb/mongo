@@ -519,19 +519,13 @@ uint32_t getElementOffset(const BSONObj& object, const BSONElement& elt) {
     // allocation to be properly defined.
     //
     // Ensure that 0 < element size, that the element pointer is bounded on the left by the
-    // object pointer, and that the end of the element is bounded on the right by the end of the
-    // object (according to the element's and object's sizes). Writing 'offset + elementSize <=
-    // objsize' in ptrdiff_t subsumes the size check and avoids signed overflow. When the element
-    // and object size are both 32-bit, this invariant also guarantees that the offset
-    // (elt.rawdata() - object.objdata()) is within the bounds of a uint32_t.
-    //
-    // Because this function is on the hot path of some important workloads, we group all checks
-    // into a single invariant call. The offset and element size are hoisted out of the return
-    // statement.
+    // object pointer, and that the end of the element is bounded on the right by the object's
+    // terminal EOO, hence the strict upper comparison. Writing 'offset + elementSize < objsize'
+    // in ptrdiff_t subsumes the size check and avoids signed overflow.
     const auto offset = elt.rawdata() - object.objdata();
     const int elementSize = elt.size();
     invariant(!elt.eoo() && elementSize > 0 && offset > 0 &&
-              offset + elementSize <= object.objsize());
+              offset + elementSize < object.objsize());
 
     return static_cast<uint32_t>(offset);
 }
@@ -800,9 +794,27 @@ public:
 
         // It should be impossible to have an opaque left child and be non-serialized,
         dassert(rep->serialized);
-        BSONElement childElt =
-            (hasValue(*rep) ? getSerializedElement(*rep).embeddedObject() : getObject(rep->objIdx))
-                .firstElement();
+
+        int64_t thisObjectOffset;
+        if (hasValue(*rep)) {
+            BSONElement thisElement = getSerializedElement(*rep);
+            tassert(
+                13324400, "Cannot resolve child on non-object element", thisElement.isABSONObj());
+
+            // The offset of the embedded object is the offset of the wrapping element, plus the
+            // size of its field name, plus the size of the type byte.
+            thisObjectOffset = static_cast<int64_t>(rep->offset) + thisElement.fieldNameSize() + 1;
+        } else {
+            // The element referenced by 'index' is the root object and lives at offset 0 of its
+            // underlying 'BSONObj' data.
+            thisObjectOffset = 0;
+        }
+
+        // The first child of an object is always exactly 4 bytes after the start of the object.
+        const int64_t childOffset = thisObjectOffset + 4;
+        invariant(childOffset < getObject(rep->objIdx).objsize(),
+                  "mutable bson child begins outside its backing BSONObj");
+        BSONElement childElt(getObject(rep->objIdx).objdata() + childOffset);
 
         if (!childElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing
@@ -817,7 +829,7 @@ public:
 
             newRep.serialized = true;
             newRep.objIdx = rep->objIdx;
-            newRep.offset = getElementOffset(getObject(rep->objIdx), childElt);
+            newRep.offset = static_cast<uint32_t>(childOffset);
             newRep.parent = index;
             newRep.sibling.right = Element::kOpaqueRepIdx;
             // If this new object has possible substructure, mark its children as opaque.
@@ -873,7 +885,16 @@ public:
             return rep->sibling.right;
 
         BSONElement elt = getSerializedElement(*rep);
-        BSONElement rightElt(elt.rawdata() + elt.size());
+
+        // Bound the next element's offset before constructing a BSONElement at it: the BSONElement
+        // constructor scans forward for the field name's NUL terminator, so it must not be handed a
+        // pointer outside the buffer.
+        const BSONObj& backing = getObject(rep->objIdx);
+        const int64_t nextOffset = static_cast<int64_t>(rep->offset) + elt.size();
+        invariant(nextOffset > 0 && nextOffset < backing.objsize(),
+                  "mutable bson right sibling begins outside its backing BSONObj");
+
+        BSONElement rightElt(backing.objdata() + nextOffset);
 
         if (!rightElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing
@@ -888,7 +909,7 @@ public:
 
             newRep.serialized = true;
             newRep.objIdx = rep->objIdx;
-            newRep.offset = getElementOffset(getObject(rep->objIdx), rightElt);
+            newRep.offset = static_cast<uint32_t>(nextOffset);
             newRep.parent = rep->parent;
             newRep.sibling.left = index;
             newRep.sibling.right = Element::kOpaqueRepIdx;
