@@ -27,6 +27,7 @@
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/write_conflict_backoff.h"
 #include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
@@ -330,8 +331,8 @@ void PlanExecutorImpl::logWriteConflictAndBackoff(size_t numAttempts) {
     if (MONGO_unlikely(planExecutorHangBeforeLogAndBackoff.shouldFail())) {
         planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
     }
-    mongo::logWriteConflictAndBackoff(
-        numAttempts, "plan execution", ""sv, NamespaceStringOrUUID(_nss));
+    write_conflict_backoff::logAndBackoff(
+        _opCtx, numAttempts, "plan execution", ""sv, NamespaceStringOrUUID(_nss));
 }
 
 /**
@@ -663,8 +664,13 @@ void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
             // Defer the logAndBackoff() call to the yield handler.
             _writeConflictsInARowToLog = retryState.writeConflictsInARow;
         } else {
-            // Do the log and backoff immediately, while we're holding the ticket.
-            logWriteConflictAndBackoff(retryState.writeConflictsInARow);
+            // Log and backoff immediately, while holding the ticket. Use the legacy stepped
+            // schedule here: the exponential ramp sleeps up to ~2x capMs, far too long to
+            // hold a ticket through.
+            mongo::logWriteConflictAndBackoff(retryState.writeConflictsInARow,
+                                              "plan execution",
+                                              ""sv,
+                                              NamespaceStringOrUUID(_nss));
         }
     }
 
