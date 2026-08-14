@@ -15,6 +15,12 @@ sbe::value::Path toPath(const T& fullPath) {
     sbe::value::Path ret;
 
     FieldPath fieldPath{fullPath};
+    size_t reserveSize = 1;
+    if (fieldPath.getPathLength() > 0) {
+        reserveSize += 2 * (fieldPath.getPathLength() - 1) + 1;
+    }
+    ret.reserve(reserveSize);
+
     for (size_t i = 0; i < fieldPath.getPathLength() - 1; ++i) {
         ret.emplace_back(sbe::value::Get{.field = std::string(fieldPath.getFieldName(i))});
         ret.emplace_back(sbe::value::Traverse{});
@@ -118,7 +124,6 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
         return boost::none;
     }
 
-    auto childStageOutputsData = childStageOutputs.getSlotNameToIdMap();
     for (const std::string& pathExpr : extractFieldPathsReqs.getPathExprs()) {
         FieldPath fieldPath{pathExpr};
         tassert(11163705,
@@ -130,15 +135,18 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
     return boost::make_optional(extractFieldPathsReqs);
 }
 
-std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
-                                                          StageBuilderState& state,
-                                                          const PlanStageSlots& childStageOutputs,
-                                                          PlanStageReqs& extractFieldPathsReqs,
-                                                          const PlanNodeId nodeId) {
+std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(
+    SbStage stage,
+    StageBuilderState& state,
+    const PlanStageSlots& childStageOutputs,
+    const PlanStageReqs& extractFieldPathsReqs,
+    const PlanNodeId nodeId) {
     std::vector<std::pair<sbe::value::Path, sbe::value::SlotId>> outputs;
+    const auto& pathExprs = extractFieldPathsReqs.getPathExprs();
+    outputs.reserve(pathExprs.size());
 
     PlanStageSlots extractionOutputs;
-    for (const std::string& fullPath : extractFieldPathsReqs.getPathExprs()) {
+    for (const std::string& fullPath : pathExprs) {
         FieldPath fieldPath{fullPath};
         tassert(11087200,
                 "extract_field_paths does not extract toplevel fields that already have slots",
@@ -161,12 +169,13 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
         tassert(11163701,
                 "Expected only toplevel paths as input to extract_field_paths stage",
                 path.size() == 2);
-        std::pair<sbe::value::Path, sbe::value::SlotId> input = {path, p.second.getId()};
-        inputs.push_back(input);
+        std::pair<sbe::value::Path, sbe::value::SlotId> input = {std::move(path), p.second.getId()};
+        inputs.push_back(std::move(input));
     }
     tassert(11163700, "Expected nonempty inputs", !inputs.empty());
 
-    return {sbe::makeS<sbe::ExtractFieldPathsStage>(std::move(stage), inputs, outputs, nodeId),
-            extractionOutputs};
+    return {sbe::makeS<sbe::ExtractFieldPathsStage>(
+                std::move(stage), std::move(inputs), std::move(outputs), nodeId),
+            std::move(extractionOutputs)};
 }
 }  // namespace mongo::stage_builder
