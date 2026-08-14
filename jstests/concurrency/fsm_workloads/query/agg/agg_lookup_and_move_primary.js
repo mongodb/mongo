@@ -186,43 +186,67 @@ export const $config = (function () {
             }
         }
 
+        // TODO(SERVER-133444): The setup of the test was re-written to make it idempotent in order
+        // to not end up with multiple collections or too many items in them in case of transitioning
+        // error occurring in the setup while executing the test add_remove_shards suite and retrying it
+        // according to fsm runner logic. However we should revisit this decision considering solving
+        // the problem at the root rewriting fsm runner workflow.
+
         // Load local collection data.
         {
-            createRandomCollectionType(this.localCollName);
-
-            const bulk = db[this.localCollName].initializeUnorderedBulkOp();
-            for (let i = 0; i < this.numDocs; ++i) {
-                bulk.insert({_id: i, x: i});
+            const exists = db.getCollectionNames().includes(this.localCollName);
+            if (!exists) {
+                createRandomCollectionType(this.localCollName);
             }
-            const res = bulk.execute();
-            assert.commandWorked(res);
-            assert.eq(this.numDocs, res.nInserted);
+
+            const curNumDocs = db[this.localCollName].countDocuments({});
+            if (curNumDocs < this.numDocs) {
+                const bulk = db[this.localCollName].initializeUnorderedBulkOp();
+                for (let i = curNumDocs; i < this.numDocs; ++i) {
+                    bulk.insert({_id: i, x: i});
+                }
+                const res = bulk.execute();
+                assert.commandWorked(res);
+                assert.eq(this.numDocs - curNumDocs, res.nInserted);
+            }
         }
 
         // Load foreign collection data.
         {
-            createRandomCollectionType(this.foreignColl1Name);
-
-            const bulk = db[this.foreignColl1Name].initializeUnorderedBulkOp();
-            for (let i = 0; i < this.numDocs; ++i) {
-                bulk.insert({_id: i, y: i});
+            const exists = db.getCollectionNames().includes(this.foreignColl1Name);
+            if (!exists) {
+                createRandomCollectionType(this.foreignColl1Name);
             }
-            const res = bulk.execute();
-            assert.commandWorked(res);
-            assert.eq(this.numDocs, res.nInserted);
+
+            const curNumDocs = db[this.foreignColl1Name].countDocuments({});
+            if (curNumDocs < this.numDocs) {
+                const bulk = db[this.foreignColl1Name].initializeUnorderedBulkOp();
+                for (let i = curNumDocs; i < this.numDocs; ++i) {
+                    bulk.insert({_id: i, y: i});
+                }
+                const res = bulk.execute();
+                assert.commandWorked(res);
+                assert.eq(this.numDocs - curNumDocs, res.nInserted);
+            }
         }
 
         // Load foreign collection 2 data.
         {
-            createRandomCollectionType(this.foreignColl2Name);
-
-            const bulk = db[this.foreignColl2Name].initializeUnorderedBulkOp();
-            for (let i = 0; i < this.numDocs; ++i) {
-                bulk.insert({_id: i, z: i});
+            const exists = db.getCollectionNames().includes(this.foreignColl2Name);
+            if (!exists) {
+                createRandomCollectionType(this.foreignColl2Name);
             }
-            const res = bulk.execute();
-            assert.commandWorked(res);
-            assert.eq(this.numDocs, res.nInserted);
+
+            const curNumDocs = db[this.foreignColl2Name].countDocuments({});
+            if (curNumDocs < this.numDocs) {
+                const bulk = db[this.foreignColl2Name].initializeUnorderedBulkOp();
+                for (let i = curNumDocs; i < this.numDocs; ++i) {
+                    bulk.insert({_id: i, z: i});
+                }
+                const res = bulk.execute();
+                assert.commandWorked(res);
+                assert.eq(this.numDocs - curNumDocs, res.nInserted);
+            }
         }
     }
 

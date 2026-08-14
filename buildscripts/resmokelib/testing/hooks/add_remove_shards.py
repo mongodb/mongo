@@ -40,6 +40,13 @@ from buildscripts.resmokelib.utils import version_comparison
 TRANSITION_INTERVALS = [10]
 
 
+class IdleRequestReceived(errors.ResmokeError):
+    """Exception raised when idle request was sent from resmoke runner.
+    Should lead to shutdown of the hook."""
+
+    pass
+
+
 class ContinuousAddRemoveShard(interface.Hook):
     DESCRIPTION = (
         "Continuously adds and removes shards at regular intervals. If running with configsvr "
@@ -273,6 +280,11 @@ class _AddRemoveShardThread(threading.Thread):
         if not self._add_remove_random_shards:
             return "config", None
 
+        # If the previous round was interrupted mid-drain by an idle request, pick the same shard for draining
+        draining_shard = self._find_draining_shard()
+        if draining_shard is not None:
+            return draining_shard["_id"], draining_shard["host"]
+
         # If running with both config transitions and random shard add/removals, pick any shard
         # including the config shard. Otherwise, pick any shard that is not the config shard.
         shard_to_remove_and_add = (
@@ -281,6 +293,13 @@ class _AddRemoveShardThread(threading.Thread):
             else self._get_other_shard_info("config")
         )
         return shard_to_remove_and_add["_id"], shard_to_remove_and_add["host"]
+
+    def _find_draining_shard(self):
+        res = self._client.admin.command({"listShards": 1})
+        for shard in res["shards"]:
+            if shard.get("draining", False):
+                return shard
+        return None
 
     def run(self):
         try:
@@ -305,7 +324,12 @@ class _AddRemoveShardThread(threading.Thread):
                 self.logger.info(f"Waiting {wait_secs} seconds before " + msg)
                 self.__lifecycle.wait_for_action_interval(wait_secs)
 
-                self._transition_to_dedicated_or_remove_shard(shard_id)
+                # If the transitioning was interrupted by idle request, finish the run immediately
+                # skipping decommissioning the shard and post remove shard checks
+                try:
+                    self._transition_to_dedicated_or_remove_shard(shard_id)
+                except IdleRequestReceived:
+                    continue
 
                 shard_obj = None
                 removed_shard_fixture = None
@@ -838,6 +862,12 @@ class _AddRemoveShardThread(threading.Thread):
                 )
             )
 
+        # If resmoke runner has requested the hook to go idle while draining or moving,
+        # the hook needs to send acknowledgement immediately and shut down.
+        if self.__lifecycle.poll_for_idle_request():
+            self.__lifecycle.send_idle_acknowledgement()
+            raise IdleRequestReceived()
+
         self._handle_stalled_sharded_collections(sharded_colls, source)
 
         # If random balancing is on, the balancer will also move unsharded collections (both tracked
@@ -1100,6 +1130,7 @@ class _AddRemoveShardThread(threading.Thread):
             POLL_AND_DRAIN          SHARD_NOT_FOUND                         HANDLE_SHARD_NOT_FOUND
             HANDLE_SHARD_NOT_FOUND  listShards confirms shard absent        DONE
             HANDLE_SHARD_NOT_FOUND  listShards shows shard still present    POLL_AND_DRAIN (retry; possible failover artifact)
+            any                     receive idle request                    throws an IdleRequestReceived exception (and shuts down the hook immediately)
             any                     unrecognized error                      propagates
 
         Retryable errors (classified by `_is_retryable_add_remove_shard_error()`) do not change
@@ -1293,6 +1324,7 @@ class _AddRemoveShardThread(threading.Thread):
             DRAIN_COMPLETE          SHARD_NOT_FOUND                         HANDLE_SHARD_NOT_FOUND
             HANDLE_SHARD_NOT_FOUND  listShards confirms shard absent        DONE
             HANDLE_SHARD_NOT_FOUND  listShards shows shard still present    NOT_STARTED (retry; possible failover artifact)
+            any                     receive idle request                    throws an IdleRequestReceived exception (and shuts down the hook immediately)
             any                     unrecognized error                      propagates
 
         (*) Re-enters the same state; tenacity's exponential back-off gives the cluster time to
