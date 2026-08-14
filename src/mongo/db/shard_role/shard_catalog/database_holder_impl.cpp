@@ -27,6 +27,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -287,7 +288,17 @@ DatabaseHolderImpl::DBsIndex::NormalizedDatabaseName DatabaseHolderImpl::DBsInde
     const DatabaseName& dbName) {
     // Case-fold the UTF-8 string using Unicode rules so that names differing only in case
     // (including non-ASCII characters) map to the same key.
-    return icuCaseFold(dbName.toStringForResourceId());
+    const auto name = dbName.toStringForResourceId();
+    try {
+        return icuCaseFold(name);
+    } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+        LOGV2_ERROR(11379210,
+                    "The database name is not valid UTF-8",
+                    logAttrs(dbName),
+                    "databaseNameBytes"_attr = hexblob::encode(name),
+                    "error"_attr = redact(ex));
+        throw;
+    }
 }
 
 const DatabaseHolderImpl::DBsIndex::DBs& DatabaseHolderImpl::DBsIndex::viewAll() const {

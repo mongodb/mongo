@@ -519,6 +519,47 @@ export let rewriteCatalogTable = function (conn, modifyCatalogEntry) {
 };
 
 /**
+ * Like 'rewriteCatalogTable', but invokes 'modifyHexLine' with the raw hex encoding of each catalog
+ * entry, and writes back whatever it returns. Use this instead of 'rewriteCatalogTable' when the
+ * modification cannot round-trip through BSON in the shell, such as writing bytes that are not
+ * valid UTF-8: the shell re-encodes JS strings as well-formed UTF-8, so assigning them to a field
+ * silently loses the invalid bytes.
+ */
+export let rewriteCatalogTableHex = function (conn, modifyHexLine) {
+    const uri = "_mdb_catalog";
+    const fullURI = "table:" + uri;
+
+    const separator = _isWindows() ? "\\" : "/";
+    const tempDumpFile = conn.dbpath + separator + "temp_dump";
+    const newTableFile = conn.dbpath + separator + "new_table_file" + count++;
+    runWiredTigerTool(
+        "-h",
+        conn.dbpath,
+        "-r",
+        "-C",
+        "log=(compressor=snappy,path=journal)",
+        "dump",
+        "-x",
+        "-f",
+        tempDumpFile,
+        fullURI,
+    );
+
+    let lines = cat(tempDumpFile).split("\n");
+
+    // Each record takes two lines with a key and a value. We will only modify the values.
+    for (let i = wtHeaderLines; i < lines.length; i += 2) {
+        lines[i] = modifyHexLine(lines[i]);
+    }
+
+    writeFile(newTableFile, lines.join("\n"));
+
+    runWiredTigerTool("-h", conn.dbpath, "alter", fullURI, "write_timestamp_usage=never");
+    runWiredTigerTool("-h", conn.dbpath, "load", "-f", newTableFile, "-r", uri);
+    runWiredTigerTool("-h", conn.dbpath, "alter", fullURI, "write_timestamp_usage=none");
+};
+
+/**
  * Extracts KV record lines from a WiredTiger dump output.
  */
 export function wtExtractRecordsFromDump(lines) {

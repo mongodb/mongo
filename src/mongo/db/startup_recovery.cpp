@@ -68,6 +68,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/quick_exit.h"
@@ -110,6 +111,28 @@ bool isWriteableStorageEngine() {
     return storageGlobalParams.engine != "devnull";
 }
 
+/**
+ * Opens a database during startup, attributing failures to the database being opened.
+ */
+Database* openDbDuringStartup(OperationContext* opCtx,
+                              const DatabaseName& dbName,
+                              DatabaseHolder* databaseHolder = nullptr) try {
+    if (!databaseHolder) {
+        databaseHolder = DatabaseHolder::get(opCtx);
+    }
+    return databaseHolder->openDb(opCtx, dbName);
+} catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+    const auto name = dbName.toStringForResourceId();
+    LOGV2_ERROR(13340100,
+                "Failed to open database during startup. If the database name is reported as not "
+                "being valid, the durable catalog is likely corrupt and the deployment should be "
+                "restored from a backup",
+                logAttrs(dbName),
+                "databaseNameBytes"_attr = hexblob::encode(name),
+                "error"_attr = redact(ex));
+    throw;
+}
+
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
 // The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
 // this function into one single builder that records the time elapsed during startup. Its default
@@ -125,7 +148,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
     if (!db) {
         LOGV2(20998, "Re-creating admin database that was dropped.");
     }
-    db = databaseHolder->openDb(opCtx, fcvNss.dbName());
+    db = openDbDuringStartup(opCtx, fcvNss.dbName(), databaseHolder);
     invariant(db);
 
     // If the server configuration collection, which contains the FCV document, does not exist, then
@@ -313,7 +336,7 @@ void openDatabases(OperationContext* opCtx, Func&& onDatabase) {
     auto dbNames = catalog::listDatabases();
     for (const auto& dbName : dbNames) {
         LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
-        auto db = databaseHolder->openDb(opCtx, dbName);
+        auto db = openDbDuringStartup(opCtx, dbName, databaseHolder);
         invariant(db);
         onDatabase(db->name());
     }
@@ -323,14 +346,12 @@ void openDatabases(OperationContext* opCtx, Func&& onDatabase) {
  * Returns 'true' if this server has a configuration document in local.system.replset.
  */
 bool hasReplSetConfigDoc(OperationContext* opCtx) {
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-
     // We open the "local" database before reading to ensure the in-memory catalog entries for the
     // 'kSystemReplSetNamespace' collection have been populated if the collection exists. If the
     // "local" database doesn't exist at this point yet, then it will be created.
     const auto nss = NamespaceString::kSystemReplSetNamespace;
 
-    databaseHolder->openDb(opCtx, nss.dbName());
+    openDbDuringStartup(opCtx, nss.dbName());
     BSONObj config;
     return Helpers::getSingleton(opCtx, nss, config);
 }
@@ -649,12 +670,10 @@ void startupRepair(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     if (auto fcvColl = catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-
         SectionScopedTimer scopedTimer(svcCtx->getFastClockSource(),
                                        TimedSectionId::repairServerConfigNamespace,
                                        startupTimeElapsedBuilder);
-        databaseHolder->openDb(opCtx, fcvColl->ns().dbName());
+        openDbDuringStartup(opCtx, fcvColl->ns().dbName());
         fassertNoTrace(4805000,
                        repair::repairCollection(
                            opCtx, storageEngine, NamespaceString::kServerConfigurationNamespace));
@@ -822,7 +841,7 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
-        databaseHolder->openDb(opCtx, dbName);
+        openDbDuringStartup(opCtx, dbName, databaseHolder);
     }
 
     SingleProducerMultiConsumerQueue<NamespaceString> queue{
@@ -967,7 +986,6 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
 
     OfflineValidateResults offlineValidateResults;
 
-    auto databaseHolder = DatabaseHolder::get(opCtx);
     const auto dbNames = std::invoke([opCtx]() -> std::vector<DatabaseName> {
         if (gValidateDbName.empty()) {
             return CollectionCatalog::get(opCtx)->getAllDbNames();
@@ -978,8 +996,9 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
             gValidateDbName.data(),
             SerializationContext(SerializationContext::Source::Catalog))};
     });
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     for (const auto& dbName : dbNames) {
-        databaseHolder->openDb(opCtx, dbName);
+        openDbDuringStartup(opCtx, dbName, databaseHolder);
     }
     for (const auto& dbName : dbNames) {
         const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
