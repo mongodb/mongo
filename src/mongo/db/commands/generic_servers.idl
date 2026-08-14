@@ -40,12 +40,24 @@ structs:
             memSizeMB: long
             memLimitMB: long
             numCores: int
-            numCoresAvailableToProcess: int
-            numPhysicalCores: int
-            numCpuSockets: int
-            cpuArch: string
-            numaEnabled: bool
-            numNumaNodes: int
+            numCoresAvailableToProcess:
+                type: int
+                optional: true
+            numPhysicalCores:
+                type: int
+                optional: true
+            numCpuSockets:
+                type: int
+                optional: true
+            cpuArch:
+                type: string
+                optional: true
+            numaEnabled:
+                type: bool
+                optional: true
+            numNumaNodes:
+                type: int
+                optional: true
 
     hostInfoOsReply:
         description: "hostInfo.os reply fields"
@@ -59,12 +71,15 @@ structs:
         is_command_reply: true
         fields:
             system: hostInfoSystemReply
-            os: hostInfoOsReply
+            os:
+                type: hostInfoOsReply
+                optional: true
 
             # extra is operating system specific
             extra:
                 description: "Extra system information from ProcessInfo"
                 type: object
+                optional: true
 
     getCmdLineOptsReply:
         description: "Command line options as passed to the server executable on startup"

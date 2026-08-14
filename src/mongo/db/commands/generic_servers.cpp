@@ -17,6 +17,8 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -196,6 +198,18 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     BSONObjBuilder extra;
     p.appendSystemDetails(extra);
     reply.setExtra(extra.obj());
+
+    auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+    bool requireFiltering = metricsPolicyManager.requiresFiltering(
+        opCtx, MetricsCategoryEnum::kHostInfo, /*forceFiltered=*/false);
+
+    if (requireFiltering) {
+        const auto& matcher =
+            metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kHostInfo);
+        BSONObjBuilder bob;
+        metrics_filtering_util::appendPaths(bob, reply.toBSON(), matcher);
+        reply = HostInfoReply::parseOwned(bob.obj());
+    }
 
     return reply;
 }
