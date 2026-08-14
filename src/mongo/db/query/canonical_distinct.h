@@ -36,19 +36,22 @@ public:
                       bool mirrored = false,
                       boost::optional<UUID> sampleId = boost::none,
                       boost::optional<BSONObj> projSpec = boost::none,
-                      bool flipDistinctScanDirection = false)
+                      bool flipDistinctScanDirection = false,
+                      bool unwindsArrays = false)
         : _key(std::move(key)),
           _mirrored(mirrored),
           _sampleId(std::move(sampleId)),
           _projSpec(std::move(projSpec)),
-          _flipDistinctScanDirection(flipDistinctScanDirection) {}
+          _flipDistinctScanDirection(flipDistinctScanDirection),
+          _unwindsArrays(unwindsArrays) {}
 
     CanonicalDistinct(const CanonicalDistinct& other)
         : _key(other.getKey()),
           _mirrored(other.isMirrored()),
           _sampleId(other.getSampleId()),
           _projSpec(other.getProjectionSpec()),
-          _flipDistinctScanDirection(other.isDistinctScanDirectionFlipped()) {
+          _flipDistinctScanDirection(other.isDistinctScanDirectionFlipped()),
+          _unwindsArrays(other.unwindsArrays()) {
         setSortRequirement(other.getSortRequirement());
     }
 
@@ -76,6 +79,10 @@ public:
 
     bool isDistinctScanDirectionFlipped() const {
         return _flipDistinctScanDirection;
+    }
+
+    bool unwindsArrays() const {
+        return _unwindsArrays;
     }
 
     void setRewrittenGroupStage(
@@ -121,6 +128,10 @@ private:
     // preserve the semantics of the query.
     // TODO SERVER-94369: Remove this and rely entirely on '_sortRequirement'.
     bool _flipDistinctScanDirection{false};
+
+    // When set to true, signals that we are a processing a $unwind+$group query, which means that
+    // DISTINCT_SCAN may enumerate each multikey index entry as its own value.
+    bool _unwindsArrays{false};
 
     // When the aggreation rewriting is successful and the multiplanning generates a DISTINCT_SCAN,
     // we need to do the last modifications to the pipeline to be compatible with the DISTINCT_SCAN.

@@ -457,6 +457,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.scanDirection = dn->direction;
                 params.bounds = dn->bounds;
                 params.fieldNo = dn->fieldNo;
+                params.unwindsArrays = dn->unwindsArrays;
                 return std::make_unique<DistinctScan>(expCtx,
                                                       _collection,
                                                       std::move(params),

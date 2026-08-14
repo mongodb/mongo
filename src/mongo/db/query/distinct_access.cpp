@@ -27,12 +27,16 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
+                                bool unwindsArrays,
                                 const OrderedPathSet& projectionFields,
                                 bool hasSort) {
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // either unwinds arrays and treats each element in an array as its own key or ignores missing
-    // fields.
-    const bool mayUnwindArraysOrIgnoreMissing = !strictDistinctOnly;
+    // ignores missing fields.
+    const bool mayIgnoreMissing = !strictDistinctOnly;
+    // A plan which treats each element in an array as its own key may be chosen when the caller
+    // did not request a "strict" distinct scan or when we know we are unwinding on the distinct
+    // field.
+    const bool mayUnwindArrays = !strictDistinctOnly || unwindsArrays;
 
     if (keyPattern.hasField(field)) {
         // This handles regular fields of Compound Wildcard Indexes as well.
@@ -50,11 +54,11 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
         }
 
         // If we do not want to ignore missing fields then we cannot use a sparse index.
-        if (!mayUnwindArraysOrIgnoreMissing && sparse) {
+        if (!mayIgnoreMissing && sparse) {
             return false;
         }
 
-        if (!mayUnwindArraysOrIgnoreMissing &&
+        if (!mayUnwindArrays &&
             isAnyComponentOfPathOrProjectionMultikey(
                 keyPattern, multikey, multikeyPaths, field, projectionFields, hasSort)) {
             // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
@@ -92,6 +96,7 @@ projection_executor::ProjectionExecutor* getWildcardProjectionExecutor(const Ind
     return index.indexPathProjection->exec();
 }
 
+
 /**
  * Check if an index is suitable for the DISTINCT_SCAN transition. The function represents the
  * extracted condition used by `getIndexEntriesForDistinct()` which generates all the suitable
@@ -103,7 +108,8 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
-                                bool hasSort) {
+                                bool hasSort,
+                                bool unwindsArrays) {
     return isIndexSuitableForDistinct(index.keyPattern,
                                       index.multikey,
                                       index.multikeyPaths,
@@ -113,6 +119,7 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
                                       filter,
                                       flipDistinctScanDirection,
                                       strictDistinctOnly,
+                                      unwindsArrays,
                                       projectionFields,
                                       hasSort);
 }
@@ -195,6 +202,7 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           bool flipDistinctScanDirection,
                           bool strictDistinctOnly,
                           bool hasSort,
+                          bool unwindsArrays,
                           size_t* indexOut) {
     tassert(951520, "indexOut must be initialized", indexOut);
     size_t minIndexFields = Ordering::kMaxCompoundIndexKeys + 1;
@@ -207,7 +215,8 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                                         {} /*filter*/,
                                         flipDistinctScanDirection,
                                         strictDistinctOnly,
-                                        hasSort)) {
+                                        hasSort,
+                                        unwindsArrays)) {
             continue;
         }
         if (isAFullIndexScanPreferable(indices[i], key, collator)) {
@@ -251,6 +260,7 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
                              strictDistinctOnly,
                              canonicalQuery.getDistinct()->getSortRequirement().has_value() ||
                                  canonicalQuery.getSortPattern(),
+                             canonicalDistinct.unwindsArrays(),
                              &distinctNodeIndex)) {
         // Hand-construct a distinct scan plan. Note that this is not a valid plan yet.
         // 'analyzeDataAccess()' will add additional stages as needed and call
@@ -263,6 +273,13 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
             dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
         dn->queryCollator = collator;
         dn->fieldNo = 0;
+        dn->unwindsArrays = canonicalDistinct.unwindsArrays();
+        if (dn->unwindsArrays && Ordering::make(dn->index.keyPattern).get(dn->fieldNo) < 0) {
+            // The DISTINCT_SCAN stage requires ascending keys for '_replaceUndefinedWithNull', so
+            // we need to scan a descending index backwards.
+            dn->direction = -1;
+            dn->bounds = dn->bounds.reverse();
+        }
 
         // An index with a non-simple collation requires a FETCH stage.
         std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
@@ -460,6 +477,14 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
     // ensure it is provided by the index.
     const bool hasSortRequirement = canonicalQuery.getDistinct()->getSortRequirement().has_value();
     const bool hasSort = canonicalQuery.getSortPattern() || hasSortRequirement;
+    const bool unwindsArrays = canonicalQuery.getDistinct()->unwindsArrays();
+
+    // FETCH returns whole documents, so for each index key we would get the whole array instead of
+    // the unwound element(s). Shard filtering and $sort are rejected earlier on when attempting the
+    // $unwind+$group rewrite, so we don't need to support them here either.
+    if (unwindsArrays && (fetchNode || shardFilterNode || sortKeyGenNode)) {
+        return false;
+    }
 
     // When multiplanning for distinct is enabled, this function is reached from the query planner
     // which is also called by the fallback find path when multiplanning is disabled. In the latter
@@ -473,7 +498,8 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
                                         filter,
                                         flipDistinctScanDirection,
                                         strictDistinctOnly,
-                                        !hasSort)) {
+                                        !hasSort,
+                                        unwindsArrays)) {
             return false;
         }
         if (filter.isEmpty() && !hasSort &&
@@ -546,9 +572,10 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
         }
     }
 
-    // In practice, the only query that can be answered by a distinct scan on a multikey field
-    // is a distinct() with no filter.
-    const bool canScanMultikeyPath = !strictDistinctOnly && filter.isEmpty() && !hasSort;
+    // In practice, the only queries that can be answered by a distinct scan on a multikey field
+    // are a distinct() with no filter and a $unwind+$group pipeline with no filter.
+    const bool canScanMultikeyPath =
+        (!strictDistinctOnly || unwindsArrays) && filter.isEmpty() && !hasSort;
 
     // We should not use a distinct scan if the field over which we are computing the distinct is
     // multikey.
@@ -567,11 +594,15 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
     }
 
     // Multikeyness is currently not taken into account when deciding whether a distinct scan
-    // direction can be reversed in 'analyzeNonBlockingSort()'. This is fine, because multikey
-    // indexes are not allowed with STRICT_DISTINCT_ONLY.
+    // direction can be reversed in 'analyzeNonBlockingSort()'. This is fine, because with
+    // STRICT_DISTINCT_ONLY multikey indexes are only allowed for the $unwind+$group rewrite,
+    // which is currently disallowed when there's a sort requirement.
     tassert(9261503,
             "Expected a strict distinct scan when the query has a sortRequirement",
             !hasSortRequirement || strictDistinctOnly);
+    tassert(3371503,
+            "Unexpected sort requirement for the $unwind+$group distinct scan rewrite",
+            !hasSortRequirement || !unwindsArrays);
 
     // Only validate the sort requirement when there is no sort pattern on 'canonicalQuery'. Because
     // when there is a sort pattern, 'analyzeSort()' has already validated that the required sort
@@ -592,15 +623,35 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
         return false;
     }
 
-    const int direction = indexScanNode ? indexScanNode->direction : distinctScanNode->direction;
+    // The $unwind+$group rewrite rejects accumulators, which are the only source of a flipped
+    // distinct scan direction. TODO SERVER-133206: $last/$bottom support will flip the direction
+    // here and needs '_replaceUndefinedWithNull' to work on a backward scan.
+    tassert(3371504,
+            "Unexpected flipped distinct scan direction for the $unwind+$group rewrite",
+            !unwindsArrays || !flipDistinctScanDirection);
+
+    const int originalDirection =
+        indexScanNode ? indexScanNode->direction : distinctScanNode->direction;
+    int finalDirection = flipDistinctScanDirection ? -originalDirection : originalDirection;
+
+    // The DISTINCT_SCAN stage requires ascending keys for '_replaceUndefinedWithNull'. We are free
+    // to reverse the scan direction, because the $unwind+$group rewrite never has a sort: $unwind
+    // must always be the first stage in the pipeline.
+    if (unwindsArrays && finalDirection * Ordering::make(indexEntry.keyPattern).get(fieldNo) != 1) {
+        tassert(3371505, "Unexpected sort for the $unwind+$group distinct scan rewrite", !hasSort);
+        finalDirection = -finalDirection;
+    }
+
     // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
     auto distinctNode = std::make_unique<DistinctNode>(canonicalQuery.nss(), indexEntry);
-    distinctNode->direction = flipDistinctScanDirection ? -direction : direction;
-    distinctNode->bounds = flipDistinctScanDirection ? indexBounds.reverse() : indexBounds;
+    distinctNode->direction = finalDirection;
+    distinctNode->bounds =
+        finalDirection == originalDirection ? indexBounds : indexBounds.reverse();
     distinctNode->queryCollator = queryCollator;
     distinctNode->fieldNo = fieldNo;
     distinctNode->isShardFiltering = shardFilterNode != nullptr;
     distinctNode->isFetching = isShardFilteringDistinctScanEnabled && fetchNode != nullptr;
+    distinctNode->unwindsArrays = unwindsArrays;
 
     // The expected tree structure is (all nodes except IXSCAN can also be absent):
     // PROJECT => SORT_KEY_GENERATOR => SHARDING_FILTER => FETCH => IXSCAN.
