@@ -144,20 +144,18 @@ groups:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
   - name: "Developer Productivity"
     teams:
+      - "DevProd AXIS"
       - "DevProd Build"
-      - "DevProd Evergreen App"
-      - "DevProd Evergreen UI"
-      - "DevProd Infrastructure"
+      - "DevProd Evergreen"
       - "DevProd Performance Infrastructure"
       - "DevProd Release Infrastructure"
-      - "DevProd Runtime Environments"
       - "DevProd Services & Integrations"
       - "DevProd Test Infrastructure"
     slack_tags:
       - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
-      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+      - "<@U03JWS27799>" # john.daniels@mongodb.com
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U0V5GV746>" # david.golden@mongodb.com
 
 teams:
   #######################################################################
@@ -312,33 +310,29 @@ teams:
     slack_tags:
       - "<!subteam^S07M9UNSX5J>" # @streams-engine-team
 
-  # R&D Productivity Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=88587938
+  # DevProd Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=88587938
+  - name: "DevProd AXIS"
+    slack_tags:
+      - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com
   - name: "DevProd Build"
     slack_tags:
-      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-      - "<@U03JWS27799>" # john.daniels@mongodb.com - Lead
-  - name: "DevProd Evergreen App"
+      - "<@U03JWS27799>" # john.daniels@mongodb.com
+  - name: "DevProd Evergreen"
     slack_tags:
-      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-  - name: "DevProd Evergreen UI"
-    slack_tags:
-      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-  - name: "DevProd Infrastructure"
-    slack_tags:
-      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+      - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com
+      - "<@UCBGNB7JP>" # annie.black@mongodb.com
   - name: "DevProd Performance Infrastructure"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
       - "<@U04V70K9ZU5>" # james.littlejohn@mongodb.com - Lead
   - name: "DevProd Release Infrastructure"
     slack_tags:
-      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
-  - name: "DevProd Runtime Environments"
-    slack_tags:
-      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+      - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com
+      - "<@U0VSD7XNX>" # zakhar.kleyman@mongodb.com
   - name: "DevProd Services & Integrations"
     slack_tags:
-      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U7KJZBDFE>" # geoff.mishkin@mongodb.com
   - name: "DevProd Test Infrastructure"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
