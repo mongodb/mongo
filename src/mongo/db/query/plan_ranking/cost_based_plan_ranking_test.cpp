@@ -69,9 +69,12 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneDoesNotTripFullBatchAssertion) {
     insertNDocuments(5001);  // {_id:i, a:i, b:i, c:i}
     auto colls = getCollsAccessor();
 
-    // No document has c == -1, so no candidate plan advances during the trial.
+    // The 'c' predicate matches the last 1000 documents, so it is estimated as non-zero (a zero
+    // estimate would make CBR fall back to multi-planning), but the candidate index scans start
+    // at the low end of 'a'/'b' and so advance no result within the works budget of the
+    // estimation trial.
     auto [cq, plannerData] =
-        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
+        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << GT << 4000));
     plannerData.plannerParams = makePlannerParams(indices, 5001);
 
     plan_ranking::CostBasedPlanRankingStrategy strategy;

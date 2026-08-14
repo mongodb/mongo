@@ -174,6 +174,10 @@ export const PlanRankerReason = {
     kFeatureFlag: "featureFlag",
     kQueryKnob: "queryKnob",
     kInestimableNode: "inestimableNode",
+    // A node was estimated to produce zero rows from an approximate source, which means "no
+    // matching data observed" rather than a true zero. CBR abandons ranking and hands every
+    // candidate to the multi-planner.
+    kZeroCE: "zeroCE",
     kHistogramCEInternalColl: "histogramCEInternalColl",
     kSmallCollection: "smallCollection",
     kMpEarlyExitOrResult: "mpEarlyExitOrResult",

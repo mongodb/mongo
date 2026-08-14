@@ -6,7 +6,13 @@
  * ]
  */
 
-import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    assertChosenRanker,
+    ChosenRanker,
+    getRejectedPlans,
+    getWinningPlanFromExplain,
+    PlanRankerReason,
+} from "jstests/libs/query/analyze_plan.js";
 import {ceEqual} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -74,10 +80,6 @@ try {
         {query: {a: 90}, expectedCE: 46},
         {query: {a: {$gt: 5}}, expectedCE: 4372},
         {query: {a: {$lt: 5}}, expectedCE: 486},
-        // Check non existing value (max value in dataset: 98).
-        // An approximate-source (Histogram) zero is clamped to 1 by
-        // CardinalityEstimator::clampZeroEstimates.
-        {query: {a: 250}, expectedCE: 1},
         // CollScan with sargable filter should use histogram
         {query: {b: 4}, expectedCE: 1030},
         {query: {b: {$gt: 3}}, expectedCE: 1030},
@@ -99,6 +101,14 @@ try {
         {query: {a: {$ne: 90}}, expectedCE: 4906},
     ];
     testCases.forEach((tc) => assertQueryUsesHistograms(tc));
+
+    // Check non existing value (max value in dataset: 98). The histogram estimates zero on the
+    // scan nodes (ZeroCEEstimate), so CBR hands the plans to the multi-planner instead of
+    // costing them.
+    assertChosenRanker(coll.find({a: 250}).explain(), {
+        chosenRanker: ChosenRanker.kMultiPlanning,
+        reason: PlanRankerReason.kZeroCE,
+    });
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));

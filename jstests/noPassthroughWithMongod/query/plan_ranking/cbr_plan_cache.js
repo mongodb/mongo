@@ -128,24 +128,11 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
 
-    const strategy = assert.commandWorked(
-        db.adminCommand({
-            getParameter: 1,
-            internalQueryMixedPlanRankingStrategy: 1,
-        }),
-    )["internalQueryMixedPlanRankingStrategy"];
-    // We happen to use CBR to pick the winning plan for 'bIndexQuery' with EstimateRankingEffort,
-    // and MP with NoMultiplanningResults.
-    if (isMultiplanning || strategy === "NoMultiplanningResults") {
-        assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
-        assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
-    } else if (strategy === "EstimateRankingEffort") {
-        // TODO SERVER-116684: Change these assertions.
-        assert.eq(entry.creationExecStats.length, 1);
-        assert.eq(entry.candidatePlanScores.length, 1);
-    } else {
-        assert(false, `Unhandled strategy: ${strategy}`);
-    }
+    // 'bIndexQuery' matches no documents, so CBR estimates one of the index scans to zero and
+    // abandons ranking altogether, handing both candidates to MP. This holds for every CBR
+    // fallback strategy, so MP always picks the winner here.
+    assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
+    assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
     // This query will trigger replanning since the number of works is vastly higher than the cached plan.
     // Because of this, the new plan will not be active at first.

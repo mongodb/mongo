@@ -24,6 +24,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/ce/histogram:histogram_estimator",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+        "//src/mongo/db/query/compiler/physical_model/query_solution",
         "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
     ],
 )

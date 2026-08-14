@@ -524,11 +524,11 @@
     "rows" :    253},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_compound":{"$in":[11,7]}},{"a_idx":{"$ne":9}},{"a_compound":{"$all":[5,16,20,8]}}],"a_compound":{"$elemMatch":{"$nin":[3,16]}},"a_noidx":{"$nin":[14,11,17]},"k_idx":{"$nin":[7,15]}}},{"$sort":{"a_idx":1,"c_idx":1}},{"$limit":41},{"$project":{"_id":0,"h_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_idx_1","indexBounds":{"k_idx":["[MinKey, 7.0)","(7.0, 15.0)","(15.0, MaxKey]"]}}}}},
-    "keys" :  99802,
-    "docs" :  99800,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[MinKey, 3.0)","(3.0, 16.0)","(16.0, MaxKey]"]}}}}},
+    "keys" : 442157,
+    "docs" : 100000,
     "sorts": 409067,
-    "plans":     23,
+    "plans":     24,
     "rows" :     41},
 
 {">>>pipeline": [{"$match":{"$nor":[{"i_noidx":{"$gt":4}},{"a_compound":{"$gt":16}},{"a_compound":{"$all":[12,20,11]}}],"d_idx":{"$ne":1}}},{"$sort":{"h_idx":-1}},{"$limit":218}],
@@ -840,7 +840,7 @@
     "keys" :  10873,
     "docs" :  10873,
     "sorts": 111916,
-    "plans":     25,
+    "plans":     26,
     "rows" :  10872},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$exists":false}},{"a_idx":{"$nin":[11,15]}},{"a_idx":{"$elemMatch":{"$in":[12,16]}}}],"$or":[{"i_idx":{"$nin":[6,20,14]}},{"i_compound":{"$nin":[17,17,4]}},{"c_compound":{"$in":[16,5]}}]}},{"$sort":{"d_idx":-1}},{"$project":{"_id":0,"c_idx":1}}],
@@ -848,7 +848,7 @@
     "keys" :   2006,
     "docs" :   2004,
     "sorts":  17240,
-    "plans":     19,
+    "plans":     20,
     "rows" :   2004},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_compound":{"$lt":7}},{"i_idx":{"$eq":5}},{"$and":[{"a_compound":{"$all":[16,20]}},{"a_compound":{"$nin":[10,10,5,10]}}]}],"k_compound":{"$exists":true}}},{"$limit":197},{"$project":{"a_noidx":1}}],
@@ -888,7 +888,7 @@
     "keys" : 148706,
     "docs" :  99448,
     "sorts": 1243835,
-    "plans":     23,
+    "plans":     24,
     "rows" :  99448},
 
 {">>>pipeline": [{"$match":{"$nor":[{"z_compound":{"$gte":9}},{"c_noidx":{"$in":[5,17,20]}},{"$or":[{"a_compound":{"$all":[11,2,11,7]}},{"a_noidx":{"$elemMatch":{"$in":[15,4,13]}}}]},{"c_noidx":{"$in":[12,3,14,13]}}],"a_compound":{"$exists":true},"i_compound":{"$exists":true}}},{"$project":{"a_noidx":1,"k_compound":1}}],
@@ -1120,7 +1120,7 @@
     "keys" : 468941,
     "docs" : 100000,
     "sorts": 622575,
-    "plans":     21,
+    "plans":     22,
     "rows" :    186},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_noidx":{"$exists":false}},{"k_compound":{"$lte":1}},{"a_compound":{"$all":[14,10,20,12,20]}}],"a_compound":{"$all":[9,19,19]},"h_compound":{"$gt":16}}},{"$sort":{"i_idx":-1}},{"$project":{"_id":0,"a_noidx":1,"h_noidx":1,"z_idx":1}}],
@@ -1140,11 +1140,11 @@
     "rows" :  97000},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"a_compound":{"$elemMatch":{"$lte":2}}},{"$and":[{"$nor":[{"a_noidx":{"$elemMatch":{"$exists":false}}},{"z_noidx":{"$exists":true}}]},{"a_idx":{"$elemMatch":{"$gte":10}}}]},{"a_idx":{"$elemMatch":{"$exists":true}}},{"i_compound":{"$exists":false}}]},{"k_compound":{"$gte":20}}],"a_compound":{"$eq":2},"d_noidx":{"$eq":8}}},{"$sort":{"d_idx":1,"z_idx":1}},{"$limit":86},{"$skip":5}],
-    "winningPlan": {"stage":"SKIP","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[2.0, 2.0]"]}}}}},
-    "keys" :  38792,
-    "docs" :  38792,
+    "winningPlan": {"stage":"SKIP","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[null, null]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[10.0, inf]"]}}},{"stage":"IXSCAN","indexName":"k_compound_1","indexBounds":{"k_compound":["[20.0, inf]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 2.0]"]}}}]}}}},
+    "keys" : 939250,
+    "docs" : 379312,
     "sorts":  17105,
-    "plans":     23,
+    "plans":     24,
     "rows" :     81},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$nin":[16,2,9,15,16]}},{"$and":[{"c_compound":{"$exists":false}},{"a_idx":{"$exists":false}},{"a_idx":{"$all":[14,7,7,4]}}]}],"a_compound":{"$gt":15}}},{"$project":{"_id":0,"a_noidx":1,"c_idx":1,"z_noidx":1}}],
@@ -1260,11 +1260,11 @@
     "rows" :    235},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_noidx":{"$lte":10}},{"a_compound":{"$elemMatch":{"$exists":false,"$in":[8,4,1]}}}]},{"$and":[{"i_compound":{"$exists":true}},{"i_idx":{"$exists":true}},{"a_compound":{"$all":[14,3,4]}}]},{"a_compound":{"$elemMatch":{"$exists":true}}}],"a_idx":{"$all":[1,3]}}},{"$sort":{"a_idx":-1,"d_idx":-1}},{"$limit":107},{"$project":{"_id":0,"a_compound":1,"a_idx":1,"a_noidx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[3.0, 3.0]"]}}}}},
-    "keys" :  25786,
-    "docs" :  25786,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[1.0, 1.0]"]}}}}},
+    "keys" :  44506,
+    "docs" :  44506,
     "sorts":  31978,
-    "plans":     25,
+    "plans":     26,
     "rows" :    107},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[18,11]}},{"d_compound":{"$exists":true}}],"a_idx":{"$all":[11,1]}}}],
@@ -1344,7 +1344,7 @@
     "keys" :  10282,
     "docs" :  10282,
     "sorts":      0,
-    "plans":     27,
+    "plans":     28,
     "rows" :    254},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[19,2,19]}},{"i_noidx":{"$lte":6}},{"z_compound":{"$in":[19,4,8]}}],"a_compound":{"$nin":[20,20,7]},"k_compound":{"$ne":4}}},{"$sort":{"i_idx":1,"k_idx":-1}},{"$limit":70},{"$project":{"a_idx":1}}],
@@ -1384,7 +1384,7 @@
     "keys" :  17094,
     "docs" :  17094,
     "sorts":  22542,
-    "plans":     29,
+    "plans":     30,
     "rows" :   2549},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"a_compound":{"$all":[20,13,2,18]}},{"z_idx":{"$lt":4}}]},{"a_idx":{"$in":[11,14]}}],"i_compound":{"$lte":11}}},{"$sort":{"d_idx":-1}}],
@@ -1400,7 +1400,7 @@
     "keys" :  20098,
     "docs" :  19876,
     "sorts":      3,
-    "plans":     13,
+    "plans":     14,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_noidx":{"$exists":false}},{"a_compound":{"$elemMatch":{"$exists":false}}},{"a_compound":{"$all":[13,9,3]}}],"a_noidx":{"$elemMatch":{"$lte":12}}}},{"$sort":{"i_idx":-1}},{"$project":{"_id":0,"a_noidx":1}}],
@@ -1628,11 +1628,11 @@
     "rows" :     49},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[1,8,15]}},{"a_idx":{"$exists":false}},{"h_idx":{"$ne":6}},{"a_compound":{"$exists":false}}],"h_compound":{"$exists":true}}},{"$sort":{"a_idx":-1,"i_idx":-1}},{"$limit":112},{"$project":{"_id":0,"z_compound":1,"z_noidx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"h_compound_1","indexBounds":{"h_compound":["[MinKey, MaxKey]"]}}}}},
-    "keys" : 100000,
-    "docs" : 100000,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"h_idx_1","indexBounds":{"h_idx":["[MinKey, 6.0)","(6.0, MaxKey]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[1.0, 1.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[null, null]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[null, null]"]}}}]}}}},
+    "keys" : 143507,
+    "docs" : 143506,
     "sorts": 566131,
-    "plans":     19,
+    "plans":     20,
     "rows" :    112},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$all":[6,5]}},{"a_idx":{"$exists":true}},{"i_compound":{"$exists":false}}],"a_idx":{"$elemMatch":{"$exists":true,"$in":[2,20]}},"k_compound":{"$in":[8,16]}}},{"$sort":{"k_idx":1}},{"$limit":59},{"$project":{"c_idx":1}}],
@@ -1796,11 +1796,11 @@
     "rows" :  99913},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$all":[12,1,6]}},{"a_idx":{"$elemMatch":{"$exists":true,"$in":[1,1],"$ne":1,"$nin":[16,5]}}},{"h_idx":{"$in":[11,3,11]}},{"a_idx":{"$elemMatch":{"$in":[8,20]}}},{"a_idx":{"$exists":false}},{"z_idx":{"$in":[7,10]}}]},{"$or":[{"$or":[{"$and":[{"d_idx":{"$lte":5}},{"c_compound":{"$gte":20}},{"d_noidx":{"$in":[18,12,5,19]}}]},{"a_compound":{"$all":[11,9,11]}},{"k_compound":{"$exists":true}},{"d_compound":{"$in":[14,2,11]}}]},{"$and":[{"a_noidx":{"$elemMatch":{"$exists":true,"$gt":1,"$in":[2,12],"$lt":19}}},{"a_noidx":{"$elemMatch":{"$lte":4}}},{"a_idx":{"$exists":true}}]}]}]}},{"$sort":{"k_idx":-1,"z_idx":1}},{"$limit":203}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"z_idx_1","indexBounds":{"z_idx":["[7.0, 7.0]","[10.0, 10.0]"]}},{"stage":"IXSCAN","indexName":"h_idx_1","indexBounds":{"h_idx":["[3.0, 3.0]","[11.0, 11.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[null, null]","[8.0, 8.0]","[20.0, 20.0]"]}}}]}}},
-    "keys" :  14379,
-    "docs" :  25421,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"z_idx_1","indexBounds":{"z_idx":["[7.0, 7.0]","[10.0, 10.0]"]}},{"stage":"IXSCAN","indexName":"h_idx_1","indexBounds":{"h_idx":["[3.0, 3.0]","[11.0, 11.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[1.0, 1.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[null, null]","[8.0, 8.0]","[20.0, 20.0]"]}}}]}}},
+    "keys" :  57885,
+    "docs" :  68927,
     "sorts":  84218,
-    "plans":     31,
+    "plans":     32,
     "rows" :    203},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_idx":{"$ne":10}},{"a_compound":{"$all":[19,20,11]}}],"h_compound":{"$gte":8}}},{"$project":{"_id":0,"i_idx":1}}],
@@ -2036,11 +2036,11 @@
     "rows" :  99992},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$exists":true}},{"a_compound":{"$in":[9,5,2,5]}},{"k_idx":{"$gt":10}},{"d_idx":{"$exists":false}}],"a_noidx":{"$gt":18},"z_compound":{"$in":[17,20,1]}}},{"$sort":{"c_idx":1,"h_idx":1}},{"$limit":162}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"z_compound_1","indexBounds":{"z_compound":["[1.0, 1.0]","[17.0, 17.0]","[20.0, 20.0]"]}}}},
-    "keys" :  38425,
-    "docs" :  38424,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_idx_1","indexBounds":{"d_idx":["[null, null]"]}}},{"stage":"IXSCAN","indexName":"k_idx_1","indexBounds":{"k_idx":["(10.0, inf]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["[MinKey, MaxKey]"],"d_compound":["[MinKey, MaxKey]"]}}},{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[2.0, 2.0]","[5.0, 5.0]","[9.0, 9.0]"],"i_compound":["[MinKey, MaxKey]"]}}]}}},
+    "keys" : 260236,
+    "docs" : 200000,
     "sorts": 233885,
-    "plans":     15,
+    "plans":     16,
     "rows" :    162},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[10,3,1]}},{"a_compound":{"$eq":14}}],"a_compound":{"$in":[1,13,8]}}},{"$sort":{"d_idx":1}}],
@@ -2140,11 +2140,11 @@
     "rows" :  50129},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$gt":14}}},{"k_idx":{"$exists":false}},{"a_idx":{"$all":[18,12,6]}},{"z_idx":{"$eq":3}},{"a_compound":{"$all":[15,11,7,4]}}],"a_compound":{"$in":[15,11]}}},{"$sort":{"d_idx":1}},{"$limit":28}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_idx_1","indexBounds":{"d_idx":["[MinKey, MaxKey]"]}}}},
-    "keys" :  10282,
-    "docs" :  10282,
-    "sorts":      0,
-    "plans":     23,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[11.0, 11.0]","[15.0, 15.0]"]}}}},
+    "keys" :   2006,
+    "docs" :   2004,
+    "sorts":   8677,
+    "plans":     24,
     "rows" :     28},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_noidx":{"$lte":10}},{"$and":[{"c_compound":{"$lte":7}},{"z_compound":{"$nin":[19,9]}}]}]}},{"$sort":{"h_idx":-1}}],
@@ -2172,11 +2172,11 @@
     "rows" :   1385},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_compound":{"$in":[5,11]}},{"$and":[{"h_noidx":{"$exists":false}},{"i_compound":{"$in":[14,12,13]}}]},{"z_compound":{"$nin":[7,2]}}],"a_compound":{"$nin":[9,2,17]}}},{"$sort":{"d_idx":-1,"i_idx":1,"k_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[12.0, 12.0]","[13.0, 13.0]","[14.0, 14.0]"]}}},{"stage":"IXSCAN","indexName":"z_compound_1","indexBounds":{"z_compound":["[MinKey, 2.0)","(2.0, 7.0)","(7.0, MaxKey]"]}},{"stage":"IXSCAN","indexName":"c_compound_1","indexBounds":{"c_compound":["[5.0, 5.0]","[11.0, 11.0]"]}}]}}},
-    "keys" :  67772,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"c_compound_1","indexBounds":{"c_compound":["[5.0, 5.0]","[11.0, 11.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[MinKey, 2.0)","(2.0, 9.0)","(9.0, 17.0)","(17.0, MaxKey]"],"i_compound":["[12.0, 12.0]","[13.0, 13.0]","[14.0, 14.0]"]}}},{"stage":"IXSCAN","indexName":"z_compound_1_c_compound_1","indexBounds":{"z_compound":["[MinKey, 2.0)","(2.0, 7.0)","(7.0, MaxKey]"],"c_compound":["[MinKey, MaxKey]"]}}]}}},
+    "keys" : 167783,
     "docs" :  67769,
     "sorts": 637512,
-    "plans":     23,
+    "plans":     24,
     "rows" :  53619},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[7,19,17]}},{"i_compound":{"$exists":true}}],"a_compound":{"$lte":8}}},{"$sort":{"k_idx":1,"z_idx":-1}},{"$limit":168}],
@@ -2184,7 +2184,7 @@
     "keys" : 179917,
     "docs" :  99995,
     "sorts": 612366,
-    "plans":     23,
+    "plans":     24,
     "rows" :    168},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_idx":{"$all":[8,16,9,19,8,6]}},{"$or":[{"a_compound":{"$all":[10,17,1,16]}},{"a_noidx":{"$nin":[20,6]}},{"a_noidx":{"$all":[3,9]}},{"a_compound":{"$all":[10,2,20]}},{"a_idx":{"$ne":9}}]}]},{"i_compound":{"$nin":[1,8,10]}}],"a_compound":{"$elemMatch":{"$exists":true,"$gt":8}}}},{"$skip":76}],
@@ -2268,11 +2268,11 @@
     "rows" :  98949},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$exists":false}},{"z_compound":{"$exists":true}},{"a_compound":{"$lte":15}}],"a_compound":{"$elemMatch":{"$in":[2,14,3]}}}},{"$sort":{"a_idx":-1,"d_idx":-1,"k_idx":-1}},{"$limit":237}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[2.0, 2.0]","[3.0, 3.0]","[14.0, 14.0]"]}}}},
-    "keys" :  65580,
-    "docs" :  60139,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 15.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"z_compound_1_c_compound_1","indexBounds":{"z_compound":["[MinKey, MaxKey]"],"c_compound":["[MinKey, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[null, null]"],"i_compound":["[MinKey, MaxKey]"]}}}]}}},
+    "keys" : 295941,
+    "docs" : 200000,
     "sorts": 388983,
-    "plans":     19,
+    "plans":     20,
     "rows" :    237},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$nin":[14,13]}},{"a_idx":{"$all":[7,1,16,5]}}],"a_idx":{"$eq":16}}}],
@@ -2316,11 +2316,11 @@
     "rows" :  99985},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"a_compound":{"$exists":false}},{"a_idx":{"$exists":false}}]},{"d_compound":{"$lte":18}}],"k_compound":{"$nin":[9,11,15]}}},{"$sort":{"d_idx":1,"z_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"d_compound_1_k_compound_1","indexBounds":{"d_compound":["[-inf, 18.0]"],"k_compound":["[MinKey, 9.0)","(9.0, 11.0)","(11.0, 15.0)","(15.0, MaxKey]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, 9.0)","(9.0, 11.0)","(11.0, 15.0)","(15.0, MaxKey]"],"a_compound":["[null, null]"]}}}]}}},
-    "keys" : 100703,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, 9.0)","(9.0, 11.0)","(11.0, 15.0)","(15.0, MaxKey]"],"a_compound":["[MinKey, MaxKey]"]}}}},
+    "keys" : 467886,
     "docs" :  99700,
     "sorts": 1247239,
-    "plans":     21,
+    "plans":     22,
     "rows" :  99700},
 
 {">>>pipeline": [{"$match":{"$and":[{"h_idx":{"$lt":11}},{"a_idx":{"$elemMatch":{"$exists":true,"$in":[9,5]}}},{"a_compound":{"$gt":3}}],"$or":[{"a_compound":{"$all":[4,15,10,12,19]}},{"a_compound":{"$all":[9,18,17,2]}},{"a_compound":{"$nin":[14,4,6]}}],"z_idx":{"$nin":[17,3,4,12,11]}}},{"$sort":{"k_idx":1}},{"$limit":114},{"$project":{"_id":0,"a_noidx":1}}],
@@ -2484,11 +2484,11 @@
     "rows" :   4680},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_idx":{"$eq":10}},{"a_idx":{"$all":[2,17,16]}},{"a_compound":{"$exists":true}},{"$or":[{"$and":[{"z_idx":{"$nin":[20,14,13,14]}},{"$or":[{"a_compound":{"$elemMatch":{"$exists":true}}},{"d_compound":{"$exists":true}},{"a_idx":{"$exists":true}},{"a_noidx":{"$in":[4,8]}}]},{"$nor":[{"a_compound":{"$nin":[17,14]}},{"a_compound":{"$nin":[12,18,17]}}]},{"i_noidx":{"$nin":[14,8,2]}},{"d_noidx":{"$nin":[15,10]}}]},{"a_idx":{"$all":[17,14]}}]}],"a_compound":{"$all":[1,4]}}},{"$sort":{"i_idx":1,"k_idx":1,"z_idx":1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[4.0, 4.0]"]}}}},
-    "keys" :  17094,
-    "docs" :  17094,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[1.0, 1.0]"]}}}},
+    "keys" :  44506,
+    "docs" :  44506,
     "sorts":  43364,
-    "plans":     29,
+    "plans":     30,
     "rows" :   4597},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$elemMatch":{"$exists":true,"$in":[6,6]}}},{"$or":[{"a_compound":{"$all":[4,9,3]}},{"a_compound":{"$ne":19}}]},{"a_compound":{"$exists":true}}],"$nor":[{"z_idx":{"$nin":[5,20,4]}},{"k_idx":{"$eq":11}}]}},{"$project":{"_id":0,"a_noidx":1}}],
@@ -2512,7 +2512,7 @@
     "keys" :  12528,
     "docs" :  12528,
     "sorts":  31615,
-    "plans":     29,
+    "plans":     30,
     "rows" :   3456},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"k_idx":{"$exists":false}},{"a_idx":{"$all":[16,13]}},{"c_compound":{"$ne":4}}]},{"a_idx":{"$in":[18,7,8]}}],"a_compound":{"$in":[11,5,9]}}}],
@@ -2588,11 +2588,11 @@
     "rows" :    195},
 
 {">>>pipeline": [{"$match":{"$or":[{"z_compound":{"$nin":[10,8]}},{"a_compound":{"$exists":true}},{"d_compound":{"$eq":20}}],"a_idx":{"$elemMatch":{"$lte":17}},"i_compound":{"$exists":true}}},{"$sort":{"c_idx":1,"d_idx":1}},{"$limit":100},{"$project":{"k_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[MinKey, MaxKey]"]}}}}},
-    "keys" : 100000,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[-inf, 17.0]"]}}}}},
+    "keys" : 197941,
     "docs" : 100000,
     "sorts": 560517,
-    "plans":     25,
+    "plans":     26,
     "rows" :    100},
 
 {">>>pipeline": [{"$match":{"$and":[{"h_noidx":{"$lte":8}},{"$nor":[{"k_idx":{"$exists":false}},{"c_idx":{"$exists":false}}]}],"$or":[{"a_compound":{"$nin":[4,19,19]}},{"a_idx":{"$all":[18,15,17,16]}}],"k_compound":{"$nin":[2,3,11]}}},{"$sort":{"i_idx":-1}}],
@@ -2664,7 +2664,7 @@
     "keys" :   1000,
     "docs" :   1000,
     "sorts":    838,
-    "plans":     31,
+    "plans":     32,
     "rows" :     51},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_noidx":{"$exists":false}},{"a_compound":{"$all":[8,18,10,3]}}],"a_compound":{"$elemMatch":{"$nin":[9,7,7]}}}},{"$sort":{"z_idx":1}}],
@@ -2680,7 +2680,7 @@
     "keys" :  39794,
     "docs" :  39477,
     "sorts": 457281,
-    "plans":     19,
+    "plans":     20,
     "rows" :  39477},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_noidx":{"$gte":4}},{"a_compound":{"$all":[15,9,18]}}],"i_idx":{"$exists":true}}},{"$sort":{"h_idx":1,"k_idx":-1}},{"$skip":3}],
@@ -2752,7 +2752,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     19,
+    "plans":     20,
     "rows" :      0},
 
 {">>>pipeline": [{"$match":{"$nor":[{"h_idx":{"$in":[13,4,11,2]}},{"i_noidx":{"$in":[20,2,6,9]}},{"a_compound":{"$all":[9,1]}},{"a_idx":{"$elemMatch":{"$exists":false,"$in":[19,20]}}}],"k_compound":{"$lt":5}}},{"$sort":{"i_idx":-1}}],
@@ -2976,7 +2976,7 @@
     "keys" :  10001,
     "docs" :  10000,
     "sorts": 102103,
-    "plans":     31,
+    "plans":     32,
     "rows" :  10000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$elemMatch":{"$exists":false,"$nin":[19,18,5]}}},{"a_idx":{"$elemMatch":{"$exists":false}}},{"d_noidx":{"$gte":8}}],"a_compound":{"$elemMatch":{"$exists":true,"$nin":[4,10]}},"a_idx":{"$elemMatch":{"$exists":true}},"k_compound":{"$ne":15}}},{"$sort":{"i_idx":-1}},{"$project":{"a_idx":1,"a_noidx":1}}],
@@ -3204,11 +3204,11 @@
     "rows" :  86900},
 
 {">>>pipeline": [{"$match":{"$or":[{"i_compound":{"$lte":7}},{"a_compound":{"$in":[20,12]}},{"a_idx":{"$exists":false}}],"a_compound":{"$in":[5,20]},"k_compound":{"$nin":[10,7,20]}}},{"$sort":{"c_idx":-1,"z_idx":1}},{"$limit":126}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[-inf, 7.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[null, null]"]}}},{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]","[20.0, 20.0]"]}}]}}},
-    "keys" :   2010,
-    "docs" :   2008,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[5.0, 5.0]","[20.0, 20.0]"],"i_compound":["[-inf, 7.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[null, null]"]}}},{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]","[20.0, 20.0]"],"i_compound":["[MinKey, MaxKey]"]}}]}}},
+    "keys" :   2006,
+    "docs" :   2001,
     "sorts":   5480,
-    "plans":     25,
+    "plans":     26,
     "rows" :    126},
 
 {">>>pipeline": [{"$match":{"$or":[{"k_compound":{"$exists":true}},{"a_idx":{"$all":[7,9,13,10]}},{"c_compound":{"$nin":[17,13]}}],"a_compound":{"$lte":14}}},{"$sort":{"d_idx":1}},{"$skip":52}],
@@ -3408,7 +3408,7 @@
     "keys" :  13530,
     "docs" :  13498,
     "sorts":  79144,
-    "plans":     27,
+    "plans":     28,
     "rows" :    204},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"i_compound":{"$nin":[10,10]}},{"a_noidx":{"$all":[15,15,2]}}]},{"a_compound":{"$lt":5}}],"k_compound":{"$exists":true}}},{"$sort":{"z_idx":-1}},{"$skip":99}],
@@ -3768,7 +3768,7 @@
     "keys" : 269000,
     "docs" :  99980,
     "sorts": 1069529,
-    "plans":     21,
+    "plans":     22,
     "rows" :  86478},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[6,9,11]}},{"k_compound":{"$eq":4}},{"k_noidx":{"$eq":6}}],"a_compound":{"$exists":true}}},{"$limit":211}],
@@ -3968,7 +3968,7 @@
     "keys" : 191941,
     "docs" : 100000,
     "sorts": 1250995,
-    "plans":     23,
+    "plans":     24,
     "rows" :  99978},
 
 {">>>pipeline": [{"$match":{"$or":[{"c_idx":{"$lte":19}},{"a_compound":{"$nin":[11,11,5]}},{"a_idx":{"$all":[18,14]}}],"h_compound":{"$nin":[7,6,8]}}},{"$sort":{"d_idx":-1}},{"$limit":237}],
@@ -4084,11 +4084,11 @@
     "rows" :    168},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$elemMatch":{"$eq":15,"$nin":[19,20,2,14]}}},{"i_compound":{"$eq":20}},{"a_compound":{"$all":[11,15]}}],"k_idx":{"$lte":20}}},{"$sort":{"c_idx":1,"d_idx":1,"h_idx":1}},{"$limit":187},{"$project":{"a_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_idx_1","indexBounds":{"k_idx":["[-inf, 20.0]"]}}}}},
-    "keys" :   2100,
-    "docs" :   2100,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[15.0, 15.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[15.0, 15.0]"]}}},{"stage":"IXSCAN","indexName":"i_compound_1_z_compound_1","indexBounds":{"i_compound":["[20.0, 20.0]"],"z_compound":["[MinKey, MaxKey]"]}}]}}}},
+    "keys" :   2001,
+    "docs" :   3001,
     "sorts":    567,
-    "plans":     19,
+    "plans":     20,
     "rows" :    101},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$nin":[16,3,16]},"d_compound":{"$exists":true}}},{"$sort":{"a_idx":1}}],
@@ -4212,11 +4212,11 @@
     "rows" :    239},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[3,20,14,8,3]}},{"$nor":[{"a_idx":{"$elemMatch":{"$nin":[19,8,6]}}},{"k_compound":{"$lt":10}}]},{"c_idx":{"$in":[6,3]}},{"d_compound":{"$lt":11}}],"a_compound":{"$gte":14}}},{"$sort":{"h_idx":1,"k_idx":1}},{"$limit":213},{"$project":{"_id":0,"k_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[14.0, inf]"]}}}}},
-    "keys" : 275000,
-    "docs" :  99986,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[20.0, 20.0]"]}}},{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[3.0, 3.0]","[6.0, 6.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, -inf)","[10.0, MaxKey]"],"a_compound":["[14.0, inf]"]}}},{"stage":"IXSCAN","indexName":"d_compound_1_k_compound_1","indexBounds":{"d_compound":["[-inf, 11.0)"],"k_compound":["[MinKey, MaxKey]"]}}]}}}},
+    "keys" : 376000,
+    "docs" : 199996,
     "sorts": 636040,
-    "plans":     23,
+    "plans":     24,
     "rows" :    213},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$and":[{"a_compound":{"$nin":[7,12,18,4]}},{"a_compound":{"$nin":[7,14]}},{"z_compound":{"$exists":false}}]},{"i_compound":{"$nin":[11,18]}},{"a_compound":{"$exists":false}}],"a_idx":{"$ne":17}}},{"$project":{"a_compound":1}}],
@@ -4552,7 +4552,7 @@
     "keys" :  99996,
     "docs" :  99996,
     "sorts": 1251238,
-    "plans":     23,
+    "plans":     24,
     "rows" :  99994},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$exists":true}},{"$nor":[{"k_compound":{"$exists":false}},{"a_compound":{"$all":[12,2]}}]},{"k_idx":{"$nin":[4,19,14]}}],"z_noidx":{"$exists":true}}},{"$sort":{"h_idx":-1}},{"$project":{"a_noidx":1,"k_noidx":1}}],
@@ -4908,11 +4908,11 @@
     "rows" :    198},
 
 {">>>pipeline": [{"$match":{"$nor":[{"c_compound":{"$eq":4}},{"$nor":[{"$and":[{"i_compound":{"$exists":true}},{"a_compound":{"$in":[11,3]}},{"$nor":[{"h_idx":{"$eq":15}},{"k_compound":{"$in":[5,19,20]}}]},{"a_compound":{"$elemMatch":{"$exists":true}}}]},{"c_idx":{"$in":[15,17,7]}}]}],"k_idx":{"$exists":true}}},{"$sort":{"a_idx":-1,"z_idx":1}},{"$project":{"_id":0,"a_noidx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[3.0, 3.0]","[11.0, 11.0]"]}}},{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[7.0, 7.0]","[15.0, 15.0]","[17.0, 17.0]"]}}]}}}},
-    "keys" :  26792,
-    "docs" :  52994,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, 5.0)","(5.0, 19.0)","(19.0, 20.0)","(20.0, MaxKey]"],"a_compound":["[MinKey, MaxKey]"]}}},{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[7.0, 7.0]","[15.0, 15.0]","[17.0, 17.0]"]}}]}}}},
+    "keys" : 467850,
+    "docs" : 126080,
     "sorts": 294938,
-    "plans":     23,
+    "plans":     24,
     "rows" :  26380},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"$nor":[{"c_noidx":{"$ne":16}},{"a_compound":{"$lt":12}},{"c_compound":{"$ne":1}},{"h_idx":{"$lt":1}},{"a_idx":{"$lte":3}}]},{"d_noidx":{"$nin":[11,4]}}]},{"i_idx":{"$lte":14}},{"i_idx":{"$in":[18,14,13]}}],"d_compound":{"$eq":8}}}],
@@ -5036,11 +5036,11 @@
     "rows" :  88744},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_idx":{"$elemMatch":{"$exists":true}}},{"a_noidx":{"$lt":8}},{"d_noidx":{"$lte":15}},{"$or":[{"a_idx":{"$gt":10}},{"a_compound":{"$exists":false}},{"$and":[{"$nor":[{"a_compound":{"$ne":18}},{"d_noidx":{"$lte":20}}]},{"c_compound":{"$exists":false}}]}]},{"c_idx":{"$exists":true}}]}},{"$sort":{"d_idx":-1,"i_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[MinKey, MaxKey]"]}}}},
-    "keys" : 100000,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}}},
+    "keys" : 468941,
     "docs" : 100000,
     "sorts": 1250847,
-    "plans":     17,
+    "plans":     18,
     "rows" :  99967},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[1,13,15]}},{"a_compound":{"$exists":false}},{"a_compound":{"$nin":[9,12]}}],"z_idx":{"$ne":11}}},{"$sort":{"d_idx":-1}},{"$limit":101}],
@@ -5148,11 +5148,11 @@
     "rows" :  20841},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"a_idx":{"$all":[11,4,4]}},{"a_idx":{"$eq":15}}]},{"$and":[{"c_compound":{"$in":[13,1,20,15]}},{"$or":[{"c_noidx":{"$exists":true}},{"a_noidx":{"$all":[8,19]}}]}]},{"$nor":[{"$and":[{"a_compound":{"$elemMatch":{"$in":[12,12,20,1]}}},{"$or":[{"a_idx":{"$exists":true}},{"a_noidx":{"$elemMatch":{"$gte":15,"$in":[4,9]}}},{"k_noidx":{"$exists":true}}]}]},{"a_idx":{"$exists":true}},{"a_compound":{"$gt":6}}]}],"d_compound":{"$lte":2},"d_noidx":{"$ne":12}}},{"$sort":{"d_idx":1,"h_idx":-1,"z_idx":1}},{"$limit":58}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_compound_1","indexBounds":{"d_compound":["[-inf, 2.0]"]}}}},
-    "keys" :  30000,
-    "docs" :  30000,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_compound_1","indexBounds":{"c_compound":["[1.0, 1.0]","[13.0, 13.0]","[15.0, 15.0]","[20.0, 20.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[11.0, 11.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[MinKey, 6.0]","(inf, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["[1.0, 1.0]","[13.0, 13.0]","[15.0, 15.0]","[20.0, 20.0]"],"d_compound":["[-inf, 2.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[MinKey, 6.0]","(inf, MaxKey]"],"i_compound":["[MinKey, MaxKey]"]}}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[15.0, 15.0]"]}}]}}},
+    "keys" : 451165,
+    "docs" : 361789,
     "sorts": 151813,
-    "plans":     23,
+    "plans":     24,
     "rows" :     58},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$all":[13,16,1]}},{"k_compound":{"$gt":16}},{"a_compound":{"$elemMatch":{"$eq":19,"$exists":true}}}],"a_compound":{"$gt":7}}},{"$sort":{"d_idx":1}},{"$project":{"_id":0,"k_idx":1}}],
@@ -5192,7 +5192,7 @@
     "keys" :  89144,
     "docs" :  89144,
     "sorts":      0,
-    "plans":     23,
+    "plans":     24,
     "rows" :     56},
 
 {">>>pipeline": [{"$match":{"$nor":[{"d_compound":{"$eq":20}},{"a_compound":{"$all":[11,16,10]}}],"k_noidx":{"$ne":5}}},{"$sort":{"a_idx":1}},{"$project":{"_id":0,"a_noidx":1,"d_noidx":1}}],
@@ -5676,11 +5676,11 @@
     "rows" :     57},
 
 {">>>pipeline": [{"$match":{"$or":[{"$and":[{"h_idx":{"$gte":11}},{"a_idx":{"$elemMatch":{"$exists":true,"$in":[14,10]}}}]},{"c_compound":{"$gte":4}},{"a_idx":{"$in":[4,1,2]}}],"a_idx":{"$exists":true}}},{"$sort":{"d_idx":1,"i_idx":1,"z_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[10.0, 10.0]","[14.0, 14.0]"]}}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[1.0, 1.0]","[2.0, 2.0]","[4.0, 4.0]"]}},{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["[4.0, inf]"],"d_compound":["[MinKey, MaxKey]"]}}]}}},
-    "keys" : 102403,
-    "docs" :  86776,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}}},
+    "keys" : 468941,
+    "docs" : 100000,
     "sorts": 1046701,
-    "plans":      9,
+    "plans":     10,
     "rows" :  84769},
 
 {">>>pipeline": [{"$match":{"$and":[{"$nor":[{"a_idx":{"$exists":false}},{"$nor":[{"d_compound":{"$in":[12,17]}},{"a_compound":{"$all":[5,10,1]}},{"c_idx":{"$lte":2}}]},{"a_noidx":{"$lt":2}},{"z_compound":{"$exists":false}}]},{"a_idx":{"$lt":12}}],"$or":[{"a_idx":{"$exists":true}},{"d_noidx":{"$in":[20,2,8,16]}}]}},{"$sort":{"i_idx":1}},{"$project":{"_id":0,"a_compound":1,"d_noidx":1}}],
@@ -5988,11 +5988,11 @@
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$or":[{"d_idx":{"$exists":true}},{"$or":[{"a_compound":{"$ne":3}},{"a_compound":{"$elemMatch":{"$in":[11,17]}}},{"a_idx":{"$all":[19,13,16]}}]}],"a_compound":{"$elemMatch":{"$gte":14}},"a_noidx":{"$elemMatch":{"$gte":12}},"k_compound":{"$nin":[10,2]}}},{"$sort":{"c_idx":1,"h_idx":-1}},{"$limit":142},{"$project":{"_id":0,"a_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1","indexBounds":{"k_compound":["[MinKey, 2.0)","(2.0, 10.0)","(10.0, MaxKey]"]}}}}},
-    "keys" :  99802,
-    "docs" :  99800,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[13.0, 13.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, 2.0)","(2.0, 10.0)","(10.0, MaxKey]"],"a_compound":["[MinKey, 3.0)","(3.0, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[MinKey, 2.0)","(2.0, 10.0)","(10.0, MaxKey]"],"a_compound":["[11.0, 11.0]","[17.0, 17.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_idx_1","indexBounds":{"d_idx":["[MinKey, MaxKey]"]}}}]}}}},
+    "keys" : 548567,
+    "docs" : 302804,
     "sorts": 594320,
-    "plans":     27,
+    "plans":     28,
     "rows" :    142},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$lte":2}},"z_compound":{"$exists":true}}},{"$project":{"k_idx":1}}],
@@ -6068,11 +6068,11 @@
     "rows" :  46685},
 
 {">>>pipeline": [{"$match":{"$and":[{"$and":[{"c_idx":{"$lte":15}},{"a_idx":{"$nin":[8,3]}},{"$or":[{"h_compound":{"$exists":false}},{"z_compound":{"$exists":true}}]}]},{"a_idx":{"$elemMatch":{"$exists":true}}}],"a_compound":{"$nin":[14,8,6,1]}}},{"$sort":{"d_idx":1,"k_idx":1}},{"$project":{"_id":0,"h_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[-inf, 15.0]"]}}}}},
-    "keys" : 100000,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}}}},
+    "keys" : 468941,
     "docs" : 100000,
     "sorts": 284574,
-    "plans":     13,
+    "plans":     14,
     "rows" :  25528},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"a_compound":{"$lt":18}},{"a_compound":{"$elemMatch":{"$exists":false,"$nin":[4,11,2]}}},{"a_compound":{"$eq":19}}]},{"a_compound":{"$eq":4}}],"i_noidx":{"$gte":6}}},{"$project":{"a_compound":1,"a_noidx":1,"i_idx":1}}],
@@ -6124,11 +6124,11 @@
     "rows" : 100000},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$exists":false}},{"$nor":[{"a_idx":{"$all":[8,4,7]}},{"d_compound":{"$exists":false}},{"a_compound":{"$elemMatch":{"$exists":false,"$nin":[7,8]}}},{"a_idx":{"$all":[10,2,9]}},{"a_compound":{"$all":[9,11]}},{"a_idx":{"$lte":20}}]}],"a_idx":{"$gte":3}}},{"$sort":{"a_idx":1,"c_idx":1}},{"$limit":36}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[8.0, 8.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[10.0, 10.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_compound_1","indexBounds":{"d_compound":["[null, null]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[9.0, 9.0]"]}}},{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[-inf, 20.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[null, null]"]}}}]}}},
-    "keys" : 222042,
-    "docs" : 121101,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[MinKey, MaxKey]"]}}}},
+    "keys" : 468941,
+    "docs" : 100000,
     "sorts": 458347,
-    "plans":     23,
+    "plans":     24,
     "rows" :     36},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_idx":{"$elemMatch":{"$in":[7,6,14]}}},{"a_idx":{"$nin":[6,12,16,1]}},{"a_idx":{"$elemMatch":{"$in":[5,3,4,13]}}},{"a_idx":{"$all":[14,8,8,19,18]}}],"h_noidx":{"$gte":9}}},{"$sort":{"c_idx":-1}},{"$limit":215},{"$project":{"a_compound":1}}],
@@ -6404,11 +6404,11 @@
     "rows" :  20085},
 
 {">>>pipeline": [{"$match":{"$or":[{"z_idx":{"$lte":20}},{"$nor":[{"a_idx":{"$exists":false}},{"a_compound":{"$elemMatch":{"$nin":[11,17,8]}}},{"$or":[{"i_idx":{"$exists":true}},{"z_idx":{"$exists":false}}]},{"a_idx":{"$lte":18}}]}],"a_compound":{"$elemMatch":{"$lte":2,"$nin":[8,6,2]}}}},{"$sort":{"i_idx":-1,"z_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[-inf, 2.0)"]}}}},
-    "keys" :  54506,
-    "docs" :  50725,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}},{"stage":"IXSCAN","indexName":"z_idx_1","indexBounds":{"z_idx":["[-inf, 20.0]"]}}]}}},
+    "keys" : 568941,
+    "docs" : 200000,
     "sorts": 600288,
-    "plans":     11,
+    "plans":     12,
     "rows" :  50725},
 
 {">>>pipeline": [{"$match":{"$nor":[{"k_noidx":{"$lt":9}},{"a_compound":{"$all":[6,2,7]}},{"h_noidx":{"$lte":2}}],"a_idx":{"$nin":[13,7]},"c_noidx":{"$nin":[11,18,7]}}}],
@@ -7376,15 +7376,15 @@
     "keys" :  12111,
     "docs" :  12111,
     "sorts": 125977,
-    "plans":     15,
+    "plans":     16,
     "rows" :  12111},
 
 {">>>pipeline": [{"$match":{"$and":[{"d_noidx":{"$gt":6}},{"k_idx":{"$exists":true}},{"d_idx":{"$lt":10}},{"$or":[{"a_idx":{"$nin":[5,12]}},{"a_idx":{"$exists":false}},{"i_compound":{"$exists":false}}]}],"a_noidx":{"$nin":[17,3,6]},"c_idx":{"$nin":[8,18]}}},{"$sort":{"a_idx":1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[MinKey, 8.0)","(8.0, 18.0)","(18.0, MaxKey]"]}}}},
-    "keys" : 100000,
+    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MinKey, MaxKey]"]}}},
+    "keys" : 468941,
     "docs" : 100000,
-    "sorts": 252454,
-    "plans":     11,
+    "sorts":      0,
+    "plans":     12,
     "rows" :  22872},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$nor":[{"a_compound":{"$all":[2,14]}},{"a_idx":{"$elemMatch":{"$gte":15}}},{"a_compound":{"$ne":19}}]},{"a_idx":{"$nin":[6,7,7]}}],"i_compound":{"$nin":[20,13,18]}}}],
@@ -8380,7 +8380,7 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1043, "plans": 12165, "keys": 105316686, "docs": 57300503, "sorts": 69302182, "rows": 38020022, "errors":      0},
+">>>totals": {"pipelines": 1043, "plans": 12208, "keys": 111348255, "docs": 58917707, "sorts": 69058405, "rows": 38020022, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"mixed","internalQueryCBRCEMode":"samplingCE","internalQueryMixedPlanRankingStrategy":"NoMultiplanningResults","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 

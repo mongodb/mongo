@@ -76,7 +76,18 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
             const explain = cursor.explain();
             const plans = getAllPlans(explain);
             for (const plan of plans) {
-                assert(plan.hasOwnProperty("cardinalityEstimate"));
+                if (!plan.hasOwnProperty("cardinalityEstimate")) {
+                    // CBR abandons estimation for the whole query when a scan node estimates to
+                    // zero, handing all candidates to the multi-planner and reporting no estimates
+                    // in explain. That may only happen when the predicate truly matches nothing.
+                    assert.eq(
+                        0,
+                        actualDocuments,
+                        "plan has no cardinality estimate but the predicate matches documents",
+                        {predicate, plan},
+                    );
+                    continue;
+                }
                 const cardinalityEstimate = plan.cardinalityEstimate;
 
                 // 'Histogram', 'Code' and 'Metadata' all imply a confident estimate,

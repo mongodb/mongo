@@ -429,7 +429,9 @@ public:
                                                std::move(result.maybeExplainData));
             }
         }
-
+        if (result.solutions.size() > 1) {
+            CurOp::get(_opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+        }
         return buildMultiPlan(std::move(rankerResult.getValue()));
     }
 

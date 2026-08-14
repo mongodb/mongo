@@ -71,8 +71,11 @@ for (const config of samplingConfigs) {
 
     // Run a query with explain and check that the plans are costed using samplingCE. On a replica
     // set the sampling read relies on majority-committed data, which can briefly lag the inserts
-    // above. Poll until every candidate plan is costed via sampling.
-    const samplingQuery = {a: {$gt: 500}, b: {$lt: 5}};
+    // above. Poll until every candidate plan is costed via sampling. Both predicates must match
+    // within any sample - in particular the sequential-scan sample, which only covers the first
+    // few hundred documents (a = 0..~383) - since a zero scan estimate (ZeroCEEstimate) would
+    // make CBR hand the plans to the multi-planner uncosted.
+    const samplingQuery = {a: {$gt: 100}, b: {$lt: 5}};
     assert.soon(
         () => {
             const plans = getAllPlans(coll.find(samplingQuery).explain());

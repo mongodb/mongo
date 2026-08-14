@@ -89,15 +89,16 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
     return static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
 }
 
-const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
-                                 size_t numDocs,
-                                 OperationContext& opCtx,
-                                 int sampleSize,
-                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
-                                 NamespaceString nss,
-                                 SamplingCEMethodEnum samplingStyle,
-                                 boost::optional<int> numChunks,
-                                 boost::optional<PlanningTimeProfile&> timeProfile) {
+std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    NamespaceString nss,
+    SamplingCEMethodEnum samplingStyle,
+    boost::optional<int> numChunks,
+    boost::optional<PlanningTimeProfile&> timeProfile,
+    boost::optional<std::vector<size_t>&> originalPlanHashes) {
     const auto collection = acquireCollection(
         &opCtx,
         CollectionAcquisitionRequest(nss,
@@ -136,6 +137,13 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames);
 
+    if (originalPlanHashes) {
+        ASSERT(statusWithMultiPlanSolns.isOK());
+        for (const auto& soln : statusWithMultiPlanSolns.getValue()) {
+            originalPlanHashes->push_back(soln->hash());
+        }
+    }
+
     Timer generateSampleTimer;
     samplingEstimator->generateSample(
         topLevelSampleFieldNames.empty()
@@ -159,7 +167,20 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     }
 
     ASSERT(statusWithCBRSolns.isOK());
-    auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
+    return std::move(statusWithCBRSolns.getValue().solutions);
+}
+
+const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
+                                 size_t numDocs,
+                                 OperationContext& opCtx,
+                                 int sampleSize,
+                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
+                                 NamespaceString nss,
+                                 SamplingCEMethodEnum samplingStyle,
+                                 boost::optional<int> numChunks,
+                                 boost::optional<PlanningTimeProfile&> timeProfile) {
+    auto solutions =
+        cbrRankPlans(cq, numDocs, opCtx, sampleSize, nss, samplingStyle, numChunks, timeProfile);
     ASSERT(solutions.size() == 1);
     const QuerySolution* result = solutions[0].get();
     // The plan itself is owned by bestCBRPlan

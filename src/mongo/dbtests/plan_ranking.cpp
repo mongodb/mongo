@@ -92,6 +92,36 @@ public:
     }
 
     /**
+     * Assert that CBR declined to rank the plans for 'cq' (e.g. a zero cardinality estimate on
+     * a scan node) and handed all candidates back to the multi-planner.
+     */
+    void assertCBRDeclinesToRank(CanonicalQuery* cq, size_t numDocs) {
+        std::vector<size_t> originalPlanHashes;
+        auto solutions = plan_ranking_tests::cbrRankPlans(cq,
+                                                          numDocs,
+                                                          _opCtx,
+                                                          N,
+                                                          nss,
+                                                          SamplingCEMethodEnum::kRandom,
+                                                          boost::none /* numChunks */,
+                                                          boost::none /* times */,
+                                                          originalPlanHashes);
+        ASSERT_GREATER_THAN(solutions.size(), 1U);
+
+        // Every candidate must come back in the planner's original order. Multi-planner score
+        // ordering is stable for ties, so reordering the candidates here would let the winner
+        // depend on which plan CBR happened to be costing when it gave up.
+        std::vector<size_t> returnedPlanHashes;
+        for (const auto& soln : solutions) {
+            returnedPlanHashes.push_back(soln->hash());
+        }
+        ASSERT_EQ(originalPlanHashes.size(), returnedPlanHashes.size());
+        for (size_t i = 0; i < originalPlanHashes.size(); ++i) {
+            ASSERT_EQ(originalPlanHashes[i], returnedPlanHashes[i]) << "at candidate " << i;
+        }
+    }
+
+    /**
      * Was a backup plan picked during the ranking process?
      */
     bool hasBackupPlan() const {
@@ -312,12 +342,9 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedMPPlan, soln->root()).isOK());
 
-        // In fact, the optimal plan is
-        const std::string expectedCBRPlan(
-            "{fetch: {filter: {a:1}, node: "
-            "{ixscan: {filter: null, pattern: {b:1}}}}}");
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(expectedCBRPlan, cbrSoln->root()).isOK());
+        // 'b > 1' matches nothing, so the sampled scan estimate is zero (ZeroCEEstimate) and
+        // CBR hands all plans back to the multi-planner.
+        assertCBRDeclinesToRank(cq.get(), N);
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -432,11 +459,9 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
 
-        // Both plans see CE = 0 from the sampler. CardinalityEstimator::clampZeroEstimates
-        // floors approximate zeros to kMinCE and the CostEstimator's additive per-stage minimum
-        // breaks the resulting tie in favour of the structurally cheaper covered plan.
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // Both plans see CE = 0 from the sampler on their scan nodes (ZeroCEEstimate), so CBR
+        // declines to rank them and hands them back to the multi-planner.
+        assertCBRDeclinesToRank(cq.get(), N);
     }
 };
 
@@ -468,8 +493,9 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // 'a = N+1' matches nothing, so the sampled scan estimate is zero (ZeroCEEstimate) and
+        // CBR hands all plans back to the multi-planner.
+        assertCBRDeclinesToRank(cq.get(), N);
     }
 };
 
@@ -505,8 +531,9 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // 'a >= N+1' matches nothing, so the sampled scan estimate is zero (ZeroCEEstimate) and
+        // CBR hands all plans back to the multi-planner.
+        assertCBRDeclinesToRank(cq.get(), N);
     }
 };
 

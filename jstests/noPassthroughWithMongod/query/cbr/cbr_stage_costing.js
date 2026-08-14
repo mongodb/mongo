@@ -8,7 +8,12 @@
  * ]
  */
 
-import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getRejectedPlans,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
+import {isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -69,6 +74,17 @@ function planCost(cursor) {
     const explain = cursor.explain();
     const winningPlan = getWinningPlanFromExplain(explain);
     return winningPlan.costEstimate;
+}
+
+/**
+ * Asserts that no plan for 'cursor' carries a cost. A scan node estimated at zero rows aborts CBR
+ * (ZeroCEEstimate) and the multi-planner ranks the candidates uncosted.
+ */
+function assertNoPlanCosted(cursor) {
+    const explain = cursor.explain();
+    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach((plan) => {
+        assert(!isPlanCosted(plan), "expected the plan to not be costed", {plan});
+    });
 }
 
 /**
@@ -171,11 +187,15 @@ function runTest(planRankerMode) {
 
     // Some cost assertions require actual, non-heuristic cardinality estimates
     if (planRankerMode !== "heuristicCE") {
-        // IXSCAN cost for an interval containing no documents should be small. The CE for
-        // such an interval is approximate-source zero, which clampZeroEstimates clamps to
-        // 1, so the cost matches that of a one-document interval rather than collapsing to
-        // minCost.
-        assert.between(0.0, ixscanCost({predicate: {a: {$lt: 0}}, hint: {a: 1}}), 0.005);
+        // IXSCAN cost for an interval containing no documents should fallback to multiplanning.
+        assert(
+            !isPlanCosted(
+                coll
+                    .find({a: {$lt: 0}})
+                    .hint({a: 1})
+                    .explain(),
+            ),
+        );
 
         // IXSCAN cost for an interval containing one document should be small.
         assert.between(0.0, ixscanCost({predicate: {a: {$lte: 0}}, hint: {a: 1}}), 0.005);
@@ -355,8 +375,9 @@ function runTest(planRankerMode) {
      */
 
     if (planRankerMode !== "heuristicCE") {
-        // FETCH cost should be very small if there is nothing to fetch.
-        assert.lt(rootStageCost(coll.find({a: -1}).hint({a: 1})), 0.01);
+        // There is nothing to fetch: the scan is estimated at zero rows, which aborts CBR, so no
+        // plan is costed at all.
+        assertNoPlanCosted(coll.find({a: -1}).hint({a: 1}));
 
         // FETCH cost should be small if there is one document to fetch.
         assert.lt(rootStageCost(coll.find({a: 1}).hint({a: 1})), 0.01);
@@ -599,7 +620,10 @@ function runTest(planRankerMode) {
 
     // Projections over empty imputs have negligible cost.
     assert.lt(rootStageCost(collZeroRows.find({}, {_id: 0}).hint({$natural: 1})), 0.01);
-    assert.lt(rootStageCost(collZeroRows.find({}, {_id: 0}).hint({a: 1})), 0.01);
+
+    // Over an index scan on the same empty collection the scan is estimated at zero rows, which
+    // aborts CBR, so no plan is costed at all.
+    assertNoPlanCosted(collZeroRows.find({}, {_id: 0}).hint({a: 1}));
 
     // Projections over more documents are more costly.
     assert.gt(

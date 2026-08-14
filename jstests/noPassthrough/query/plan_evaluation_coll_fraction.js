@@ -1,6 +1,12 @@
 /**
  * Tests the behavior of the internalQueryPlanTotalEvaluationCollFraction parameter.
  */
+import {
+    assertChosenRanker,
+    ChosenRanker,
+    getEngine,
+    PlanRankerReason,
+} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it, beforeEach, after} from "jstests/libs/mochalite.js";
@@ -127,8 +133,50 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
     } else if (planRanker === "mixed" && !sbeFeatureFlagFullEnabled) {
         describe("Mixed plan ranker", function () {
             describe("fallback to CBR", function () {
-                it("does not update multi-planner metrics when plan cache is disabled", function () {
-                    // We do not measure works for the chosen CBR plan, so MP metrics must not change.
+                // The query matches nothing on a fully-sampled collection, so CBR's scan
+                // estimates are zero (ZeroCEEstimate) and CBR hands ranking back to the
+                // multi-planner, whose stopping condition is recorded regardless of the plan
+                // cache setting.
+                it("records the multi-planner stopping condition when plan cache is disabled", function () {
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}),
+                    );
+
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 1,
+                        },
+                        getStoppingCondition(0.1),
+                    );
+
+                    assert.docEq(
+                        {
+                            hitEof: 1,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(20.0),
+                    );
+                });
+
+                it("does not update multi-planner metrics when CBR chooses the winner", function () {
+                    // One matching document exists, but it sits beyond the trial phase's works
+                    // budget, so multi-planning produces no result and hands over to CBR. The
+                    // sample does observe the document, so CBR costs the plans and picks the
+                    // winner. We do not measure works for the chosen CBR plan, so with the plan
+                    // cache disabled the MP metrics must not change.
+                    coll.insert({
+                        nonSelective1: 0,
+                        nonSelective2: 0,
+                        nonSelective3: 0,
+                        nonSelective4: 0,
+                        nonSelective5: 0,
+                        nonSelective6: 0,
+                        selective: -1,
+                    });
+
                     assert.commandWorked(
                         db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}),
                     );
@@ -142,19 +190,20 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                         getStoppingCondition(0.1),
                     );
 
-                    assert.docEq(
-                        {
-                            hitEof: 0,
-                            hitResultsLimit: 0,
-                            hitWorksLimit: 0,
-                        },
-                        getStoppingCondition(20.0),
-                    );
+                    const explain = coll.find(query).explain();
+                    // TODO SERVER-117707: CBR is not engaged for SBE-targeted queries, so the
+                    // winner is only costed under the classic engine. Drop the guard once CBR
+                    // supports SBE.
+                    if (getEngine(explain) === "classic") {
+                        assertChosenRanker(explain, {
+                            chosenRanker: ChosenRanker.kCostBased,
+                            reason: PlanRankerReason.kNoMultiplanningResults,
+                        });
+                    }
                 });
 
-                it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
-                    // With plan cache enabled, we measure works for the CBR-chosen plan.
-                    // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
+                it("records hitWorksLimit with low collFraction", function () {
+                    // At low collFraction, the resumed multi-planner stops on its works budget.
                     assert.commandWorked(
                         db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}),
                     );
@@ -163,22 +212,21 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                         {
                             hitEof: 0,
                             hitResultsLimit: 0,
-                            hitWorksLimit: 0,
+                            hitWorksLimit: 1,
                         },
                         getStoppingCondition(0.1),
                     );
                 });
 
-                it("records hitEof when CBR fallback is measured with high collFraction", function () {
-                    // With a higher collFraction, CBR can run until EOF instead of hitting works limit.
-                    // With plan cache enabled, this should be reflected as hitEof.
+                it("records hitEof with high collFraction", function () {
+                    // With a higher collFraction, the resumed multi-planner runs until EOF.
                     assert.commandWorked(
                         db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}),
                     );
 
                     assert.docEq(
                         {
-                            hitEof: 0,
+                            hitEof: 1,
                             hitResultsLimit: 0,
                             hitWorksLimit: 0,
                         },

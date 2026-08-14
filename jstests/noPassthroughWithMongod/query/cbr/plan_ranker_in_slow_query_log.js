@@ -16,17 +16,33 @@ import {setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 const collName = jsTestName();
 const coll = db[collName];
 
+const kNumDocs = 1000;
+// The predicate used throughout. Both fields are low-cardinality (see 'before') so that every
+// conjunct matches a large fraction of the collection: under samplingCE, a predicate matching only
+// a handful of documents may be absent from the sample entirely, and a resulting zero cardinality
+// estimate aborts CBR in favor of the multi-planner - which would make the "cbr" expectation below
+// flaky.
+const kPredicate = {a: 1, b: 6};
+// 'a' is i%5 and 'b' is i%10, so b==6 implies a==1: every tenth document matches both conjuncts.
+const kMatchingDocs = kNumDocs / 10;
+
 describe("planRanker in slow query log and profiler", function () {
     before(function () {
         // Two competing single-field indexes plus a predicate on each field guarantees that more
         // than one candidate plan is enumerated, so plan ranking actually takes place.
         coll.drop();
         const docs = [];
-        for (let i = 0; i < 1000; i++) {
-            docs.push({a: i % 5, b: i});
+        for (let i = 0; i < kNumDocs; i++) {
+            docs.push({a: i % 5, b: i % 10});
         }
         assert.commandWorked(coll.insert(docs));
         assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
+
+        // Guard the assumption above: each conjunct, and the conjunction, must match enough
+        // documents that any sample contains some of them.
+        assert.eq(coll.find(kPredicate).itcount(), kMatchingDocs);
+        assert.gte(coll.find({a: kPredicate.a}).itcount(), kMatchingDocs);
+        assert.gte(coll.find({b: kPredicate.b}).itcount(), kMatchingDocs);
     });
 
     // Runs a find query and returns the 'planRanker' value captured from both the slow query log
@@ -34,12 +50,10 @@ describe("planRanker in slow query log and profiler", function () {
     function runAndGetPlanRanker(marker) {
         coll.getPlanCache().clear();
 
-        const predicate = {a: 1, b: 6};
-
         // Log every operation (slowms: 0).
         try {
             assert.commandWorked(db.setProfilingLevel(2, {slowms: 0}));
-            assert.eq(coll.find(predicate).comment(marker).itcount(), 1);
+            assert.eq(coll.find(kPredicate).comment(marker).itcount(), kMatchingDocs);
         } finally {
             assert.commandWorked(db.setProfilingLevel(0));
         }
@@ -90,16 +104,15 @@ describe("planRanker in slow query log and profiler", function () {
     it("reports 'none' when a cached plan is used (no ranking took place)", function () {
         setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
 
-        const predicate = {a: 1, b: 6};
         coll.getPlanCache().clear();
-        coll.find(predicate).itcount();
-        coll.find(predicate).itcount(); // Second miss: promotes entry to active
+        coll.find(kPredicate).itcount();
+        coll.find(kPredicate).itcount(); // Second miss: promotes entry to active
 
         // Third run: no ranking takes place.
         const marker = "planRankerMarkerCacheHit";
         try {
             assert.commandWorked(db.setProfilingLevel(2, {slowms: 0}));
-            assert.eq(coll.find(predicate).comment(marker).itcount(), 1);
+            assert.eq(coll.find(kPredicate).comment(marker).itcount(), kMatchingDocs);
         } finally {
             assert.commandWorked(db.setProfilingLevel(0));
         }

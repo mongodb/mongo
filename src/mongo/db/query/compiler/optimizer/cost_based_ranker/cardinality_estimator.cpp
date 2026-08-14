@@ -11,6 +11,7 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/logv2/log.h"
 
 #include <string_view>
 
@@ -192,6 +193,21 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     if (!ceRes.isOK()) {
         return ceRes;
     }
+
+    // A zero scan estimate fails the whole plan because CBR does not always pick the better plan
+    // in this case.
+    if (nodeType == STAGE_IXSCAN && ceRes.getValue() == zeroCE) {
+        LOGV2_DEBUG(13336200,
+                    2,
+                    "Aborting CBR plan estimation: a scan node's cardinality estimate is zero. "
+                    "The plan will be ranked by the multi-planner instead",
+                    "stage"_attr = nodeStageTypeToString(node),
+                    "ceSource"_attr = toStringData(ceRes.getValue().source()));
+        return Status(ErrorCodes::ZeroCEEstimate,
+                      str::stream() << "Node " << nodeStageTypeToString(node)
+                                    << " has a zero cardinality estimate");
+    }
+
     if (isConjunctionBreaker) {
         popSelectivities();
         _inputCard = ceRes.getValue();
