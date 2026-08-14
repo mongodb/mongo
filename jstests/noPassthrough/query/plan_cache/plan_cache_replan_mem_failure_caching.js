@@ -6,19 +6,12 @@
  * ]
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 function assertCacheBehavior(rankingMode) {
     const conn = MongoRunner.runMongod({
         setParameter: {allowDiskUseByDefault: false, internalQueryPlanRanker: rankingMode},
     });
     const db = conn.getDB("test");
-
-    if (sbePlanCacheEnabled(db)) {
-        jsTest.log.info("Skipping test because the SBE plan cache is enabled");
-        MongoRunner.stopMongod(conn);
-        quit();
-    }
 
     const coll = db[jsTestName()];
     assert(coll.drop());
