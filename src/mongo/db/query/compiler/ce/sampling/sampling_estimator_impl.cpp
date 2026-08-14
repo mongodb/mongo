@@ -333,7 +333,7 @@ size_t SamplingEstimatorImpl::calculateSampleSize(const QueryKnobConfiguration& 
     double z = getZScore(ci);
     double ciWidth = 2 * marginOfError / 100.0;
     size_t sampleSize = static_cast<size_t>(std::lround((z * z) / (ciWidth * ciWidth)));
-    tassert(sampleSize > 0, "Sample size should be larger than 0.", 113010001);
+    tassert(11301000, "Sample size should be larger than 0.", sampleSize > 0);
 
     return sampleSize;
 }
