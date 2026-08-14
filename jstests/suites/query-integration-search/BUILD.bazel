@@ -21,6 +21,7 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/mongotmock/lib",
     ],
+    shard_count = 8,
     tags = [
         "ci-release-critical",
     ],
