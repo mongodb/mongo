@@ -37,9 +37,6 @@ class ProjectionExecutor;
  *
  * For wildcards indicies (when 'wildcardProj' is specified), the projection needs to cover the
  * field over which we are distinct-ing.
- *
- * 'unwindsArrays' indicates that the distinct key is consumed through a preceding $unwind. An index
- * that is multikey on the distinct field may then be used for a strict distinct scan.
  */
 bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
                                 bool multikey,
@@ -50,7 +47,6 @@ bool isIndexSuitableForDistinct(const BSONObj& keyPattern,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly,
-                                bool unwindsArrays,
                                 const OrderedPathSet& projectionFields = {},
                                 bool hasSort = true);
 

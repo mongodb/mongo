@@ -21,8 +21,7 @@ public:
                           const BSONObj& filter = BSONObj(),
                           const BSONObj& sort = BSONObj(),
                           const BSONObj& proj = BSONObj(),
-                          const bool flipDistinctScanDirection = false,
-                          const bool unwindsArrays = false) {
+                          const bool flipDistinctScanDirection = false) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(filter);
         findCommand->setSort(sort);
@@ -43,8 +42,7 @@ public:
                               // In order to replicate what distinct() does, we set up our
                               // projection here for potential use in an optimization.
                               parsed_distinct_command::getDistinctProjection(distinctKey),
-                              flipDistinctScanDirection,
-                              unwindsArrays));
+                              flipDistinctScanDirection));
 
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
         if (statusWithMultiPlanSolns.getStatus().code() ==
@@ -231,63 +229,6 @@ TEST_F(QueryPlannerDistinctTest, FlipDistinctScanDirection) {
     assertCandidateExists(
         "{sort: {pattern: {x: 1, y: 1}, limit: 0, type: 'simple', node: {fetch: {node: {ixscan: "
         "{pattern: {x: 1, z: 1}, dir: 1}}}}}}");
-}
-
-TEST_F(QueryPlannerDistinctTest, MultikeyIndexEligibleOnlyForUnwoundDistinct) {
-    params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: 1}"), true /*multikey*/);
-
-    runDistinctQuery("x");
-    assertNumSolutions(1);
-    assertCandidateExists("{cscan: {dir: 1}}");
-
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
-    assertNumSolutions(1);
-    assertCandidateExists(
-        "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");
-}
-
-// See '_replaceUndefinedWithNull' in the DistinctScan executor.
-TEST_F(QueryPlannerDistinctTest, UnwoundDistinctReversesDescendingIndexScan) {
-    params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: -1}"), true /*multikey*/);
-
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
-    assertNumSolutions(1);
-    assertCandidateExists(
-        "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: -1}, "
-        "direction: '-1'}}}}");
-}
-
-/**
- * Even for an unwound distinct, a multikey index cannot answer a filtered query: skipping to the
- * next distinct value could skip over entries of documents matching the filter.
- */
-TEST_F(QueryPlannerDistinctTest, UnwoundDistinctWithFilterCannotUseMultikeyIndex) {
-    params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: 1}"), true /*multikey*/);
-
-    runDistinctQuery(
-        "x", fromjson("{x: {$gt: 3}}"), BSONObj(), BSONObj(), false, true /*unwindsArrays*/);
-    assertNumSolutions(1);
-    assertCandidateExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
-}
-
-/**
- * A non-multikey index qualifies for an unwound distinct scan as well.
- */
-TEST_F(QueryPlannerDistinctTest, UnwoundDistinctWithNonMultikeyIndex) {
-    params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: 1}"));
-
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
-    assertNumSolutions(1);
-    assertCandidateExists(
-        "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");
 }
 
 }  // namespace

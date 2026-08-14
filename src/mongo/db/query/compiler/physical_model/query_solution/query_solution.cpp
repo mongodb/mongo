@@ -1686,7 +1686,6 @@ std::unique_ptr<QuerySolutionNode> DistinctNode::clone() const {
     copy->direction = this->direction;
     copy->isShardFiltering = this->isShardFiltering;
     copy->isFetching = this->isFetching;
-    copy->unwindsArrays = this->unwindsArrays;
 
     return copy;
 }

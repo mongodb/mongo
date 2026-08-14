@@ -3,7 +3,6 @@
 
 #include "mongo/db/exec/classic/distinct_scan.h"
 
-#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
@@ -30,44 +29,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-namespace {
-/**
- * Returns 'key' with its 'fieldNo'-th element rewritten from undefined to null, or 'key' unchanged
- * if that element is not undefined.
- */
-BSONObj replaceUndefinedWithNull(const BSONObj& key, size_t fieldNo) {
-    size_t i = 0;
-    for (auto&& elt : key) {
-        if (i++ < fieldNo) {
-            continue;
-        }
-        if (elt.type() != BSONType::undefined) {
-            return key;
-        }
-        break;
-    }
-
-    BSONObjBuilder bob;
-    i = 0;
-    for (auto&& elt : key) {
-        if (i++ == fieldNo) {
-            bob.appendNull(elt.fieldNameStringData());
-        } else {
-            bob.append(elt);
-        }
-    }
-    return bob.obj();
-}
-
-/**
- * Returns true if the distinct field itself may contain arrays. The index may be multikey because
- * of another field, so check path-level multikey info when available.
- */
-bool distinctFieldIsMultikey(const DistinctParams& params) {
-    return params.isMultiKey &&
-        (params.multikeyPaths.empty() || !params.multikeyPaths[params.fieldNo].empty());
-}
-}  // namespace
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
                            CollectionAcquisition collection,
@@ -81,17 +42,9 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
       _scanDirection(params.scanDirection),
       _bounds(std::move(params.bounds)),
       _fieldNo(params.fieldNo),
-      // A non-multikey undefined key can only be an undefined value, which groups as undefined,
-      // whereas a multikey one is indistinguishable from an empty array, which gets the same group
-      // key as null.
-      _replaceUndefinedWithNull(params.unwindsArrays && distinctFieldIsMultikey(params)),
       _checker(&_bounds, _keyPattern, _scanDirection),
       _shardFilterer(std::move(shardFilterer)),
       _needsFetch(needsFetch) {
-    tassert(3371501,
-            "_replaceUndefinedWithNull requires that keys are scanned in an ascending order",
-            !_replaceUndefinedWithNull ||
-                _scanDirection * Ordering::make(_keyPattern).get(_fieldNo) == 1);
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = params.name;
     _specificStats.indexVersion = static_cast<int>(indexDescriptor()->version());
@@ -107,7 +60,6 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                                    .getOwned();
     _specificStats.isShardFiltering = _shardFilterer != nullptr;
     _specificStats.isFetching = _needsFetch;
-    _specificStats.unwindsArrays = params.unwindsArrays;
     _specificStats.isShardFilteringDistinctScanEnabled =
         expCtx->isFeatureFlagShardFilteringDistinctScanEnabled();
 
@@ -222,14 +174,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
         case IndexBoundsChecker::VALID: {
             if (!kv->key.isOwned())
                 kv->key = kv->key.getOwned();
-
-            if (_replaceUndefinedWithNull) {
-                // The empty array gets the same group key as the 'undefined' BSON value but
-                // produces a null group key when unwound. Note that rewriting undefined to null
-                // here also makes the seek below skip the adjacent null band, so at most one null
-                // key is returned.
-                kv->key = replaceUndefinedWithNull(kv->key, _fieldNo);
-            }
 
             // If we are retrying a fetch that yielded, reuse the existing working set member;
             // otherwise allocate a new one.

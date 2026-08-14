@@ -376,17 +376,6 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
                    "{}");
 }
 
-TEST_F(CanonicalQueryEncoderTest, ComputeKeyDistinctUnwindsArrays) {
-    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    unique_ptr<CanonicalQuery> cqPlain(canonicalize(opCtx(), "{}"));
-    cqPlain->setDistinct(CanonicalDistinct("a"));
-    unique_ptr<CanonicalQuery> cqUnwound(canonicalize(opCtx(), "{}"));
-    cqUnwound->setDistinct(
-        CanonicalDistinct("a", false, boost::none, boost::none, false, true /*unwindsArrays*/));
-    ASSERT_NOT_EQUALS(canonical_query_encoder::encodeClassic(*cqPlain),
-                      canonical_query_encoder::encodeClassic(*cqUnwound));
-}
-
 // Cache keys for $_internalBucketGeoWithin with flat and spherical geometry should
 // not be the same.
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyTimeseriesGeoWithin) {

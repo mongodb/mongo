@@ -52,10 +52,6 @@ struct RewriteOnFirstDocumentResult {
 
     // The rewritten $group stage. nullptr is the rewrite is impossible.
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage;
-
-    // True if the $group is preceded by an eligible $unwind (i.e. one with
-    // preserveNullAndEmptyArrays=true) on the grouped field.
-    bool groupFollowsUnwind = false;
 };
 
 /**

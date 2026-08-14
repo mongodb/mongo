@@ -505,7 +505,6 @@ struct DistinctScanStats : public SpecificStats {
     bool isUnique = false;
     bool isShardFiltering = false;
     bool isFetching = false;
-    bool unwindsArrays = false;
     // TODO SERVER-92983: Remove once feature flag is removed.
     bool isShardFilteringDistinctScanEnabled = false;
 
