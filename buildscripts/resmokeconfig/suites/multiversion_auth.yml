@@ -77,13 +77,6 @@ selector:
     # may be better addressed at the binary-download config level).
     - jstests/multiVersion/genericBinVersion/skip_level_upgrade.js
 
-    # TODO SERVER-132999: $-prefixed timeseries timeField/metaField support was
-    # removed in 8.3. The test starts at the last-lts binary expecting it to allow creating such
-    # collections before upgrade. Now that last-lts is 9.0 (>= 8.3), the starting binary already
-    # rejects them, so assertCreateDollarCollectionsWorks fails. Documented for removal of the upgrade
-    # portion once 9.0 is last-lts (SERVER-117054).
-    - jstests/multiVersion/genericBinVersion/query-integration-timeseries/timeseries_dollar_prefixed_timefield_errors.js
-
     # TODO SERVER-133011: the test hardcodes the expected change-event sequence
     # produced by the last-lts binary. Now that last-lts is 9.0, the DDL change-event stream differs
     # from 8.0 (an extra/relocated "create" event), so the expectedEvents sequence no longer matches

@@ -35,7 +35,6 @@ selector:
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js
     - jstests/multiVersion/genericBinVersion/query-optimization/object_bindata_convert_upgrade_downgrade.js
     - jstests/multiVersion/genericBinVersion/skip_level_upgrade.js
-    - jstests/multiVersion/genericBinVersion/query-integration-timeseries/timeseries_dollar_prefixed_timefield_errors.js
     - jstests/multiVersion/genericChangeStreams/change_streams_event_resumability.js
     - jstests/multiVersion/genericSetFCVUsage/replica_set_write_block_upgrade_downgrade.js
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/major_version_upgrade.js

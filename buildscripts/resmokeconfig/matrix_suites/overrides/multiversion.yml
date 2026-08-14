@@ -408,9 +408,6 @@
       - jstests/sharding/resharding_verification_timeout.js
       - jstests/sharding/resharding_clone_count_uses_shard_key_index.js
       - jstests/sharding/reshard_collection_validation_size_threshold.js
-      # TODO SERVER-132999: requires_fcv_90 now runs with 9.0 last-LTS, but
-      # the 9.0 binary does not apply fixed-bucket event-filter pruning expected by this test.
-      - jstests/sharding/timeseries/timeseries_query_extended_range.js
       # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
       # enabled at 9.0 last-LTS, so the v2 reader bypasses the v1 failpoint used by this test.
       - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
@@ -419,11 +416,3 @@
       - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
       # TODO SERVER-132935: re-enable once the 9.0 binary can parse latestFCV 9.1.
       - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
-
-- name: sharding_jscore_passthrough_last_lts_new_old_old_new_excluded_files
-  value:
-    exclude_files:
-      # TODO SERVER-132999: requires_fcv_90 now runs with the 9.0 last-LTS
-      # mongos, but that binary lacks the fixed-bucket rewrites expected by these tests.
-      - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
-      - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js

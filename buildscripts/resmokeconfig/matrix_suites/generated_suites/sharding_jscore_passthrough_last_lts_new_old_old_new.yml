@@ -66,8 +66,6 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
-    - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

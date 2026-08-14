@@ -6,7 +6,7 @@
  * @tags: [
  *   # This test moves chunks around itself.
  *   assumes_balancer_off,
- *   requires_fcv_90,
+ *   requires_fcv_91,
  * ]
  */
 

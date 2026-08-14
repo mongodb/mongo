@@ -6,7 +6,7 @@
  *     uses_explain,
  *     # We need a timeseries collection.
  *     requires_timeseries,
- *     requires_fcv_90,
+ *     requires_fcv_91,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # Refusing to run a test that issues an aggregation command with explain because it may

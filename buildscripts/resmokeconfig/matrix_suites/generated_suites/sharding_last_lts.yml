@@ -28,7 +28,6 @@ selector:
     - jstests/sharding/resharding_verification_timeout.js
     - jstests/sharding/resharding_clone_count_uses_shard_key_index.js
     - jstests/sharding/reshard_collection_validation_size_threshold.js
-    - jstests/sharding/timeseries/timeseries_query_extended_range.js
     - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
     - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
     - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
