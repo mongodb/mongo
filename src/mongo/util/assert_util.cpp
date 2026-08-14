@@ -16,6 +16,7 @@
 #include "mongo/util/str.h"
 
 #include <csignal>
+#include <cstdio>
 #include <exception>
 #include <ostream>
 #include <string_view>
@@ -70,7 +71,8 @@ MONGO_COMPILER_NORETURN void callAbort() {
     if (reentry++)
         endProcessWithSignal(SIGABRT);
 
-    [[maybe_unused]] static auto initOnce = (std::abort(), 0);
+    [[maybe_unused]] static auto initOnce =
+        (std::fflush(stdout), std::fflush(stderr), std::abort(), 0);
     MONGO_COMPILER_UNREACHABLE;
 }
 }  // namespace

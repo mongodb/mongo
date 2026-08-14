@@ -6,6 +6,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/exit_code.h"
 
+#include <cstdio>
 #include <mutex>  // IWYU pragma: keep
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)

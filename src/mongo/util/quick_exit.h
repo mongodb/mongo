@@ -9,6 +9,8 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <cstdio>
+
 [[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
@@ -33,6 +35,9 @@ MONGO_COMPILER_NORETURN inline void quickExit(ExitCode code) {
     if (code == ExitCode::clean) {
         TestingProctor::instance().exitAbruptlyIfDeferredErrors(false);
     }
+
+    std::fflush(stdout);
+    std::fflush(stderr);
     quickExitWithoutLogging(code);
 }
 
