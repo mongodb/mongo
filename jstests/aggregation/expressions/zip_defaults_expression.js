@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   # The whole-array defaults mode is only supported by binaries with SERVER-109615.
- *   requires_fcv_90,
+ *   requires_fcv_91,
  * ]
  */
 import "jstests/libs/query/sbe_assert_error_override.js";

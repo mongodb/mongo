@@ -4,7 +4,7 @@
 // @tags: [
 //     # The accumulator does not exist on older binaries, which fail with "unknown group
 //     # operator" instead of the internal-only rejection.
-//     requires_fcv_90,
+//     requires_fcv_91,
 // ]
 import {before, describe, it} from "jstests/libs/mochalite.js";
 
