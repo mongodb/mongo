@@ -121,8 +121,8 @@ inline boost::optional<PlanExplainerData>& operator<<(boost::optional<PlanExplai
  * seam exists to prevent.
  *
  * Nor does the reported version (getVersion()) determine the format: "3" is deliberately
- * reported for legacy-shaped output throughout the mixed-fidelity windows (planSummary /
- * plannerChoice until SERVER-131451, SBE/Express until SERVER-132033) - version reporting is
+ * reported for legacy-shaped output throughout the mixed-fidelity windows (planSummary until
+ * SERVER-133235, SBE/Express until SERVER-132033) - version reporting is
  * uniform by design while output fidelity varies per path, so the two must stay
  * decoupled.
  *

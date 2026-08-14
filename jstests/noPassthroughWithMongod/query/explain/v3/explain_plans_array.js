@@ -2,7 +2,9 @@
  * Tests the V3 "queryPlanner.plans" array. It runs the same query under every plan-ranker mode
  * (pure multi-planning, strict CBR with sampling and heuristic CE, and the default mixed mode
  * with both of its outcomes), plus the special plan cases (cached plan, single plan,
- * subplanned $or, EOF, count, express). For each resulting explain it asserts:
+ * subplanned $or, EOF, count, express). Unless a case says otherwise the verbosity is
+ * plannerStats; plannerChoice, which renders the same shape with every statistic withheld, has its
+ * own case. For each resulting explain it asserts:
  *
  * - The per-plan object layout: {isCached, solutionHashUnstable, multiPlanStats, planStages}.
  * - The per-node "statistics" grouping: {costBased, multiPlan}. The grouping is sparse - a
@@ -277,6 +279,53 @@ describe("V3 queryPlanner.plans array", function () {
         }
         // The plans after the winner are in cost-ascending order (the cost-based ranker decided).
         assertAscending(costs.slice(1), plans);
+    });
+
+    it("plannerChoice: same plans[] shape, structure only", function () {
+        // plannerChoice renders the same plans[] shape as the stats-rich modes but withholds every
+        // statistic: no per-node "statistics" grouping of either family and no plan-level
+        // "multiPlanStats". Asserted under both mixed-mode outcomes, since what is excluded must not
+        // depend on which ranker did the deciding - only the plan *order* does.
+        for (const [name, filter] of [
+            ["multi-planner decided", matchingFilter],
+            ["cost-based ranker decided", cbrWinFilter],
+        ]) {
+            setPlanRankerConfig(db); // Defaults: mixed ranking, sampling CE.
+            const explain = explainFind(filter, "plannerChoice");
+            assert.eq(explain.explainVersion, "3", "expected V3 version reporting", {
+                explain,
+                name,
+            });
+            const plans = getV3Plans(explain);
+            assert.gte(plans.length, 2, "expected multiple candidate plans", {plans, name});
+            for (const plan of plans) {
+                assertWellFormedPlan(plan);
+                assert(!hasMultiPlanGroup(plan), "unexpected multiPlan group", {plan, name});
+                assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan, name});
+                assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {
+                    plan,
+                    name,
+                });
+                forEachNode(plan.planStages, (node) => {
+                    assert(!node.hasOwnProperty("statistics"), "unexpected statistics", {
+                        node,
+                        name,
+                    });
+                });
+            }
+
+            // The structure itself is unabridged: the same stage trees plannerStats shows.
+            const statsPlans = getV3Plans(explainFind(filter, "plannerStats"));
+            assert.eq(plans.length, statsPlans.length, {plans, statsPlans, name});
+            const stagesOf = (plan) => {
+                const stages = [];
+                forEachNode(plan.planStages, (node) => stages.push(node.stage));
+                return stages;
+            };
+            for (let i = 0; i < plans.length; ++i) {
+                assert.eq(stagesOf(plans[i]), stagesOf(statsPlans[i]), {plans, statsPlans, name});
+            }
+        }
     });
 
     it("featureFlagCostBasedRanker off behaves as pure multi-planning", function () {

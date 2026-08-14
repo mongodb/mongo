@@ -832,11 +832,13 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob.append("filter", stats.common.filter);
     }
 
-    // The per-node statistics grouping. Sparse: the subobject (and each group inside it) is
-    // present only when the corresponding statistics were computed for this node - "costBased"
-    // iff the cost-based ranker estimated this node, "multiPlan" iff this tree carries
-    // multi-planning trial counters and the policy requests per-candidate statistics.
-    const bool hasCostBased = querySolutionNode && estimates.contains(querySolutionNode);
+    // The per-node statistics grouping. Sparse: the subobject (and each group inside it) is present
+    // only when the policy requests that family of statistics AND it was computed for this node -
+    // "costBased" iff the cost-based ranker estimated this node, "multiPlan" iff this tree carries
+    // multi-planning trial counters. The plannerChoice mode requests neither family, so no node
+    // carries a "statistics" subobject at all there, however the plans were ranked.
+    const bool hasCostBased = explainPolicy.hasCostBasedStats() && querySolutionNode &&
+        estimates.contains(querySolutionNode);
     const bool hasMultiPlan = explainPolicy.hasAllPlansStats() && isTrialTree;
     if (hasCostBased || hasMultiPlan) {
         BSONObjBuilder statisticsBob(bob.subobjStart("statistics"));

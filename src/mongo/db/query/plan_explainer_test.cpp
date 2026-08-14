@@ -497,6 +497,57 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3StopConditionExhaustedBudget) {
     }
 }
 
+TEST_F(PlanExplainerTest, GetPlanEntriesV3PlannerChoiceIsStructureOnly) {
+    // plannerChoice renders the same V3 plans[] shape as the stats-rich modes - one entry per
+    // candidate, winner first - but excludes both ranking-statistics families and execution
+    // statistics. The query multi-plans, so trial statistics exist and are deliberately withheld:
+    // no node carries a "statistics" subobject and no entry carries a plan-level summary.
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    const auto policy = explainPolicyFor(ExplainOptions::Verbosity::kPlannerChoice);
+    auto entries = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+
+    for (const auto& entry : entries) {
+        // The plans did run a trial - that is what 'hasTrialStats' records - but this verbosity
+        // reports none of it: no plan-level summary, hence no "multiPlanStats" and no
+        // "stopCondition" in the assembled output.
+        ASSERT(entry.hasTrialStats) << entry.planStatsTree;
+        ASSERT_FALSE(entry.summary.has_value()) << entry.planStatsTree;
+
+        forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
+            ASSERT(node.hasField("stage")) << node;
+            ASSERT_FALSE(node.hasField("statistics")) << node;
+            // Counters never leak out of the statistics grouping either.
+            ASSERT_FALSE(node.hasField("works")) << node;
+            ASSERT_FALSE(node.hasField("nReturned")) << node;
+        });
+    }
+
+    // Structure is still fully described: the same trees the stats-rich modes show, minus the
+    // statistics. Comparing stage sequences pins that plannerChoice is a projection of plannerStats
+    // rather than a differently shaped output.
+    auto statsEntries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kMultiPlanner);
+    ASSERT_EQ(entries.size(), statsEntries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        std::vector<std::string> plannerChoiceStages;
+        std::vector<std::string> plannerStatsStages;
+        forEachV3Node(entries[i].planStatsTree, [&](const BSONObj& node) {
+            plannerChoiceStages.push_back(node["stage"].String());
+        });
+        forEachV3Node(statsEntries[i].planStatsTree, [&](const BSONObj& node) {
+            plannerStatsStages.push_back(node["stage"].String());
+        });
+        ASSERT_EQ(plannerChoiceStages, plannerStatsStages)
+            << entries[i].planStatsTree << statsEntries[i].planStatsTree;
+    }
+}
+
 TEST_F(PlanExplainerTest, GetPlanEntriesV3SingleSolutionSparseStatistics) {
     // Sparseness: a single-solution plan never ran a trial and was never costed, so no node has a
     // "statistics" subobject at all (absent, not empty), and there are no plan-level trial stats.

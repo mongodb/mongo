@@ -389,14 +389,22 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
 }
 
 /**
- * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for the
- * stats-rich V3 verbosities (plannerStats, execStats) - the version-independent general block
- * followed by one uniform "plans" array of per-plan objects (winner first, then the remaining
- * candidates ordered by the deciding ranker's metric), replacing the legacy winningPlan /
- * rejectedPlans split. There are two deliberate delegation windows:
+ * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for
+ * plannerChoice and the stats-rich V3 verbosities (plannerStats, execStats) - the
+ * version-independent general block followed by one uniform "plans" array of per-plan objects
+ * (winner first, then the remaining candidates ordered by the deciding ranker's metric), replacing
+ * the legacy winningPlan / rejectedPlans split.
  *
- * - planSummary / plannerChoice still render legacy-shaped output under explainVersion "3".
- *   TODO SERVER-131451 (the reductions) closes that window.
+ * The shape is uniform across those modes; what varies is which statistics each plan carries, and
+ * that is decided by the ExplainPolicy alone. At plannerChoice both ranking-statistics families are
+ * off, so plans[] holds structure only: no per-node "statistics" subobject and no plan-level
+ * "multiPlanStats". The plans are still *ordered* by the deciding ranker's metric - ordering reads
+ * the metric without displaying it, so the ranking that happened stays visible in the sequence.
+ *
+ * There are two deliberate delegation windows:
+ *
+ * - planSummary still renders legacy-shaped output under explainVersion "3".
+ *   TODO SERVER-133235 (the remaining reduction) closes that window.
  * - Explainers that do not implement the per-plan enumerator (SBE, Express: default-empty
  *   getPlanEntries()) keep the legacy delegation. TODO SERVER-132033 routes them through
  *   getPlanEntries(); the classic engine always yields at least one entry.
@@ -411,8 +419,7 @@ void generatePlannerInfoV3(PlanExecutor* exec,
                            BSONObj extraInfo,
                            const SerializationContext& serializationContext,
                            BSONObjBuilder* out) {
-    if (v3Verbosity == ExplainOptions::Verbosity::kPlanSummary ||
-        v3Verbosity == ExplainOptions::Verbosity::kPlannerChoice) {
+    if (v3Verbosity == ExplainOptions::Verbosity::kPlanSummary) {
         generatePlannerInfo(exec,
                             mapV3ToLegacyVerbosity(v3Verbosity),
                             cmd,

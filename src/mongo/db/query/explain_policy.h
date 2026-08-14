@@ -24,6 +24,8 @@ enum class ExplainSettings : uint32_t {
     kExecStats = 1u << 2,      // winning-plan execution statistics
     kAllPlansExecStats = 1u << 3,  // per-candidate all-plans multiplanning statistics
     kBytecode = 1u << 4,           // SBE virtual-machine bytecode of the winning plan
+    kCostBasedStats = 1u << 5,     // per-node cost-based ranker estimates (cost, cardinality, CE
+                                   // source)
 };
 
 constexpr ExplainSettings operator|(ExplainSettings a, ExplainSettings b) {
@@ -64,6 +66,13 @@ public:
     }
     constexpr bool hasAllPlansStats() const {
         return has(ExplainSettings::kAllPlansExecStats);
+    }
+    // Whether the cost-based ranker's per-node estimates should be present. Separate from
+    // hasAllPlansStats(): the two ranking-statistics families are computed independently (a plan
+    // can carry either, both, or neither), and the V3 plannerChoice mode excludes both while still
+    // showing every candidate's plan structure.
+    constexpr bool hasCostBasedStats() const {
+        return has(ExplainSettings::kCostBasedStats);
     }
     // Whether the winning plan's SBE virtual-machine bytecode should be present.
     constexpr bool hasByteCode() const {
@@ -106,11 +115,10 @@ ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v);
  * plannerChoice -> queryPlanner, plannerStats -> execAllPlans, execStatsV3 -> execStats; legacy
  * verbosities map to themselves). Used by the remaining legacy-delegation code paths:
  *
- * - Find path: only the planSummary/plannerChoice reductions (until SERVER-131451) and the
- *   explainers without a per-plan enumerator (SBE, Express; until SERVER-132033) still delegate.
- *   The
- *   stats-rich modes (plannerStats, execStats) render the real V3 output on the classic
- *   engine.
+ * - Find path: only the planSummary reduction (until SERVER-133235) and the explainers without a
+ *   per-plan enumerator (SBE, Express; until SERVER-132033) still delegate. The modes from
+ *   plannerChoice up (plannerChoice, plannerStats, execStats) render the real V3 output on the
+ *   classic engine.
  * - Aggregation path: delegates end-to-end until SERVER-130810.
  */
 ExplainOptions::Verbosity mapV3ToLegacyVerbosity(ExplainOptions::Verbosity v);

@@ -9,12 +9,13 @@
  * that section and every section before it, and none after. The test runs every query under every
  * verbosity.
  *
- * Each V3 mode reports "explainVersion: '3'". On the find path,
- * plannerStats/execStats render the real V3 queryPlanner (a "plans" array); plannerStats does not
- * execute the query and has no executionStats section, while execStats adds exactly the retained
- * legacy kExecStats section (never an allPlansExecution array - that content lives in
- * queryPlanner.plans[]). planSummary/plannerChoice remain legacy-delegated (-> queryPlanner)
- * until SERVER-131451. The aggregation path remains legacy-delegated end-to-end
+ * Each V3 mode reports "explainVersion: '3'". On the find path, plannerChoice and
+ * plannerStats/execStats all render the real V3 queryPlanner (a "plans" array), differing only in
+ * which statistics the plans carry: plannerChoice carries none, plannerStats adds the ranking
+ * statistics without executing the query, and execStats adds exactly the retained legacy
+ * kExecStats section (never an allPlansExecution array - that content lives in
+ * queryPlanner.plans[]). planSummary remains legacy-delegated (-> queryPlanner) until
+ * SERVER-133235. The aggregation path remains legacy-delegated end-to-end
  * (TODO SERVER-130810), so not-fully-lowered pipelines keep the mapped legacy shapes
  * (plannerStats -> allPlansExecution, still executing the pipeline).
  */
@@ -229,6 +230,19 @@ describe("V3 stats-rich output shape (find path)", function () {
         }
         return value;
     }
+
+    it("plannerChoice renders plans[] and no execution sections", function () {
+        const explain = assert.commandWorked(
+            db.runCommand({explain: findCommand, verbosity: "plannerChoice"}),
+        );
+        const queryPlanner = explain.queryPlanner;
+        assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
+        assert(!queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {explain});
+        assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
+            explain,
+        });
+        assert(!explain.hasOwnProperty("executionStats"), "unexpected executionStats", {explain});
+    });
 
     it("plannerStats renders plans[] and no legacy keys or execution sections", function () {
         const explain = assert.commandWorked(

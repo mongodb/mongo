@@ -58,6 +58,10 @@ selector:
     # do not apply. The merged V3 representation is covered by
     # jstests/noPassthroughWithMongod/query/explain/v3/explain_plans_array.js.
     - jstests/core/query/plan_ranking/cbr_for_no_mp_results.js
+
+    # This test asserts on the number of commands run, which may be incorrect in this suite where
+    # we may run an explain multiple times implicitly.
+    - jstests/core/diagnostics/operation_latency_histogram.js
 executor:
   archive:
     hooks:
