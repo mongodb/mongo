@@ -783,6 +783,21 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "document_source_join_plan_cache_stats",
+    srcs = [
+        "document_source_join_plan_cache_stats.cpp",
+    ],
+    # This document source is not part of the 'pipeline' library because reading the node-global
+    # join plan cache requires a dep on 'join_plan_cache', which 'pipeline' cannot take: that would
+    # create the cycle 'pipeline' -> 'join_plan_cache' -> 'join_ordering' ->
+    # 'canonical_query_base' -> 'pipeline'.
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/plan_cache:join_plan_cache",
+    ],
+)
+
 idl_generator(
     name = "document_source_internal_projection_gen",
     src = "document_source_internal_projection.idl",
@@ -1493,6 +1508,7 @@ mongo_cc_unit_test(
         "document_source_internal_document_results_and_metadata_test.cpp",
         "document_source_internal_hybrid_search_test.cpp",
         "document_source_internal_split_pipeline_test.cpp",
+        "document_source_join_plan_cache_stats_test.cpp",
         "document_source_limit_test.cpp",
         "document_source_list_extensions_test.cpp",
         "document_source_list_mql_entities_test.cpp",
@@ -1550,6 +1566,7 @@ mongo_cc_unit_test(
         ":accumulator",
         ":aggregation_context_fixture",
         ":document_source_internal_apply_oplog_update",
+        ":document_source_join_plan_cache_stats",
         ":document_source_lookup_test_util",
         ":document_source_mock",
         ":document_sources_idl",

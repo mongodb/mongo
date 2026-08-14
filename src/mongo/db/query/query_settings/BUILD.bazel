@@ -149,6 +149,7 @@ mongo_cc_unit_test(
     deps = [
         ":query_settings",
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
+        "//src/mongo/db/pipeline:document_source_join_plan_cache_stats",  # Necessary because tests rely on the $joinPlanCacheStats pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_knobs",

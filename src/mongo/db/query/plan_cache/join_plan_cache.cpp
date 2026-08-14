@@ -5,10 +5,14 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/container_size_helper.h"
+#include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include <algorithm>
 #include <mutex>
@@ -80,6 +84,52 @@ size_t CachedJoinPlan::estimateObjectSizeInBytes() const {
         std::visit([](const auto& n) { return n.estimateHeapBytes(); }, node);
 }
 
+BSONObj CachedJoinPlan::toBSON() const {
+    BSONObjBuilder bob;
+    std::visit(OverloadedVisitor{
+                   [&](const CachedAccessPath& node) {
+                       bob.append("nodeId", static_cast<int>(node.nodeId));
+                       if (node.solnCacheData) {
+                           const auto& scd = *node.solnCacheData;
+                           // SolutionCacheData::toString() dereferences 'tree' for index-based
+                           // solutions, so only serialize the access path when it is well-formed.
+                           const bool needsTree =
+                               scd.solnType == SolutionCacheData::WHOLE_IXSCAN_SOLN ||
+                               scd.solnType == SolutionCacheData::USE_INDEX_TAGS_SOLN;
+                           if (!needsTree || scd.tree) {
+                               bob.append("accessPath", scd.toString());
+                           }
+                       }
+                   },
+                   [&](const CachedInljNode& node) {
+                       bob.append("nodeId", static_cast<int>(node.nodeId));
+                       bob.append("inljForeignIndexName", node.inljForeignIndexName);
+                   },
+                   [&](const CachedJoinNode& node) {
+                       bob.append("joinMethod", join_ordering::joinMethodToString(node.method));
+                       BSONArrayBuilder predsBob(bob.subarrayStart("joinPredicates"));
+                       for (const auto& pred : node.joinPredicates) {
+                           predsBob.append(pred.toString());
+                       }
+                       predsBob.doneFast();
+                       if (node.leftEmbeddingField) {
+                           bob.append("leftEmbeddingField", node.leftEmbeddingField->fullPath());
+                       }
+                       if (node.rightEmbeddingField) {
+                           bob.append("rightEmbeddingField", node.rightEmbeddingField->fullPath());
+                       }
+                       if (node.left) {
+                           bob.append("left", node.left->toBSON());
+                       }
+                       if (node.right) {
+                           bob.append("right", node.right->toBSON());
+                       }
+                   },
+               },
+               node);
+    return bob.obj();
+}
+
 JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                                        join_ordering::NodeId baseNode,
                                        std::vector<CollectionTag> collections,
@@ -93,7 +143,7 @@ JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
       nodeFingerprints(std::move(nodeFingerprints)),
       _collections(std::move(collections)) {}
 
-std::vector<CollectionTag> JoinPlanCacheEntry::getCollectionTags() {
+std::vector<CollectionTag> JoinPlanCacheEntry::getCollectionTags() const {
     std::lock_guard lk(_collectionsMutex);
     return _collections;
 }
@@ -153,6 +203,23 @@ size_t JoinPlanCache::size() const {
     return _cache.size();
 }
 
+std::vector<BSONObj> JoinPlanCache::serializeEntries() const {
+    // Gather entries into a vector to avoid holding the partition locks while serializing to BSON.
+    std::vector<std::pair<JoinPlanCacheKey, std::shared_ptr<const JoinPlanCacheEntry>>> entries;
+    _cache.forEach(
+        [&](const JoinPlanCacheKey& key, const std::shared_ptr<const JoinPlanCacheEntry>& entry) {
+            if (entry) {
+                entries.push_back({key, entry});
+            }
+        });
+    std::vector<BSONObj> results;
+    results.reserve(entries.size());
+    std::for_each(entries.begin(), entries.end(), [&results](auto& entry) {
+        results.push_back(joinPlanCacheEntryToBSON(entry.first, *entry.second));
+    });
+    return results;
+}
+
 JoinPlanCache& JoinPlanCache::get(ServiceContext* svc) {
     return *getJoinPlanCacheDecoration(svc);
 }
@@ -166,6 +233,29 @@ void bumpCollectionVersionForDDL(Collection* writableColl) {
     ++JoinPlanCache::currentVersionTags(writableColl).collectionVersion;
 }
 }  // namespace join_ordering
+
+BSONObj joinPlanCacheEntryToBSON(const JoinPlanCacheKey& key, const JoinPlanCacheEntry& entry) {
+    BSONObjBuilder bob;
+    bob.append("planCacheKey", zeroPaddedHex(canonical_query_encoder::computeHash(key)));
+    bob.append("baseNode", static_cast<int>(entry.baseNode));
+    bob.append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
+
+    BSONArrayBuilder collectionsBob(bob.subarrayStart("collections"));
+    for (const auto& tag : entry.getCollectionTags()) {
+        BSONObjBuilder tagBob(collectionsBob.subobjStart());
+        tag.uuid.appendToBuilder(&tagBob, "uuid");
+        tagBob.append("collectionVersion",
+                      static_cast<long long>(tag.versionTag.collectionVersion));
+        tagBob.append("sampleVersion", static_cast<long long>(tag.versionTag.sampleVersion));
+        tagBob.doneFast();
+    }
+    collectionsBob.doneFast();
+
+    if (entry.joinTree) {
+        bob.append("plan", entry.joinTree->toBSON());
+    }
+    return bob.obj();
+}
 
 std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& mca) {
     std::vector<CollectionTag> tags;

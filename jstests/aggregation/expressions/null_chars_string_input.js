@@ -460,6 +460,7 @@ const skips = new Set([
     "$listSessions",
     "$mergeCursors",
     "$planCacheStats",
+    "$joinPlanCacheStats",
     "$querySettings",
     "$_internalListQuerySettings",
     "$_internalQuerySettingsDebugShape",

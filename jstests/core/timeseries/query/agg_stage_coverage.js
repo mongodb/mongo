@@ -481,6 +481,7 @@ const skippedStages = [
     "$listSampledQueries",
     "$shardedDataDistribution",
     "$querySettings",
+    "$joinPlanCacheStats",
     // Internal stage the $querySettings desugar appends for showDebugQueryShape; never user-run.
     "$_internalListQuerySettings",
     "$_internalQuerySettingsDebugShape",

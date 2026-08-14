@@ -197,6 +197,9 @@ commands:
                       resource_pattern: exact_namespace
                       action_type:
                           [remove, update, collStats, indexStats, planCacheRead]
+                - privilege: # Can be triggered by aggregation ($joinPlanCacheStats)
+                      resource_pattern: database
+                      action_type: planCacheRead
         reply_type: CreateCommandReply
         # TODO (SERVER-115805): Remove this module visibility override once this command’s API and
         # implementation are part of the same module.

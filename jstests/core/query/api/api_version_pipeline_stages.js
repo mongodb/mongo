@@ -33,6 +33,7 @@ const unstablePipelines = [
     [{$listLocalSessions: {}}],
     [{$listSessions: {}}],
     [{$planCacheStats: {}}],
+    [{$joinPlanCacheStats: {}}],
     [{$unionWith: {coll: "coll2", pipeline: [{$collStats: {latencyStats: {}}}]}}],
     [{$lookup: {from: "coll2", as: "out", pipeline: [{$indexStats: {}}]}}],
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],

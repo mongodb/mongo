@@ -171,6 +171,7 @@ const kNeverInVersion1Stages = new Set([
     "$listSampledQueries",
     "$listSessions",
     "$planCacheStats",
+    "$joinPlanCacheStats",
     "$querySettings",
     // $querySettings desugar internals
     "$_internalListQuerySettings",

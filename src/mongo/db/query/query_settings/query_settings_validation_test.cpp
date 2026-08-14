@@ -109,6 +109,10 @@ TEST_F(QuerySettingsValidationTestFixture,
     QuerySettings rejectionSettings;
     rejectionSettings.setReject(true);
 
+    // $joinPlanCacheStats refuses to parse unless both of these are enabled.
+    unittest::ServerParameterGuard joinOptGuard{"internalEnableJoinOptimization", true};
+    unittest::ServerParameterGuard joinPlanCacheGuard{"internalEnableJoinPlanCache", true};
+
     auto collectionlessNss = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
     const stdx::unordered_set<std::string_view, StringMapHasher>
         collectionLessRejectionIncompatibleStages = {
@@ -119,6 +123,7 @@ TEST_F(QuerySettingsValidationTestFixture,
             "$currentOp"sv,
             "$listCatalog"sv,
             "$listLocalSessions"sv,
+            "$joinPlanCacheStats"sv,
         };
 
     for (auto&& stage : QuerySettingsService::getRejectionIncompatibleStages()) {

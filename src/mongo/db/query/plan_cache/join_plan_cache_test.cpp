@@ -3,6 +3,10 @@
 
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -319,6 +323,77 @@ TEST(JoinPlanCacheEvictionTest, SizeReflectsRunningByteTotal) {
     ASSERT_EQ(2 * perEntryCost, cache.size());
     cache.remove("a");
     ASSERT_EQ(perEntryCost, cache.size());
+}
+
+TEST(JoinPlanCacheStatsTest, EmptyCacheProducesNoStats) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    ASSERT_TRUE(cache.serializeEntries().empty());
+}
+
+TEST(JoinPlanCacheStatsTest, StatsHaveOneEntryPerCachedPlan) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.put("keyA", makeEntry());
+    cache.put("keyB", makeEntry());
+
+    auto stats = cache.serializeEntries();
+    ASSERT_EQ(2u, stats.size());
+    for (const auto& obj : stats) {
+        ASSERT_TRUE(obj.hasField("planCacheKey"));
+        ASSERT_TRUE(obj.hasField("baseNode"));
+        ASSERT_TRUE(obj.hasField("estimatedSizeBytes"));
+        ASSERT_TRUE(obj.hasField("collections"));
+    }
+}
+
+TEST(JoinPlanCacheStatsTest, SerializesBaseNodeAndSizeAndKeyHash) {
+    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
+                                                      join_ordering::NodeId{7},
+                                                      std::vector<CollectionTag>{},
+                                                      std::vector<NodeFingerprint>{});
+    const auto expectedSize = static_cast<long long>(entry->estimatedEntrySizeBytes);
+
+    BSONObj obj = joinPlanCacheEntryToBSON("some-encoded-shape", *entry);
+    ASSERT_EQ(7, obj["baseNode"].numberInt());
+    ASSERT_EQ(expectedSize, obj["estimatedSizeBytes"].numberLong());
+    // The key hash is rendered as a fixed-width, zero-padded hex string.
+    ASSERT_EQ(BSONType::string, obj["planCacheKey"].type());
+    ASSERT_EQ(8, obj["planCacheKey"].str().size());
+    // A null join tree omits the plan sub-object.
+    ASSERT_FALSE(obj.hasField("plan"));
+}
+
+TEST(JoinPlanCacheStatsTest, SerializesComplexPlanTree) {
+    auto entry = std::make_unique<JoinPlanCacheEntry>(makeComplexTree(),
+                                                      join_ordering::NodeId{0},
+                                                      std::vector<CollectionTag>{},
+                                                      std::vector<NodeFingerprint>{});
+
+    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    ASSERT_TRUE(obj.hasField("plan"));
+    BSONObj plan = obj["plan"].Obj();
+    ASSERT_EQ(join_ordering::joinMethodToString(join_ordering::JoinMethod::HJ),
+              plan["joinMethod"].str());
+    ASSERT_EQ(BSONType::array, plan["joinPredicates"].type());
+    ASSERT_EQ(1, plan["joinPredicates"].Array().size());
+    // Both children are serialized recursively as access-path leaves.
+    ASSERT_TRUE(plan["left"].Obj().hasField("nodeId"));
+    ASSERT_TRUE(plan["right"].Obj().hasField("nodeId"));
+}
+
+TEST(JoinPlanCacheStatsTest, SerializesCollectionTags) {
+    const auto uuid = UUID::gen();
+    std::vector<CollectionTag> tags{
+        CollectionTag{uuid, CollectionVersionTag{/*collectionVersion*/ 3, /*sampleVersion*/ 5}}};
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, std::move(tags), std::vector<NodeFingerprint>{});
+
+    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    auto collections = obj["collections"].Array();
+    ASSERT_EQ(1, collections.size());
+    BSONObj tag = collections[0].Obj();
+    ASSERT_EQ(uuid, unittest::assertGet(UUID::parse(tag["uuid"])));
+    ASSERT_EQ(3, tag["collectionVersion"].numberLong());
+    ASSERT_EQ(5, tag["sampleVersion"].numberLong());
 }
 
 }  // namespace

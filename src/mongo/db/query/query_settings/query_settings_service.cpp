@@ -57,6 +57,7 @@ const auto kSerializationContext =
 const stdx::unordered_set<std::string_view, StringMapHasher> rejectionIncompatibleStages = {
     "$querySettings"sv,
     "$planCacheStats"sv,
+    "$joinPlanCacheStats"sv,
     "$collStats"sv,
     "$indexStats"sv,
     "$listSessions"sv,

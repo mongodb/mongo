@@ -78,6 +78,8 @@ struct CachedJoinPlan {
     // Total memory footprint of this subtree, including this node's own sizeof plus the
     // heap-allocated bytes of the active variant alternative (and, recursively, its children).
     size_t estimateObjectSizeInBytes() const;
+
+    BSONObj toBSON() const;
 };
 
 // Live per-Collection version counters, bumped on DDL/sample refresh. Lives as a Collection
@@ -143,7 +145,7 @@ struct JoinPlanCacheEntry {
      * Returns a copy of this entry's collection tags. A copy rather than a reference because the
      * tags can be refreshed concurrently by 'refreshCollectionTags'.
      */
-    std::vector<CollectionTag> getCollectionTags();
+    std::vector<CollectionTag> getCollectionTags() const;
 
     /*
      * Adopts the version counters in 'tags' for the collections this entry already references.
@@ -161,7 +163,9 @@ struct JoinPlanCacheEntry {
 
 private:
     // Guards '_collections', held only for the copy out of, or the counter updates to, that vector.
-    std::mutex _collectionsMutex;
+    // Mutable so that reading the tags out of a const entry (e.g. when serializing the cache for
+    // $joinPlanCacheStats) is possible.
+    mutable std::mutex _collectionsMutex;
 
     // One CollectionTag per collection referenced by 'joinTree', compared against the live
     // collections to detect invalidation on plan cache lookup.
@@ -285,10 +289,22 @@ public:
      */
     size_t size() const;
 
+    /*
+     * Serializes every entry in the cache to BSON, one object per entry, for the
+     * $joinPlanCacheStats aggregation stage. Consistency across partitions is not guaranteed.
+     */
+    std::vector<BSONObj> serializeEntries() const;
+
     static JoinPlanCache& get(ServiceContext* svc);
 
 private:
     JoinPlanCacheStore _cache;
 };
+
+/*
+ * Serializes a single join plan cache entry (and its key) to BSON for $joinPlanCacheStats. Exposed
+ * as a free function so it can be unit tested independently of the cache.
+ */
+BSONObj joinPlanCacheEntryToBSON(const JoinPlanCacheKey& key, const JoinPlanCacheEntry& entry);
 
 }  // namespace mongo

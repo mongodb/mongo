@@ -2129,6 +2129,26 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "aggregate_joinPlanCacheStats",
+            command: {aggregate: 1, pipeline: [{$joinPlanCacheStats: {}}], cursor: {}},
+            // $joinPlanCacheStats dumps the node-global join plan cache. It is collectionless on
+            // 'admin' and is gated behind the internalEnableJoinOptimization/
+            // internalEnableJoinPlanCache knobs which are off by default -- so an authorized user
+            // still fails with QueryFeatureNotAllowed after the authorization check passes. This
+            // holds on both a standalone and a router, since the router authorizes and applies the
+            // knob gate before dispatching to the shards.
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_readDbAdminAny,
+                    privileges: [
+                        {resource: {db: adminDbName, collection: ""}, actions: ["planCacheRead"]},
+                    ],
+                    expectFailWithErrorCodes: [ErrorCodes.QueryFeatureNotAllowed],
+                },
+            ],
+        },
+        {
             testname: "aggregate_currentOp_allUsers_true",
             command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}},
             testcases: [
