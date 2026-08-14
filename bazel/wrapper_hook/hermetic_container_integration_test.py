@@ -439,6 +439,13 @@ class LinuxBazelDownloadTest(unittest.TestCase):
 
 
 class HermeticContainerEnablementTest(unittest.TestCase):
+    def setUp(self):
+        self.container_detection = mock.patch.object(
+            hermetic_container_integration, "_is_running_in_container", return_value=False
+        )
+        self.container_detection.start()
+        self.addCleanup(self.container_detection.stop)
+
     def test_default_enabled_on_linux_when_docker_exists(self):
         for machine in ["x86_64", "aarch64"]:
             with self.subTest(machine=machine):
@@ -899,6 +906,39 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
 
+    def test_defaults_to_native_when_already_in_a_container(self):
+        with mock.patch.object(
+            hermetic_container_integration, "_is_running_in_container", return_value=True
+        ):
+            self.assertEqual(
+                hermetic_container_integration.select_integration_mode(
+                    env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
+                    system="Linux",
+                    docker_exists=lambda: True,
+                    args=["build", "install-dist-test"],
+                    machine="x86_64",
+                ),
+                hermetic_container_integration.IntegrationMode.DIRECT,
+            )
+
+    def test_can_explicitly_enable_nested_container(self):
+        with mock.patch.object(
+            hermetic_container_integration, "_is_running_in_container", return_value=True
+        ):
+            self.assertEqual(
+                hermetic_container_integration.select_integration_mode(
+                    env={
+                        "MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1",
+                        "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
+                    },
+                    system="Linux",
+                    docker_exists=lambda: True,
+                    args=["build", "install-dist-test"],
+                    machine="x86_64",
+                ),
+                hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+            )
+
     def test_ci_uses_default_linux_container_mode(self):
         for distro, machine in [
             ("amazon_linux_2023", "aarch64"),
@@ -937,6 +977,56 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 machine="x86_64",
             )
         )
+
+
+class ContainerDetectionTest(unittest.TestCase):
+    def test_detects_container_markers_and_cgroups(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            marker = root / ".dockerenv"
+            cgroup = root / "cgroup"
+
+            marker.touch()
+            self.assertTrue(
+                hermetic_container_integration._is_running_in_container(
+                    env={}, container_marker_paths=(marker,), cgroup_path=root / "missing"
+                )
+            )
+
+            marker.unlink()
+            cgroup.write_text("0::/kubepods.slice/kubepods-burstable.slice\n", encoding="utf-8")
+            self.assertTrue(
+                hermetic_container_integration._is_running_in_container(
+                    env={}, container_marker_paths=(marker,), cgroup_path=cgroup
+                )
+            )
+
+    def test_detects_container_environment_variable(self):
+        self.assertTrue(
+            hermetic_container_integration._is_running_in_container(
+                env={"container": "podman"},
+                container_marker_paths=(),
+                cgroup_path=pathlib.Path("/definitely-not-a-container-cgroup"),
+            )
+        )
+
+    def test_detects_kubernetes_with_private_cgroup_namespace(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cgroup = pathlib.Path(temp_dir) / "cgroup"
+            cgroup.write_text("0::/\n", encoding="utf-8")
+
+            self.assertFalse(
+                hermetic_container_integration._is_running_in_container(
+                    env={}, container_marker_paths=(), cgroup_path=cgroup
+                )
+            )
+            self.assertTrue(
+                hermetic_container_integration._is_running_in_container(
+                    env={"KUBERNETES_SERVICE_HOST": "10.0.0.1"},
+                    container_marker_paths=(),
+                    cgroup_path=cgroup,
+                )
+            )
 
 
 class LinuxHostContainerTest(unittest.TestCase):

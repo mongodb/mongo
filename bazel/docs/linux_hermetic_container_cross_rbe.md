@@ -50,11 +50,14 @@ command instead, so that rootless Podman uses `--userns=keep-id` and disables SE
 separation for the repository/output bind mounts rather than relabeling those host trees. Both
 runtimes use the same pinned OCI image. Set `HERMETIC_CONTAINER_DOCKER_COMMAND` explicitly to force
 a particular Docker-compatible runtime. Builds fail closed if neither runtime is available, the
-selected runtime cannot start the pinned image, or the image cannot be pulled. Only the explicit
-opt-out above allows native build-tool execution. Existing native behavior is retained, with a
-warning, when:
+selected runtime cannot start the pinned image, or the image cannot be pulled. Detection that Bazel
+is already running inside a container is an additional condition that allows native build-tool
+execution. Set `MONGO_BAZEL_USE_HERMETIC_CONTAINER=1` to explicitly enable nested container
+execution. Existing native behavior is also retained when:
 
 - the host distro has no pinned RBE container or no mongo toolchain for the host architecture,
+- Bazel is already running inside a container (unless nested container execution is explicitly
+  enabled),
 - the invocation uses a macOS cross configuration, which retains its original setup for now,
 - the invocation is a non-build command (`query`, `clean`, `info`, ...).
 

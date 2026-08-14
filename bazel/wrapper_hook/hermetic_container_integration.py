@@ -37,6 +37,10 @@ MONGO_TOOLCHAIN_VERSION_V5_FILE = (
 AL2023_DISTRO = "amazon_linux_2023"
 HERMETIC_CONTAINER_DISABLED_VALUES = {"0", "false", "no", "off"}
 HERMETIC_CONTAINER_ENABLED_VALUES = {"1", "true", "yes", "on"}
+CONTAINER_MARKER_PATHS = (pathlib.Path("/.dockerenv"), pathlib.Path("/run/.containerenv"))
+CONTAINER_CGROUP_PATH = pathlib.Path("/proc/1/cgroup")
+CONTAINER_CGROUP_RE = re.compile(r"docker|kubepods|containerd|libpod|lxc", re.IGNORECASE)
+KUBERNETES_SERVICE_HOST_ENV = "KUBERNETES_SERVICE_HOST"
 DEFAULT_HOST_CA_BUNDLE = pathlib.Path("/etc/ssl/certs/ca-certificates.crt")
 DEFAULT_CONTAINER_CA_BUNDLE = "/tmp/mongo-hermetic_container-ca-certificates.crt"
 DEFAULT_HERMETIC_CONTAINER_CONTAINER_ARCH = "x86_64"
@@ -426,6 +430,27 @@ def _env_is_true(value: str | None) -> bool:
     return value is not None and value.lower() in HERMETIC_CONTAINER_ENABLED_VALUES
 
 
+def _is_running_in_container(
+    env: Mapping[str, str] = os.environ,
+    container_marker_paths: Sequence[pathlib.Path] = CONTAINER_MARKER_PATHS,
+    cgroup_path: pathlib.Path = CONTAINER_CGROUP_PATH,
+) -> bool:
+    """Return whether the current process appears to be running in a container."""
+
+    if (
+        env.get("container")
+        or env.get(KUBERNETES_SERVICE_HOST_ENV)
+        or any(path.exists() for path in container_marker_paths)
+    ):
+        return True
+
+    try:
+        cgroup = cgroup_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return CONTAINER_CGROUP_RE.search(cgroup) is not None
+
+
 def _use_wsl_docker(env: Mapping[str, str]) -> bool:
     return env.get("MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE", "").lower() == WSL_DOCKER_HOST_MODE
 
@@ -532,6 +557,11 @@ def select_integration_mode(
         return IntegrationMode.DIRECT
 
     if env.get("MONGO_BAZEL_IN_HERMETIC_CONTAINER") == "1":
+        return IntegrationMode.DIRECT
+
+    # Avoid nesting the local build container when Bazel is already running in a
+    # container. An explicit opt-in still permits nested containers when needed.
+    if system == "Linux" and not _env_is_true(explicit) and _is_running_in_container(env):
         return IntegrationMode.DIRECT
 
     if system == "Darwin":
