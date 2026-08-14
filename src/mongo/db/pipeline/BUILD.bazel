@@ -358,6 +358,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:sort_executor",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+        "//src/mongo/db/query/util:represent_as_util",
         "//src/mongo/db/sorter:sorter_base",
     ],
 )
@@ -373,6 +374,7 @@ mongo_cc_library(
         ":field_path",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query/util:represent_as_util",
     ],
 )
 
