@@ -826,7 +826,7 @@ fi
     # to carry its own executable.
     runfiles = ctx.runfiles(
         files = ctx.files.data + server_bins,
-        transitive_files = cc_toolchain.all_files if cc_toolchain else None,
+        transitive_files = cc_toolchain.all_files if cc_toolchain and ctx.configuration.coverage_enabled else None,
     )
     runfiles = runfiles.merge(ctx.attr.resmoke_bin[DefaultInfo].default_runfiles)
     for dep in ctx.attr.server_deps + ctx.attr.data:
