@@ -60,6 +60,8 @@
 
 namespace mongo {
 
+struct RenameCollectionOptions;
+
 class MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionParticipantService final
     : public repl::PrimaryOnlyService {
 public:
@@ -157,6 +159,15 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
 
 private:
+    friend class RenameCollectionParticipantServiceTest;
+
+    static void _renameOrDropTarget(OperationContext* opCtx,
+                                    const NamespaceString& fromNss,
+                                    const NamespaceString& toNss,
+                                    const RenameCollectionOptions& options,
+                                    const UUID& sourceUUID,
+                                    const boost::optional<UUID>& targetUUID);
+
     RenameCollectionParticipantDocument _doc;
     const RenameCollectionRequest _request;
 

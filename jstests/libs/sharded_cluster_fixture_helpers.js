@@ -55,6 +55,18 @@ export function setupTestDatabase(conn, dbName, optPrimaryShard = null) {
     return newDb;
 }
 
+export function createCollectionAndInsertDocuments(collectionType, testDb, collName, documents, dataShard) {
+    if (collectionType === "unsplittable") {
+        assert.commandWorked(
+            testDb.runCommand({
+                createUnsplittableCollection: collName,
+                dataShard: dataShard.shardName,
+            }),
+        );
+    }
+    assert.commandWorked(testDb[collName].insert(documents));
+}
+
 // Basic check of the tracking state for a namespace on the sharding catalog.
 export function verifyCollectionTrackingState(conn, nss, expectedToBeTracked, expectedToBeUnsplittable = false) {
     const configDB = conn.getSiblingDB("config");
