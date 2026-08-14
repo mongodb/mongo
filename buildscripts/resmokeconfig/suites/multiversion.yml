@@ -17,12 +17,6 @@ selector:
     # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
 
-    # TODO SERVER-133003: featureFlagQueryMemoryTracking is binary-gated (not
-    # FCV-gated) and enabled by default starting in the 9.0 binary. This test assumes the
-    # last-LTS/downgraded binary emits no memory metrics, which no longer holds now that last-LTS is
-    # 9.0. Re-enable once the test's mixed-version expectations are updated.
-    - jstests/multiVersion/genericBinVersion/query-integration-observability/memory_tracking_upgrade_downgrade.js
-
     # TODO SERVER-133008: the extensions API (binary-gated, not FCV-gated)
     # was introduced in the 9.0 binary. This test's premise is upgrading from a version with no
     # extensions, requiring the last-LTS/downgraded binary to reject $testFoo. That no longer holds
@@ -48,13 +42,6 @@ selector:
     # representative-queries expectations. Re-enable once the test accounts for backfill being enabled
     # at last-LTS.
     - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_upgrade_downgrade.js
-
-    # TODO SERVER-133003: featureFlagQueryStatsInsert is FCV-gated at 9.0. The
-    # test assumes insert query stats are NOT recorded while FCV is last-LTS. Now that last-LTS is 9.0
-    # (>= 9.0), the feature is enabled at last-LTS and inserts are recorded, breaking the
-    # not-recorded expectations. Re-enable once the test accounts for insert query stats being enabled
-    # at last-LTS.
-    - jstests/multiVersion/genericBinVersion/query-integration-observability/query_stats_insert_upgrade_downgrade.js
 
     # TODO SERVER-133004: this test verifies that downgrading FCV below 8.3 fails
     # when v4 2dsphere indexes exist, downgrading to last-lts (8.0). It is documented (SERVER-118561)
@@ -210,36 +197,12 @@ selector:
     # at the downgrade target, so the downgrade succeeds and the assertion fails.
     - jstests/multiVersion/genericBinVersion/query-execution/error_and_log_validation_action.js
 
-    # TODO SERVER-133003: featureFlagQueryStatsCountDistinct is FCV-gated at
-    # 8.1. With binaries upgraded but FCV still at last-lts, the test asserts the flag is disabled and
-    # count/distinct query stats are not collected. Now that last-lts is 9.0 (>= 8.1), the flag is
-    # enabled at last-lts, breaking those expectations. Documented for removal once 9.0 becomes last
-    # LTS (SERVER-95358).
-    - jstests/multiVersion/genericBinVersion/feature_flag_query_stats_count_distinct_upgrade_downgrade.js
-
     # TODO SERVER-131690: featureFlagReplicationUsageOfPriorityPort is FCV-gated at 8.3.
     # The test asserts downgrade to last-LTS is forbidden with CannotDowngrade while a priorityPort is
     # present in the ReplSetConfig. Now that last-LTS is 9.0 (>= 8.3), priority ports are supported at
     # the downgrade target, so the downgrade is no longer blocked and the CannotDowngrade assertions
     # fail.
     - jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js
-
-    # TODO SERVER-133003: featureFlagQueryStatsDelete is FCV-gated at 9.0. The
-    # test asserts delete query stats are NOT recorded while FCV is last-LTS. Now that last-LTS is 9.0
-    # (>= 9.0), the feature is enabled at last-LTS and deletes are recorded, breaking the not-recorded
-    # expectations.
-    - jstests/multiVersion/genericBinVersion/query-integration-observability/query_stats_delete_upgrade_downgrade.js
-
-    # TODO SERVER-133003: featureFlagQueryStatsCBRMetrics is FCV-gated at 8.3.
-    # The test asserts CBR metrics do NOT appear in query stats while FCV is last-LTS. Now that
-    # last-LTS is 9.0 (>= 8.3), the metrics appear at last-LTS, breaking the do-not-appear
-    # expectations.
-    - jstests/multiVersion/genericBinVersion/query-integration-observability/query_stats_cbr_metrics_upgrade_downgrade.js
-
-    # TODO QUERY-INTEGRATION-OBSERVABILITY: featureFlagQueryStatsUpdateCommand is FCV-gated at 9.0.
-    # The test expects update query stats not to be recorded while FCV is last-LTS. Now that last-LTS
-    # is 9.0, the feature is enabled at last-LTS and updates are recorded.
-    - jstests/multiVersion/genericBinVersion/query-integration-observability/query_stats_update_upgrade_downgrade.js
 
     # TODO SERVER-133009: featureFlagPqsQueryKnobs is FCV-gated at 9.0. The test
     # expects queryKnobs to be rejected while downgraded and stripped on FCV downgrade. Now that
