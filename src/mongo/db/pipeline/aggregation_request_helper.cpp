@@ -133,6 +133,12 @@ void validate(const AggregateCommandRequest& aggregate,
                         hintElem.value() == BSON(query_request_helper::kNaturalSortField << 1)));
     }
 
+    if (aggregate.getResumeAfter() || aggregate.getStartAt()) {
+        uassert(12848200,
+                "$_resumeAfter is not supported for collectionless aggregations",
+                !nss.isCollectionlessAggregateNS());
+    }
+
     if (client) {
         assertInternalParamsAreSetByInternalClients(client, aggregate);
     }
