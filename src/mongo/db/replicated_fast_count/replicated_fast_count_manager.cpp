@@ -97,6 +97,17 @@ void ReplicatedFastCountManager::initializeContainerStores(
     LOGV2(12231710, "Initializing container stores");
     invariant(metadataRS, "metadata RecordStore must not be null");
     invariant(timestampsRS, "timestamps RecordStore must not be null");
+
+    // TODO (SERVER-126250): This can be a nullptr check once we change the
+    // ReplicatedFastCountManager() constructor to default initialize Collection stores.
+    if (_sizeCountStore->usesContainers()) {
+        massert(13337202,
+                "Timestamp store must use containers when the size/count store uses containers",
+                _timestampStore->usesContainers());
+        LOGV2(13337200, "Replicated fast count container stores are already initialized; skipping");
+        return;
+    }
+
     _sizeCountStore =
         std::make_unique<replicated_fast_count::ContainerSizeCountStore>(std::move(metadataRS));
     _timestampStore = std::make_unique<replicated_fast_count::ContainerSizeCountTimestampStore>(
@@ -588,6 +599,9 @@ bool ReplicatedFastCountManager::isRunning_ForTest() {
 }
 
 bool ReplicatedFastCountManager::usesContainers_ForTest() const {
+    tassert(13337201,
+            "Size/count store and timestamp store must agree on whether they use containers",
+            _sizeCountStore->usesContainers() == _timestampStore->usesContainers());
     return _sizeCountStore->usesContainers();
 }
 

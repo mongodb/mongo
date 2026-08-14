@@ -24,6 +24,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -119,6 +120,131 @@ TEST_F(ReplicatedFastCountManagerIdempotenceTest, IdempotentStartupAndShutdown) 
 
     manager->shutdown(operationContext());
     manager->shutdown(operationContext());
+}
+
+// The checkpoint coordinator captures raw SizeCount[Timestamp]Store pointers at construction, so
+// the manager must never replace the store objects it points at while the coordinator is running.
+//
+// This fixture binds the manager to container-backed stores from the start and exercises repeated
+// initializeContainerStores() calls.
+class ReplicatedFastCountManagerRebindContainerTest : public CatalogTestFixture {
+public:
+    ReplicatedFastCountManagerRebindContainerTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        _opCtx = operationContext();
+        _engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
+
+        ASSERT_OK(createInternalFastCountContainers(_opCtx,
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/false));
+    }
+
+    // Returns freshly opened RecordStores for the container idents created in setUp().
+    std::pair<std::unique_ptr<RecordStore>, std::unique_ptr<RecordStore>> makeContainerStores() {
+        auto metadataRS =
+            _engine->getRecordStore(_opCtx,
+                                    NamespaceString::kAdminCommandNamespace,
+                                    ident::kFastCountMetadataStore,
+                                    RecordStore::Options{.keyFormat = KeyFormat::String},
+                                    /*uuid=*/boost::none);
+        auto timestampsRS =
+            _engine->getRecordStore(_opCtx,
+                                    NamespaceString::kAdminCommandNamespace,
+                                    ident::kFastCountMetadataStoreTimestamps,
+                                    RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                    /*uuid=*/boost::none);
+        return {std::move(metadataRS), std::move(timestampsRS)};
+    }
+
+    OperationContext* _opCtx;
+    KVEngine* _engine;
+    test_helpers::NsAndUUID _coll = {
+        .nss = NamespaceString::createNamespaceString_forTest("rebind_container_test", "coll"),
+        .uuid = UUID::gen()};
+};
+
+TEST_F(ReplicatedFastCountManagerRebindContainerTest,
+       InitializeContainerStoresIsIdempotentWhenAlreadyContainerBacked) {
+    // Bind the manager to container-backed stores and start the checkpoint coordinator with live
+    // background threads.
+    auto [metadataRS, timestampsRS] = makeContainerStores();
+    auto manager = std::make_unique<ReplicatedFastCountManager>(
+        std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
+        std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+    manager->startup(_opCtx);
+    ASSERT_TRUE(manager->isRunning_ForTest());
+    ASSERT_TRUE(manager->usesContainers_ForTest());
+
+    SizeCountStore* boundSizeCountStore = manager->getSizeCountStores_ForTest().first;
+    SizeCountTimestampStore* boundTimestampStore = manager->getSizeCountStores_ForTest().second;
+
+    // Calling initializeContainerStores() again while the stores are already container-backed is a
+    // no-op: the coordinator keeps running against the same store objects rather than being stopped
+    // and the stores replaced. The freshly opened RecordStores passed in are dropped.
+    auto [metadataRS2, timestampsRS2] = makeContainerStores();
+    manager->initializeContainerStores(std::move(metadataRS2), std::move(timestampsRS2));
+
+    ASSERT_TRUE(manager->isRunning_ForTest());
+    ASSERT_TRUE(manager->usesContainers_ForTest());
+    ASSERT_EQ(manager->getSizeCountStores_ForTest().first, boundSizeCountStore);
+    ASSERT_EQ(manager->getSizeCountStores_ForTest().second, boundTimestampStore);
+
+    manager->shutdown(_opCtx);
+    ASSERT_FALSE(manager->isRunning_ForTest());
+}
+
+// Stronger variant of the above: a repeated initializeContainerStores() while the flusher thread
+// is stalled mid-flush inside _doFlush() must leave the coordinator running and the bound stores
+// untouched. If the call instead destroyed and replaced the store objects, the resumed flusher
+// would dereference freed store pointers.
+TEST_F(ReplicatedFastCountManagerRebindContainerTest,
+       InitializeContainerStoresIdempotentDuringInFlightFlush) {
+    ASSERT_OK(storageInterface()->createCollection(
+        _opCtx, _coll.nss, CollectionOptions{.uuid = _coll.uuid}));
+
+    auto [metadataRS, timestampsRS] = makeContainerStores();
+    auto manager = std::make_unique<ReplicatedFastCountManager>(
+        std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
+        std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+    manager->startup(_opCtx);
+    ASSERT_TRUE(manager->isRunning_ForTest());
+
+    SizeCountStore* boundSizeCountStore = manager->getSizeCountStores_ForTest().first;
+    SizeCountTimestampStore* boundTimestampStore = manager->getSizeCountStores_ForTest().second;
+
+    // Buffer a size/count delta so the flush has real work, then stall the flusher inside _doFlush
+    // right after it checks out the batch and before it reads the timestamp store.
+    test_helpers::writeToOplog(
+        _opCtx,
+        test_helpers::makeOplogEntry(Timestamp(1, 1), _coll, repl::OpTypeEnum::kInsert, 10));
+    FailPointEnableBlock hangFp("hangAfterReplicatedFastCountSnapshot");
+    manager->flushAsync();
+    hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
+
+    // The flusher is now parked inside _doFlush holding pointers to the bound stores. A repeated
+    // initializeContainerStores() returns immediately without touching the stores or the
+    // coordinator; the flusher resumes against the same live store objects.
+    auto [metadataRS2, timestampsRS2] = makeContainerStores();
+    manager->initializeContainerStores(std::move(metadataRS2), std::move(timestampsRS2));
+
+    ASSERT_TRUE(manager->isRunning_ForTest());
+    ASSERT_TRUE(manager->usesContainers_ForTest());
+    ASSERT_EQ(manager->getSizeCountStores_ForTest().first, boundSizeCountStore);
+    ASSERT_EQ(manager->getSizeCountStores_ForTest().second, boundTimestampStore);
+
+    globalFailPointRegistry().find("hangAfterReplicatedFastCountSnapshot")->setMode(FailPoint::off);
+
+    manager->shutdown(_opCtx);
+    ASSERT_FALSE(manager->isRunning_ForTest());
 }
 
 using ReplicatedFastCountManagerStartupTest = ReplicatedFastCountManagerTest;

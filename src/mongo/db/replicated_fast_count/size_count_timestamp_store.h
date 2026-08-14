@@ -61,6 +61,8 @@ public:
      * `canAcceptWritesFor` primary check, so the write is not replicated.
      */
     virtual void writeToTable(OperationContext* opCtx, Timestamp timestamp) = 0;
+
+    virtual bool usesContainers() const = 0;
 };
 
 /**
@@ -74,6 +76,10 @@ public:
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
     void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
+
+    bool usesContainers() const override {
+        return false;
+    }
 };
 
 /**
@@ -90,6 +96,10 @@ public:
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
     void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
+
+    bool usesContainers() const override {
+        return true;
+    }
 
     RecordStore* rs_ForTest() const;
 

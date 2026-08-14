@@ -60,6 +60,7 @@ public:
 
     static ReplicatedFastCountManager& get(ServiceContext* svcCtx);
 
+    // TODO (SERVER-126250): Leave the stores as nullptrs.
     ReplicatedFastCountManager()
         : _sizeCountStore(std::make_unique<CollectionSizeCountStore>()),
           _timestampStore(std::make_unique<CollectionSizeCountTimestampStore>()) {
@@ -70,6 +71,9 @@ public:
      * Initializes the stores in container mode with the given RecordStores. Ownership of each
      * RecordStore is transferred into the corresponding SizeCount[Timestamp]Store member. Must be
      * called before startup().
+     *
+     * This function is idempotent: if the stores are already container-backed, this is a no-op and
+     * the given RecordStores are dropped.
      */
     void initializeContainerStores(std::unique_ptr<RecordStore> metadataRS,
                                    std::unique_ptr<RecordStore> timestampsRS);
