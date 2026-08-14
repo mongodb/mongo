@@ -1409,6 +1409,109 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     ru1->clearCommitTimestamp();
 }
 
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       SecondaryPathPublishesAllTablesAtCommitTimestamp) {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    // Unlike the primary, the secondary applies each oplog entry under one fixed _commitTimestamp,
+    // so every table created in the transaction shares the same epoch.
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(5, 0)))
+        .Times(2)
+        .WillRepeatedly(testing::Return(42ULL));
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-a"), 42ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-b"), 42ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(0);
+    EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(0);
+
+    ru1->setCommitTimestamp(Timestamp(5, 0));
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-b");
+    txn.commit();
+    ru1->clearCommitTimestamp();
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       MultiTimestampWuowPublishesEachTableAtItsOwnEpoch) {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(2, 0)))
+        .WillOnce(testing::Return(41ULL));
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(3, 0)))
+        .WillOnce(testing::Return(42ULL));
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-a"), 41ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-b"), 42ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(1);
+    EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(1);
+
+    StorageWriteTransaction txn(*ru1);
+    ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+    ru1->onCreateTable("table-a");
+    ASSERT_OK(ru1->setTimestamp(Timestamp(3, 0)));
+    ru1->onCreateTable("table-b");
+    txn.commit();
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       TableCreatedBeforeAnyTimestampPublishesAtCommitTimestamp) {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    // The table is created before any timestamp is set. Its untimestamped writes are assigned the
+    // transaction's last timestamp at commit, so it must publish there too.
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(3, 0)))
+        .WillOnce(testing::Return(42ULL));
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-a"), 42ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(1);
+    EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(1);
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->onCreateTable("table-a");
+    ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+    ASSERT_OK(ru1->setTimestamp(Timestamp(3, 0)));
+    txn.commit();
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, SchemaEpochPathPublishesAtSetEpoch) {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(testing::_)).Times(0);
+    EXPECT_CALL(
+        *mockEngine(),
+        publishIdent(testing::_, std::string("table-a"), KVEngine::kUntimestampedSchemaEpoch))
+        .Times(1);
+    EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(0);
+    EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(0);
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
+    ru1->onCreateTable("table-a");
+    txn.commit();
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       TableCreatedBeforeAndAfterFirstTimestampBothPublishAtCommitTimestamp) {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    // Mirrors MultiIndexBlock::init(), which creates an untimestamped resumable-state table before
+    // calling onInit() (which sets the timestamp), then creates timestamped per-index tables
+    // afterward, all in the same transaction. Both tables must publish at the same epoch.
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(2, 0)))
+        .Times(2)
+        .WillRepeatedly(testing::Return(42ULL));
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-a"), 42ULL)).Times(1);
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, std::string("table-b"), 42ULL)).Times(1);
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->onCreateTable("table-a");
+    ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+    ru1->onCreateTable("table-b");
+    txn.commit();
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitRollbackThrowsWriteConflictAndCleansUpState) {
     bool onCommitCalled = false;
     bool onRollbackCalled = false;
@@ -1458,13 +1561,41 @@ using WiredTigerRecoveryUnitPublishTableCreationTestDeathTest =
     WiredTigerRecoveryUnitPublishTableCreationTest;
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
                    CommitWithoutTimestampOrSchemaEpochWhenSchemaEpochsInUse,
-                   "_schemaEpoch") {
+                   "timestamp") {
     mockEngine()->_usesSchemaEpochs = true;
 
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
     ru1->onCreateTable("my-table");
     // Committing without a timestamp or schema epoch when schema epochs are in use must fail
+    txn.commit();
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
+                   SchemaEpochTableAlsoGetsATimestamp,
+                   "schemaEpoch") {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
+    ru1->onCreateTable("table-a");
+    ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+    // setSchemaEpoch() is only valid for a transaction that never becomes timestamped.
+    txn.commit();
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
+                   SchemaEpochWithMultipleCreatedTables,
+                   "_createdTables") {
+    mockEngine()->_usesSchemaEpochs = true;
+
+    StorageWriteTransaction txn(*ru1);
+    ru1->getSession();
+    ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
+    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-b");
+    // An explicit schema epoch only covers a transaction creating a single table.
     txn.commit();
 }
 

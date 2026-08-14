@@ -237,9 +237,7 @@ private:
 
     void _abort();
     void _commit(boost::optional<Timestamp> commitTime);
-    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
-                                 uint64_t schemaEpoch,
-                                 bool needsAllDurablePin);
+    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, bool needsAllDurablePin);
 
     void _ensureSession();
     void _resetPerTransactionState();
@@ -351,8 +349,14 @@ private:
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;
 
-    // Tracks the uris of the tables created under this recovery unit.
-    std::vector<std::string> _createdTables;
+    // Tracks the tables created under this recovery unit, each with the timestamp of the write
+    // that introduces it (the current timestamp at creation, or the commit timestamp set later).
+    // Null when the transaction never sets a timestamp.
+    struct CreatedTable {
+        std::string uri;
+        Timestamp timestamp;
+    };
+    std::vector<CreatedTable> _createdTables;
 };
 
 // Constructs a WiredTigerCursor::Params instance from the given params and returns it.
