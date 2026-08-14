@@ -1,1 +1,1 @@
-BAZELISK_BASE_URL=https://mdb-build-public.s3.amazonaws.com/bazel_binary_patch_builds/6a74dc471114980008a737f8
+BAZELISK_BASE_URL=https://mdb-build-public.s3.amazonaws.com/bazel_binary_waterfall_builds/da250b22cec659bb99d2c36c9c10a2a87fc70fd2
