@@ -179,11 +179,13 @@ export function makeDocsOfTotalSize(numDocs, totalBytes) {
     return docs;
 }
 
-// Returns the expected _id object for a sample document. The field order here must mirror
-// ce::PersistentSampleId in persistent_sample.idl in order to successfully match the _id object.
+// Returns the expected _id string for a sample page document. This must mirror
+// ce::makePersistentSampleId() in persistent_sample_loader.cpp:
+//     <collectionUuid>_<schemaVersion>_<samplingMethod>_<sampleSize>[_<numChunks>]_<pageNo>
 // samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.
-// pageNo defaults to 0 (expected when only 1 page exists) and is always present in the _id.
+// pageNo defaults to 0 (expected when only 1 page exists) and is zero-padded to the width of
+// sampleSize so that lexicographic _id order matches page order.
 export function getExpectedId(
     uuid,
     samplingType,
@@ -192,22 +194,10 @@ export function getExpectedId(
     numChunks = null,
     pageNo = 0,
 ) {
-    const id = {
-        [sampleDocFieldNames.schemaVersionField]: NumberInt(expectedSchemaVersion),
-        [sampleDocFieldNames.uuidField]: UUID(uuid),
-        [sampleDocFieldNames.samplingMethodField]: samplingType,
-        [sampleDocFieldNames.sampleSizeField]: NumberLong(sampleSize),
-    };
-    if (numChunks !== null) {
-        assert.eq(
-            "chunk",
-            samplingType,
-            `numChunks should only be passed for chunk sampling; got ${samplingType}`,
-        );
-        id[sampleDocFieldNames.numChunksField] = NumberInt(numChunks);
-    }
-    id[sampleDocFieldNames.pageNoField] = NumberInt(pageNo);
-    return id;
+    return (
+        getExpectedIdPrefix(uuid, samplingType, sampleSize, expectedSchemaVersion, numChunks) +
+        padPageNo(pageNo, sampleSize)
+    );
 }
 
 // Returns the single sample page document matching the given _id.
@@ -221,7 +211,9 @@ export function getSampleDoc(samplesColl, expectedId) {
     return results[0];
 }
 
-// Returns a query filter that matches every page of a single sample
+// Returns a query filter that matches every page of a single sample. All pages of a sample share
+// an _id prefix and differ only in their zero-padded page number, so the filter is a bounded _id
+// range rather than a set of equalities on sub-fields of an object.
 export function getSampleLookupFilter(
     uuid,
     samplingType,
@@ -229,8 +221,20 @@ export function getSampleLookupFilter(
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
 ) {
-    const id = getExpectedId(uuid, samplingType, sampleSize, expectedSchemaVersion, numChunks);
-    return idToLookupFilter(id);
+    const prefix = getExpectedIdPrefix(
+        uuid,
+        samplingType,
+        sampleSize,
+        expectedSchemaVersion,
+        numChunks,
+    );
+    const width = String(sampleSize).length;
+    return {
+        [sampleDocFieldNames.idField]: {
+            $gte: prefix + "0".repeat(width),
+            $lte: prefix + "9".repeat(width),
+        },
+    };
 }
 
 // Validates a full persisted sample, which may be split across multiple pages.
@@ -295,17 +299,36 @@ export function validatePersistentSample(
  * Private helpers
  */
 
-// Converts _id object into dotted-path query filter to match all pages of a sample
-function idToLookupFilter(id) {
-    const idField = sampleDocFieldNames.idField;
-    const filter = {};
-    for (const subField of Object.keys(id)) {
-        if (subField === sampleDocFieldNames.pageNoField) {
-            continue;
-        }
-        filter[`${idField}.${subField}`] = id[subField];
+// Returns the part of the _id shared by every page of a sample, up to and including the separator
+// preceding the page number.
+function getExpectedIdPrefix(
+    uuid,
+    samplingType,
+    sampleSize,
+    expectedSchemaVersion = kPersistentSampleSchemaVersion,
+    numChunks = null,
+) {
+    let prefix = `${uuid}_${expectedSchemaVersion}_${samplingType}_${sampleSize}_`;
+    if (numChunks !== null) {
+        assert.eq(
+            "chunk",
+            samplingType,
+            `numChunks should only be passed for chunk sampling; got ${samplingType}`,
+        );
+        prefix += `${numChunks}_`;
     }
-    return filter;
+    return prefix;
+}
+
+// Zero-pads `pageNo` to the width of `sampleSize`, mirroring ce::makePersistentSampleId().
+function padPageNo(pageNo, sampleSize) {
+    const width = String(sampleSize).length;
+    const page = String(pageNo);
+    assert.lte(page.length, width, "pageNo does not fit the padding width implied by sampleSize", {
+        pageNo,
+        sampleSize,
+    });
+    return page.padStart(width, "0");
 }
 
 function validateSamplePage(
@@ -333,7 +356,8 @@ function validateSamplePage(
     );
     const sampleId = page[sampleDocFieldNames.idField];
 
-    assert.docEq(expectedId, sampleId, `Unexpected ${sampleDocFieldNames.idField}`, {expectedId});
+    assert.eq(expectedId, sampleId, `Unexpected ${sampleDocFieldNames.idField}`, {expectedId});
+    assert.eq(pageNo, page[sampleDocFieldNames.pageNoField], "Unexpected pageNo", {sampleId});
     assert.eq(
         samplingMethod,
         page[sampleDocFieldNames.samplingMethodField],
@@ -450,14 +474,14 @@ function assertPagesShareMetadata(pages) {
     ].filter((field) => pages[0][field] !== undefined);
 
     const firstId = pages[0][sampleDocFieldNames.idField];
-    const firstIdSansPageNo = idWithoutPageNo(firstId);
+    const firstIdSansPageNo = idWithoutPageNo(firstId, pages[0]);
     for (let i = 1; i < pages.length; ++i) {
         const page = pages[i];
         const pageId = page[sampleDocFieldNames.idField];
 
-        assert.docEq(
+        assert.eq(
             firstIdSansPageNo,
-            idWithoutPageNo(pageId),
+            idWithoutPageNo(pageId, page),
             "page _id differs across pages (ignoring pageNo)",
             {firstId, pageId},
         );
@@ -466,16 +490,19 @@ function assertPagesShareMetadata(pages) {
                 {[field]: pages[0][field]},
                 {[field]: page[field]},
                 `page metadata field '${field}' differs across pages`,
-                {pageNo: pageId[sampleDocFieldNames.pageNoField]},
+                {pageNo: page[sampleDocFieldNames.pageNoField]},
             );
         }
     }
 }
 
-function idWithoutPageNo(id) {
-    const copy = Object.assign({}, id);
-    delete copy[sampleDocFieldNames.pageNoField];
-    return copy;
+// Strips the trailing zero-padded page number from an _id, leaving the sample's identity prefix.
+function idWithoutPageNo(id, page) {
+    const width = padPageNo(
+        page[sampleDocFieldNames.pageNoField],
+        page[sampleDocFieldNames.sampleSizeField],
+    ).length;
+    return id.slice(0, id.length - width);
 }
 
 // Mirror of C++ getZScore() in sampling_estimator_impl.cpp.

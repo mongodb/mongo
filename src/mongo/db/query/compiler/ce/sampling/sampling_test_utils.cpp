@@ -603,19 +603,20 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     BSONObjBuilder builder;
     // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
     // numChunks, or sampleSize=0, used in parse-rejection tests) we can't build a valid key, so
-    // use a stand-in random _id object so the doc still has a well-formed PersistentSampleId.
+    // use a stand-in random _id string so the doc still has a well-formed key.
     const bool validForKey = sampleSize > 0 &&
         (method != SamplingTechniqueEnum::kChunk || (numChunks.has_value() && *numChunks > 0));
     if (validForKey) {
         builder.append("_id",
-                       makePersistentSampleIdObj(collUuid, method, sampleSize, numChunks, pageNo));
+                       makePersistentSampleId(collUuid, method, sampleSize, numChunks, pageNo));
     } else {
         builder.append("_id",
-                       makePersistentSampleIdObj(collUuid,
-                                                 SamplingTechniqueEnum::kRandom,
-                                                 sampleSize > 0 ? sampleSize : 1,
-                                                 boost::none));
+                       makePersistentSampleId(collUuid,
+                                              SamplingTechniqueEnum::kRandom,
+                                              sampleSize > 0 ? sampleSize : 1,
+                                              boost::none));
     }
+    builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
     builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collUuid.toString());
     builder.append(PersistentSampleDoc::kSchemaVersionFieldName, schemaVersion);
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());

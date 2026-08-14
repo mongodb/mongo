@@ -24,12 +24,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <limits>
+#include <algorithm>
+#include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
@@ -52,6 +55,56 @@ const int kArrayElementMaxOverheadBytes =
 constexpr int kBytesToClosePage = 2;
 
 /**
+ * Separator between the parts of a persistent sample `_id`. Must sort strictly greater than every
+ * digit so that a sample whose identity prefix is a numeric prefix of another's (e.g. sampleSize
+ * 1 vs 10) sorts outside the latter's page range rather than inside it.
+ */
+constexpr char kIdSeparator = '_';
+static_assert(kIdSeparator > '9');
+
+/**
+ * Number of digits the page number is zero-padded to for a sample of the given size.
+ */
+size_t pageNoWidth(size_t sampleSize) {
+    return fmt::formatted_size("{}", sampleSize);
+}
+
+/**
+ * Builds the part of the `_id` shared by every page of a sample, up to and including the separator
+ * that precedes the page number.
+ */
+std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
+                                         SamplingTechniqueEnum method,
+                                         size_t sampleSize,
+                                         boost::optional<int> numChunks) {
+    tassert(12432800,
+            "Chunk-based persistent sample ID requires numChunks",
+            method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
+    tassert(12432801,
+            "numChunks must only be set for chunk-technique persistent samples",
+            method == SamplingTechniqueEnum::kChunk || !numChunks.has_value());
+    tassert(12832700,
+            "A persistent sample document should never be created or looked up with sampling "
+            "method kFullCollScan",
+            method != SamplingTechniqueEnum::kFullCollScan);
+    tassert(13102000, "Persistent sample ID requires a positive sample size", sampleSize > 0);
+
+    std::string prefix = fmt::format("{}{}{}{}{}{}{}{}",
+                                     collectionUuid.toString(),
+                                     kIdSeparator,
+                                     kPersistentSampleSchemaVersion,
+                                     kIdSeparator,
+                                     idlSerialize(method),
+                                     kIdSeparator,
+                                     sampleSize,
+                                     kIdSeparator);
+    if (numChunks) {
+        fmt::format_to(std::back_inserter(prefix), "{}{}", *numChunks, kIdSeparator);
+    }
+    return prefix;
+}
+
+/**
  * Appends every field of a sample page document except the `docs` array, leaving `builder` ready
  * for the caller to append that array.
  */
@@ -62,10 +115,11 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                               boost::optional<int> numChunks,
                               int pageNo,
                               Date_t createdAt) {
-    const BSONObj docId =
-        makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks, pageNo);
+    const std::string id =
+        makePersistentSampleId(collectionUuid, method, sampleSize, numChunks, pageNo);
 
-    builder.append(PersistentSampleDoc::k_idFieldName, docId);
+    builder.append(PersistentSampleDoc::k_idFieldName, id);
+    builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
     builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collectionUuid.toString());
     builder.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, createdAt);
@@ -79,32 +133,38 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
 
 }  // namespace
 
-BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
-                                  SamplingTechniqueEnum method,
-                                  size_t sampleSize,
-                                  boost::optional<int> numChunks,
-                                  int pageNo) {
-    tassert(12432800,
-            "Chunk-based persistent sample ID requires numChunks",
-            method != SamplingTechniqueEnum::kChunk || numChunks.has_value());
-    tassert(12432801,
-            "numChunks must only be set for chunk-technique persistent samples",
-            method == SamplingTechniqueEnum::kChunk || !numChunks.has_value());
-    tassert(12832700,
-            "A persistent sample document should never be created or looked up with sampling "
-            "method kFullCollScan",
-            method != SamplingTechniqueEnum::kFullCollScan);
+std::string makePersistentSampleId(const UUID& collectionUuid,
+                                   SamplingTechniqueEnum method,
+                                   size_t sampleSize,
+                                   boost::optional<int> numChunks,
+                                   int pageNo) {
+    tassert(13321001, "Persistent sample page number must be non-negative", pageNo >= 0);
 
-    PersistentSampleId id;
-    id.setSchemaVersion(kPersistentSampleSchemaVersion);
-    id.setCollectionUuid(collectionUuid);
-    id.setSamplingMethod(method);
-    id.setSampleSize(static_cast<long long>(sampleSize));
-    if (method == SamplingTechniqueEnum::kChunk) {
-        id.setNumChunks(*numChunks);
-    }
-    id.setPageNo(pageNo);
-    return id.toBSON();
+    const size_t width = pageNoWidth(sampleSize);
+    tassert(13321000,
+            str::stream() << "Persistent sample page number " << pageNo
+                          << " does not fit in the padding width " << width
+                          << " implied by sample size " << sampleSize,
+            fmt::formatted_size("{}", pageNo) <= width);
+
+    std::string id = makePersistentSampleIdPrefix(collectionUuid, method, sampleSize, numChunks);
+    fmt::format_to(std::back_inserter(id), "{:0{}}", pageNo, width);
+    return id;
+}
+
+std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
+                                                                SamplingTechniqueEnum method,
+                                                                size_t sampleSize,
+                                                                boost::optional<int> numChunks) {
+    // The bounds are the lowest and highest page-number components representable in the padding
+    // width, so they bracket every page this sample could have without needing a sentinel page
+    // number that no document uses.
+    const size_t width = pageNoWidth(sampleSize);
+    std::string minId = makePersistentSampleIdPrefix(collectionUuid, method, sampleSize, numChunks);
+    std::string maxId = minId;
+    minId.append(width, '0');
+    maxId.append(width, '9');
+    return {std::move(minId), std::move(maxId)};
 }
 
 std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
@@ -198,20 +258,9 @@ BSONObj makePersistentSampleAllPagesLookupFilter(const UUID& collectionUuid,
                                                  SamplingTechniqueEnum method,
                                                  size_t sampleSize,
                                                  boost::optional<int> numChunks) {
-    const BSONObj id = makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks);
-
-    BSONObjBuilder predicate;
-    predicate.appendAs(id[PersistentSampleId::kCollectionUuidFieldName],
-                       persistentSampleIdField(PersistentSampleId::kCollectionUuidFieldName));
-    predicate.appendAs(id[PersistentSampleId::kSamplingMethodFieldName],
-                       persistentSampleIdField(PersistentSampleId::kSamplingMethodFieldName));
-    predicate.appendAs(id[PersistentSampleId::kSampleSizeFieldName],
-                       persistentSampleIdField(PersistentSampleId::kSampleSizeFieldName));
-    if (numChunks) {
-        predicate.appendAs(id[PersistentSampleId::kNumChunksFieldName],
-                           persistentSampleIdField(PersistentSampleId::kNumChunksFieldName));
-    }
-    return predicate.obj();
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(collectionUuid, method, sampleSize, numChunks);
+    return BSON(PersistentSampleDoc::k_idFieldName << BSON("$gte" << minId << "$lte" << maxId));
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
@@ -241,18 +290,6 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
         parsed.getNumChunks().has_value()) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "persistent sample 'numChunks' must only be set for chunk-technique samples");
-    }
-
-    // The identity fields are stored both inside the structured `_id` and as top-level fields;
-    // a mismatch means a corrupt persisted sample.
-    const PersistentSampleId& id = parsed.get_id();
-    if (id.getSchemaVersion() != parsed.getSchemaVersion() ||
-        id.getCollectionUuid().toString() != parsed.getCollectionUuid() ||
-        id.getSamplingMethod() != parsed.getSamplingMethod() ||
-        id.getNumChunks() != parsed.getNumChunks()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "persistent sample '_id' identity fields do not match the document's "
-                      "top-level fields");
     }
 
     const auto sampleSize = static_cast<size_t>(parsed.getSampleSize());
@@ -322,13 +359,13 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
         PersistentSampleDoc page = std::move(parsed.getValue());
 
         // The pages of a sample must form a contiguous run 0..N-1 arriving in pageNo order.
-        if (page.get_id().getPageNo() != static_cast<int>(i)) {
+        if (page.getPageNo() != static_cast<int>(i)) {
             return Status(ErrorCodes::UnsupportedFormat,
                           str::stream()
                               << "persistent sample pages must be a contiguous "
                                  "run 0.."
                               << (pages.size() - 1) << " in order. Run is broken by page with _id: "
-                              << page.get_id().toBSON() << ", expected pageNo: " << i);
+                              << page.get_id() << ", expected pageNo: " << i);
         }
 
         // All pages must agree on the sample's identity.
@@ -383,17 +420,10 @@ StatusWith<LoadedPersistentSample> PersistentSampleLoader::tryLoad(
 
     // Perform a bounded range scan on the clustered samples collection to retrieve all pages in a
     // sample ordered by pageNo.
-    using PageNoType = decltype(std::declval<PersistentSampleId>().getPageNo());
-    const BSONObj minId =
-        makePersistentSampleIdObj(collectionUuid, method, sampleSize, numChunks, /*pageNo=*/0);
-    const BSONObj maxId =
-        makePersistentSampleIdObj(collectionUuid,
-                                  method,
-                                  sampleSize,
-                                  numChunks,
-                                  /*pageNo=*/std::numeric_limits<PageNoType>::max());
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(collectionUuid, method, sampleSize, numChunks);
 
-    const auto recordIdForId = [](const BSONObj& id) {
+    const auto recordIdForId = [](std::string_view id) {
         return RecordIdBound(
             record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));
     };

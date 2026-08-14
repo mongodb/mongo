@@ -8,12 +8,12 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
-#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -40,23 +40,30 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   Date_t createdAt);
 
 /**
- * Builds the `_id` object for a persisted sample document
+ * Builds the `_id` string for a persisted sample page document:
  *
- * Exposed so that both the read path (PersistentSampleLoader) and the write path (analyze command)
- * produce identical keys.
+ *     <collectionUuid>_<schemaVersion>_<samplingMethod>_<sampleSize>[_<numChunks>]_<pageNo>
+ *
+ * All pages of a given sample share an identical prefix up to (and including) the separator that
+ * precedes the page number, so the pages of one sample - and only that sample - form a contiguous
+ * run in lexicographic `_id` order. `pageNo` is zero-padded to the width of `sampleSize` so that
+ * lexicographic order matches numeric order. This is enough padding because a sample can never
+ * have more pages than it has documents, and it can never have more documents than `sampleSize`.
  */
-BSONObj makePersistentSampleIdObj(const UUID& collectionUuid,
-                                  SamplingTechniqueEnum method,
-                                  size_t sampleSize,
-                                  boost::optional<int> numChunks,
-                                  int pageNo = 0);
+std::string makePersistentSampleId(const UUID& collectionUuid,
+                                   SamplingTechniqueEnum method,
+                                   size_t sampleSize,
+                                   boost::optional<int> numChunks,
+                                   int pageNo = 0);
 
 /**
- * Returns the dotted path for a given sub-field of the `_id` object of a persisted sample document.
+ * Returns the inclusive [min, max] `_id` bounds spanning every page a sample with the given
+ * identity values could have.
  */
-inline std::string persistentSampleIdField(std::string_view subField) {
-    return str::stream() << PersistentSampleDoc::k_idFieldName << "." << subField;
-}
+std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
+                                                                SamplingTechniqueEnum method,
+                                                                size_t sampleSize,
+                                                                boost::optional<int> numChunks);
 
 /**
  * Builds a filter matching all pages of a persisted sample with the given identity values.

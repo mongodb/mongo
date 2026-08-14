@@ -13,7 +13,6 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -23,106 +22,173 @@ namespace {
 const BSONObj kStubSampleDoc = BSON("_id" << 1);
 const std::vector<BSONObj> kStubSampleDocs{kStubSampleDoc};
 
-// ── makePersistentSampleIdObj ─────────────────────────────────────────────────────────────────
+// ── makePersistentSampleId ────────────────────────────────────────────────────────────────────
 
-TEST(MakePersistentSampleIdObj, EqualIdentitiesProduceEqualIds) {
-    const UUID uuid = UUID::gen();
-    const auto a =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
-    const auto b =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
-    ASSERT_BSONOBJ_EQ(a, b);
+// A fixed UUID so the tests below can spell out the expected `_id` strings in full.
+const UUID kUuid = uassertStatusOK(UUID::parse("01234567-89ab-cdef-0123-456789abcdef"));
+
+// The layout the tests pin down. schemaVersion is part of the identity so a schema bump can never
+// match a stale document, and it follows the UUID so that every sample of one collection is
+// contiguous in the clustered collection.
+std::string expectedId(std::string_view method, std::string_view tail) {
+    return str::stream() << kUuid.toString() << "_" << kPersistentSampleSchemaVersion << "_"
+                         << method << "_" << tail;
 }
 
-TEST(MakePersistentSampleIdObj, PopulatesFieldsInPrefixOrder) {
-    const UUID uuid = UUID::gen();
-    const auto randomId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    // schemaVersion is part of the identity so a schema bump can never match a stale document.
-    ASSERT_EQ(randomId[PersistentSampleId::kSchemaVersionFieldName].numberInt(),
-              kPersistentSampleSchemaVersion);
-    ASSERT_EQ(UUID::parse(randomId[PersistentSampleId::kCollectionUuidFieldName]), uuid);
-    ASSERT_EQ(randomId[PersistentSampleId::kSamplingMethodFieldName].str(), "random");
-    ASSERT_EQ(randomId[PersistentSampleId::kSampleSizeFieldName].numberLong(), 384);
-    ASSERT_TRUE(randomId[PersistentSampleId::kNumChunksFieldName].eoo());
-    ASSERT_EQ(randomId[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
+TEST(MakePersistentSampleId, LayoutForEachSamplingTechnique) {
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none),
+              expectedId("random", "384_000"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 384, boost::none),
+              expectedId("seqScan", "384_000"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kStrides, 384, boost::none),
+              expectedId("strides", "384_000"));
+    // numChunks is only part of the key for the chunk technique, and sits between the sample size
+    // and the page number.
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10),
+              expectedId("chunk", "384_10_000"));
+}
 
-    // schemaVersion first, pageNo last, so the clustered key orders pages by pageNo.
-    std::vector<std::string> fieldNames;
-    for (auto&& e : randomId) {
-        fieldNames.push_back(std::string{e.fieldNameStringData()});
+// We may use full coll scan to generate a sample but it is never persisted under that technique.
+// We'd use the requested techinque instead.
+DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, FullCollScanIsRejected, "12832700") {
+    makePersistentSampleId(kUuid, SamplingTechniqueEnum::kFullCollScan, 384, boost::none);
+}
+
+DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, PageNoWiderThanSampleSizeIsRejected, "13321000") {
+    makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, /*pageNo=*/100);
+}
+
+TEST(MakePersistentSampleId, IsDeterministic) {
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, 7),
+              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, 7));
+}
+
+TEST(MakePersistentSampleId, PageNoDefaultsToZero) {
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none),
+              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 0));
+}
+
+TEST(MakePersistentSampleId, PageNoIsZeroPaddedToTheWidthOfSampleSize) {
+    // A sample can hold at most one page per sampled document, so padding the page number to the
+    // width of the sample size is always enough to keep every page the same length.
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 5, boost::none, 4),
+              expectedId("random", "5_4"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 7),
+              expectedId("random", "384_007"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 383),
+              expectedId("random", "384_383"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10000, boost::none, 42),
+              expectedId("random", "10000_00042"));
+}
+
+TEST(MakePersistentSampleId, EveryIdOfASampleHasTheSameLength) {
+    // Equal length is what makes lexicographic order coincide with numeric page order.
+    const size_t length =
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none).size();
+    for (int pageNo : {0, 1, 9, 10, 99, 100, 999}) {
+        ASSERT_EQ(
+            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, pageNo)
+                .size(),
+            length);
     }
-    ASSERT_EQ(fieldNames.front(), PersistentSampleId::kSchemaVersionFieldName);
-    ASSERT_EQ(fieldNames.back(), PersistentSampleId::kPageNoFieldName);
-
-    const auto chunkId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    ASSERT_EQ(chunkId[PersistentSampleId::kNumChunksFieldName].numberInt(), 10);
-    ASSERT_EQ(chunkId[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
 }
 
-TEST(MakePersistentSampleIdObj, PageNoDefaultsToZeroAndIsSettable) {
-    const UUID uuid = UUID::gen();
-    // Omitting the argument yields page 0.
-    const auto defaulted =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    ASSERT_EQ(defaulted[PersistentSampleId::kPageNoFieldName].numberInt(), 0);
-
-    // An explicit page number is threaded through to the _id.
-    const auto page7 =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 7);
-    ASSERT_EQ(page7[PersistentSampleId::kPageNoFieldName].numberInt(), 7);
+TEST(MakePersistentSampleId, PagesOfSameSampleSortInPageNoOrder) {
+    std::string previous;
+    for (int pageNo = 0; pageNo < 384; ++pageNo) {
+        const auto id =
+            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+        ASSERT_LT(previous, id);
+        previous = id;
+    }
 }
 
-TEST(MakePersistentSampleIdObj, DifferentConfigurationsProduceDifferentIds) {
-    const UUID uuid = UUID::gen();
-    const auto randomId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    const auto otherUuidId =
-        makePersistentSampleIdObj(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none);
-    const auto chunkId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    const auto differentSizeId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none);
-    const auto differentChunksId =
-        makePersistentSampleIdObj(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
-    const auto differentPageId = makePersistentSampleIdObj(
-        uuid, SamplingTechniqueEnum::kRandom, 384, boost::none, /*pageNo=*/1);
+TEST(MakePersistentSampleId, EveryIdentityFieldChangesTheId) {
+    const auto baseline =
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 1);
+    ASSERT_NE(baseline,
+              makePersistentSampleId(
+                  UUID::gen(), SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 1));
+    ASSERT_NE(baseline,
+              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 1));
+    ASSERT_NE(
+        baseline,
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 385, /*numChunks=*/10, 1));
+    ASSERT_NE(
+        baseline,
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20, 1));
+    ASSERT_NE(
+        baseline,
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 2));
+}
 
-    ASSERT_BSONOBJ_NE(randomId, otherUuidId);
-    ASSERT_BSONOBJ_NE(randomId, chunkId);
-    ASSERT_BSONOBJ_NE(randomId, differentSizeId);
-    ASSERT_BSONOBJ_NE(chunkId, differentChunksId);
-    ASSERT_BSONOBJ_NE(randomId, differentPageId);
+// ── makePersistentSampleIdRange ───────────────────────────────────────────────────────────────
+
+TEST(MakePersistentSampleIdRange, BoundsAreThePageNumberExtremes) {
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    ASSERT_EQ(minId, expectedId("random", "384_000"));
+    ASSERT_EQ(maxId, expectedId("random", "384_999"));
+
+    const auto [chunkMin, chunkMax] =
+        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    ASSERT_EQ(chunkMin, expectedId("chunk", "384_10_000"));
+    ASSERT_EQ(chunkMax, expectedId("chunk", "384_10_999"));
+}
+
+TEST(MakePersistentSampleIdRange, BracketsEveryPageOfTheSample) {
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    ASSERT_LTE(minId, maxId);
+    // 383 is the highest page a 384-document sample can have.
+    for (int pageNo : {0, 1, 42, 383}) {
+        const auto id =
+            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+        ASSERT_LTE(minId, id);
+        ASSERT_LTE(id, maxId);
+    }
+}
+
+TEST(MakePersistentSampleIdRange, ExcludesOtherSamples) {
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 1, boost::none);
+
+    // A sample whose size is a numeric prefix of another's must not fall inside its range: this is
+    // the footgun that motivated moving off object-valued _ids.
+    const std::vector<std::string> outsiders{
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, 9),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 100, boost::none, 0),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 1, /*numChunks=*/1),
+        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 1, boost::none),
+        makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 1, boost::none),
+    };
+    for (const auto& id : outsiders) {
+        ASSERT_TRUE(id < minId || id > maxId) << "id unexpectedly inside range: " << id;
+    }
 }
 
 // ── makePersistentSampleAllPagesLookupFilter ─────────────────────────────────────────────────────
 
-TEST(makePersistentSampleAllPagesLookupFilter, MatchesIdentitySubFieldsButNotPageNo) {
+TEST(makePersistentSampleAllPagesLookupFilter, IsAnInclusiveIdRange) {
     const UUID uuid = UUID::gen();
-    const auto predicate = makePersistentSampleAllPagesLookupFilter(
-        uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-
-    ASSERT_EQ(UUID::parse(
-                  predicate[persistentSampleIdField(PersistentSampleId::kCollectionUuidFieldName)]),
-              uuid);
-    ASSERT_EQ(
-        predicate[persistentSampleIdField(PersistentSampleId::kSamplingMethodFieldName)].str(),
-        "random");
-    ASSERT_EQ(
-        predicate[persistentSampleIdField(PersistentSampleId::kSampleSizeFieldName)].numberLong(),
-        384);
-    ASSERT_TRUE(predicate[persistentSampleIdField(PersistentSampleId::kNumChunksFieldName)].eoo());
-    ASSERT_TRUE(predicate[persistentSampleIdField(PersistentSampleId::kPageNoFieldName)].eoo());
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(uuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    ASSERT_BSONOBJ_EQ(makePersistentSampleAllPagesLookupFilter(
+                          uuid, SamplingTechniqueEnum::kRandom, 384, boost::none),
+                      BSON("_id" << BSON("$gte" << minId << "$lte" << maxId)));
 }
 
 TEST(makePersistentSampleAllPagesLookupFilter, IncludesNumChunksForChunkTechnique) {
     const UUID uuid = UUID::gen();
-    const auto predicate = makePersistentSampleAllPagesLookupFilter(
-        uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    ASSERT_EQ(
-        predicate[persistentSampleIdField(PersistentSampleId::kNumChunksFieldName)].numberInt(),
-        10);
+    const auto [minId, maxId] =
+        makePersistentSampleIdRange(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
+    ASSERT_BSONOBJ_EQ(makePersistentSampleAllPagesLookupFilter(
+                          uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10),
+                      BSON("_id" << BSON("$gte" << minId << "$lte" << maxId)));
+    // The chunk count is part of the shared prefix, so a different one yields a disjoint range.
+    const auto [otherMin, otherMax] =
+        makePersistentSampleIdRange(uuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
+    ASSERT_TRUE(otherMin > maxId || otherMax < minId);
 }
 
 // ── parsePersistentSample ─────────────────────────────────────────────────────────────────────
@@ -146,7 +212,7 @@ TEST(ParsePersistentSample, ValidRandomSamplePopulatesAllFields) {
     ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kRandom);
     ASSERT_EQUALS(static_cast<size_t>(sample.getSampleSize()), docs.size());
     ASSERT_FALSE(sample.getNumChunks().has_value());
-    ASSERT_EQUALS(sample.get_id().getPageNo(), 0);
+    ASSERT_EQUALS(sample.getPageNo(), 0);
 
     ASSERT_EQUALS(sample.getCreatedAt(),
                   sampleDoc[PersistentSampleDoc::kCreatedAtFieldName].date());
@@ -311,23 +377,15 @@ TEST(ParsePersistentSample, RejectsNonPositiveNumChunks) {
 
 TEST(ParsePersistentSample, RejectsNegativePageNo) {
     // pageNo is defined in the idl to be >= 0
-    const UUID uuid = UUID::gen();
-    const BSONObj badId = BSON(
-        PersistentSampleId::kSchemaVersionFieldName
-        << kPersistentSampleSchemaVersion << PersistentSampleId::kCollectionUuidFieldName << uuid
-        << PersistentSampleId::kSamplingMethodFieldName
-        << idlSerialize(SamplingTechniqueEnum::kRandom) << PersistentSampleId::kSampleSizeFieldName
-        << static_cast<long long>(kStubSampleDocs.size()) << PersistentSampleId::kPageNoFieldName
-        << -1);
-    auto result =
-        parsePersistentSample(buildPersistentSampleDoc(uuid,
-                                                       SamplingTechniqueEnum::kRandom,
-                                                       /*sampleSize=*/kStubSampleDocs.size(),
-                                                       /*docs=*/kStubSampleDocs,
-                                                       /*numChunks=*/boost::none,
-                                                       /*schemaVersion=*/
-                                                       kPersistentSampleSchemaVersion,
-                                                       BSON("_id" << badId)));
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/
+                                 kPersistentSampleSchemaVersion,
+                                 BSON(PersistentSampleDoc::kPageNoFieldName << -1)));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -347,8 +405,9 @@ TEST(ParsePersistentSample, RejectsMissingDocsField) {
     const UUID uuid = UUID::gen();
     BSONObjBuilder b;
     b.append("_id",
-             makePersistentSampleIdObj(
+             makePersistentSampleId(
                  uuid, SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), boost::none));
+    b.append(PersistentSampleDoc::kPageNoFieldName, 0);
     b.append(PersistentSampleDoc::kCollectionUuidFieldName, uuid.toString());
     b.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
     b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
@@ -397,15 +456,14 @@ BSONObj buildPage(const UUID& uuid,
                   const std::vector<BSONObj>& docs,
                   int pageNo,
                   boost::optional<int> numChunks = boost::none) {
-    return buildPersistentSampleDoc(
-        uuid,
-        method,
-        sampleSize,
-        docs,
-        numChunks,
-        /*schemaVersion=*/kPersistentSampleSchemaVersion,
-        /*overrides=*/
-        BSON("_id" << makePersistentSampleIdObj(uuid, method, sampleSize, numChunks, pageNo)));
+    return buildPersistentSampleDoc(uuid,
+                                    method,
+                                    sampleSize,
+                                    docs,
+                                    numChunks,
+                                    /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                    /*overrides=*/BSONObj{},
+                                    pageNo);
 }
 
 TEST(ReassemblePersistentSample, EmptyPagesReturnsNoSuchKey) {
@@ -694,7 +752,7 @@ TEST(MakePersistentSamplePageDocs, DiscardsAcrossMultiplePagesRoundTrip) {
     for (size_t pageNo = 0; pageNo < pages.size(); ++pageNo) {
         auto swParsed = parsePersistentSample(pages[pageNo]);
         ASSERT_OK(swParsed.getStatus());
-        ASSERT_EQ(swParsed.getValue().get_id().getPageNo(), static_cast<int>(pageNo));
+        ASSERT_EQ(swParsed.getValue().getPageNo(), static_cast<int>(pageNo));
         ASSERT_LTE(pages[pageNo].objsize(), BSONObjMaxUserSize);
         ASSERT_GTE(swParsed.getValue().getDocs().size(), 1u);
     }
@@ -730,10 +788,15 @@ TEST(MakePersistentSamplePageDocs, PagesAreNumberedSequentiallyFromZero) {
     }
     const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
     ASSERT_GTE(pages.size(), 3u);
+    std::string previousId;
     for (size_t pageNo = 0; pageNo < pages.size(); ++pageNo) {
         auto swParsed = parsePersistentSample(pages[pageNo]);
         ASSERT_OK(swParsed.getStatus());
-        ASSERT_EQ(swParsed.getValue().get_id().getPageNo(), static_cast<int>(pageNo));
+        ASSERT_EQ(swParsed.getValue().getPageNo(), static_cast<int>(pageNo));
+        // The read path orders pages by `_id` and checks their contiguity with 'pageNo', so
+        // ascending 'pageNo' must come with ascending `_id`.
+        ASSERT_LT(previousId, swParsed.getValue().get_id());
+        previousId = swParsed.getValue().get_id();
         ASSERT_LT(pages[pageNo].objsize(), BSONObjMaxUserSize);
     }
 }
@@ -782,7 +845,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
     const PersistentSampleDoc& parsed = swParsed.getValue();
     ASSERT_EQ(parsed.getSampleSize(), 1000);
     ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kRandom);
-    ASSERT_EQ(parsed.get_id().getPageNo(), 0);
+    ASSERT_EQ(parsed.getPageNo(), 0);
     ASSERT_EQ(parsed.getDocs().size(), 2u);
     ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
 }
@@ -803,7 +866,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
     ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk);
     ASSERT_TRUE(parsed.getNumChunks().has_value());
     ASSERT_EQ(parsed.getNumChunks().value(), numChunks.value());
-    ASSERT_EQ(parsed.get_id().getPageNo(), 0);
+    ASSERT_EQ(parsed.getPageNo(), 0);
     ASSERT_EQ(parsed.getDocs().size(), 2u);
     ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
     ASSERT_EQ(parsed.getDocs()[1]["a"].numberInt(), 2);
