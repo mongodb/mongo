@@ -81,3 +81,23 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "container_write_test",
+    srcs = [
+        "container_write_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "container_write",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/repl:oplog_interface_local",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:stub_container",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
