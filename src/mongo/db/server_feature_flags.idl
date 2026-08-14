@@ -384,7 +384,7 @@ feature_flags:
     featureFlagEnableSchemaEpochs:
         description: "Enable using WiredTiger schema epochs on supported platforms."
         cpp_varname: gFeatureFlagEnableSchemaEpochs
-        default: false
+        default: true
         fcv_gated: false
     featureFlagPipelinedOplogApplier:
         description: "Enable pipelined oplog applier."
