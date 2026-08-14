@@ -495,22 +495,6 @@ resmoke_suite_test(
     ],
 )
 
-# TODO (SERVER-109519): Remove this temporary suite.
-resmoke_suite_test(
-    name = "sharding_jscore_passthrough_legacy_timeseries_no_rawdata",
-    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_legacy_timeseries_no_rawdata.yml",
-    shard_count = 3,
-    tags = [
-        "ci-default",
-        "jscore",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_with_injected_catalog_metadata",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_injected_catalog_metadata.yml",
@@ -713,23 +697,6 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "unsplittable_collections",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-# TODO (SERVER-109519): Remove this temporary suite.
-resmoke_suite_test(
-    name = "sharding_legacy_timeseries_no_rawdata",
-    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_legacy_timeseries_no_rawdata.yml",
-    shard_count = 5,
-    tags = [
-        "ci-default",
-        "requires_replicated_fast_count_recovery",
-        "sharding",
     ],
     deps = [
         "//src/mongo/db:mongod",
