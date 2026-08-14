@@ -753,6 +753,22 @@ public:
     }
 };
 
+class AccumulatorMin;
+class AccumulatorSum;
+class AccumulatorMax;
+class AccumulatorAvg;
+class AccumulatorStdDevPop;
+class AccumulatorStdDevSamp;
+
+template <typename AccumulatorState>
+inline constexpr bool isAccumulatorExpressionImplementedInSbe =
+    std::is_same_v<AccumulatorState, AccumulatorSum> ||
+    std::is_same_v<AccumulatorState, AccumulatorMin> ||
+    std::is_same_v<AccumulatorState, AccumulatorMax> ||
+    std::is_same_v<AccumulatorState, AccumulatorAvg> ||
+    std::is_same_v<AccumulatorState, AccumulatorStdDevPop> ||
+    std::is_same_v<AccumulatorState, AccumulatorStdDevSamp>;
+
 /**
  * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
  * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
@@ -763,14 +779,14 @@ class ExpressionFromAccumulator
 public:
     explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
+        expCtx->capSbeCompatibility(getSbeCompatibility());
     }
 
     ExpressionFromAccumulator(ExpressionContext* const expCtx,
                               Expression::ExpressionVector&& children)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx,
                                                                           std::move(children)) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
+        expCtx->capSbeCompatibility(getSbeCompatibility());
     }
 
     Value evaluate(const Document& root,
@@ -805,6 +821,16 @@ public:
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionFromAccumulator<AccumulatorState>>(
             &expCtx, this->cloneChildren(expCtx));
+    }
+
+private:
+    static constexpr SbeCompatibility getSbeCompatibility() {
+        if constexpr (isAccumulatorExpressionImplementedInSbe<AccumulatorState>) {
+            // TODO SERVER-132588: Enable expression-form accumulators in trySbeRestricted.
+            return SbeCompatibility::requiresSbeFull;
+        } else {
+            return SbeCompatibility::notCompatible;
+        }
     }
 };
 

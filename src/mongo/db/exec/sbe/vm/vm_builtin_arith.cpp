@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/util/str.h"
@@ -332,6 +333,44 @@ value::TagValueMaybeOwned ByteCode::builtinConvertSimpleSumToDoubleDoubleSumImpl
 
     return accTagVal;
 }
+
+value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSumFromAcc(ArityType arity) {
+    // Reuse the same DoubleDouble accumulator state and helpers as the $sum
+    auto accTagVal = value::TagValueOwned::fromRaw(genericInitializeDoubleDoubleSumState());
+    value::Array* accumulator = value::getArrayView(accTagVal.value());
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        aggDoubleDoubleSumImpl(accumulator, tag, val);
+    };
+
+    // A single array argument is summed element-wise, while a single non-array argument
+    // or multiple arguments are each processed directly. Non-numeric values are ignored.
+    processStackRange(0, arity, processOne);
+
+    return aggDoubleDoubleSumFinalizeImpl(accumulator);
+}
+
+template <bool isSamp>
+value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc(ArityType arity) {
+    auto accTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::Array* accumulator = value::getArrayView(accTagVal.value());
+    accumulator->reserve(AggStdDevValueElems::kSizeOfArray);
+
+    accumulator->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+    accumulator->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    accumulator->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        aggStdDevImpl(accumulator, {tag, val});
+    };
+
+    processStackRange(0, arity, processOne);
+
+    return aggStdDevFinalizeImpl(accTagVal.value(), isSamp);
+}
+template value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc<false>(ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc<true>(ArityType arity);
+
 
 }  // namespace vm
 }  // namespace sbe

@@ -856,6 +856,66 @@ int32_t aggMinMaxN(value::Array* state,
 }
 }  // namespace
 
+value::TagValueMaybeOwned ByteCode::builtinAvgFromAcc(ArityType arity) {
+    auto accTagVal = value::TagValueOwned::fromRaw(genericInitializeDoubleDoubleSumState());
+    size_t numNumericArgs = 0;
+    value::Array* accumulator = value::getArrayView(accTagVal.value());
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        if (value::isNumber(tag)) {
+            aggDoubleDoubleSumImpl(accumulator, tag, val);
+            ++numNumericArgs;
+        }
+    };
+
+    processStackRange(0, arity, processOne);
+
+    if (numNumericArgs == 0) {
+        return value::TagValueMaybeOwned::null();
+    }
+    auto sum = aggDoubleDoubleSumFinalizeImpl(accumulator);
+    return genericDiv(sum.view(), value::TagValueView::numberInt64(numNumericArgs));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+value::TagValueMaybeOwned ByteCode::builtinMinMaxNFromAcc(ArityType arity) {
+    CollatorInterface* collator = nullptr;
+    ArityType startIdx = 0;
+    if (arity > 0) {
+        auto arg0 = viewFromStack(0);
+        if (arg0.tag == value::TypeTags::collator) {
+            collator = value::getCollatorView(arg0.value);
+            startIdx = 1;
+        }
+    }
+
+    value::TagValueOwned acc = value::TagValueOwned::nothing();
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        // Mirror how SBE HashAgg handles nullish accumulator inputs.
+        if (value::isNullish(tag)) {
+            tag = value::TypeTags::Nothing;
+            val = 0;
+        }
+        if constexpr (S == AccumulatorMinMaxN::MinMaxSense::kMax) {
+            acc = aggMax(acc.view(), value::TagValueView{tag, val}, collator);
+        } else {
+            acc = aggMin(acc.view(), value::TagValueView{tag, val}, collator);
+        }
+    };
+
+    processStackRange(startIdx, arity, processOne);
+
+    if (acc.tag() == value::TypeTags::Nothing) {
+        return value::TagValueMaybeOwned::null();
+    }
+    return std::move(acc);
+}
+template value::TagValueMaybeOwned
+ByteCode::builtinMinMaxNFromAcc<AccumulatorMinMaxN::MinMaxSense::kMin>(ArityType arity);
+template value::TagValueMaybeOwned
+ByteCode::builtinMinMaxNFromAcc<AccumulatorMinMaxN::MinMaxSense::kMax>(ArityType arity);
+
 template <AccumulatorMinMaxN::MinMaxSense S>
 value::TagValueMaybeOwned ByteCode::builtinAggMinMaxN(ArityType arity) {
     tassert(11080087, "Unexpected arity value", arity == 2 || arity == 3);
