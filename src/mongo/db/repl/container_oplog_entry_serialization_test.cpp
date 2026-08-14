@@ -220,5 +220,28 @@ TEST(ContainerOplogEntrySerializationTest, ContainerValParseRejectsNonBinDataArr
     ASSERT_THROWS_CODE(ContainerVal::parse(obj["v"]), DBException, ErrorCodes::TypeMismatch);
 }
 
+TEST(ContainerOplogEntrySerializationTest, ContainerKeyIsPacked) {
+    const char k[] = "K1";
+    // Only an array holds more than one key.
+    ASSERT_TRUE(
+        ContainerKey::isPacked(BSON("k" << BSON_ARRAY(BSONBinData(k, 2, BinDataGeneral)))["k"]));
+    ASSERT_FALSE(ContainerKey::isPacked(BSON("k" << BSONBinData(k, 2, BinDataGeneral))["k"]));
+    ASSERT_FALSE(ContainerKey::isPacked(BSON("k" << int64_t{7})["k"]));
+
+    // An array of one is still the packed encoding, and an absent key is not packed.
+    ASSERT_TRUE(ContainerKey::isPacked(BSON("k" << BSONArray())["k"]));
+    ASSERT_FALSE(ContainerKey::isPacked(BSONObj()["k"]));
+}
+
+TEST(ContainerOplogEntrySerializationTest, ContainerValIsPacked) {
+    const char v[] = "V";
+    ASSERT_TRUE(
+        ContainerVal::isPacked(BSON("v" << BSON_ARRAY(BSONBinData(v, 1, BinDataGeneral)))["v"]));
+    ASSERT_FALSE(ContainerVal::isPacked(BSON("v" << BSONBinData(v, 1, BinDataGeneral))["v"]));
+
+    // An absent value is not packed, which is the common shape for a bytes-keyed range insert.
+    ASSERT_FALSE(ContainerVal::isPacked(BSONObj()["v"]));
+}
+
 }  // namespace
 }  // namespace mongo::repl

@@ -3396,6 +3396,10 @@ Status applyContainerOperations(OperationContext* opCtx,
 
         auto* opObserver = opCtx->getServiceContext()->getOpObserver();
 
+        // The packed (array 'k' and/or 'v') branches below are only reachable from callers that
+        // apply serially: applyOps, and prepared transactions in recovery and initial sync.
+        // expandBatchedContainerOps() unrolls packed entries before writer assignment, so
+        // steady-state secondary application never sees one here.
         switch (op->getOpType()) {
             case repl::OpTypeEnum::kContainerInsert: {
                 auto parsed = repl::ContainerInsertOplogEntryO::parse(

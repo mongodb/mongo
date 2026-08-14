@@ -348,6 +348,11 @@ void _dispatchTxnOpsToWriterVectors(OperationContext* opCtx,
                                     std::vector<std::vector<ApplierOperation>>* writerVectors,
                                     CachedCollectionProperties* collPropertiesCache,
                                     RetryImageRectifier* retryImageRectifier) {
+    // Split multi-key container ops so that each key is hashed to a writer thread on its own. This
+    // must happen after any aggregation over 'txnOps' (affected namespaces, size metadata), which
+    // counts packed entries once.
+    OplogApplierUtils::expandBatchedContainerOps(txnOps);
+
     auto& extractedOps = retryImageRectifier->storeExtractedOpsAndDeletes(
         std::move(txnOps), derivedOps, op->shouldPrepare());
 
@@ -1100,8 +1105,10 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 invariant(partialTxnList->empty(), op.toStringForLogging());
             } else {
                 // The applyOps entry was not generated as part of a transaction.
+                auto applyOpsOps = ApplyOps::extractOperations(op);
+                OplogApplierUtils::expandBatchedContainerOps(applyOpsOps);
                 auto& extractedOps = retryImageRectifier.storeExtractedOpsAndDeletes(
-                    ApplyOps::extractOperations(op), derivedOps, false /* isPrepared */);
+                    std::move(applyOpsOps), derivedOps, false /* isPrepared */);
 
                 // Nested entries cannot have different session updates.
                 OplogApplierUtils::addDerivedOps(
@@ -1133,6 +1140,22 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                              &retryImageRectifier);
             invariant(partialTxnList->empty(), op.toStringForLogging());
             continue;
+        }
+
+        // A container op logged outside of an applyOps may still pack multiple keys, which have to
+        // be split apart before they can be hashed to writer threads individually.
+        if (derivedOps && op.isContainerOpType()) {
+            // Note an empty expansion is not the same as no expansion: it means the op was packed
+            // but had no keys, so it is dropped rather than applied as it is.
+            if (auto expandedOps = OplogApplierUtils::expandBatchedContainerOp(op)) {
+                derivedOps->emplace_back(std::move(*expandedOps));
+                OplogApplierUtils::addDerivedOps(opCtx,
+                                                 &derivedOps->back(),
+                                                 writerVectors,
+                                                 &collPropertiesCache,
+                                                 false /*serial*/);
+                continue;
+            }
         }
 
         OplogApplierUtils::addToWriterVector(opCtx, &op, writerVectors, &collPropertiesCache);

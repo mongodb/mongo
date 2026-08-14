@@ -7505,6 +7505,487 @@ TEST_F(PreparedTxnSplitSizeMetadataTest, SizeMetadataIsSummedAcrossSplits) {
     EXPECT_EQ(entry.getCt(), 2);  // two inserts
 }
 
+// Tests that container ops packing multiple keys are split apart before being distributed, so that
+// every op touching a given key is assigned to the same writer thread. Without the split, an insert
+// of a batch of keys and a delete of one of those keys can land on different threads and race.
+class ContainerOpWriterVectorTest : public OplogApplierImplTest {
+protected:
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        _workerPool = makeReplWorkerPool();
+        _applier = std::make_unique<OplogApplierImpl>(
+            nullptr,  // executor
+            nullptr,  // oplogBuffer
+            &_observer,
+            ReplicationCoordinator::get(_opCtx.get()),
+            getConsistencyMarkers(),
+            getStorageInterface(),
+            OplogApplier::Options(OplogApplication::Mode::kSecondary, false),
+            _workerPool.get());
+    }
+
+    OplogEntry makeContainerOp(OpTime opTime, OpTypeEnum opType, const BSONObj& o) {
+        return OplogEntry(DurableOplogEntry(DurableOplogEntryParams{
+            .opTime = opTime,
+            .opType = opType,
+            .nss = NamespaceString::kContainerNamespace,
+            .container = kIdent,
+            .oField = o,
+            .wallClockTime = Date_t::now(),
+        }));
+    }
+
+    static BSONBinData bytesKey(std::string_view key) {
+        return BSONBinData(key.data(), key.size(), BinDataGeneral);
+    }
+
+    // Builds a container op suitable for nesting in an applyOps entry.
+    static ReplOperation makeContainerReplOp(OpTypeEnum type, const BSONObj& o) {
+        ReplOperation op;
+        op.setOpType(type);
+        op.setNss(NamespaceString::kContainerNamespace);
+        op.setContainer(kIdent);
+        op.setObject(o);
+        return op;
+    }
+
+    size_t countOpsOnNss(const std::vector<std::vector<ApplierOperation>>& writerVectors,
+                         const NamespaceString& nss) {
+        size_t count = 0;
+        for (const auto& writer : writerVectors) {
+            count += std::count_if(writer.begin(), writer.end(), [&](const ApplierOperation& op) {
+                return op->getNss() == nss;
+            });
+        }
+        return count;
+    }
+
+    // Returns the index of the writer vector holding the single container op whose 'o' field equals
+    // 'expectedO', asserting that exactly one op across all writers matches.
+    size_t writerFor(const std::vector<std::vector<ApplierOperation>>& writerVectors,
+                     const BSONObj& expectedO) {
+        boost::optional<size_t> found;
+        for (size_t i = 0; i < writerVectors.size(); ++i) {
+            for (const auto& op : writerVectors[i]) {
+                if (op->isContainerOpType() &&
+                    SimpleBSONObjComparator::kInstance.evaluate(op->getObject() == expectedO)) {
+                    ASSERT_FALSE(found.has_value())
+                        << "more than one writer got " << expectedO.toString();
+                    found = i;
+                }
+            }
+        }
+        ASSERT_TRUE(found.has_value()) << "no writer got " << expectedO.toString();
+        return *found;
+    }
+
+    size_t countContainerOps(const std::vector<std::vector<ApplierOperation>>& writerVectors) {
+        size_t count = 0;
+        for (const auto& writer : writerVectors) {
+            count += std::count_if(writer.begin(), writer.end(), [](const ApplierOperation& op) {
+                return op->isContainerOpType();
+            });
+        }
+        return count;
+    }
+
+    uint32_t hashOf(OplogEntry& op) {
+        CachedCollectionProperties collPropertiesCache;
+        return OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &op, &collPropertiesCache);
+    }
+
+    // Asserts that 'packed' expands to entries hashing exactly like scalar entries built from
+    // 'expectedScalarOs', in order.
+    //
+    // This compares raw hashes rather than writer indices on purpose. A writer index is
+    // 'hash % numWriters', so two different hashes collide onto one writer once every numWriters
+    // times; an expansion that produced the right op count with a wrong key could pass a
+    // writer-index check by luck. Hash equality admits no such collision.
+    void assertExpansionHashesMatchScalars(const OplogEntry& packed,
+                                           OpTypeEnum type,
+                                           const std::vector<BSONObj>& expectedScalarOs) {
+        auto expanded = OplogApplierUtils::expandBatchedContainerOp(packed);
+        ASSERT_TRUE(expanded.has_value());
+        ASSERT_EQ(expectedScalarOs.size(), expanded->size());
+
+        for (size_t i = 0; i < expanded->size(); ++i) {
+            auto scalar = makeContainerOp({Timestamp(9, 9), 1}, type, expectedScalarOs[i]);
+            ASSERT_EQ(hashOf((*expanded)[i]), hashOf(scalar))
+                << "expanded[" << i << "] o=" << (*expanded)[i].getObject().toString()
+                << " did not hash like scalar o=" << expectedScalarOs[i].toString();
+        }
+    }
+
+    static constexpr std::string_view kIdent = "test-ident";
+    NoopOplogApplierObserver _observer;
+    std::unique_ptr<ThreadPool> _workerPool;
+    std::unique_ptr<OplogApplierImpl> _applier;
+};
+
+TEST_F(ContainerOpWriterVectorTest, BytesKeyArrayInsertIsSplitPerKey) {
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    std::vector<OplogEntry> ops{
+        makeContainerOp({Timestamp(1, 1), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2") << bytesKey("K3"))
+                                 << "v" << value)),
+        // A single-key delete of one of the batched keys, as generated when batching is off or when
+        // only one key is deleted.
+        makeContainerOp(
+            {Timestamp(1, 2), 1}, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2"))),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    // Three single-key inserts plus the delete.
+    ASSERT_EQ(4, countContainerOps(writerVectors));
+
+    // The insert of K2 and the delete of K2 must be applied by the same thread.
+    ASSERT_EQ(writerFor(writerVectors, BSON("k" << bytesKey("K2") << "v" << value)),
+              writerFor(writerVectors, BSON("k" << bytesKey("K2"))));
+}
+
+TEST_F(ContainerOpWriterVectorTest, IntKeyRangeInsertIsSplitPerKey) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+
+    std::vector<OplogEntry> ops{
+        // An int base key with an array of values covers the keys 'base' and 'base + 1'.
+        makeContainerOp({Timestamp(1, 1), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << base << "v" << BSON_ARRAY(v0 << v1))),
+        // A delete of the second key in that range, which only hashes to the same thread if the
+        // range was expanded; the packed entry only ever names 'base'.
+        makeContainerOp(
+            {Timestamp(1, 2), 1}, OpTypeEnum::kContainerDelete, BSON("k" << (base + 1))),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(3, countContainerOps(writerVectors));
+    ASSERT_EQ(writerFor(writerVectors, BSON("k" << (base + 1) << "v" << v1)),
+              writerFor(writerVectors, BSON("k" << (base + 1))));
+}
+
+TEST_F(ContainerOpWriterVectorTest, KeyArrayDeleteIsSplitPerKey) {
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    std::vector<OplogEntry> ops{
+        makeContainerOp({Timestamp(1, 1), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << bytesKey("K2") << "v" << value)),
+        makeContainerOp({Timestamp(1, 2), 1},
+                        OpTypeEnum::kContainerDelete,
+                        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")))),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(3, countContainerOps(writerVectors));
+    ASSERT_EQ(writerFor(writerVectors, BSON("k" << bytesKey("K2") << "v" << value)),
+              writerFor(writerVectors, BSON("k" << bytesKey("K2"))));
+}
+
+TEST_F(ContainerOpWriterVectorTest, PairedKeyAndValueArraysAreSplitPairwise) {
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    std::vector<OplogEntry> ops{
+        makeContainerOp({Timestamp(1, 1), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")) << "v"
+                                 << BSON_ARRAY(v1 << v2))),
+        makeContainerOp(
+            {Timestamp(1, 2), 1}, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2"))),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(3, countContainerOps(writerVectors));
+    // Each key keeps its own paired value.
+    ASSERT_EQ(writerFor(writerVectors, BSON("k" << bytesKey("K2") << "v" << v2)),
+              writerFor(writerVectors, BSON("k" << bytesKey("K2"))));
+}
+
+TEST_F(ContainerOpWriterVectorTest, SingleKeyOpsAreNotExpanded) {
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    std::vector<OplogEntry> ops{
+        makeContainerOp({Timestamp(1, 1), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << bytesKey("K1") << "v" << value)),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(1, countContainerOps(writerVectors));
+    // No expansion means no derived ops were needed to own the split entries.
+    ASSERT_TRUE(derivedOps.empty());
+}
+
+// A packed entry with no keys writes nothing, so it must be dropped rather than passed through.
+// Passing it through would trip the tassert in getContainerKeyHash(), since it is still a packed
+// entry; this is why expandBatchedContainerOp() distinguishes an empty expansion (drop) from
+// boost::none (not packed, apply as is).
+TEST_F(ContainerOpWriterVectorTest, EmptyKeyArrayEntryIsDroppedRatherThanApplied) {
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    auto emptyInsert = makeContainerOp({Timestamp(1, 1), 1},
+                                       OpTypeEnum::kContainerInsert,
+                                       BSON("k" << BSONArray() << "v" << value));
+    auto emptyDelete = makeContainerOp(
+        {Timestamp(1, 2), 1}, OpTypeEnum::kContainerDelete, BSON("k" << BSONArray()));
+
+    // An empty expansion is not the same as no expansion: both are packed entries, so both return
+    // a value, but that value holds no ops.
+    for (const auto* packed : {&emptyInsert, &emptyDelete}) {
+        auto expanded = OplogApplierUtils::expandBatchedContainerOp(*packed);
+        ASSERT_TRUE(expanded.has_value()) << packed->toStringForLogging();
+        ASSERT_TRUE(expanded->empty()) << packed->toStringForLogging();
+    }
+
+    // The empty entries are dropped and the rest of the batch is distributed as usual.
+    std::vector<OplogEntry> ops{
+        emptyInsert,
+        emptyDelete,
+        makeContainerOp({Timestamp(1, 3), 1},
+                        OpTypeEnum::kContainerInsert,
+                        BSON("k" << bytesKey("K1") << "v" << value)),
+    };
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(1, countContainerOps(writerVectors));
+    // The surviving op is the single-key insert; writerFor() asserts it is present exactly once.
+    writerFor(writerVectors, BSON("k" << bytesKey("K1") << "v" << value));
+}
+
+// Every entry an expansion produces must carry the optime of the packed entry it came from.
+// applyContainerOperations() commits a group of container ops at the timestamp of the first one and
+// uasserts (12337302) that the rest agree, and the recovery unit's commit timestamp is taken from
+// that same field, so an expanded entry that lost or altered its 'ts' would either fail to apply or
+// commit at the wrong point in the oplog.
+TEST_F(ContainerOpWriterVectorTest, ExpandedEntriesKeepOriginalCommitTimestamp) {
+    const OpTime opTime{Timestamp(7, 3), 2};
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+
+    // One case per expansion shape, since each rebuilds the 'o' field differently.
+    const std::vector<std::pair<OpTypeEnum, BSONObj>> packedCases{
+        // Array of keys sharing one value.
+        {OpTypeEnum::kContainerInsert,
+         BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")) << "v" << v0)},
+        // Paired arrays of keys and values.
+        {OpTypeEnum::kContainerInsert,
+         BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")) << "v" << BSON_ARRAY(v0 << v1))},
+        // Int base key with an array of values, where the keys are synthesized rather than copied.
+        {OpTypeEnum::kContainerInsert, BSON("k" << int64_t{100} << "v" << BSON_ARRAY(v0 << v1))},
+        // Array of keys to delete.
+        {OpTypeEnum::kContainerDelete, BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")))},
+    };
+
+    for (const auto& [type, o] : packedCases) {
+        auto packed = makeContainerOp(opTime, type, o);
+        auto expanded = OplogApplierUtils::expandBatchedContainerOp(packed);
+        ASSERT_TRUE(expanded.has_value()) << o.toString();
+        ASSERT_EQ(2, expanded->size()) << o.toString();
+
+        for (const auto& op : *expanded) {
+            ASSERT_EQ(opTime, op.getOpTime()) << o.toString();
+            ASSERT_EQ(opTime.getTimestamp(), op.getTimestamp()) << o.toString();
+            ASSERT_EQ(packed.getWallClockTime(), op.getWallClockTime()) << o.toString();
+            // The container the keys belong to must survive the rebuild too, since the commit
+            // grouping keys off of it.
+            ASSERT_EQ(packed.getContainer(), op.getContainer()) << o.toString();
+        }
+    }
+}
+
+// The existing ContainerOplogEntryHashesOnKey and ContainerUpdateOplogEntryHashesOnKey tests pin
+// this invariant for scalar keys. These extend it to the packed shapes, which is the gap the
+// scatter bug slipped through.
+TEST_F(ContainerOpWriterVectorTest, ExpandedBytesKeyArrayHashesLikeScalarEntries) {
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto packed = makeContainerOp(
+        {Timestamp(1, 1), 1},
+        OpTypeEnum::kContainerInsert,
+        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2") << bytesKey("K3")) << "v" << v));
+
+    assertExpansionHashesMatchScalars(packed,
+                                      OpTypeEnum::kContainerInsert,
+                                      {BSON("k" << bytesKey("K1") << "v" << v),
+                                       BSON("k" << bytesKey("K2") << "v" << v),
+                                       BSON("k" << bytesKey("K3") << "v" << v)});
+}
+
+TEST_F(ContainerOpWriterVectorTest, ExpandedIntKeyRangeHashesLikeScalarEntries) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto packed = makeContainerOp({Timestamp(1, 1), 1},
+                                  OpTypeEnum::kContainerInsert,
+                                  BSON("k" << base << "v" << BSON_ARRAY(v0 << v1)));
+
+    // Note the second key is 'base + 1', which the packed entry never names.
+    assertExpansionHashesMatchScalars(
+        packed,
+        OpTypeEnum::kContainerInsert,
+        {BSON("k" << base << "v" << v0), BSON("k" << (base + 1) << "v" << v1)});
+}
+
+TEST_F(ContainerOpWriterVectorTest, ExpandedPairedArraysHashLikeScalarEntries) {
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto packed = makeContainerOp(
+        {Timestamp(1, 1), 1},
+        OpTypeEnum::kContainerInsert,
+        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2")) << "v" << BSON_ARRAY(v1 << v2)));
+
+    assertExpansionHashesMatchScalars(
+        packed,
+        OpTypeEnum::kContainerInsert,
+        {BSON("k" << bytesKey("K1") << "v" << v1), BSON("k" << bytesKey("K2") << "v" << v2)});
+}
+
+TEST_F(ContainerOpWriterVectorTest, ExpandedKeyArrayDeleteHashesLikeScalarEntries) {
+    auto packed = makeContainerOp({Timestamp(1, 1), 1},
+                                  OpTypeEnum::kContainerDelete,
+                                  BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2"))));
+
+    assertExpansionHashesMatchScalars(packed,
+                                      OpTypeEnum::kContainerDelete,
+                                      {BSON("k" << bytesKey("K1")), BSON("k" << bytesKey("K2"))});
+}
+
+// Guards against the hash degenerating to something key-independent, which would make every
+// assertion above pass vacuously.
+TEST_F(ContainerOpWriterVectorTest, DistinctKeysInOneExpansionHashDifferently) {
+    auto packed = makeContainerOp(
+        {Timestamp(1, 1), 1},
+        OpTypeEnum::kContainerInsert,
+        BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2") << bytesKey("K3"))));
+
+    auto expanded = OplogApplierUtils::expandBatchedContainerOp(packed);
+    ASSERT_TRUE(expanded.has_value());
+    ASSERT_EQ(3, expanded->size());
+
+    ASSERT_NOT_EQUALS(hashOf((*expanded)[0]), hashOf((*expanded)[1]));
+    ASSERT_NOT_EQUALS(hashOf((*expanded)[1]), hashOf((*expanded)[2]));
+    ASSERT_NOT_EQUALS(hashOf((*expanded)[0]), hashOf((*expanded)[2]));
+}
+
+// The tests above build standalone container entries, which take the single-op expansion path.
+// Container writes generated under a BatchedWriteContext instead arrive nested in a
+// non-transactional applyOps, which is the path primary-driven index build writes actually take,
+// and which goes through the bulk expandBatchedContainerOps() instead.
+TEST_F(ContainerOpWriterVectorTest, PackedContainerOpsNestedInApplyOpsAreExpanded) {
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    const auto crudNss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    // A non-container op in the same applyOps, to cover the branch of the bulk loop that carries
+    // ops over untouched.
+    ReplOperation crudOp;
+    crudOp.setOpType(OpTypeEnum::kInsert);
+    crudOp.setNss(crudNss);
+    crudOp.setUuid(UUID::gen());
+    crudOp.setObject(BSON("_id" << 1));
+
+    std::vector<ReplOperation> innerOps{
+        makeContainerReplOp(OpTypeEnum::kContainerInsert,
+                            BSON("k"
+                                 << BSON_ARRAY(bytesKey("K1") << bytesKey("K2") << bytesKey("K3"))
+                                 << "v" << v)),
+        crudOp,
+        makeContainerReplOp(OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2"))),
+    };
+
+    std::vector<OplogEntry> ops{
+        addMultiOpType(makeApplyOpsOplogEntry({Timestamp(1, 1), 1},
+                                              innerOps,
+                                              {},
+                                              Date_t::now(),
+                                              {},
+                                              boost::none /* prevWriteOpTimeInTransaction */),
+                       MultiOplogEntryType::kApplyOpsAppliedSeparately)};
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    // The packed insert became three single-key inserts, plus the delete.
+    ASSERT_EQ(4, countContainerOps(writerVectors));
+
+    // The insert of K2 and the delete of K2 must still land on the same thread.
+    ASSERT_EQ(writerFor(writerVectors, BSON("k" << bytesKey("K2") << "v" << v)),
+              writerFor(writerVectors, BSON("k" << bytesKey("K2"))));
+
+    // The non-container op survives the rebuild rather than being dropped.
+    ASSERT_EQ(1, countOpsOnNss(writerVectors, crudNss));
+}
+
+// A packed op holding a single key still has to be expanded, even though doing so leaves the op
+// count unchanged. This guards expandBatchedContainerOps() against deciding whether an expansion is
+// needed from the expanded count alone: were this entry left packed, it would reach writer thread
+// assignment as a packed entry and trip its assertion.
+TEST_F(ContainerOpWriterVectorTest, SingleElementKeyArrayInApplyOpsIsStillExpanded) {
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    std::vector<ReplOperation> innerOps{makeContainerReplOp(
+        OpTypeEnum::kContainerInsert, BSON("k" << BSON_ARRAY(bytesKey("K1")) << "v" << v))};
+
+    std::vector<OplogEntry> ops{
+        addMultiOpType(makeApplyOpsOplogEntry({Timestamp(1, 1), 1},
+                                              innerOps,
+                                              {},
+                                              Date_t::now(),
+                                              {},
+                                              boost::none /* prevWriteOpTimeInTransaction */),
+                       MultiOplogEntryType::kApplyOpsAppliedSeparately)};
+
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        _workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    ASSERT_EQ(1, countContainerOps(writerVectors));
+
+    // The surviving op holds the scalar key, not the one element array it arrived as. writerFor()
+    // asserts exactly one op matches.
+    std::ignore = writerFor(writerVectors, BSON("k" << bytesKey("K1") << "v" << v));
+}
+
+using ContainerOpWriterVectorDeathTest = ContainerOpWriterVectorTest;
+
+// The backstop for any distribution path that forgets to expand: a packed entry must fail loudly at
+// writer assignment rather than silently scatter its keys across threads.
+DEATH_TEST_F(ContainerOpWriterVectorDeathTest,
+             PackedEntryReachingWriterAssignmentFails,
+             "container op packing multiple keys reached writer thread assignment") {
+    auto packed = makeContainerOp({Timestamp(1, 1), 1},
+                                  OpTypeEnum::kContainerInsert,
+                                  BSON("k" << BSON_ARRAY(bytesKey("K1") << bytesKey("K2"))));
+    std::ignore = hashOf(packed);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

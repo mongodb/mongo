@@ -7,6 +7,7 @@
 #include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -1109,6 +1110,178 @@ TEST_F(ApplyContainerOpsTest, BatchDeleteBytesKeyedRangeSerializedRoundTrip) {
     ASSERT_EQ(
         _get(_opCtx.get(), _bytesIdent, std::span<const char>(k2.data(), k2.size())).getStatus(),
         ErrorCodes::NoSuchKey);
+}
+
+// Applying a packed container entry directly (as the applyOps command path and serial
+// recovery/initial-sync transaction application do) must leave the container in exactly the state
+// produced by applying the single-key entries that OplogApplierUtils::expandBatchedContainerOps()
+// derives from it (as steady-state secondary application does). Without this, the two paths could
+// drift and only one of them would be covered.
+class ContainerOpExpansionEquivalenceTest : public ApplyContainerOpsTest {
+protected:
+    void setUp() override {
+        ApplyContainerOpsTest::setUp();
+
+        // Mirror idents, so the packed entry and its expansion can be applied side by side and
+        // compared.
+        auto* se = getServiceContext()->getStorageEngine();
+        _bytesIdentB = se->generateNewInternalIdent();
+        _intIdentB = se->generateNewInternalIdent();
+        auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _trsBytesB = se->getEngine()->makeInternalRecordStore(*ru, _bytesIdentB, KeyFormat::String);
+        _trsIntB = se->getEngine()->makeInternalRecordStore(*ru, _intIdentB, KeyFormat::Long);
+        swt.commit();
+    }
+
+    // Applies 'o' as one packed entry against 'packedIdent', then applies the expansion of the same
+    // 'o' against 'expandedIdent'. Asserts the entry really was packed and reports how many
+    // single-key entries it expanded into.
+    size_t applyPackedAndExpanded(OpTypeEnum type,
+                                  const BSONObj& o,
+                                  std::string_view packedIdent,
+                                  std::string_view expandedIdent) {
+        auto packed = makeContainerBatchEntry(_nss, packedIdent, type, o);
+        ASSERT_OK(applyContainerOpHelper(_opCtx.get(), packed));
+
+        auto toExpand = makeContainerBatchEntry(_nss, expandedIdent, type, o);
+        auto expanded = OplogApplierUtils::expandBatchedContainerOp(toExpand);
+        ASSERT_TRUE(expanded.has_value()) << "entry was not recognized as packed: " << o.toString();
+        for (const auto& single : *expanded) {
+            ASSERT_OK(applyContainerOpHelper(_opCtx.get(), single));
+        }
+        return expanded->size();
+    }
+
+    // Asserts both idents hold 'expected' at 'key'.
+    void assertBothHave(std::span<const char> key, BSONBinData expected) {
+        for (std::string_view ident :
+             {std::string_view(_bytesIdent), std::string_view(_bytesIdentB)}) {
+            auto got = _get(_opCtx.get(), ident, key);
+            ASSERT_OK(got.getStatus()) << "missing in ident " << ident;
+            ASSERT_EQ(0, std::memcmp(got.getValue().get(), expected.data, expected.length));
+        }
+    }
+
+    void assertBothHave(int64_t key, BSONBinData expected) {
+        for (std::string_view ident : {std::string_view(_intIdent), std::string_view(_intIdentB)}) {
+            auto got = _get(_opCtx.get(), ident, key);
+            ASSERT_OK(got.getStatus()) << "missing key " << key << " in ident " << ident;
+            ASSERT_EQ(0, std::memcmp(got.getValue().get(), expected.data, expected.length));
+        }
+    }
+
+    void assertBothMissing(std::span<const char> key) {
+        ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, key).getStatus(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(_get(_opCtx.get(), _bytesIdentB, key).getStatus(), ErrorCodes::NoSuchKey);
+    }
+
+    void assertBothMissing(int64_t key) {
+        ASSERT_EQ(_get(_opCtx.get(), _intIdent, key).getStatus(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(_get(_opCtx.get(), _intIdentB, key).getStatus(), ErrorCodes::NoSuchKey);
+    }
+
+    static std::span<const char> span(std::string_view s) {
+        return {s.data(), s.size()};
+    }
+
+    std::string _bytesIdentB;
+    std::string _intIdentB;
+    std::unique_ptr<RecordStore> _trsBytesB;
+    std::unique_ptr<RecordStore> _trsIntB;
+};
+
+// Branch: array of bytes keys sharing one value.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithSingleValue) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k3.data(), 2, BinDataGeneral))
+                      << "v" << v);
+    ASSERT_EQ(3,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    for (std::string_view k : {k1, k2, k3}) {
+        assertBothHave(span(k), v);
+    }
+}
+
+// Branch: array of bytes keys with no value at all, which must stay absent rather than becoming an
+// empty BinData.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithNoValue) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    for (std::string_view k : {k1, k2}) {
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdent, span(k)).getStatus());
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdentB, span(k)).getStatus());
+    }
+}
+
+// Branch: keys and values paired off positionally.
+TEST_F(ContainerOpExpansionEquivalenceTest, PairedKeyAndValueArrays) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral))
+                      << "v" << BSON_ARRAY(v1 << v2));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    // Pairing must be positional, not shuffled.
+    assertBothHave(span(k1), v1);
+    assertBothHave(span(k2), v2);
+}
+
+// Branch: int base key with an array of values, writing at consecutive keys.
+TEST_F(ContainerOpExpansionEquivalenceTest, IntKeyedRange) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+    auto v2 = BSONBinData("C", 1, BinDataGeneral);
+
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(v0 << v1 << v2));
+    ASSERT_EQ(3, applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _intIdent, _intIdentB));
+
+    assertBothHave(base, v0);
+    assertBothHave(base + 1, v1);
+    assertBothHave(base + 2, v2);
+
+    // The range must not run past its length in either path.
+    assertBothMissing(base + 3);
+    assertBothMissing(base - 1);
+}
+
+// Branch: array of bytes keys to delete, leaving untargeted keys alone.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayDelete) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    for (std::string_view ident : {std::string_view(_bytesIdent), std::string_view(_bytesIdentB)}) {
+        for (std::string_view k : {k1, k2, k3}) {
+            ASSERT_OK(applyContainerOpHelper(
+                _opCtx.get(),
+                makeContainerInsertOplogEntry(
+                    OpTime(), ident, BSONBinData(k.data(), 2, BinDataGeneral), v)));
+        }
+    }
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerDelete, o, _bytesIdent, _bytesIdentB));
+
+    assertBothMissing(span(k1));
+    assertBothMissing(span(k2));
+    assertBothHave(span(k3), v);
 }
 
 }  // namespace

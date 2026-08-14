@@ -30,6 +30,12 @@ public:
 
     static ContainerKey parse(const BSONElement& elem);
 
+    /**
+     * Returns true if 'elem' encodes more than one key, without parsing it. An absent element is
+     * not packed.
+     */
+    static bool isPacked(const BSONElement& elem);
+
     void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     bool isArrayKey() const {
@@ -73,6 +79,15 @@ public:
     explicit ContainerVal(std::span<const char> data) : _data(data) {}
 
     static ContainerVal parse(const BSONElement& elem);
+
+    /**
+     * Returns true if 'elem' encodes more than one value, without parsing it. An absent element is
+     * not packed.
+     *
+     * Note that a container insert with an unpacked key and a packed value still writes several
+     * keys: an int key with an array of values covers the consecutive keys starting at that key.
+     */
+    static bool isPacked(const BSONElement& elem);
 
     void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
 

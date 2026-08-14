@@ -76,6 +76,11 @@ ContainerKey ContainerKey::parse(const BSONElement& elem) {
     }
 }
 
+bool ContainerKey::isPacked(const BSONElement& elem) {
+    // Only an array holds more than one key; NumberLong and BinData are both single keys.
+    return elem.type() == BSONType::array;
+}
+
 void ContainerKey::serialize(std::string_view fieldName, BSONObjBuilder* builder) const {
     std::visit(OverloadedVisitor{
                    [&](const std::vector<std::span<const char>>& keys) {
@@ -126,6 +131,11 @@ ContainerVal ContainerVal::parse(const BSONElement& elem) {
                       str::stream() << "Expected container value to be BinData or Array, but got "
                                     << typeName(elem.type()));
     }
+}
+
+bool ContainerVal::isPacked(const BSONElement& elem) {
+    // Only an array holds more than one value; a lone BinData is a single value.
+    return elem.type() == BSONType::array;
 }
 
 void ContainerVal::serialize(std::string_view fieldName, BSONObjBuilder* builder) const {

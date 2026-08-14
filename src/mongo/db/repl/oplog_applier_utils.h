@@ -84,6 +84,31 @@ public:
     static void stableSortByNamespace(std::vector<ApplierOperation>& ops);
 
     /**
+     * Rewrites, in place and preserving relative order, every container op in 'ops' that packs
+     * multiple keys into the equivalent sequence of single-key container ops. Ops that are not
+     * multi-key container ops are left untouched.
+     *
+     * Writer thread assignment for a container op hashes the container ident together with the key,
+     * so that all ops touching a key are applied by the same thread in oplog order. A packed entry
+     * hashes as a single unit, which does not agree with the hash of any other entry touching the
+     * same keys, so packed entries must be expanded before they are distributed.
+     */
+    static void expandBatchedContainerOps(std::vector<OplogEntry>& ops);
+
+    /**
+     * Returns the single-key container ops equivalent to 'op', or boost::none if 'op' is not a
+     * container op that packs multiple keys.
+     *
+     * Note that boost::none and an empty vector mean different things, and callers must treat them
+     * differently: boost::none means 'op' was not packed and should be applied as it is, while an
+     * empty vector means 'op' was packed but has no keys to write (its key is an empty array) and
+     * should be dropped. Applying such an entry as it is would trip the assertion in writer thread
+     * assignment, since it is a packed entry.
+     */
+    [[nodiscard]] static boost::optional<std::vector<OplogEntry>> expandBatchedContainerOp(
+        const OplogEntry& op);
+
+    /**
      * Adds a single oplog entry to the appropriate writer vector. Returns the index of the
      * writer vector the entry was written to.
      */

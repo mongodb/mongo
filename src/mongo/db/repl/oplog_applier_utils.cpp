@@ -16,6 +16,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -119,12 +120,100 @@ void processCrudOp(OperationContext* opCtx,
     }
 }
 
+
+/**
+ * Returns the number of single-key ops that 'op' expands to, or boost::none if 'op' is not a packed
+ * container op.
+ *
+ * Note the count is not enough on its own to tell whether an op is packed: an array holding a
+ * single key is packed but expands to one op, and an empty array is packed but expands to none.
+ */
+boost::optional<size_t> packedContainerOpCount(const OplogEntry& op) {
+    if (!op.isContainerOpType()) {
+        return boost::none;
+    }
+    const BSONObj& o = op.getObject();
+    if (const auto key = o[ContainerInsertOplogEntryO::kKeyFieldName];
+        ContainerKey::isPacked(key)) {
+        return key.embeddedObject().nFields();
+    }
+    // An unpacked key paired with a packed value covers the consecutive keys starting at that key,
+    // so the number of values is the number of keys written.
+    if (const auto val = o[ContainerInsertOplogEntryO::kValueFieldName];
+        ContainerVal::isPacked(val)) {
+        return val.embeddedObject().nFields();
+    }
+    return boost::none;
+}
+
+/**
+ * Returns true if 'op' is a container op that packs more than one key into a single entry, either
+ * by making the key an array or by making the value an array (in which case the keys are the
+ * consecutive integers starting at the key).
+ */
+bool isBatchedContainerOp(const OplogEntry& op) {
+    if (!op.isContainerOpType()) {
+        return false;
+    }
+    const BSONObj& o = op.getObject();
+    return ContainerKey::isPacked(o[ContainerInsertOplogEntryO::kKeyFieldName]) ||
+        ContainerVal::isPacked(o[ContainerInsertOplogEntryO::kValueFieldName]);
+}
+
 void getContainerKeyHash(OperationContext* opCtx,
                          OplogEntry* op,
                          boost::optional<size_t>& hashKey) {
+    // Multi-key entries must have been expanded by expandBatchedContainerOps() before reaching
+    // here. Hashing one as a unit would send it to a different writer thread than the other entries
+    // touching its keys, letting inserts and deletes of the same key race.
+    invariant(!isBatchedContainerOp(*op),
+              str::stream() << "container op packing multiple keys reached writer thread "
+                               "assignment: "
+                            << redact(op->toBSONForLogging()));
+
     BSONElement key = op->getObject()["k"];
     BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
     hashKey.emplace(elementHasher.hash(key));
+}
+
+/**
+ * Returns a copy of 'op' whose 'o' field holds 'oField'.
+ *
+ * Note that the rebuilt 'o' is appended last rather than in its original position, so the field
+ * order of the result differs from that of a natural oplog entry.
+ */
+OplogEntry withObject(const OplogEntry& op, const BSONObj& oField) {
+    BSONObjBuilder builder;
+    for (auto&& elem : op.getEntry().getRaw()) {
+        if (elem.fieldNameStringData() != OplogEntry::kObjectFieldName) {
+            builder.append(elem);
+        }
+    }
+    builder.append(OplogEntry::kObjectFieldName, oField);
+    return OplogEntry(builder.obj());
+}
+
+/**
+ * Makes room in 'v' for 'additional' more elements.
+ *
+ * Note this grows geometrically rather than to exactly the size needed. expandBatchedContainerOps()
+ * accumulates many expansions into one buffer, and reserving the exact size each time would
+ * reallocate on every packed op instead of amortizing the growth.
+ */
+void reserveAdditional(std::vector<OplogEntry>& v, size_t additional) {
+    const size_t needed = v.size() + additional;
+    if (needed > v.capacity()) {
+        v.reserve(std::max(needed, v.capacity() * 2));
+    }
+}
+
+BSONObj makeSingleContainerInsertO(ContainerKey key, boost::optional<ContainerVal> value) {
+    ContainerInsertOplogEntryO insertO;
+    insertO.setKey(std::move(key));
+    if (value) {
+        insertO.setValue(std::move(*value));
+    }
+    return insertO.toBSON();
 }
 
 /**
@@ -216,6 +305,142 @@ uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
     }
 
     return opHash ? absl::HashOf(nss, *opHash) : absl::HashOf(nss);
+}
+
+namespace {
+/**
+ * Appends to 'expanded' the single-key container ops equivalent to 'op' and returns true. Returns
+ * false, leaving 'expanded' untouched, if 'op' is not a container op that packs multiple keys.
+ *
+ * This is the accumulating form used by expandBatchedContainerOps(), which collects many expansions
+ * into one buffer. expandBatchedContainerOp() wraps it for callers holding a single op.
+ */
+bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& expanded) {
+    if (!isBatchedContainerOp(op)) {
+        return false;
+    }
+
+    const BSONObj& o = op.getObject();
+    switch (op.getOpType()) {
+        case OpTypeEnum::kContainerInsert: {
+            const auto insertO = ContainerInsertOplogEntryO::parse(
+                o, IDLParserContext("ContainerInsertOplogEntryO"));
+            const auto& key = insertO.getKey();
+            const auto& maybeVal = insertO.getValue();
+
+            if (maybeVal && maybeVal->isArrayVal()) {
+                const auto values = maybeVal->getArrayVal();
+                if (key.isIntKey()) {
+                    // A single int key with an array of values inserts at the consecutive keys
+                    // starting at that key, matching applyContainerOperations().
+                    const int64_t baseKey = key.getIntKey();
+                    reserveAdditional(expanded, values.size());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        expanded.emplace_back(
+                            withObject(op,
+                                       makeSingleContainerInsertO(
+                                           ContainerKey(baseKey + static_cast<int64_t>(i)),
+                                           ContainerVal(values[i]))));
+                    }
+                    return true;
+                }
+                // Otherwise keys and values are paired off; DurableOplogEntry's constructor has
+                // already checked that the two arrays are the same length.
+                const auto keys = key.getArrayKey();
+                invariant(keys.size() == values.size(), op.toStringForLogging());
+                reserveAdditional(expanded, keys.size());
+                for (size_t i = 0; i < keys.size(); ++i) {
+                    expanded.emplace_back(
+                        withObject(op,
+                                   makeSingleContainerInsertO(ContainerKey(keys[i]),
+                                                              ContainerVal(values[i]))));
+                }
+                return true;
+            }
+
+            // An array of keys sharing one (possibly absent) value.
+            invariant(key.isArrayKey(), op.toStringForLogging());
+            const auto keys = key.getArrayKey();
+            reserveAdditional(expanded, keys.size());
+            for (auto&& singleKey : keys) {
+                expanded.emplace_back(
+                    withObject(op, makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
+            }
+            return true;
+        }
+        case OpTypeEnum::kContainerDelete: {
+            const auto deleteO = ContainerDeleteOplogEntryO::parse(
+                o, IDLParserContext("ContainerDeleteOplogEntryO"));
+            const auto keys = deleteO.getKey().getArrayKey();
+            reserveAdditional(expanded, keys.size());
+            for (auto&& singleKey : keys) {
+                ContainerDeleteOplogEntryO singleO;
+                singleO.setKey(ContainerKey(singleKey));
+                expanded.emplace_back(withObject(op, singleO.toBSON()));
+            }
+            return true;
+        }
+        case OpTypeEnum::kContainerUpdate:
+            // Container updates are always a single key and a single value, enforced by
+            // DurableOplogEntry's constructor.
+            //
+            // TODO SERVER-131747 Support container updates with multiple kvs
+            MONGO_UNREACHABLE_TASSERT(13230702);
+        default:
+            MONGO_UNREACHABLE_TASSERT(13230703);
+    }
+}
+}  // namespace
+
+boost::optional<std::vector<OplogEntry>> OplogApplierUtils::expandBatchedContainerOp(
+    const OplogEntry& op) {
+    std::vector<OplogEntry> expanded;
+    if (!appendExpandedContainerOp(op, expanded)) {
+        return boost::none;
+    }
+    return expanded;
+}
+
+void OplogApplierUtils::expandBatchedContainerOps(std::vector<OplogEntry>& ops) {
+    // One pass to decide whether anything needs expanding and, if so, how large the result will be.
+    // Sizing the buffer exactly means building it never reallocates, which matters because
+    // OplogEntry is not nothrow move constructible, so every reallocation would copy rather than
+    // move. Walking the packed arrays to count them only reads BSON element headers, far cheaper
+    // than the entry copy each expanded op already costs.
+    //
+    // Note 'anyPacked' cannot be derived from 'expandedSize': a packed op holding a single key
+    // expands to one op, leaving the total equal to ops.size() even though expansion is required.
+    size_t expandedSize = 0;
+    bool anyPacked = false;
+    for (const auto& op : ops) {
+        if (const auto count = packedContainerOpCount(op)) {
+            anyPacked = true;
+            expandedSize += *count;
+        } else {
+            ++expandedSize;
+        }
+    }
+
+    // Container ops are rare next to CRUD ops, so don't rebuild the vector unless one of them
+    // actually needs expanding.
+    if (!anyPacked) {
+        return;
+    }
+
+    // Ops that are not expanded are copied rather than moved out of 'ops', so that a throw from
+    // appendExpandedContainerOp() leaves 'ops' as it was instead of leaving a prefix of it
+    // moved-from. Building the whole result before committing it below keeps this all-or-nothing.
+    std::vector<OplogEntry> expandedOps;
+    expandedOps.reserve(expandedSize);
+    for (const auto& op : ops) {
+        if (!appendExpandedContainerOp(op, expandedOps)) {
+            expandedOps.push_back(op);
+        }
+    }
+
+    // Commit. Swapping two vectors cannot throw, so 'ops' either keeps its original contents or
+    // gets the fully expanded ones.
+    ops.swap(expandedOps);
 }
 
 uint32_t OplogApplierUtils::addToWriterVector(
