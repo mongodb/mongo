@@ -637,6 +637,35 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownAllowedFromScheduleWorkAtCallback) {
     future.get();
 }
 
+// AsyncWorkScheduler schedules on the executor while holding '_mutex', and the callback re-acquires
+// '_mutex'. Block the scheduling thread holding '_mutex', shut the executor down, then let it
+// proceed: it must not self-deadlock, and scheduleWork must resolve with an error.
+TEST_F(AsyncWorkSchedulerTest, NoDeadlockWhenExecutorShutsDownWhileSchedulingUnderMutex) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    boost::optional<StatusWith<int>> result;
+    stdx::thread scheduler;
+    {
+        FailPointEnableBlock fpBlock("hangAfterShutdownCheckWhileHoldingSchedulerMutex");
+
+        scheduler = stdx::thread(
+            [&] { result = async.scheduleWork([](OperationContext*) { return 0; }).getNoThrow(); });
+
+        // Wait until the scheduling thread is blocked holding '_mutex', just past the shutdown
+        // check.
+        fpBlock->waitForTimesEntered(fpBlock.initialTimesEntered() + 1);
+
+        // Shut the executor down while the scheduling thread holds '_mutex' mid-schedule.
+        shutdownExecutorPool();
+    }  // Disabling the failpoint here releases the blocked thread.
+
+    // The scheduling thread must finish without deadlocking on '_mutex'.
+    scheduler.join();
+
+    ASSERT(result);
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result->getStatus());
+}
+
 // Regression test: the scheduler must stay alive while a scheduleRemoteCommand continuation that
 // captured a raw 'this' is still pending. The failpoint parks a worker after targeting but before
 // the command handle is registered, so join() must block until the command completes. Without the

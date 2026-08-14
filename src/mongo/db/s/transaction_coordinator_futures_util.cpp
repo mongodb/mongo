@@ -90,6 +90,8 @@ void hangBeforeSchedulingRemoteCommandForTest() {
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(hangAfterShutdownCheckWhileHoldingSchedulerMutex);
+
 AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext)
     : AsyncWorkScheduler(serviceContext, nullptr, WithLock::withoutLock() /* No parent */) {}
 

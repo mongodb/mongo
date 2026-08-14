@@ -18,6 +18,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -41,6 +42,8 @@ namespace mongo {
 using OperationContextFn = std::function<void(OperationContext*)>;
 
 namespace txn {
+
+extern FailPoint hangAfterShutdownCheckWhileHoldingSchedulerMutex;
 
 /**
  * This class groups all the asynchronous work scheduled by a given TransactionCoordinatorDriver.
@@ -205,6 +208,8 @@ private:
         auto it = [&] {
             std::lock_guard lg(_mutex);
             uassertStatusOK(_shutdownStatus);
+            // Lets a test block here with '_mutex' held to race an executor shutdown.
+            hangAfterShutdownCheckWhileHoldingSchedulerMutex.pauseWhileSet();
             auto handle = uassertStatusOK(scheduleWork());
             return _activeHandles.emplace(_activeHandles.begin(), std::move(handle));
         }();

@@ -81,6 +81,39 @@ TEST_F(ThreadPoolExecutorTest, ScheduleAfterShutdown) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status1);
 }
 
+// Unlike schedule() above, the handle-returning scheduleWork()/scheduleRemoteCommand() must return
+// ShutdownInProgress without running the callback when shut down. Callers that schedule while
+// holding a mutex the callback also takes (e.g. AsyncWorkScheduler) rely on this to avoid deadlock.
+// 'schedule' takes the executor and the callback and returns the StatusWith<CallbackHandle>.
+template <typename ScheduleFn>
+void assertScheduleAfterShutdownReturnsErrorWithoutRunningCallback(TaskExecutorTest& fixture,
+                                                                   ScheduleFn&& schedule) {
+    auto& executor = fixture.getExecutor();
+    fixture.launchExecutorThread();
+    fixture.shutdownExecutorThread();
+
+    Notification<void> callbackRan;
+    auto swCbHandle = schedule(executor, [&](const auto&) { callbackRan.set(); });
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, swCbHandle.getStatus());
+    fixture.joinExecutorThread();
+    ASSERT_FALSE(callbackRan);
+}
+
+TEST_F(ThreadPoolExecutorTest, ScheduleWorkAfterShutdownReturnsErrorWithoutRunningCallback) {
+    assertScheduleAfterShutdownReturnsErrorWithoutRunningCallback(
+        *this, [](auto& executor, auto&& cb) { return executor.scheduleWork(std::move(cb)); });
+}
+
+TEST_F(ThreadPoolExecutorTest,
+       ScheduleRemoteCommandAfterShutdownReturnsErrorWithoutRunningCallback) {
+    RemoteCommandRequest rcr(
+        HostAndPort("dummyHost:1234"), DatabaseName::kAdmin, BSON("hello" << 1), nullptr);
+    assertScheduleAfterShutdownReturnsErrorWithoutRunningCallback(
+        *this, [&](auto& executor, auto&& cb) {
+            return executor.scheduleRemoteCommand(rcr, std::move(cb));
+        });
+}
+
 TEST_F(ThreadPoolExecutorTest, OnEvent) {
     auto& executor = getExecutor();
     launchExecutorThread();
