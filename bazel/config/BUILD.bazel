@@ -548,6 +548,50 @@ config_setting(
 )
 
 # ==========
+# gdb_index
+# ==========
+
+bool_flag(
+    name = "gdb_index",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "gdb_index_enabled",
+    flag_values = {
+        "//bazel/config:gdb_index": "True",
+    },
+)
+
+# Evergreen CI uses the evg setting, disables Fission, and normally enables
+# separate debug info. Keep local dbg builds fast and skip indexing CI binaries
+# that cannot publish the generated index with their debug info.
+selects.config_setting_group(
+    name = "gdb_index_enabled_by_default",
+    match_all = [
+        ":running_in_evg",
+        ":fission_disabled",
+        ":separate_debug_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gdb_index_enabled_or_default",
+    match_any = [
+        ":gdb_index_enabled",
+        ":gdb_index_enabled_by_default",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gdb_index_enabled_linux",
+    match_all = [
+        ":gdb_index_enabled_or_default",
+        "@platforms//os:linux",
+    ],
+)
+
+# ==========
 # dbg_level
 # ==========
 

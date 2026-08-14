@@ -81,6 +81,22 @@ bazel_evergreen_shutils::bazel_rbe_supported() {
     fi
 }
 
+# Returns success when the debug archive task is running in a PR or commit-queue
+# build. Those builds do not need the GDB index because the debug archive is not
+# used as the mainline debugging artifact.
+bazel_evergreen_shutils::should_disable_gdb_index() {
+    local task_name_to_check="${1:-${task_name:-}}"
+
+    if [[ "$task_name_to_check" != "archive_dist_test_debug" ]]; then
+        return 1
+    fi
+
+    [[ "${is_patch:-}" == "true" ||
+        "${is_commit_queue:-}" == "true" ||
+        "${requester:-}" == "github_pr" ||
+        "${requester:-}" == "github_merge_queue" ]]
+}
+
 # Requires: evergreen_remote_exec, task_name (for tests), bazel_args vars optionally.
 bazel_evergreen_shutils::compute_local_arg() {
     local mode="${1:-build}" # build|test|run

@@ -114,11 +114,11 @@ def _gdb_download(ctx):
         # The wrapper scripts must also export these so gdb can load its python runtime (and pretty printers)
         # when invoked via bazel run/test.
         wrapper_python_setup = """
-PYTHONHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/python313-%s"
+PYTHONHOME="$(dirname "$(dirname "${GDBHOME}")")/stow/python313-%s"
 export PYTHONHOME
 export PYTHONPATH="${PYTHONHOME}/lib/python%s:${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="${PYTHONHOME}/lib:${PYTHONHOME}/lib64:${LD_LIBRARY_PATH:-}"
-""" % (ctx.attr.version, ctx.attr.version, python3_version)
+""" % (ctx.attr.version, python3_version)
 
     # GDB itself is dynamically linked against its own runtime libraries (e.g. libopcodes). Ensure those are
     # available in runfiles and on the loader path regardless of platform.
@@ -135,11 +135,29 @@ export LD_LIBRARY_PATH="${GDB_PREFIX}/lib:${GDBHOME}/lib:${LD_LIBRARY_PATH:-}"
     # by the build, not the host OS.
     wrapper_binutils_setup = """
 # Prefer resolving runfiles via manifest (works for `bazel run` and `bazel test`).
-RUNFILES_MANIFEST="${RUNFILES_MANIFEST_FILE:-${0}.runfiles_manifest}"
+RUNFILES_MANIFEST="${RUNFILES_MANIFEST_FILE:-}"
+if [ -z "${RUNFILES_MANIFEST}" ] || [ ! -f "${RUNFILES_MANIFEST}" ]; then
+    for candidate in "${0}.runfiles_manifest" "${0}.runfiles/MANIFEST"; do
+        if [ -f "${candidate}" ]; then
+            RUNFILES_MANIFEST="${candidate}"
+            break
+        fi
+    done
+fi
+
 if [ -f "${RUNFILES_MANIFEST}" ]; then
     rlocation() {
         # shellcheck disable=SC2016
         awk -v k="$1" '$1 == k { print $2; exit }' "${RUNFILES_MANIFEST}"
+    }
+elif [ -n "${RUNFILES_DIR:-}" ] && [ -d "${RUNFILES_DIR}" ]; then
+    rlocation() {
+        printf "%%s/%%s\\n" "${RUNFILES_DIR}" "$1"
+    }
+elif [ -d "${0}.runfiles" ]; then
+    RUNFILES_DIR="${0}.runfiles"
+    rlocation() {
+        printf "%%s/%%s\\n" "${RUNFILES_DIR}" "$1"
     }
 else
     rlocation() {
@@ -172,6 +190,16 @@ if [ ! -x "${GDB}" ]; then
     GDB="gdb"
 fi
 export GDB
+
+if [ -x "${GDB}" ]; then
+    GDB_PREFIX="$(dirname "$(dirname "${GDB}")")"
+    GDBHOME="$(dirname "${GDB_PREFIX}")/stow/gdb-$(basename "${GDB_PREFIX}")"
+    export LD_LIBRARY_PATH="${GDB_PREFIX}/lib:${GDBHOME}/lib:${LD_LIBRARY_PATH:-}"
+    GDB_ADD_INDEX="${GDB_PREFIX}/bin/gdb-add-index"
+else
+    GDB_ADD_INDEX="gdb-add-index"
+fi
+export GDB_ADD_INDEX
 """ % (
         ctx.attr.version,
         ctx.attr.version,
@@ -257,6 +285,18 @@ sh_binary(
     ],
     visibility = ["//visibility:public"],
 )
+
+sh_binary(
+    name = "gdb-generate-index",
+    srcs = ["working_dir_gdb_generate_index.sh"],
+    data = [
+        "%s/bin/gdb",
+        ":gdb_runtime",
+        ":python_runtime",
+        "%s",
+    ],
+    visibility = ["//visibility:public"],
+)
 """ % (
             ctx.attr.version,
             ctx.attr.version,
@@ -271,6 +311,8 @@ sh_binary(
             ctx.attr.version,
             ctx.attr.mongo_toolchain,
             ctx.attr.version,
+            ctx.attr.version,
+            ctx.attr.mongo_toolchain,
             ctx.attr.version,
             ctx.attr.mongo_toolchain,
         ),
@@ -294,7 +336,25 @@ cd $BUILD_WORKING_DIRECTORY
 %s
 %s
 %s
-${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb -iex "set auto-load safe-path %s/.gdbinit" "${@:1}"
+# Keep GDB's derived symbol indexes in the user's local cache so repeated
+# debugging sessions can reuse them. Respect an explicitly configured XDG
+# cache directory and provide the same fallback used by the index actions when
+# HOME is unavailable.
+if [ -z "${XDG_CACHE_HOME:-}" ]; then
+    if [ -n "${HOME:-}" ]; then
+        export XDG_CACHE_HOME="${HOME}/.cache"
+    else
+        export XDG_CACHE_HOME="${RUNFILES_WORKING_DIRECTORY}/.cache"
+    fi
+fi
+GDB_INDEX_CACHE_DIRECTORY="${XDG_CACHE_HOME}/gdb"
+mkdir -p "${GDB_INDEX_CACHE_DIRECTORY}"
+
+exec ${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb \\
+    -iex "set index-cache directory ${GDB_INDEX_CACHE_DIRECTORY}" \\
+    -iex "set index-cache enabled on" \\
+    -iex "set auto-load safe-path %s/.gdbinit" \\
+    "$@"
 """ % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version, str(ctx.workspace_root)),
     )
 
@@ -325,24 +385,91 @@ ${RUNFILES_WORKING_DIRECTORY}/external/gdb_%s/%s/bin/gdbserver localhost:1234 ${
 
     ctx.file(
         "working_dir_gdb_add_index.sh",
-        """
-#!/bin/bash
+        """#!/bin/bash
 
-set -e
+set -euo pipefail
 
-RUNFILES_WORKING_DIRECTORY="$(pwd)"
+RUNFILES_WORKING_DIRECTORY="${BUILD_WORKING_DIRECTORY:-$(pwd)}"
 
-if [ -z $BUILD_WORKING_DIRECTORY ]; then
-    echo "ERROR: BUILD_WORKING_DIRECTORY was not set, was this run from bazel?"
+cd "${RUNFILES_WORKING_DIRECTORY}"
+%s
+%s
+%s
+if [[ -z "${XDG_CACHE_HOME:-}" && -z "${HOME:-}" ]]; then
+    export XDG_CACHE_HOME="${RUNFILES_WORKING_DIRECTORY}/.cache"
+fi
+if [ "$#" -eq 2 ]; then
+    cp "$1" "$2"
+    set -- "$2"
+fi
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: gdb-add-index <binary>" >&2
     exit 1
 fi
 
-cd $BUILD_WORKING_DIRECTORY
+if [ ! -x "${GDB_ADD_INDEX}" ]; then
+    echo "ERROR: could not locate the gdb-add-index executable in the GDB runfiles." >&2
+    exit 1
+fi
+
+"${GDB_ADD_INDEX}" "$1"
+""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup),
+    )
+
+    ctx.file(
+        "working_dir_gdb_generate_index.sh",
+        """#!/bin/bash
+
+set -euo pipefail
+
+RUNFILES_WORKING_DIRECTORY="${BUILD_WORKING_DIRECTORY:-$(pwd)}"
+
+cd "${RUNFILES_WORKING_DIRECTORY}"
 %s
 %s
 %s
-${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb-add-index "${@:1}"
-""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version),
+if [[ -z "${XDG_CACHE_HOME:-}" && -z "${HOME:-}" ]]; then
+    export XDG_CACHE_HOME="${RUNFILES_WORKING_DIRECTORY}/.cache"
+fi
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: gdb-generate-index <binary> <index-bundle>" >&2
+    exit 1
+fi
+
+# Split DWARF indexing spends significant time opening and reading DWO files.
+# Use two worker threads per visible CPU to overlap I/O with index construction.
+worker_threads="$((2 * $(nproc)))"
+
+input_binary="$1"
+index_bundle="$2"
+temporary_directory="$(mktemp -d)"
+trap 'rm -rf "${temporary_directory}"' EXIT
+
+mkdir -p "${index_bundle}"
+rm -f "${index_bundle}/gdb_index" "${index_bundle}/debug_names" "${index_bundle}/debug_str" "${index_bundle}/no_index"
+
+"${GDB}" --batch -nx \\
+    -iex 'set auto-load no' \\
+    -iex 'set debuginfod enabled off' \\
+    -iex "maint set worker-threads ${worker_threads}" \\
+    -ex "file '${input_binary}'" \\
+    -ex "save gdb-index -dwarf-5 '${temporary_directory}'"
+
+input_basename="$(basename "${input_binary}")"
+if [ -f "${temporary_directory}/${input_basename}.gdb-index" ]; then
+    cp "${temporary_directory}/${input_basename}.gdb-index" "${index_bundle}/gdb_index"
+elif [ -f "${temporary_directory}/${input_basename}.debug_names" ]; then
+    cp "${temporary_directory}/${input_basename}.debug_names" "${index_bundle}/debug_names"
+else
+    touch "${index_bundle}/no_index"
+fi
+
+if [ -f "${temporary_directory}/${input_basename}.debug_str" ]; then
+    cp "${temporary_directory}/${input_basename}.debug_str" "${index_bundle}/debug_str"
+fi
+""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup),
     )
 
     return None
@@ -391,6 +518,10 @@ def setup_gdb_toolchain_aliases(name = "setup_toolchains"):
     native.alias(
         name = "gdb-add-index",
         actual = "@gdb_v5//:gdb-add-index",
+    )
+    native.alias(
+        name = "gdb-generate-index",
+        actual = "@gdb_v5//:gdb-generate-index",
     )
     native.alias(
         name = "gdb_toolchain_files",

@@ -140,11 +140,13 @@ common --strategy=CppArchive=local
 common --strategy=SolibSymlink=local
 common --strategy=StripDebugInfo=local
 common --strategy=ExtractDebugInfo=local
+common --strategy=GdbGenerateIndex=local
+common --strategy=GdbApplyIndex=local
 common --strategy=TestRunner=local
 common --strategy=CoverageReport=local
 common --strategy=CcGenerateIntermediateDwp=local
 common --strategy=CcGenerateDwp=local
-common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebugInfo|StripDebugInfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=+no-remote-cache
+common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebugInfo|StripDebugInfo|GdbApplyIndex|CcGenerateIntermediateDwp|CcGenerateDwp)$=+no-remote-cache
 
 # Global clang tidy flags to avoid invalidating analysis cache between clang-tidy / regular runs
 common --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp"
@@ -166,6 +168,7 @@ common --flag_alias=allocator=//bazel/config:allocator
 common --flag_alias=use_lldbserver=//bazel/config:use_lldbserver
 common --flag_alias=opt=//bazel/config:opt
 common --flag_alias=dbg=//bazel/config:dbg
+common --flag_alias=gdb_index=//bazel/config:gdb_index
 common --flag_alias=debug_symbols=//bazel/config:debug_symbols
 common --flag_alias=thin_lto=//bazel/config:thin_lto
 common --flag_alias=separate_debug=//bazel/config:separate_debug
@@ -260,6 +263,7 @@ common --//bazel/config:compress_debug_compile=True
 common --//bazel/config:opt=off
 common --//bazel/config:dbg=True
 common --//bazel/config:dbg_level=1
+common --//bazel/config:gdb_index=False
 common --//bazel/config:debug_symbols=True
 common --//bazel/config:separate_debug=False
 common --//bazel/config:compiler_type=clang
@@ -448,6 +452,7 @@ common:remote_link --strategy=CppArchive=remote
 common:remote_link --strategy=SolibSymlink=remote
 common:remote_link --strategy=ExtractDebugInfo=remote
 common:remote_link --strategy=StripDebugInfo=remote
+common:remote_link --strategy=GdbGenerateIndex=remote
 common:remote_link --//bazel/config:remote_link=True
 common:remote_link --features=-thin_archive
 
@@ -457,6 +462,7 @@ common:remote_test --strategy=CppArchive=remote
 common:remote_test --strategy=SolibSymlink=remote
 common:remote_test --strategy=ExtractDebugInfo=remote
 common:remote_test --strategy=StripDebugInfo=remote
+common:remote_test --strategy=GdbGenerateIndex=remote
 common:remote_test --//bazel/config:remote_link=True
 common:remote_test --//bazel/config:remote_test=True
 common:remote_test --strategy=TestRunner=remote

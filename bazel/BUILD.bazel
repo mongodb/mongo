@@ -1,4 +1,5 @@
 load("//bazel/uv:defs.bzl", "dependency")
+load(":separate_debug.bzl", "gdb_index_message")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
@@ -15,6 +16,32 @@ sh_binary(
     name = "lint",
     srcs = ["lint.sh"],
     visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "gdb-add-index-noop",
+    srcs = ["gdb_add_index_noop.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "gdb-generate-index-noop",
+    srcs = ["gdb_add_index_noop.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "gdb-apply-index",
+    srcs = ["gdb_apply_index.sh"],
+    visibility = ["//visibility:public"],
+)
+
+gdb_index_message(
+    name = "gdb-index-message",
+    enabled = select({
+        "//bazel/config:gdb_index_enabled_linux": True,
+        "//conditions:default": False,
+    }),
 )
 
 py_binary(

@@ -12,6 +12,18 @@ CC_SHARED_LIBRARY_SUFFIX = "_shared"
 SHARED_ARCHIVE_SUFFIX = "_shared_archive"
 MAC_DEBUG_FOLDER_EXTENSION = ".dSYM"
 
+def _gdb_index_message_impl(ctx):
+    if not ctx.attr.enabled:
+        print("WARNING: GDB index generation is disabled for this build. To add an index to a binary, run: bazel run gdb-add-index -- <path-to-binary>. Use --config=evg in CI to add indexes automatically.")
+    return [DefaultInfo()]
+
+gdb_index_message = rule(
+    implementation = _gdb_index_message_impl,
+    attrs = {
+        "enabled": attr.bool(mandatory = True),
+    },
+)
+
 def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
     Determines and generates the inputs and outputs.
@@ -305,21 +317,60 @@ def linux_strip_resource_set(os, numInputs):
         "local_test": 1,
     }
 
+def _generate_gdb_index(ctx, inputs, input_bin):
+    binary_output_groups = ctx.attr.binary_with_debug[OutputGroupInfo]
+    dwo_files = binary_output_groups.dwo_files if "dwo_files" in binary_output_groups else depset()
+    index_bundle = ctx.actions.declare_directory(input_bin.basename + ".gdb_index")
+    ctx.actions.run(
+        executable = ctx.executable.gdb_generate_index,
+        outputs = [index_bundle],
+        inputs = depset([input_bin], transitive = [inputs, dwo_files]),
+        tools = [ctx.attr.gdb_generate_index[DefaultInfo].files_to_run],
+        arguments = [input_bin.path, index_bundle.path],
+        env = {"BUILD_WORKING_DIRECTORY": ""},
+        resource_set = linux_extract_resource_set,
+        mnemonic = "GdbGenerateIndex",
+    )
+    return index_bundle
+
+def _apply_gdb_index(ctx, cc_toolchain, input_bin, index_bundle, output_bin):
+    ctx.actions.run(
+        executable = ctx.executable.gdb_apply_index,
+        outputs = [output_bin],
+        inputs = depset([input_bin, index_bundle], transitive = [cc_toolchain.all_files]),
+        tools = [ctx.attr.gdb_apply_index[DefaultInfo].files_to_run],
+        arguments = [index_bundle.path, input_bin.path, output_bin.path],
+        env = {"OBJCOPY": cc_toolchain.objcopy_executable},
+        execution_requirements = {
+            "no-remote": "1",
+            "local": "1",
+        },
+        resource_set = linux_strip_resource_set,
+        mnemonic = "GdbApplyIndex",
+    )
+
 def linux_extraction(ctx, cc_toolchain, inputs):
     outputs = []
     unstripped_static_bin = None
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
     input_file = ctx.attr.binary_with_debug.files.to_list()
     if input_bin:
+        gdb_index_added = ctx.attr.type == "program" and ctx.attr.gdb_index_enabled
+        input_bin_with_gdb_index = input_bin
+        if gdb_index_added:
+            index_bundle = _generate_gdb_index(ctx, inputs, input_bin)
+            input_bin_with_gdb_index = ctx.actions.declare_file(input_bin.basename + ".gdb_indexed") if ctx.attr.enabled else output_bin
+            _apply_gdb_index(ctx, cc_toolchain, input_bin, index_bundle, input_bin_with_gdb_index)
+
         if ctx.attr.enabled:
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
-                inputs = depset([input_bin], transitive = [cc_toolchain.all_files]),
+                inputs = depset([input_bin_with_gdb_index], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_extract_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--only-keep-debug",
-                    input_bin.path,
+                    input_bin_with_gdb_index.path,
                     debug_info.path,
                 ],
                 mnemonic = "ExtractDebugInfo",
@@ -328,23 +379,24 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
-                inputs = depset([input_bin, debug_info], transitive = [cc_toolchain.all_files]),
+                inputs = depset([input_bin_with_gdb_index, debug_info], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_strip_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--strip-debug",
                     "--add-gnu-debuglink",
                     debug_info.path,
-                    input_bin.path,
+                    input_bin_with_gdb_index.path,
                     output_bin.path,
                 ],
                 mnemonic = "StripDebugInfo",
             )
             outputs += [output_bin, debug_info]
         else:
-            ctx.actions.symlink(
-                output = output_bin,
-                target_file = input_bin,
-            )
+            if not gdb_index_added:
+                ctx.actions.symlink(
+                    output = output_bin,
+                    target_file = input_bin,
+                )
             outputs += [output_bin]
 
     if len(input_file):
@@ -679,6 +731,19 @@ extract_debuginfo = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "linkstatic": attr.bool(default = True, doc = "If binaries are meant to be statically linked."),
@@ -714,6 +779,19 @@ extract_debuginfo_binary = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
@@ -748,6 +826,19 @@ extract_debuginfo_test = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(

@@ -178,6 +178,21 @@ PDB_GENERATION_ENABLED = select({
     "//conditions:default": True,
 })
 
+GDB_INDEX_ENABLED = select({
+    "//bazel/config:gdb_index_enabled_linux": True,
+    "//conditions:default": False,
+})
+
+GDB_GENERATE_INDEX = select({
+    "//bazel/config:gdb_index_enabled_linux": "//:gdb-generate-index",
+    "//conditions:default": "//bazel:gdb-generate-index-noop",
+})
+
+GDB_INDEX_MESSAGE_DATA = select({
+    "//bazel/config:gdb_index_enabled_linux": [],
+    "//conditions:default": ["//bazel:gdb-index-message"],
+})
+
 TCMALLOC_ERROR_MESSAGE = """
 Error:\n" +
     Build failed due to unsupported platform for current allocator selection:
@@ -673,7 +688,7 @@ def _mongo_cc_binary_and_test(
         "visibility": visibility,
         "testonly": testonly,
         "copts": copts,
-        "data": data + SANITIZER_DATA + ["//bazel:test_wrapper"],
+        "data": data + SANITIZER_DATA + ["//bazel:test_wrapper"] + GDB_INDEX_MESSAGE_DATA,
         "tags": tags,
         "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
@@ -752,6 +767,8 @@ def _mongo_cc_binary_and_test(
             tags = original_tags + ["final_target"],
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
+            gdb_index_enabled = GDB_INDEX_ENABLED,
+            gdb_generate_index = GDB_GENERATE_INDEX,
             deps = all_deps,
             visibility = visibility,
             exec_properties = exec_properties,
@@ -765,6 +782,8 @@ def _mongo_cc_binary_and_test(
             tags = original_tags + ["final_target"],
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
+            gdb_index_enabled = GDB_INDEX_ENABLED,
+            gdb_generate_index = GDB_GENERATE_INDEX,
             deps = all_deps,
             visibility = visibility,
             exec_properties = exec_properties,

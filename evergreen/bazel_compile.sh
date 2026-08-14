@@ -127,6 +127,13 @@ BEP_FULL="build_events_full.json"
 BEP_OUT="build_events.json"
 BASE_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-}"
 BASE_FLAGS+=" ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+GDB_INDEX_FLAGS=""
+if bazel_evergreen_shutils::should_disable_gdb_index "${task_name:-}"; then
+    # Append this after all task and patch flags so PR/commit-queue builds cannot
+    # accidentally re-enable the expensive index generation action.
+    GDB_INDEX_FLAGS=" --//bazel/config:gdb_index=False"
+    echo "Disabling GDB index for ${task_name} (requester=${requester:-}, is_patch=${is_patch:-}, is_commit_queue=${is_commit_queue:-})"
+fi
 RELEASE_EXECUTION_LOG_FLAGS=""
 RELEASE_LOCAL_SAFETY_FLAGS=""
 SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=false
@@ -157,7 +164,7 @@ if [[ "${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD}" == "true" ]]; then
     fi
 fi
 
-ALL_FLAGS="${BASE_FLAGS}"
+ALL_FLAGS="${BASE_FLAGS}${GDB_INDEX_FLAGS}"
 ALL_FLAGS+=" --build_event_json_file=${BEP_FULL}"
 ALL_FLAGS+=" ${RELEASE_EXECUTION_LOG_FLAGS}"
 echo "${ALL_FLAGS}" >.bazel_build_flags

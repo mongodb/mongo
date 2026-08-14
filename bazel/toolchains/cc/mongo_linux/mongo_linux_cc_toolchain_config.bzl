@@ -531,6 +531,11 @@ def _impl(ctx):
         ],
     )
 
+    # Bazel's built-in fission_support feature adds a linker-generated GDB
+    # index. Keep split DWARF, but generate the index explicitly with
+    # gdb-add-index so it is consistent across linkers.
+    fission_support_feature = feature(name = "fission_support")
+
     preprocessor_defines_feature = feature(
         name = "preprocessor_defines",
         enabled = True,
@@ -2136,6 +2141,7 @@ def _impl(ctx):
         pic_feature,
         pie_feature,
         per_object_debug_info_feature,
+        fission_support_feature,
         preprocessor_defines_feature,
         objcopy_embed_flags_feature,
         opt_feature,
