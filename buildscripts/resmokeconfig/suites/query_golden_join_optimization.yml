@@ -25,6 +25,7 @@ executor:
         enableTestCommands: 1
         # Keep these parameters in sync with the Join Optimization variant to make local testing easier.
         internalEnableJoinOptimization: true
+        internalEnableJoinPlanCache: true
         featureFlagCostBasedRanker: true
         featureFlagPathArrayness: true
         featureFlagPersistentStats: true
