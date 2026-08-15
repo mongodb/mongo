@@ -261,6 +261,13 @@ commands:
                 type: HelloInternalClientField
                 optional: true
                 stability: stable
+            replicationCompressionClient:
+                # Set by replication data-plane clients so the server applies the replication
+                # compression policy for this connection. Absent on external clients, heartbeats,
+                # and shard RPC, which continue using the normal net.compression policy.
+                type: safeBool
+                optional: true
+                stability: internal
             client:
                 type: ClientMetadata
                 optional: true

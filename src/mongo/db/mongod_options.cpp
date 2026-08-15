@@ -25,6 +25,7 @@
 #include "mongo/db/mongod_options_sharding_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
@@ -553,6 +555,39 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (!replSettingsWithStatus.isOK())
         return replSettingsWithStatus.getStatus();
     const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
+
+    // Seed the replicationNetworkCompression setParameter from the YAML/CLI config
+    // replication.networkCompression.compressors, if the operator supplied one. We reject a
+    // conflicting setParameter entry so an inconsistent startup command is refused up front rather
+    // than silently having one form win. The setParameter is startup-only, so once seeded here the
+    // value is fixed for the lifetime of this mongod process.
+    if (params.count("replication.networkCompression.compressors")) {
+        auto conflictStatus = checkConflictWithSetParameter(
+            "replication.networkCompression.compressors", "replicationNetworkCompression");
+        if (!conflictStatus.isOK())
+            return conflictStatus;
+        const auto value =
+            params["replication.networkCompression.compressors"].as<std::string>();
+        repl::ReplicationNetworkCompressionSetting parsed;
+        auto s = repl::parseReplicationNetworkCompression(value, &parsed);
+        if (!s.isOK())
+            return s;
+        *repl::gReplicationNetworkCompression = value;
+    }
+
+    // Fold an explicit replicationNetworkCompression allow-list into the process-wide compressor
+    // union so those algorithms get registered even when net.compression.compressors is "disabled"
+    // (inherit/disabled add nothing). Read the FINAL parameter value, not just
+    // params.count("replication.networkCompression.compressors"), so the --setParameter form is
+    // covered too. Must run here (after net seeding and setParameter application, before compressors
+    // register); moving it into the config-option branch above would skip setParameter and leave
+    // replication compression silently inoperative.
+    {
+        const auto setting = repl::getReplicationNetworkCompressionSetting();
+        if (!setting.disabled && !setting.inheritProcessDefault) {
+            MessageCompressorRegistry::get().addReplicationCompressors(setting.allowList);
+        }
+    }
 
     if (replSettings.isReplSet()) {
         if ((params.count("security.authorization") &&

@@ -55,3 +55,27 @@ configs:
         arg_vartype: Bool
         short_name: serverless
         source: [yaml, cli]
+
+    #
+    # replication-specific network compression control, negotiated independently
+    # of the client-facing net.compression.compressors. Value semantics:
+    #   ""         -> inherit process-wide net.compression.compressors (default)
+    #   "disabled" -> negotiate replication data-plane connections uncompressed
+    #   "a,b,c"    -> use exactly these algorithms for replication data-plane connections, even if
+    #                 net.compression.compressors is "disabled"
+    # Algorithms listed here are merged into the process-wide capability set at startup so they get
+    # registered and can be decoded regardless of net.compression.compressors. This option is
+    # startup-only; the equivalent setParameter (replicationNetworkCompression) is likewise
+    # startup-only. Changing the algorithm requires editing the configuration and restarting mongod.
+    #
+    "replication.networkCompression.compressors":
+        section: "Replica set options"
+        description: >-
+            Comma-separated compressor list for replication data-plane sync-source connections.
+            Empty/default inherits net.compression.compressors; "disabled" negotiates these
+            connections uncompressed. Explicit algorithms are independent of
+            net.compression.compressors and may be used even when net compression is disabled.
+            Startup-only.
+        short_name: replicationNetworkCompressionCompressors
+        arg_vartype: String
+        source: [yaml, cli]

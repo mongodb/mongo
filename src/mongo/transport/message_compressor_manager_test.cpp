@@ -260,6 +260,572 @@ TEST(MessageCompressorManager, FullNormalCompression) {
     clientManager.clientFinish(serverObj);
 }
 
+// Non-replication traffic bumps only the process-wide network.compression counters; the
+// replication subset counters stay at zero.
+TEST(MessageCompressorManager, NonReplicationTrafficNotCountedInReplicationCompressionStats) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    BSONObjBuilder negotiatorOut;
+    std::vector<std::string_view> negotiator({"noop"});
+    manager.serverNegotiate(negotiator, &negotiatorOut);
+    checkNegotiationResult(negotiatorOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getCompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getReplicationCompressorBytesIn(), 0);
+
+    assertOk(manager.decompressMessage(compressed));
+    ASSERT_GT(compressor->getDecompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getReplicationDecompressorBytesIn(), 0);
+}
+
+// Replication data-plane traffic is a subset view: it bumps the replication counters AND is still
+// included in the process-wide network.compression counters (repl.compression is a subset, not a
+// separate accounting).
+TEST(MessageCompressorManager, ReplicationTrafficCountedInBothNetworkAndReplicationStats) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    manager.countAsReplicationCompressionTrafficForThisSession(true);
+    BSONObjBuilder negotiatorOut;
+    std::vector<std::string_view> negotiator({"noop"});
+    manager.serverNegotiate(negotiator, &negotiatorOut);
+    checkNegotiationResult(negotiatorOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getReplicationCompressorBytesIn(), 0);
+    // Subset semantics: the same bytes are also present in the process-wide net counters, and the
+    // replication portion never exceeds the process-wide total.
+    ASSERT_GTE(compressor->getCompressorBytesIn(), compressor->getReplicationCompressorBytesIn());
+
+    assertOk(manager.decompressMessage(compressed));
+    ASSERT_GT(compressor->getReplicationDecompressorBytesIn(), 0);
+    ASSERT_GTE(compressor->getDecompressorBytesIn(),
+               compressor->getReplicationDecompressorBytesIn());
+}
+
+// A replication connection's later hello without the replicationCompressionClient marker must NOT
+// clear the connection's replication accounting role: subsequent compression is still attributed to
+// repl.compression. This guards the sticky-flag fix in replication_info.cpp.
+TEST(MessageCompressorManager, ReplicationAccountingSurvivesLaterNonMarkerHello) {
+    auto registry = buildRegistry();
+    auto* compressor = registry.getCompressor("noop");
+    ASSERT(compressor);
+
+    MessageCompressorManager manager(&registry);
+    manager.countAsReplicationCompressionTrafficForThisSession(true);
+
+    std::vector<std::string_view> negotiator({"noop"});
+    BSONObjBuilder initialHelloOut;
+    manager.serverNegotiate(negotiator, &initialHelloOut);
+    checkNegotiationResult(initialHelloOut.done(), {"noop"});
+
+    // A later hello without replicationCompressionClient should not clear the connection's
+    // replication accounting role. replication_info.cpp enforces that by not writing false for
+    // non-marker hellos; this simulates that path by only re-reading the negotiated result.
+    BSONObjBuilder laterHelloOut;
+    manager.serverNegotiate(boost::none, &laterHelloOut);
+    checkNegotiationResult(laterHelloOut.done(), {"noop"});
+
+    auto compressed = assertOk(manager.compressMessage(buildMessage()));
+    ASSERT_EQ(compressed.operation(), dbCompressed);
+    ASSERT_GT(compressor->getReplicationCompressorBytesIn(), 0);
+}
+
+// When a client opts out via disableCompressionForThisSession(), clientBegin()
+// must not emit a "compression" field, the server responds without one, and clientFinish()
+// leaves the negotiated compressor list empty so subsequent compressMessage() calls become
+// no-ops. This is the mechanism that lets the oplog fetcher run uncompressed independently of
+// net.compression.compressors.
+TEST(MessageCompressorManager, ClientCanSuppressCompressionOfferForThisSession) {
+    auto registry = buildRegistry();
+    MessageCompressorManager clientManager(&registry);
+    MessageCompressorManager serverManager(&registry);
+
+    ASSERT_TRUE(clientManager.isCompressionOfferedForThisSession());
+    clientManager.disableCompressionForThisSession();
+    ASSERT_FALSE(clientManager.isCompressionOfferedForThisSession());
+
+    BSONObjBuilder clientOutput;
+    clientManager.clientBegin(&clientOutput);
+    auto clientObj = clientOutput.done();
+    // No "compression" element should be emitted at all.
+    ASSERT_FALSE(clientObj.hasField("compression"));
+
+    BSONObjBuilder serverOutput;
+    serverManager.serverNegotiate(parseBSON(clientObj), &serverOutput);
+    auto serverObj = serverOutput.done();
+    // Server has nothing to negotiate against, so it must not echo a compression list.
+    ASSERT_FALSE(serverObj.hasField("compression"));
+
+    clientManager.clientFinish(serverObj);
+    ASSERT_TRUE(clientManager.getNegotiatedCompressors().empty());
+    ASSERT_TRUE(serverManager.getNegotiatedCompressors().empty());
+}
+
+// Verify that re-enabling before the next clientBegin() restores normal
+// advertisement. This models a replication client that first disabled compression on its
+// manager and then, on a later (re)connect, re-enabled it before the next handshake ran.
+TEST(MessageCompressorManager, ClientCanReenableCompressionOfferAfterSuppressing) {
+    auto registry = buildRegistry();
+    MessageCompressorManager clientManager(&registry);
+    MessageCompressorManager serverManager(&registry);
+
+    clientManager.disableCompressionForThisSession();
+    {
+        BSONObjBuilder out;
+        clientManager.clientBegin(&out);
+        ASSERT_FALSE(out.done().hasField("compression"));
+    }
+
+    clientManager.enableCompressionForThisSession();
+    ASSERT_TRUE(clientManager.isCompressionOfferedForThisSession());
+
+    BSONObjBuilder clientOutput;
+    clientManager.clientBegin(&clientOutput);
+    auto clientObj = clientOutput.done();
+    checkNegotiationResult(clientObj, {"noop"});
+
+    BSONObjBuilder serverOutput;
+    serverManager.serverNegotiate(parseBSON(clientObj), &serverOutput);
+    auto serverObj = serverOutput.done();
+    checkNegotiationResult(serverObj, {"noop"});
+
+    clientManager.clientFinish(serverObj);
+    ASSERT_FALSE(clientManager.getNegotiatedCompressors().empty());
+}
+
+// An allow-list restricts advertisement to the intersection of the caller's
+// list and the process-wide compressor list, preserving the caller's ordering so it becomes
+// the client's negotiation preference order.
+TEST(MessageCompressorManager, ClientAllowListNarrowsAdvertisedCompressors) {
+    std::unique_ptr<MessageCompressorBase> zstdCompressor =
+        std::make_unique<ZstdMessageCompressor>();
+    std::unique_ptr<MessageCompressorBase> zlibCompressor =
+        std::make_unique<ZlibMessageCompressor>();
+    std::unique_ptr<MessageCompressorBase> snappyCompressor =
+        std::make_unique<SnappyMessageCompressor>();
+
+    MessageCompressorRegistry registry;
+    registry.setSupportedCompressors(
+        {snappyCompressor->getName(), zlibCompressor->getName(), zstdCompressor->getName()});
+    registry.registerImplementation(std::move(zlibCompressor));
+    registry.registerImplementation(std::move(zstdCompressor));
+    registry.registerImplementation(std::move(snappyCompressor));
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+
+    MessageCompressorManager clientManager(&registry);
+    MessageCompressorManager serverManager(&registry);
+
+    // Allow-list is a strict subset; order given by the caller must be preserved verbatim.
+    clientManager.setCompressorAllowListForThisSession({"zstd", "snappy"});
+
+    BSONObjBuilder clientOutput;
+    clientManager.clientBegin(&clientOutput);
+    auto clientObj = clientOutput.done();
+    checkNegotiationResult(clientObj, {"zstd", "snappy"});
+
+    BSONObjBuilder serverOutput;
+    serverManager.serverNegotiate(parseBSON(clientObj), &serverOutput);
+    auto serverObj = serverOutput.done();
+    // Server echoes the mutually supported compressors in client preference order.
+    checkNegotiationResult(serverObj, {"zstd", "snappy"});
+
+    clientManager.clientFinish(serverObj);
+    ASSERT_FALSE(clientManager.getNegotiatedCompressors().empty());
+}
+
+// Unknown names in the allow-list are silently dropped so an operator cannot
+// use the per-session hook to widen the process-wide compressor list. If every name is
+// unknown, the connection is negotiated uncompressed rather than falling back to the full
+// process list, so the operator gets a predictable failure mode.
+TEST(MessageCompressorManager, ClientAllowListDropsUnknownNamesAndCanCollapseToDisabled) {
+    auto registry = buildRegistry();  // registers only "noop"
+    MessageCompressorManager clientManager(&registry);
+    MessageCompressorManager serverManager(&registry);
+
+    // "zstd" is not in this registry; "noop" is. Only "noop" should be advertised.
+    clientManager.setCompressorAllowListForThisSession({"zstd", "noop"});
+    {
+        BSONObjBuilder out;
+        clientManager.clientBegin(&out);
+        checkNegotiationResult(out.done(), {"noop"});
+    }
+
+    // Every name unknown => nothing advertised, connection stays uncompressed.
+    clientManager.setCompressorAllowListForThisSession({"zstd", "brotli"});
+    {
+        BSONObjBuilder out;
+        clientManager.clientBegin(&out);
+        ASSERT_FALSE(out.done().hasField("compression"));
+    }
+
+    // Clearing the allow-list restores full advertisement of the process-wide list.
+    clientManager.setCompressorAllowListForThisSession({});
+    {
+        BSONObjBuilder out;
+        clientManager.clientBegin(&out);
+        checkNegotiationResult(out.done(), {"noop"});
+    }
+
+    // disableCompressionForThisSession() must still win over any allow-list state.
+    clientManager.setCompressorAllowListForThisSession({"noop"});
+    clientManager.disableCompressionForThisSession();
+    {
+        BSONObjBuilder out;
+        clientManager.clientBegin(&out);
+        ASSERT_FALSE(out.done().hasField("compression"));
+    }
+}
+
+// Builds a registry that mimics `net.compression.compressors: disabled` combined
+// with `replication.networkCompression.compressors: snappy`. The net set is empty, snappy is
+// folded into the process-wide capability set (union) via addReplicationCompressors(), and snappy
+// is registered so it can be negotiated for internal connections and decoded on any connection.
+MessageCompressorRegistry buildNetDisabledReplSnappyRegistry() {
+    MessageCompressorRegistry registry;
+    registry.setSupportedCompressors(std::vector<std::string>{});  // net disabled
+    registry.addReplicationCompressors({"snappy"});                // replication-only
+    registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+    return registry;
+}
+
+// An external (client-facing) negotiation uses the net set. With net disabled it is empty, so a
+// client advertising a replication-only compressor must be negotiated uncompressed. This is the
+// invariant that keeps net.compression.compressors: disabled meaningful for external clients even
+// though the union registry now contains snappy.
+TEST(MessageCompressorManager, ServerNegotiateExternalIgnoresReplicationOnlyCompressor) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+
+    std::vector<std::string_view> clientList{"snappy"};
+    BSONObjBuilder out;
+    manager.serverNegotiate(clientList, &out);  // default => external / net set (empty)
+    checkNegotiationResult(out.done(), {});
+}
+
+// An internal replica-set negotiation passes the replication candidate set. Even with net
+// disabled, snappy is accepted because it is both in the candidate set and registered.
+TEST(MessageCompressorManager, ServerNegotiateInternalUsesReplicationCandidateSet) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+
+    std::vector<std::string_view> clientList{"snappy"};
+    BSONObjBuilder out;
+    std::vector<std::string> replCandidates{"snappy"};
+    manager.serverNegotiate(clientList, &out, replCandidates);
+    checkNegotiationResult(out.done(), {"snappy"});
+}
+
+// A replication connection's candidate set is sticky for the connection's lifetime. After the
+// initial marker-bearing hello negotiates the replication candidate set, a later hello that
+// re-advertises compression WITHOUT the replicationCompressionClient marker (so serverNegotiate()
+// is called with no allow-list) must NOT fall back to the empty net.compression set and silently
+// drop the replication compression. This guards the sticky-candidate-set fix in
+// MessageCompressorManager::serverNegotiate().
+TEST(MessageCompressorManager, ServerRenegotiateKeepsReplicationCandidateSetSticky) {
+    auto registry = buildNetDisabledReplSnappyRegistry();  // net disabled, repl = snappy
+    MessageCompressorManager manager(&registry);
+
+    std::vector<std::string_view> clientList{"snappy"};
+    std::vector<std::string> replCandidates{"snappy"};
+
+    // Initial hello with the replication allow-list negotiates snappy.
+    BSONObjBuilder initialOut;
+    manager.serverNegotiate(clientList, &initialOut, replCandidates);
+    checkNegotiationResult(initialOut.done(), {"snappy"});
+
+    // Later hello on the same connection re-advertises compression but supplies no allow-list
+    // (marker absent). Without stickiness this would use the empty net set and drop snappy.
+    BSONObjBuilder laterOut;
+    manager.serverNegotiate(clientList, &laterOut);
+    checkNegotiationResult(laterOut.done(), {"snappy"});
+}
+
+// An empty internal candidate set (replication.networkCompression.compressors: disabled) forces
+// internal connections uncompressed regardless of what the client advertises.
+TEST(MessageCompressorManager, ServerNegotiateInternalDisabledForcesUncompressed) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+
+    std::vector<std::string_view> clientList{"snappy"};
+    BSONObjBuilder out;
+    std::vector<std::string> emptyCandidates{};
+    manager.serverNegotiate(clientList, &out, emptyCandidates);
+    checkNegotiationResult(out.done(), {});
+}
+
+// The client default path (no per-session allow-list) advertises only the net set, so a node with
+// net disabled offers nothing on ordinary outbound connections even though snappy is in the union.
+TEST(MessageCompressorManager, ClientBeginDefaultAdvertisesNetSetOnly) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+
+    BSONObjBuilder out;
+    manager.clientBegin(&out);
+    ASSERT_FALSE(out.done().hasField("compression"));
+}
+
+// The oplog fetcher path (per-session allow-list) intersects against the union, so a
+// replication-only compressor can be advertised even when net.compression.compressors: disabled.
+TEST(MessageCompressorManager, ClientBeginAllowListAdvertisesReplicationOnlyCompressor) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+
+    manager.setCompressorAllowListForThisSession({"snappy"});
+    BSONObjBuilder out;
+    manager.clientBegin(&out);
+    checkNegotiationResult(out.done(), {"snappy"});
+}
+
+// Mimics `net.compression.compressors: snappy` combined with
+// `replication.networkCompression.compressors: zlib`. Both algorithms are registered process-wide,
+// so the union registry contains {snappy, zlib}, but the net candidate set is only {snappy} and the
+// replication candidate set is only {zlib}. This is the configuration where the union registry is
+// strictly larger than any single connection's candidate set.
+MessageCompressorRegistry buildNetSnappyReplZlibRegistry() {
+    MessageCompressorRegistry registry;
+    registry.setSupportedCompressors({"snappy"});  // net
+    registry.addReplicationCompressors({"zlib"});  // replication-only
+    registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+    registry.registerImplementation(std::make_unique<ZlibMessageCompressor>());
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+    return registry;
+}
+
+// Produces an OP_COMPRESSED frame compressed with 'name' using a throwaway, un-negotiated manager.
+// Because that manager never ran serverNegotiate(), its permit list is unengaged and it can emit any
+// registered algorithm - exactly what a peer (or a hand-crafted malicious client) could put on the
+// wire.
+Message compressWith(MessageCompressorRegistry* registry, const Message& msg, std::string_view name) {
+    MessageCompressorManager producer(registry);
+    auto id = registry->getCompressor(name)->getId();
+    return assertOk(producer.compressMessage(msg, &id));
+}
+
+// An external connection negotiates the net set (snappy) only. A frame
+// compressed with a replication-only algorithm (zlib) must be rejected at decompression even though
+// zlib is registered process-wide, so the union registry can no longer be used to smuggle an
+// out-of-domain algorithm onto an external connection.
+TEST(MessageCompressorManager, ServerExternalRejectsDecompressOfReplicationOnlyFrame) {
+    auto registry = buildNetSnappyReplZlibRegistry();
+    auto zlibFrame = compressWith(&registry, buildMessage(), "zlib");
+
+    MessageCompressorManager server(&registry);
+    BSONObjBuilder out;
+    std::vector<std::string_view> clientList{"snappy"};
+    server.serverNegotiate(clientList, &out);  // default => external / net set
+    checkNegotiationResult(out.done(), {"snappy"});
+
+    MessageCompressorId cid;
+    auto sw = server.decompressMessage(zlibFrame, &cid);
+    ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
+}
+
+// The server echo-back path must never emit a compressor outside this
+// connection's candidate set. Forcing the zlib id on an external connection returns the message
+// uncompressed instead of producing an OP_COMPRESSED zlib frame.
+TEST(MessageCompressorManager, ServerExternalEchoBackOfReplicationOnlyCompressorFallsBackUncompressed) {
+    auto registry = buildNetSnappyReplZlibRegistry();
+    MessageCompressorManager server(&registry);
+    BSONObjBuilder out;
+    std::vector<std::string_view> clientList{"snappy"};
+    server.serverNegotiate(clientList, &out);
+
+    auto zlibId = registry.getCompressor("zlib")->getId();
+    auto msg = buildMessage();
+    auto sw = server.compressMessage(msg, &zlibId);
+    ASSERT_OK(sw.getStatus());
+    // Not permitted for this connection => returned as-is, still the original opcode (not compressed).
+    ASSERT_EQ(sw.getValue().operation(), dbQuery);
+}
+
+// The same registry, but a replication connection (candidate set {zlib}) both
+// decompresses a zlib frame and echoes it back with zlib. This confirms the permit list keeps
+// in-domain behavior fully working and only blocks cross-domain use.
+TEST(MessageCompressorManager, ServerReplicationConnectionAcceptsReplicationCompressor) {
+    auto registry = buildNetSnappyReplZlibRegistry();
+    auto zlibFrame = compressWith(&registry, buildMessage(), "zlib");
+
+    MessageCompressorManager server(&registry);
+    BSONObjBuilder out;
+    std::vector<std::string_view> clientList{"zlib"};
+    std::vector<std::string> replCandidates{"zlib"};
+    server.serverNegotiate(clientList, &out, replCandidates);
+    checkNegotiationResult(out.done(), {"zlib"});
+
+    MessageCompressorId cid;
+    auto recvd = assertOk(server.decompressMessage(zlibFrame, &cid));
+    ASSERT_EQ(cid, registry.getCompressor("zlib")->getId());
+    auto echoed = assertOk(server.compressMessage(recvd, &cid));
+    ASSERT_EQ(echoed.operation(), dbCompressed);
+}
+
+// With net.compression.compressors: disabled the external candidate set is
+// empty, so the permit list is empty and even a registered, replication-attributed algorithm (snappy)
+// cannot be decompressed on an external connection. This makes "disabled" truly mean uncompressed
+// for external clients despite the union registry containing snappy.
+TEST(MessageCompressorManager, ServerExternalWithNetDisabledRejectsAnyCompressedFrame) {
+    auto registry = buildNetDisabledReplSnappyRegistry();  // net empty, repl = snappy
+    auto snappyFrame = compressWith(&registry, buildMessage(), "snappy");
+
+    MessageCompressorManager server(&registry);
+    BSONObjBuilder out;
+    std::vector<std::string_view> clientList{"snappy"};
+    server.serverNegotiate(clientList, &out);  // external, net set empty
+    checkNegotiationResult(out.done(), {});
+
+    MessageCompressorId cid;
+    auto sw = server.decompressMessage(snappyFrame, &cid);
+    ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
+}
+
+// Client-side inbound decompression is also constrained by the negotiated result.
+// A server response compressed with a replication-only algorithm that the client did not advertise
+// or negotiate must be rejected even though that algorithm is registered process-wide in the union.
+TEST(MessageCompressorManager, ClientSideDecompressionRejectsUnnegotiatedCompressor) {
+    auto registry = buildNetSnappyReplZlibRegistry();
+    auto zlibFrame = compressWith(&registry, buildMessage(), "zlib");
+
+    MessageCompressorManager client(&registry);
+    BSONObjBuilder clientOut;
+    client.clientBegin(&clientOut);  // advertises the net set (snappy)
+    // Server responds negotiating snappy only.
+    client.clientFinish(BSON("compression" << BSON_ARRAY("snappy")));
+
+    MessageCompressorId cid;
+    auto sw = client.decompressMessage(zlibFrame, &cid);
+    ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
+}
+
+// A client connection that negotiated no compression (for example replicationNetworkCompression:
+// disabled) must reject any compressed response, including a registered replication-only algorithm.
+TEST(MessageCompressorManager, ClientSideDisabledNegotiationRejectsCompressedResponse) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    auto snappyFrame = compressWith(&registry, buildMessage(), "snappy");
+
+    MessageCompressorManager client(&registry);
+    client.disableCompressionForThisSession();
+    BSONObjBuilder clientOut;
+    client.clientBegin(&clientOut);
+    ASSERT_FALSE(clientOut.done().hasField("compression"));
+    client.clientFinish(BSONObj{});
+
+    MessageCompressorId cid;
+    auto sw = client.decompressMessage(snappyFrame, &cid);
+    ASSERT_EQ(ErrorCodes::BadValue, sw.getStatus());
+}
+
+// A manager NOT marked as a replication client must never emit the
+// "replicationCompressionClient" hello marker, so the server treats it like any other internal or
+// external connection (heartbeats, shard RPC, external clients all keep using the net set). This
+// is the guard that scopes replication.networkCompression to actual sync-source connections.
+TEST(MessageCompressorManager, ClientBeginDoesNotMarkReplicationByDefault) {
+    auto registry = buildRegistry();  // registers "noop" in the net set
+    MessageCompressorManager manager(&registry);
+
+    BSONObjBuilder out;
+    manager.clientBegin(&out);
+    auto obj = out.done();
+    ASSERT_FALSE(obj.hasField(MessageCompressorManager::kReplicationCompressionClientFieldName));
+}
+
+// Once marked as a replication client, clientBegin() must emit
+// "replicationCompressionClient": true so the server routes this connection (and only this
+// connection) through the replication candidate set. The marker must be present in every state
+// (inherit / allow-list / suppressed) because the server needs to identify the connection type
+// regardless of whether it ends up advertising compression.
+TEST(MessageCompressorManager, ClientBeginMarksReplicationClientInEveryState) {
+    auto registry = buildNetDisabledReplSnappyRegistry();
+    MessageCompressorManager manager(&registry);
+    manager.markReplicationClientForThisSession(true);
+
+    // (a) inherit (no allow-list, net disabled => advertises nothing) still carries the marker.
+    {
+        BSONObjBuilder out;
+        manager.clientBegin(&out);
+        auto obj = out.done();
+        ASSERT_TRUE(
+            obj.getField(MessageCompressorManager::kReplicationCompressionClientFieldName)
+                .booleanSafe());
+        // net disabled + inherit => nothing advertised.
+        ASSERT_FALSE(obj.hasField("compression"));
+    }
+
+    // (b) allow-list (advertises snappy from the union) carries the marker.
+    {
+        manager.setCompressorAllowListForThisSession({"snappy"});
+        BSONObjBuilder out;
+        manager.clientBegin(&out);
+        auto obj = out.done();
+        ASSERT_TRUE(
+            obj.getField(MessageCompressorManager::kReplicationCompressionClientFieldName)
+                .booleanSafe());
+        checkNegotiationResult(obj, {"snappy"});
+    }
+
+    // (c) suppressed (disabled) still carries the marker even though it advertises nothing.
+    {
+        manager.setCompressorAllowListForThisSession({});
+        manager.disableCompressionForThisSession();
+        BSONObjBuilder out;
+        manager.clientBegin(&out);
+        auto obj = out.done();
+        ASSERT_TRUE(
+            obj.getField(MessageCompressorManager::kReplicationCompressionClientFieldName)
+                .booleanSafe());
+        ASSERT_FALSE(obj.hasField("compression"));
+    }
+}
+
+// A replication compressor that this build does not provide is a hard startup error, exactly like
+// an unavailable net compressor. This keeps replication.networkCompression.compressors consistent
+// with net.compression.compressors: a configured-but-uncompiled algorithm can never be silently
+// ignored (which would leave the operator believing replication compression is active when it is
+// not).
+TEST(MessageCompressorRegistryTest, FinalizeRejectsUnavailableReplicationCompressor) {
+    MessageCompressorRegistry registry;
+    registry.setSupportedCompressors(std::vector<std::string>{});
+    // "brotli" is not a real compressor in this build; naming it for replication must fail startup.
+    registry.addReplicationCompressors({"snappy", "brotli"});
+    registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+    ASSERT_NOT_OK(registry.finalizeSupportedCompressors());
+}
+
+// A replication compressor that IS compiled in survives finalize and is reported in both the union
+// and the replication attribution set, while the net set stays empty (disabled).
+TEST(MessageCompressorRegistryTest, FinalizeKeepsAvailableReplicationOnlyCompressor) {
+    MessageCompressorRegistry registry;
+    registry.setSupportedCompressors(std::vector<std::string>{});
+    registry.addReplicationCompressors({"snappy"});
+    registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+
+    const auto& unionNames = registry.getCompressorNames();
+    ASSERT_TRUE(std::find(unionNames.begin(), unionNames.end(), "snappy") != unionNames.end());
+
+    const auto& replNames = registry.getReplCompressorNames();
+    ASSERT_TRUE(std::find(replNames.begin(), replNames.end(), "snappy") != replNames.end());
+
+    // The net set stays empty (disabled).
+    ASSERT_TRUE(registry.getNetCompressorNames().empty());
+}
+
+TEST(MessageCompressorRegistryTest, FinalizeRejectsUnavailableNetCompressor) {
+    MessageCompressorRegistry registry;
+    // "brotli" as a net compressor is a hard error because no implementation registers it.
+    registry.setSupportedCompressors({"brotli"});
+    ASSERT_NOT_OK(registry.finalizeSupportedCompressors());
+}
+
 TEST(NoopMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
     checkFidelity(testMessage, std::make_unique<NoopMessageCompressor>());
