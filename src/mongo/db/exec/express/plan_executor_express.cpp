@@ -28,7 +28,6 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/write_conflict_backoff.h"
 #include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
@@ -457,18 +456,15 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
             if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
                 expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
             }
-            write_conflict_backoff::logAndBackoff(_opCtx,
-                                                  writeConflictsInARow,
-                                                  "plan execution",
-                                                  "write contention during express execution"sv,
-                                                  NamespaceStringOrUUID(_nss));
+            logWriteConflictAndBackoff(writeConflictsInARow,
+                                       "plan execution",
+                                       "write contention during express execution"sv,
+                                       NamespaceStringOrUUID(_nss));
         });
     } else {
         if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
             expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
         }
-        // Log and backoff while holding the ticket. Use the legacy stepped schedule here: the
-        // exponential ramp sleeps up to ~2x capMs, far too long to hold a ticket through.
         logWriteConflictAndBackoff(writeConflictsInARow,
                                    "plan execution",
                                    "write contention during express execution"sv,

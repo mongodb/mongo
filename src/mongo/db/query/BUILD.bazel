@@ -1,5 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -234,19 +234,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":explain_policy",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "write_conflict_backoff_test",
-    srcs = [
-        "write_conflict_backoff_test.cpp",
-    ],
-    tags = ["mongo_unittest_third_group"],
-    deps = [
-        ":query_knobs",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context_test_fixture",
     ],
 )
 

@@ -1194,45 +1194,11 @@ server_parameters:
         mod_visibility: needs_replacement
         description: >-
             Enables behavior where the query engine will release resources before sleeping for write
-            conflicts. With the exponential write-conflict backoff (sleeps up to
-            writeConflictBackoffCapMs), holding a ticket through the sleep starves the pool;
-            disable only to fall back to the legacy hold-ticket throttling behavior.
+            conflicts.
         set_at: [startup, runtime]
         cpp_varname: internalQueryEnableWriteConflictBackoffWithoutTicket
         cpp_vartype: Atomic<bool>
-        default: true
-        redact: false
-
-    internalQueryWriteConflictBackoffRampStartMs:
-        mod_visibility: needs_replacement
-        description: >-
-            First sleep of the plan executor's exponential write-conflict backoff ramp, applied
-            at the 4th consecutive attempt. Attempts 1-3 sleep 0/1/2ms regardless, so short
-            contention resolves without a meaningful wait. 0 disables the exponential backoff
-            entirely and falls back to the legacy stepped schedule.
-        set_at: [startup, runtime]
-        cpp_varname: internalQueryWriteConflictBackoffRampStartMs
-        cpp_vartype: Atomic<long long>
-        default: 8
-        validator:
-            gte: 0
-            # One hour; also keeps the geometric ramp far from int64 overflow.
-            lte: 3600000
-        redact: false
-
-    internalQueryWriteConflictBackoffCapMs:
-        mod_visibility: needs_replacement
-        description: >-
-            Upper bound on a single write-conflict backoff sleep. The actual sleep is jittered
-            to [cap, 2*cap], so it's not strictly a hard upper bound.
-        set_at: [startup, runtime]
-        cpp_varname: internalQueryWriteConflictBackoffCapMs
-        cpp_vartype: Atomic<long long>
-        default: 256
-        validator:
-            gte: 1
-            # One hour; also keeps the geometric ramp far from int64 overflow.
-            lte: 3600000
+        default: false
         redact: false
 
     internalQueryWriteConflictBackoffMaxReleaseTicketCycles:
