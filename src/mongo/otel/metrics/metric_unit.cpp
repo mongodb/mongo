@@ -39,6 +39,10 @@ std::string_view toString(MetricUnit unit) {
         case MetricUnit::kBytes:
             return "bytes";
 
+        // Throughput
+        case MetricUnit::kBytesPerSecond:
+            return "bytes_per_second";
+
         // Database
         case MetricUnit::kOperations:
             return "operations";
