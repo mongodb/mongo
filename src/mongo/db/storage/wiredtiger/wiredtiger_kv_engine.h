@@ -554,7 +554,7 @@ public:
 
     void setLastMaterializedLsn(uint64_t lsn) final;
 
-    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final;
+    Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final;
 
     void promoteToLeader() final;
 

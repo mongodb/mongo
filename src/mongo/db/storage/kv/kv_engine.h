@@ -422,7 +422,9 @@ public:
     /**
      * Configures the specified checkpoint as the starting point for recovery.
      */
-    virtual void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {}
+    virtual Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+        return Status::OK();
+    }
 
     /**
      * Configures the storage engine as the leader, allowing it to flush checkpoints to remote

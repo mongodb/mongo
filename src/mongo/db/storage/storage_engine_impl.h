@@ -116,7 +116,7 @@ public:
 
     void setLastMaterializedLsn(uint64_t lsn) override;
 
-    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) override;
+    Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) override;
 
     void promoteToLeader() override;
 

@@ -783,8 +783,8 @@ void StorageEngineImpl::setLastMaterializedLsn(uint64_t lsn) {
     _engine->setLastMaterializedLsn(lsn);
 }
 
-void StorageEngineImpl::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
-    _engine->setRecoveryCheckpointMetadata(checkpointMetadata);
+Status StorageEngineImpl::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+    return _engine->setRecoveryCheckpointMetadata(checkpointMetadata);
 }
 
 void StorageEngineImpl::promoteToLeader() {

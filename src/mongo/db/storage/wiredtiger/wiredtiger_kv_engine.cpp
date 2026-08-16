@@ -2308,14 +2308,29 @@ FlushAllFilesObserver* WiredTigerKVEngine::getFlushAllFilesObserver() const {
 }
 
 void WiredTigerKVEngine::setLastMaterializedLsn(uint64_t lsn) {
-    invariantWTOK(_conn->set_context_uint(_conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, lsn),
-                  nullptr);
+    int ret = _conn->set_context_uint(_conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, lsn);
+    // The frontier is set before the install that goes with it succeeds, so a failed install can
+    // leave it ahead of the installed checkpoint. WT rejects a backwards frontier with EINVAL,
+    // and the LSN being refused is the first thing anyone debugging that will want.
+    if (ret == EINVAL) {
+        LOGV2_FATAL(13206604, "Materialization frontier moved backwards", "lsn"_attr = lsn);
+    }
+    invariantWTOK(ret, nullptr);
 }
 
-void WiredTigerKVEngine::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+Status WiredTigerKVEngine::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
     auto getCkptMetaConfigString =
         fmt::format("disaggregated=(checkpoint_meta=\"{}\")", checkpointMetadata);
-    invariantWTOK(_conn->reconfigure(_conn, getCkptMetaConfigString.c_str()), nullptr);
+    int ret = _conn->reconfigure(_conn, getCkptMetaConfigString.c_str());
+    // EBUSY marks a transient pickup failure (busy data handles, superseded checkpoint). A
+    // failed pickup does not advance the checkpoint metadata LSN, so retrying is safe.
+    if (ret == EBUSY) {
+        return {ErrorCodes::ObjectIsBusy,
+                "WiredTiger temporarily could not apply the checkpoint metadata; the checkpoint "
+                "pickup should be retried"};
+    }
+    invariantWTOK(ret, nullptr);
+    return Status::OK();
 }
 
 void WiredTigerKVEngine::promoteToLeader() {

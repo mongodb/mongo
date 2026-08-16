@@ -117,8 +117,15 @@ public:
         _lastSetMaterializedLsn = lsn;
     }
 
-    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {
+    Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {
         _operations.push_back("setRecoveryCheckpointMetadata");
+        auto status = _nextRecoveryCheckpointMetadataStatus;
+        _nextRecoveryCheckpointMetadataStatus = Status::OK();
+        return status;
+    }
+
+    void failNextSetRecoveryCheckpointMetadata(Status status) {
+        _nextRecoveryCheckpointMetadataStatus = std::move(status);
     }
 
     void promoteToLeader() final {}
@@ -358,6 +365,7 @@ private:
     int _setStepDownTimestampCount = 0;
     int _checkpointCount = 0;
     std::vector<std::string> _operations;
+    Status _nextRecoveryCheckpointMetadataStatus = Status::OK();
 };
 
 }  // namespace mongo
