@@ -343,13 +343,15 @@ int
 __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
-    WT_CONFIG_ITEM durable_cval, oldest_cval, stable_cval, step_down_cval;
+    WT_CONFIG_ITEM durable_cval, oldest_cval, stable_cval, step_down_cval, step_down_epoch_cval;
     WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t durable_ts, oldest_ts, stable_disagg_epoch, stable_ts, step_down_ts;
+    wt_timestamp_t durable_ts, oldest_ts, stable_disagg_epoch, stable_ts, step_down_epoch,
+      step_down_ts;
     wt_timestamp_t last_durable_ts, last_oldest_ts, last_stable_disagg_epoch, last_stable_ts,
-      current_step_down_ts;
+      current_step_down_epoch, current_step_down_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool force, has_durable, has_oldest, has_stable, has_stable_disagg_epoch, has_step_down;
+    bool epochs_in_use, force, has_durable, has_oldest, has_stable, has_stable_disagg_epoch,
+      has_step_down, has_step_down_epoch;
 
     txn_global = &S2C(session)->txn_global;
 
@@ -378,8 +380,13 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_config_gets_def(session, cfg, "step_down_timestamp", 0, &step_down_cval));
     has_step_down = step_down_cval.len != 0;
 
+    WT_RET(__wt_config_gets_def(
+      session, cfg, "step_down_disaggregated_schema_epoch", 0, &step_down_epoch_cval));
+    has_step_down_epoch = step_down_epoch_cval.len != 0;
+
     /* If no timestamp was supplied, there's nothing to do. */
-    if (!has_durable && !has_oldest && !has_stable && !has_stable_disagg_epoch && !has_step_down)
+    if (!has_durable && !has_oldest && !has_stable && !has_stable_disagg_epoch && !has_step_down &&
+      !has_step_down_epoch)
         return (0);
 
     /*
@@ -392,6 +399,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
       session, "stable disaggregated schema epoch", &stable_disagg_epoch, &cval));
     WT_RET(
       __wt_txn_parse_timestamp(session, "step down timestamp", &step_down_ts, &step_down_cval));
+    WT_RET(__wt_txn_parse_timestamp(
+      session, "step down disaggregated schema epoch", &step_down_epoch, &step_down_epoch_cval));
 
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;
@@ -408,6 +417,23 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
             WT_RET_MSG(session, EINVAL, "set_timestamp: step down timestamp is already set");
     }
 
+    /*
+     * Schema epochs order schema operations independently of timestamps, so when they are in use
+     * the step-down boundary should be declared in both spaces in the same call. These too are hard
+     * invariants, validated even under force.
+     *
+     * FIXME-WT-18314: Reject a step down timestamp without the epoch once the server supplies it.
+     */
+    epochs_in_use = __wt_get_stable_disaggregated_schema_epoch(session) != WT_SCHEMA_EPOCH_NONE;
+    if (has_step_down_epoch && !has_step_down)
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: step down disaggregated schema epoch requires the step down timestamp "
+          "in the same call");
+    if (has_step_down && !epochs_in_use && has_step_down_epoch)
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: step down disaggregated schema epoch requires schema epochs to be in "
+          "use");
+
     if (force) {
         WT_STAT_CONN_INCR(session, txn_set_ts_force);
         goto set;
@@ -420,6 +446,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     last_stable_disagg_epoch =
       __wt_atomic_load_uint64_relaxed(&txn_global->stable_disaggregated_schema_epoch);
     current_step_down_ts = __wt_atomic_load_uint64_relaxed(&txn_global->step_down_timestamp);
+    current_step_down_epoch =
+      __wt_atomic_load_uint64_relaxed(&txn_global->step_down_disaggregated_schema_epoch);
 
     /*
      * It is an invalid call to set the oldest or stable timestamps or the stable disaggregated
@@ -519,6 +547,30 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
           __wt_timestamp_to_string(current_step_down_ts, ts_string[1]));
     }
 
+    /*
+     * The same ordering holds in epoch space: the stable epoch must be able to reach the step-down
+     * epoch exactly and never pass it.
+     */
+    if (has_stable_disagg_epoch)
+        last_stable_disagg_epoch = stable_disagg_epoch;
+    if (has_step_down_epoch && step_down_epoch < last_stable_disagg_epoch) {
+        __wt_readunlock(session, &txn_global->rwlock);
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: step down disaggregated schema epoch %s must not be older than the "
+          "stable disaggregated schema epoch %s",
+          __wt_timestamp_to_string(step_down_epoch, ts_string[0]),
+          __wt_timestamp_to_string(last_stable_disagg_epoch, ts_string[1]));
+    }
+    if (has_stable_disagg_epoch && current_step_down_epoch != WT_SCHEMA_EPOCH_NONE &&
+      stable_disagg_epoch > current_step_down_epoch) {
+        __wt_readunlock(session, &txn_global->rwlock);
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: stable disaggregated schema epoch %s must not advance past the step "
+          "down disaggregated schema epoch %s",
+          __wt_timestamp_to_string(stable_disagg_epoch, ts_string[0]),
+          __wt_timestamp_to_string(current_step_down_epoch, ts_string[1]));
+    }
+
     __wt_readunlock(session, &txn_global->rwlock);
 
     /* Check if we are actually updating anything. */
@@ -587,14 +639,25 @@ set:
      * Once the step-down timestamp is set, committed writes are directed to the ingest constituent
      * and everything from before belongs to stable. The application is expected to step down after
      * setting it, which clears it, so it is only valid on a leader and cannot be changed while set.
+     * The step-down epoch is stored in the same locked section so readers observe the boundary in
+     * both spaces or in neither.
      */
     if (has_step_down) {
         __wt_writelock(session, &txn_global->step_down_lock);
         __wt_atomic_store_uint64_relaxed(&txn_global->step_down_timestamp, step_down_ts);
+        if (has_step_down_epoch)
+            __wt_atomic_store_uint64_relaxed(
+              &txn_global->step_down_disaggregated_schema_epoch, step_down_epoch);
         __wt_writeunlock(session, &txn_global->step_down_lock);
         WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 1);
         __wt_verbose_info(session, WT_VERB_TIMESTAMP, "Updated global step down timestamp to %s",
           __wt_timestamp_to_string(step_down_ts, ts_string[0]));
+        if (has_step_down_epoch) {
+            WT_STAT_CONN_SET(session, txn_stepdown_epoch_set, 1);
+            __wt_verbose_info(session, WT_VERB_TIMESTAMP,
+              "Updated global step down disaggregated schema epoch to %s",
+              __wt_timestamp_to_string(step_down_epoch, ts_string[0]));
+        }
     }
 
     /*

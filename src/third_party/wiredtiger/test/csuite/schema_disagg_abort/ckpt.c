@@ -16,19 +16,37 @@
 #include "schema_disagg_abort.h"
 
 /*
+ * ckpt_latest --
+ *     Read the latest complete checkpoint. False when none found; the caller frees the metadata
+ *     buffer.
+ */
+bool
+ckpt_latest(WORKLOAD_STATE *state, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args)
+{
+    WT_CONNECTION *conn = state->conn;
+    WT_PAGE_LOG *page_log = state->page_log;
+
+    WT_SESSION *session;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    const int ret = page_log->pl_get_complete_checkpoint(page_log, session, args);
+    testutil_check_error_ok(ret, WT_NOTFOUND);
+    testutil_check(session->close(session, NULL));
+
+    return (ret != WT_NOTFOUND);
+}
+
+/*
  * ckpt_pick_up --
  *     Pick up the latest complete checkpoint onto this connection. Returns true if a checkpoint was
  *     adopted, false if the page log has no new checkpoint.
  */
 static bool
-ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session, WT_PAGE_LOG *page_log)
+ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session)
 {
     WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
 
-    const int ret = page_log->pl_get_complete_checkpoint(page_log, session, &ckpt_args);
-    if (ret == WT_NOTFOUND)
+    if (!ckpt_latest(state, &ckpt_args))
         return (false);
-    testutil_check(ret);
 
     if (ckpt_args.checkpoint_lsn == state->adopted_ckpt_lsn) {
         free(ckpt_args.checkpoint_metadata.mem);
@@ -57,12 +75,8 @@ ckpt_adopt_latest(WORKLOAD_STATE *state)
     WT_SESSION *session;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    WT_PAGE_LOG *page_log;
-    testutil_check(conn->get_page_log(conn, "palite", &page_log));
+    (void)ckpt_pick_up(state, session);
 
-    (void)ckpt_pick_up(state, session, page_log);
-
-    testutil_check(page_log->terminate(page_log, NULL));
     testutil_check(session->close(session, NULL));
 
     println("Node %" PRIu32 ": adopted the latest checkpoint before step-up", state->cfg->node_id);
@@ -84,8 +98,6 @@ thread_ckpt_run(void *arg)
     /* The role's checkpoint bookkeeping for this phase; only a follower adopts checkpoints. */
     CKPT_CTX ckpt = {0};
     __wt_epoch(NULL, &ckpt.phase_start);
-    if (!state->leads)
-        testutil_check(state->conn->get_page_log(state->conn, "palite", &ckpt.page_log));
 
     /* The cadence draws from the stream one past the generator's per-worker streams. */
     WT_RAND_STATE *rnd = &state->gen_rnd[state->nth_workers];
@@ -106,8 +118,6 @@ thread_ckpt_run(void *arg)
         wait = __wt_random(rnd) % MAX_CKPT_INVL;
     }
 
-    if (ckpt.page_log != NULL)
-        testutil_check(ckpt.page_log->terminate(ckpt.page_log, NULL));
     testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
 }
@@ -144,15 +154,23 @@ thread_ts_run(void *arg)
 
     while (workload_active(state, STAGE_TS)) {
         /*
-         * The single frontier serves both schema and data operations: everything at or below it is
-         * published and committed.
+         * Setting timestamps is a critical section: the stable frontier must not advance while a
+         * step-down is in progress.
          */
-        const uint64_t frontier = workers_min(state);
-        if (frontier != 0) {
-            const uint64_t cur_stable = query_ts(state->conn, "stable_timestamp");
-            if (frontier >= cur_stable)
-                set_frontier(state->conn, frontier);
+        __wt_atomic_store_bool(&state->ts_busy, true);
+        if (__wt_atomic_load_uint64(&state->stepdown_ts) == 0) {
+            /*
+             * The single frontier serves both schema and data operations: everything at or below it
+             * is published and committed.
+             */
+            const uint64_t frontier = workers_min(state);
+            if (frontier != 0) {
+                const uint64_t cur_stable = query_ts(state->conn, "stable_timestamp");
+                if (frontier >= cur_stable)
+                    set_frontier(state->conn, frontier);
+            }
         }
+        __wt_atomic_store_bool(&state->ts_busy, false);
 
         __wt_sleep(0, 100 * WT_THOUSAND);
     }
@@ -167,9 +185,13 @@ thread_ts_run(void *arg)
 void
 leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 {
-    /* The stable value this checkpoint is bound to cover; it can only advance mid-checkpoint. */
-    const uint64_t covered = query_ts(state->conn, "stable_timestamp");
-    if (covered == 0) {
+    /* Skip the checkpoint if the step-down is in progress. */
+    if (__wt_atomic_load_uint64(&state->stepdown_ts) != 0)
+        return;
+
+    /* Skip the checkpoint if there is no stable timestamp yet. */
+    const uint64_t stable_ts = query_ts(state->conn, "stable_timestamp");
+    if (stable_ts == 0) {
         struct timespec now;
         __wt_epoch(NULL, &now);
         if (WT_TIMEDIFF_SEC(now, ckpt->phase_start) > MAX_OP_WAIT)
@@ -180,23 +202,33 @@ leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
     /* The timestamp thread owns the stable epoch and timestamps; just checkpoint. */
     testutil_check(session->checkpoint(session, "use_timestamp=true"));
 
-    println("Node %" PRIu32 ": checkpoint %d complete", state->cfg->node_id, ++ckpt->produced);
+    println(
+      "Node %" PRIu32 ": checkpoint %" PRIu32 " complete", state->cfg->node_id, ++ckpt->produced);
 
     /* A stable frontier implies every worker published, so this checkpoint has a schema op. */
-    if (ckpt->produced == 1)
+    if (ckpt->produced == 1u)
         testutil_sentinel(NULL, LEADER_READY_FILE);
 }
 
 /*
  * follower_checkpoint --
- *     Adopt the latest checkpoint the page log holds. The workers keep running through it. The
- *     first adoption reports follower readiness.
+ *     Adopt the latest checkpoint from the leader. The workers keep running through it.
  */
 void
 follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 {
-    if (ckpt_pick_up(state, session, ckpt->page_log) && !ckpt->picked_up) {
+    WT_UNUSED(ckpt);
+
+    if (!ckpt_pick_up(state, session))
+        return;
+
+    /* Adopted LSN is 0 at the beginning. */
+    const bool first_ckpt = state->adopted_ckpt_lsn == 0;
+
+    /* Each adoption is reported for a stepping-down peer. */
+    adopted_lsn_publish(state->cfg->node_id, state->adopted_ckpt_lsn);
+
+    /* The first picked up checkpoint: follower is ready. */
+    if (first_ckpt)
         testutil_sentinel(NULL, FOLLOWER_READY_FILE);
-        ckpt->picked_up = true;
-    }
 }

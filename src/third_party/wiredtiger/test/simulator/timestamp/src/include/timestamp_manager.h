@@ -60,6 +60,7 @@ private:
     /* No copies of the singleton allowed. */
 private:
     timestamp_manager();
+    ~timestamp_manager() = default;
 
 public:
     timestamp_manager(timestamp_manager const &) = delete;

@@ -991,6 +991,10 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
         return;
 
+    /* A page being instantiated ends up clean, don't dirty it. */
+    if (F_ISSET(page->modify, WT_PAGE_MODIFY_INSTANTIATING))
+        return;
+
     WT_ASSERT(session,
       !F_ISSET(btree, WT_BTREE_DISAGGREGATED) ||
         __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
@@ -1204,6 +1208,14 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
      * mark the tree or page dirty.
      */
     if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
+        return;
+
+    /*
+     * Instantiating updates onto a page that has just been read is internal bookkeeping: the page
+     * is left clean, so dirtying the tree here would cost a checkpoint of a tree with no
+     * user-visible change.
+     */
+    if (F_ISSET(page->modify, WT_PAGE_MODIFY_INSTANTIATING))
         return;
 
     WT_ASSERT(session,
@@ -2293,23 +2305,23 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
      * a reasonable amount of time is currently pretty arbitrary.
      */
     if (__wt_evict_aggressive(session) ||
-      mod->last_evict_pass_gen + 5 <
+      mod->rec_evict_attempt_pass_gen + 5 <
         __wt_atomic_load_uint64_relaxed(&S2C(session)->evict->evict_pass_gen))
         return (true);
 
     /* Retry if the global transaction state has moved forward. */
     if (__wt_atomic_load_uint64_v_relaxed(&txn_global->current) ==
         __wt_atomic_load_uint64_v_relaxed(&txn_global->oldest_id) ||
-      mod->last_eviction_id != __wt_txn_oldest_id(session))
+      mod->rec_evict_attempt_oldest_id != __wt_txn_oldest_id(session))
         return (true);
 
     /*
      * It is possible that we have not started using the timestamps just yet. So, check for the last
      * time we evicted only if there is a timestamp set.
      */
-    if (mod->last_eviction_timestamp != WT_TS_NONE) {
+    if (mod->rec_evict_attempt_pinned_ts != WT_TS_NONE) {
         __wt_txn_pinned_timestamp(session, &pinned_ts);
-        if (pinned_ts > mod->last_eviction_timestamp)
+        if (pinned_ts > mod->rec_evict_attempt_pinned_ts)
             return (true);
     }
 

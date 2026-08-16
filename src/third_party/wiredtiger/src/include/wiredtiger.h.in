@@ -2781,6 +2781,14 @@ struct __wt_connection {
      * specified timestamp in tables configured with \c "log=(enabled=false)". Values must be
      * monotonically increasing.  The value must not be older than the current oldest timestamp.
      * See @ref timestamp_global_api., a string; default empty.}
+     * @config{step_down_disaggregated_schema_epoch, the schema epoch that marks the planned
+     * step-down boundary in disaggregated storage.  May only be supplied together with \c
+     * step_down_timestamp\, and should accompany it whenever schema epochs are in use.  Schema
+     * operations published at or below this epoch are covered by the final checkpoint taken before
+     * the step-down; operations published above it are deferred until after the next step-up.  The
+     * value must not be older than the current stable disaggregated schema epoch\, and before
+     * stepping down the application must advance the stable disaggregated schema epoch to equal it.
+     * Cannot be changed while set., a string; default empty.}
      * @config{step_down_timestamp, the timestamp that prepares for a planned step-down in
      * disaggregated storage.  The application must ensure the timestamp is newer than every commit
      * timestamp already allocated\, and that no new timestamp is allocated until this call returns.
@@ -2788,7 +2796,9 @@ struct __wt_connection {
      * survives the step-down\, and their commit timestamps must be after this timestamp; in-flight
      * write transactions are rolled back for the application to retry.  Before stepping down\, the
      * application must advance the stable timestamp to equal it and checkpoint at that boundary.
-     * Cannot be changed while set; only valid on a leader., a string; default empty.}
+     * When schema epochs are in use\, \c step_down_disaggregated_schema_epoch should be supplied in
+     * the same call.  Cannot be changed while set; only valid on a leader., a string; default
+     * empty.}
      * @configend
      * @errors
      */
@@ -9239,76 +9249,78 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_SET_TS_STABLE_DISAGG_EPOCH_UPD	2035
 /*! transaction: set timestamp stable updates */
 #define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		2036
+/*! transaction: step-down disaggregated schema epoch is currently set */
+#define	WT_STAT_CONN_TXN_STEPDOWN_EPOCH_SET		2037
 /*! transaction: step-down timestamp is currently set */
-#define	WT_STAT_CONN_TXN_STEPDOWN_TS_SET		2037
+#define	WT_STAT_CONN_TXN_STEPDOWN_TS_SET		2038
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				2038
+#define	WT_STAT_CONN_TXN_BEGIN				2039
 /*!
  * transaction: transaction checkpoint history store file duration
  * (usecs)
  */
-#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		2039
+#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		2040
 /*! transaction: transaction global checkpoint timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_CHECKPOINT_TIMESTAMP	2040
+#define	WT_STAT_CONN_TXN_GLOBAL_CHECKPOINT_TIMESTAMP	2041
 /*! transaction: transaction global durable timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_DURABLE_TIMESTAMP	2041
+#define	WT_STAT_CONN_TXN_GLOBAL_DURABLE_TIMESTAMP	2042
 /*! transaction: transaction global last running timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_LAST_RUNNING_TIMESTAMP	2042
+#define	WT_STAT_CONN_TXN_GLOBAL_LAST_RUNNING_TIMESTAMP	2043
 /*! transaction: transaction global newest timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_NEWEST_TIMESTAMP	2043
+#define	WT_STAT_CONN_TXN_GLOBAL_NEWEST_TIMESTAMP	2044
 /*! transaction: transaction global oldest timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_OLDEST_TIMESTAMP	2044
+#define	WT_STAT_CONN_TXN_GLOBAL_OLDEST_TIMESTAMP	2045
 /*! transaction: transaction global pinned timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_PINNED_TIMESTAMP	2045
+#define	WT_STAT_CONN_TXN_GLOBAL_PINNED_TIMESTAMP	2046
 /*! transaction: transaction global stable timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_STABLE_TIMESTAMP	2046
+#define	WT_STAT_CONN_TXN_GLOBAL_STABLE_TIMESTAMP	2047
 /*! transaction: transaction global version cursor timestamp */
-#define	WT_STAT_CONN_TXN_GLOBAL_VERSION_CURSOR_TIMESTAMP	2047
+#define	WT_STAT_CONN_TXN_GLOBAL_VERSION_CURSOR_TIMESTAMP	2048
 /*!
  * transaction: transaction number of older readers older than oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_READERS			2048
+#define	WT_STAT_CONN_TXN_PINNED_READERS			2049
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			2049
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			2050
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	2050
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	2051
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_LAG		2051
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_LAG		2052
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT_LAG	2052
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT_LAG	2053
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER_LAG	2053
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER_LAG	2054
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	2054
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	2055
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	2055
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	2056
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	2056
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	2057
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			2057
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			2058
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				2058
+#define	WT_STAT_CONN_TXN_COMMIT				2059
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			2059
+#define	WT_STAT_CONN_TXN_ROLLBACK			2060
 /*!
  * transaction: transactions rolled back because their own dirty content
  * exceeds the eviction updates or dirty trigger
  */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TOO_LARGE_FOR_CACHE	2060
+#define	WT_STAT_CONN_TXN_ROLLBACK_TOO_LARGE_FOR_CACHE	2061
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		2061
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		2062
 /*!
  * transaction: write transactions rolled back for straddling the step-
  * down timestamp setting boundary
  */
-#define	WT_STAT_CONN_TXN_ROLLBACK_STEPDOWN		2062
+#define	WT_STAT_CONN_TXN_ROLLBACK_STEPDOWN		2063
 
 /*!
  * @}

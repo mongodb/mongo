@@ -3183,10 +3183,6 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
      * the same name; in order to keep from having two checkpoints with the same name you would have
      * to use the bulk-load's fake checkpoint to delete a physical checkpoint, and that will end in
      * tears.
-     *
-     * FIXME-WT-18266: this decision doesn't check the tree's dirty state, so a concurrent clearer
-     * of "original" outside the schema lock (for example, a live-restore worker) can race with a
-     * stale read here and cause checkpoint to skip reconciling an already-dirty tree.
      */
     if (is_checkpoint && __wt_atomic_load_uint8_relaxed(&btree->original)) {
         __wt_checkpoint_tree_reconcile_update(session, &ta);

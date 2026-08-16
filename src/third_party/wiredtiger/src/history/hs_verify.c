@@ -9,18 +9,50 @@
 #include "wt_internal.h"
 
 /*
+ * __hs_verify_checkpoint_oldest --
+ *     Return the oldest timestamp of the checkpoint the given data store was read at. WT_TS_NONE
+ *     otherwise for anything else.
+ */
+static WT_INLINE wt_timestamp_t
+__hs_verify_checkpoint_oldest(WT_SESSION_IMPL *session, const char *uri)
+{
+    if (!WT_URI_IS_STABLE_CHECKPOINT(uri))
+        return (WT_TS_NONE);
+
+    /* The value is only stable, and only describes the data store being walked, under the lock. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+
+    return (__wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_oldest_timestamp));
+}
+
+/*
+ * __hs_verify_obsolete --
+ *     Is a history store record obsolete against the checkpoint's oldest timestamp? Transaction ids
+ *     are not comparable across the connections sharing a disaggregated history store, so only the
+ *     timestamp is considered.
+ */
+static WT_INLINE bool
+__hs_verify_obsolete(WT_TIME_WINDOW *tw, wt_timestamp_t checkpoint_oldest_ts)
+{
+    return (checkpoint_oldest_ts != WT_TS_NONE && WT_TIME_WINDOW_HAS_STOP(tw) &&
+      tw->durable_stop_ts <= checkpoint_oldest_ts);
+}
+
+/*
  * __hs_verify_id --
  *     Verify the history store for a single btree. Given a cursor to the tree, walk all history
  *     store keys. This function assumes any caller has already opened a cursor to the history
  *     store.
  */
 static int
-__hs_verify_id(
-  WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *ds_cbt, uint32_t this_btree_id)
+__hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *ds_cbt,
+  uint32_t this_btree_id, wt_timestamp_t checkpoint_oldest_ts)
 {
     WT_DECL_ITEM(prev_key);
     WT_DECL_RET;
     WT_ITEM key;
+    WT_TIME_WINDOW *hs_tw;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter, recno;
     uint32_t btree_id;
@@ -52,12 +84,33 @@ __hs_verify_id(
         if (btree_id != this_btree_id)
             break;
 
+        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+
+        /* Nothing prepared is ever written to the history store. */
+        if (WT_TIME_WINDOW_HAS_PREPARE(hs_tw)) {
+            F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+            WT_ERR_PANIC(session, WT_PANIC,
+              "the history store holds a prepared time window for key %s in the data store %s",
+              __wt_key_string(session, key.data, key.size, CUR2BT(ds_cbt)->key_format, &key),
+              session->dhandle->name);
+        }
+
         /*
          * If we have already checked against this key, keep going to the next key. We only need to
          * check the key once.
          */
         WT_ERR(__wt_compare(session, NULL, &key, prev_key, &cmp));
         if (cmp == 0)
+            continue;
+
+        /*
+         * A follower's own oldest timestamp trails the one that wrote the checkpoint, so its cursor
+         * still hands back records that reconciliation had already written off when it dropped
+         * their keys from the page image. Skip those, as the writer's own cursor did. The last
+         * checked key is left alone so that any remaining record for this key is judged on its own
+         * window rather than excused by this one.
+         */
+        if (__hs_verify_obsolete(hs_tw, checkpoint_oldest_ts))
             continue;
 
         /* Check the key can be found in the data store.*/
@@ -72,6 +125,18 @@ __hs_verify_id(
         WT_ERR(ret);
 
         if (ds_cbt->compare != 0) {
+            /*
+             * The history store cursor judged this record live before we searched the data store,
+             * but global visibility only ever advances: a record that has since become obsolete was
+             * never an orphan, the two checks simply straddled the change. Recheck it, and leave
+             * the last checked key alone so that any remaining record for this key is judged on its
+             * own window rather than excused by this one.
+             */
+            if (__wt_txn_tw_stop_visible_all(session, hs_tw)) {
+                WT_ERR(__cursor_reset(ds_cbt));
+                continue;
+            }
+
             F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
             /* Note that we are reformatting the HS key here. */
             WT_ERR_PANIC(session, WT_PANIC,
@@ -132,6 +197,7 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE ds_cbt;
     WT_DECL_RET;
+    wt_timestamp_t checkpoint_oldest_ts;
 
     WT_RET(__wt_hs_verify_cursor_open(session, btree_id, &hs_cursor));
     if (hs_cursor == NULL) {
@@ -141,6 +207,8 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
           session->dhandle->name);
         return (0);
     }
+
+    checkpoint_oldest_ts = __hs_verify_checkpoint_oldest(session, session->dhandle->name);
 
     /* Position the hs cursor on the requested btree id, there could be nothing in the HS yet. */
     hs_cursor->set_key(hs_cursor, 1, btree_id);
@@ -159,7 +227,8 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
     __wt_btcur_open(&ds_cbt);
 
     /* Note that the following call moves the hs cursor internally. */
-    WT_ERR_NOTFOUND_OK(__hs_verify_id(session, hs_cursor, &ds_cbt, btree_id), false);
+    WT_ERR_NOTFOUND_OK(
+      __hs_verify_id(session, hs_cursor, &ds_cbt, btree_id, checkpoint_oldest_ts), false);
 
     WT_ERR(__wt_btcur_close(&ds_cbt, false));
 
@@ -183,7 +252,7 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
     WT_DECL_ITEM(ds_uri_buf);
     WT_DECL_RET;
     WT_ITEM key;
-    wt_timestamp_t hs_start_ts;
+    wt_timestamp_t checkpoint_oldest_ts, hs_start_ts;
     uint64_t hs_counter;
     uint32_t btree_id;
     char *uri_data;
@@ -261,10 +330,12 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
         } else
             WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
+        checkpoint_oldest_ts = __hs_verify_checkpoint_oldest(session, ds_cursor->uri);
 
         /* Note that the following call moves the hs cursor internally. */
-        WT_ERR_NOTFOUND_OK(
-          __hs_verify_id(session, hs_cursor, (WT_CURSOR_BTREE *)ds_cursor, btree_id), true);
+        WT_ERR_NOTFOUND_OK(__hs_verify_id(session, hs_cursor, (WT_CURSOR_BTREE *)ds_cursor,
+                             btree_id, checkpoint_oldest_ts),
+          true);
 
         /* We are either positioned on a different btree id or the entire HS has been parsed. */
         if (ret == WT_NOTFOUND) {

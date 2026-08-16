@@ -8,11 +8,58 @@
 
 /*
  * The reader stage: the single consumer of the node's event source - the self-pipe when this phase
- * generates, a live peer's otherwise. Queues events for the workers and ends the phase on the
- * hand-over. Checkpoints are not in the stream; the checkpoint thread owns them.
+ * generates, a live peer's otherwise. Queues events for the workers, runs the step-down work at the
+ * marker, and ends the phase on the hand-over.
  */
 
 #include "schema_disagg_abort.h"
+
+/*
+ * workers_timestamps_assert --
+ *     Assert that no worker completed an event above the given timestamp.
+ */
+static void
+workers_timestamps_assert(WORKLOAD_STATE *state, uint64_t timestamp)
+{
+    for (uint32_t t = 0; t < state->nth_workers; t++) {
+        const uint64_t completed = __wt_atomic_load_uint64(&state->workers[t].completed_ts);
+        testutil_assertfmt(completed <= timestamp,
+          "step-down: worker %" PRIu32 " completed %" PRIu64 " above the marker's %" PRIu64, t,
+          completed, timestamp);
+    }
+}
+
+/*
+ * reader_step_down --
+ *     The step-down work once the timestamp is set.
+ */
+static void
+reader_step_down(WORKLOAD_STATE *state, uint64_t ts)
+{
+    WT_CONNECTION *conn = state->conn;
+
+    /* Signal the timestamp and checkpoint threads to pause. */
+    __wt_atomic_store_uint64(&state->stepdown_ts, ts);
+    while (__wt_atomic_load_bool(&state->ts_busy))
+        __wt_sleep(0, WT_THOUSAND);
+
+    set_stepdown_ts(conn, ts);
+    set_frontier(conn, ts);
+
+    WT_SESSION *session;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(session->checkpoint(session, "use_timestamp=true"));
+    testutil_check(session->close(session, NULL));
+
+    /* Keep the step-down checkpoint's LSN; the next leader should adopt it. */
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
+    testutil_assert(ckpt_latest(state, &ckpt_args));
+    free(ckpt_args.checkpoint_metadata.mem);
+
+    __wt_atomic_store_uint64(&state->stepdown_ckpt_lsn, ckpt_args.checkpoint_lsn);
+    println("Node %" PRIu32 ": step-down checkpoint at %" PRIu64 " (lsn %" PRIu64 ")",
+      state->cfg->node_id, ts, ckpt_args.checkpoint_lsn);
+}
 
 /*
  * thread_reader_run --
@@ -49,6 +96,16 @@ thread_reader_run(void *arg)
         case EVENT_PUBLISH_CREATE:
         case EVENT_PUBLISH_DROP:
             evq_enqueue(state, &ev);
+            break;
+        case EVENT_STEPDOWN:
+            testutil_assert(state->leads && state->generates);
+            /*
+             * Drain the workers before stepping-down. Write operations cannot straddle the
+             * step-down timestamp.
+             */
+            evq_drain_barrier(state);
+            workers_timestamps_assert(state, ev.event_ts);
+            reader_step_down(state, ev.event_ts);
             break;
         case EVENT_SWITCH:
             /* The final event of the term's stream: this node must step up. */

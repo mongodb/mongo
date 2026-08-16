@@ -955,6 +955,14 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     /* We don't handle in-memory prepare resolution here. */
     WT_ASSERT(session, !__wt_btree_stays_in_memory(btree));
 
+    /*
+     * The prepared updates are already on disk, so the page must not end up dirty. The modify path
+     * would otherwise dirty the page and the tree; flag the page so it stays clean. The page isn't
+     * yet reachable by other threads, so the flag needs no synchronization.
+     */
+    WT_RET(__wt_page_modify_init(session, page));
+    F_SET(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
+
     __wt_btcur_init(session, &cbt);
     __wt_btcur_open(&cbt);
 
@@ -1016,16 +1024,15 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     }
 
-    /*
-     * The data is written to the disk so we can mark the page clean after re-instantiating prepared
-     * updates to avoid reconciling the page every time.
-     */
-    __wt_page_modify_clear(session, page);
-
     if (0) {
 err:
         __wt_free_update_list(session, &upd);
     }
+    F_CLR(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
+
+    /* The page with re-instantiated prepared updates should be clean. */
+    WT_ASSERT(session, !__wt_page_is_modified(page));
+
     WT_TRET(__wt_btcur_close(&cbt, true));
     __wt_scr_free(session, &value);
     return (ret);

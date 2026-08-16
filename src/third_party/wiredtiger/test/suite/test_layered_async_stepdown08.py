@@ -73,6 +73,21 @@ class test_layered_async_stepdown08(
             self.set_stable_epoch(10)
         self.set_global_ts(1, 1)
 
+    def set_stable_epoch(self, epoch, conn=None):
+        """Advance the stable schema epoch, tracking it for the step-down boundary."""
+        super().set_stable_epoch(epoch, conn)
+        self.stable_epoch = epoch
+
+    def set_step_down_ts(self, ts):
+        """
+        Open the step-down window, declaring the boundary in epoch space too in the epoch world.
+        Using the current stable epoch means the demotion needs no further epoch movement.
+        """
+        if self.use_epochs:
+            super().set_step_down_ts(ts, self.stable_epoch)
+        else:
+            super().set_step_down_ts(ts)
+
     def publish_if_epochs(self, uri, epoch):
         """Publish a create, which the epoch-less world has no notion of."""
         if self.use_epochs:

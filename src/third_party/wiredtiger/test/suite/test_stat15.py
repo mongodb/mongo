@@ -57,21 +57,41 @@ class test_stat15(wttest.WiredTigerTestCase):
         self.assertGreaterEqual(total_pages, leaf_pages,
             'expected cache_pages_inuse >= cache_pages_inuse_leaf')
 
+    # Enough keys of this size to populate several hundred leaf pages, sampled with a stride
+    # that lands on a different page each time.
+    num_keys = 10000
+    evict_stride = 50
+
     def test_cache_pages_inuse_leaf_decreases_after_eviction(self):
         # Create a table and insert enough data to populate multiple leaf pages
         self.session.create(self.uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(self.uri, None, None)
-        for i in range(10000):
+        for i in range(self.num_keys):
             cursor[str(i).zfill(6)] = 'x' * 1000
         cursor.close()
         self.session.checkpoint(None)
 
+        # Reopen and read the whole table, so the number of resident leaf pages reflects the
+        # on-disk tree rather than however far background eviction happened to get.
+        self.reopen_conn()
+        cursor = self.session.open_cursor(self.uri, None, None)
+        while cursor.next() == 0:
+            pass
+        cursor.close()
+
         leaf_before = self.get_conn_stat(stat.conn.cache_pages_inuse_leaf)
         self.assertGreater(leaf_before, 0)
 
-        # Force eviction by reopening the connection (clears cache).
-        self.reopen_conn()
+        # Evict a page at a time with an eviction cursor.
+        evict_session = self.conn.open_session()
+        evict_cursor = evict_session.open_cursor(self.uri, None, 'debug=(release_evict)')
+        for i in range(0, self.num_keys, self.evict_stride):
+            evict_cursor.set_key(str(i).zfill(6))
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        evict_cursor.close()
+        evict_session.close()
 
         leaf_after = self.get_conn_stat(stat.conn.cache_pages_inuse_leaf)
         self.assertLess(leaf_after, leaf_before,
-            'expected cache_pages_inuse_leaf to decrease after cache cleared')
+            'expected cache_pages_inuse_leaf to decrease after eviction')

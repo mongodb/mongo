@@ -751,6 +751,7 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
     WT_DECL_ITEM(current_buf);
     WT_DECL_ITEM(metadata_uri_buf);
     WT_DECL_RET;
+    WT_DISAGG_METADATA_OP *latest_entry;
     WT_DISAGG_STABLE_BTREE_IDS stable_btree_ids;
     WT_SHARED_METADATA_OP latest_op;
     WT_TIMER apply_timer;
@@ -961,7 +962,13 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
              * be a new layered table that we should pick up, but it could also mean that we have
              * already dropped the table locally and should not recreate it as a result.
              */
-            latest_op = __wti_disagg_table_latest_create_remove(session, current, &latest_epoch);
+            __wt_spin_lock(
+              session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
+            latest_entry = __wti_disagg_table_latest_create_remove(session, current);
+            latest_op = latest_entry == NULL ? WT_SHARED_METADATA_NONE : latest_entry->metadata_op;
+            latest_epoch = latest_entry == NULL ? WT_SCHEMA_EPOCH_NONE : latest_entry->schema_epoch;
+            __wt_spin_unlock(
+              session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
             if (strict &&
               (latest_op != WT_SHARED_METADATA_REMOVE || latest_epoch <= ckpt_schema_epoch))
                 WT_ERR_PANIC(session, EINVAL,
@@ -1024,7 +1031,13 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
              *
              * FIXME-WT-17746: Remove the local metadata entries for the dropped table.
              */
-            latest_op = __wti_disagg_table_latest_create_remove(session, current, &latest_epoch);
+            __wt_spin_lock(
+              session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
+            latest_entry = __wti_disagg_table_latest_create_remove(session, current);
+            latest_op = latest_entry == NULL ? WT_SHARED_METADATA_NONE : latest_entry->metadata_op;
+            latest_epoch = latest_entry == NULL ? WT_SCHEMA_EPOCH_NONE : latest_entry->schema_epoch;
+            __wt_spin_unlock(
+              session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
             if (strict &&
               (latest_op != WT_SHARED_METADATA_CREATE || latest_epoch <= ckpt_schema_epoch))
                 WT_ERR_PANIC(session, EINVAL,

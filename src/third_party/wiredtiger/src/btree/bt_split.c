@@ -1467,9 +1467,9 @@ __split_multi_inmem_mod_stats_update(WT_PAGE_MODIFY *mod, WT_PAGE_MODIFY *orig_m
      * Restore the previous page's modify state to avoid repeatedly attempting eviction on the same
      * page.
      */
-    mod->last_evict_pass_gen = orig_modify->last_evict_pass_gen;
-    mod->last_eviction_id = orig_modify->last_eviction_id;
-    mod->last_eviction_timestamp = orig_modify->last_eviction_timestamp;
+    mod->rec_evict_attempt_pass_gen = orig_modify->rec_evict_attempt_pass_gen;
+    mod->rec_evict_attempt_oldest_id = orig_modify->rec_evict_attempt_oldest_id;
+    mod->rec_evict_attempt_pinned_ts = orig_modify->rec_evict_attempt_pinned_ts;
     mod->rec_max_txn = orig_modify->rec_max_txn;
     mod->rec_max_timestamp = orig_modify->rec_max_timestamp;
     /*

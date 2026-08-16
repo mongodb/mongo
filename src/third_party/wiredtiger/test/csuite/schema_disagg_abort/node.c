@@ -89,13 +89,17 @@ disagg_opts_init(const TEST_CONFIG *cfg)
  *     Open this node's WiredTiger connection in the given disaggregated mode.
  */
 static void
-node_open(TEST_CONFIG *cfg, const char *disagg_mode, WT_CONNECTION **connp)
+node_open(WORKLOAD_STATE *state, const char *disagg_mode)
 {
     char node_home[32];
-    testutil_snprintf(node_home, sizeof(node_home), NODE_HOME_FMT, cfg->node_id);
+    testutil_snprintf(node_home, sizeof(node_home), NODE_HOME_FMT, state->cfg->node_id);
 
-    cfg->opts->disagg.mode = disagg_mode;
-    testutil_wiredtiger_open(cfg->opts, node_home, ENV_CONFIG_DEF, NULL, connp, false, false);
+    state->cfg->opts->disagg.mode = disagg_mode;
+    testutil_wiredtiger_open(
+      state->cfg->opts, node_home, ENV_CONFIG_DEF, NULL, &state->conn, false, false);
+
+    /* The page log outlives every role the node takes; the connection owns it either way. */
+    testutil_check(state->conn->get_page_log(state->conn, "palite", &state->page_log));
 }
 
 /*
@@ -237,12 +241,14 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->stop_stage = STAGE_NONE;
     state->handover_received = false;
     state->emitted = state->applied = 0;
+    state->stepdown_ts = state->stepdown_ckpt_lsn = 0;
 
     /* Reset workers' state. Note: tables' state survives role transitioning. */
     for (uint32_t i = 0; i < cfg->nth; i++) {
         state->workers[i].completed_ts = 0;
         state->workers[i].busy = false;
         state->workers[i].evq.head = state->workers[i].evq.tail = 0;
+        memset(state->workers[i].stepdown_insert, 0, sizeof(state->workers[i].stepdown_insert));
     }
 
     /* Re-seed the phase's worker and auxiliary streams. */
@@ -279,28 +285,15 @@ workload_stop(WORKLOAD_STATE *state)
 
 /*
  * node_step_down --
- *     Leader to follower. The term is quiesced and drained, so its final timestamp is the step-down
- *     boundary: nothing more will be committed or published. The checkpoint has to land on that
- *     boundary exactly - WiredTiger asserts it at the role change - and has to carry the epoch with
- *     it, since the step-down clears the shared metadata queue and loses any publish left behind.
- *
- * The reconfigure has to precede the hand-over: the page log allows one writer, so this node must
- *     already be a follower before the peer is told to step up. Without a live peer there is
- *     nothing to send and this node continues both sides itself.
+ *     Leader to follower.
  */
 static void
 node_step_down(WORKLOAD_STATE *state, uint64_t final_ts)
 {
     WT_CONNECTION *conn = state->conn;
-    WT_SESSION *session;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    if (final_ts != 0) {
-        set_ts(conn, "step_down_timestamp", final_ts);
-        set_frontier(conn, final_ts);
-    }
-    testutil_check(session->checkpoint(session, "use_timestamp=true"));
-    testutil_check(session->close(session, NULL));
+    /* Step-down transition must be done by now. */
+    testutil_assert(__wt_atomic_load_uint64(&state->stepdown_ts) != 0);
     testutil_check(conn->reconfigure(conn, "disaggregated=(role=follower)"));
 
     SCHEMA_EVENT ev = {0};
@@ -312,8 +305,10 @@ node_step_down(WORKLOAD_STATE *state, uint64_t final_ts)
         println("Node %" PRIu32 ": no peer to hand over to; continuing alone", state->cfg->node_id);
     }
 
-    /* Reset adopted checkpoint tracking. */
+    /* Reset adopted checkpoint and transition tracking. */
     state->adopted_ckpt_lsn = 0;
+    __wt_atomic_store_uint64(&state->stepdown_ts, 0);
+    __wt_atomic_store_uint64(&state->stepdown_ckpt_lsn, 0);
 }
 
 /*
@@ -384,6 +379,7 @@ node_run(TEST_CONFIG *cfg, WORKLOAD_STATE *state, const NODE_ROLE *role)
     } while (trigger != TRIGGER_STOP);
 
     /* The parent directed a graceful stop; the last phase is already quiesced. */
+    testutil_check(state->page_log->terminate(state->page_log, NULL));
     testutil_check(state->conn->close(state->conn, role->close_config));
     println("Node %" PRIu32 ": stopped gracefully as %s", cfg->node_id, role->name);
     return (EXIT_SUCCESS);
@@ -416,7 +412,7 @@ node_main(TEST_CONFIG *cfg)
     WORKLOAD_STATE *state = workload_state_create(cfg);
 
     const NODE_ROLE *role = node_role(cfg->start_leader);
-    node_open(cfg, role->name, &state->conn);
+    node_open(state, role->name);
     /*
      * Enter the epoch world before the workload can publish anything, on either role: a follower
      * publishes the operations it applies too. Timestamps start at the same point, so the first

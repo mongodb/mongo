@@ -39,9 +39,13 @@ class LayeredStepdownMixin:
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(oldest) +
                                 ',stable_timestamp=' + self.timestamp_str(stable))
 
-    # Set the planned step-down timestamp at the given cutoff.
-    def set_step_down_ts(self, ts):
-        self.conn.set_timestamp('step_down_timestamp=' + self.timestamp_str(ts))
+    # Set the planned step-down timestamp at the given cutoff. When schema epochs are in use the
+    # boundary must be declared in epoch space too, so pass the step-down epoch alongside.
+    def set_step_down_ts(self, ts, epoch=None):
+        config = 'step_down_timestamp=' + self.timestamp_str(ts)
+        if epoch is not None:
+            config += ',step_down_disaggregated_schema_epoch=' + self.timestamp_str(epoch)
+        self.conn.set_timestamp(config)
 
     # Complete a planned step-down: advance stable to the cutoff, take the step-down checkpoint
     # and demote to follower.
@@ -157,6 +161,13 @@ class LayeredStepdownMixin:
     def step_down_ts_is_set(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         value = stat_cursor[stat.conn.txn_stepdown_ts_set][2]
+        stat_cursor.close()
+        return value
+
+    # Whether the connection currently has a step-down disaggregated schema epoch set.
+    def step_down_epoch_is_set(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        value = stat_cursor[stat.conn.txn_stepdown_epoch_set][2]
         stat_cursor.close()
         return value
 

@@ -187,7 +187,10 @@ __drop_layered(
     WT_DECL_ITEM(ingest_uri_buf);
     WT_DECL_ITEM(stable_uri_buf);
     WT_DECL_RET;
+    char *stable_value;
     const char *ingest_uri, *stable_uri, *tablename;
+
+    stable_value = NULL;
 
     WT_UNUSED(force);
 
@@ -218,11 +221,16 @@ __drop_layered(
               uri);
     }
 
-    /* Remove all the associated metadata from shared metadata table. */
-    WT_SAVE_DHANDLE(session,
-      ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
-        WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true));
-    WT_ERR(ret);
+    /*
+     * Snapshot the stable table's configuration before the local metadata is removed. The shared
+     * metadata REMOVE enqueued below needs it for drop-size accounting, and by then the local rows
+     * are gone. The stable table may have no local row on a follower or for a table created after
+     * the step-down timestamp was set.
+     *
+     * FIXME-WT-18322: Read the size from the shared metadata table when the REMOVE is applied,
+     * removing the need for this snapshot.
+     */
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, stable_uri, &stable_value), false);
 
     /*
      * Drop the layered table constituents. The stable table may not exist locally: a follower never
@@ -248,9 +256,20 @@ __drop_layered(
      * No need for a meta track drop, since the top-level table has no underlying files to remove.
      */
 
+    /*
+     * Remove all the associated metadata from the shared metadata table. The queue entry is outside
+     * metadata tracking, so enqueue it only after the local drop can no longer fail. Should the
+     * enqueue itself fail, metadata tracking unrolls the local drop, keeping both sides consistent.
+     */
+    WT_SAVE_DHANDLE(session,
+      ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
+        WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, stable_value));
+    WT_ERR(ret);
+
 err:
     __wt_scr_free(session, &ingest_uri_buf);
     __wt_scr_free(session, &stable_uri_buf);
+    __wt_free(session, stable_value);
 
     return (ret);
 }

@@ -580,12 +580,6 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
     /* We just read the page and it's still locked. The append list should be empty. */
     WT_ASSERT(session, WT_COL_APPEND(page) == NULL);
 
-    /*
-     * The modify code marks the page dirty. Mark it back to clean as instantiated deleted page
-     * should be clean.
-     */
-    __wt_page_modify_clear(session, page);
-
 err:
     __wt_free(session, upd);
 
@@ -702,17 +696,17 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Give the page a modify structure. We need it to remember that the page has been instantiated.
      * We do not need to mark the page dirty here. (It used to be necessary because evicting a clean
-     * instantiated page would lose the delete information; but that is no longer the case.) Note
-     * though that because VLCS instantiation goes through col_modify it will mark the page dirty
-     * regardless, except in read-only trees where attempts to mark things dirty are ignored.
-     * Therefore, we explicitly mark it as clean. (Row- store instantiation adds the tombstones by
-     * hand and so does not need to mark the page dirty.)
+     * instantiated page would lose the delete information; but that is no longer the case.) VLCS
+     * instantiation goes through col_modify, which would otherwise dirty the page and the tree, so
+     * flag the page to keep the modify path from doing so. (Row-store instantiation adds the
+     * tombstones by hand and so does not need to mark the page dirty.)
      *
      * Note that partially visible truncates that may need instantiation can appear in read-only
      * trees (whether a read-only open of the live database or via a checkpoint cursor) if they were
      * not yet globally visible when the tree was checkpointed.
      */
     WT_RET(__wt_page_modify_init(session, page));
+    F_SET(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
 
     /*
      * If the truncate operation is not yet resolved and the btree is not read-only, count how many
@@ -737,7 +731,7 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
                 ++count;
             break;
         }
-        WT_RET(__wt_calloc_def(session, count + 1, &update_list));
+        WT_ERR(__wt_calloc_def(session, count + 1, &update_list));
     }
 
     /*
@@ -758,9 +752,7 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 
     page->modify->instantiated = true;
     page->modify->inst_updates = update_list;
-
-    /* The instantiated deleted page should be clean. */
-    WT_ASSERT(session, !__wt_page_is_modified(page));
+    update_list = NULL;
 
     /*
      * We will leave the WT_PAGE_DELETED structure in the ref; all of its information has been
@@ -768,9 +760,12 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
      * page reconciliation until the instantiated page is itself successfully reconciled.
      */
 
-    return (0);
-
 err:
+    F_CLR(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
+
+    /* The instantiated deleted page should be clean. */
+    WT_ASSERT(session, !__wt_page_is_modified(page));
+
     __wt_free(session, update_list);
     return (ret);
 }

@@ -97,6 +97,9 @@
 #define SWITCH_DONE_FMT "switch_done.%" PRIu32 /* the n-th switch completed */
 #define STOP_FILE "stop_run"                   /* parent directs a graceful stop */
 
+/* The follower's latest adopted checkpoint LSN; a stepping-down leader polls it. */
+#define ADOPTED_LSN_FILE "ckpt_adopted"
+
 /* Connection config. */
 #define ENV_CONFIG_DEF "create,statistics=(all),statistics_log=(json,on_close,wait=1)"
 
@@ -107,16 +110,7 @@ typedef enum { ROLE_PARENT = 0, ROLE_NODE } TEST_ROLE;
 typedef enum { KILL_LONE = 0, KILL_LEADER, KILL_FOLLOWER } KILL_TARGET;
 #define KILL_TARGETS 3
 
-/*
- * Events, the single currency both roles run on: the leader executes each one and relays it to its
- * peer, which executes it identically. A schema operation is split in two - the operation, then a
- * publish at a fresh epoch - so the independently paced checkpoints land between them, the window
- * this test targets.
- *
- * EVENT_SWITCH ends a term's stream, carrying the term's final counter value: a relay-integrity
- * check the receiver asserts against its own once drained, and the boundary the leaving leader arms
- * its step-down at.
- */
+/* Test-wide events. Leader sends them; follower receives them from the peer. */
 typedef enum {
     EVENT_NONE = 0,
     EVENT_CREATE,
@@ -124,6 +118,7 @@ typedef enum {
     EVENT_INSERT,
     EVENT_PUBLISH_CREATE,
     EVENT_PUBLISH_DROP,
+    EVENT_STEPDOWN,
     EVENT_SWITCH
 } EVENT_TYPE;
 
@@ -215,18 +210,20 @@ typedef struct {
  * Workload-engine state, one per node process, owned by node.c.
  */
 typedef struct {
-    TEST_CONFIG *cfg;    /* bound at creation */
-    WT_CONNECTION *conn; /* owned here; open for the node's life */
-    /*
-     * This phase leads: the generator produces the workload, checkpoint events are produced rather
-     * than picked up, and every applied event is relayed to the peer. Fixed per phase.
-     */
-    bool leads;
+    TEST_CONFIG *cfg;          /* bound at creation */
+    WT_CONNECTION *conn;       /* owned here; open for the node's life */
+    WT_PAGE_LOG *page_log;     /* owned here; held for the node's life */
+    bool leads;                /* this phase leads */
     bool generates;            /* this phase generates events into the self-pipe; fixed per phase */
     bool handover_received;    /* the term was handed over this phase; atomic access */
     uint32_t stop_stage;       /* how far the phase's shutdown has progressed; atomic access */
     uint64_t adopted_ckpt_lsn; /* skip re-adopting the same checkpoint; reset on role change */
     uint32_t switch_gen;       /* how many role transitions this node has completed */
+
+    /* Step-down state, zero outside a transition; atomic access. */
+    uint64_t stepdown_ts;       /* while set, the timestamp and checkpoint threads hold */
+    uint64_t stepdown_ckpt_lsn; /* the step-down checkpoint, once taken */
+    bool ts_busy;               /* the timestamp thread is mid-advance; atomic access */
 
     /* Single monotonic timestamp for schema epochs AND commit timestamps. */
     uint64_t current_ts;
@@ -242,6 +239,8 @@ typedef struct {
         uint64_t completed_ts; /* the latest published or committed timestamp; atomic access */
         /* Table state is carried across leader-follower transitions. */
         TABLE_STATE table_state[MAX_POOL_SIZE];
+        /* Slot took an insert while stepping down; not droppable until the step-down completes. */
+        bool stepdown_insert[MAX_POOL_SIZE];
     } workers[MAX_TH];
 
     /* The single-threaded stages, indexed by stage: generator, reader, checkpoint, timestamp. */
@@ -252,15 +251,11 @@ typedef struct {
 } WORKLOAD_STATE;
 
 /*
- * The checkpoint thread's bookkeeping for one phase. Thread-local: it lives on that thread's stack
- * and is handed to the role's checkpoint operation, so the engine holds no per-role state. Each
- * field belongs to one role only.
+ * The checkpoint thread's bookkeeping for one phase.
  */
 typedef struct {
-    WT_PAGE_LOG *page_log;       /* following: the page log checkpoints are picked up from */
-    bool picked_up;              /* following: the first pickup reported readiness */
-    struct timespec phase_start; /* leading: when the phase began, bounding the startup skip */
-    int produced;                /* leading: checkpoints produced so far */
+    uint32_t produced;           /* checkpoints produced so far */
+    struct timespec phase_start; /* when the phase began, used for checkpoint timeouts */
 } CKPT_CTX;
 
 /*
@@ -277,8 +272,10 @@ typedef struct {
 /* main.c */
 void println(const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
 uint64_t query_ts(WT_CONNECTION *conn, const char *name);
-void set_ts(WT_CONNECTION *conn, const char *name, uint64_t ts);
+void set_stepdown_ts(WT_CONNECTION *conn, uint64_t ts);
 void set_frontier(WT_CONNECTION *conn, uint64_t ts);
+void adopted_lsn_publish(uint32_t node_id, uint64_t lsn);
+uint64_t adopted_lsn_read(void);
 
 /* parent.c */
 void parent_main(TEST_CONFIG *cfg, const char *self_path);
@@ -317,6 +314,7 @@ WT_THREAD_RET thread_reader_run(void *arg);
 WT_THREAD_RET thread_ckpt_run(void *arg);
 WT_THREAD_RET thread_ts_run(void *arg);
 void ckpt_adopt_latest(WORKLOAD_STATE *state);
+bool ckpt_latest(WORKLOAD_STATE *state, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args);
 void leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
 void follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
 

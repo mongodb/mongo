@@ -1709,8 +1709,13 @@ __conn_startup_cleanup_and_verify(WT_CONNECTION_IMPL *conn, bool verify_meta)
         /*
          * If the user wants to verify WiredTiger metadata, verify the history store now that the
          * metadata table may have been salvaged and eviction has been started and recovery run.
+         *
+         * Hold the checkpoint lock, as WT_SESSION::verify does: a disaggregated follower judges a
+         * record against the oldest timestamp of the checkpoint it picked up, and that only
+         * describes the data store being walked while no other checkpoint can be picked up.
          */
-        WT_ERR(__wt_hs_verify(session));
+        WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_hs_verify(session));
+        WT_ERR(ret);
     }
 
     /* The chunk cache metadata table may exist on upgrade. Discard it. */

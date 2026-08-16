@@ -1463,6 +1463,7 @@ struct __wt_connection_stats {
     int64_t txn_set_ts_stable_disagg_epoch;
     int64_t txn_set_ts_stable_disagg_epoch_upd;
     int64_t txn_set_ts_stable_upd;
+    int64_t txn_stepdown_epoch_set;
     int64_t txn_stepdown_ts_set;
     int64_t txn_begin;
     int64_t txn_hs_ckpt_duration;

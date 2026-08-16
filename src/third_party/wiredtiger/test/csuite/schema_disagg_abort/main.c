@@ -55,14 +55,15 @@ query_ts(WT_CONNECTION *conn, const char *name)
 }
 
 /*
- * set_ts --
- *     Set one of the connection's timestamps from an integer.
+ * set_stepdown_ts --
+ *     Set connection's step-down timestamps.
  */
 void
-set_ts(WT_CONNECTION *conn, const char *name, uint64_t ts)
+set_stepdown_ts(WT_CONNECTION *conn, uint64_t ts)
 {
-    char config[64];
-    testutil_snprintf(config, sizeof(config), "%s=%" PRIx64, name, ts);
+    char config[128];
+    testutil_snprintf(config, sizeof(config),
+      "step_down_timestamp=%" PRIx64 ",step_down_disaggregated_schema_epoch=%" PRIx64, ts, ts);
     testutil_check(conn->set_timestamp(conn, config));
 }
 
@@ -81,6 +82,42 @@ set_frontier(WT_CONNECTION *conn, uint64_t ts)
       ",stable_disaggregated_schema_epoch=%" PRIx64,
       ts, ts, ts);
     testutil_check(conn->set_timestamp(conn, config));
+}
+
+/*
+ * adopted_lsn_publish --
+ *     Report the latest adopted checkpoint LSN for a stepping-down peer to wait on.
+ */
+void
+adopted_lsn_publish(uint32_t node_id, uint64_t lsn)
+{
+    /* Write to a temporary file first, so a reader never sees a partial value */
+    char tmp[64];
+    testutil_snprintf(tmp, sizeof(tmp), ADOPTED_LSN_FILE ".%" PRIu32, node_id);
+
+    FILE *fp;
+    testutil_assert_errno((fp = fopen(tmp, "w")) != NULL);
+    testutil_assert(fprintf(fp, "%" PRIu64 "\n", lsn) > 0);
+    testutil_check(fclose(fp));
+    /* Publish the LSN. */
+    testutil_assert_errno(rename(tmp, ADOPTED_LSN_FILE) == 0);
+}
+
+/*
+ * adopted_lsn_read --
+ *     Return the peer's last reported adopted checkpoint LSN; zero when none yet.
+ */
+uint64_t
+adopted_lsn_read(void)
+{
+    FILE *fp = fopen(ADOPTED_LSN_FILE, "r");
+    if (fp == NULL)
+        return (0);
+
+    uint64_t lsn = 0;
+    (void)fscanf(fp, "%" SCNu64, &lsn);
+    testutil_check(fclose(fp));
+    return (lsn);
 }
 
 /*

@@ -225,9 +225,9 @@ __reconcile_save_evict_state(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t fla
      * this state changes.
      */
     if (LF_ISSET(WT_REC_EVICT)) {
-        mod->last_eviction_id = oldest_id;
-        __wt_txn_pinned_timestamp(session, &mod->last_eviction_timestamp);
-        mod->last_evict_pass_gen =
+        mod->rec_evict_attempt_oldest_id = oldest_id;
+        __wt_txn_pinned_timestamp(session, &mod->rec_evict_attempt_pinned_ts);
+        mod->rec_evict_attempt_pass_gen =
           __wt_atomic_load_uint64_relaxed(&S2C(session)->evict->evict_pass_gen);
     }
 
@@ -236,8 +236,8 @@ __reconcile_save_evict_state(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t fla
      * Check that transaction time always moves forward for a given page. If this check fails,
      * reconciliation can free something that a future reconciliation will need.
      */
-    WT_ASSERT(session, mod->last_oldest_id <= oldest_id);
-    mod->last_oldest_id = oldest_id;
+    WT_ASSERT(session, mod->rec_last_oldest_id <= oldest_id);
+    mod->rec_last_oldest_id = oldest_id;
 #endif
 }
 
