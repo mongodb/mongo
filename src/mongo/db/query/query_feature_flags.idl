@@ -46,12 +46,6 @@ feature_flags:
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
 
-    featureFlagAggOutTimeseries:
-        description: "Feature flag for enabling support for $out to write to time-series collections"
-        cpp_varname: gFeatureFlagAggOutTimeseries
-        default: true
-        fcv_gated: false
-
     featureFlagTimeSeriesInSbe:
         description: "Feature flag to enable queries against time-series collections to execute in SBE"
         cpp_varname: gFeatureFlagTimeSeriesInSbe

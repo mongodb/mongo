@@ -432,18 +432,11 @@ void OutStage::initialize() {
                         _commonStats.stageTypeStr),
             !_originalOutCollInfo || _originalOutCollInfo->options["capped"].eoo());
 
-    uassert(7406100,
-            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
-
     createTemporaryCollection();
 }
 
 void OutStage::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
-    uassert(7406101,
-            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     // Rename the temporary collection to the namespace the user requested, and drop the target
     // collection if $out is writing to a collection that exists.
