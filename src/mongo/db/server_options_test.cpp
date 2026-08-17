@@ -1596,6 +1596,9 @@ private:
     const std::string _configName;
 };
 
+// In secure compilation mode the option is not registered at all, so there is nothing left to
+// exercise here: the parser rejects it before any of the validation below can run.
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
 class ExtensionsSignaturePubKeyPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
 public:
     ExtensionsSignaturePubKeyPathOptionTest()
@@ -1628,6 +1631,8 @@ TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistentFile) {
                                     ConfigSource::kCommandLine,
                                     {ErrorCodes::BadValue, "the provided file does not exist"});
 }
+
+#endif  // not MONGO_CONFIG_EXT_SIG_SECURE
 
 class ExtensionsConfigPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
 public:
