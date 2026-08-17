@@ -552,6 +552,113 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
     ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);
 }
 
+TEST_F(CurOpStatsTest, EndOfOpMetricsAccountForEveryAdmissionQueue) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
+
+    auto* executionAdmCtx = &ExecutionAdmissionContext::get(opCtx.get());
+    auto* ingressRequestAdmCtx = &IngressRequestAdmissionContext::get(opCtx.get());
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx.get());
+    auto* writeThrottleAdmCtx = &WriteThrottlerAdmissionContext::get(opCtx.get());
+
+    executionAdmCtx->setAdmission_forTest(2);
+    ingressRequestAdmCtx->setAdmission_forTest(3);
+    ingressAdmCtx->setAdmission_forTest(4);
+    writeThrottleAdmCtx->setAdmission_forTest(5);
+
+    ingressAdmCtx->recordLowAdmission();
+    ingressAdmCtx->recordOperationLoadShed();
+
+    Milliseconds executionTime{0};
+    addTicketQueueTime(executionAdmCtx, tickSource(), executionTime, Milliseconds(3));
+    addTicketQueueTime(ingressRequestAdmCtx, tickSource(), executionTime, Milliseconds(5));
+    addTicketQueueTime(ingressAdmCtx, tickSource(), executionTime, Milliseconds(6));
+    addTicketQueueTime(writeThrottleAdmCtx, tickSource(), executionTime, Milliseconds(7));
+
+    curop->ensureStarted();
+    curop->done();
+
+    curop->debug().getQueryStatsInfo().metricsRequested = true;
+    curop->setEndOfOpMetrics(0);
+
+    const auto& metrics = curop->debug().getAdditiveMetrics();
+    ASSERT_TRUE(metrics.totalTimeQueuedMicros.has_value());
+    ASSERT_EQ(*metrics.totalTimeQueuedMicros, Milliseconds(21));
+    ASSERT_TRUE(metrics.totalAdmissions.has_value());
+    ASSERT_EQ(*metrics.totalAdmissions, 14ULL);
+    ASSERT_TRUE(metrics.totalLowPriorityAdmissions.has_value());
+    ASSERT_EQ(*metrics.totalLowPriorityAdmissions, 1ULL);
+    ASSERT_TRUE(metrics.totalNormalPriorityAdmissions.has_value());
+    ASSERT_EQ(*metrics.totalNormalPriorityAdmissions, 13ULL);
+    ASSERT_TRUE(metrics.wasLoadShed.has_value());
+    ASSERT_TRUE(*metrics.wasLoadShed);
+}
+
+TEST_F(CurOpStatsTest, EndOfOpMetricsReportedWhenOnlyNonExecutionGatesAdmitted) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
+
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx.get());
+    ingressAdmCtx->setAdmission_forTest(1);
+    ASSERT_EQ(ExecutionAdmissionContext::get(opCtx.get()).getAdmissions(), 0);
+
+    Milliseconds executionTime{0};
+    addTicketQueueTime(ingressAdmCtx, tickSource(), executionTime, Milliseconds(4));
+
+    curop->ensureStarted();
+    curop->done();
+
+    curop->debug().getQueryStatsInfo().metricsRequested = true;
+    curop->setEndOfOpMetrics(0);
+
+    const auto& metrics = curop->debug().getAdditiveMetrics();
+    ASSERT_TRUE(metrics.totalTimeQueuedMicros.has_value());
+    ASSERT_EQ(*metrics.totalTimeQueuedMicros, Milliseconds(4));
+    ASSERT_TRUE(metrics.totalAdmissions.has_value());
+    ASSERT_EQ(*metrics.totalAdmissions, 1ULL);
+}
+
+TEST_F(CurOpStatsTest, CurrentOpSummarizesAdmissionStatsFromEveryQueue) {
+    auto opCtx = makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
+
+    auto* ingressAdmCtx = &IngressAdmissionContext::get(opCtx.get());
+    ingressAdmCtx->setAdmission_forTest(5);
+    ingressAdmCtx->recordOperationLoadShed();
+    auto* executionAdmCtx = &ExecutionAdmissionContext::get(opCtx.get());
+    executionAdmCtx->setAdmission_forTest(7);
+
+    Milliseconds executionTime{0};
+    addTicketQueueTime(ingressAdmCtx, tickSource(), executionTime, Milliseconds(2));
+    addTicketQueueTime(executionAdmCtx, tickSource(), executionTime, Milliseconds(5));
+
+    curop->ensureStarted();
+
+    BSONObjBuilder builder;
+    SerializationContext sc = SerializationContext::stateCommandReply();
+    sc.setPrefixState(false);
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportState(&builder, sc);
+    }
+    auto reported = builder.done();
+
+    ASSERT_TRUE(reported.hasField("totalAdmissions"));
+    ASSERT_EQ(reported["totalAdmissions"].numberInt(), 12);
+    ASSERT_EQ(reported["totalTimeQueuedMicros"].numberLong(),
+              durationCount<Microseconds>(Milliseconds(7)));
+    ASSERT_TRUE(reported["wasLoadShed"].Bool());
+}
+
 TEST_F(CurOpStatsTest, ProfilerEntryReportsAdmissionQueueStats) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);

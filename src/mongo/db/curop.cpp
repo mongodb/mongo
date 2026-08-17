@@ -56,6 +56,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 #include <tuple>
 
@@ -175,6 +176,25 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                               dbName, SerializationContext::stateCommandReply(sc)))
                                          .firstElement());
     return newCmdObj;
+}
+
+struct AggregateAdmissionStats {
+    std::int32_t admissions = 0;
+    std::int32_t lowPriorityAdmissions = 0;
+    Microseconds totalTimeQueued{0};
+    bool loadShed = false;
+};
+
+AggregateAdmissionStats sumAdmissionStatsAcrossGates(OperationContext* opCtx) {
+    AggregateAdmissionStats stats;
+    for (auto&& [queueType, lookup] : TicketHolderQueueStats::getQueueMetricsRegistry()) {
+        const AdmissionContext* admCtx = lookup(opCtx);
+        stats.admissions += admCtx->getAdmissions();
+        stats.lowPriorityAdmissions += admCtx->getLowAdmissions();
+        stats.totalTimeQueued += admCtx->totalTimeQueuedMicros();
+        stats.loadShed = stats.loadShed || admCtx->getLoadShed();
+    }
+    return stats;
 }
 }  // namespace
 
@@ -508,20 +528,22 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
                          admCtx.getMaxAcquisitionDelinquencyMillis())};
         }
 
-        if (admCtx.getAdmissions() > 0) {
+        const auto admissionStats = sumAdmissionStatsAcrossGates(opCtx());
+        if (admissionStats.admissions > 0) {
             metrics.totalTimeQueuedMicros =
                 metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
-                admCtx.totalTimeQueuedMicros();
-            metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
+                admissionStats.totalTimeQueued;
+            metrics.totalAdmissions =
+                metrics.totalAdmissions.value_or(0) + admissionStats.admissions;
             // Low priority admissions come from AdmissionContext::getLowAdmissions().
             // Normal priority admissions = total - low.
-            auto lowAdmissions = admCtx.getLowAdmissions();
-            auto normalAdmissions = admCtx.getAdmissions() - lowAdmissions;
+            auto lowAdmissions = admissionStats.lowPriorityAdmissions;
+            auto normalAdmissions = admissionStats.admissions - lowAdmissions;
             metrics.totalNormalPriorityAdmissions =
                 metrics.totalNormalPriorityAdmissions.value_or(0) + normalAdmissions;
             metrics.totalLowPriorityAdmissions =
                 metrics.totalLowPriorityAdmissions.value_or(0) + lowAdmissions;
-            metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
+            metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admissionStats.loadShed;
             metrics.wasDeprioritized =
                 metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
             metrics.wasMarkedNonDeprioritizable =
@@ -1234,10 +1256,11 @@ void CurOp::reportState(BSONObjBuilder* builder,
             BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
             OpDebug::appendDelinquentInfo(opCtx, sub);
         }
-        if (admCtx.getAdmissions() > 0) {
-            builder->append("totalTimeQueuedMicros", admCtx.totalTimeQueuedMicros().count());
-            builder->append("totalAdmissions", admCtx.getAdmissions());
-            builder->append("wasLoadShed", admCtx.getLoadShed());
+        const auto admissionStats = sumAdmissionStatsAcrossGates(opCtx);
+        if (admissionStats.admissions > 0) {
+            builder->append("totalTimeQueuedMicros", admissionStats.totalTimeQueued.count());
+            builder->append("totalAdmissions", admissionStats.admissions);
+            builder->append("wasLoadShed", admissionStats.loadShed);
             builder->append("wasDeprioritized", admCtx.getPriorityLowered());
         }
     }
