@@ -287,6 +287,13 @@ public:
      * Creates and returns a new policy that governs checkpoint scheduling for this provider.
      */
     virtual std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const = 0;
+
+    /**
+     * Reports the current number of active layered data handles to any provider-specific metrics
+     * sink. Default is a no-op; only providers that expose a metric derived from this count
+     * override it.
+     */
+    virtual void reportLayeredDataHandleCount(int64_t count) const {}
 };
 
 }  // namespace rss
