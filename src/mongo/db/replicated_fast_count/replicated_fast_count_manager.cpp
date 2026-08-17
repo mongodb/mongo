@@ -375,8 +375,10 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
                 opCtx, *shard_role_details::getRecoveryUnit(opCtx));
             // We pass the oplog UUID here to include the oplog's own size and count in the
             // aggregation.
-            return aggregateReplicatedMetadataDeltasInOplog(
-                *oplogCursor, *seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
+            return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
+                                                            *seekAfterTimestamp,
+                                                            oplogColl->uuid(),
+                                                            /*isCheckpoint=*/false);
         }();
 
         for (const auto& [uuid, delta] : scanResult.deltas) {
@@ -458,8 +460,10 @@ void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContex
                 opCtx, *shard_role_details::getRecoveryUnit(opCtx));
             // Pass the oplog UUID so the oplog's own size and count are included in the
             // aggregation.
-            return aggregateReplicatedMetadataDeltasInOplog(
-                *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
+            return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
+                                                            seekAfterTimestamp,
+                                                            oplogColl->uuid(),
+                                                            /*isCheckpoint=*/false);
         }();
         for (const auto& [uuid, delta] : scanResult.deltas) {
             deltasByUuid[uuid].count += delta.metadata.sizeCount.count;

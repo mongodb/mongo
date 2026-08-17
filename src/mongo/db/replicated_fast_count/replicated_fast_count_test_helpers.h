@@ -378,7 +378,8 @@ struct NsAndUUID {
 repl::OplogEntry makeOplogEntry(Timestamp ts,
                                 NsAndUUID userColl,
                                 repl::OpTypeEnum opType,
-                                int32_t sizeDelta);
+                                int32_t sizeDelta,
+                                boost::optional<int64_t> hash = boost::none);
 repl::OplogEntry makeOplogEntry(Timestamp ts, NsAndUUID userColl, repl::OpTypeEnum opType);
 
 /**

@@ -93,17 +93,16 @@ CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry
                                .count = -truncateRangeEntry.getDocsDeleted()};
 }
 
-// Updates the 'replicatedMetadataDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
-void recordCollectionSizeCountDelta(const UUID& uuid,
-                                    const CollectionSizeCount& sizeCountDelta,
-                                    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+// Updates the 'replicatedMetadataDeltasOut' to track the new 'metadataDelta' for 'uuid'.
+void recordCollectionReplicatedMetadataDelta(
+    const UUID& uuid,
+    const CollectionReplicatedMetadata& metadataDelta,
+    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
-        uuid,
-        ReplicatedMetadataDelta{.metadata = {.sizeCount = sizeCountDelta},
-                                .state = DDLState::kNone});
+        uuid, ReplicatedMetadataDelta{.metadata = metadataDelta, .state = DDLState::kNone});
     if (!inserted) {
         // Entry exists, so update as needed.
-        it->second.metadata.sizeCount = it->second.metadata.sizeCount + sizeCountDelta;
+        it->second.metadata = it->second.metadata + metadataDelta;
     }
 }
 
@@ -111,15 +110,17 @@ void recordCollectionImport(const UUID& uuid,
                             const ImportCollectionOplogEntry& importEntry,
                             ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
 
-    const CollectionSizeCount importedSizeCount{.size = importEntry.getDataSize(),
-                                                .count = importEntry.getNumRecords()};
+    // Importing a collection means that we have a pre-existing collection without hashes, so we
+    // need to invalidate the collection hash.
+    const CollectionReplicatedMetadata importedMetadata{
+        .sizeCount = {.size = importEntry.getDataSize(), .count = importEntry.getNumRecords()},
+        .hash = boost::none};
 
     auto it = replicatedMetadataDeltasOut.find(uuid);
     if (it == replicatedMetadataDeltasOut.end()) {
         replicatedMetadataDeltasOut.emplace(
             uuid,
-            ReplicatedMetadataDelta{.metadata = {.sizeCount = importedSizeCount},
-                                    .state = DDLState::kCreated});
+            ReplicatedMetadataDelta{.metadata = importedMetadata, .state = DDLState::kCreated});
         return;
     }
 
@@ -129,16 +130,18 @@ void recordCollectionImport(const UUID& uuid,
             "Encountered writes to a collection before it was imported",
             it->second.state == DDLState::kDropped);
 
-    it->second = ReplicatedMetadataDelta{.metadata = {.sizeCount = importedSizeCount},
+    it->second = ReplicatedMetadataDelta{.metadata = importedMetadata,
                                          .state = DDLState::kDroppedAndRecreated};
 }
 
 void recordCollectionCreate(const UUID& uuid,
                             ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    // A collection created empty has folded in no document hashes, so its hash is the identity.
     auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
         uuid,
         ReplicatedMetadataDelta{
-            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                         .hash = kEmptyCollectionValidationHash},
             .state = DDLState::kCreated});
     massert(12054100, "Encountered writes to a collection before it was created", inserted);
 }
@@ -166,16 +169,22 @@ void recordCollectionCreateFromMigrate(const repl::OplogEntry& entry,
     //  expects no prior entry for kCreated.
     //  2. readAndIncrementReplicatedMetadata() knows not to increment this ReplicatedMetadataDelta
     //  entry with the stale persisted size/count of this collection before it was dropped.
+    // Re-created empty by the migration, so the hash restarts from wherever a fresh create would
+    // start it.
     it->second = ReplicatedMetadataDelta{
-        .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+        .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                     .hash = kEmptyCollectionValidationHash},
         .state = DDLState::kDroppedAndRecreated};
 }
 
 void recordCollectionDrop(const UUID& uuid, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    // A dropped collection has no contents to hash, and the store entry is removed at checkpoint
+    // time.
     auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
         uuid,
         ReplicatedMetadataDelta{
-            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
+            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                         .hash = boost::none},
             .state = DDLState::kDropped});
     if (!inserted) {
         if (it->second.state == DDLState::kCreated) {
@@ -189,16 +198,16 @@ void recordCollectionDrop(const UUID& uuid, ReplicatedMetadataDeltas& replicated
 }
 
 template <OpSizeCountExtractable T>
-boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op) {
+boost::optional<CollectionReplicatedMetadata> extractReplicatedMetadataForOpImpl(const T& op) {
     const auto& sizeMd = op.getSizeMetadata();
     if (!sizeMd) {
         return boost::none;
     }
 
     const auto* perOpMd = std::get_if<SingleOpSizeMetadata>(&sizeMd.value());
-    if (!perOpMd || !perOpMd->getSz()) {
-        // Return boost::none if the oplog entry has no size metadata or if the size metadata does
-        // not contain a size delta.
+    if (!perOpMd) {
+        // Multi-op metadata on an entry for a single operation is malformed, so this operation's
+        // contribution cannot be determined.
         return boost::none;
     }
 
@@ -223,6 +232,32 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
         return boost::none;
     }
 
+    if (!perOpMd->getSz()) {
+        if (perOpMd->getH()) {
+            // Continuous internode validation has a strict dependency on replicated fast count,
+            // meaning that if the sz is absent, the hash should be absent too.
+            LOGV2_WARNING(13321400,
+                          "Unexpected input: Size metadata carries a document hash with no size "
+                          "delta",
+                          "ns"_attr = op.getNss().toStringForErrorMsg(),
+                          "opTime"_attr = opTimeStringForLog(op),
+                          "oplogEntry"_attr = redact(toBSONForLog(op)));
+            // The document hash is still this operation's real contribution to the collection hash,
+            // so it is folded in against a zero size and count delta.
+            //
+            // A UUID is required because callers attribute the returned delta to one; without it
+            // there is no collection to fold into.
+            if (op.getUuid()) {
+                return CollectionReplicatedMetadata{.sizeCount =
+                                                        CollectionSizeCount{.size = 0, .count = 0},
+                                                    .hash = perOpMd->getH()};
+            }
+        }
+        // An absent size delta means the entry is opting out of size and count tracking, so there
+        // is nothing to record for it.
+        return boost::none;
+    }
+
     massert(12116001,
             str::stream() << "Unexpected input: Missing `ui` field for "
                           << op.getNss().toStringForErrorMsg()
@@ -230,7 +265,9 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
                           << ", entry opTime: " << opTimeStringForLog(op),
             op.getUuid().has_value());
 
-    return CollectionSizeCount{.size = *perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
+    return CollectionReplicatedMetadata{
+        .sizeCount = {.size = *perOpMd->getSz(), .count = computeCountDeltaForOp(opType)},
+        .hash = perOpMd->getH()};
 }
 
 boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) {
@@ -264,9 +301,13 @@ int extractReplicatedMetadataDeltasForCommitTxn(
     const auto& multiMd = std::get<std::vector<MultiOpSizeMetadata>>(sizeMd.value());
     int processed = 0;
     for (const auto& meta : multiMd) {
-        recordCollectionSizeCountDelta(
+        // TODO SERVER-131796: Fold the transaction's accumulated hash in from MultiOpSizeMetadata's
+        // `h` field.
+        recordCollectionReplicatedMetadataDelta(
             meta.getUuid(),
-            CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
+            CollectionReplicatedMetadata{
+                .sizeCount = CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
+                .hash = boost::none},
             replicatedMetadataDeltasOut);
         ++processed;
     }
@@ -302,7 +343,14 @@ int processOplogEntry(const repl::OplogEntry& entry,
             const auto delta = extractSizeCountDeltaForTruncateRange(entry);
             // Truncation returns an estimate on the number of records and bytes that were removed.
             // We accept that size and count might be slightly off after performing truncation.
-            recordCollectionSizeCountDelta(*entryUuid, delta, replicatedMetadataDeltasOut);
+            //
+            // The entry does not carry the hashes of the records it removed, so their contributions
+            // cannot be folded back out. Leaving the hash absent invalidates the hash to be
+            // persisted for this collection.
+            recordCollectionReplicatedMetadataDelta(
+                *entryUuid,
+                CollectionReplicatedMetadata{.sizeCount = delta, .hash = boost::none},
+                replicatedMetadataDeltasOut);
             return 1;
         }
         case repl::OplogEntry::CommandType::kCreate:
@@ -320,8 +368,8 @@ int processOplogEntry(const repl::OplogEntry& entry,
             break;
     }
 
-    if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
-        recordCollectionSizeCountDelta(*entryUuid, *delta, replicatedMetadataDeltasOut);
+    if (auto delta = extractReplicatedMetadataForOp(entry); delta.has_value()) {
+        recordCollectionReplicatedMetadataDelta(*entryUuid, *delta, replicatedMetadataDeltasOut);
         return 1;
     }
 
@@ -336,26 +384,27 @@ void mergeDeltas(const ReplicatedMetadataDeltas& src, ReplicatedMetadataDeltas& 
                 delta.state != DDLState::kDropped);
         if (delta.state == DDLState::kCreated) {
             recordCollectionCreate(uuid, dst);
-            if (delta.metadata.sizeCount.size != 0 || delta.metadata.sizeCount.count != 0) {
-                recordCollectionSizeCountDelta(uuid, delta.metadata.sizeCount, dst);
+            if (delta.metadata.sizeCount.size != 0 || delta.metadata.sizeCount.count != 0 ||
+                delta.metadata.hash != kEmptyCollectionValidationHash) {
+                recordCollectionReplicatedMetadataDelta(uuid, delta.metadata, dst);
             }
         } else {
-            recordCollectionSizeCountDelta(uuid, delta.metadata.sizeCount, dst);
+            recordCollectionReplicatedMetadataDelta(uuid, delta.metadata, dst);
         }
     }
 }
 
-boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
+boost::optional<CollectionReplicatedMetadata> extractReplicatedMetadataForOp(
     const repl::OplogEntry& oplogEntry) {
-    return extractSizeCountDeltaForOpImpl(oplogEntry);
+    return extractReplicatedMetadataForOpImpl(oplogEntry);
 }
 
 template <OpSizeCountExtractable T>
 std::vector<MultiOpSizeMetadata> aggregateMultiOpSizeMetadataImpl(const std::vector<T>& ops) {
     ReplicatedMetadataDeltas deltas;
     for (const auto& op : ops) {
-        if (auto delta = extractSizeCountDeltaForOpImpl(op)) {
-            recordCollectionSizeCountDelta(*op.getUuid(), *delta, deltas);
+        if (auto delta = extractReplicatedMetadataForOpImpl(op)) {
+            recordCollectionReplicatedMetadataDelta(*op.getUuid(), *delta, deltas);
         }
     }
 

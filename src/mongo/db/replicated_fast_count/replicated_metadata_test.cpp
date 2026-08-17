@@ -50,7 +50,7 @@ TEST(CollectionReplicatedMetadataTest, AddingTheSameHashTwiceCancels) {
     EXPECT_EQ(empty, (empty + insert) + remove);
 }
 
-TEST(CollectionReplicatedMetadataTest, AbsentHashPoisonsOnBothSides) {
+TEST(CollectionReplicatedMetadataTest, AbsentHashInvalidatesOnBothSides) {
     const CollectionReplicatedMetadata tracked{.sizeCount = {.size = 10, .count = 1}, .hash = 42};
     const CollectionReplicatedMetadata untracked{.sizeCount = {.size = 10, .count = 1},
                                                  .hash = boost::none};
@@ -62,7 +62,7 @@ TEST(CollectionReplicatedMetadataTest, AbsentHashPoisonsOnBothSides) {
     EXPECT_FALSE((untracked + untracked).hash);
 }
 
-// Absence is sticky: once poisoned, folding in tracked deltas cannot resurrect the hash.
+// Absence is sticky: once the hash is invalidated, folding in tracked deltas cannot restore it.
 TEST(CollectionReplicatedMetadataTest, AbsentHashIsNotResurrectedByLaterDeltas) {
     CollectionReplicatedMetadata accumulated{.sizeCount = {.size = 0, .count = 0}, .hash = 0};
     accumulated = accumulated +

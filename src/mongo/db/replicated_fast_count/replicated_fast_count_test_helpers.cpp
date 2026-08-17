@@ -706,9 +706,11 @@ absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
 
 
 namespace {
-repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta,
+                                                       boost::optional<int64_t> hash) {
     SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
+    m.setH(hash);
     return m;
 }
 }  // namespace
@@ -716,14 +718,15 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDel
 repl::OplogEntry makeOplogEntry(Timestamp ts,
                                 NsAndUUID userColl,
                                 repl::OpTypeEnum opType,
-                                int32_t sizeDelta) {
+                                int32_t sizeDelta,
+                                boost::optional<int64_t> hash) {
     return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(ts, 1),
         .opType = opType,
         .nss = userColl.nss,
         .uuid = userColl.uuid,
         .oField = BSONObj(),
-        .sizeMetadata = makeOperationSizeMetadata(sizeDelta),
+        .sizeMetadata = makeOperationSizeMetadata(sizeDelta, hash),
         .wallClockTime = Date_t::now(),
     }};
 }

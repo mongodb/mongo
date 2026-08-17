@@ -14,6 +14,8 @@
 
 namespace mongo {
 
+inline constexpr int64_t kEmptyCollectionValidationHash = 0;
+
 /**
  * Combines two validation hashes with XOR, which is its own inverse: folding a contribution in and
  * back out again restores the original value, and the order of the contributions does not matter.
@@ -62,8 +64,6 @@ inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& coll
 struct CollectionReplicatedMetadata {
     CollectionSizeCount sizeCount;
 
-    // Only populated when featureFlagContinuousInternodeValidationPerCollection is enabled. Absent
-    // means the collection is not being tracked.
     boost::optional<int64_t> hash;
 
     bool operator==(const CollectionReplicatedMetadata&) const = default;

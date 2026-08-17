@@ -26,6 +26,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <string_view>
 
@@ -275,75 +277,342 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
 // Helpers for constructing oplog entries with size metadata.
 // ---------------------------------------------------------------------------
 
-repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(
+    int32_t replicatedSizeDelta, boost::optional<int64_t> hash = boost::none) {
     SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
+    m.setH(hash);
     return m;
 }
 
 repl::OplogEntry makeOplogEntryWithSizeMetadata(const NamespaceString& nss,
                                                 repl::OpTypeEnum opType,
-                                                int32_t sizeDelta) {
+                                                int32_t sizeDelta,
+                                                boost::optional<int64_t> hash = boost::none,
+                                                boost::optional<UUID> uuid = boost::none) {
 
-    auto sizeMetadata = makeOperationSizeMetadata(sizeDelta);
+    auto sizeMetadata = makeOperationSizeMetadata(sizeDelta, hash);
     return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(),
         .opType = opType,
         .nss = nss,
-        .uuid = UUID::gen(),
+        .uuid = uuid.value_or(UUID::gen()),
         .oField = BSONObj(),
         .sizeMetadata = sizeMetadata,
         .wallClockTime = Date_t::now(),
     }};
 }
 
+// Builds an entry for a single operation whose size metadata is the multi-op form. That form is
+// only valid on a commitTransaction entry, so the operation's contribution cannot be determined and
+// it makes the collection's hash untrackable.
+repl::OplogEntry makeOplogEntryWithMultiOpSizeMetadata(const NamespaceString& nss,
+                                                       boost::optional<UUID> uuid) {
+    MultiOpSizeMetadata multiOpMetadata;
+    multiOpMetadata.setUuid(uuid.value_or(UUID::gen()));
+    multiOpMetadata.setSz(0);
+    multiOpMetadata.setCt(0);
+    const repl::OplogEntrySizeMetadata sizeMetadata{
+        std::vector<MultiOpSizeMetadata>{multiOpMetadata}};
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = nss,
+        .uuid = uuid,
+        .oField = BSONObj(),
+        .sizeMetadata = sizeMetadata,
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+// Builds an entry whose size metadata carries neither a size delta nor a document hash. Nothing of
+// the operation's contribution can be read, so it invalidates the collection's hash.
+repl::OplogEntry makeOplogEntryWithEmptySizeMetadata(const NamespaceString& nss,
+                                                     boost::optional<UUID> uuid) {
+    const repl::OplogEntrySizeMetadata sizeMetadata = SingleOpSizeMetadata{};
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = nss,
+        .uuid = uuid,
+        .oField = BSONObj(),
+        .sizeMetadata = sizeMetadata,
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+// Builds an entry whose size metadata carries a document hash but no size delta. The operation's
+// contribution cannot be determined, so it makes the collection's hash untrackable.
+repl::OplogEntry makeOplogEntryWithHashButNoSizeDelta(const NamespaceString& nss,
+                                                      boost::optional<UUID> uuid,
+                                                      int64_t hash) {
+    SingleOpSizeMetadata perOpMetadata;
+    perOpMetadata.setH(hash);
+    const repl::OplogEntrySizeMetadata sizeMetadata = perOpMetadata;
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = nss,
+        .uuid = uuid,
+        .oField = BSONObj(),
+        .sizeMetadata = sizeMetadata,
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+// Builds an entry with neither size metadata nor a UUID, like the periodic noop.
+repl::OplogEntry makeOplogEntryWithoutSizeMetadataOrUuid(const NamespaceString& nss,
+                                                         repl::OpTypeEnum opType) {
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = opType,
+        .nss = nss,
+        .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
 // ===========================================================================
-// Test fixture for extractSizeCountDeltaForOp() -- lightweight, no real writes.
+// Test fixture for extractReplicatedMetadataForOp() -- lightweight, no real writes.
 // ===========================================================================
 
-class ExtractSizeCountDeltaTest : public CatalogTestFixture {
+class ExtractReplicatedMetadataTest : public CatalogTestFixture {
 protected:
     NamespaceString _nss1 = NamespaceString::createNamespaceString_forTest(
         "replicated_fast_count_delta_utils_test", "coll1");
 };
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForInsert) {
+// Extraction always reads the hash off the size metadata.
+using ExtractCollectionHashTest = ExtractReplicatedMetadataTest;
+
+TEST_F(ExtractReplicatedMetadataTest, NoMetadataForSizeMetadataWithoutSizeDelta) {
+    // Size metadata carrying no size delta is opting out of size and count tracking, so the entry
+    // is skipped outright and its collection stays out of the accumulated deltas.
+    const auto op = makeOplogEntryWithEmptySizeMetadata(_nss1, UUID::gen());
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+
+    ReplicatedMetadataDeltas deltas;
+    EXPECT_EQ(0, processOplogEntry(op, deltas));
+    EXPECT_TRUE(deltas.empty());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, NoMetadataForOpOptingOutOfSizeCountTracking) {
+    // An entry with no size metadata at all is opting out of size and count tracking, so it is
+    // skipped outright rather than treated as a contribution we failed to read.
+    const auto noopOp = makeOplogEntryWithoutSizeMetadataOrUuid(_nss1, repl::OpTypeEnum::kNoop);
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(noopOp).has_value());
+
+    ReplicatedMetadataDeltas deltas;
+    EXPECT_EQ(processOplogEntry(noopOp, deltas), 0);
+    EXPECT_TRUE(deltas.empty());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, HashCarriedWithoutSizeDeltaIsReportedAndFolded) {
+    // An entry carrying a hash with no size delta is reported rather than being fatal, because it
+    // is durable in the oplog. The hash is still the operation's real contribution, so it is folded
+    // in against a zero size and count delta. The log id is asserted because log ingestion is what
+    // surfaces this.
+    const int64_t hash = 0x0123456789abcdef;
+    const auto op = makeOplogEntryWithHashButNoSizeDelta(_nss1, UUID::gen(), hash);
+
+    unittest::LogCaptureGuard logs;
+    const auto extracted = extractReplicatedMetadataForOp(op);
+    logs.stop();
+
+    ASSERT_TRUE(extracted.has_value());
+    EXPECT_EQ(extracted->sizeCount, (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(extracted->hash, hash);
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13321400)), 1);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, HashCarriedWithoutSizeDeltaOrUuidIsSkipped) {
+    // Without a UUID there is no collection to attribute the hash to, and callers dereference the
+    // entry's UUID as soon as a value is returned.
+    const auto op = makeOplogEntryWithHashButNoSizeDelta(_nss1, boost::none, 0x0123456789abcdef);
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, NoMetadataWhenSingleOpEntryCarriesMultiOpMetadata) {
+    // Multi-op metadata on an entry for a single operation is malformed, so there is nothing to
+    // record for it.
+    const auto op = makeOplogEntryWithMultiOpSizeMetadata(_nss1, UUID::gen());
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, HashWithoutSizeDeltaOnIneligibleNamespaceIsSkipped) {
+    // The size-metadata contract only binds operations whose hash would be folded in. An entry for
+    // a namespace fast count never tracks is skipped rather than being treated as malformed, so
+    // reaching the end of this test at all is the assertion.
+    const auto ineligibleNss =
+        NamespaceString::createNamespaceString_forTest("mydb", "system.profile");
+    ASSERT_FALSE(isReplicatedFastCountEligible(ineligibleNss));
+    const auto op =
+        makeOplogEntryWithHashButNoSizeDelta(ineligibleNss, UUID::gen(), 0x0123456789abcdef);
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, NoMetadataForIneligibleNamespaceCarryingHash) {
+    // A namespace fast count never tracks has no hash to accumulate, so an entry for it is skipped
+    // outright rather than contributing its hash to anything.
+    const auto ineligibleNss =
+        NamespaceString::createNamespaceString_forTest("mydb", "system.profile");
+    const auto op = makeOplogEntryWithSizeMetadata(
+        ineligibleNss, repl::OpTypeEnum::kInsert, 400, int64_t{0x0123456789abcdef}, UUID::gen());
+
+    EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+
+    ReplicatedMetadataDeltas deltas;
+    EXPECT_EQ(0, processOplogEntry(op, deltas));
+    EXPECT_TRUE(deltas.empty());
+}
+
+TEST_F(ExtractReplicatedMetadataTest, OpWithoutHashInvalidatesAccumulatedHash) {
+    // A collection accumulates a hash, then an operation that carries none arrives. The accumulated
+    // hash must go absent rather than stay at a value that is now missing a contribution, while the
+    // size and count keep accumulating.
+    const auto uuid = UUID::gen();
+    const int32_t sizeDelta = 400;
+    const int64_t hash = 0x0123456789abcdef;
+
+    ReplicatedMetadataDeltas deltas;
+    const auto insertOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, sizeDelta, hash, uuid);
+    EXPECT_EQ(1, processOplogEntry(insertOp, deltas));
+    ASSERT_TRUE(deltas.contains(uuid));
+    EXPECT_EQ(hash, deltas.at(uuid).metadata.hash);
+
+    const auto opWithoutHash = makeOplogEntryWithSizeMetadata(
+        _nss1, repl::OpTypeEnum::kInsert, sizeDelta, boost::none, uuid);
+    processOplogEntry(opWithoutHash, deltas);
+
+    EXPECT_FALSE(deltas.at(uuid).metadata.hash);
+    EXPECT_EQ(2 * sizeDelta, deltas.at(uuid).metadata.sizeCount.size);
+    EXPECT_EQ(2, deltas.at(uuid).metadata.sizeCount.count);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, InvalidatedHashIsNotResurrectedByLaterOps) {
+    // Absence is absorbing: once a contribution has been lost, folding in later operations that do
+    // carry a hash must not produce a value again.
+    const auto uuid = UUID::gen();
+    ReplicatedMetadataDeltas deltas;
+
+    processOplogEntry(
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, 400, boost::none, uuid),
+        deltas);
+    processOplogEntry(makeOplogEntryWithSizeMetadata(
+                          _nss1, repl::OpTypeEnum::kInsert, 400, int64_t{0x2222}, uuid),
+                      deltas);
+
+    EXPECT_FALSE(deltas.at(uuid).metadata.hash);
+    EXPECT_EQ(800, deltas.at(uuid).metadata.sizeCount.size);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaForInsert) {
     const int32_t sizeDelta = 400;
     const auto insertOp =
         makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Insert means count increases by 1.
-    EXPECT_EQ(1, extractedSizeCount->count);
-    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(1, extractedSizeCount->sizeCount.count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->sizeCount.size);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForUpdate) {
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaForUpdate) {
     const int32_t sizeDelta = 400;
     const auto insertOp =
         makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kUpdate, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Updates imply no new documents, count delta is 0.
-    EXPECT_EQ(0, extractedSizeCount->count);
-    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(0, extractedSizeCount->sizeCount.count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->sizeCount.size);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForDelete) {
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaForDelete) {
     const int32_t sizeDelta = 400;
     const auto insertOp =
         makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kDelete, sizeDelta);
-    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
     // Delete implies one less document.
-    EXPECT_EQ(-1, extractedSizeCount->count);
-    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(-1, extractedSizeCount->sizeCount.count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->sizeCount.size);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnInsert) {
+TEST_F(ExtractCollectionHashTest, ExtractHashForInsert) {
+    const int64_t hash = 0x0123456789abcdef;
+    const auto insertOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, 400 /* sizeDelta */, hash);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    EXPECT_EQ(hash, extractedSizeCount->hash);
+}
+
+TEST_F(ExtractCollectionHashTest, ExtractHashForUpdate) {
+    // For updates, 'h' is already the pre-image hash XOR-ed with the post-image hash, so it is
+    // surfaced unchanged.
+    const int64_t hash = 0x0123456789abcdef;
+    const auto updateOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kUpdate, 400 /* sizeDelta */, hash);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(updateOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    EXPECT_EQ(hash, extractedSizeCount->hash);
+}
+
+TEST_F(ExtractCollectionHashTest, ExtractHashForDelete) {
+    // For deletes, 'h' is the pre-image hash, and XOR-ing it back out removes the document's
+    // contribution, so it is surfaced unchanged as well.
+    const int64_t hash = 0x0123456789abcdef;
+    const auto deleteOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kDelete, 400 /* sizeDelta */, hash);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(deleteOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    EXPECT_EQ(hash, extractedSizeCount->hash);
+}
+
+TEST_F(ExtractCollectionHashTest, NoHashWhenHAbsentFromMetadata) {
+    // An entry written before the feature was enabled carries 'sz' but no 'h'. Its size and count
+    // still count, but the collection hash cannot be tracked across it.
+    const int32_t sizeDelta = 400;
+    const auto insertOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, sizeDelta);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    EXPECT_EQ(sizeDelta, extractedSizeCount->sizeCount.size);
+    EXPECT_EQ(1, extractedSizeCount->sizeCount.count);
+    EXPECT_FALSE(extractedSizeCount->hash);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, HashParsedWithEveryFeatureFlagOff) {
+    // The hash is read off the size metadata unconditionally, so that a node upgrading into hash
+    // accumulation reads the same value from entries written before the flags were on. The fixture
+    // leaves every validation flag off, so reaching a value here is the whole contract.
+    const int32_t sizeDelta = 400;
+    const int64_t hash = 0x0123456789abcdef;
+    const auto insertOp =
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, sizeDelta, hash);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    EXPECT_EQ(sizeDelta, extractedSizeCount->sizeCount.size);
+    EXPECT_EQ(1, extractedSizeCount->sizeCount.count);
+    EXPECT_EQ(hash, extractedSizeCount->hash);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnInsert) {
     SingleOpSizeMetadata metadataWithoutSz;
     ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
     repl::OplogEntry insertOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
@@ -357,10 +626,10 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnInse
 
     // With 'sz' absent, extraction of the insert size delta must return boost::none.
     ASSERT_TRUE(insertOp.getSizeMetadata().has_value());
-    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(insertOp), boost::none);
+    EXPECT_EQ(extractReplicatedMetadataForOp(insertOp), boost::none);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnUpdate) {
+TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnUpdate) {
     SingleOpSizeMetadata metadataWithoutSz;
     ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
     repl::OplogEntry updateOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
@@ -374,10 +643,10 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnUpda
 
     // With 'sz' absent, extraction of the update size delta must return boost::none.
     ASSERT_TRUE(updateOp.getSizeMetadata().has_value());
-    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(updateOp), boost::none);
+    EXPECT_EQ(extractReplicatedMetadataForOp(updateOp), boost::none);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnDelete) {
+TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnDelete) {
     SingleOpSizeMetadata metadataWithoutSz;
     ASSERT_FALSE(metadataWithoutSz.getSz().has_value());
     repl::OplogEntry deleteOp{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
@@ -391,10 +660,10 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenSzAbsentFromMetadataOnDele
 
     // With 'sz' absent, extraction of the delete size delta must return boost::none.
     ASSERT_TRUE(deleteOp.getSizeMetadata().has_value());
-    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(deleteOp), boost::none);
+    EXPECT_EQ(extractReplicatedMetadataForOp(deleteOp), boost::none);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
+TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
     // 'OpTypeEnum::kInsert' supports replicated fast count information, but none is extracted
     // because the 'm' field is absent from the oplog entry.
     repl::OplogEntry insertOpNoSizeMetadata{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
@@ -404,12 +673,11 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
         .oField = BSONObj(),
         .wallClockTime = Date_t::now(),
     }}};
-    const auto extractedSizeCount =
-        replicated_fast_count::extractSizeCountDeltaForOp(insertOpNoSizeMetadata);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOpNoSizeMetadata);
     EXPECT_FALSE(insertOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
-TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpType) {
+TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpType) {
     // 'OpTypeEnum::kCommand' does not support top level 'sizeMetadata' field 'm', and in absence of
     // the 'sizeMetadata', nothing is returned when trying to extract size count deltas.
     repl::OplogEntry commandOpNoSizeMetadata{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
@@ -419,21 +687,20 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpTyp
         .oField = BSONObj(),
         .wallClockTime = Date_t::now(),
     }}};
-    const auto extractedSizeCount =
-        replicated_fast_count::extractSizeCountDeltaForOp(commandOpNoSizeMetadata);
+    const auto extractedSizeCount = extractReplicatedMetadataForOp(commandOpNoSizeMetadata);
     EXPECT_FALSE(commandOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnUnsupportedOpType) {
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnUnsupportedOpType) {
     const auto oplogEntry =
         makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
 
     // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
     // operations are incompatible with a top-level 'm' field.
-    EXPECT_EQ(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), boost::none);
+    EXPECT_EQ(extractReplicatedMetadataForOp(oplogEntry), boost::none);
 }
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNss) {
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnNonEligibleNss) {
     const NamespaceString localNss =
         NamespaceString::createNamespaceString_forTest("local", "coll1");
     EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
@@ -442,10 +709,10 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNss) {
         makeOplogEntryWithSizeMetadata(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
 
     // Even though the oplog entry carries size metadata, ineligible namespaces should be skipped.
-    EXPECT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry).has_value());
+    EXPECT_FALSE(extractReplicatedMetadataForOp(oplogEntry).has_value());
 }
 
-TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSizeMetadata) {
+TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSizeMetadata) {
     const NamespaceString localNss =
         NamespaceString::createNamespaceString_forTest("local", "coll1");
     EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
@@ -459,7 +726,7 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSi
     }}};
 
     // Local namespace without sizeMetadata shouldn't throw an error.
-    EXPECT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
+    EXPECT_FALSE(extractReplicatedMetadataForOp(insertOpLocalNs).has_value());
 }
 
 // ===========================================================================
@@ -860,6 +1127,51 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForNestedApply
     EXPECT_EQ(deltas.at(_uuid2), expectedDeltasNss2);
 }
 
+TEST_F(ExtractSizeCountDeltaForApplyOpsTest, NestedApplyOpsFoldsHashesPerCollection) {
+    // Hashes fold across nesting levels the same way size and count do, and each collection keeps
+    // its own: the two contributions to _uuid1 XOR together while _uuid2 keeps only its own.
+    const BSONObj docA = BSON("_id" << 0 << "x" << "0");
+    const int64_t hash1 = 0x1111111111111111;
+    const int64_t hash2 = 0x2222222222222222;
+    const int64_t hash3 = 0x4444444444444444;
+
+    const NamespaceString adminCmdNss =
+        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+
+    const BSONObj innerMostInsertNs1 =
+        BSON("op" << "i"
+                  << "ns" << _nss1.ns_forTest() << "ui" << _uuid1 << "o" << docA << "m"
+                  << BSON("sz" << docA.objsize() << "h" << hash1));
+    const BSONObj innerMostInsertNs2 =
+        BSON("op" << "i"
+                  << "ns" << _nss2.ns_forTest() << "ui" << _uuid2 << "o" << docA << "m"
+                  << BSON("sz" << docA.objsize() << "h" << hash2));
+    const BSONObj nestedApplyOps =
+        BSON("op" << "c"
+                  << "ns" << adminCmdNss.ns_forTest() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(innerMostInsertNs1 << innerMostInsertNs2)));
+    const BSONObj firstLevelInsert =
+        BSON("op" << "i"
+                  << "ns" << _nss1.ns_forTest() << "ui" << _uuid1 << "o" << docA << "m"
+                  << BSON("sz" << docA.objsize() << "h" << hash3));
+
+    const repl::OplogEntry applyOpsEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = adminCmdNss,
+        .oField = BSON("applyOps" << BSON_ARRAY(firstLevelInsert << nestedApplyOps)),
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    ReplicatedMetadataDeltas deltas;
+    extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, deltas);
+
+    ASSERT_TRUE(deltas.contains(_uuid1));
+    ASSERT_TRUE(deltas.contains(_uuid2));
+    EXPECT_EQ(deltas.at(_uuid1).metadata.hash, hash1 ^ hash3);
+    EXPECT_EQ(deltas.at(_uuid2).metadata.hash, hash2);
+}
+
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithNoPriorState) {
     // A fromMigrate kCreate entry with no prior UUID in the deltas map should behave like a normal
     // create.
@@ -958,6 +1270,63 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropThenInser
     EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
 }
 
+TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropSeedsIdentityHash) {
+    // The migration re-creates the collection empty, so its hash restarts from the identity just as
+    // it would for a fresh create, rather than carrying anything from before the drop.
+    const NamespaceString cmdNss = _nss1.getCommandNS();
+    const BSONObj document = BSON("_id" << 0 << "x" << "hello");
+    const int64_t hash = 0x0123456789abcdef;
+
+    const BSONObj dropOp = BSON("op" << "c"
+                                     << "ns" << cmdNss.ns_forTest() << "ui" << _uuid1 << "o"
+                                     << BSON("drop" << _nss1.coll()));
+    const BSONObj createFromMigrateOp =
+        BSON("op" << "c"
+                  << "ns" << cmdNss.ns_forTest() << "ui" << _uuid1 << "o"
+                  << BSON("create" << _nss1.coll()) << "fromMigrate" << true);
+    const BSONObj insertOp =
+        BSON("op" << "i"
+                  << "ns" << _nss1.ns_forTest() << "ui" << _uuid1 << "o" << document << "m"
+                  << BSON("sz" << document.objsize() << "h" << hash));
+
+    // The re-creation on its own starts from the identity.
+    {
+        const repl::OplogEntry applyOpsEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = NamespaceString::kAdminCommandNamespace,
+            .oField = BSON("applyOps" << BSON_ARRAY(dropOp << createFromMigrateOp)),
+            .wallClockTime = Date_t::now(),
+        }}};
+
+        ReplicatedMetadataDeltas replicatedMetadataDeltas;
+        extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas);
+
+        ASSERT_TRUE(replicatedMetadataDeltas.contains(_uuid1));
+        EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
+        EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).metadata.hash,
+                  kEmptyCollectionValidationHash);
+    }
+
+    // A document migrated back in folds into that identity.
+    {
+        const repl::OplogEntry applyOpsEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = NamespaceString::kAdminCommandNamespace,
+            .oField = BSON("applyOps" << BSON_ARRAY(dropOp << createFromMigrateOp << insertOp)),
+            .wallClockTime = Date_t::now(),
+        }}};
+
+        ReplicatedMetadataDeltas replicatedMetadataDeltas;
+        extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, replicatedMetadataDeltas);
+
+        ASSERT_TRUE(replicatedMetadataDeltas.contains(_uuid1));
+        EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
+        EXPECT_EQ(replicatedMetadataDeltas.at(_uuid1).metadata.hash, hash);
+    }
+}
+
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithPreExistingWritesFails) {
     // A fromMigrate kCreate for a UUID that already has non-dropped state (e.g. from prior inserts
     // without an intervening drop) should fail with massert 12554002.
@@ -1051,6 +1420,7 @@ protected:
         int32_t sizeDelta = 0;
         bool includeSizeMetadata = true;
         boost::optional<BSONObj> commandObj;
+        boost::optional<int64_t> hash;
     };
 
     /**
@@ -1089,7 +1459,12 @@ protected:
             spec.coll.uuid.appendToBuilder(&opBuilder, "ui");
             opBuilder.append("o", BSONObj());
             if (spec.includeSizeMetadata) {
-                opBuilder.append("m", BSON("sz" << spec.sizeDelta));
+                BSONObjBuilder sizeMetadataBuilder;
+                sizeMetadataBuilder.append("sz", spec.sizeDelta);
+                if (spec.hash) {
+                    sizeMetadataBuilder.append("h", *spec.hash);
+                }
+                opBuilder.append("m", sizeMetadataBuilder.obj());
             }
             innerOpsArray.append(opBuilder.obj());
         }
@@ -1422,6 +1797,165 @@ TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationMarksStateCreated) {
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 0);
 }
 
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationSeedsIdentityHash) {
+    // A collection created empty has folded in no document hashes, so it starts from the identity
+    // rather than from an absent hash.
+    const Timestamp ts1{1, 1};
+    std::list<repl::OplogEntry> entries{test_helpers::makeCreateOplogEntry(ts1, collA)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, kEmptyCollectionValidationHash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenInsertFoldsIntoIdentity) {
+    // The identity leaves the folded contribution unchanged, so a create followed by one insert
+    // yields exactly that insert's hash.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hash = 0x0123456789abcdef;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 10, hash),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenSameSizeUpdateFoldsHash) {
+    // A same-size update contributes no size and no count, so the hash is the only evidence it
+    // happened. Seeding the create with the identity is what makes that contribution visible.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hash = 0x0123456789abcdef;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kUpdate, 0, hash),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationThenOpWithoutHashInvalidatesIdentity) {
+    // The seeded identity is a claim that every contribution so far has been folded in, so an
+    // operation that carries none must invalidate it rather than leave it standing.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 10),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, InsertThenDeleteOfSameDocumentRestoresIdentityHash) {
+    // XOR is its own inverse, so folding a document's hash in and back out again returns the
+    // collection to the hash it had when it was empty. This is the property the whole accumulation
+    // rests on.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    const int64_t hash = 0x0123456789abcdef;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 100, hash),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kDelete, -100, hash),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, kEmptyCollectionValidationHash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, TruncateRangeInvalidatesAccumulatedHash) {
+    // Truncation removes records this node never hashed individually, so their contributions can
+    // never be XOR-ed back out. The hash must go absent rather than keep a value that still
+    // includes them.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        test_helpers::makeOplogEntry(
+            ts2, collA, repl::OpTypeEnum::kInsert, 100, int64_t{0x0123456789abcdef}),
+        test_helpers::makeTruncateRangeOplogEntry(ts3,
+                                                  collA,
+                                                  /*bytesDeleted=*/100,
+                                                  /*docsDeleted=*/1),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionLeavesHashAbsent) {
+    // An import adopts documents this node never hashed, so there is no baseline to fold into and
+    // the hash stays absent, unlike a create which starts from the identity.
+    const Timestamp ts1{1, 1};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(ts1,
+                                                     collA,
+                                                     /*numRecords=*/5,
+                                                     /*dataSize=*/500)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest,
+       ImportAfterDropLeavesHashAbsentAndLaterWritesCannotRestoreIt) {
+    // The re-created entry has no usable baseline, so writes that do carry a hash must not produce
+    // a value again. This is the counterpart to a fromMigrate re-create, which does start from the
+    // identity because the migration re-creates the collection empty.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeDropOplogEntry(ts1, collA),
+        test_helpers::makeImportCollectionOplogEntry(ts2,
+                                                     collA,
+                                                     /*numRecords=*/5,
+                                                     /*dataSize=*/500),
+        test_helpers::makeOplogEntry(
+            ts3, collA, repl::OpTypeEnum::kInsert, 100, int64_t{0x0123456789abcdef}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
+    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
+}
+
 TEST_F(AggregateSizeCountFromOplogTest, CollectionDropMarksStateDropped) {
     const Timestamp ts1{1, 1};
     std::list<repl::OplogEntry> entries{test_helpers::makeDropOplogEntry(ts1, collA)};
@@ -1548,8 +2082,8 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
 }
 
 // When the fast lanes (Layer 2 / Layer 2.5) see a CRUD entry with `m.sz` but no `ui`, they fall
-// through to Layer 3, where the massert id 12116001 in `extractSizeCountDeltaForOpImpl` surfaces
-// the invariant violation. Both tests below exercise the fast-lane paths via the cursor.
+// through to Layer 3, where the massert id 12116001 in `extractReplicatedMetadataForOpImpl`
+// surfaces the invariant violation. Both tests below exercise the fast-lane paths via the cursor.
 
 TEST_F(AggregateSizeCountFromOplogTest, AggregateCrudWithSizeMetadataMissingUiThrows) {
     // A direct CRUD entry that carries `m.sz` but lacks `ui` falls through Layer 2 to Layer 3.
@@ -1917,6 +2451,122 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
     EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 100, .count = 1}));
+}
+
+// ---------------------------------------------------------------------------
+// mergeDeltas: a committed transaction chain's buffered deltas folded into the scan result.
+// ---------------------------------------------------------------------------
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnCreateThenSameSizeUpdateFoldsHash) {
+    // A same-size update contributes no size and no count, so the hash is the only evidence the
+    // transaction touched the collection at all. Merging must fold it into the created collection's
+    // seeded identity rather than skip it for having nothing else to contribute.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hash = 0x0123456789abcdef;
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{.coll = collA,
+              .opType = repl::OpTypeEnum::kCommand,
+              .includeSizeMetadata = false,
+              .commandObj = BSON("create" << collA.nss.coll())}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{.coll = collA, .opType = repl::OpTypeEnum::kUpdate, .sizeDelta = 0, .hash = hash}},
+            ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       ChainedTxnFoldsHashesOfEveryCollectionTouched) {
+    // Each collection in the chain keeps its own hash; contributions must not cross UUIDs.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hashA = 0x1111111111111111;
+    const int64_t hashB = 0x2222222222222222;
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{.coll = collA, .opType = repl::OpTypeEnum::kInsert, .sizeDelta = 10, .hash = hashA}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{.coll = collB, .opType = repl::OpTypeEnum::kInsert, .sizeDelta = 20, .hash = hashB}},
+            ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    ASSERT_TRUE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hashA);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.hash, hashB);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnHashDiscardedWithUnterminatedChain) {
+    // A chain that never reaches its terminal entry contributes nothing, hash included.
+    const Timestamp ts1{1, 1};
+
+    std::list<repl::OplogEntry> entries{makeApplyOpsOplogEntry(
+        ts1,
+        {{.coll = collA,
+          .opType = repl::OpTypeEnum::kInsert,
+          .sizeDelta = 10,
+          .hash = 0x0123456789abcdef}},
+        ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}})};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnCommitInvalidatesHash) {
+    // A prepared transaction's per-operation hashes are dropped at the prepare, and the
+    // commitTransaction entry summarizes only size and count. The collection hash therefore goes
+    // absent rather than keeping a value that is missing the transaction's contributions.
+    // TODO SERVER-131796: Carry the transaction's accumulated hash on the commitTransaction entry.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    MultiOpSizeMetadata metaA;
+    metaA.setUuid(collA.uuid);
+    metaA.setSz(50);
+    metaA.setCt(1);
+
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeCreateOplogEntry(ts1, collA),
+        makeApplyOpsOplogEntry(ts2,
+                               {{.coll = collA,
+                                 .opType = repl::OpTypeEnum::kInsert,
+                                 .sizeDelta = 50,
+                                 .hash = 0x0123456789abcdef}},
+                               ApplyOpsTxnFields{.prepared = true, .prevOpTime = repl::OpTime{}}),
+        makeCommitTxnOplogEntry(ts3, {metaA}, opTimeAt(ts2)),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 50, .count = 1}));
+    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
 }
 
 TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnWithCreateThenDropCancelsOut) {

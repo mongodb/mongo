@@ -19,7 +19,8 @@ namespace mongo::replicated_fast_count {
 
 /**
  * Holds the accumulated replicated-metadata deltas for an in-progress multi-entry transaction
- * chain.
+ * chain. Each delta carries the collection's size and count contribution, and its validation hash
+ * contribution.
  */
 struct TxnChainState {
     ReplicatedMetadataDeltas deltas;
@@ -31,6 +32,9 @@ struct TxnChainState {
  *
  * `deltas` contains an entry for each `uuid` which has replicated-metadata information within the
  * scanned oplog range. May include entries where size count deltas sum to 0.
+ *
+ * A delta's hash is absent for a collection whose contributions could not all be accounted for,
+ * since a hash folded over part of a range is not a usable value.
  *
  * `lastTimestamp` is the timestamp of the final oplog entry visited during the scan that is NOT
  * from an internal fast count store collection, or boost::none if no such entries were scanned
@@ -173,9 +177,10 @@ private:
 
 /**
  * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
- * aggregates the size count deltas across UUIDs including the oplog collection itself. Pass
- * 'isCheckpoint=true' only on the checkpoint scan path to increment checkpoint scan counters; leave
- * false (the default) on read paths.
+ * aggregates the replicated-metadata deltas across UUIDs including the oplog collection itself.
+ * The per-document hashes carried on the scanned entries are always folded into per-collection
+ * validation hashes. Pass 'isCheckpoint=true' only on the checkpoint scan path to increment
+ * checkpoint scan counters; leave false (the default) on read paths.
  */
 OplogScanResult aggregateReplicatedMetadataDeltasInOplog(SeekableRecordCursor& oplogCursor,
                                                          const Timestamp& seekAfterTS,

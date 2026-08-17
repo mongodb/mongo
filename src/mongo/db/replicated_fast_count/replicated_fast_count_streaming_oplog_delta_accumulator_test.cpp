@@ -199,10 +199,17 @@ protected:
     }
 
     // Builds a raw insert inner-op BSON for use inside an applyOps array.
-    BSONObj makeInnerInsertBson(const test_helpers::NsAndUUID& coll, int32_t sizeDelta) {
+    BSONObj makeInnerInsertBson(const test_helpers::NsAndUUID& coll,
+                                int32_t sizeDelta,
+                                boost::optional<int64_t> hash = boost::none) {
+        BSONObjBuilder m;
+        m.append("sz", sizeDelta);
+        if (hash) {
+            m.append("h", *hash);
+        }
         return BSON("op" << "i"
                          << "ns" << coll.nss.ns_forTest() << "ui" << coll.uuid << "o"
-                         << BSON("_id" << 1) << "m" << BSON("sz" << sizeDelta));
+                         << BSON("_id" << 1) << "m" << m.obj());
     }
 
     // Builds a raw container op (ci/cu/cd) inner-op BSON for use inside an applyOps array.
@@ -450,6 +457,51 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudWithHash_FoldsHashIntoDelta) {
+    // The fast lane reads `h` off the size metadata with no feature-flag check, matching Layer 3.
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(hash, result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_TwoCrudEntries_XorsHashesForOneCollection) {
+    // Two operations on one collection fold together with XOR.
+    const int64_t hash1 = 0x0123456789abcdef;
+    const int64_t hash2 = 0x1122334455667788;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(
+             Timestamp{1, 1}, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash1)),
+         makeRawCrudBson(
+             Timestamp{1, 2}, "i"sv, collA.nss, collA.uuid, BSON("sz" << 20 << "h" << hash2))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 30, .count = 2}));
+    EXPECT_EQ(hash1 ^ hash2, result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerOpWithHash_FoldsHashIntoDelta) {
+    // Layer 2.5 routes each inner op through the same fast CRUD path, so inner hashes fold too.
+    const Timestamp ts{1, 1};
+    const int64_t hash1 = 0x0123456789abcdef;
+    const int64_t hash2 = 0x1122334455667788;
+    const auto result =
+        runAccumulatorRaw({makeApplyOpsBson(ts,
+                                            BSON_ARRAY(makeInnerInsertBson(collA, 10, hash1)
+                                                       << makeInnerInsertBson(collA, 20, hash2)))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 30, .count = 2}));
+    EXPECT_EQ(hash1 ^ hash2, result.deltas.at(collA.uuid).metadata.hash);
+}
+
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDeltas) {
     // local.* is ineligible for replicated fast count. Layer 2's `isFastCountEligibleNonStore`
     // check skips the delta but still counts the entry as processed (ts advances).
@@ -630,6 +682,20 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 500);
     EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 5);
     EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudHashWithoutSz_FallsThroughToLayer3) {
+    // The fast lane requires `sz`, so it must not handle a hash-only entry itself; it falls through
+    // so Layer 3 reports it and folds the hash in against a zero size and count delta.
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result =
+        runAccumulatorRaw({makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, BSON("h" << hash))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
 }
 
 // ----- Death tests for unsupported data shapes -----

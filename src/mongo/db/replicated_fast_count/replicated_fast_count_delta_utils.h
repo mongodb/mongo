@@ -18,14 +18,25 @@ namespace mongo {
 namespace replicated_fast_count {
 
 /**
- * Returns the size and count delta extracted from the oplog entry's size metadata ('m' field), if
- * present.
+ * Returns the size, count and validation hash delta extracted from the oplog entry's size metadata
+ * ('m' field).
+ *
+ * Returns boost::none when there is nothing to record: the entry opted out of tracking by carrying
+ * no 'm' field or no 'sz' within it, it carries the multi-op form of 'm', which is malformed for a
+ * single operation, or it is out of scope for fast count with an ineligible namespace or an
+ * operation type that cannot carry a top-level 'm'.
+ *
+ * The returned delta's hash is absent when the entry carried no 'h'. Folding that in invalidates
+ * the hash to be persisted, so that a contribution we never read is not mistaken for one that was
+ * folded in. An entry carrying an 'h' with no 'sz' is fatal: the two are written under the same
+ * conditions, so one without the other means no accumulated hash can be trusted.
  *
  * This function expects to be called on an oplog entry for a single operation. For 'applyOps'
  * entries, the top-level entry cannot have an 'm' (size metadata) field; however, the inner
  * operations within the 'applyOps' array can and should be parsed separately.
  */
-boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::OplogEntry& oplogEntry);
+boost::optional<CollectionReplicatedMetadata> extractReplicatedMetadataForOp(
+    const repl::OplogEntry& oplogEntry);
 
 /**
  * Aggregates per-collection size and count deltas across a list of operations. Returns one

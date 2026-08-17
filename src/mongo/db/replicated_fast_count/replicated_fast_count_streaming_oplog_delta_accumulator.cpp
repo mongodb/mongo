@@ -39,15 +39,14 @@ using namespace std::literals::string_view_literals;
 // Helper used by the fast lanes to accumulate per-uuid deltas. Same semantics as the homonymous
 // helper in `replicated_fast_count_delta_utils.cpp` (private there); duplicated here to keep
 // the fast lanes self-contained.
-void recordCollectionSizeCountDelta(const UUID& uuid,
-                                    const CollectionSizeCount& sizeCountDelta,
-                                    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+void recordCollectionReplicatedMetadataDelta(
+    const UUID& uuid,
+    const CollectionReplicatedMetadata& metadataDelta,
+    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
-        uuid,
-        ReplicatedMetadataDelta{.metadata = {.sizeCount = sizeCountDelta},
-                                .state = DDLState::kNone});
+        uuid, ReplicatedMetadataDelta{metadataDelta, DDLState::kNone});
     if (!inserted) {
-        it->second.metadata.sizeCount = it->second.metadata.sizeCount + sizeCountDelta;
+        it->second.metadata = it->second.metadata + metadataDelta;
     }
 }
 
@@ -242,12 +241,23 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
     }
     const auto mObj = f.m.Obj();
     const auto szElem = mObj.getField(SingleOpSizeMetadata::kSzFieldName);
+    const auto hElem = mObj.getField(SingleOpSizeMetadata::kHFieldName);
     if (szElem.eoo()) {
+        if (!hElem.eoo()) {
+            // A hash with no size delta is a contribution that cannot be folded in. Fall through
+            // so Layer 3 reports it and skips the entry, keeping that in one place.
+            return boost::none;
+        }
         return 0;  // No `sz` field → no delta possible from this entry. Counted as "processed".
     }
     if (!szElem.isNumber()) {
         // `sz` must be numeric per SingleOpSizeMetadata. Anything else is
         // malformed; fall through to Layer 3.
+        return boost::none;
+    }
+    if (!hElem.eoo() && !hElem.isNumber()) {
+        // `h` must be numeric per SingleOpSizeMetadata. Anything else is malformed; fall through
+        // to Layer 3.
         return boost::none;
     }
     if (f.ns.type() != BSONType::string) {
@@ -271,7 +281,8 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
     }
     if (f.ui.eoo()) {
         // Missing `ui` is an invariant violation; let Layer 3 surface it via its existing
-        // massert in `extractSizeCountDeltaForOpImpl` so the failure message stays in one place.
+        // massert in `extractReplicatedMetadataForOpImpl` so the failure message stays in one
+        // place.
         return boost::none;
     }
     const auto entryUuid = uassertStatusOK(UUID::parse(f.ui));
@@ -289,9 +300,15 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
         default:
             MONGO_UNREACHABLE;
     }
-    recordCollectionSizeCountDelta(
+    boost::optional<int64_t> hash;
+    if (!hElem.eoo()) {
+        hash = hElem.safeNumberLong();
+    }
+    recordCollectionReplicatedMetadataDelta(
         entryUuid,
-        CollectionSizeCount{.size = szElem.safeNumberInt(), .count = countDelta},
+        CollectionReplicatedMetadata{
+            .sizeCount = CollectionSizeCount{.size = szElem.safeNumberInt(), .count = countDelta},
+            .hash = hash},
         replicatedMetadataDeltasOut);
     return 1;
 }
@@ -415,7 +432,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
     }
 
     for (const auto& [uuid, delta] : localDeltas) {
-        recordCollectionSizeCountDelta(uuid, delta.metadata.sizeCount, replicatedMetadataDeltasOut);
+        recordCollectionReplicatedMetadataDelta(uuid, delta.metadata, replicatedMetadataDeltasOut);
     }
     return {FastApplyOpsOutcome::kProcessed, processed};
 }
@@ -443,9 +460,13 @@ boost::optional<int> tryFastCommitTxn(const ScanFields& f,
             return boost::none;
         }
         const auto uuid = uassertStatusOK(UUID::parse(uuidElem));
-        recordCollectionSizeCountDelta(
+        // TODO SERVER-133292: Support tracking the collection hash with prepared transactions.
+        recordCollectionReplicatedMetadataDelta(
             uuid,
-            CollectionSizeCount{.size = szElem.safeNumberLong(), .count = ctElem.safeNumberLong()},
+            CollectionReplicatedMetadata{.sizeCount =
+                                             CollectionSizeCount{.size = szElem.safeNumberLong(),
+                                                                 .count = ctElem.safeNumberLong()},
+                                         .hash = boost::none},
             replicatedMetadataDeltasOut);
         ++processed;
     }
