@@ -367,6 +367,54 @@ TEST_F(AbortTest, AbortsUnresumedPrimaryDrivenBuildsOnEveryCollectionInTheDataba
     EXPECT_EQ(numIndexesTotal(otherNss), 1);
 }
 
+TEST_F(AbortTest, AbortsBuildRunByCoordinatorMatchingIndexNames) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    insertDocument();
+
+    // Park the builder thread so that the build is still in progress when we abort it. The abort
+    // interrupts the build rather than waiting for the fail point to be lifted.
+    FailPointEnableBlock hangAfterInitializingIndexBuild{"hangAfterInitializingIndexBuild"};
+    auto future = startCoordinatorRunIndexBuild();
+
+    ASSERT_TRUE(
+        IndexBuildsCoordinator::get(opCtx)->hasIndexBuilder(opCtx, _collectionUUID, {"a_1"}));
+    ASSERT_EQ(numIndexesInProgress(), 1);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    int unlocks = 0;
+    int locks = 0;
+    index_builds::abort(
+        opCtx,
+        _nss,
+        _collectionUUID,
+        {"a_1"},
+        "dropIndexes command",
+        [&] {
+            ++unlocks;
+            collection = boost::none;
+        },
+        [&] {
+            ++locks;
+            collection.emplace(acquireExclusive());
+            return true;
+        });
+
+    // The locks were yielded so that the builder thread could exit, and handed back.
+    EXPECT_GT(unlocks, 0);
+    EXPECT_EQ(locks, unlocks);
+    ASSERT_TRUE(collection.has_value());
+
+    EXPECT_EQ(future.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
+    EXPECT_FALSE(
+        IndexBuildsCoordinator::get(opCtx)->hasIndexBuilder(opCtx, _collectionUUID, {"a_1"}));
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+    EXPECT_EQ(numIndexesTotal(_nss), 1);
+}
+
 TEST_F(AbortTest, AbortsBuildRunByCoordinator) {
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
     unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
@@ -410,6 +458,233 @@ TEST_F(AbortTest, AbortsBuildRunByCoordinator) {
     EXPECT_TRUE(registry().all().empty());
     EXPECT_EQ(numIndexesInProgress(), 0);
     EXPECT_EQ(numIndexesTotal(_nss), 1);
+}
+
+TEST_F(AbortTest, AbortsBothRunningAndUnresumedBuildsOnCollection) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    insertDocument();
+
+    FailPointEnableBlock hangAfterInitializingIndexBuild{"hangAfterInitializingIndexBuild"};
+    auto future = startCoordinatorRunIndexBuild();
+    startUnresumedPrimaryDrivenIndexBuild(_nss, _collectionUUID, {"b"});
+    ASSERT_EQ(registry().all().size(), 2);
+    ASSERT_EQ(numIndexesInProgress(), 2);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    int unlocks = 0;
+    int locks = 0;
+    {
+        auto commitTimestampGuard = makeCommitTimestampGuard();
+        abort(
+            opCtx,
+            _nss,
+            _collectionUUID,
+            "collection is being dropped",
+            [&] {
+                ++unlocks;
+                collection = boost::none;
+            },
+            [&] {
+                ++locks;
+                collection.emplace(acquireExclusive());
+                return true;
+            });
+    }
+
+    // The locks were yielded for the running build's abort and again after the inline one.
+    EXPECT_GT(unlocks, 1);
+    EXPECT_EQ(locks, unlocks);
+    ASSERT_TRUE(collection.has_value());
+
+    EXPECT_EQ(future.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
+    EXPECT_FALSE(IndexBuildsCoordinator::get(opCtx)->inProgForCollection(_collectionUUID));
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+    EXPECT_EQ(numIndexesTotal(_nss), 1);
+}
+
+TEST_F(AbortTest, AbortsUnresumedPrimaryDrivenBuildMatchingIndexNames) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    startUnresumedPrimaryDrivenIndexBuild();
+    ASSERT_EQ(numIndexesInProgress(), 1);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    auto commitTimestampGuard = makeCommitTimestampGuard();
+    abort(
+        opCtx,
+        _nss,
+        _collectionUUID,
+        {"a_1"},
+        "dropIndexes command",
+        [&] { collection = boost::none; },
+        [&] {
+            collection.emplace(acquireExclusive());
+            return true;
+        });
+
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+    EXPECT_EQ(numIndexesTotal(_nss), 1);
+}
+
+TEST_F(AbortTest, LeavesUnresumedPrimaryDrivenBuildsOfOtherIndexNamesAlone) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    startUnresumedPrimaryDrivenIndexBuild(_nss, _collectionUUID, {"a", "b"});
+    ASSERT_EQ(numIndexesInProgress(), 2);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    auto commitTimestampGuard = makeCommitTimestampGuard();
+    auto abortNames = [&](const std::vector<std::string>& indexNames) {
+        abort(
+            opCtx,
+            _nss,
+            _collectionUUID,
+            indexNames,
+            "dropIndexes command",
+            [&] { collection = boost::none; },
+            [&] {
+                collection.emplace(acquireExclusive());
+                return true;
+            });
+    };
+
+    abortNames({"c_1"});
+    abortNames({"a_1"});
+    EXPECT_EQ(registry().all().size(), 1);
+    EXPECT_EQ(numIndexesInProgress(), 2);
+
+    // Naming the build's whole index set aborts it.
+    abortNames({"a_1", "b_1"});
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+}
+
+TEST_F(AbortTest, MatchesUnresumedPrimaryDrivenBuildByExactIndexNameSet) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    startUnresumedPrimaryDrivenIndexBuild(_nss, _collectionUUID, {"a", "b", "c"});
+    ASSERT_EQ(numIndexesInProgress(), 3);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    auto commitTimestampGuard = makeCommitTimestampGuard();
+    auto abortNames = [&](const std::vector<std::string>& indexNames) {
+        abort(
+            opCtx,
+            _nss,
+            _collectionUUID,
+            indexNames,
+            "dropIndexes command",
+            [&] { collection = boost::none; },
+            [&] {
+                collection.emplace(acquireExclusive());
+                return true;
+            });
+    };
+
+    // A superset of the build's index names does not match it.
+    abortNames({"a_1", "b_1", "c_1", "d_1"});
+    EXPECT_EQ(registry().all().size(), 1);
+    EXPECT_EQ(numIndexesInProgress(), 3);
+
+    // Neither does a subset, even one that differs by a single name.
+    abortNames({"a_1", "b_1"});
+    EXPECT_EQ(registry().all().size(), 1);
+    EXPECT_EQ(numIndexesInProgress(), 3);
+
+    // A permutation of exactly the build's index names matches it.
+    abortNames({"c_1", "a_1", "b_1"});
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+}
+
+TEST_F(AbortTest, AbortsUnresumedPrimaryDrivenBuildMatchingIndexNamesWhileAnotherBuildRuns) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    insertDocument();
+
+    // Park the builder thread so that its build ('a_1') is still in progress throughout.
+    FailPointEnableBlock hangAfterInitializingIndexBuild{"hangAfterInitializingIndexBuild"};
+    auto future = startCoordinatorRunIndexBuild();
+    startUnresumedPrimaryDrivenIndexBuild(_nss, _collectionUUID, {"b"});
+    ASSERT_EQ(registry().all().size(), 2);
+    ASSERT_EQ(numIndexesInProgress(), 2);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    auto unlock = [&] {
+        collection = boost::none;
+    };
+    auto lock = [&] {
+        collection.emplace(acquireExclusive());
+        return true;
+    };
+
+    {
+        auto commitTimestampGuard = makeCommitTimestampGuard();
+        abort(opCtx, _nss, _collectionUUID, {"b_1"}, "dropIndexes command", unlock, lock);
+    }
+
+    // The unresumed build is gone and the running one is untouched.
+    EXPECT_TRUE(
+        IndexBuildsCoordinator::get(opCtx)->hasIndexBuilder(opCtx, _collectionUUID, {"a_1"}));
+    EXPECT_FALSE(future.isReady());
+    EXPECT_EQ(registry().all().size(), 1);
+    EXPECT_EQ(numIndexesInProgress(), 1);
+
+    // Aborting the running build's indexes then takes the coordinator branch and joins its thread.
+    abort(opCtx, _nss, _collectionUUID, {"a_1"}, "dropIndexes command", unlock, lock);
+
+    EXPECT_EQ(future.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
+    EXPECT_TRUE(registry().all().empty());
+    EXPECT_EQ(numIndexesInProgress(), 0);
+    EXPECT_EQ(numIndexesTotal(_nss), 1);
+}
+
+TEST_F(AbortTest, AbortsBuildRunByCoordinatorMatchingIndexNamesWhileAnotherBuildIsUnresumed) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    insertDocument();
+
+    FailPointEnableBlock hangAfterInitializingIndexBuild{"hangAfterInitializingIndexBuild"};
+    auto future = startCoordinatorRunIndexBuild();
+    auto unresumedBuildUUID = startUnresumedPrimaryDrivenIndexBuild(_nss, _collectionUUID, {"b"});
+    ASSERT_EQ(numIndexesInProgress(), 2);
+
+    boost::optional<CollectionAcquisition> collection(acquireExclusive());
+    abort(
+        opCtx,
+        _nss,
+        _collectionUUID,
+        {"a_1"},
+        "dropIndexes command",
+        [&] { collection = boost::none; },
+        [&] {
+            collection.emplace(acquireExclusive());
+            return true;
+        });
+
+    EXPECT_EQ(future.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
+    EXPECT_FALSE(
+        IndexBuildsCoordinator::get(opCtx)->hasIndexBuilder(opCtx, _collectionUUID, {"a_1"}));
+
+    // The unresumed build is still registered and its index is still being built.
+    EXPECT_TRUE(registry().contains(unresumedBuildUUID));
+    EXPECT_EQ(registry().all().size(), 1);
+    EXPECT_EQ(numIndexesInProgress(), 1);
 }
 
 TEST_F(AbortTest, DoesNotYieldLocksWhenThereAreNoIndexBuilds) {

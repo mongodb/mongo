@@ -3,6 +3,7 @@
 
 #include "mongo/db/index_builds/abort.h"
 
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
@@ -10,6 +11,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
@@ -56,6 +58,56 @@ bool abortUnresumedPrimaryDrivenIndexBuilds(
 }
 
 }  // namespace
+
+void abort(OperationContext* opCtx,
+           const NamespaceString& ns,
+           const UUID& collectionUUID,
+           const std::vector<std::string>& indexNames,
+           const std::string& reason,
+           const std::function<void()>& unlock,
+           const std::function<bool()>& lock) {
+    auto& coordinator = *IndexBuildsCoordinator::get(opCtx);
+
+    auto buildsExactly = [&](const std::vector<IndexBuildInfo>& indexes) {
+        auto buildIndexNames = toIndexNames(indexes);
+        return std::is_permutation(
+            indexNames.begin(), indexNames.end(), buildIndexNames.begin(), buildIndexNames.end());
+    };
+
+    // Every path out of this loop either holds the caller's locks and has seen no matching index
+    // build while holding them, or the caller has declined to re-acquire. Builds can start whenever
+    // the locks are yielded, so each yield has to be followed by another lock.
+    while (true) {
+        // Aborting a build the coordinator is running means signalling its builder thread and
+        // waiting for it to exit, which it cannot do while we hold the collection lock.
+        if (coordinator.hasIndexBuilder(opCtx, collectionUUID, indexNames)) {
+            unlock();
+            coordinator.abortIndexBuildByIndexNames(opCtx, collectionUUID, indexNames, reason);
+            if (!lock()) {
+                return;
+            }
+            continue;
+        }
+
+        // The coordinator is not running a build for these indexes, so any that is still registered
+        // has not yet been resumed.
+        if (!abortUnresumedPrimaryDrivenIndexBuilds(
+                opCtx,
+                [&](const primary_driven::Registry::Entry& build) {
+                    return build.collectionUUID == collectionUUID && buildsExactly(build.indexes);
+                },
+                reason)) {
+            return;
+        }
+
+        // That abort wrote to the catalog, making the caller's acquisition of the old instance
+        // invalid. Unlock and re-lock to refresh it.
+        unlock();
+        if (!lock()) {
+            return;
+        }
+    }
+}
 
 void abort(OperationContext* opCtx,
            const NamespaceString& ns,
