@@ -92,6 +92,12 @@ public:
      */
     bool connect(const SockAddr& remote);
 
+    /**
+     * As connect(), but reports why the connection failed. Callers that retry can use the error
+     * category to tell a transient network failure apart from a permanent one.
+     */
+    Status connectWithStatus(const SockAddr& remote, Milliseconds connectTimeoutMillis);
+
     void close();
     void send(const char* data, int len, const char* context);
     void send(const std::vector<std::pair<char*, int>>& data, const char* context);

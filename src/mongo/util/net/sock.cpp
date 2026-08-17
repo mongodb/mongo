@@ -74,15 +74,36 @@ bool setBlock(int fd, bool block) {
 #endif
 }
 
-void networkWarnWithDescription(const Socket& socket,
-                                std::string_view call,
-                                std::error_code ec = lastSocketError()) {
-    LOGV2_WARNING(23190,
-                  "Failed to connect to remote host",
-                  "remoteSocketAddress"_attr = socket.remoteAddr().getAddr(),
-                  "remoteSocketAddressPort"_attr = socket.remoteAddr().getPort(),
-                  "call"_attr = call,
-                  "error"_attr = errorMessage(ec));
+// Separates failures that a caller can usefully retry from ones that will fail identically every
+// time. Anything unrecognized is treated as retryable, since a socket failure is far more often
+// transient than permanent.
+ErrorCodes::Error connectErrorCode(std::error_code ec) {
+    if (ec == std::errc::timed_out) {
+        return ErrorCodes::NetworkTimeout;
+    }
+    if (ec == std::errc::connection_refused || ec == std::errc::host_unreachable ||
+        ec == std::errc::network_unreachable || ec == std::errc::network_down ||
+        ec == std::errc::network_reset || ec == std::errc::connection_reset ||
+        ec == std::errc::connection_aborted) {
+        return ErrorCodes::HostUnreachable;
+    }
+    if (ec == std::errc::address_family_not_supported || ec == std::errc::invalid_argument ||
+        ec == std::errc::permission_denied || ec == std::errc::wrong_protocol_type) {
+        return ErrorCodes::InvalidOptions;
+    }
+    return ErrorCodes::SocketException;
+}
+
+// Builds the failure without logging it, so a caller that retries can decide whether a given
+// attempt is worth reporting. connect() logs on the caller's behalf for callers that cannot.
+Status makeConnectError(const Socket& socket,
+                        std::string_view call,
+                        std::error_code ec = lastSocketError()) {
+    return Status(connectErrorCode(ec),
+                  fmt::format("Failed to connect to {} in {}: {}",
+                              socket.remoteAddr().toString(),
+                              call,
+                              errorMessage(ec)));
 }
 
 const double kMaxConnectTimeoutMS = 5000;
@@ -267,17 +288,29 @@ bool Socket::connect(const SockAddr& remote) {
 }
 
 bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) {
+    Status status = connectWithStatus(remote, connectTimeoutMillis);
+    if (status.isOK()) {
+        return true;
+    }
+
+    LOGV2_WARNING(23190,
+                  "Failed to connect to remote host",
+                  "remoteSocketAddress"_attr = remote.getAddr(),
+                  "remoteSocketAddressPort"_attr = remote.getPort(),
+                  "error"_attr = status.reason());
+    return false;
+}
+
+Status Socket::connectWithStatus(const SockAddr& remote, Milliseconds connectTimeoutMillis) {
     _remote = remote;
 
     _fd = ::socket(remote.getType(), SOCK_STREAM, 0);
     if (_fd == INVALID_SOCKET) {
-        networkWarnWithDescription(*this, "socket");
-        return false;
+        return makeConnectError(*this, "socket");
     }
 
     if (!setBlock(_fd, false)) {
-        networkWarnWithDescription(*this, "set socket to non-blocking mode");
-        return false;
+        return makeConnectError(*this, "set socket to non-blocking mode");
     }
 
     const Date_t expiration = Date_t::now() + connectTimeoutMillis;
@@ -287,13 +320,11 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
         auto ec = lastSocketError();
 #ifdef _WIN32
         if (ec != systemError(WSAEWOULDBLOCK)) {
-            networkWarnWithDescription(*this, "connect", ec);
-            return false;
+            return makeConnectError(*this, "connect", ec);
         }
 #else
         if (ec != posixError(EINTR) && ec != posixError(EINPROGRESS)) {
-            networkWarnWithDescription(*this, "connect", ec);
-            return false;
+            return makeConnectError(*this, "connect", ec);
         }
 #endif
 
@@ -307,14 +338,12 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
             int pollReturn = socketPoll(&pfd, 1, timeout.count());
 #ifdef _WIN32
             if (pollReturn == SOCKET_ERROR) {
-                networkWarnWithDescription(*this, "poll");
-                return false;
+                return makeConnectError(*this, "poll");
             }
 #else
             if (pollReturn == -1) {
                 if (errno != EINTR) {
-                    networkWarnWithDescription(*this, "poll");
-                    return false;
+                    return makeConnectError(*this, "poll");
                 }
 
                 // EINTR in poll, try again
@@ -323,12 +352,10 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
 #endif
             // No activity for the full duration of the timeout.
             if (pollReturn == 0) {
-                LOGV2_WARNING(23192,
-                              "Failed to connect to remote host. Giving up",
-                              "remoteAddr"_attr = _remote.getAddr(),
-                              "remotePort"_attr = _remote.getPort(),
-                              "connectTimeout"_attr = connectTimeoutMillis);
-                return false;
+                return Status(ErrorCodes::NetworkTimeout,
+                              fmt::format("Timed out after {} connecting to {}",
+                                          connectTimeoutMillis.toString(),
+                                          _remote.toString()));
             }
 
             // We had a result, see if there's an error on the socket.
@@ -336,13 +363,11 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
             socklen_t optLen = sizeof(optVal);
             if (::getsockopt(
                     _fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&optVal), &optLen) == -1) {
-                networkWarnWithDescription(*this, "getsockopt");
-                return false;
+                return makeConnectError(*this, "getsockopt");
             }
             if (optVal != 0) {
-                networkWarnWithDescription(
+                return makeConnectError(
                     *this, "checking socket for error after poll", systemError(optVal));
-                return false;
             }
 
             // We had activity and we don't have errors on the socket, we're connected.
@@ -351,8 +376,7 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
     }
 
     if (!setBlock(_fd, true)) {
-        networkWarnWithDescription(*this, "could not set socket to blocking mode");
-        return false;
+        return makeConnectError(*this, "could not set socket to blocking mode");
     }
 
     if (_timeout > 0) {
@@ -374,7 +398,7 @@ bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) 
 
     _awaitingHandshake = false;
 
-    return true;
+    return Status::OK();
 }
 
 // throws if SSL_write or send fails
