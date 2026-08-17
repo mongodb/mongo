@@ -135,8 +135,24 @@ joinTestWrapper(db, () => {
         },
     ]);
 
-    runJoinTest("2-Nodes, Exclusion projection (local/foreign)", a, [
-        {$project: {"obj": 0}},
+    // Note: exclusion projections on the base collection are not supported, but exclusions on the foreign side are.
+    // TODO SERVER-131452: Add a test for a base collection exclusion.
+    runJoinTest("2-Nodes, Exclusion projection (foreign)", a, [
+        {
+            $lookup: {
+                from: b.getName(),
+                localField: "a",
+                foreignField: "b",
+                as: "j1",
+                pipeline: [{$project: {"obj": 0}}],
+            },
+        },
+        {$unwind: "$j1"},
+    ]);
+
+    // Excluding _id is ok, as long as we include other fields.
+    runJoinTest("2-Nodes, Inclusion projection -id base, exclusion foreign", a, [
+        {$project: {_id: 0, a: 1}},
         {
             $lookup: {
                 from: b.getName(),
@@ -150,24 +166,16 @@ joinTestWrapper(db, () => {
     ]);
 
     runJoinTest("2-Nodes, Exclusion projection (trailing $match)", a, [
-        {$project: {"obj": 0}},
         {$lookup: {from: b.getName(), as: "j1", pipeline: [{$project: {"obj.foo": 0}}]}},
         {$unwind: "$j1"},
         {$match: {$expr: {$eq: ["$j1.b", "$a"]}}},
     ]);
 
-    // TODO SERVER-131452: this produces incorrect results.
-    runJoinTest(
-        "2-Nodes, Exclusion projection on subobject (trailing $match)",
-        a,
-        [
-            {$project: {"obj.subobj": 0}},
-            {$lookup: {from: b.getName(), as: "j1", pipeline: [{$project: {"_id": 0}}]}},
-            {$unwind: "$j1"},
-            {$match: {$expr: {$eq: ["$j1.b", "$a"]}}},
-        ],
-        false /* assertResultsEqual */,
-    );
+    runJoinTest("2-Nodes, Exclusion projection on subobject (trailing $match)", a, [
+        {$lookup: {from: b.getName(), as: "j1", pipeline: [{$project: {"obj.foo": 0, "_id": 0}}]}},
+        {$unwind: "$j1"},
+        {$match: {$expr: {$eq: ["$j1.b", "$a"]}}},
+    ]);
 
     // TODO SERVER-131449: Ensure the last $lookup is eligible after fix to deps graph.
     runJoinTest("4-Nodes, Rename all join preds, subpipeline edges", a, [

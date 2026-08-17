@@ -2223,14 +2223,15 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 11. Basic example with a $project excluding a field from the base collection
+## 11. Basic example with a $project including a field from the base collection
 ### No join opt
 ### Pipeline
 ```json
 [
 	{
 		"$project" : {
-			"_id" : false
+			"a" : 1,
+			"b" : 1
 		}
 	},
 	{
@@ -2259,20 +2260,20 @@ rightEmbeddingField: "none"
 ```
 ### Results
 ```json
-{ "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
 ### With bottom-up plan enumeration (left-deep)
 usedJoinOptimization: true
@@ -2290,7 +2291,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: { "_id" : true, "a" : true, "b" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -2311,7 +2312,7 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  PROJECTION_SIMPLE
-  |  |  transformBy: { "_id" : false }
+  |  |  transformBy: { "_id" : true, "a" : true, "b" : true }
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md]
   |  |  direction: "forward"
@@ -2338,7 +2339,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: { "_id" : true, "a" : true, "b" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -2362,7 +2363,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: { "_id" : true, "a" : true, "b" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -2389,7 +2390,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  transformBy: { "_id" : true, "a" : true, "b" : true }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -2413,7 +2414,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  transformBy: { "_id" : true, "a" : true, "b" : true }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -2434,7 +2435,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: { "_id" : true, "a" : true, "b" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -5611,7 +5612,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
-## 29. $project in prefix excluding a non-join-predicate field with single join
+## 29. $project in prefix including only the join-predicate field with single join
 ### No join opt
 ### Pipeline
 ```json
@@ -5619,7 +5620,7 @@ rightEmbeddingField: "x"
 	{
 		"$project" : {
 			"_id" : 0,
-			"b" : 0
+			"a" : 1
 		}
 	},
 	{
@@ -5658,7 +5659,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5675,7 +5676,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5692,7 +5693,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5709,7 +5710,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5726,7 +5727,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5743,7 +5744,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -5760,7 +5761,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false, "b" : false }
+  transformBy: { "a" : true, "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"

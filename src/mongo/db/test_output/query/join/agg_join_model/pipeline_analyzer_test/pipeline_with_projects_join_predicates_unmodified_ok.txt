@@ -6,7 +6,9 @@
                 "accessPath": {
                     "filter": {},
                     "projection": {
-                        "_id": false
+                        "_id": true,
+                        "a": true,
+                        "b": true
                     }
                 },
                 "embedPath": ""

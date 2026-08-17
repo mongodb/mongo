@@ -245,6 +245,75 @@ runTestCaseIneligiblePipeline({
     expectedCount: 1,
 });
 
+// Fallback if the prefix of the pipeline contains an exclusion $project on the base collection.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {b: 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// Same, for an exclusion $project on a subpath, and with a preceding $match.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$match: {b: 1}},
+        {$project: {"x.c": 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// Excluding only "_id" is still an exclusion projection, so it falls back too.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {_id: 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// Excluding "_id" while including other fields is fine.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {$project: {_id: 0, m: "$a"}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "m", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// An exclusion $project is only restricted on the base collection- it is still supported inside a
+// $lookup sub-pipeline.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {d: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// An exclusion $project after the joins (in the suffix) is unaffected.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$project: {"x._id": 0}},
+    ],
+    expectedCount: 1,
+});
+
 // Fallback if $lookup sub-pipeline contains a $sort.
 runTestCaseIneligiblePipeline({
     pipeline: [

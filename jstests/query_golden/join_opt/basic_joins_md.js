@@ -330,9 +330,9 @@ joinTestWrapper(db, () => {
         {$unwind: "$k.y.z"},
     ]);
 
-    section("Basic example with a $project excluding a field from the base collection");
+    section("Basic example with a $project including a field from the base collection");
     runBasicJoinTest([
-        {$project: {_id: false}},
+        {$project: {a: 1, b: 1}},
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: "$x"},
         {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
@@ -568,9 +568,9 @@ joinTestWrapper(db, () => {
         {$unwind: "$x"},
     ]);
 
-    section("$project in prefix excluding a non-join-predicate field with single join");
+    section("$project in prefix including only the join-predicate field with single join");
     runBasicJoinTest([
-        {$project: {_id: 0, b: 0}},
+        {$project: {_id: 0, a: 1}},
         {
             $lookup: {
                 from: foreignColl1.getName(),

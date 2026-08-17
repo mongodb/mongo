@@ -10,7 +10,9 @@
                         }
                     },
                     "projection": {
-                        "k": false
+                        "_id": true,
+                        "a": true,
+                        "c": true
                     }
                 },
                 "embedPath": ""

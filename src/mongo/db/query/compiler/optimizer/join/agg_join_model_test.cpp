@@ -2444,7 +2444,7 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$match: {c: 1}},
-            {$project: {k: 0}},
+            {$project: {a: 1, c: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
             {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
@@ -2535,7 +2535,7 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
 TEST_F(PipelineAnalyzerTest, PipelineWithProjectsJoinPredicatesUnmodifiedOk) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
-            {$project: {_id: 0}},
+            {$project: {a: 1, b: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
                 {$project: {_id: 0}}
             ]}},
@@ -2632,7 +2632,7 @@ TEST_F(PipelineAnalyzerTest, PipelineWithProjectsExprJoinPredicateModifiedForJoi
 
 TEST_F(PipelineAnalyzerTest, PrefixTooComplexForCQPushdownBails) {
     const auto query = R"([
-            {$project: {_id: 0}},
+            {$project: {a: 1}},
             {$addFields: {bar: "$a"}},
             {$match: {bar: {$gt: 0}}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a"}},
@@ -2665,7 +2665,7 @@ TEST_F(PipelineAnalyzerTest, PrefixTooComplexForCQPushdownBails) {
 TEST_F(PipelineAnalyzerTest, InferredPredicateDoesntDiscardProjections) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
-            {$project: {_id: 0}},
+            {$project: {a: 1, b: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
                 {$match: {b: {$eq: 3}}},
                 {$project: {_id: 0}}
@@ -2855,6 +2855,52 @@ TEST_F(PipelineAnalyzerTest, PrefixProjectInclusionExcludesJoinFieldBails) {
     ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+}
+
+// Tests that an exclusion $project on the base collection makes the pipeline ineligible for join
+// reordering. TODO SERVER-131452: Enable this case.
+TEST_F(PipelineAnalyzerTest, PrefixExclusionProjectIsIneligible) {
+    const auto query = R"([
+        {$project: {c: 0}},
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x"}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b", "c"}, {{"A", {"b"}}});
+
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+// An exclusion $project on a subpath of the base collection is ineligible as well.
+TEST_F(PipelineAnalyzerTest, PrefixExclusionProjectOnSubPathIsIneligible) {
+    const auto query = R"([
+        {$match: {a: {$gt: 0}}},
+        {$project: {"c.d": 0}},
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x"}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a", "b", "c.d"}, {{"A", {"b"}}});
+
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+// Exclusion projections are still supported in a $lookup subpipeline- only the base collection is
+// restricted.
+TEST_F(PipelineAnalyzerTest, SubPipelineExclusionProjectIsEligible) {
+    const auto query = R"([
+        {$lookup: {from: "A", localField: "a", foreignField: "b", as: "x", pipeline: [
+            {$project: {c: 0}}
+        ]}},
+        {$unwind: "$x"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b", "c"}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 // Tests that two joins each having a $project in their subpipeline are correctly handled.

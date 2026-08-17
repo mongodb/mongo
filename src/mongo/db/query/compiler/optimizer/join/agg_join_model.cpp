@@ -267,11 +267,32 @@ boost::optional<JoinFallbackReason> isUnwindEligible(const DocumentSourceUnwind&
     return boost::none;
 }
 
-bool isSubPipelineOrPrefixEligible(auto start, auto end) {
-    return std::all_of(start, end, [](const auto& docSrc) {
+/**
+ * Checks whether every stage in ['start', 'end') is one we can push into a CanonicalQuery, either
+ * for a $lookup sub-pipeline or for the pipeline prefix over the base collection.
+ *
+ * 'allowExclusionProjection' must be false for the base collection prefix, because the stage
+ * builders do not yet support exclusion projections there. They remain supported in $lookup
+ * sub-pipelines.
+ *
+ * TODO SERVER-131452: Relax this restriction.
+ */
+bool isSubPipelineOrPrefixEligible(DocumentSourceContainer::const_iterator start,
+                                   DocumentSourceContainer::const_iterator end,
+                                   bool allowExclusionProjection) {
+    return std::all_of(start, end, [&](const auto& docSrc) {
+        if (auto* transform =
+                dynamic_cast<DocumentSourceSingleDocumentTransformation*>(docSrc.get());
+            transform) {
+            // Allow $project as long as it isn't an exclusion projection. Note that an inclusion
+            // projection which also excludes _id (e.g. {_id: 0, a: 1}) is still permitted; only a
+            // pure exclusion projection (e.g. {_id: 0}) is rejected.
+            return allowExclusionProjection ||
+                transform->getTransformerType() !=
+                TransformerInterface::TransformerType::kExclusionProjection;
+        }
         return dynamic_cast<DocumentSourceMatch*>(docSrc.get()) ||
             dynamic_cast<DocumentSourceProject*>(docSrc.get()) ||
-            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(docSrc.get()) ||
             dynamic_cast<DocumentSourceAddFields*>(docSrc.get());
     });
 }
@@ -306,7 +327,8 @@ boost::optional<JoinFallbackReason> isLookupEligible(const DocumentSourceLookUp&
     // is combined with that $match in extractPredicatesFromLookup().
     if (!isSubPipelineOrPrefixEligible(
             lookup.getResolvedIntrospectionPipeline().getSources().begin(),
-            lookup.getResolvedIntrospectionPipeline().getSources().end())) {
+            lookup.getResolvedIntrospectionPipeline().getSources().end(),
+            true /* allowExclusionProjection */)) {
         return JoinFallbackReason::kIneligibleSubPipelineStage;
     }
     return boost::none;
@@ -357,7 +379,7 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
                 joinOptMetrics.fallbackReasons.increment(*reason);
                 return false;
             }
-            if (!isSubPipelineOrPrefixEligible(startIt, it)) {
+            if (!isSubPipelineOrPrefixEligible(startIt, it, false /* allowExclusionProjection */)) {
                 joinOptMetrics.fallbackReasons.increment(
                     JoinFallbackReason::kIneligiblePrefixStage);
                 return false;

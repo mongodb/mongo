@@ -370,13 +370,59 @@ rightEmbeddingField: "j2"
   COLLSCAN [test.projections_md_b]
   direction: "forward"
 ```
-## 6. 2-Nodes, Exclusion projection (local/foreign)
+## 6. 2-Nodes, Exclusion projection (foreign)
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "projections_md_b",
+			"localField" : "a",
+			"foreignField" : "b",
+			"as" : "j1",
+			"pipeline" : [
+				{
+					"$project" : {
+						"obj" : 0
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$j1"
+	}
+]
+```
+### Results
+```json
+{ "_id" : 1, "a" : 1, "j1" : { "_id" : 1, "b" : 1 }, "obj" : { "subobj" : { "field" : "foo" } } }
+```
+### 2-Nodes, Exclusion projection (foreign) + Join Optimization
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [b = a]
+leftEmbeddingField: "j1"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.projections_md_a]
+  |  direction: "forward"
+  |
+  PROJECTION_SIMPLE
+  transformBy: { "obj" : false }
+  |
+  COLLSCAN [test.projections_md_b]
+  direction: "forward"
+```
+## 7. 2-Nodes, Inclusion projection -id base, exclusion foreign
 ### Pipeline
 ```json
 [
 	{
 		"$project" : {
-			"obj" : 0
+			"_id" : 0,
+			"a" : 1
 		}
 	},
 	{
@@ -401,9 +447,9 @@ rightEmbeddingField: "j2"
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "j1" : { "_id" : 1, "b" : 1 } }
+{ "a" : 1, "j1" : { "_id" : 1, "b" : 1 } }
 ```
-### 2-Nodes, Exclusion projection (local/foreign) + Join Optimization
+### 2-Nodes, Inclusion projection -id base, exclusion foreign + Join Optimization
 usedJoinOptimization: true
 
 ```
@@ -412,7 +458,7 @@ leftEmbeddingField: "j1"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "obj" : false }
+  |  transformBy: { "a" : true, "_id" : false }
   |  |
   |  COLLSCAN [test.projections_md_a]
   |  direction: "forward"
@@ -423,15 +469,10 @@ rightEmbeddingField: "none"
   COLLSCAN [test.projections_md_b]
   direction: "forward"
 ```
-## 7. 2-Nodes, Exclusion projection (trailing $match)
+## 8. 2-Nodes, Exclusion projection (trailing $match)
 ### Pipeline
 ```json
 [
-	{
-		"$project" : {
-			"obj" : 0
-		}
-	},
 	{
 		"$lookup" : {
 			"from" : "projections_md_b",
@@ -462,7 +503,7 @@ rightEmbeddingField: "none"
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "j1" : { "_id" : 1, "b" : 1, "obj" : { } } }
+{ "_id" : 1, "a" : 1, "j1" : { "_id" : 1, "b" : 1, "obj" : { } }, "obj" : { "subobj" : { "field" : "foo" } } }
 ```
 ### 2-Nodes, Exclusion projection (trailing $match) + Join Optimization
 usedJoinOptimization: true
@@ -471,9 +512,6 @@ usedJoinOptimization: true
 HASH_JOIN_EMBEDDING [b $= a]
 leftEmbeddingField: "j1"
 rightEmbeddingField: "none"
-  |  |
-  |  PROJECTION_SIMPLE
-  |  transformBy: { "obj" : false }
   |  |
   |  COLLSCAN [test.projections_md_a]
   |  direction: "forward"
@@ -484,15 +522,10 @@ rightEmbeddingField: "none"
   COLLSCAN [test.projections_md_b]
   direction: "forward"
 ```
-## 8. 2-Nodes, Exclusion projection on subobject (trailing $match)
+## 9. 2-Nodes, Exclusion projection on subobject (trailing $match)
 ### Pipeline
 ```json
 [
-	{
-		"$project" : {
-			"obj.subobj" : 0
-		}
-	},
 	{
 		"$lookup" : {
 			"from" : "projections_md_b",
@@ -500,6 +533,7 @@ rightEmbeddingField: "none"
 			"pipeline" : [
 				{
 					"$project" : {
+						"obj.foo" : 0,
 						"_id" : 0
 					}
 				}
@@ -523,7 +557,7 @@ rightEmbeddingField: "none"
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "j1" : { "b" : 1, "obj" : { "foo" : "foo" } }, "obj" : { } }
+{ "_id" : 1, "a" : 1, "j1" : { "b" : 1, "obj" : { } }, "obj" : { "subobj" : { "field" : "foo" } } }
 ```
 ### 2-Nodes, Exclusion projection on subobject (trailing $match) + Join Optimization
 usedJoinOptimization: true
@@ -533,24 +567,16 @@ HASH_JOIN_EMBEDDING [b $= a]
 leftEmbeddingField: "j1"
 rightEmbeddingField: "none"
   |  |
-  |  PROJECTION_DEFAULT
-  |  transformBy: { "obj" : { "subobj" : false } }
-  |  |
   |  COLLSCAN [test.projections_md_a]
   |  direction: "forward"
   |
-  PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : false, "obj" : { "foo" : false } }
   |
   COLLSCAN [test.projections_md_b]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 1, "a" : 1, "j1" : { "b" : 1, "obj" : { "foo" : "foo" } }, "obj" : { "subobj" : { "field" : "foo" } } }
-```
-## 9. 4-Nodes, Rename all join preds, subpipeline edges
+## 10. 4-Nodes, Rename all join preds, subpipeline edges
 ### Pipeline
 ```json
 [
