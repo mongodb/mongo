@@ -19,6 +19,12 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include <fcntl.h>
 
@@ -242,6 +248,47 @@ LandlockFilesystemRule LandlockFilesystemRule::readWrite(std::string path) {
     return {std::move(path), kAccessReadWrite};
 }
 
+StatusWith<LandlockFilesystemRule> LandlockFilesystemRule::fromConfigString(
+    std::string_view entry) {
+    // Every diagnostic quotes the entry exactly as written. Stray whitespace,
+    // an empty entry, etc. is visible
+    const auto malformed = [&](const std::string& detail) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Invalid security.landlock.additionalPathRules entry '"
+                                    << entry << "': " << detail
+                                    << ". Expected \"r:<absolute path>\" or "
+                                       "\"rw:<absolute path>\"");
+    };
+
+    // The first colon only: the access specifier cannot contain one, but a path can.
+    const auto separator = entry.find(':');
+    if (separator == std::string_view::npos) {
+        return malformed("missing the '<access>:' prefix");
+    }
+    const auto access = entry.substr(0, separator);
+    const auto path = entry.substr(separator + 1);
+
+    if (access.empty()) {
+        return malformed("no access specifier precedes the ':'");
+    }
+    if (path.empty()) {
+        return malformed("no path follows the access specifier");
+    }
+    // A relative path would be resolved against whatever directory the process happens
+    // to be in -- "/" once --fork has chdir'd
+    if (!path.starts_with('/')) {
+        return malformed("the path must be absolute");
+    }
+
+    if (access == "r") {
+        return readOnly(std::string{path});
+    }
+    if (access == "rw") {
+        return readWrite(std::string{path});
+    }
+    return malformed(str::stream() << "unknown access specifier '" << access << "'");
+}
+
 std::vector<std::string_view> LandlockRuleset::fsAccessRightNames(uint64_t mask) {
     static constexpr std::pair<uint64_t, std::string_view> kFsRightNames[] = {
         {LANDLOCK_ACCESS_FS_EXECUTE, "LANDLOCK_ACCESS_FS_EXECUTE"},
@@ -413,6 +460,15 @@ Status LandlockRuleset::restrictSelf() {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "Failed to enforce Landlock ruleset: "
                                     << errorMessage(lastSystemError()));
+    }
+    return Status::OK();
+}
+
+Status validateLandlockAdditionalPathRules(const std::vector<std::string>& entries) {
+    for (const auto& entry : entries) {
+        if (auto swRule = LandlockFilesystemRule::fromConfigString(entry); !swRule.isOK()) {
+            return swRule.getStatus();
+        }
     }
     return Status::OK();
 }

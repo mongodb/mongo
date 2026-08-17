@@ -36,7 +36,7 @@ filters:
   - "mongos_main*":
     approvers:
       - 10gen/server-programmability
-  - "mongos_options_*":
+  - "mongos_options*":
     approvers:
       - 10gen/server-programmability
   - "service_entry_point*":

@@ -185,6 +185,11 @@ boost::filesystem::path canonicalStartupPath(const std::string& path) {
     return ec ? absolutePath : canonicalPath;
 }
 
+std::vector<std::string> startupOptionList(const std::string& key) {
+    const auto& params = optionenvironment::startupOptionsParsed;
+    return params.count(key) ? params[key].as<std::vector<std::string>>()
+                             : std::vector<std::string>{};
+}
 }  // namespace
 
 // A configured path resolved for a rule (see canonicalStartupPath). Empty stays
@@ -247,7 +252,6 @@ std::string startupOptionValue(const std::string& key) {
     const auto& params = optionenvironment::startupOptionsParsed;
     return params.count(key) ? params[key].as<std::string>() : std::string{};
 }
-
 }  // namespace landlock_policy
 
 namespace {
@@ -364,6 +368,69 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
     };
 }
 
+/**
+ * Grants the hierarchies the operator declared in
+ * security.landlock.additionalPathRules, for paths the server has no way to derive --
+ * a site-managed CA bundle, say, or a directory some feature reads. Absent or empty,
+ * this grants nothing.
+ *
+ * One entry is exactly one rule. Unlike security.clusterIpSourceAllowlist and
+ * processManagement.loadExtensions, entries are NOT split on commas: a path
+ * can contain commas. The separator is the YAML list element, or a repeat of the command-line
+ * option (the option composes, so entries from both sources accumulate).
+ *
+ * Syntax was already checked when the options were parsed
+ * (validateLandlockAdditionalPathRules), so reaching a parse failure here would mean the
+ * validator and the parser disagree.
+ */
+void registerAdditionalPathRules(LandlockRuleset& ruleset) {
+    const auto entries = startupOptionList("security.landlock.additionalPathRules");
+    if (entries.empty()) {
+        return;
+    }
+
+    // These widen the sandbox past what the server asked for, so the whole set is
+    // logged before any of it is applied: the individual grants that follow are
+    // indistinguishable from derived ones in the log.
+    LOGV2(13214200,
+          "Landlock: granting additional path rules from the server configuration",
+          "additionalPathRules"_attr = entries);
+
+    for (const auto& entry : entries) {
+        auto swRule = LandlockFilesystemRule::fromConfigString(entry);
+        if (!swRule.isOK()) {
+            LOGV2_FATAL(13214201,
+                        "Failed to parse a configured additional Landlock path rule",
+                        "additionalPathRule"_attr = entry,
+                        "error"_attr = swRule.getStatus());
+        }
+        const auto& rule = swRule.getValue();
+
+        // addPathRule() grants nothing for a path that is absent, which is right for
+        // the derived rules -- they enumerate every path any configuration could need,
+        // and most hosts have only some of them -- but wrong here. The operator named
+        // this path, so there is a mistake in the configuration.
+        // The non-throwing exists() overload is required: a filesystem_error
+        // escaping this initializer would abort with no usable diagnostic.
+        boost::system::error_code ec;
+        if (!boost::filesystem::exists(rule.path(), ec)) {
+            LOGV2_FATAL(13214202,
+                        "The path named by a configured additional Landlock path rule does "
+                        "not exist or could not be read",
+                        "additionalPathRule"_attr = entry,
+                        "path"_attr = rule.path(),
+                        "error"_attr = ec ? ec.message() : "no such file or directory");
+        }
+
+        if (Status status = ruleset.addPathRule(rule); !status.isOK()) {
+            LOGV2_FATAL(13214203,
+                        "Failed to add a configured additional Landlock path rule",
+                        "additionalPathRule"_attr = entry,
+                        "error"_attr = status);
+        }
+    }
+}
+
 // Opens the sandbox for assembly as directed by --landlockMode /
 // security.landlock.mode (default: disabled): creates the ruleset every later
 // contributor adds to, and grants the community policy. Never enforces an
@@ -456,6 +523,8 @@ MONGO_INITIALIZER_GENERAL(EndLandlockSandboxInitialization,
         return;
     }
     auto& ruleset = *gLandlockRuleset;
+
+    registerAdditionalPathRules(ruleset);
 
     if (ruleset.abiVersion() < 7) {
         LOGV2_WARNING(13118810,

@@ -16,14 +16,17 @@
 // and syscall numbers, and the mapping from ABI version to supported rights) are
 // deliberately confined to landlock.cpp: callers describe what they need with
 // the LandlockFilesystemRule factories below and never handle raw rights.
+#if defined(__linux__)
 
 #include "mongo/base/status_with.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
-#if defined(__linux__)
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
@@ -45,6 +48,19 @@ public:
 
     /** Full read and mutate rights, for data hierarchies. */
     static LandlockFilesystemRule readWrite(std::string path);
+
+    /**
+     * Parses one security.landlock.additionalPathRules entry, `<access>:<path>`, where
+     * <access> is "r" (readOnly) or "rw" (readWrite) and <path> is absolute. Only the
+     * first colon separates the two, so a path may contain colons of its own; entries
+     * are never split on any other character, so a path may contain commas too.
+     *
+     * The path is taken exactly as written -- the kernel resolves it when the rule is
+     * added, and a path absent on this system grants nothing (see addPathRule). A
+     * malformed entry is reported as InvalidOptions naming the entry, rather than
+     * skipped, so that a typo cannot quietly narrow the policy an operator asked for.
+     */
+    static StatusWith<LandlockFilesystemRule> fromConfigString(std::string_view entry);
 
     const std::string& path() const {
         return _path;
@@ -166,6 +182,17 @@ private:
 // LANDLOCK_CREATE_RULESET_VERSION query -- the documented feature-detection
 // call. Fails when the kernel lacks Landlock (pre-5.13) or has it disabled in its LSM stack.
 StatusWith<long> landlockAbiVersion();
+
+/**
+ * Checks the syntax of every security.landlock.additionalPathRules entry, for the
+ * option's IDL validator. Runs during option parsing, so a malformed entry is rejected
+ * whatever the sandbox mode is and whatever the running kernel supports -- otherwise a
+ * typo would sit unnoticed until someone enabled the sandbox on a Landlock kernel.
+ *
+ * Syntax only: whether each path exists is a question for the moment the rules are
+ * applied, long after options are parsed.
+ */
+Status validateLandlockAdditionalPathRules(const std::vector<std::string>& entries);
 
 }  // namespace mongo
 

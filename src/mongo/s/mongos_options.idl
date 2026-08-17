@@ -5,6 +5,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/mongos_options.h"
+        - "mongo/util/landlock/landlock.h"
     configs:
         section: "Sharding options"
         source: [yaml, cli, ini]
@@ -52,5 +53,21 @@ configs:
         arg_vartype: String
         default: "disabled"
         source: [cli, yaml]
+        condition:
+            preprocessor: "defined(__linux__)"
+    "security.landlock.additionalPathRules":
+        description: >-
+            Additional filesystem hierarchies to permit under the Landlock sandbox, for paths
+            the server cannot derive from its own configuration. Each entry is
+            '<access>:<path>', where <access> is 'r' for read or 'rw' for read and write, and
+            <path> is absolute; the grant covers everything beneath it. Give one entry per
+            YAML list element, or repeat this option once per rule on the command line;
+            entries from both sources accumulate. Linux only.
+        short_name: landlockAdditionalPathRules
+        arg_vartype: StringVector
+        duplicate_behavior: append
+        source: [cli, yaml]
+        validator:
+            callback: validateLandlockAdditionalPathRules
         condition:
             preprocessor: "defined(__linux__)"
