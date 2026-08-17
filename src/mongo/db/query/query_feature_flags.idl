@@ -227,13 +227,6 @@ feature_flags:
         version: 8.3
         fcv_gated: true
 
-    featureFlagConvertBinDataVectors:
-        description: "Feature flag to enable converting to and from BinDataVectors and BSON Arrays"
-        cpp_varname: gFeatureFlagConvertBinDataVectors
-        default: true
-        version: 8.3
-        fcv_gated: true
-
     featureFlagConvertObjectToBinData:
         description: "Feature flag to enable converting from Object to BinData"
         cpp_varname: gFeatureFlagConvertObjectToBinData

@@ -289,11 +289,7 @@ assert.commandWorked(bulk.execute());
 
     // BinData -> array has by far the largest blow-up of any $convert conversion (one array element
     // per vector entry, so the output can be many times the input size), so it is the only tracked
-    // case. It requires the vector conversion feature flag.
-    if (!FeatureFlagUtil.isEnabled(db, "ConvertBinDataVectors")) {
-        return;
-    }
-
+    // case.
     // Build a vector-subtype BinData from an array field, then convert it back to an array.
     const memColl = db.agg_convert_memory_limit;
     memColl.drop();

@@ -68,7 +68,6 @@ Value makeVectorBinData() {
 }
 
 TEST_F(EvaluateConvertTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
                                                 << "array"));
@@ -86,7 +85,6 @@ TEST_F(EvaluateConvertTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
 }
 
 TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
                                                 << "array"));
@@ -112,7 +110,6 @@ TEST_F(EvaluateConvertTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
 }
 
 TEST_F(EvaluateConvertTest, FallbackTrackerWithinLimitDoesNotThrow) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
                                                 << "array"));
@@ -135,7 +132,6 @@ TEST_F(EvaluateConvertTest, FallbackTrackerWithinLimitDoesNotThrow) {
 }
 
 TEST_F(EvaluateConvertTest, FallbackTrackerEnforcesLimit) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << makeVectorBinData() << "to"
                                                 << "array"));
@@ -4813,7 +4809,6 @@ TEST(ExpressionConvert, StringToDouble) {
  */
 
 TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
 
@@ -4859,7 +4854,6 @@ TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripIntArray) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto originalArray = Value(BSON_ARRAY(1 << 5 << 10 << 24 << -30 << 79 << 83));
@@ -4883,7 +4877,6 @@ TEST(ExpressionConvertTest, CanRoundTripIntArray) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripIntArrayHexFormat) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto originalArray = Value(BSON_ARRAY(1 << 5 << 10 << 24 << -30 << 79 << 83));
@@ -4926,7 +4919,6 @@ BSONArray createBsonArrayFromFloats(std::vector<double> arr) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripFloatArray) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto bsonArray = createBsonArrayFromFloats({10.3, 5.87, 10.10294, 24.1, -30.2, 79, 83});
@@ -4951,7 +4943,6 @@ TEST(ExpressionConvertTest, CanRoundTripFloatArray) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripFloatArrayBigEndian) {
-    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = ExpressionContextForTest{};
 
     auto bsonArray = createBsonArrayFromFloats({10.3, 5.87, 10.10294, 24.1, -30.2, 79, 83});

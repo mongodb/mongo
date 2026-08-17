@@ -993,12 +993,6 @@ private:
                                               Value inputValue,
                                               ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
-        if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
-                expCtx->versionContextForFeatureFlagCheck(),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            uasserted(10506607, "$convert from BinData vector to BSON array is not enabled");
-        }
-
         auto binData = inputValue.getBinData();
         uassert(ErrorCodes::ConversionFailure,
                 "Conversion from binData to array is only supported for bindata with the vector "
@@ -1013,12 +1007,6 @@ private:
                                               Value inputValue,
                                               ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
-        if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
-                expCtx->versionContextForFeatureFlagCheck(),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            uasserted(10506608, "$convert from BSON array to BinData vector is not enabled");
-        }
-
         uassert(ErrorCodes::ConversionFailure,
                 "Converting array to BinData requires array",
                 inputValue.isArray());

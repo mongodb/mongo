@@ -3,7 +3,6 @@
  * @tags: [
  *   # BinData $convert array was added in v8.3.
  *   requires_fcv_83,
- *   featureFlagConvertBinDataVectors,
  * ]
  */
 
