@@ -3039,14 +3039,33 @@ export class ReplSetTest {
         }
 
         try {
-            const liveSecondaries = _determineLiveSecondaries(this);
-            this.checkReplicaSet(
-                checkDBHashesForReplSet,
-                liveSecondaries,
-                this,
-                excludedDBs,
-                msgPrefix,
-                ignoreUUIDs,
+            let lastCode491Error;
+            assert.soon(
+                () => {
+                    try {
+                        this.checkReplicaSet(
+                            checkDBHashesForReplSet,
+                            _determineLiveSecondaries(this),
+                            this,
+                            excludedDBs,
+                            msgPrefix,
+                            ignoreUUIDs,
+                        );
+                        return true;
+                    } catch (e) {
+                        if (
+                            e.code !==
+                            ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace
+                        ) {
+                            throw e;
+                        }
+                        lastCode491Error = e;
+                        return false;
+                    }
+                },
+                () =>
+                    `CheckReplDBHash repeatedly failed with code 491: ` +
+                    `${lastCode491Error.message}`,
             );
         } finally {
             // Clear failpoint set above that disables change streams pre-images removal.
