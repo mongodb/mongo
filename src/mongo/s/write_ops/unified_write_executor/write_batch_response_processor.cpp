@@ -35,6 +35,7 @@
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -204,6 +205,8 @@ void aggregateQueryStatsMetrics(OperationContext* opCtx, const WriteBatchRespons
 
 ProcessorResult WriteBatchResponseProcessor::onWriteBatchResponse(
     OperationContext* opCtx, RoutingContext& routingCtx, const WriteBatchResponse& response) {
+    _lastRoundStaleVersions.clear();
+    _lastRoundStaleDbVersions.clear();
     // If we are collecting query stats for any of the ops in this write batch,
     // aggregate them into OpDebug now.
     aggregateQueryStatsMetrics(opCtx, response);
@@ -514,8 +517,15 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
                ErrorCodes::isStaleShardVersionError(status.code())) {
         if (status == ErrorCodes::StaleDbVersion) {
             LOGV2_DEBUG(10411403, 4, "Noting stale database response", "status"_attr = status);
+            if (const auto info = status.extraInfo<StaleDbRoutingVersion>()) {
+                _lastRoundStaleDbVersions.try_emplace(info->getDb(), info->getVersionReceived());
+            }
         } else {
             LOGV2_DEBUG(10346900, 4, "Noting stale config response", "status"_attr = status);
+            if (const auto info = status.extraInfo<StaleConfigInfo>()) {
+                _lastRoundStaleVersions.try_emplace(
+                    info->getNss(), std::make_pair(info->getShardId(), info->getVersionReceived()));
+            }
         }
         routingCtx.onStaleError(status);
     } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {

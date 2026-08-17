@@ -29,8 +29,13 @@
 
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
 #include "mongo/unittest/unittest.h"
 
@@ -70,15 +75,61 @@ public:
         setupShards(shards);
     }
 
+    // Like expectCollectionRoutingRequest but uses a caller-supplied epoch, timestamp, and uuid so
+    // that repeated calls return the same collection identity and ShardVersion (needed to simulate
+    // an unproductive refresh).
+    void expectCollectionRoutingRequestWithVersion(
+        NamespaceString nss, ShardId shardId, OID epoch, Timestamp timestamp, UUID uuid) {
+        onFindCommand([=, this](const executor::RemoteCommandRequest&) {
+            CollectionType coll(nss, epoch, timestamp, Date_t::now(), uuid, BSON("a" << 1));
+            ChunkType chunk(uuid,
+                            ChunkRange(BSON("a" << MINKEY), BSON("a" << MAXKEY)),
+                            ChunkVersion({epoch, timestamp}, {1, 0}),
+                            shardId);
+            chunk.setName(OID::gen());
+            return std::vector<BSONObj>{coll.toBSON(), BSON("chunks" << chunk.toConfigBSON())};
+        });
+    }
+
     void expectDatabaseRoutingRequest(DatabaseName dbName, ShardId shardId) {
-        onFindCommand([&](const executor::RemoteCommandRequest& request) {
+        onFindCommand([=, this](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.dbname.toString_forTest(), "config");
             ASSERT_EQ(request.cmdObj.getField("find").String(), "databases");
             ASSERT_BSONOBJ_EQ(request.cmdObj.getField("filter").Obj(),
                               BSON("_id" << dbName.toString_forTest()));
 
-            DatabaseType db(dbName, shardId, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+            DatabaseType db(dbName,
+                            shardId,
+                            DatabaseVersion(UUID::gen(), Timestamp(++_routingVersionCounter, 1)));
             return std::vector<BSONObj>{db.toBSON()};
+        });
+    }
+
+    // Like expectDatabaseRoutingRequest but returns a fixed DatabaseVersion (needed to simulate
+    // an unproductive database-version refresh).
+    void expectDatabaseRoutingRequestWithVersion(DatabaseName dbName,
+                                                 ShardId shardId,
+                                                 UUID uuid,
+                                                 Timestamp timestamp) {
+        onFindCommand([=, this](const executor::RemoteCommandRequest&) {
+            DatabaseType db(dbName, shardId, DatabaseVersion(uuid, timestamp));
+            return std::vector<BSONObj>{db.toBSON()};
+        });
+    }
+
+    // Intercepts the collection routing lookup for an untracked collection by returning an empty
+    // result. This causes the catalog cache to record "no routing table" for the namespace.
+    void expectUntrackedCollectionRoutingRequest(NamespaceString nss) {
+        onFindCommand([=, this](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.dbname.toString_forTest(), "config");
+            ASSERT_EQ(request.cmdObj.getField("aggregate").String(), "collections");
+            return std::vector<BSONObj>{};
+        });
+        // An untracked collection triggers a follow-up lookup for the timeseries buckets namespace.
+        onFindCommand([=, this](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.dbname.toString_forTest(), "config");
+            ASSERT_EQ(request.cmdObj.getField("aggregate").String(), "collections");
+            return std::vector<BSONObj>{};
         });
     }
 
@@ -91,7 +142,7 @@ public:
 
             auto uuid = UUID::gen();
             auto epoch = OID::gen();
-            auto timestamp = Timestamp(1, 1);
+            auto timestamp = Timestamp(++_routingVersionCounter, 1);
             CollectionType coll(nss, epoch, timestamp, Date_t::now(), uuid, BSON("a" << 1));
             ChunkType chunk(uuid,
                             ChunkRange(BSON("a" << MINKEY), BSON("a" << MAXKEY)),
@@ -195,6 +246,9 @@ public:
             return BSON("ok" << 1 << "n" << n);
         });
     }
+
+private:
+    uint32_t _routingVersionCounter = 0;
 };
 
 TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
@@ -538,6 +592,277 @@ TEST_F(UnifiedWriteExecutorTest, UnorderedBulkWriteErrorsAndStops) {
                                 0 /* nUpserted */,
                                 0 /* nDelete */
     );
+
+    future.default_timed_get();
+}
+
+namespace {
+
+// Returns a bulkWrite cursor response with a StaleDbVersion error for each op in the request,
+// using the DatabaseVersion the scheduler actually sent as receivedVersion.
+BSONObj makeBulkWriteStaleDbVersionResponse(const NamespaceString& nss,
+                                            const executor::RemoteCommandRequest& request) {
+    const auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    const auto bulkWrite =
+        BulkWriteCommandRequest::parse(opMsgRequest.body, IDLParserContext("bulkWrite"));
+    const auto& ops = bulkWrite.getOps();
+
+    boost::optional<DatabaseVersion> receivedVersion;
+    for (const auto& nsEntry : bulkWrite.getNsInfo()) {
+        if (nsEntry.getNs() == nss) {
+            receivedVersion = nsEntry.getDatabaseVersion();
+            break;
+        }
+    }
+    tassert(12378202, "NSS not found in bulkWrite nsInfo", receivedVersion.has_value());
+
+    BSONArrayBuilder firstBatch;
+    for (size_t i = 0; i < ops.size(); ++i) {
+        BulkWriteReplyItem item(
+            static_cast<int>(i),
+            Status(StaleDbRoutingVersion(nss.dbName(), *receivedVersion, boost::none),
+                   "Stale db version error"));
+        firstBatch.append(item.serialize());
+    }
+
+    return BSON("cursor" << BSON("id" << 0ll << "firstBatch" << firstBatch.arr() << "ns"
+                                      << "admin.$cmd.bulkWrite")
+                         << "nErrors" << static_cast<int>(ops.size()) << "nInserted" << 0
+                         << "nMatched" << 0 << "nModified" << 0 << "nUpserted" << 0 << "nDeleted"
+                         << 0);
+}
+
+// Returns a bulkWrite cursor response with a StaleConfig error for each op in the request,
+// using the ShardVersion the scheduler actually sent as receivedVersion.
+BSONObj makeBulkWriteStaleConfigResponse(const NamespaceString& nss,
+                                         const executor::RemoteCommandRequest& request,
+                                         const ShardId& shardId) {
+    const auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    const auto bulkWrite =
+        BulkWriteCommandRequest::parse(opMsgRequest.body, IDLParserContext("bulkWrite"));
+    const auto& ops = bulkWrite.getOps();
+
+    boost::optional<ShardVersion> receivedVersion;
+    for (const auto& nsEntry : bulkWrite.getNsInfo()) {
+        if (nsEntry.getNs() == nss) {
+            receivedVersion = nsEntry.getShardVersion();
+            break;
+        }
+    }
+    tassert(12378200,
+            "NSS not found in bulkWrite nsInfo with shardVersion",
+            receivedVersion.has_value());
+
+    // Pass boost::none as wantedVersion so the routing cache does a forced refresh rather than
+    // trying to advance to a specific version the test mock cannot satisfy.
+    BSONArrayBuilder firstBatch;
+    for (size_t i = 0; i < ops.size(); ++i) {
+        BulkWriteReplyItem item(
+            static_cast<int>(i),
+            Status(StaleConfigInfo(nss, *receivedVersion, boost::none, shardId), "Stale error"));
+        firstBatch.append(item.serialize());
+    }
+
+    return BSON("cursor" << BSON("id" << 0ll << "firstBatch" << firstBatch.arr() << "ns"
+                                      << "admin.$cmd.bulkWrite")
+                         << "nErrors" << static_cast<int>(ops.size()) << "nInserted" << 0
+                         << "nMatched" << 0 << "nModified" << 0 << "nUpserted" << 0 << "nDeleted"
+                         << 0);
+}
+
+}  // namespace
+
+// When each stale round is followed by a routing refresh that returns new metadata
+// (different ShardVersion), metadataRefreshed=true resets numRoundsWithoutProgress each time.
+// Even kMaxRoundsWithoutProgress+1 stale rounds should therefore not trigger NoProgressMade.
+TEST_F(UnifiedWriteExecutorTest, StaleRoundsWithProductiveRefreshSucceed) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto future = launchAsync([&]() {
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
+        ASSERT_EQ(reply.getNErrors(), 0);
+        ASSERT_EQ(reply.getNInserted(), 1);
+    });
+
+    expectDatabaseRoutingRequest(dbName, shardId1);
+    expectCollectionRoutingRequest(nss, shardId1);
+
+    // Run kMaxRoundsWithoutProgress+1 stale rounds. Each call to expectCollectionRoutingRequest
+    // increments _routingVersionCounter, producing a distinct Timestamp and therefore a different
+    // ChunkVersion, making metadataRefreshed=true after every refresh.
+    const int kStaleRounds = gMaxRoundsWithoutProgress.loadRelaxed() + 1;
+    for (int i = 0; i < kStaleRounds; ++i) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return makeBulkWriteStaleConfigResponse(nss, request, shardId1);
+        });
+        expectCollectionRoutingRequest(nss, shardId1);
+    }
+
+    expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1))},
+                                {nss},
+                                shardId1,
+                                {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)},
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0);
+
+    future.default_timed_get();
+}
+
+// When each stale round's routing refresh returns the same ShardVersion as the receivedVersion
+// in the stale error, metadataRefreshed=false and numRoundsWithoutProgress increments normally.
+// After kMaxRoundsWithoutProgress+1 unproductive stale rounds, NoProgressMade is returned.
+TEST_F(UnifiedWriteExecutorTest, StaleRoundsWithUnproductiveRefreshReturnsNoProgressMade) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto future = launchAsync([&]() {
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
+        ASSERT_EQ(reply.getNErrors(), 1);
+        const auto& status = reply.getCursor().getFirstBatch()[0].getStatus();
+        ASSERT_EQ(status.code(), ErrorCodes::NoProgressMade);
+        const int kMax = gMaxRoundsWithoutProgress.loadRelaxed();
+        ASSERT_STRING_CONTAINS(status.reason(), str::stream() << kMax << " rounds");
+        ASSERT_STRING_CONTAINS(status.reason(), str::stream() << (kMax + 1) << " rounds total");
+        ASSERT_EQ(reply.getNInserted(), 0);
+    });
+
+    // Use a fixed epoch, timestamp, and UUID so every routing refresh returns an identical
+    // collection entry → metadataRefreshed=false every round.
+    const OID fixedEpoch = OID::gen();
+    const Timestamp fixedTimestamp(1, 1);
+    const UUID fixedUUID = UUID::gen();
+
+    expectDatabaseRoutingRequest(dbName, shardId1);
+    expectCollectionRoutingRequestWithVersion(nss, shardId1, fixedEpoch, fixedTimestamp, fixedUUID);
+
+    // Each stale round: the shard echoes back the same receivedVersion, and the refresh returns
+    // the same version, so metadataRefreshed=false and numRoundsWithoutProgress increments.
+    // NoProgressMade fires after kMaxRoundsWithoutProgress+1 rounds (the check is strict >).
+    const int kStaleRounds = gMaxRoundsWithoutProgress.loadRelaxed() + 1;
+    for (int i = 0; i < kStaleRounds; ++i) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return makeBulkWriteStaleConfigResponse(nss, request, shardId1);
+        });
+        // After the last stale round numRoundsWithoutProgress exceeds the limit, so run() breaks
+        // out of the loop before issuing another routing request.
+        if (i < kStaleRounds - 1) {
+            expectCollectionRoutingRequestWithVersion(
+                nss, shardId1, fixedEpoch, fixedTimestamp, fixedUUID);
+        }
+    }
+
+    future.default_timed_get();
+}
+
+// When each StaleDbVersion round is followed by a database routing refresh that returns a new
+// DatabaseVersion, metadataRefreshed=true resets numRoundsWithoutProgress each time. Even
+// kMaxRoundsWithoutProgress+1 stale rounds should not trigger NoProgressMade.
+TEST_F(UnifiedWriteExecutorTest, StaleDbRoundsWithProductiveRefreshSucceed) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto future = launchAsync([&]() {
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
+        ASSERT_EQ(reply.getNErrors(), 0);
+        ASSERT_EQ(reply.getNInserted(), 1);
+    });
+
+    // Initial routing: DB version V1, collection is untracked (empty routing table).
+    expectDatabaseRoutingRequest(dbName, shardId1);
+    expectUntrackedCollectionRoutingRequest(nss);
+
+    // Run kMaxRoundsWithoutProgress+1 stale rounds. Each call to expectDatabaseRoutingRequest
+    // increments _routingVersionCounter, producing a distinct Timestamp and therefore a different
+    // DatabaseVersion each time, so metadataRefreshed=true after every refresh.
+    // The collection routing entry stays cached across rounds (onStaleDatabaseVersion only
+    // invalidates the database cache entry, not per-collection entries).
+    const int kStaleRounds = gMaxRoundsWithoutProgress.loadRelaxed() + 1;
+    for (int i = 0; i < kStaleRounds; ++i) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return makeBulkWriteStaleDbVersionResponse(nss, request);
+        });
+        expectDatabaseRoutingRequest(dbName, shardId1);
+    }
+
+    expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1))},
+                                {nss},
+                                shardId1,
+                                {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)},
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0);
+
+    future.default_timed_get();
+}
+
+// When each StaleDbVersion round's database refresh returns the same DatabaseVersion,
+// metadataRefreshed=false and numRoundsWithoutProgress increments normally. After
+// kMaxRoundsWithoutProgress+1 unproductive rounds, NoProgressMade is returned.
+TEST_F(UnifiedWriteExecutorTest, StaleDbRoundsWithUnproductiveRefreshReturnsNoProgressMade) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto future = launchAsync([&]() {
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
+        ASSERT_EQ(reply.getNErrors(), 1);
+        const auto& status = reply.getCursor().getFirstBatch()[0].getStatus();
+        ASSERT_EQ(status.code(), ErrorCodes::NoProgressMade);
+        const int kMax = gMaxRoundsWithoutProgress.loadRelaxed();
+        ASSERT_STRING_CONTAINS(status.reason(), str::stream() << kMax << " rounds");
+        ASSERT_STRING_CONTAINS(status.reason(), str::stream() << (kMax + 1) << " rounds total");
+        ASSERT_EQ(reply.getNInserted(), 0);
+    });
+
+    // Use a fixed UUID and timestamp so every database refresh returns the same DatabaseVersion,
+    // making metadataRefreshed=false each round.
+    const UUID fixedUUID = UUID::gen();
+    const Timestamp fixedTimestamp(1, 1);
+
+    expectDatabaseRoutingRequestWithVersion(dbName, shardId1, fixedUUID, fixedTimestamp);
+    expectUntrackedCollectionRoutingRequest(nss);
+
+    // Each stale round: the shard echoes back the same receivedVersion, the refresh returns the
+    // same DatabaseVersion, so numRoundsWithoutProgress increments each time.
+    // NoProgressMade fires after kMaxRoundsWithoutProgress+1 rounds (the check is strict >).
+    const int kStaleRounds = gMaxRoundsWithoutProgress.loadRelaxed() + 1;
+    for (int i = 0; i < kStaleRounds; ++i) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return makeBulkWriteStaleDbVersionResponse(nss, request);
+        });
+        // After the last stale round numRoundsWithoutProgress exceeds the limit, so run() breaks
+        // out of the loop before issuing another routing request.
+        if (i < kStaleRounds - 1) {
+            expectDatabaseRoutingRequestWithVersion(dbName, shardId1, fixedUUID, fixedTimestamp);
+        }
+    }
 
     future.default_timed_get();
 }
