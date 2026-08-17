@@ -116,6 +116,12 @@ assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 assert.commandWorked(
     testDB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}),
 );
+assert.commandWorked(
+    testDB.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 10,
+    }),
+);
 resetCollection();
 coll.aggregate([{$group: {"_id": {$avg: "$a"}}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
@@ -467,6 +473,12 @@ function restartProfiler() {
 assert.commandWorked(
     shard0DB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}),
 );
+assert.commandWorked(
+    shard0DB.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 10,
+    }),
+);
 restartProfiler();
 // Test that 'usedDisk' doesn't get populated on the profiler entry of the base pipeline, when the
 // $unionWith'd pipeline needs to use disk on a sharded collection.
@@ -562,6 +574,12 @@ assert.commandWorked(
     shard0DB.adminCommand({
         setParameter: 1,
         internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
+    }),
+);
+assert.commandWorked(
+    shard0DB.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 100 * 1024 * 1024,
     }),
 );
 
