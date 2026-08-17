@@ -9,7 +9,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -24,10 +23,9 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
-                                                       DocumentSourceQueryStats::LiteParsed::parse,
-                                                       AllowedWithApiStrict::kNeverInVersion1,
-                                                       &feature_flags::gFeatureFlagQueryStats);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(queryStats,
+                                     DocumentSourceQueryStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(queryStats,
                                                    DocumentSourceQueryStats,

@@ -134,8 +134,8 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
 /**
  * Registers a request for query stats collection. The function may decide not to collect anything,
- * so this should be called for all requests. The decision is made based on the feature flag and
- * query stats rate limiting.
+ * so this should be called for all requests. The decision is made based on query stats rate
+ * limiting.
  *
  * The originating command/query does not persist through the end of query execution due to
  * optimizations made to the original query and the expiration of OpCtx across getMores. In order

@@ -9,7 +9,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_stats/find_key.h"
@@ -39,7 +38,6 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
     query_shape::FindCmdShape findShape(*parsedFind, expCtx);
 
-    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, false);
 
@@ -214,7 +212,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     auto opCtx = makeOperationContext();
 
     {
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -222,7 +219,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test that window-based rate limiting will be elected when sampling rate is set to 0.0
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
@@ -233,7 +229,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
 
     {  // Test that sampling-based rate limiting takes precedence over window-based policy when both
        // are enabled.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
 
@@ -243,7 +238,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test idempotency when both parameters are set but being set in different order.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
 
@@ -253,7 +247,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test that query stats is disabled when both rate limit and sample rate are set to 0.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 0.0);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
@@ -269,7 +262,6 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     auto serviceCtx = opCtx->getServiceContext();
 
     {
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
                                                       0.042);
 
@@ -279,7 +271,6 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // Full sampling rate of 1.0 should yield a per-thousand rate of 1000.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 1.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
@@ -288,7 +279,6 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // A rate of 0.0 should disable write command sampling.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 0.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);

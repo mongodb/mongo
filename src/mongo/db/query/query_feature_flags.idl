@@ -38,14 +38,6 @@ feature_flags:
         default: false
         fcv_gated: false
 
-    featureFlagQueryStats:
-        description: "Feature flag for enabling full queryStats collection."
-        cpp_varname: gFeatureFlagQueryStats
-        default: true
-        version: 7.2
-        fcv_gated: true
-        check_against_fcv: legacy_fcv_snapshot_only
-
     featureFlagTimeSeriesInSbe:
         description: "Feature flag to enable queries against time-series collections to execute in SBE"
         cpp_varname: gFeatureFlagTimeSeriesInSbe

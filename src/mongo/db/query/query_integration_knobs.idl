@@ -119,7 +119,8 @@ server_parameters:
     internalQueryStatsCacheSize:
         description: >-
             The maximum amount of memory that the system will allocate for the query queryStats
-            cache. This will accept values in either of the following formats:
+            cache. Disables the query stats store when set to 0. This will accept values in either 
+            of the following formats:
             1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
             2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
             The default value is 1%, which means 1% of the physical memory available to the process.

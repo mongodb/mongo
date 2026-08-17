@@ -2,7 +2,6 @@
  * Enabling queryStats on shard servers is possible but considered undefined behavior. This test
  * asserts that it does not crash the server, especially in the case where multiple cursors are
  * created per operation (eg sharded $search).
- * @tags: [featureFlagQueryStats]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
