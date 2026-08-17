@@ -57,10 +57,6 @@ SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMe
 SimpleMemoryUsageTracker::SimpleMemoryUsageTracker()
     : SimpleMemoryUsageTracker(MemoryUsageLimit{std::numeric_limits<int64_t>::max()}) {}
 
-void SimpleMemoryUsageTracker::set(int64_t total) {
-    add(total - _inUseTrackedMemoryBytes);
-}
-
 void SimpleMemoryUsageTracker::setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp) {
     _writeToCurOp = std::move(writeToCurOp);
 }

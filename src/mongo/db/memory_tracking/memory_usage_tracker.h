@@ -60,7 +60,13 @@ public:
         addInternal(diff, true /* report */);
     }
 
-    void set(int64_t total);
+    /**
+     * Defined inline so that callers reach the zero-diff early return in 'add()' without paying for
+     * an out-of-line call.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void set(int64_t total) {
+        add(total - _inUseTrackedMemoryBytes);
+    }
 
     int64_t inUseTrackedMemoryBytes() const {
         return _inUseTrackedMemoryBytes;

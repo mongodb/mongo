@@ -158,7 +158,4 @@ void SorterStats::setMemUsage(uint64_t memUsage) {
     _memUsage = memUsage;
 }
 
-uint64_t SorterStats::memUsage() const {
-    return _memUsage;
-}
 }  // namespace mongo

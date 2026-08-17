@@ -48,7 +48,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
         auto last = end - 1;
         auto fieldsToMatch = scanFieldAccessors.size();
         for (auto bsonElement = start; bsonElement != last;) {
-            auto field = bson::fieldNameAndLength(bsonElement);
+            auto field = bson::fieldNameAndLength(bsonElement, end);
             auto accessor = getFieldAccessor(scanFieldNames, scanFieldAccessors, field);
 
             if (accessor != nullptr) {

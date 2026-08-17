@@ -80,6 +80,8 @@ public:
 
         _makeSorter();
 
+        auto& memoryTracker = _stage._memoryTracker.value();
+
         while (_stage._children[0]->getNext() == PlanState::ADVANCED) {
             KeyRow keys{_inKeyAccessors.size()};
 
@@ -99,7 +101,7 @@ public:
                 return vals;
             });
 
-            _stage._memoryTracker.value().set(_sorter->stats().memUsage());
+            memoryTracker.set(_sorter->stats().memUsage());
         }
 
         _stage._specificStats.peakTrackedMemBytes =

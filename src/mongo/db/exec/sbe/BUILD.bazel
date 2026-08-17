@@ -493,6 +493,16 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "sbe_bson_field_extraction_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/stages:sbe_bson_field_extraction_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_scan_test",
     srcs = [
         "//src/mongo/db/exec/sbe:sbe_scan_test.cpp",

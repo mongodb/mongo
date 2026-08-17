@@ -537,4 +537,83 @@ TEST(SBESmallString, Length) {
         ASSERT_EQ(length, value::getStringLength(tag, val));
     }
 }
+
+// The bounded 'bson::fieldNameAndLength()' scans a word at a time rather than calling the shared
+// library 'strlen()', so cover the boundaries around the word size and an empty name.
+TEST(SBEBson, FieldNameAndLength) {
+    std::vector<std::string> names{
+        "",
+        "a",
+        "abcdefg",            // 7: one below the word size.
+        "abcdefgh",           // 8: exactly the word size.
+        "abcdefghi",          // 9: one above the word size.
+        "abcdefghijklmno",    // 15: one below two words.
+        "abcdefghijklmnop",   // 16: exactly two words.
+        "abcdefghijklmnopq",  // 17: one above two words.
+        std::string(255, 'x'),
+        // Field names are UTF-8, so bytes >= 0x80 are legal. The word-at-a-time zero-byte test
+        // relies on an '& ~word' term to keep high-bit bytes from registering as terminators, so
+        // exercise a name made entirely of them, at a length that spans a full word and a tail.
+        std::string(11, char(0xFF)),
+        "\xc3\xa9\xc3\xa8\xc3\xaa",  // "ééê" in UTF-8: six bytes, all >= 0x80.
+    };
+
+    for (const auto& name : names) {
+        BSONObj obj = BSON(name << 1);
+
+        // Skip the leading 4-byte object length to land on the first element.
+        const char* be = obj.objdata() + 4;
+        const char* end = obj.objdata() + obj.objsize();
+        auto view = bson::fieldNameAndLength(be, end);
+
+        ASSERT_EQ(name.size(), view.size()) << "name: '" << name << "'";
+        ASSERT_EQ(name, std::string(view)) << "name: '" << name << "'";
+
+        // The unbounded overload still uses libc, so it is a direct oracle for the bounded one.
+        ASSERT_EQ(bson::fieldNameAndLength(be), view) << "name: '" << name << "'";
+
+        // 'BSONElement' is the independent oracle for both the name and where the value starts,
+        // which is what 'getValue()' derives from the same length.
+        BSONElement elem = obj.firstElement();
+        ASSERT_EQ(std::string_view{elem.fieldName()}, view);
+        ASSERT_EQ(elem.value(), bson::getValue(be));
+    }
+}
+
+// The word-at-a-time load is only safe because it stops at 'end'. The tightest case is a short name
+// in a small object.
+TEST(SBEBson, FieldNameAndLengthStopsAtEnd) {
+    // {"a": null} is about as small as a one-field object gets: a null value occupies no bytes, so
+    // only the NUL terminator and the EOO byte follow the name.
+    BSONObj obj = BSON("a" << BSONNULL);
+
+    const char* be = obj.objdata() + 4;
+    const char* end = obj.objdata() + obj.objsize();
+    ASSERT_LT(end - (be + 1), 8) << "test no longer exercises the partial-word tail";
+
+    auto view = bson::fieldNameAndLength(be, end);
+    ASSERT_EQ("a", view);
+    ASSERT_EQ(std::string_view{obj.firstElement().fieldName()}, view);
+}
+
+// A document with several short field names walks the same path the collection scan uses when the
+// plan asks for two or more fields, so assert every name in a multi-field object round-trips.
+TEST(SBEBson, FieldNameAndLengthAcrossMultipleFields) {
+    BSONObj obj = BSON("_id" << 0 << "zero" << 0 << "hello" << "hellohellohellohellobye"
+                             << "randomInt" << 3);
+
+    const char* be = obj.objdata() + 4;
+    const char* end = obj.objdata() + obj.objsize();
+    const char* last = end - 1;
+
+    std::vector<std::string> seen;
+    while (be != last) {
+        auto view = bson::fieldNameAndLength(be, end);
+        seen.emplace_back(view);
+        be = bson::advance(be, view.size());
+    }
+
+    std::vector<std::string> expected{"_id", "zero", "hello", "randomInt"};
+    ASSERT_EQ(expected, seen);
+}
 }  // namespace mongo::sbe
