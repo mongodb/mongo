@@ -7,8 +7,10 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <functional>
 
 namespace mongo::oplog_truncation {
@@ -18,6 +20,23 @@ namespace mongo::oplog_truncation {
 // Returns true if truncation succeeded and the marker should be popped, false otherwise.
 using TruncateFn [[MONGO_MOD_PUBLIC]] =
     std::function<bool(OperationContext*, const CollectionTruncateMarkers::Marker&)>;
+
+/**
+ * Cumulative amount of time spent truncating the oplog, in microseconds. Updated once per
+ * individual truncate marker truncated.
+ */
+[[MONGO_MOD_PUBLIC]] int64_t getTotalTimeTruncatingMicros();
+
+/**
+ * Cumulative number of truncate markers truncated from the oplog.
+ */
+[[MONGO_MOD_PUBLIC]] int64_t getTruncateCount();
+
+/**
+ * Records time spent truncating markers from the oplog.
+ */
+[[MONGO_MOD_PUBLIC]] void recordTruncationStats(Microseconds elapsedMicros,
+                                                int64_t markersTruncated);
 
 /**
  * Validates that oplog bounds are safe for truncation up to the given marker.

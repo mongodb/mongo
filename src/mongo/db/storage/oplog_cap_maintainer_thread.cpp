@@ -45,12 +45,6 @@ const auto getMaintainerThreadMutex = ServiceContext::declareDecoration<std::mut
 // to confirm we only ever have one running thread per ServiceContext.
 const auto getActiveThreadCount = ServiceContext::declareDecoration<Atomic<int>>();
 
-// Cumulative amount of time spent truncating the oplog.
-Atomic<int64_t> totalTimeTruncating;
-
-// Cumulative number of truncates of the oplog.
-Atomic<int64_t> truncateCount;
-
 // Cumulative number of times the thread has been interrupted
 Atomic<int64_t> interruptCount;
 
@@ -107,8 +101,9 @@ public:
             builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
         }
 
-        builder.append("totalTimeTruncatingMicros", totalTimeTruncating.load());
-        builder.append("truncateCount", truncateCount.load());
+        builder.append("totalTimeTruncatingMicros",
+                       oplog_truncation::getTotalTimeTruncatingMicros());
+        builder.append("truncateCount", oplog_truncation::getTruncateCount());
         builder.append("interruptCount", interruptCount.load());
 
         return builder.obj();
@@ -262,11 +257,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             return false;
         }
 
-        auto elapsedMicros = timer.micros();
-        totalTimeTruncating.fetchAndAdd(elapsedMicros);
-        truncateCount.fetchAndAdd(1);
-
-        auto elapsedMillis = elapsedMicros / 1000;
+        auto elapsedMillis = timer.millis();
         LOGV2(22402,
               "Oplog truncation finished",
               "pinnedOplogTimestamp"_attr = mayTruncateUpTo,

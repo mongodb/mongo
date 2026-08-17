@@ -9,10 +9,35 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::oplog_truncation {
+
+namespace {
+
+// Cumulative amount of time spent truncating the oplog, updated once per marker truncated.
+Atomic<int64_t> totalTimeTruncating;
+
+// Cumulative number of markers truncated from the oplog.
+Atomic<int64_t> truncateCount;
+
+}  // namespace
+
+int64_t getTotalTimeTruncatingMicros() {
+    return totalTimeTruncating.loadRelaxed();
+}
+
+int64_t getTruncateCount() {
+    return truncateCount.loadRelaxed();
+}
+
+void recordTruncationStats(Microseconds elapsedMicros, int64_t markersTruncated) {
+    totalTimeTruncating.fetchAndAddRelaxed(durationCount<Microseconds>(elapsedMicros));
+    truncateCount.fetchAndAddRelaxed(markersTruncated);
+}
 
 bool checkOplogTruncationBounds(OperationContext* opCtx,
                                 RecordStore& oplog,
@@ -78,10 +103,22 @@ RecordId truncateByMarkerQueue(OperationContext* opCtx,
                                RecordId mayTruncateUpTo,
                                TruncateFn truncateFn) {
     RecordId highestTruncated;
+
+    Timer timer;
+    int64_t reportedMicros = 0;
+
+    // Update the time spent truncating.
+    auto reportElapsed = [&] {
+        auto elapsedMicros = timer.micros();
+        totalTimeTruncating.fetchAndAddRelaxed(elapsedMicros - reportedMicros);
+        reportedMicros = elapsedMicros;
+    };
+
     for (auto getNextMarker = true; getNextMarker;) {
         auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
         auto truncateMarker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx);
         if (!truncateMarker) {
+            reportElapsed();
             break;
         }
         invariant(truncateMarker->lastRecord.isValid());
@@ -99,6 +136,12 @@ RecordId truncateByMarkerQueue(OperationContext* opCtx,
                 highestTruncated = truncateMarker->lastRecord;
                 return true;
             });
+
+        // Update truncation statistics one per individual marker truncate.
+        reportElapsed();
+        if (getNextMarker) {
+            truncateCount.fetchAndAddRelaxed(1);
+        }
     }
 
     return highestTruncated;

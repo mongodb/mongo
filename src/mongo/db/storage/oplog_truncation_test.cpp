@@ -27,6 +27,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -34,6 +35,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
@@ -603,6 +605,71 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
     }
+}
+
+// The truncation statistics are updated once per individual marker truncated, so that an
+// observer polling them sees progress while a backlog of expired oplog is being truncated.
+TEST_F(OplogTruncationTest, TruncationStatsUpdatedOncePerMarkerTruncated) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto engine = getServiceContext()->getStorageEngine();
+
+    auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(oplogTruncateMarkers);
+
+    ASSERT_OK(rs->oplog()->updateSize(230));
+    oplogTruncateMarkers->setMinBytesPerMarker(100);
+
+    // Three full markers, plus a fourth so that the oldest three may all be truncated.
+    insertOplog(1, 100);
+    insertOplog(2, 110);
+    insertOplog(3, 120);
+    insertOplog(4, 130);
+    ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
+
+    advanceStableTimestamp(Timestamp(1, 4));
+    auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
+
+    const auto startingTruncateCount = oplog_truncation::getTruncateCount();
+    const auto startingTimeTruncating = oplog_truncation::getTotalTimeTruncatingMicros();
+
+    // Spend a known amount of time truncating each marker. Without this, truncating a marker in
+    // this test can complete in well under a microsecond.
+    constexpr Milliseconds kTimePerMarker{1};
+    const auto kMicrosPerMarker = durationCount<Microseconds>(kTimePerMarker);
+
+    // Record the statistics observed at the start of each individual marker truncation.
+    std::vector<int64_t> truncateCountPerMarker;
+    std::vector<int64_t> timeTruncatingPerMarker;
+    oplog_truncation::truncateByMarkerQueue(
+        opCtx,
+        *rs,
+        mayTruncateUpTo,
+        [&](OperationContext*, const CollectionTruncateMarkers::Marker&) {
+            truncateCountPerMarker.push_back(oplog_truncation::getTruncateCount());
+            timeTruncatingPerMarker.push_back(oplog_truncation::getTotalTimeTruncatingMicros());
+            sleepFor(kTimePerMarker);
+            return true;
+        });
+
+    ASSERT_EQ(3U, truncateCountPerMarker.size());
+    ASSERT_EQ(startingTruncateCount, truncateCountPerMarker[0]);
+    ASSERT_EQ(startingTruncateCount + 1, truncateCountPerMarker[1]);
+    ASSERT_EQ(startingTruncateCount + 2, truncateCountPerMarker[2]);
+    ASSERT_EQ(startingTruncateCount + 3, oplog_truncation::getTruncateCount());
+
+    // Each callback samples from inside the marker truncation it is timing, which is recorded only
+    // once that truncation returns. The first marker sees nothing accumulated, and each one after
+    // it sees at least the time spent on every preceding marker.
+    ASSERT_EQ(3U, timeTruncatingPerMarker.size());
+    ASSERT_EQ(startingTimeTruncating, timeTruncatingPerMarker[0]);
+    ASSERT_GTE(timeTruncatingPerMarker[1], startingTimeTruncating + kMicrosPerMarker);
+    ASSERT_GTE(timeTruncatingPerMarker[2], startingTimeTruncating + 2 * kMicrosPerMarker);
+    ASSERT_GTE(oplog_truncation::getTotalTimeTruncatingMicros(),
+               startingTimeTruncating + 3 * kMicrosPerMarker);
 }
 
 /**
