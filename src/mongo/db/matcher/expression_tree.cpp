@@ -81,7 +81,6 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
         case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
         case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
         case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
-        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
         case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
         case MatchExpression::INTERNAL_SCHEMA_TYPE:
@@ -110,6 +109,7 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
         case MatchExpression::INTERNAL_SCHEMA_COND:
         case MatchExpression::INTERNAL_SCHEMA_EQ:
         case MatchExpression::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
         case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
