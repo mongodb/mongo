@@ -193,6 +193,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:cluster_server_parameter_commands_invocation",
         "//src/mongo/db/commands:core",
         "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/commands:fsync_idl",
         "//src/mongo/db/commands:kill_common",
         "//src/mongo/db/commands:list_databases_command",
         "//src/mongo/db/commands:profile_common",

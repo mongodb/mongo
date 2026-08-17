@@ -563,12 +563,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "mongod_fsync",
+    name = "fsync_idl",
     srcs = [
-        "fsync.cpp",
         ":fsync_gen",
     ],
     deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongod_fsync",
+    srcs = [
+        "fsync.cpp",
+    ],
+    deps = [
+        ":fsync_idl",
         "//src/mongo/db:commands",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db/auth",
