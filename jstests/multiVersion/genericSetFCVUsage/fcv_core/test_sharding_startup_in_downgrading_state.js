@@ -73,10 +73,15 @@ function runSharding() {
     st.restartConfigServer(0);
     jsTestLog("Restarting the mongos:");
     st.restartMongos(0);
+    // This test uses the default 10-second election timeout (see initiateWithDefaultElectionTimeout).
+    // The internal client host-selection timeout is 15 seconds in test builds
+    // (defaultFindReplicaSetHostTimeoutMS). With only two voting nodes per shard, a split vote can
+    // delay electing a primary beyond that timeout and cause the following requests to fail, so
+    // wait explicitly for each shard to elect a primary after restarting.
     jsTestLog("Restarting shard0:");
-    st.restartShardRS(0);
+    st.restartShardRS(0, true /* waitForPrimary */);
     jsTestLog("Restarting shard1:");
-    st.restartShardRS(1);
+    st.restartShardRS(1, true /* waitForPrimary */);
 
     st.waitForShardingInitialized();
 
