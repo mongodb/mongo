@@ -3,10 +3,15 @@
 import os
 import platform
 import tempfile
+import time
 import unittest
+from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
-from buildscripts.resmokelib.hang_analyzer.dumper import GDBDumper
+import psutil
+
+from buildscripts.resmokelib.hang_analyzer.dumper import GDBDumper, SigabrtDumper
+from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
 
 
 class TestGDBDumperAnalyzeCores(unittest.TestCase):
@@ -173,6 +178,129 @@ class TestBinaryParsing(unittest.TestCase):
         args = run.call_args[0][0]
         self.assertIn(core_path, args)
         self.assertNotIn("-ex", args)
+
+
+class TestSigabrtDumperFallback(unittest.TestCase):
+    """Unit tests for SigabrtDumper falling back to a debugger."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.logger = Mock()
+        self.fallback = Mock()
+        self.dumper = SigabrtDumper(self.logger, "stdout", fallback_dumper=self.fallback)
+        # Keep the test fast; the production grace period is minutes.
+        self.dumper.SIGABRT_GRACE = timedelta(seconds=0)
+
+    def _dump(self, pinfo):
+        with (
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.psutil.Process") as process,
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.signal_process"),
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.resume_process"),
+        ):
+            process.side_effect = lambda pid: self.procs[pid]
+            self.dumper._dump_impl(pinfo, take_dump=True)
+
+    def test_process_surviving_sigabrt_falls_back_to_debugger(self):
+        """A process wedged in its own signal handler ignores SIGABRT, so we must still get stacks."""
+        wedged = Mock(pid=5994)
+        wedged.is_running.return_value = True
+        wedged.status.return_value = psutil.STATUS_SLEEPING
+        self.procs = {5994: wedged}
+
+        self._dump(Pinfo(name="mongod", pidv=[5994]))
+
+        # Backtraces only: taking a core dump is what the sanitizer exemption exists to avoid.
+        self.fallback.dump_live_backtraces.assert_called_once()
+        self.fallback.dump_info.assert_not_called()
+        (pinfo,), _ = self.fallback.dump_live_backtraces.call_args
+        self.assertEqual(pinfo.name, "mongod")
+        self.assertEqual(pinfo.pidv, [5994])
+
+    def test_process_dying_from_sigabrt_does_not_use_debugger(self):
+        """SIGABRT working as intended must not change behaviour."""
+        died = Mock(pid=5994)
+        died.is_running.return_value = False
+        self.procs = {5994: died}
+
+        self._dump(Pinfo(name="mongod", pidv=[5994]))
+
+        self.fallback.dump_live_backtraces.assert_not_called()
+
+
+class TestGDBDumperLiveBacktraces(unittest.TestCase):
+    """Unit tests for GDBDumper.dump_live_backtraces."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.logger = Mock()
+        self.dumper = GDBDumper(self.logger, "stdout")
+
+    def test_gdb_is_asked_to_attach_and_backtrace_without_a_core_dump(self):
+        """The commands must actually reach gdb; computing them without invoking it collects nothing."""
+        with (
+            patch.object(self.dumper, "find_debugger") as find_debugger,
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.call") as call,
+        ):
+            find_debugger.return_value = "/usr/bin/gdb"
+            call.return_value = 0
+            self.dumper.dump_live_backtraces(Pinfo(name="mongod", pidv=[5994]))
+
+        call.assert_called_once()
+        argv = call.call_args[0][0]
+        self.assertEqual(argv[0], "/usr/bin/gdb")
+        self.assertIn("attach 5994", argv)
+        self.assertIn("thread apply all bt", argv)
+        self.assertIn("detach", argv)
+        # No core dump, and no reliance on .gdbinit / the mongo GDB extensions.
+        self.assertNotIn("gcore", " ".join(argv))
+        self.assertIn("--nx", argv)
+        # A failing gdb must not raise out of the hang analyzer's teardown path.
+        self.assertFalse(call.call_args[1]["check"])
+
+    def test_missing_debugger_is_not_fatal(self):
+        """No debugger on the host must warn rather than raise."""
+        with (
+            patch.object(self.dumper, "find_debugger") as find_debugger,
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.call") as call,
+        ):
+            find_debugger.return_value = None
+            self.dumper.dump_live_backtraces(Pinfo(name="mongod", pidv=[5994]))
+
+        call.assert_not_called()
+        self.logger.warning.assert_called_once()
+
+    def test_backtrace_budget_is_shared_across_processes(self):
+        """The timeout bounds the whole set of PIDs; a per-process bound would scale with survivors."""
+        self.dumper.BACKTRACE_TIMEOUT_SECONDS = 1
+
+        with (
+            patch.object(self.dumper, "find_debugger") as find_debugger,
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.call") as call,
+        ):
+            find_debugger.return_value = "/usr/bin/gdb"
+            call.side_effect = lambda *args, **kwargs: time.sleep(0.05) or 0
+            self.dumper.dump_live_backtraces(Pinfo(name="mongod", pidv=[1, 2, 3]))
+
+        timeouts = [args[0][2] for args in call.call_args_list]
+        self.assertEqual(len(timeouts), 3)
+        # Each process gets what is left of the budget, not a fresh copy of it.
+        self.assertEqual(timeouts, sorted(timeouts, reverse=True))
+        self.assertLess(timeouts[-1], timeouts[0])
+        self.assertLessEqual(timeouts[0], self.dumper.BACKTRACE_TIMEOUT_SECONDS)
+
+    def test_exhausted_budget_skips_remaining_processes(self):
+        """Once the budget is gone the loop must stop rather than attach with a non-positive timeout."""
+        self.dumper.BACKTRACE_TIMEOUT_SECONDS = 0
+
+        with (
+            patch.object(self.dumper, "find_debugger") as find_debugger,
+            patch("buildscripts.resmokelib.hang_analyzer.dumper.call") as call,
+        ):
+            find_debugger.return_value = "/usr/bin/gdb"
+            self.dumper.dump_live_backtraces(Pinfo(name="mongod", pidv=[1, 2, 3]))
+
+        call.assert_not_called()
+        self.logger.warning.assert_called_once()
 
 
 if __name__ == "__main__":
