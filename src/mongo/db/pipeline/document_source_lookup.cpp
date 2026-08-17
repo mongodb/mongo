@@ -1256,8 +1256,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // marker, the join $match's position, and the view's own stages -- must be emitted together or
     // not at all.
     const bool serializeResolvedViewForRemote = _fromNsIsAView && serializeForRemote &&
-        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain() &&
-        !opts.serializeForFLE2;
+        !opts.isShapifying() && !opts.isSerializingForExplain() && !opts.serializeForFLE2;
 
     // Do not include the tenantId in serialized 'from' namespace.
     auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(serializeFromNs)
@@ -1303,7 +1302,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         if (!_userPipeline) {
             return std::vector<BSONObj>{};
         }
-        if (opts.isSerializingForQueryStats()) {
+        if (opts.isShapifying()) {
             // TODO SERVER-94227 we don't need to do any validation as part of this parsing pass.
             return pipeline_factory::makePipeline(
                        *_userPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal)
@@ -1353,7 +1352,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     }();
     if (_additionalFilter) {
         auto serializedFilter = [&]() -> BSONObj {
-            if (opts.isSerializingForQueryStats()) {
+            if (opts.isShapifying()) {
                 auto filter =
                     uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, getExpCtx()));
                 return filter->serialize(opts);

@@ -104,11 +104,10 @@ Value DocumentSourceSearch::serialize(const query_shape::SerializationOptions& o
         return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
     }
 
-    // If we aren't serializing for query stats or explain, serialize the full spec.
+    // If we aren't shapifying or serializing for explain, serialize the full spec.
     // If we are in a router, serialize the full spec.
     // Otherwise, just serialize the mongotQuery.
-    if ((!opts.isSerializingForQueryStats() && !opts.isSerializingForExplain()) ||
-        getExpCtx()->getInRouter()) {
+    if ((!opts.isShapifying() && !opts.isSerializingForExplain()) || getExpCtx()->getInRouter()) {
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
     return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));

@@ -88,9 +88,9 @@ public:
 
 private:
     BSONObj value(const query_shape::SerializationOptions& opts) const final {
-        // For query stats, set flag to serialize $not{$eq/$in/$exists} back to
+        // When shapifying, set flag to serialize $not{$eq/$in/$exists} back to
         // $ne/$nin/{$exists:false} since top-level $not cannot be re-parsed.
-        if (opts.isSerializingForQueryStats() && _matchExpr->matchType() == MatchExpression::NOT) {
+        if (opts.isShapifying() && _matchExpr->matchType() == MatchExpression::NOT) {
             query_shape::SerializationOptions modifiedOpts = opts;
             modifiedOpts.serializeForUpdatePullModifier = true;
             return _matchExpr->serialize(modifiedOpts);

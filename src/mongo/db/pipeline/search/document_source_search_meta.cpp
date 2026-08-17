@@ -136,8 +136,8 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
 }  // namespace
 
 Value DocumentSourceSearchMeta::serialize(const query_shape::SerializationOptions& opts) const {
-    // For query stats, serialize the mongot query as a single anonymized object.
-    if (opts.isSerializingForQueryStats()) {
+    // When shapifying, serialize the mongot query as a single anonymized object.
+    if (opts.isShapifying()) {
         return Value(Document{{getSourceName(), opts.serializeLiteral(getSearchQuery())}});
     }
     return DocumentSourceInternalSearchMongotRemote::serialize(opts);

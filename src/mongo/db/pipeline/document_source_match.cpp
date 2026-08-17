@@ -97,7 +97,7 @@ std::string_view DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(const query_shape::SerializationOptions& opts) const {
-    if (opts.isSerializingForExplain() || opts.isSerializingForQueryStats()) {
+    if (opts.isSerializingForExplain() || opts.isShapifying()) {
         return Value(
             DOC(getSourceName() << Document(_matchProcessor->getExpression()->serialize(opts))));
     }
@@ -614,9 +614,9 @@ void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
 
 Value DocumentSourceInternalChangeStreamMatch::serialize(
     const query_shape::SerializationOptions& opts) const {
-    if (opts.isSerializingForQueryStats()) {
-        // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
-        // query stats. For query stats we will serialize only the user specified $changeStream
+    if (opts.isShapifying()) {
+        // Stages made internally by 'DocumentSourceChangeStream' should not be included in the
+        // query shape. When shapifying we will serialize only the user specified $changeStream
         // stage.
         return Value();
     }

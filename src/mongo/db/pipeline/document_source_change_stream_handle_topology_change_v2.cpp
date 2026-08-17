@@ -62,9 +62,9 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChangeV2::constraints(
 
 Value DocumentSourceChangeStreamHandleTopologyChangeV2::doSerialize(
     const query_shape::SerializationOptions& opts) const {
-    if (opts.isSerializingForQueryStats()) {
-        // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
-        // query stats. For query stats we will serialize only the user specified $changeStream
+    if (opts.isShapifying()) {
+        // Stages made internally by 'DocumentSourceChangeStream' should not be included in the
+        // query shape. When shapifying we will serialize only the user specified $changeStream
         // stage.
         return Value();
     }

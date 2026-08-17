@@ -163,10 +163,10 @@ public:
 
             // When a projection's $elemMatch starts with a "$", PathMatchExpression::serialize
             // wraps the $-prefixed path in "$_internalPath", producing a shape that is not valid
-            // projection syntax and cannot be re-parsed for querystats. Therefore we have to
+            // projection syntax and cannot be re-parsed. Therefore we have to
             // construct a re-parseable projection: "{$<path>: {$elemMatch: <rhs of equality>}}".
             const std::string_view path = me->path();
-            if (path.starts_with('$') && _options.isSerializingForQueryStats()) {
+            if (path.starts_with('$') && _options.isShapifying()) {
                 BSONObjBuilder fieldSub(
                     _builders.top().subobjStart(_options.serializeFieldPathFromString(path)));
                 BSONObjBuilder elemMatchSub(fieldSub.subobjStart("$elemMatch"));

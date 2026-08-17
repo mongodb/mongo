@@ -239,7 +239,7 @@ void DocumentSourceGraphLookUp::serializeToArray(
     }
 
     if (getAdditionalFilter()) {
-        if (opts.isSerializingForQueryStats()) {
+        if (opts.isShapifying()) {
             auto matchExpr =
                 uassertStatusOK(MatchExpressionParser::parse(*getAdditionalFilter(), getExpCtx()));
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
@@ -252,8 +252,7 @@ void DocumentSourceGraphLookUp::serializeToArray(
     // resolved view pipeline so the receiver can reconstruct _params.fromLpp without re-resolving
     // the view. This is necessary because serializeFromNs above uses the backing collection name
     // (not the view name), so the receiver's lite parse sees no view and leaves fromLpp empty.
-    if (serializeForRemote && !opts.isSerializingForExplain() &&
-        !opts.isSerializingForQueryStats()) {
+    if (serializeForRemote && !opts.isSerializingForExplain() && !opts.isShapifying()) {
         if (_params.fromLpp && !(*_params.fromLpp)->getStages().empty()) {
             auto pipeline = Pipeline::parseFromLiteParsed(_params.fromLpp->pipeline(), _fromExpCtx);
             std::vector<Value> pipelineVals;

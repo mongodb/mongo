@@ -524,7 +524,7 @@ bool SerializationOptions::isSerializingForExplain() const {
     return verbosity.has_value();
 }
 
-bool SerializationOptions::isSerializingForQueryStats() const {
+bool SerializationOptions::isShapifying() const {
     return literalPolicy != LiteralSerializationPolicy::kUnchanged || transformIdentifiers;
 }
 

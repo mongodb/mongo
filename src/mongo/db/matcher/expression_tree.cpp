@@ -276,10 +276,9 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
     // For $pull modifier, rewrite $not{$eq/$in/$exists} back to $ne/$nin/{$exists: false} since
     // top-level $not cannot be re-parsed.
     if (opts.serializeForUpdatePullModifier) {
-        tassert(
-            11699500,
-            "serializeForUpdatePullModifier should only be set when serializing for query stats",
-            opts.isSerializingForQueryStats());
+        tassert(11699500,
+                "serializeForUpdatePullModifier should only be set when shapifying",
+                opts.isShapifying());
         const auto childType = expressionToNegate->matchType();
         if (childType == MatchExpression::EQ || childType == MatchExpression::MATCH_IN ||
             childType == MatchExpression::EXISTS) {

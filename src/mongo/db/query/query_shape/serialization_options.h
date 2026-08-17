@@ -262,7 +262,11 @@ struct SerializationOptions {
     bool isSerializingLiteralsAsDebugTypes() const;
     bool isReplacingLiteralsWithRepresentativeValues() const;
     bool isSerializingForExplain() const;
-    bool isSerializingForQueryStats() const;
+
+    // True when serializing to a query shape, i.e. literals are abstracted and/or identifiers are
+    // transformed. This is the case for shape consumers such as query stats and persistent query
+    // settings.
+    bool isShapifying() const;
 };
 
 }  // namespace query_shape

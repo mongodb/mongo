@@ -114,12 +114,11 @@ Value DocumentSourceChangeStreamTransform::serialize(
              Document{{"stage"sv, "internalTransform"sv}, {"options"sv, serializedOptions}}}});
     }
 
-    // Internal change stream stages are not serialized for query stats. Query stats uses this stage
-    // to serialize the user specified stage, and therefore if serializing for query stats, we
+    // Internal change stream stages are not included in the query shape. Shapified serialization
+    // uses this stage to serialize the user specified stage, and therefore when shapifying, we
     // should use the '$changeStream' stage name.
-    auto stageName = (opts.isSerializingForQueryStats())
-        ? DocumentSourceChangeStream::kStageName
-        : DocumentSourceChangeStreamTransform::kStageName;
+    auto stageName = opts.isShapifying() ? DocumentSourceChangeStream::kStageName
+                                         : DocumentSourceChangeStreamTransform::kStageName;
     return Value(Document{{stageName, serializedOptions}});
 }
 

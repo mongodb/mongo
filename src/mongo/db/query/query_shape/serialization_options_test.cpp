@@ -17,7 +17,7 @@ TEST(SerializationOptionsTest, IsDefaultSerialization) {
     ASSERT_FALSE(opts.isSerializingLiteralsAsDebugTypes());
     ASSERT_FALSE(opts.isReplacingLiteralsWithRepresentativeValues());
     ASSERT_FALSE(opts.isSerializingForExplain());
-    ASSERT_FALSE(opts.isSerializingForQueryStats());
+    ASSERT_FALSE(opts.isShapifying());
 }
 
 TEST(SerializationOptionsTest, DebugTypeStringPolicy) {
@@ -28,7 +28,7 @@ TEST(SerializationOptionsTest, DebugTypeStringPolicy) {
     ASSERT_TRUE(opts.isSerializingLiteralsAsDebugTypes());
     ASSERT_FALSE(opts.isReplacingLiteralsWithRepresentativeValues());
     ASSERT_FALSE(opts.isSerializingForExplain());
-    ASSERT_TRUE(opts.isSerializingForQueryStats());  // Since policy is NOT unchanged
+    ASSERT_TRUE(opts.isShapifying());  // Since policy is NOT unchanged
 }
 
 TEST(SerializationOptionsTest, RepresentativeParseableValuePolicy) {
@@ -39,7 +39,7 @@ TEST(SerializationOptionsTest, RepresentativeParseableValuePolicy) {
     ASSERT_FALSE(opts.isSerializingLiteralsAsDebugTypes());
     ASSERT_TRUE(opts.isReplacingLiteralsWithRepresentativeValues());
     ASSERT_FALSE(opts.isSerializingForExplain());
-    ASSERT_TRUE(opts.isSerializingForQueryStats());  // Since policy is NOT unchanged
+    ASSERT_TRUE(opts.isShapifying());  // Since policy is NOT unchanged
 }
 
 TEST(SerializationOptionsTest, ExplainModeEnabled) {
@@ -50,7 +50,7 @@ TEST(SerializationOptionsTest, ExplainModeEnabled) {
     ASSERT_FALSE(opts.isSerializingLiteralsAsDebugTypes());
     ASSERT_FALSE(opts.isReplacingLiteralsWithRepresentativeValues());
     ASSERT_TRUE(opts.isSerializingForExplain());
-    ASSERT_FALSE(opts.isSerializingForQueryStats());  // QueryStats is unrelated to Explain mode
+    ASSERT_FALSE(opts.isShapifying());  // QueryStats is unrelated to Explain mode
 }
 
 TEST(SerializationOptionsTest, TransformIdentifiersEnabled) {
@@ -61,7 +61,7 @@ TEST(SerializationOptionsTest, TransformIdentifiersEnabled) {
     ASSERT_FALSE(opts.isSerializingLiteralsAsDebugTypes());
     ASSERT_FALSE(opts.isReplacingLiteralsWithRepresentativeValues());
     ASSERT_FALSE(opts.isSerializingForExplain());
-    ASSERT_TRUE(opts.isSerializingForQueryStats());  // Since transformIdentifiers is enabled
+    ASSERT_TRUE(opts.isShapifying());  // Since transformIdentifiers is enabled
 }
 
 }  // namespace

@@ -252,7 +252,7 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     // subpipeline can reconstruct distributedPlanLogic() without the live callback.
     const bool serializingForExecutionElsewhere =
         (opts.isSerializingForRemoteDispatch || getExpCtx()->getInRouter()) &&
-        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain();
+        !opts.isShapifying() && !opts.isSerializingForExplain();
     if (serializingForExecutionElsewhere && _shardedPlan) {
         spec.setShardedPlanSpec(resolveShardedPlanSpec(*_shardedPlan, getExpCtx().get()));
     }
