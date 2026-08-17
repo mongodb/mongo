@@ -164,8 +164,8 @@ void recordCollectionCreateFromMigrate(const repl::OplogEntry& entry,
     // We use DDLState::kDroppedAndRecreated so that:
     //  1. persistCheckpoint() permits a pre-existing entry for this UUID in the SizeCountStore. It
     //  expects no prior entry for kCreated.
-    //  2. readAndIncrementSizeCounts() knows not to increment this ReplicatedMetadataDelta entry
-    //  with the stale persisted size/count of this collection before it was dropped.
+    //  2. readAndIncrementReplicatedMetadata() knows not to increment this ReplicatedMetadataDelta
+    //  entry with the stale persisted size/count of this collection before it was dropped.
     it->second = ReplicatedMetadataDelta{
         .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0}},
         .state = DDLState::kDroppedAndRecreated};

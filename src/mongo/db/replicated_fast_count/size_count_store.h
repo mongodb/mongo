@@ -51,7 +51,7 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
  * Locking: the container-backed implementation reads and writes the underlying container and does
  * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
  * of the call:
- *   MODE_IS - read(), readAndIncrementSizeCounts()
+ *   MODE_IS - read(), readAndIncrementReplicatedMetadata()
  *   MODE_IX - write(), insert(), remove()
  *
  * The collection-backed implementation acquires the collection (and its locks) internally, but
@@ -123,8 +123,8 @@ public:
      * Implementations are expected to acquire any underlying storage handles once and reuse them
      * across all UUIDs in `deltas`, since this is the checkpoint hot path.
      */
-    virtual void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                            ReplicatedMetadataDeltas& deltas) const = 0;
+    virtual void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                                    ReplicatedMetadataDeltas& deltas) const = 0;
 
     virtual bool usesContainers() const = 0;
 
@@ -148,8 +148,8 @@ public:
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     size_t remove(OperationContext* opCtx, UUID uuid) override;
-    void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                    ReplicatedMetadataDeltas& deltas) const override;
+    void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                            ReplicatedMetadataDeltas& deltas) const override;
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {
@@ -172,8 +172,8 @@ public:
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     size_t remove(OperationContext* opCtx, UUID uuid) override;
-    void readAndIncrementSizeCounts(OperationContext* opCtx,
-                                    ReplicatedMetadataDeltas& deltas) const override;
+    void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                            ReplicatedMetadataDeltas& deltas) const override;
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
 
     bool usesContainers() const override {

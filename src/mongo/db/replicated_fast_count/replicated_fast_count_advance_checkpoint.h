@@ -14,23 +14,46 @@ namespace mongo::replicated_fast_count {
  *
  * `updatedCollections` contains absolute replicated-metadata totals, not incremental deltas.
  */
-struct SizeCountCheckpointSnapshot {
+struct ReplicatedMetadataCheckpointSnapshot {
     ReplicatedMetadataDeltas updatedCollections;
     Timestamp validAsOf;
 
     bool empty() const {
         return updatedCollections.empty();
     }
+
+    bool operator==(const ReplicatedMetadataCheckpointSnapshot&) const = default;
+
+    std::string toString() const {
+        std::vector<std::pair<UUID, ReplicatedMetadataDelta>> sorted(updatedCollections.begin(),
+                                                                     updatedCollections.end());
+        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+        std::string deltaStr;
+        for (const auto& [uuid, delta] : sorted) {
+            deltaStr += fmt::format("\n    {}: {{{}}}", uuid.toString(), delta.toString());
+        }
+        return fmt::format("ReplicatedMetadataCheckpointSnapshot{{validAsOf: {}, deltas: [{}]}}",
+                           validAsOf.toString(),
+                           deltaStr);
+    }
 };
+
+inline std::ostream& operator<<(std::ostream& s,
+                                const ReplicatedMetadataCheckpointSnapshot& result) {
+    return s << result.toString();
+}
 
 /**
  * Converts incremental deltas plus a known visible cutoff into a persistable snapshot by reading
  * the currently persisted totals and incrementing them in-place.
  */
-SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCtx,
-                                                          const SizeCountStore& sizeCountStore,
-                                                          OplogScanResult scanResult,
-                                                          Timestamp scanStartAfterTS);
+ReplicatedMetadataCheckpointSnapshot materializeCheckpointSnapshot(
+    OperationContext* opCtx,
+    const SizeCountStore& sizeCountStore,
+    OplogScanResult scanResult,
+    Timestamp scanStartAfterTS);
 
 /**
  * Persists a materialized checkpoint snapshot to the `sizeCountStore` and updates the valid-as-of
@@ -39,7 +62,7 @@ SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCt
  * Returns the number of writes to the `sizeCountStore`.
  */
 size_t persistCheckpointSnapshot(OperationContext* opCtx,
-                                 const SizeCountCheckpointSnapshot& checkpoint,
+                                 const ReplicatedMetadataCheckpointSnapshot& checkpoint,
                                  SizeCountStore& sizeCountStore,
                                  SizeCountTimestampStore& timestampStore);
 

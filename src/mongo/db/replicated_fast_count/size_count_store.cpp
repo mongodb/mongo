@@ -213,11 +213,11 @@ size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     return 1;
 }
 
-void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                          ReplicatedMetadataDeltas& deltas) const {
+void CollectionSizeCountStore::readAndIncrementReplicatedMetadata(
+    OperationContext* opCtx, ReplicatedMetadataDeltas& deltas) const {
     massert(12915207,
             "Must hold the GlobalLock in a read mode when calling "
-            "SizeCountStore::readAndIncrementSizeCounts()",
+            "SizeCountStore::readAndIncrementReplicatedMetadata()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
 
     const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
@@ -279,16 +279,37 @@ void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const En
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
-    auto val = entryToContainerValue(entry);
     auto keySpan = uuidToContainerKey(uuid);
-    auto valSpan = bsonToSpan(val);
+
+    auto cursor = container.getCursor(ru);
+    const auto previousValue = cursor->find(keySpan);
+
+    const auto hashToWrite = [&]() -> boost::optional<int64_t> {
+        // Check if a previous entry exists and contains a hash.
+        if (previousValue.has_value()) {
+            const SizeCountStore::Entry previousEntry =
+                SizeCountStore::parseContainerValue(*previousValue);
+            if (!previousEntry.hash.has_value()) {
+                // The pre-existing entry does not already contain a hash. Do not write a hash,
+                // regardless of the hash in `entry`. This accounts for collections with size/count
+                // metadata created before hash validation was enabled.
+                return boost::none;
+            }
+        }
+        return entry.hash;
+    }();
+
+    const BSONObj value = entryToContainerValue(SizeCountStore::Entry{.timestamp = entry.timestamp,
+                                                                      .size = entry.size,
+                                                                      .count = entry.count,
+                                                                      .hash = hashToWrite});
+    const std::span<const char> valueSpan = bsonToSpan(value);
 
     // Check if the key exists. Containers currently only support strict inserts or strict updates.
-    auto cursor = container.getCursor(ru);
-    if (cursor->find(keySpan)) {
-        massertStatusOK(container_write::update(opCtx, ru, container, keySpan, valSpan));
+    if (previousValue.has_value()) {
+        massertStatusOK(container_write::update(opCtx, ru, container, keySpan, valueSpan));
     } else {
-        massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valSpan));
+        massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valueSpan));
     }
 }
 
@@ -334,11 +355,11 @@ size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     return 1;
 }
 
-void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                         ReplicatedMetadataDeltas& deltas) const {
+void ContainerSizeCountStore::readAndIncrementReplicatedMetadata(
+    OperationContext* opCtx, ReplicatedMetadataDeltas& deltas) const {
     massert(12915202,
             "Must hold the GlobalLock in a read mode when calling "
-            "SizeCountStore::readAndIncrementSizeCounts()",
+            "SizeCountStore::readAndIncrementReplicatedMetadata()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -355,6 +376,8 @@ void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx
         auto entry = parseContainerValue(*result);
         delta.metadata.sizeCount.count += entry.count;
         delta.metadata.sizeCount.size += entry.size;
+        // If either hash is boost::none, delta.metadata.hash is set to boost::none.
+        delta.metadata.hash = combineValidationHashes(delta.metadata.hash, entry.hash);
     }
 }
 

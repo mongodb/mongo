@@ -10,9 +10,9 @@
 namespace mongo::replicated_fast_count {
 namespace {
 
-SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
-                                                  const SizeCountStore& sizeCountStore,
-                                                  Timestamp seekAfterTimestamp) {
+ReplicatedMetadataCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
+                                                           const SizeCountStore& sizeCountStore,
+                                                           Timestamp seekAfterTimestamp) {
     // Scan the oplog from `seekAfterTimestamp` and accumulate size and count deltas for every UUID
     // that has written since the last checkpoint.
     auto scanResult = [&]() -> OplogScanResult {
@@ -35,29 +35,30 @@ SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
 }
 }  // namespace
 
-SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCtx,
-                                                          const SizeCountStore& sizeCountStore,
-                                                          OplogScanResult scanResult,
-                                                          Timestamp scanStartAfterTS) {
-    sizeCountStore.readAndIncrementSizeCounts(opCtx, scanResult.deltas);
+ReplicatedMetadataCheckpointSnapshot materializeCheckpointSnapshot(
+    OperationContext* opCtx,
+    const SizeCountStore& sizeCountStore,
+    OplogScanResult scanResult,
+    Timestamp scanStartAfterTS) {
+    sizeCountStore.readAndIncrementReplicatedMetadata(opCtx, scanResult.deltas);
     return {.updatedCollections = std::move(scanResult.deltas),
             .validAsOf = scanResult.lastTimestamp.value_or(scanStartAfterTS)};
 }
 
 size_t persistCheckpointSnapshot(OperationContext* opCtx,
-                                 const SizeCountCheckpointSnapshot& checkpoint,
+                                 const ReplicatedMetadataCheckpointSnapshot& checkpoint,
                                  SizeCountStore& sizeCountStore,
                                  SizeCountTimestampStore& timestampStore) {
     size_t entryWriteCount = 0;
     for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
         switch (entry.state) {
             case DDLState::kCreated: {
-                sizeCountStore.insert(
-                    opCtx,
-                    uuid,
-                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                          .size = entry.metadata.sizeCount.size,
-                                          .count = entry.metadata.sizeCount.count});
+                sizeCountStore.insert(opCtx,
+                                      uuid,
+                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                            .size = entry.metadata.sizeCount.size,
+                                                            .count = entry.metadata.sizeCount.count,
+                                                            .hash = entry.metadata.hash});
                 entryWriteCount++;
                 break;
             }
@@ -67,12 +68,12 @@ size_t persistCheckpointSnapshot(OperationContext* opCtx,
             }
             case DDLState::kDroppedAndRecreated:
             case DDLState::kNone: {
-                sizeCountStore.write(
-                    opCtx,
-                    uuid,
-                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                          .size = entry.metadata.sizeCount.size,
-                                          .count = entry.metadata.sizeCount.count});
+                sizeCountStore.write(opCtx,
+                                     uuid,
+                                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                           .size = entry.metadata.sizeCount.size,
+                                                           .count = entry.metadata.sizeCount.count,
+                                                           .hash = entry.metadata.hash});
                 entryWriteCount++;
                 break;
             }

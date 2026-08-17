@@ -37,7 +37,7 @@ class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {
 protected:
     void doReadAndIncrement(CollectionSizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
-        store.readAndIncrementSizeCounts(operationContext(), deltas);
+        store.readAndIncrementReplicatedMetadata(operationContext(), deltas);
     }
 };
 

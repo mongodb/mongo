@@ -950,6 +950,186 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     EXPECT_EQ(entry->count, oplogStartingCount + 2 - numEntriesTruncated);
 }
 
+class ReplicatedFastCountPersistCheckpointSnapshotTest : public CatalogTestFixture {
+public:
+    ReplicatedFastCountPersistCheckpointSnapshotTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
 
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        opCtx = operationContext();
+        ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/false));
+        KVEngine* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+        sizeCountStore = std::make_unique<ContainerSizeCountStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none));
+        timestampStore = std::make_unique<ContainerSizeCountTimestampStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none));
+    }
+
+    const test_helpers::NsAndUUID collA{.nss = NamespaceString::createNamespaceString_forTest(
+                                            "persist_checkpoint_snapshot", "collA"),
+                                        .uuid = UUID::gen()};
+    const test_helpers::NsAndUUID collB{.nss = NamespaceString::createNamespaceString_forTest(
+                                            "persist_checkpoint_snapshot", "collB"),
+                                        .uuid = UUID::gen()};
+
+    OperationContext* opCtx;
+    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
+    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+};
+
+TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest, HashNotPersistedWhenAbsent) {
+    // The order of these states matters because DDLState::kCreated expects no pre-existing entry
+    // for the provided UUID before inserting to the SizeCountStore. DDLState::kNone and
+    // DDLState::kDroppedAndRecreated update the inserted entry using SizeCountStore::write().
+    const std::array states{DDLState::kCreated, DDLState::kNone, DDLState::kDroppedAndRecreated};
+    for (const auto state : states) {
+        const ReplicatedMetadataCheckpointSnapshot snapshot{
+            .updatedCollections = ReplicatedMetadataDeltas{
+                {collA.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1}},
+                     .state = state}}}};
+
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
+        wuow.commit();
+
+        const boost::optional<SizeCountStore::Entry> result =
+            sizeCountStore->read(opCtx, collA.uuid);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->size, 25);
+        EXPECT_EQ(result->count, 1);
+        EXPECT_FALSE(result->hash.has_value());
+    }
+};
+
+TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest, HashPersistedWhenPresent) {
+    // The order of these states matters because DDLState::kCreated expects no pre-existing entry
+    // for the provided UUID before inserting to the SizeCountStore. DDLState::kNone and
+    // DDLState::kDroppedAndRecreated update the inserted entry using SizeCountStore::write().
+    const std::array states{DDLState::kCreated, DDLState::kNone, DDLState::kDroppedAndRecreated};
+    for (const auto state : states) {
+        const ReplicatedMetadataCheckpointSnapshot snapshot{
+            .updatedCollections = ReplicatedMetadataDeltas{
+                {collA.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1},
+                                  .hash = static_cast<int64_t>(0xDEADBEEFDEADBEEF)},
+                     .state = state}}}};
+
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
+        wuow.commit();
+
+        const boost::optional<SizeCountStore::Entry> result =
+            sizeCountStore->read(opCtx, collA.uuid);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->size, 25);
+        EXPECT_EQ(result->count, 1);
+        EXPECT_TRUE(result->hash.has_value());
+        EXPECT_EQ(*result->hash, static_cast<int64_t>(0xDEADBEEFDEADBEEF));
+    }
+};
+
+TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest,
+       DropAndRecreateUntrackedHashAcrossCheckpoints) {
+    // If a collection with a persisted SizeCountStore::Entry with no hash is dropped then
+    // recreated across checkpoints, we can start tracking the hash.
+    test_helpers::insertSizeCountEntry(
+        opCtx,
+        *sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp::min(), .size = 1, .count = 2, .hash = boost::none});
+    {
+        const ReplicatedMetadataCheckpointSnapshot snapshot{
+            .updatedCollections = ReplicatedMetadataDeltas{
+                {collA.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1},
+                                  .hash = boost::none},
+                     .state = DDLState::kDropped}}}};
+
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
+        wuow.commit();
+
+        const boost::optional<SizeCountStore::Entry> result =
+            sizeCountStore->read(opCtx, collA.uuid);
+        ASSERT_FALSE(result.has_value());
+    }
+
+    {
+        const ReplicatedMetadataCheckpointSnapshot snapshot{
+            .updatedCollections = ReplicatedMetadataDeltas{
+                {collA.uuid,
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1},
+                                  .hash = 0x1234},
+                     .state = DDLState::kCreated}}}};
+
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
+        wuow.commit();
+
+        const boost::optional<SizeCountStore::Entry> result =
+            sizeCountStore->read(opCtx, collA.uuid);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->size, 25);
+        EXPECT_EQ(result->count, 1);
+        EXPECT_TRUE(result->hash.has_value());
+        EXPECT_EQ(*result->hash, 0x1234);
+    }
+};
+
+TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest,
+       DropAndRecreateUntrackedHashWithinCheckpoint) {
+    test_helpers::insertSizeCountEntry(
+        opCtx,
+        *sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp::min(), .size = 1, .count = 2, .hash = boost::none});
+    const ReplicatedMetadataCheckpointSnapshot snapshot{
+        .updatedCollections = ReplicatedMetadataDeltas{
+            {collA.uuid,
+             ReplicatedMetadataDelta{
+                 .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1},
+                              .hash = 0x1234},
+                 .state = DDLState::kDroppedAndRecreated}}}};
+
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
+    wuow.commit();
+
+    const boost::optional<SizeCountStore::Entry> result = sizeCountStore->read(opCtx, collA.uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->size, 25);
+    EXPECT_EQ(result->count, 1);
+    // TODO SERVER-133557: Decide if this is the behavior we want.
+    EXPECT_FALSE(result->hash.has_value());
+};
 }  // namespace
 }  // namespace mongo::replicated_fast_count
