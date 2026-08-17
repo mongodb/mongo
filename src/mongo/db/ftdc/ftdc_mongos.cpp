@@ -8,6 +8,7 @@
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/ftdc/networking_collectors.h"
+#include "mongo/db/ftdc/register_module_ftdc_collectors.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -78,7 +79,10 @@ void startMongoSFTDC(ServiceContext* serviceContext) {
         }
     }
 
-    startFTDC(serviceContext, directory, startMode, {registerRouterCollectors});
+    startFTDC(serviceContext,
+              directory,
+              startMode,
+              {registerRouterCollectors, registerModuleFTDCCollectors});
 }
 
 void stopMongoSFTDC() {

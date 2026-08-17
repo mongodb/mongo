@@ -16,6 +16,7 @@
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/ftdc/networking_collectors.h"
+#include "mongo/db/ftdc/register_module_ftdc_collectors.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -228,6 +229,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
 
     std::vector<RegisterCollectorsFunction> registerFns{
         registerShardCollectors,
+        registerModuleFTDCCollectors,
     };
 
     startFTDC(serviceContext, dir, FTDCStartMode::kStart, std::move(registerFns));

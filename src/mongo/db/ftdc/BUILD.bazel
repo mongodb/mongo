@@ -119,6 +119,29 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "register_module_ftdc_collectors",
+    srcs = [
+        "register_module_ftdc_collectors.cpp",
+    ],
+    srcs_select = [{
+        "//bazel/config:build_atlas_required_settings": [],
+        "//conditions:default": [
+            "register_module_ftdc_collectors_noop.cpp",
+        ],
+    }],
+    deps = [
+        ":ftdc",
+    ] + select({
+        "//bazel/config:build_atlas_required_settings": [
+            "//src/mongo/db/modules/atlas/src/disagg_storage/pali:register_ftdc_collectors",
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",
+        ],
+    }),
+)
+
+mongo_cc_library(
     name = "ftdc_commands",
     srcs = [
         "ftdc_commands.cpp",
@@ -141,6 +164,7 @@ mongo_cc_library(
     deps = [
         ":ftdc_commands",
         ":ftdc_server",
+        ":register_module_ftdc_collectors",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:server_base",
         "//src/mongo/executor:task_executor_pool",
@@ -159,6 +183,7 @@ mongo_cc_library(
         ":ftdc_commands",
         ":ftdc_mongos",
         ":ftdc_server",
+        ":register_module_ftdc_collectors",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
