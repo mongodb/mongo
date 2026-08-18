@@ -24,7 +24,6 @@ namespace {
 
 constexpr size_t kMaxAcquisitionRetryAttempts = 5;
 
-
 CollectionOrViewAcquisition acquireCollectionOrViewWithLockFreeRead(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode) {
     if (mode == LockMode::MODE_IS) {
@@ -47,15 +46,17 @@ void assertSnapshotOpen(OperationContext* opCtx) {
 
 bool timeseriesCollectionExistsInCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     assertSnapshotOpen(opCtx);
-    auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, nss, boost::none /* readTimestamp */);
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
+    auto coll =
+        CollectionCatalog::get(opCtx)->establishConsistentCollection(opCtx, nss, readTimestamp);
     return coll && coll->isTimeseriesCollection();
 }
 
 bool collectionExistsInCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     assertSnapshotOpen(opCtx);
-    return static_cast<bool>(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, nss, boost::none /* readTimestamp */));
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
+    return static_cast<bool>(
+        CollectionCatalog::get(opCtx)->establishConsistentCollection(opCtx, nss, readTimestamp));
 }
 
 CollectionOrViewAcquisitionPlusTimeseriesView acquireBucketsPlusTimeseriesView(

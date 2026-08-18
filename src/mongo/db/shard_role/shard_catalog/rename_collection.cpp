@@ -1151,8 +1151,10 @@ void checkTimeseriesUpgradeDowngrade(OperationContext* opCtx,
             // a viewless timeseries collection now exists on the main namespace — indicating an
             // upgrade from view-based to viewless format during the operation.
             auto catalog = CollectionCatalog::get(opCtx);
+            auto readTimestamp =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             timeseriesFormatChanged = !!catalog->establishConsistentCollection(
-                opCtx, nss.getTimeseriesViewNamespace(), boost::none);
+                opCtx, nss.getTimeseriesViewNamespace(), readTimestamp);
         }
         uassert(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
                 fmt::format("Operation on collection '{}' was interrupted due to a time-series "
