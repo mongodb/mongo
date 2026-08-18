@@ -264,6 +264,7 @@ function testReceivingCommitIndexBuildEntryDuringStartupRecovery() {
     );
 
     secondary = rst.getSecondary();
+    rst.awaitSecondaryNodes(null, [secondary]);
     const secondaryDBAfterRestart = secondary.getDB(dbName);
 
     IndexBuildTest.waitForIndexBuildToStop(secondaryDBAfterRestart);
