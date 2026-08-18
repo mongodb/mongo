@@ -150,6 +150,24 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
     invariant(isCatalogOpen(opCtx));
 
+    // Primary-driven index builds are tracked outside of the catalog, so clear them here. This has
+    // to happen before the assertion and the database closes below, both of which refuse to
+    // proceed while index builds exist. Restore the entries if we do not successfully close the
+    // catalog.
+    auto& primaryDrivenRegistry =
+        index_builds::primary_driven::registry(opCtx->getServiceContext());
+    auto previousPrimaryDrivenBuilds = primaryDrivenRegistry.all();
+    primaryDrivenRegistry.clear();
+    ScopeGuard restorePrimaryDrivenRegistryOnFailure([&] {
+        for (auto&& [buildUUID, build] : previousPrimaryDrivenBuilds) {
+            primaryDrivenRegistry.add(buildUUID,
+                                      build.dbName,
+                                      build.collectionUUID,
+                                      build.indexes,
+                                      build.indexBuildIdent);
+        }
+    });
+
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     PreviousCatalogState previousCatalogState;
@@ -215,10 +233,8 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     // outside the catalog itself.
     catalog_stats::requiresTimeseriesExtendedRangeSupport.storeRelaxed(0);
 
-    // Primary-driven index builds are tracked outside of the catalog, so clear them here.
-    index_builds::primary_driven::registry(opCtx->getServiceContext()).clear();
-
     reopenOnFailure.dismiss();
+    restorePrimaryDrivenRegistryOnFailure.dismiss();
     return previousCatalogState;
 }
 

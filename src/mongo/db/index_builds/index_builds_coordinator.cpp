@@ -719,6 +719,8 @@ void IndexBuildsCoordinator::set(ServiceContext* serviceContext,
     auto& indexBuildsCoordinator = getIndexBuildsCoord(serviceContext);
     invariant(!indexBuildsCoordinator);
 
+    ibc->activeIndexBuilds.setPrimaryDrivenRegistry(
+        index_builds::primary_driven::registry(serviceContext));
     indexBuildsCoordinator = std::move(ibc);
 }
 
@@ -2616,30 +2618,20 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 }
 
 bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
-    return activeIndexBuilds.getActiveIndexBuildsCount() == 0;
+    return activeIndexBuilds.getIndexBuildsCount() == 0;
 }
 
 int IndexBuildsCoordinator::numInProgForDb(const DatabaseName& dbName) const {
-    auto indexBuildFilter = [dbName](const auto& replState) {
-        return dbName == replState.dbName;
-    };
-    auto dbIndexBuilds = activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
-    return int(dbIndexBuilds.size());
+    return int(activeIndexBuilds.buildUUIDsForDb(dbName).size());
 }
 
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID,
                                                  IndexBuildProtocol protocol) const {
-    auto indexBuildFilter = [=](const auto& replState) {
-        return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
-    };
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
-    return !indexBuilds.empty();
+    return !activeIndexBuilds.buildUUIDsForCollection(collectionUUID, protocol).empty();
 }
 
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID) const {
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds(
-        [=](const auto& replState) { return collectionUUID == replState.collectionUUID; });
-    return !indexBuilds.empty();
+    return !activeIndexBuilds.buildUUIDsForCollection(collectionUUID).empty();
 }
 
 bool IndexBuildsCoordinator::inProgForDb(const DatabaseName& dbName) const {
@@ -2652,39 +2644,25 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
 
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
-    boost::optional<UUID> firstIndexBuildUUID;
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds([&](const auto& replState) {
-        auto isIndexBuildForCollection = (collectionUUID == replState.collectionUUID);
-        if (isIndexBuildForCollection && !firstIndexBuildUUID) {
-            firstIndexBuildUUID = replState.buildUUID;
-        };
-        return isIndexBuildForCollection;
-    });
+    auto buildUUIDs = activeIndexBuilds.buildUUIDsForCollection(collectionUUID);
 
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             fmt::format("cannot perform operation: an index build is currently running for "
                         "collection with UUID: {}. Found index build: {}",
                         collectionUUID.toString(),
-                        firstIndexBuildUUID->toString()),
-            indexBuilds.empty());
+                        buildUUIDs.front().toString()),
+            buildUUIDs.empty());
 }
 
 void IndexBuildsCoordinator::assertNoBgOpInProgForDb(const DatabaseName& dbName) const {
-    boost::optional<UUID> firstIndexBuildUUID;
-    auto indexBuilds = activeIndexBuilds.filterIndexBuilds([&](const auto& replState) {
-        auto isIndexBuildForCollection = (dbName == replState.dbName);
-        if (isIndexBuildForCollection && !firstIndexBuildUUID) {
-            firstIndexBuildUUID = replState.buildUUID;
-        };
-        return isIndexBuildForCollection;
-    });
+    auto buildUUIDs = activeIndexBuilds.buildUUIDsForDb(dbName);
 
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             fmt::format("cannot perform operation: an index build is currently running for "
                         "database {}. Found index build: {}",
                         dbName.toStringForErrorMsg(),
-                        firstIndexBuildUUID->toString()),
-            indexBuilds.empty());
+                        buildUUIDs.front().toString()),
+            buildUUIDs.empty());
 }
 
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
@@ -2698,9 +2676,11 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationC
     activeIndexBuilds.awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
 }
 
-void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx,
-                                                    const DatabaseName& dbName) {
-    activeIndexBuilds.awaitNoBgOpInProgForDb(opCtx, dbName);
+void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    std::initializer_list<IndexBuildProtocol> protocols) {
+    activeIndexBuilds.awaitNoBgOpInProgForDb(opCtx, dbName, protocols);
 }
 
 void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opCtx,

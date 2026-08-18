@@ -435,6 +435,10 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     // Wait for all background operations to complete by waiting on each database. Single-phase
     // index builds are not stopped before rollback, so we must wait for these index builds to
     // complete.
+    //
+    // Only the index builds this node is running are waited for. Primary-driven index builds that
+    // are merely registered have no thread of their own, and their registry entries are cleared and
+    // repopulated from disk by closeCatalog()/openCatalog() below, so there is nothing to wait for.
     std::vector<DatabaseName> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
     for (const auto& dbName : dbNames) {
@@ -445,7 +449,8 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                         "Waiting for background operations to complete",
                         "numBackgroundOperationsInProgress"_attr = numInProg,
                         logAttrs(dbName));
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, dbName);
+            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(
+                opCtx, dbName, {IndexBuildProtocol::kSinglePhase});
         }
     }
 

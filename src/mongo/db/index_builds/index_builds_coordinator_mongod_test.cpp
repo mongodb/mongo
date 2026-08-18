@@ -519,7 +519,7 @@ TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest,
 
 TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest, AwaitNoBgOpInProgForDbIsInterruptible) {
     auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
-        _indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, _testFooNss.dbName());
+        _indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, _testFooNss.dbName(), {kProtocol});
     });
 
     assertWasInterrupted(result);

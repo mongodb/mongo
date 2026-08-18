@@ -7,6 +7,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
@@ -25,10 +26,12 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
 
 #include <string_view>
@@ -572,6 +575,163 @@ TEST_F(IndexBuildsCoordinatorTest, CommitRemovesBuildFromPrimaryDrivenRegistry) 
     ASSERT_OK(future.getNoThrow());
 
     EXPECT_TRUE(registry.all().empty());
+}
+
+TEST_F(IndexBuildsCoordinatorTest, RegisteredPrimaryDrivenIndexBuildCountsAsInProgress) {
+    auto opCtx = operationContext();
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto& registry = index_builds::primary_driven::registry(opCtx->getServiceContext());
+
+    auto ns = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.registeredPrimaryDrivenBuild");
+    auto collectionUUID = UUID::gen();
+    auto buildUUID = UUID::gen();
+
+    ASSERT_TRUE(indexBuildsCoord->noIndexBuildInProgress());
+
+    registry.add(
+        buildUUID,
+        ns.dbName(),
+        collectionUUID,
+        toIndexBuildInfoVec(std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                                          << "a_1")},
+                            *opCtx->getServiceContext()->getStorageEngine(),
+                            ns.dbName()),
+        /*indexBuildIdent=*/boost::none);
+
+    EXPECT_FALSE(indexBuildsCoord->noIndexBuildInProgress());
+    EXPECT_TRUE(indexBuildsCoord->inProgForCollection(collectionUUID));
+    EXPECT_TRUE(indexBuildsCoord->inProgForDb(ns.dbName()));
+    EXPECT_EQ(indexBuildsCoord->numInProgForDb(ns.dbName()), 1);
+    ASSERT_THROWS_CODE(indexBuildsCoord->assertNoIndexBuildInProgForCollection(collectionUUID),
+                       AssertionException,
+                       ErrorCodes::BackgroundOperationInProgressForNamespace);
+    ASSERT_THROWS_CODE(indexBuildsCoord->assertNoBgOpInProgForDb(ns.dbName()),
+                       AssertionException,
+                       ErrorCodes::BackgroundOperationInProgressForDatabase);
+
+    // Every build in the registry is primary-driven, so narrowing by protocol filters it out.
+    EXPECT_TRUE(
+        indexBuildsCoord->inProgForCollection(collectionUUID, IndexBuildProtocol::kPrimaryDriven));
+    EXPECT_FALSE(
+        indexBuildsCoord->inProgForCollection(collectionUUID, IndexBuildProtocol::kTwoPhase));
+    ASSERT_THROWS_CODE(indexBuildsCoord->assertNoIndexBuildInProgress(),
+                       AssertionException,
+                       ErrorCodes::BackgroundOperationInProgressForDatabase);
+    // Waiting for the protocols this node runs does not wait for a registered build.
+    ASSERT_DOES_NOT_THROW(indexBuildsCoord->awaitNoBgOpInProgForDb(
+        opCtx, ns.dbName(), {IndexBuildProtocol::kSinglePhase}));
+
+    registry.remove(buildUUID);
+
+    EXPECT_TRUE(indexBuildsCoord->noIndexBuildInProgress());
+    EXPECT_FALSE(indexBuildsCoord->inProgForCollection(collectionUUID));
+    EXPECT_EQ(indexBuildsCoord->numInProgForDb(ns.dbName()), 0);
+    ASSERT_DOES_NOT_THROW(indexBuildsCoord->assertNoIndexBuildInProgForCollection(collectionUUID));
+    ASSERT_DOES_NOT_THROW(indexBuildsCoord->assertNoBgOpInProgForDb(ns.dbName()));
+}
+
+TEST_F(IndexBuildsCoordinatorTest, RunningPrimaryDrivenIndexBuildIsCountedOnce) {
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto& registry = index_builds::primary_driven::registry(opCtx->getServiceContext());
+
+    auto ns = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.runningPrimaryDrivenBuild");
+    createCollectionWithDuplicateDocs(opCtx, ns);
+    auto collectionUUID = getCollectionExclusive(opCtx, ns).uuid();
+
+    auto indexes = toIndexBuildInfoVec(
+        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
+        *opCtx->getServiceContext()->getStorageEngine(),
+        ns.dbName());
+    auto buildUUID = UUID::gen();
+    registry.add(buildUUID, ns.dbName(), collectionUUID, indexes, /*indexBuildIdent=*/boost::none);
+
+    // Hold the build in its builder thread so that it stays both registered and running.
+    indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+    auto future = unittest::assertGet(indexBuildsCoord->startIndexBuild(
+        opCtx,
+        ns.dbName(),
+        collectionUUID,
+        indexes,
+        buildUUID,
+        {.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
+         .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
+         .commitQuorum = CommitQuorumOptions{CommitQuorumOptions::kPrimarySelfVote}}));
+
+    ASSERT_EQ(registry.all().size(), 1);
+    EXPECT_EQ(indexBuildsCoord->numInProgForDb(ns.dbName()), 1);
+
+    indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    future.getNoThrow().getStatus().ignore();
+}
+
+TEST_F(IndexBuildsCoordinatorTest, AwaitNoIndexBuildInProgressForCollectionWakesOnRegistryChange) {
+    static constexpr auto kTimeout = Seconds(10);
+
+    auto opCtx = operationContext();
+    auto& registry = index_builds::primary_driven::registry(opCtx->getServiceContext());
+
+    auto ns = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.awaitOnRegistryChange");
+    auto collectionUUID = UUID::gen();
+    auto buildUUID = UUID::gen();
+    registry.add(
+        buildUUID,
+        ns.dbName(),
+        collectionUUID,
+        toIndexBuildInfoVec(std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                                          << "a_1")},
+                            *opCtx->getServiceContext()->getStorageEngine(),
+                            ns.dbName()),
+        /*indexBuildIdent=*/boost::none);
+
+    auto [finishedPromise, finishedFuture] = makePromiseFuture<void>();
+    auto waiterClient = getServiceContext()->getService()->makeClient("indexBuildWaiter");
+    auto waiterOpCtx = waiterClient->makeOperationContext();
+
+    stdx::thread waiter([&, promise = std::move(finishedPromise)]() mutable {
+        try {
+            IndexBuildsCoordinator::get(waiterOpCtx.get())
+                ->awaitNoIndexBuildInProgressForCollection(waiterOpCtx.get(), collectionUUID);
+        } catch (const DBException&) {
+            // Only reached through the interrupt on the way out of a failing assertion below.
+            return;
+        }
+        promise.emplaceValue();
+    });
+
+    // Every assertion below throws, and destroying a joinable thread while unwinding terminates the
+    // test process instead of reporting the failure. Interrupting a waiter that has already
+    // returned does nothing.
+    ScopeGuard interruptAndJoinWaiter{[&] {
+        {
+            std::lock_guard<Client> lk(*waiterOpCtx->getClient());
+            waiterOpCtx->markKilled(ErrorCodes::Interrupted);
+        }
+        waiter.join();
+    }};
+
+    // The waiter must not return while the build is still registered.
+    auto deadline = Date_t::now() + kTimeout;
+    while (!waiterOpCtx->isWaitingForConditionOrInterrupt() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds(10));
+    }
+    ASSERT_TRUE(waiterOpCtx->isWaitingForConditionOrInterrupt())
+        << "the waiter did not block while an index build was registered";
+
+    registry.remove(buildUUID);
+
+    auto wakeDeadline = Date_t::now() + kTimeout;
+    while (!finishedFuture.isReady() && Date_t::now() < wakeDeadline) {
+        sleepFor(Milliseconds(10));
+    }
+    ASSERT_TRUE(finishedFuture.isReady()) << "removing the registry entry did not wake the waiter";
 }
 
 TEST_F(IndexBuildsCoordinatorTest, AbortRemovesBuildFromPrimaryDrivenRegistry) {

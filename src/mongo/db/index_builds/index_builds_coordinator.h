@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -425,7 +426,9 @@ public:
     /**
      * Waits for all index builds on a specified database to finish.
      */
-    void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                std::initializer_list<IndexBuildProtocol> protocols);
 
     /**
      * Waits until an index build completes or the deadline expires. If there are no index builds in

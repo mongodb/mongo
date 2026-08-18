@@ -18,6 +18,7 @@
 #include "mongo/db/index_builds/index_build_knobs_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/enabled.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -226,11 +227,20 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
         _stepUpThread.join();
     }
 
+    // Nothing tracks primary-driven index builds once this coordinator is gone. Their on-disk state
+    // is untouched: the registry is repopulated from it on startup. Clearing before the wait below
+    // means the wait is left with the builds that actually have a thread to finish.
+    index_builds::primary_driven::registry(opCtx->getServiceContext()).clear();
+
     // Wait for all active builds to stop.
     activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
     pool.join();
+
+    // The handler holds a pointer to 'activeIndexBuilds', so it has to be discarded before this
+    // coordinator is destroyed.
+    index_builds::primary_driven::registry(opCtx->getServiceContext()).setOnChangeHandler({});
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>

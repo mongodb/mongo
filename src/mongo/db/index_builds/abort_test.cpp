@@ -164,11 +164,12 @@ TEST_F(AbortTest, AbortsUnresumedPrimaryDrivenBuild) {
     unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto opCtx = operationContext();
-    startUnresumedPrimaryDrivenIndexBuild();
+    auto buildUUID = startUnresumedPrimaryDrivenIndexBuild();
 
     ASSERT_EQ(registry().all().size(), 1);
     ASSERT_EQ(numIndexesInProgress(), 1);
-    ASSERT_FALSE(IndexBuildsCoordinator::get(opCtx)->inProgForCollection(_collectionUUID));
+    ASSERT_TRUE(IndexBuildsCoordinator::get(opCtx)->inProgForCollection(_collectionUUID));
+    ASSERT_FALSE(IndexBuildsCoordinator::get(opCtx)->isIndexBuildRunning(buildUUID));
 
     boost::optional<CollectionAcquisition> collection(acquireExclusive());
     auto commitTimestampGuard = makeCommitTimestampGuard();
@@ -193,11 +194,12 @@ TEST_F(AbortTest, AbortsUnresumedPrimaryDrivenBuildForWholeDatabase) {
     unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto opCtx = operationContext();
-    startUnresumedPrimaryDrivenIndexBuild();
+    auto buildUUID = startUnresumedPrimaryDrivenIndexBuild();
 
     ASSERT_EQ(registry().all().size(), 1);
     ASSERT_EQ(numIndexesInProgress(), 1);
-    ASSERT_FALSE(IndexBuildsCoordinator::get(opCtx)->inProgForDb(_nss.dbName()));
+    ASSERT_TRUE(IndexBuildsCoordinator::get(opCtx)->inProgForDb(_nss.dbName()));
+    ASSERT_FALSE(IndexBuildsCoordinator::get(opCtx)->isIndexBuildRunning(buildUUID));
 
     boost::optional<Lock::DBLock> dbLock;
     dbLock.emplace(opCtx, _nss.dbName(), MODE_X);
