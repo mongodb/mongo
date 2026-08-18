@@ -401,18 +401,10 @@ Status parseProcMemInfo(const std::vector<std::string_view>& keys,
             ++valueIt;
 
             // If there is one last token, check if it is actually "kB"
-            if (valueIt != StringSplitIterator()) {
-                std::string_view kbToken = stringDataFromRange(*valueIt);
-                auto keyWithSuffix = std::string{key};
-
-                if (kbToken == "kB") {
-                    keyWithSuffix.append("_kb");
-                }
-
-                builder->appendNumber(keyWithSuffix, static_cast<long long>(numVal));
-            } else {
-                builder->appendNumber(key, static_cast<long long>(numVal));
-            }
+            std::string reformattedKey;
+            if (valueIt != StringSplitIterator() && stringDataFromRange(*valueIt) == "kB")
+                key = reformattedKey = fmt::format("{}_kb", key);
+            builder->appendNumber(key, static_cast<long long>(numVal));
         });
 }
 
@@ -484,7 +476,7 @@ Status parseProcNetstat(const std::vector<std::string_view>& keys,
                     std::string_view stringValue = stringDataFromRange(*valuesIt);
                     uint64_t value;
                     if (NumberParser{}(stringValue, &value).isOK()) {
-                        builder->appendNumber(std::string{prefix} + std::string{key},
+                        builder->appendNumber(fmt::format("{}{}", prefix, key),
                                               static_cast<long long>(value));
                         foundKeys = true;
                     }
@@ -526,7 +518,7 @@ Status parseProcSockstat(const std::map<std::string_view, std::set<std::string_v
         // Start a new document with the line key as the name.
         BSONObjBuilder sub(builder->subobjStart(lineKey));
         ++partIt;
-        auto lineKeySet = bucketIt->second;
+        const auto& lineKeySet = bucketIt->second;
         while (partIt != StringSplitIterator()) {
             std::string_view key = stringDataFromRange(*partIt);
             if (!lineKeySet.count(key)) {
@@ -543,7 +535,7 @@ Status parseProcSockstat(const std::map<std::string_view, std::set<std::string_v
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Couldn't parse '" << stringValue << "' to number");
             }
-            sub.appendNumber(std::string{key}, value);
+            sub.appendNumber(key, value);
             foundKeys = true;
             ++partIt;
         }
