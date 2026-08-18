@@ -843,6 +843,13 @@ __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
         ref->page_del->pg_del_start_ts = session->replay_trunc_ctx.commit_ts;
         ref->page_del->pg_del_durable_ts = session->replay_trunc_ctx.durable_ts;
         ref->page_del->committed = true;
+
+        /*
+         * Fast truncate only takes pages with a disk address, which a tree awaiting publication
+         * never has, so there is no unpublished minimum to maintain here.
+         */
+        WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_AWAITS_PUBLISH),
+          "fast truncate of a table awaiting publication");
         return (0);
     }
 

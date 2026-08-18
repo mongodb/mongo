@@ -73,7 +73,9 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
         DisaggConfigMixin.conn_extensions(self, extlist)
 
     def _wt_page_extra_config(self):
-        return self.extensionsConfig() + ',disaggregated=(role="follower")'
+        # A follower cannot open a live stable table: the standalone tool opens the
+        # (copied, offline) directory as the leader to inspect it.
+        return self.extensionsConfig() + ',disaggregated=(role="leader")'
 
     # Returns (stdout, stderr); failure=True asserts a non-zero exit.
     def _run_wt_page(self, *args, failure=False):

@@ -1840,6 +1840,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             break;
         case WT_TXN_OP_REF_DELETE:
             WT_ERR(__wt_txn_op_set_timestamp(session, op, true));
+
+            /*
+             * Fast truncate only takes pages with a disk address, which a tree awaiting publication
+             * never has, so there is no unpublished minimum to maintain here.
+             */
+            WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(op->btree, WT_BTREE_AWAITS_PUBLISH),
+              "fast truncate of a table awaiting publication");
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:

@@ -542,6 +542,13 @@ __layered_copy_ingest_table(
                                 (durable_start_ts > from_ts && durable_start_ts <= to_ts);
         if (in_ts_range) {
             /*
+             * Drained updates bypass the commit path that tracks the unpublished minimum, so do it
+             * here.
+             */
+            if (F_ISSET_ATOMIC_32(stable_btree, WT_BTREE_AWAITS_PUBLISH))
+                __wt_btree_update_unpublished_min(stable_btree, durable_start_ts);
+
+            /*
              * If the "preserve prepared" option is enabled and the ingest btree contains a resolved
              * prepared update for this key whose prepared timestamp is less than or equal to the
              * last checkpoint timestamp, the stable btree must still contain an unresolved prepared

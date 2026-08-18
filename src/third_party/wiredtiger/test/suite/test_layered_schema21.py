@@ -93,6 +93,24 @@ class test_layered_schema21(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.assertEqual(sub, wiredtiger.WT_DIRTY_DATA)
         self.assertTrue('unpublished data' in msg)
 
+    def truncate_all_rows(self, commit_ts):
+        """Truncate the whole key range at commit_ts."""
+        c_start = self.session.open_cursor(self.uri)
+        c_start.set_key(1)
+        c_stop = self.session.open_cursor(self.uri)
+        c_stop.set_key(self.nrows)
+        self.session.begin_transaction()
+        self.session.truncate(None, c_start, c_stop, None)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+        c_start.close()
+        c_stop.close()
+
+    def assert_no_rows(self, session):
+        """Assert that the table reads back empty through the given session."""
+        cursor = session.open_cursor(self.uri)
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+
     def assert_drop_succeeds(self):
         """Drop the table and confirm it is gone from local metadata."""
         self.session.drop(self.uri)
@@ -177,6 +195,38 @@ class test_layered_schema21(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.set_stable_epoch(8)
         self.leader_checkpoint(11)
 
+    def test_drop_with_drained_data_is_refused(self):
+        # The step-up drain moves follower-era ingest rows into a stable constituent created
+        # awaiting publication, so until a checkpoint publishes the table those rows exist only in
+        # its cache and the drop must be refused, exactly as when the rows were committed directly.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+        self.step_down()
+
+        # A follower-era create and insert: the rows live only in the ingest constituent.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+        self.write_rows(commit_ts=3)
+
+        # Step up: the missing stable constituent is created awaiting publication and the drain
+        # moves the rows into it.
+        self.step_up()
+        self.assert_drop_refused()
+
+        # The refused drop left no partial state, so the committed rows remain readable.
+        self.assert_all_rows(self.session)
+
+        # A checkpoint publishes and persists the table with no data loss: the rows reach a
+        # follower, and the published table then drops normally.
+        self.set_stable_epoch(10)
+        self.leader_checkpoint(3)
+        conn_follower, session_follower = self.open_follower()
+        self.assert_all_rows(session_follower)
+        session_follower.close()
+        conn_follower.close()
+        self.assert_drop_succeeds()
+
     def test_drop_empty_is_allowed(self):
         # An awaiting-publication table with no data is transient: nothing obligates a checkpoint,
         # so the drop is allowed.
@@ -195,4 +245,39 @@ class test_layered_schema21(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.write_rows(commit_ts=3)
         self.set_stable_epoch(10)
         self.leader_checkpoint(3)
+        self.assert_drop_succeeds()
+
+    def test_drop_with_replayed_truncate_is_refused(self):
+        # A follower-era truncate reaches the stable constituent through the step-up drain rather
+        # than the commit path. The deletion it carries lives only in the awaiting-publication
+        # table until a checkpoint publishes it, so the drop must be refused meanwhile and the
+        # truncate must survive the publish.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+        self.step_down()
+
+        # A follower-era create, insert and truncate: everything lives in the ingest constituent
+        # and the truncate is held in the follower truncate list.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+        self.write_rows(commit_ts=3)
+        self.truncate_all_rows(commit_ts=5)
+
+        # Step up: the missing stable constituent is created awaiting publication and the drain
+        # moves the truncated rows into it, interleaved with the recorded truncate.
+        self.step_up()
+        self.assert_drop_refused()
+
+        # The refused drop left no partial state, so the truncate is still in effect.
+        self.assert_no_rows(self.session)
+
+        # A checkpoint publishes and persists the table: a follower sees the truncated table
+        # rather than the pre-truncate rows, and the published table then drops normally.
+        self.set_stable_epoch(10)
+        self.leader_checkpoint(6)
+        conn_follower, session_follower = self.open_follower()
+        self.assert_no_rows(session_follower)
+        session_follower.close()
+        conn_follower.close()
         self.assert_drop_succeeds()

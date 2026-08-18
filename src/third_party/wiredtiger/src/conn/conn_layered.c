@@ -1441,8 +1441,17 @@ __disagg_step_down(WT_SESSION_IMPL *session)
       __wt_open_internal_session(S2C(session), "disagg-step-down", false, 0, 0, &internal_session));
 
     /*
-     * The schema lock serializes application schema operations against the step-down, which clears
-     * the shared metadata queue and changes layered-table state underneath them.
+     * The schema lock serializes two things against the step-down.
+     *
+     * First, application schema operations: the step-down clears the shared metadata queue and
+     * changes layered-table state underneath them.
+     *
+     * Second, cursor opens: every btree open runs under the schema lock, so holding it here means
+     * an open either completes before the step-down, and the walk below sees the handle and marks
+     * it read-only, or starts after the role change, and the open itself refuses to produce a live
+     * stable tree on a follower. Without this ordering an open could straddle the step-down: read
+     * the leader role before it, finish after the walk, and leave a writable live stable tree on a
+     * follower that nothing ever marks.
      */
     WT_WITH_CHECKPOINT_LOCK(internal_session,
       WT_WITH_SCHEMA_LOCK(internal_session, ret = __disagg_step_down_int(internal_session)));

@@ -7,5 +7,5 @@ requires-python = ">=3.13"
 dependencies = [
     "mcp[cli]>=1.23.0",
     "pydantic>=2.11.4",
-    "python-dotenv>=1.1.0",
+    "python-dotenv>=1.2.2",
 ]

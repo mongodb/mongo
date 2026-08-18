@@ -150,8 +150,9 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_kvs_at(self.uri, 20), {'below': 'v', 'at': 'v'})
         self.assertEqual(self.read_kvs_at(self.uri, 21), {'below': 'v', 'at': 'v', 'above': 'v'})
 
-        # Ground truth: the content split exactly at the cutoff.
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 30), {'below', 'at'})
+        # Ground truth: the content split exactly at the cutoff. A follower cannot open the
+        # live stable table, so read its checkpoint view.
+        self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(self.uri), 30), {'below', 'at'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 30), {'above'})
 
     # Set up a straddler's uncommitted delete on stable and probe it with a later remove of the
@@ -362,9 +363,9 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertIn((updated, 'v'), kvs, 'the invisible update must not reach this snapshot')
         self.assertIn((removed, 'v'), kvs, 'the invisible tombstone must not reach this snapshot')
 
-    # A layered tree never opens by checkpoint, before or after the demotion. Reading the step-down
-    # checkpoint means opening a checkpoint cursor on the stable constituent, which holds the stable
-    # content only: the ingest half was never checkpointed.
+    # A layered tree never opens by checkpoint, before or after the demotion. Reading the
+    # step-down checkpoint means opening the stable constituent's checkpoint view, which holds
+    # the stable content only: the ingest half was never checkpointed.
     def test_checkpoint_cursor_after_step_down(self):
         self.set_global_ts(1, 1)
         self.session.create(self.uri, 'key_format=S,value_format=S')
@@ -383,12 +384,7 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
             lambda: self.session.open_cursor(self.uri, None, 'checkpoint=WiredTigerCheckpoint'),
             '/do not support opening by checkpoint/')
 
-        cursor = self.session.open_cursor(self.stable_uri(self.uri), None,
-            'checkpoint=WiredTigerCheckpoint')
-        seen = {}
-        while cursor.next() == 0:
-            seen[cursor.get_key()] = cursor.get_value()
-        cursor.close()
+        seen = self.read_kvs_at(self.stable_checkpoint_uri(self.uri), 20)
         self.assertEqual(seen, {'b': 's', 'd': 's'},
             'the step-down checkpoint must hold exactly the stable content')
 

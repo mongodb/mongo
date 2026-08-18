@@ -29,7 +29,7 @@
 # helper_layered_stepdown.py
 #   Shared helpers for the async (planned) step-down layered table tests.
 
-import errno, os, wiredtiger
+import errno, os, re, wiredtiger
 from wiredtiger import stat
 
 # Shared helpers for the layered async step-down test suite.
@@ -84,6 +84,14 @@ class LayeredStepdownMixin:
         cursor.close()
         session.close()
         return config
+
+    # The checkpoint-view URI of a layered table's stable constituent: the only form a
+    # follower may open directly. Requires the constituent to be checkpointed.
+    def stable_checkpoint_uri(self, uri, conn=None):
+        config = self.stable_metadata(conn, uri)
+        m = re.search(r'checkpoint=\((WiredTigerCheckpoint\.\d+)=', config or '')
+        self.assertIsNotNone(m, f'no checkpoint in stable metadata: {config}')
+        return f'{self.stable_uri(uri)}/{m.group(1)}'
 
     # Whether a layered table's stable constituent has a row in the local metadata.
     def stable_constituent_exists(self, conn, uri):

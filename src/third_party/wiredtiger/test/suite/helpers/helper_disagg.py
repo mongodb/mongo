@@ -870,14 +870,15 @@ class DisaggSchemaEpochMixin:
         return found
 
     def uri_stable_exists(self, conn, uri):
-        """Return True if uri's stable constituent is present in conn's local metadata."""
+        """Return True if uri's stable constituent is present in conn's local metadata.
+
+        Read the metadata directly: a follower cannot open the live stable table, and a
+        cursor-open error cannot be told apart from absence."""
         session = conn.open_session('')
-        exists = True
-        try:
-            c = session.open_cursor(self.stable_uri(uri))
-            c.close()
-        except wiredtiger.WiredTigerError:
-            exists = False
+        cursor = session.open_cursor('metadata:')
+        cursor.set_key(self.stable_uri(uri))
+        exists = cursor.search() == 0
+        cursor.close()
         session.close()
         return exists
 

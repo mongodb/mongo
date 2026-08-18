@@ -330,15 +330,13 @@ __clayered_assert_stable_mode(WTI_CURSOR_LAYERED *clayered)
         return;
 
     /*
-     * The stable cursor's btree must be read-write for a leader and read-only for a follower.
-     *
-     * FIXME-WT-18179: A read operation can race with a step-down and open a live stable btree
-     * on a follower. Temporarily disable this assertion until this race is fixed.
-     *
-     * WT_ASSERT(CUR2S(clayered),
-     *   (clayered->last_role == WTI_CLAYERED_ROLE_LEADER) !=
-     *     F_ISSET_ATOMIC_32(CUR2BT(clayered->stable_cursor), WT_BTREE_READONLY));
+     * A follower's stable constituent is always read-only: either a checkpoint view, or a live tree
+     * frozen by a step-down. Only this direction holds; a leader can inherit a read-only stable
+     * tree across a role change, and the next operation reopens it for the new role.
      */
+    WT_ASSERT(CUR2S(clayered),
+      clayered->last_role == WTI_CLAYERED_ROLE_LEADER ||
+        F_ISSET_ATOMIC_32(CUR2BT(clayered->stable_cursor), WT_BTREE_READONLY));
 }
 
 /* __clayered_enter() local flags. */
@@ -835,6 +833,7 @@ err:
 static int
 __clayered_open_stable_leader(WTI_CURSOR_LAYERED *clayered)
 {
+    WT_DECL_RET;
     WT_LAYERED_TABLE *layered = (WT_LAYERED_TABLE *)clayered->dhandle;
     WT_SESSION_IMPL *session = CUR2S(clayered);
 
@@ -848,7 +847,20 @@ __clayered_open_stable_leader(WTI_CURSOR_LAYERED *clayered)
     if (__clayered_stable_bind_check_needed(session))
         WT_RET(__clayered_stable_bind_check_role_change(session, true));
 
-    return (__clayered_open_stable_int(clayered, layered->stable_uri));
+    /*
+     * The open refuses with EBUSY and the disaggregated sub-error when a role change has happened
+     * since the operation was started. Convert it to a rollback: a cursor operation must not return
+     * EBUSY, and the application already retries a rollback, reopening the cursor for the current
+     * role. No other busy source is expected on this path.
+     */
+    ret = __clayered_open_stable_int(clayered, layered->stable_uri);
+    if (ret == EBUSY) {
+        WT_ASSERT(session, session->err_info.sub_level_err == WT_CONFLICT_DISAGG);
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_open_stable_stepdown_race);
+        WT_RET_SUB(session, WT_ROLLBACK, WT_NONE,
+          "the live stable table open raced a step-down to the follower role");
+    }
+    return (ret);
 }
 
 /*
@@ -1520,9 +1532,17 @@ __clayered_stable_replay_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, 
     F_SET(upd, WT_UPDATE_RESTORED_FROM_INGEST);
 
     ret = __wt_row_modify(cbt, &cbt->iface.key, NULL, &upd, WT_UPDATE_INVALID, false, false);
-    if (ret != 0)
+    if (ret != 0) {
         __wt_free(session, upd);
-    return (ret);
+        return (ret);
+    }
+
+    /*
+     * Replayed truncates bypass the commit path that tracks the unpublished minimum, so do it here.
+     */
+    if (F_ISSET_ATOMIC_32(CUR2BT(cbt), WT_BTREE_AWAITS_PUBLISH))
+        __wt_btree_update_unpublished_min(CUR2BT(cbt), session->replay_trunc_ctx.durable_ts);
+    return (0);
 }
 
 /*

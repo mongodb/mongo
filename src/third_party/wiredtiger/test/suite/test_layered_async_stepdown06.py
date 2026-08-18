@@ -70,16 +70,19 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_kvs_at(t_post, 40), {'b': 'ingest'})
         self.assertEqual(self.read_kvs_at(t_both, 40), {'a': 'stable', 'b': 'ingest'})
 
-        # Ground truth: each half is still in its own constituent.
+        # Ground truth: each half is still in its own constituent. A follower cannot open
+        # the live stable table, so read the checkpoint view; a constituent that was never
+        # checkpointed has nothing in stable.
         self.assertEqual(self.read_keys_at(self.ingest_uri(t_pre), 40), set())
-        self.assertEqual(self.read_keys_at(self.stable_uri(t_post), 40), set())
+        if self.stable_is_checkpointed(self.conn, t_post):
+            self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(t_post), 40), set())
         self.assertEqual(self.read_keys_at(self.ingest_uri(t_both), 40), {'b'})
-        self.assertEqual(self.read_keys_at(self.stable_uri(t_both), 40), {'a'})
+        self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(t_both), 40), {'a'})
 
         # A follower write commits fine and routes to ingest.
         self.write_at(t_both, {'c': 'follower'}, 50)
         self.assertEqual(self.read_keys_at(self.ingest_uri(t_both), 60), {'b', 'c'})
-        self.assertEqual(self.read_keys_at(self.stable_uri(t_both), 60), {'a'})
+        self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(t_both), 60), {'a'})
         self.assertEqual(self.read_kvs_at(t_both, 60),
             {'a': 'stable', 'b': 'ingest', 'c': 'follower'})
 
