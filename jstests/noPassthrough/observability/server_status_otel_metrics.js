@@ -29,4 +29,21 @@ describe("OTel metrics reported under serverStatus", function () {
             {replicatedFastCount: metrics.replicatedFastCount},
         );
     });
+
+    it("reports the internode hash mismatch counters under metrics.repl.internodeConsistency", function () {
+        // These counters only advance when a non-primary disagrees with a document hash the primary
+        // recorded, so on a plain mongod they must be present and zero.
+        const metrics = this.mongod.getDB(jsTestName()).serverStatus().metrics;
+        const hashMismatch = metrics.repl.internodeConsistency.hashMismatch;
+        for (const opType of ["insert", "update", "delete"]) {
+            assert.eq(
+                hashMismatch[opType],
+                0,
+                `Expected ${opType} counter to be present and zero`,
+                {
+                    hashMismatch,
+                },
+            );
+        }
+    });
 });

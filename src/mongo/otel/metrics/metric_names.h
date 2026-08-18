@@ -457,6 +457,13 @@ public:
     static constexpr MetricName kReplicatedFastCountTailerRetriedScanCount = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.replicatedFastCount.tailer.retriedScanCount");
 
+    static constexpr MetricName kInternodeConsistencyHashMismatchInsert = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.insert");
+    static constexpr MetricName kInternodeConsistencyHashMismatchUpdate = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.update");
+    static constexpr MetricName kInternodeConsistencyHashMismatchDelete = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.delete");
+
     static constexpr MetricName kIndexBuildKeysInsertedFromScan =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.keysInsertedFromScan");
     static constexpr MetricName kIndexBuildDocsScanned =

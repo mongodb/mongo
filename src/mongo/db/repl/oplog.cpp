@@ -53,6 +53,7 @@
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/repl/internode_validation_metrics.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -1651,6 +1652,11 @@ void verifyValidationHash(OperationContext* opCtx,
     if (*expectedHash == actualHash) {
         return;
     }
+
+    // Count the divergence before gathering diagnostics. The counter is only observable when
+    // 'continuousInternodeValidationFatalOnMismatch' is disabled: in fatal mode this node aborts
+    // below, before the counter is ever exported.
+    incrementDocumentHashMismatchCount(op.getOpType());
 
     // Read back the document we just persisted to compare against what this node actually stored.
     const BSONObj& oplogObject = op.getObject();

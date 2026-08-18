@@ -7,6 +7,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/repl/internode_validation_metrics.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -16,19 +17,27 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace mongo {
 namespace repl {
 namespace {
+
+using otel::metrics::MetricNames;
+using otel::metrics::OtelMetricsCapturer;
 
 // The log emitted for a mismatch when 'continuousInternodeValidationFatalOnMismatch' is disabled.
 constexpr int32_t kMismatchLogId = 12882800;
@@ -36,6 +45,51 @@ constexpr int32_t kMismatchLogId = 12882800;
 constexpr std::string_view kEmptyFieldLevelDiff = "{}";
 // The 'fieldLevelDiff' logged for deletes, where no diff can be derived.
 constexpr std::string_view kNoFieldLevelDiff = "<not derivable>";
+
+/**
+ * Returns the hash-mismatch counter that mismatches of 'opType' feed.
+ */
+otel::metrics::MetricName mismatchCounterName(OpTypeEnum opType) {
+    switch (opType) {
+        case OpTypeEnum::kInsert:
+            return MetricNames::kInternodeConsistencyHashMismatchInsert;
+        case OpTypeEnum::kUpdate:
+            return MetricNames::kInternodeConsistencyHashMismatchUpdate;
+        case OpTypeEnum::kDelete:
+            return MetricNames::kInternodeConsistencyHashMismatchDelete;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+TEST(InternodeValidationMetricsTest, MismatchCountersStartAtZero) {
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+
+    for (const auto& name : {MetricNames::kInternodeConsistencyHashMismatchInsert,
+                             MetricNames::kInternodeConsistencyHashMismatchUpdate,
+                             MetricNames::kInternodeConsistencyHashMismatchDelete}) {
+        EXPECT_EQ(capturer.readInt64Counter(name), 0);
+    }
+}
+
+TEST(InternodeValidationMetricsTest, MismatchCountersIncrementPerOpType) {
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+
+    incrementDocumentHashMismatchCount(OpTypeEnum::kInsert);
+    incrementDocumentHashMismatchCount(OpTypeEnum::kInsert);
+    incrementDocumentHashMismatchCount(OpTypeEnum::kUpdate);
+    incrementDocumentHashMismatchCount(OpTypeEnum::kDelete);
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kInternodeConsistencyHashMismatchInsert), 2);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kInternodeConsistencyHashMismatchUpdate), 1);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kInternodeConsistencyHashMismatchDelete), 1);
+}
 
 /**
  * End-to-end tests that exercise the per-document hash check.
@@ -142,12 +196,43 @@ protected:
     }
 
     /**
+     * Returns the hash-mismatch counter for 'opType'.
+     */
+    static int64_t readMismatchCounter(OtelMetricsCapturer& capturer, OpTypeEnum opType) {
+        return capturer.readInt64Counter(mismatchCounterName(opType));
+    }
+
+    /**
+     * Asserts that the per-op-type hash-mismatch counters account for exactly the mismatches in
+     * 'expected'.
+     */
+    static void assertMismatchCounters(OtelMetricsCapturer& capturer,
+                                       const std::vector<ExpectedMismatch>& expected) {
+        if (!OtelMetricsCapturer::canReadMetrics()) {
+            return;
+        }
+
+        for (const auto opType : {OpTypeEnum::kInsert, OpTypeEnum::kUpdate, OpTypeEnum::kDelete}) {
+            const std::string_view serializedOpType = idl::serialize(opType);
+            const int64_t mismatchesOfOpType =
+                std::count_if(expected.begin(), expected.end(), [&](const ExpectedMismatch& m) {
+                    return m.opType == serializedOpType;
+                });
+            EXPECT_EQ(readMismatchCounter(capturer, opType), mismatchesOfOpType)
+                << "opType: " << serializedOpType;
+        }
+    }
+
+    /**
      * Applies 'applyOps' with log capture active and asserts that it succeeded having reported
-     * exactly one mismatch log line per entry of 'expected', and no others.
+     * exactly one mismatch log line per entry of 'expected', and no others. Also asserts that the
+     * per-op-type hash-mismatch counters agree with 'expected'.
      */
     template <typename ApplyFn>
     void assertOnlyLogsMismatches(ApplyFn&& applyOps,
                                   const std::vector<ExpectedMismatch>& expected) {
+        // Constructing the capturer resets the counters, so it has to come before 'applyOps'.
+        OtelMetricsCapturer capturer;
         unittest::LogCaptureGuard logs;
         ASSERT_OK(applyOps());
         logs.stop();
@@ -163,6 +248,8 @@ protected:
                 << "opType: " << mismatch.opType << ", expectedHash: " << mismatch.expectedHash;
         }
         EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMismatchLogId)), expected.size());
+
+        assertMismatchCounters(capturer, expected);
     }
 
     NamespaceString _nss;
@@ -197,6 +284,20 @@ TEST_F(VerifyValidationHashTest, MatchingHashAppliesCleanly) {
 
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     ASSERT_BSONOBJ_EQ(doc, *documentAtRecordId(_opCtx.get(), _nss, rid));
+}
+
+// A hash this node agrees with leaves the mismatch counters alone.
+TEST_F(VerifyValidationHashTest, MatchingHashLeavesMismatchCountersAtZero) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+
+    OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc, rid, computeDocValidationHash(doc));
+
+    OtelMetricsCapturer capturer;
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertMismatchCounters(capturer, {});
 }
 
 // shouldVerifyValidationHash returns true with steady-state secondary, feature enabled, supported
@@ -313,6 +414,89 @@ TEST_F(VerifyValidationHashLogOnlyTest, DeleteMismatchedHashOnlyLogs) {
     assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {deleteMismatch(doc)});
 
     assertNoDocumentAt(rid);
+}
+
+// Each op type bumps only its own mismatch counter.
+TEST_F(VerifyValidationHashLogOnlyTest, InsertMismatchIncrementsOnlyInsertCounter) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+
+    OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
+
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    ASSERT_OK(runOpSteadyState(op));
+
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kInsert), 1);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kUpdate), 0);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kDelete), 0);
+}
+
+TEST_F(VerifyValidationHashLogOnlyTest, UpdateMismatchIncrementsOnlyUpdateCounter) {
+    const RecordId rid(1);
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, preImage, rid);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    OplogEntry op = makeUpdateOplogEntryWithRecordIdAndHash(
+        nextOpTime(),
+        _nss,
+        BSON("_id" << 1),
+        postImage,
+        rid,
+        corrupt(computeUpdateValidationHash(preImage, postImage)));
+
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    ASSERT_OK(runOpSteadyState(op));
+
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kUpdate), 1);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kInsert), 0);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kDelete), 0);
+}
+
+TEST_F(VerifyValidationHashLogOnlyTest, DeleteMismatchIncrementsOnlyDeleteCounter) {
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
+
+    OplogEntry op = makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, corrupt(computeDocValidationHash(doc)));
+
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    ASSERT_OK(runOpSteadyState(op));
+
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kDelete), 1);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kInsert), 0);
+    EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kUpdate), 0);
+}
+
+// Repeated mismatches on the same op type accumulate.
+TEST_F(VerifyValidationHashLogOnlyTest, RepeatedInsertMismatchesAccumulate) {
+    OtelMetricsCapturer capturer;
+    if (!OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+
+    for (int i = 1; i <= 3; ++i) {
+        const RecordId rid(i);
+        const BSONObj doc = BSON("_id" << i << "x" << 100);
+        OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+            nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
+        ASSERT_OK(runOpSteadyState(op));
+
+        EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kInsert), i);
+        EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kUpdate), 0);
+        EXPECT_EQ(readMismatchCounter(capturer, OpTypeEnum::kDelete), 0);
+    }
 }
 
 TEST_F(VerifyValidationHashTest, InsertWithNestedArraysMatchingHashAppliesCleanly) {

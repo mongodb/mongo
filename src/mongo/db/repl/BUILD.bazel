@@ -36,6 +36,21 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "internode_validation_metrics",
+    srcs = [
+        "internode_validation_metrics.cpp",
+    ],
+    hdrs = [
+        "internode_validation_metrics.h",
+    ],
+    deps = [
+        ":oplog_entry",
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "intent_registry",
     srcs = [
         "intent_guard.cpp",
@@ -884,6 +899,7 @@ mongo_cc_library(
         ":apply_ops_command_info",
         ":image_collection_entry",
         ":internode_validation_hash_utils",
+        ":internode_validation_metrics",
         ":local_oplog_info",
         ":oplog_constraint_violation_logger",
         ":repl_coordinator_interface",
@@ -2157,6 +2173,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":internode_validation_hash_utils",
+        ":internode_validation_metrics",
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry",
         ":oplog_entry_test_helpers",
@@ -2166,6 +2183,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/dbtests:mocklib",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
