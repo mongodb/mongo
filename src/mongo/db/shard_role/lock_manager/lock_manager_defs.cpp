@@ -31,15 +31,42 @@ const ResourceId resourceIdMultiDocumentTransactionsBarrier = ResourceId(
 const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
     RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kReplicationStateTransitionLock));
 
+namespace {
+
+/**
+ * Returns the human-readable name of 'rId', when it has one. A global resource is named after its
+ * ResourceGlobalId, while the resources tracked by the ResourceCatalog are named after the
+ * namespace, database or label they were registered with.
+ */
+boost::optional<std::string> resourceName(const ResourceId& rId) {
+    switch (rId.getType()) {
+        case RESOURCE_GLOBAL:
+            // The hash id of a global resource is its ResourceGlobalId.
+            return std::string(
+                resourceGlobalIdName(static_cast<ResourceGlobalId>(rId.getHashId())));
+        case RESOURCE_DATABASE:
+        case RESOURCE_COLLECTION:
+        case RESOURCE_DDL_DATABASE:
+        case RESOURCE_DDL_COLLECTION:
+        case RESOURCE_MUTEX:
+            return ResourceCatalog::get().name(rId);
+        case ResourceTypesCount:
+        case RESOURCE_INVALID:
+        case RESOURCE_METADATA:
+        case RESOURCE_TENANT:
+        default:
+            return boost::none;
+    }
+}
+
+}  // namespace
+
 std::string toStringForLogging(const ResourceId& rId) {
     StringBuilder ss;
-    const auto type = rId.getType();
-    ss << "{" << rId._fullHash << ": " << resourceTypeName(type) << ", " << rId.getHashId();
-    if (type == RESOURCE_DATABASE || type == RESOURCE_COLLECTION || type == RESOURCE_MUTEX ||
-        type == RESOURCE_DDL_DATABASE || type == RESOURCE_DDL_COLLECTION) {
-        if (auto resourceName = ResourceCatalog::get().name(rId)) {
-            ss << ", " << *resourceName;
-        }
+    ss << "{" << rId._fullHash << ": " << resourceTypeName(rId.getType()) << ", "
+       << rId.getHashId();
+    if (auto name = resourceName(rId)) {
+        ss << ", " << *name;
     }
     ss << "}";
 
@@ -48,26 +75,9 @@ std::string toStringForLogging(const ResourceId& rId) {
 
 std::string ResourceId::toStringForErrorMessage() const {
     StringBuilder ss;
-    const auto type = getType();
-    ss << "{" << resourceTypeName(type);
-    switch (type) {
-        case RESOURCE_GLOBAL:
-            ss << " : " << getHashId();
-            break;
-        case RESOURCE_DATABASE:
-        case RESOURCE_COLLECTION:
-        case RESOURCE_DDL_DATABASE:
-        case RESOURCE_DDL_COLLECTION:
-        case RESOURCE_MUTEX:
-            if (auto resourceName = ResourceCatalog::get().name(*this)) {
-                ss << " : " << *resourceName;
-            }
-            break;
-        case ResourceTypesCount:
-        case RESOURCE_INVALID:
-        case RESOURCE_METADATA:
-        case RESOURCE_TENANT:
-            break;
+    ss << "{" << resourceTypeName(getType());
+    if (auto name = resourceName(*this)) {
+        ss << " : " << *name;
     }
     ss << "}";
 

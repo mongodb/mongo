@@ -9,10 +9,13 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -59,6 +62,55 @@ TEST(ResourceIdTest, Masking) {
             ASSERT_EQUALS(id.getType(), resources[r]);
         }
     }
+}
+
+TEST(ResourceIdTest, ToStringForLoggingNamesGlobalResources) {
+    // Global resources are printed by name rather than by their numeric id.
+    const auto assertNamed = [](const ResourceId& resId) {
+        const std::string str = toStringForLogging(resId);
+        ASSERT_STRING_CONTAINS(str,
+                               str::stream() << "Global, " << resId.getHashId() << ", "
+                                             << resourceGlobalIdName(static_cast<ResourceGlobalId>(
+                                                    resId.getHashId())));
+    };
+
+    assertNamed(resourceIdGlobal);
+    assertNamed(resourceIdMultiDocumentTransactionsBarrier);
+    assertNamed(resourceIdReplicationStateTransitionLock);
+}
+
+TEST(ResourceIdTest, ToStringForLoggingNamesCatalogedResources) {
+    ResourceMutex mutex("TestLabel");
+    const ResourceId resId = mutex.getRid();
+    ASSERT_STRING_CONTAINS(toStringForLogging(resId),
+                           str::stream() << "Mutex, " << resId.getHashId() << ", TestLabel}");
+}
+
+TEST(ResourceIdTest, ToStringForLoggingUnnamedResourceOnlyHasItsTypeAndHashId) {
+    ResourceId resIdMetadata(RESOURCE_METADATA, 324334234);
+    ASSERT_STRING_CONTAINS(toStringForLogging(resIdMetadata), "Metadata, 324334234}");
+}
+
+TEST(ResourceIdTest, ToStringForErrorMessageNamesGlobalResources) {
+    EXPECT_EQ("{Global : Global}", resourceIdGlobal.toStringForErrorMessage());
+    EXPECT_EQ("{Global : MultiDocumentTransactionsBarrier}",
+              resourceIdMultiDocumentTransactionsBarrier.toStringForErrorMessage());
+    EXPECT_EQ("{Global : ReplicationStateTransition}",
+              resourceIdReplicationStateTransitionLock.toStringForErrorMessage());
+}
+
+TEST(ResourceIdTest, ToStringForErrorMessageNamesCatalogedResources) {
+    ResourceMutex mutex("TestLabel");
+    EXPECT_EQ("{Mutex : TestLabel}", mutex.getRid().toStringForErrorMessage());
+}
+
+TEST(ResourceIdTest, ToStringForErrorMessageUnnamedResourceOnlyHasItsType) {
+    ResourceId resIdMetadata(RESOURCE_METADATA, 324334234);
+    EXPECT_EQ("{Metadata}", resIdMetadata.toStringForErrorMessage());
+}
+
+DEATH_TEST(ResourceIdDeathTest, ResourceGlobalIdNameRejectsOutOfRangeId, "invariant") {
+    resourceGlobalIdName(ResourceGlobalId::kNumIds);
 }
 
 TEST(ResourceIdTest, SaltingWorks) {

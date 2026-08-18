@@ -211,6 +211,7 @@ MONGO_STATIC_ASSERT((sizeof(ResourceGlobalIdNames) / sizeof(ResourceGlobalIdName
  * Returns a human-readable name for the specified global resource.
  */
 [[MONGO_MOD_PRIVATE]] constexpr const char* resourceGlobalIdName(ResourceGlobalId id) {
+    invariant(id < ResourceGlobalId::kNumIds);
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
