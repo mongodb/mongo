@@ -957,6 +957,16 @@ certs:
         DNS: localhost
         IP: 127.0.0.1
 
+  - name: "kmip-server.pem"
+    description: KMIP server certificate (SAN includes hostname "kmip").
+    Subject: {CN: "Trusted Kernel Test Server"}
+    Issuer: "trusted-ca.pem"
+    extensions:
+      extendedKeyUsage: [serverAuth]
+      subjectAltName:
+        DNS: [kmip, localhost]
+        IP: 127.0.0.1
+
   # Expired counterpart of trusted-server.pem with an identical subject. Used to verify
   # that a subject= certificate selector skips an expired certificate when another
   # certificate with the same subject is valid (SERVER-129942).
