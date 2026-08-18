@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagVectorSimilarityExpressions,
  *   requires_fcv_82,
  * ]
  */

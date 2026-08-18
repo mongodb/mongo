@@ -5,7 +5,6 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagRankFusionFull,
- *   featureFlagVectorSimilarityExpressions,
  *   requires_fcv_90,
  * ]
  */

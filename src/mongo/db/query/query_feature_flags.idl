@@ -234,15 +234,6 @@ feature_flags:
         version: 9.0
         fcv_gated: true
 
-    featureFlagVectorSimilarityExpressions:
-        description:
-            "Feature flag to enable vector similarity expressions $similarityDotProduct,
-            $similarityCosine, and $similarityEuclidean"
-        cpp_varname: gFeatureFlagVectorSimilarity
-        default: true
-        version: 8.2
-        fcv_gated: true
-
     featureFlagExtensionsAPI:
         description: "Feature flag to enable loading extensions via the Extensions API."
         cpp_varname: gFeatureFlagExtensionsAPI

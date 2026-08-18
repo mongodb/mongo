@@ -7,7 +7,6 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagSearchHybridScoringFull,
- *   featureFlagVectorSimilarityExpressions,
  *   requires_sharding,
  *   requires_fcv_90,
  * ]

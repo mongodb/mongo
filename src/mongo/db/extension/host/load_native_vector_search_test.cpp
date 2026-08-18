@@ -33,8 +33,6 @@ protected:
 
     static void SetUpTestSuite() {
         unittest::ServerParameterGuard extensionsAPIController{"featureFlagExtensionsAPI", true};
-        unittest::ServerParameterGuard vecSimilarityExprController{
-            "featureFlagVectorSimilarityExpressions", true};
         ExtensionLoader::load(
             "nativeVectorSearch",
             test_util::makeEmptyExtensionConfig(kNativeVectorSearchLibExtensionPath));
@@ -120,8 +118,6 @@ protected:
 
 private:
     unittest::ServerParameterGuard _extensionsAPIController{"featureFlagExtensionsAPI", true};
-    unittest::ServerParameterGuard _vecSimilarityExprController{
-        "featureFlagVectorSimilarityExpressions", true};
     unittest::ServerParameterGuard _signatureValidationController{
         "featureFlagExtensionsApiSignatureValidation", true};
 };

@@ -5993,11 +5993,7 @@ Value ExpressionVectorSimilarity::serialize(
 
 /* ----------------------- ExpressionSimilarityDotProduct ---------------------------- */
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityDotProduct,
-                                      ExpressionSimilarityDotProduct::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityDotProduct, ExpressionSimilarityDotProduct::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityDotProduct::parse(ExpressionContext* const expCtx,
                                                                 BSONElement expr,
@@ -6015,11 +6011,7 @@ Value ExpressionSimilarityDotProduct::evaluate(const Document& root,
 
 /* ----------------------- ExpressionSimilarityCosine ---------------------------- */
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityCosine,
-                                      ExpressionSimilarityCosine::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityCosine, ExpressionSimilarityCosine::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityCosine::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
@@ -6035,11 +6027,7 @@ Value ExpressionSimilarityCosine::evaluate(const Document& root,
 }
 
 /* ----------------------- ExpressionSimilarityEuclidean ---------------------------- */
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityEuclidean,
-                                      ExpressionSimilarityEuclidean::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityEuclidean, ExpressionSimilarityEuclidean::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityEuclidean::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
