@@ -2428,6 +2428,13 @@ void WiredTigerKVEngine::setStepDownTimestamp(Timestamp stepDownTimestamp) {
     // already set, so any error here reflects a violated precondition in the caller.
     auto stepDownTSConfigString =
         fmt::format("step_down_timestamp={:x}", stepDownTimestamp.asULL());
+    // Declare the same boundary in schema-epoch space, which WiredTiger only accepts once an
+    // epoch is in use.
+    if (getStableSchemaEpoch()) {
+        fmt::format_to(std::back_inserter(stepDownTSConfigString),
+                       ",step_down_disaggregated_schema_epoch={:x}",
+                       _provider.getSchemaEpochForTimestamp(stepDownTimestamp));
+    }
     invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
 
     _stepDownTimestamp.store(stepDownTimestamp.asULL());
