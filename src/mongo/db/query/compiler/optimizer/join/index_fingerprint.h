@@ -58,11 +58,12 @@ std::vector<StringSet> relevantFieldsPerNode(const JoinGraph& graph,
  * Hashes those of 'inljEligibleIndexes' that are relevant to 'relevantFields', i.e. those with a
  * key pattern field -- in any position, not just the leading one -- that is one of those fields.
  *
- * The result is independent of the order of 'inljEligibleIndexes'.
+ * Returns one hash per relevant index. The result set is sorted since the index catalog enumerates
+ * its entries in a non-deterministic order.
  *
  * Exposed for testing only.
  */
-NodeFingerprint computeRelevantIndexFingerprint(
+std::vector<IndexFingerprint> computeRelevantIndexHashes(
     const std::vector<std::shared_ptr<const IndexCatalogEntry>>& inljEligibleIndexes,
     const StringSet& relevantFields);
 

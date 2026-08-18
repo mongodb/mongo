@@ -141,6 +141,22 @@ TEST(JoinPlanCacheSizeTest, ComplexTreeLargerThanLeaf) {
     ASSERT_GT(complexEntry->estimatedEntrySizeBytes, leafEntry->estimatedEntrySizeBytes);
 }
 
+TEST(JoinPlanCacheSizeTest, RelevantIndexHashesIncreaseSize) {
+    auto baseline =
+        std::make_unique<JoinPlanCacheEntry>(makeComplexTree(),
+                                             join_ordering::NodeId{0},
+                                             std::vector<CollectionTag>{},
+                                             std::vector<NodeFingerprint>{NodeFingerprint{}});
+
+    auto withHashes = std::make_unique<JoinPlanCacheEntry>(
+        makeComplexTree(),
+        join_ordering::NodeId{0},
+        std::vector<CollectionTag>{},
+        std::vector<NodeFingerprint>{NodeFingerprint{.relevantIndexHashes = {2, 3, 4}}});
+
+    ASSERT_GT(withHashes->estimatedEntrySizeBytes, baseline->estimatedEntrySizeBytes);
+}
+
 TEST(JoinPlanCacheSizeTest, LongerFieldPathIncreasesSize) {
     auto baseline = std::make_unique<JoinPlanCacheEntry>(makeComplexTree(),
                                                          join_ordering::NodeId{0},
@@ -205,7 +221,8 @@ TEST(JoinPlanCacheSizeTest, NodeFingerprintsIncreaseSize) {
         makeComplexTree(),
         join_ordering::NodeId{0},
         std::vector<CollectionTag>{},
-        std::vector<NodeFingerprint>{NodeFingerprint{1}, NodeFingerprint{2}});
+        std::vector<NodeFingerprint>{NodeFingerprint{.relevantIndexHashes = {1}},
+                                     NodeFingerprint{.relevantIndexHashes = {2}}});
 
     ASSERT_GTE(fingerprinted->estimatedEntrySizeBytes - baseline->estimatedEntrySizeBytes,
                2 * sizeof(NodeFingerprint));

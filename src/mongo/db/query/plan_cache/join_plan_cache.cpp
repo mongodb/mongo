@@ -130,14 +130,21 @@ BSONObj CachedJoinPlan::toBSON() const {
     return bob.obj();
 }
 
+size_t NodeFingerprint::estimateObjectSizeInBytes() const {
+    return container_size_helper::estimateObjectSizeInBytes(relevantIndexHashes);
+}
+
 JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                                        join_ordering::NodeId baseNode,
                                        std::vector<CollectionTag> collections,
                                        std::vector<NodeFingerprint> nodeFingerprints)
-    : estimatedEntrySizeBytes(sizeof(JoinPlanCacheEntry) +
-                              (joinTree ? joinTree->estimateObjectSizeInBytes() : 0) +
-                              container_size_helper::estimateObjectSizeInBytes(collections) +
-                              container_size_helper::estimateObjectSizeInBytes(nodeFingerprints)),
+    : estimatedEntrySizeBytes(
+          sizeof(JoinPlanCacheEntry) + (joinTree ? joinTree->estimateObjectSizeInBytes() : 0) +
+          container_size_helper::estimateObjectSizeInBytes(collections) +
+          container_size_helper::estimateObjectSizeInBytes(
+              nodeFingerprints,
+              [](const NodeFingerprint& fp) { return fp.estimateObjectSizeInBytes(); },
+              /*includeShallowSize*/ true)),
       joinTree(std::move(joinTree)),
       baseNode(baseNode),
       nodeFingerprints(std::move(nodeFingerprints)),

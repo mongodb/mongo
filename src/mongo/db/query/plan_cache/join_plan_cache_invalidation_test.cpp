@@ -93,7 +93,7 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsAdoptsTheCurrentColle
     ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation,
               classifyCollectionTags(entry->getCollectionTags(), mca));
 
-    // Simulates what a lookup does once the relevant-index fingerprints have revalidated the entry
+    // Simulates what a lookup does once the per-node fingerprints have revalidated the entry
     // against the post-DDL catalog: adopt that catalog's version tags so the next lookup takes the
     // fast path without fingerprinting again.
     entry->refreshCollectionTags(makeCollectionTags(mca));

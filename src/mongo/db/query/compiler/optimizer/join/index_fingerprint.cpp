@@ -184,11 +184,10 @@ std::vector<StringSet> relevantFieldsPerNode(const JoinGraph& graph,
     return fields;
 }
 
-NodeFingerprint computeRelevantIndexFingerprint(
+std::vector<IndexFingerprint> computeRelevantIndexHashes(
     const std::vector<std::shared_ptr<const IndexCatalogEntry>>& inljEligibleIndexes,
     const StringSet& relevantFields) {
-    // Collect the per-index hashes first, then fold them in a canonical order below.
-    std::vector<size_t> indexHashes;
+    std::vector<IndexFingerprint> indexHashes;
     for (const auto& ice : inljEligibleIndexes) {
         const auto* desc = ice->descriptor();
         if (!indexTouchesAnyField(desc->keyPattern(), relevantFields)) {
@@ -196,18 +195,8 @@ NodeFingerprint computeRelevantIndexFingerprint(
         }
         indexHashes.push_back(hashIndex(*desc));
     }
-    // Sort the index hashes, so that the fingerprint does not depend on
-    // the order in which the index catalog happens to enumerate its entries.
     std::sort(indexHashes.begin(), indexHashes.end());
-
-    // Fold in the count so that an empty relevant index set does not hash to 0, which is what a
-    // default-constructed fingerprint holds.
-    NodeFingerprint fingerprint = 0;
-    boost::hash_combine(fingerprint, indexHashes.size());
-    for (size_t h : indexHashes) {
-        boost::hash_combine(fingerprint, h);
-    }
-    return fingerprint;
+    return indexHashes;
 }
 
 std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
@@ -224,7 +213,8 @@ std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                 str::stream() << "no INLJ-eligible index list for collection "
                               << nss.toStringForErrorMsg(),
                 it != perCollIdxs.end());
-        fingerprints.push_back(computeRelevantIndexFingerprint(it->second, perNodeFields[i]));
+        fingerprints.push_back(NodeFingerprint{
+            .relevantIndexHashes = computeRelevantIndexHashes(it->second, perNodeFields[i])});
     }
     return fingerprints;
 }

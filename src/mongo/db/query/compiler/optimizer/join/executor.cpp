@@ -385,10 +385,9 @@ void recordSuffixLoweringMetrics(const Pipeline* suffix,
  * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
  * if it is stale and the query must be replanned.
  *
- * A bumped collection version alone is not enough to reject the entry: the DDL responsible may
- * have touched an index that is irrelevant to the cached plan. In that case we use relevant-index
- * fingerprints, which only cover indexes usable for the fields each join graph node actually
- * references.
+ * A bumped collection version alone is not enough to reject the entry: the DDL responsible may have
+ * touched an index this plan could never use, which cannot change which plan the optimizer would
+ * pick now. The per-node index fingerprints tell that case apart from a change that does matter.
  */
 bool validateCacheEntry(JoinPlanCacheEntry& hit,
                         const MultipleCollectionAccessor& mca,
