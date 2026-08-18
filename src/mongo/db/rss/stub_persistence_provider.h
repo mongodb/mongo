@@ -77,6 +77,12 @@ public:
                   "StubPersistenceProvider::shouldUseReplicatedFastCount() method not implemented");
     }
 
+    bool shouldUseContinuousInternodeValidation() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::shouldUseContinuousInternodeValidation() method not "
+                  "implemented");
+    }
+
     bool relaxContainerOplogConstraints() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::relaxContainerOplogConstraints() method not "
