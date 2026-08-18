@@ -12,9 +12,6 @@ import {
     testNonExistingCollection,
 } from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
 
-// This test requires running commands directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 // Set this to opt into the 'samplesPerSecond' check.
 TestData.testingDiagnosticsEnabled = false;
 

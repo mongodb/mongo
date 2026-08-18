@@ -16,9 +16,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// This test requires running transactions directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 const kDbName = "testDb";
 const kCollName = "testColl";
 

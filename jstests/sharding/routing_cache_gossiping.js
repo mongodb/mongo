@@ -10,10 +10,6 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-// This test requires running commands directly against the shard since 'requestGossipRoutingCache'
-// is a shard-only field.
-TestData.replicaSetEndpointIncompatible = true;
-
 const st = new ShardingTest({shards: 1});
 
 const dbName = "test";
