@@ -494,8 +494,9 @@ TEST_F(AbortTest, AbortsBothRunningAndUnresumedBuildsOnCollection) {
             });
     }
 
-    // The locks were yielded for the running build's abort and again after the inline one.
-    EXPECT_GT(unlocks, 1);
+    // The locks were yielded so that the running build's builder thread could exit. The registered
+    // build is aborted by the same call, so a second yield is no longer needed.
+    EXPECT_GT(unlocks, 0);
     EXPECT_EQ(locks, unlocks);
     ASSERT_TRUE(collection.has_value());
 

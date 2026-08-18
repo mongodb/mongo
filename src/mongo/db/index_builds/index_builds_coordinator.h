@@ -15,6 +15,7 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
@@ -313,6 +314,12 @@ public:
      * Does not stop new index builds from starting.
      */
     void abortAllIndexBuildsWithReason(OperationContext* opCtx, const std::string& reason);
+
+    /**
+     * Returns whether this node is running the given index build, meaning it has a builder thread
+     * that has to be signalled and joined to stop it.
+     */
+    bool isIndexBuildRunning(const UUID& buildUUID) const;
 
     /**
      * Returns true if there is an index builder building the given index names on a collection.
@@ -914,6 +921,30 @@ protected:
      * Looks up active index build by UUID. Returns NoSuchKey if the build does not exist.
      */
     StatusWith<std::shared_ptr<ReplIndexBuildState>> _getIndexBuild(const UUID& buildUUID) const;
+
+    /**
+     * Aborts a primary-driven index build that is registered but not yet running. There is no
+     * builder thread to signal, so this aborts the build's durable state directly, under the
+     * collection X lock.
+     *
+     * Returns whether the build was aborted; it may have been resumed or aborted concurrently.
+     */
+    bool _abortUnresumedPrimaryDrivenIndexBuild(
+        OperationContext* opCtx,
+        const UUID& buildUUID,
+        const index_builds::primary_driven::Registry::Entry& build,
+        const std::string& reason);
+
+    /**
+     * Aborts the registered primary-driven index builds that 'match' and are not running here.
+     * Returns the UUIDs of the builds that were aborted. Callers must deal with running builds
+     * first: a build the coordinator is running is registered too, and aborting its durable state
+     * from underneath its builder thread would corrupt it.
+     */
+    std::vector<UUID> _abortUnresumedPrimaryDrivenIndexBuilds(
+        OperationContext* opCtx,
+        const std::function<bool(const index_builds::primary_driven::Registry::Entry&)>& match,
+        const std::string& reason);
 
     /** Called by implementations to bump the waitForCommitQuorum counter when they do so.*/
     void _incWaitForCommitQuorum();
