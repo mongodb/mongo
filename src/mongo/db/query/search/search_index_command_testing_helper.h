@@ -23,6 +23,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -191,6 +192,9 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
     for (auto& host : allClusterHosts) {
         auto runStart = clock.now();
         auto runElapsed = Milliseconds(0);
+        // Tracks the most recent retriable failure so that, if we exhaust the retry budget below,
+        // the resulting error names the underlying cause rather than an opaque timeout.
+        Status lastError = Status::OK();
         do {
             executor::RemoteCommandRequest request(host,
                                                    dbName,
@@ -241,6 +245,7 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
                                 "host"_attr = host,
                                 "error"_attr = response.status);
                     opCtx->sleepFor(kRetryPeriodMs);
+                    lastError = response.status;
                     runElapsed = clock.now() - runStart;
                     continue;
                 }
@@ -254,14 +259,18 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
                 // mongot-localdev (see getSearchIndexManagerResponse). This is transient on slow
                 // builds (e.g. aubsan) where mongot may still be starting up. Retry instead of
                 // immediately failing so we don't produce a spurious BF.
-                if (cmdStatus.code() == ErrorCodes::SearchIndexManagementHostUnreachable) {
-                    LOGV2_DEBUG(
-                        12706500,
-                        1,
-                        "blockUntilIndexQueryable: mongot temporarily unreachable, retrying",
-                        "host"_attr = host,
-                        "error"_attr = cmdStatus);
+                // MaxTimeMSExpired means this single round trip exceeded kRemoteCommandTimeout.
+                // That is expected on a slow host and is precisely what the maxTimeout budget below
+                // exists to absorb, so retry rather than aborting on the first attempt.
+                if (cmdStatus.code() == ErrorCodes::SearchIndexManagementHostUnreachable ||
+                    cmdStatus.code() == ErrorCodes::MaxTimeMSExpired) {
+                    LOGV2_DEBUG(12706500,
+                                1,
+                                "blockUntilIndexQueryable: retriable command error, retrying",
+                                "host"_attr = host,
+                                "error"_attr = cmdStatus);
                     opCtx->sleepFor(kRetryPeriodMs);
+                    lastError = cmdStatus;
                     runElapsed = clock.now() - runStart;
                     continue;
                 }
@@ -282,7 +291,11 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
         } while (runElapsed < maxTimeout);
 
         if (runElapsed > maxTimeout) {
-            uasserted(9638406, "Index is not replicated and queryable within the max timeout");
+            uasserted(9638406,
+                      str::stream()
+                          << "Index is not replicated and queryable within the max timeout"
+                          << (lastError.isOK() ? std::string{}
+                                               : "; last error: " + lastError.toString()));
         }
     }
 }
