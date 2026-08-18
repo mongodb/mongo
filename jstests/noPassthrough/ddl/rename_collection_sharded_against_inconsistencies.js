@@ -1,7 +1,17 @@
-// Tests the expected behaviour of renameCollection against catalog inconsistencies caused by direct
-// writes to shards (which need a noPassthrough environment to be performed).
+/*
+ * Tests the expected behaviour of renameCollection against catalog inconsistencies caused by direct
+ * writes to shards (which need a noPassthrough environment to be performed).
+ *
+ * @tags: [
+ *   requires_persistence,
+ * ]
+ */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// Dropping untracked collections leaves UNTRACKED CSS entries on the non-primary shard.
+// TODO (SERVER-133353): Remove this once UNTRACKED is dropped from CSS in direct connections.
+TestData.skipCheckMetadataConsistency = true;
 
 let st = new ShardingTest({});
 

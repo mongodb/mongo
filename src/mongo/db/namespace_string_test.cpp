@@ -646,6 +646,38 @@ TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
     ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
 }
 
+TEST_F(NamespaceStringTest, IsConvertToCappedTmpCollection) {
+    ASSERT_TRUE(NamespaceString::createNamespaceString_forTest(
+                    "test", "tmpAdY1h.convertToCapped.convert_to_capped_collection_3")
+                    .isConvertToCappedTmpCollection());
+    ASSERT_FALSE(
+        NamespaceString::createNamespaceString_forTest("test", "convert_to_capped_collection_3")
+            .isConvertToCappedTmpCollection());
+    ASSERT_FALSE(NamespaceString::createNamespaceString_forTest("test", "tmp.agg_out.xyz")
+                     .isConvertToCappedTmpCollection());
+    ASSERT_FALSE(NamespaceString::createNamespaceString_forTest(
+                     "test", "tmpX.convertToCapped.coll")  // fewer than 5 random chars
+                     .isConvertToCappedTmpCollection());
+    ASSERT_FALSE(NamespaceString::createNamespaceString_forTest(
+                     "test", "tmpAdY1h.convertToCapped.")  // missing <originalColl>
+                     .isConvertToCappedTmpCollection());
+}
+
+TEST_F(NamespaceStringTest, IsRenameCollectionTmpCollection) {
+    ASSERT_TRUE(NamespaceString::createNamespaceString_forTest("test", "tmpQcm2o.renameCollection")
+                    .isRenameCollectionTmpCollection());
+    ASSERT_TRUE(NamespaceString::createNamespaceString_forTest(
+                    "test", "system.buckets.tmpQcm2o.renameCollection")
+                    .isRenameCollectionTmpCollection());
+    ASSERT_FALSE(NamespaceString::createNamespaceString_forTest("test", "user.renameCollection")
+                     .isRenameCollectionTmpCollection());
+    ASSERT_FALSE(NamespaceString::createNamespaceString_forTest("test", "tmpX.renameCollection")
+                     .isRenameCollectionTmpCollection());
+    ASSERT_FALSE(
+        NamespaceString::createNamespaceString_forTest("test", "tmpQcm2o.renameCollection.extra")
+            .isRenameCollectionTmpCollection());
+}
+
 TEST_F(NamespaceStringTest, FieldStatsCollection) {
     const auto fieldStatsNss = NamespaceString::createNamespaceString_forTest(
         boost::none, "test", "system.stats.field_stats");

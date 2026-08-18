@@ -182,6 +182,9 @@ filters:
   - "sharded_index_consistency_metrics_stale_version_retries.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "shard_collection_error_handling.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "shard_identity_rollback.js":
     approvers:
       - 10gen/server-catalog-and-routing

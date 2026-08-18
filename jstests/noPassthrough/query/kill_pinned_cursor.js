@@ -1,22 +1,29 @@
-// @tags: [
-//   does_not_support_stepdowns,
-//   requires_getmore,
-//   requires_replication,
-// ]
-//
-// Uses getMore to pin an open cursor.
-//
-// Does not support stepdowns because if a stepdown were to occur between running find() and
-// calling killCursors on the cursor ID returned by find(), the killCursors might be sent to
-// different node than the one which has the cursor. This would result in the node returning
-// "CursorNotFound."
-//
-// Test killing a pinned cursor. Since cursors are generally pinned for short periods while result
-// batches are generated, this requires some special machinery to keep a cursor permanently pinned.
+/*
+ * Uses getMore to pin an open cursor.
+ *
+ * Does not support stepdowns because if a stepdown were to occur between running find() and
+ * calling killCursors on the cursor ID returned by find(), the killCursors might be sent to
+ * different node than the one which has the cursor. This would result in the node returning
+ * "CursorNotFound."
+ *
+ * Test killing a pinned cursor. Since cursors are generally pinned for short periods while result
+ * batches are generated, this requires some special machinery to keep a cursor permanently pinned.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ *   requires_getmore,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
+ */
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
 TestData.disableImplicitSessions = true;
+
+// Collections created via direct shard connections leave UNTRACKED CSS entries after drop.
+// TODO (SERVER-133353): Remove this once UNTRACKED is dropped from CSS in direct connections.
+TestData.skipCheckMetadataConsistency = true;
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";

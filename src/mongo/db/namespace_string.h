@@ -100,6 +100,16 @@ public:
     // Prefix for the temporary collection used by the $out stage.
     static constexpr std::string_view kOutTmpCollectionPrefix{"tmp.agg_out."};
 
+    // Prefix of temporary collection names used by convertToCapped
+    // (tmp%%%%%.convertToCapped.<originalColl>).
+    static constexpr std::string_view kConvertToCappedTmpCollectionModelPrefix{
+        "tmp%%%%%.convertToCapped."};
+
+    // Temporary collection name model used by renameCollection
+    // (tmp%%%%%.renameCollection, including system.buckets.* for timeseries).
+    static constexpr std::string_view kRenameCollectionTmpCollectionModel{
+        "tmp%%%%%.renameCollection"};
+
     // Maintainers Note: The large set of `NamespaceString`-typed static data
     // members of the `NamespaceString` class representing system-reserved
     // collections is now generated from "namespace_string_reserved.h".
@@ -551,6 +561,18 @@ public:
      * ("tmp.agg_out") and legacy ("system.buckets.tmp.agg_out") timeseries namespaces.
      */
     bool isOutStageTmpCollection() const;
+
+    /**
+     * Returns true if the collection is a temporary convertToCapped collection
+     * (tmp%%%%%.convertToCapped.<originalColl>).
+     */
+    bool isConvertToCappedTmpCollection() const;
+
+    /**
+     * Returns true if the collection is a temporary renameCollection collection
+     * (tmp%%%%%.renameCollection, including system.buckets.tmp%%%%%.renameCollection).
+     */
+    bool isRenameCollectionTmpCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.

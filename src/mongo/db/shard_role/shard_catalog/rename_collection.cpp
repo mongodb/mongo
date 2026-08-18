@@ -469,7 +469,7 @@ acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     boost::optional<NamespaceString> nsForRenameOutOfTheWay;
     if (needsRenameOutOfTheWay) {
         auto tmpNameResult = [&]() {
-            std::string collectionNameModel = "tmp%%%%%.renameCollection";
+            std::string collectionNameModel{NamespaceString::kRenameCollectionTmpCollectionModel};
             if (source.isTimeseriesBucketsCollection()) {
                 collectionNameModel =
                     std::string{NamespaceString::kTimeseriesBucketsCollectionPrefix} +
@@ -854,8 +854,7 @@ void dropPriorTemporaryCollectionIfNeeded(OperationContext* opCtx,
                 fmt::format("Collection for UUID {} already exists with a non-temporary name {}",
                             targetUUID->toString(),
                             tempAcquisition.nss().toStringForErrorMsg()),
-                tempAcquisition.nss().coll().find("tmp") != std::string_view::npos &&
-                    tempAcquisition.nss().coll().ends_with(".renameCollection"));
+                tempAcquisition.nss().isRenameCollectionTmpCollection());
             // Now we drop the old temp collection.
             DropReply unused;
             uassertStatusOK(
@@ -934,7 +933,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     auto acqStatus = [&]() -> StatusWith<RenameAcrossDatabasesCollectionLocks> {
         while (true) {
             auto tmpNameResult = [&]() {
-                std::string collectionNameModel = "tmp%%%%%.renameCollection";
+                std::string collectionNameModel{
+                    NamespaceString::kRenameCollectionTmpCollectionModel};
                 if (source.isTimeseriesBucketsCollection()) {
                     collectionNameModel =
                         fmt::format("{}{}",

@@ -562,6 +562,7 @@ structs:
                 description: "The namespace of the collection."
             collectionUUID:
                 type: uuid
+                optional: true
                 description: "The UUID of the collection."
             details:
                 type: object

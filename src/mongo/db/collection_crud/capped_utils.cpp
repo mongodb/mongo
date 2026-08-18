@@ -256,7 +256,8 @@ ConvertToCappedAcquisitions acquireLocksForConvertToCapped(
     const NamespaceString& fromNs,
     const boost::optional<UUID>& targetUUID) {
     const auto& dbName = fromNs.dbName();
-    const auto modelName = fmt::format("tmp%%%%%.convertToCapped.{}", fromNs.coll());
+    const auto modelName = fmt::format(
+        "{}{}", NamespaceString::kConvertToCappedTmpCollectionModelPrefix, fromNs.coll());
 
     // If given a targetUUID we must also acquire whatever collection with it since it's a
     // temporary leftover collection from a failed execution and will be dropped.s
