@@ -387,8 +387,8 @@ bool validateCacheEntry(JoinPlanCacheEntry& hit,
             "Cached join plan must have one index fingerprint per join graph node",
             hit.nodeFingerprints.size() == model.getGraph().numNodes());
 
-    auto currentFingerprints =
-        makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), perCollIdxs);
+    auto currentFingerprints = makeNodeFingerprints(
+        model.getGraph(), model.getResolvedPaths(), perCollIdxs, *hit.joinTree);
     if (hit.nodeFingerprints != currentFingerprints) {
         LOGV2_DEBUG(
             13036802, 5, "Join plan cache entry invalidated by a change to a relevant index");
@@ -678,11 +678,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "Join plan cache key must be set when the join plan cache is in use",
                 cacheKey.has_value());
 
-        auto entry = std::make_unique<JoinPlanCacheEntry>(
-            std::move(reordered.cachedJoinPlan),
-            reordered.baseNode,
-            makeCollectionTags(mca),
-            makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), eligibleIdxs));
+        auto fingerprints = makeNodeFingerprints(
+            model.getGraph(), model.getResolvedPaths(), eligibleIdxs, *reordered.cachedJoinPlan);
+        auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
+                                                          reordered.baseNode,
+                                                          makeCollectionTags(mca),
+                                                          std::move(fingerprints));
         JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
     }
 

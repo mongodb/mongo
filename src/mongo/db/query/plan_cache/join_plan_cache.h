@@ -122,6 +122,10 @@ using IndexFingerprint = std::size_t;
 // Computed by 'join_ordering::makeNodeFingerprints' (index_fingerprint.h) from the live catalog,
 // both when an entry is stored and when a stored entry needs revalidating.
 struct NodeFingerprint {
+    // Hash over the indexes the cached plan actually uses on this node, so that dropping, renaming,
+    // hiding or redefining one of them is detected.
+    IndexFingerprint usedFingerprint = 0;
+
     // One hash per index relevant to this node, sorted so that the value does not depend on the
     // order in which the index catalog enumerates its entries.
     std::vector<IndexFingerprint> relevantIndexHashes;

@@ -13,11 +13,13 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
 #include <functional>
 #include <string>
+#include <variant>
 
 #include <boost/container_hash/hash.hpp>
 
@@ -141,6 +143,41 @@ bool indexTouchesAnyField(const BSONObj& keyPattern, const StringSet& relevantFi
     return false;
 }
 
+/**
+ * Adds the name of every index the cached access path 'tree' reads from to 'out'.
+ */
+void addUsedIndexNames(const PlanCacheIndexTree* tree, StringSet& out) {
+    if (!tree) {
+        return;
+    }
+    if (tree->entry) {
+        out.insert(tree->entry->identifier.catalogName);
+    }
+    for (const auto& child : tree->children) {
+        addUsedIndexNames(child.get(), out);
+    }
+}
+
+void addUsedIndexNames(const CachedJoinPlan& plan, std::vector<StringSet>& out) {
+    std::visit(OverloadedVisitor{
+                   [&](const CachedAccessPath& ap) {
+                       tassert(13347900, "node id out of range", ap.nodeId < out.size());
+                       if (ap.solnCacheData) {
+                           addUsedIndexNames(ap.solnCacheData->tree.get(), out[ap.nodeId]);
+                       }
+                   },
+                   [&](const CachedInljNode& inlj) {
+                       tassert(13347901, "node id out of range", inlj.nodeId < out.size());
+                       out[inlj.nodeId].insert(inlj.inljForeignIndexName);
+                   },
+                   [&](const CachedJoinNode& join) {
+                       addUsedIndexNames(*join.left, out);
+                       addUsedIndexNames(*join.right, out);
+                   },
+               },
+               plan.node);
+}
+
 }  // namespace
 
 StringSet relevantFieldsForQuery(const CanonicalQuery& cq) {
@@ -199,10 +236,42 @@ std::vector<IndexFingerprint> computeRelevantIndexHashes(
     return indexHashes;
 }
 
+IndexFingerprint computeUsedIndexFingerprint(
+    const std::vector<std::shared_ptr<const IndexCatalogEntry>>& inljEligibleIndexes,
+    const StringSet& usedIndexNames) {
+    std::vector<size_t> indexHashes;
+    for (const auto& ice : inljEligibleIndexes) {
+        const auto* desc = ice->descriptor();
+        if (!usedIndexNames.contains(desc->indexName())) {
+            continue;
+        }
+        indexHashes.push_back(hashIndex(*desc));
+    }
+    // Sorted so that the fingerprint does not depend on the order in which the index catalog
+    // happens to enumerate its entries.
+    std::sort(indexHashes.begin(), indexHashes.end());
+
+    IndexFingerprint fingerprint = 0;
+    // Hash the count in to distinguish from a default-constructed fingerprint value.
+    boost::hash_combine(fingerprint, indexHashes.size());
+    for (size_t hash : indexHashes) {
+        boost::hash_combine(fingerprint, hash);
+    }
+    return fingerprint;
+}
+
+std::vector<StringSet> usedIndexNamesPerNode(const CachedJoinPlan& plan, size_t numNodes) {
+    std::vector<StringSet> names(numNodes);
+    addUsedIndexNames(plan, names);
+    return names;
+}
+
 std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                                                   const std::vector<ResolvedPath>& resolvedPaths,
-                                                  const AvailableIndexes& perCollIdxs) {
+                                                  const AvailableIndexes& perCollIdxs,
+                                                  const CachedJoinPlan& plan) {
     const auto perNodeFields = relevantFieldsPerNode(graph, resolvedPaths);
+    const auto perNodeUsedNames = usedIndexNamesPerNode(plan, graph.numNodes());
 
     std::vector<NodeFingerprint> fingerprints;
     fingerprints.reserve(graph.numNodes());
@@ -214,6 +283,7 @@ std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                               << nss.toStringForErrorMsg(),
                 it != perCollIdxs.end());
         fingerprints.push_back(NodeFingerprint{
+            .usedFingerprint = computeUsedIndexFingerprint(it->second, perNodeUsedNames[i]),
             .relevantIndexHashes = computeRelevantIndexHashes(it->second, perNodeFields[i])});
     }
     return fingerprints;

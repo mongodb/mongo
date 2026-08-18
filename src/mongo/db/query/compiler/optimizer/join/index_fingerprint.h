@@ -18,14 +18,23 @@ namespace mongo::join_ordering {
 
 /**
  * Computes one fingerprint per node of 'graph', in ascending NodeId order, from the INLJ-eligible
- * indexes in 'perCollIdxs'. Used both when populating a join plan cache entry and when validating
- * one whose collection version tags no longer match.
+ * indexes in 'perCollIdxs' and the indexes 'plan' uses. Used both when populating a join plan cache
+ * entry and when validating one whose collection version tags no longer match
  *
  * 'perCollIdxs' must contain an entry for every namespace referenced by 'graph'.
  */
 std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                                                   const std::vector<ResolvedPath>& resolvedPaths,
-                                                  const AvailableIndexes& perCollIdxs);
+                                                  const AvailableIndexes& perCollIdxs,
+                                                  const CachedJoinPlan& plan);
+
+/**
+ * The names of the indexes 'plan' uses, per node of the join graph, in ascending NodeId order.
+ * 'numNodes' is the number of nodes in the graph 'plan' was cached for.
+ *
+ * Exposed for testing only.
+ */
+std::vector<StringSet> usedIndexNamesPerNode(const CachedJoinPlan& plan, size_t numNodes);
 
 /**
  * Every field path that 'cq' references, across its filter, projection and sort.
@@ -66,5 +75,15 @@ std::vector<StringSet> relevantFieldsPerNode(const JoinGraph& graph,
 std::vector<IndexFingerprint> computeRelevantIndexHashes(
     const std::vector<std::shared_ptr<const IndexCatalogEntry>>& inljEligibleIndexes,
     const StringSet& relevantFields);
+
+/**
+ * Hashes those of 'inljEligibleIndexes' whose name is in 'usedIndexNames', which are the indexes a
+ * cached plan uses on one node.
+ *
+ * Exposed for testing only.
+ */
+IndexFingerprint computeUsedIndexFingerprint(
+    const std::vector<std::shared_ptr<const IndexCatalogEntry>>& inljEligibleIndexes,
+    const StringSet& usedIndexNames);
 
 }  // namespace mongo::join_ordering

@@ -14,6 +14,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -136,6 +137,12 @@ public:
         return computeRelevantIndexHashes(readyIndexes(mca, kNss), StringSet(relevantFields));
     }
 
+    // Fingerprints the indexes of 'kNss' named in 'usedIndexNames'.
+    IndexFingerprint usedFingerprint(std::initializer_list<std::string> usedIndexNames) {
+        auto mca = multipleCollectionAccessor(operationContext(), {kNss});
+        return computeUsedIndexFingerprint(readyIndexes(mca, kNss), StringSet(usedIndexNames));
+    }
+
     // Deliberately not the fixture's makeCanonicalQuery(), which cannot express a sort and which
     // installs a pre-parsed filter. Going through ParsedFindCommandParams parses filter, projection
     // and sort the way a real find command would.
@@ -178,16 +185,71 @@ public:
         ASSERT_EQ(expected, relevantFieldsPerNode(joinGraph, resolvedPaths)[nodeId]);
     }
 
+    // A cached INLJ node on 'nodeId' probing the index named 'indexName'.
+    static std::unique_ptr<CachedJoinPlan> inljPlanNode(NodeId nodeId, std::string indexName) {
+        return std::make_unique<CachedJoinPlan>(
+            CachedInljNode{.nodeId = nodeId, .inljForeignIndexName = std::move(indexName)});
+    }
+
+    struct CachedIndex {
+        std::string name;
+        BSONObj keyPattern;
+    };
+
+    // A cached access path on 'nodeId' reading from 'indexes': the first is the root of the index
+    // tree, any others are its children.
+    static std::unique_ptr<CachedJoinPlan> accessPathPlanNode(
+        NodeId nodeId, const std::vector<CachedIndex>& indexes) {
+        auto cacheData = std::make_unique<SolutionCacheData>();
+        for (const auto& index : indexes) {
+            auto node = std::make_unique<PlanCacheIndexTree>();
+            node->entry = std::make_unique<IndexEntry>(index.keyPattern,
+                                                       IndexType::INDEX_BTREE,
+                                                       IndexConfig::kLatestIndexVersion,
+                                                       false /* multikey */,
+                                                       MultikeyPaths{},
+                                                       std::set<FieldRef>{},
+                                                       false /* sparse */,
+                                                       false /* unique */,
+                                                       IndexEntry::Identifier{index.name},
+                                                       BSONObj() /* infoObj */,
+                                                       nullptr /* wildcardProjection */);
+            if (cacheData->tree) {
+                cacheData->tree->children.push_back(std::move(node));
+            } else {
+                cacheData->tree = std::move(node);
+            }
+        }
+        return std::make_unique<CachedJoinPlan>(
+            CachedAccessPath{.nodeId = nodeId, .solnCacheData = std::move(cacheData)});
+    }
+
+    // A cached plan over 'left' and 'right'.
+    static std::unique_ptr<CachedJoinPlan> joinPlanNode(std::unique_ptr<CachedJoinPlan> left,
+                                                        std::unique_ptr<CachedJoinPlan> right) {
+        return std::make_unique<CachedJoinPlan>(
+            CachedJoinNode{.left = std::move(left), .right = std::move(right)});
+    }
+
+    // A two-node cached plan that reads from no index at all, for the tests that only care about
+    // the relevant index set.
+    static std::unique_ptr<CachedJoinPlan> planUsingNoIndexes() {
+        return joinPlanNode(accessPathPlanNode(NodeId{0}, {}), accessPathPlanNode(NodeId{1}, {}));
+    }
+
     // Fingerprints every node of 'joinGraph' against the live index catalogs of 'nssList'. The
     // accessor is held for the whole call so that the catalog entries it hands out stay valid.
     std::vector<NodeFingerprint> fingerprintGraph(const JoinGraph& joinGraph,
-                                                  std::vector<NamespaceString> nssList) {
+                                                  std::vector<NamespaceString> nssList,
+                                                  const CachedJoinPlan* plan = nullptr) {
         auto mca = multipleCollectionAccessor(operationContext(), nssList);
         AvailableIndexes perCollIdxs;
         for (const auto& nss : nssList) {
             perCollIdxs.emplace(nss, readyIndexes(mca, nss));
         }
-        auto fingerprints = makeNodeFingerprints(joinGraph, resolvedPaths, perCollIdxs);
+        auto defaultPlan = plan ? nullptr : planUsingNoIndexes();
+        auto fingerprints = makeNodeFingerprints(
+            joinGraph, resolvedPaths, perCollIdxs, plan ? *plan : *defaultPlan);
         // Checked here rather than per test: every caller below indexes the result by NodeId, which
         // would be an out-of-range read rather than a clean failure if this ever regressed.
         ASSERT_EQ(joinGraph.numNodes(), fingerprints.size());
@@ -710,6 +772,100 @@ TEST_F(IndexFingerprintTest, FingerprintIsIndependentOfIndexCreationOrder) {
 }
 
 //
+// usedIndexNamesPerNode: which indexes a cached plan reads from.
+//
+
+TEST_F(IndexFingerprintTest, UsedIndexNamesFromAnAccessPath) {
+    auto plan = accessPathPlanNode(NodeId{0}, {{"a_1", BSON("a" << 1)}, {"b_1", BSON("b" << 1)}});
+    auto names = usedIndexNamesPerNode(*plan, 1);
+    ASSERT_EQ(StringSet({"a_1", "b_1"}), names[0]);
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexNamesFromAnUntaggedAccessPathAreEmpty) {
+    // A collection scan tags no index, so the node depends on no index at all.
+    auto plan = accessPathPlanNode(NodeId{0}, {});
+    ASSERT_TRUE(usedIndexNamesPerNode(*plan, 1)[0].empty());
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexNamesFromAnInljProbeIndex) {
+    auto plan = inljPlanNode(NodeId{0}, "a_1");
+    ASSERT_EQ(StringSet({"a_1"}), usedIndexNamesPerNode(*plan, 1)[0]);
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexNamesAreAttributedPerNodeAcrossNestedJoins) {
+    auto plan = joinPlanNode(
+        accessPathPlanNode(NodeId{0}, {{"a_1", BSON("a" << 1)}}),
+        joinPlanNode(
+            inljPlanNode(NodeId{1}, "b_1"),
+            accessPathPlanNode(NodeId{2}, {{"c_1", BSON("c" << 1)}, {"d_1", BSON("d" << 1)}})));
+
+    auto names = usedIndexNamesPerNode(*plan, 3);
+    ASSERT_EQ(StringSet({"a_1"}), names[0]);
+    ASSERT_EQ(StringSet({"b_1"}), names[1]);
+    ASSERT_EQ(StringSet({"c_1", "d_1"}), names[2]);
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexNamesCoverEveryNodeEvenWhenThePlanMentionsNone) {
+    auto plan = accessPathPlanNode(NodeId{0}, {{"a_1", BSON("a" << 1)}});
+    auto names = usedIndexNamesPerNode(*plan, 2);
+    ASSERT_EQ(2, names.size());
+    ASSERT_TRUE(names[1].empty());
+}
+
+//
+// computeUsedIndexFingerprint: detecting a change to an index the plan reads from.
+//
+
+TEST_F(IndexFingerprintTest, UsedIndexFingerprintIsStableAcrossRepeatedComputation) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    ASSERT_EQ(usedFingerprint({"a_1"}), usedFingerprint({"a_1"}));
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexFingerprintOfANodeReadingNoIndexIsNotZero) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    ASSERT_NE(IndexFingerprint{}, usedFingerprint({}));
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexFingerprintIgnoresIndexesThePlanDoesNotRead) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto before = usedFingerprint({"a_1"});
+
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    dropIndex("a_1_b_1");
+    ASSERT_EQ(before, usedFingerprint({"a_1"}));
+}
+
+TEST_F(IndexFingerprintTest, DroppingAUsedIndexChangesTheUsedIndexFingerprint) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto before = usedFingerprint({"a_1"});
+
+    dropIndex("a_1");
+    ASSERT_NE(before, usedFingerprint({"a_1"}));
+}
+
+TEST_F(IndexFingerprintTest, RedefiningAUsedIndexChangesTheUsedIndexFingerprint) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto before = usedFingerprint({"a_1"});
+
+    dropIndex("a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1");
+    ASSERT_NE(before, usedFingerprint({"a_1"}));
+}
+
+TEST_F(IndexFingerprintTest, UsedIndexFingerprintIsIndependentOfIndexCreationOrder) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{b: 1}"), "b_1");
+    const auto forwardOrder = usedFingerprint({"a_1", "b_1"});
+
+    dropIndex("a_1");
+    dropIndex("b_1");
+    addIndex(fromjson("{b: 1}"), "b_1");
+    addIndex(fromjson("{a: 1}"), "a_1");
+
+    ASSERT_EQ(forwardOrder, usedFingerprint({"a_1", "b_1"}));
+}
+
+//
 // makeNodeFingerprints: driving the above over a whole graph.
 //
 // End to end for the library: a real join graph plus real index catalogs in, one fingerprint per
@@ -891,7 +1047,8 @@ TEST_F(IndexFingerprintTest, MakeNodeFingerprintsProducesOneFingerprintPerNode) 
         perCollIdxs.emplace(nss, readyIndexes(mca, nss));
     }
 
-    auto fingerprints = makeNodeFingerprints(ctx.joinGraph, ctx.resolvedPaths, perCollIdxs);
+    auto plan = planUsingNoIndexes();
+    auto fingerprints = makeNodeFingerprints(ctx.joinGraph, ctx.resolvedPaths, perCollIdxs, *plan);
     ASSERT_EQ(2, fingerprints.size());
 }
 
