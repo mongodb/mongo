@@ -64,10 +64,17 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                            internalLookupStageIntermediateDocumentMaxSizeBytes.load());
     serverBob.appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
                            internalQueryProhibitBlockingMergeOnMongoS.load());
-    auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
-    serverBob.append("internalQueryFrameworkControl", idl::serialize(queryControl));
+    const auto& knobs = expCtx->getQueryKnobConfiguration();
+    serverBob.append("internalQueryFrameworkControl",
+                     idl::serialize(knobs.getInternalQueryFrameworkControlForOp()));
     serverBob.appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
                            internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
+    serverBob.append("internalQueryPlanRanker", idl::serialize(knobs.getPlanRanker()));
+    serverBob.append("internalQueryCBRCEMode", idl::serialize(knobs.getCBRCEMode()));
+    serverBob.append("internalQueryMixedPlanRankingStrategy",
+                     idl::serialize(knobs.getMixedPlanRankingStrategy()));
+    serverBob.appendBool("featureFlagCostBasedRanker",
+                         feature_flags::gFeatureFlagCostBasedRanker.checkEnabled());
     serverBob.doneFast();
 }
 
