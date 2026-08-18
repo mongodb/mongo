@@ -24,7 +24,7 @@ rst.startSet();
 rst.initiate();
 
 // This test relies on marker-based oplog truncation, which may be disabled in disagg.
-// TODO(SERVER-123977) remove this once this feature flag is enabled by default
+// TODO(SERVER-125068) remove this once this feature flag is deleted
 skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 const primary = rst.getPrimary();

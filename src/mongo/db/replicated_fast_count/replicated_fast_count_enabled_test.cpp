@@ -110,6 +110,8 @@ TEST(ReplicatedFastCountEligibleNsTest, OplogEligibleWhenTruncationFFOn) {
 }
 
 TEST(ReplicatedFastCountEligibleNsTest, OplogIneligibleWhenTruncationFFOff) {
+    unittest::ServerParameterGuard ffTruncation("featureFlagSizeBasedOplogTruncationForDisagg",
+                                                false);
     EXPECT_FALSE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
 }
 

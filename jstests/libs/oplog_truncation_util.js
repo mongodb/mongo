@@ -29,7 +29,7 @@ export function isDisagg(primary) {
  *
  * Returns true if running in disaggregated storage mode
  *
- * TODO(SERVER-123977) delete this function once the feature flag is enabled by default
+ * TODO(SERVER-125068) delete this function once the feature flag is removed
  */
 export function skipTestIfSizeBasedOplogTruncationDisabled(primary, teardown) {
     const isDsc = isDisagg(primary);

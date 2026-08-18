@@ -53,7 +53,7 @@ feature_flags:
             Feature flag to enable oplog truncation based on size and time for disagg,
             instead of oplog truncation only based on time.
         cpp_varname: gFeatureFlagSizeBasedOplogTruncationForDisagg
-        default: false
+        default: true
         fcv_gated: false
     featureFlagElegantStepDownForDisagg:
         description: >-

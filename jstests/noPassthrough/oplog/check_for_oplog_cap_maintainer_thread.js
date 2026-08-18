@@ -25,7 +25,7 @@ rst.initiate();
 const primary = rst.getPrimary();
 
 // This test relies on marker-based oplog truncation, which may be disabled in disagg.
-// TODO(SERVER-123977) remove this once this feature flag is enabled by default
+// TODO(SERVER-125068) remove this once this feature flag is deleted
 const isDsc = skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 checkLog.containsJson(primary, 5295000); // OplogCapMaintainerThread started.
