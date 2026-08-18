@@ -104,7 +104,7 @@ public:
         JoinReorderingContext jCtx{.joinGraph = joinGraphStorage.value(),
                                    .resolvedPaths = std::move(resolvedPaths),
                                    .singleTableAccess = std::move(singleTableAccess),
-                                   .perCollIdxs = std::move(perCollIdxs),
+                                   .perCollIdxs = perCollIdxs,
                                    .catStats = std::move(catStats)};
 
         return jCtx;

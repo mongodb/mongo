@@ -11,6 +11,11 @@ namespace mongo::join_ordering {
 using JoinPredicateEstimatorFixture = JoinOrderingTestFixture;
 using namespace cost_based_ranker;
 
+namespace {
+// Provides 'JoinReorderingContext' an empty set of indexes to pass into JoinReorderingContext.
+const AvailableIndexes kNoIndexes{};
+}  // namespace
+
 // Join graph: A -- B with edge A.foo = B.foo and 'A' being the main collection
 // The cardinality estimate for 'A' is smaller, so we assert that we use NDV(A.foo) for the join
 // predicate selectivity estimate.
@@ -39,7 +44,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
         CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
     JoinGraph graph(std::move(mgraph));
-    JoinReorderingContext ctx{graph, paths};
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
     OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
     auto selEst = JoinCardinalityEstimator::joinPredicateSel(
         ctx, samplingEstimators, graph.getEdge(0), ceMetrics);
@@ -86,7 +91,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
     samplingEstimators[bNss] = std::move(bSamplingEstimator);
 
     JoinGraph graph(std::move(mgraph));
-    JoinReorderingContext ctx{graph, paths};
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
     OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
     auto selEst = JoinCardinalityEstimator::joinPredicateSel(
         ctx, samplingEstimators, graph.getEdge(0), ceMetrics);
@@ -141,7 +146,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
         CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
     JoinGraph graph(std::move(mgraph));
-    JoinReorderingContext ctx{graph, paths};
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
     OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
     auto selEst = JoinCardinalityEstimator::joinPredicateSel(
         ctx, samplingEstimators, graph.getEdge(0), ceMetrics);

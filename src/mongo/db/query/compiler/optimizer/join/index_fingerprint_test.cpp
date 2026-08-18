@@ -120,7 +120,7 @@ public:
     }
 
     // All ready index entries on 'nss'. In production this list is the INLJ-eligible subset
-    // produced by 'extractINLJEligibleIndexesFromGraph'; computeRelevantIndexHashes itself
+    // produced by 'extractINLJEligibleIndexes'; computeRelevantIndexFingerprint itself
     // does no eligibility filtering, so these tests hand it the catalog contents directly and
     // exercise only the relevance filtering and hashing that it does own.
     std::vector<std::shared_ptr<const IndexCatalogEntry>> readyIndexes(

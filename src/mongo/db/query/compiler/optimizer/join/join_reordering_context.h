@@ -54,7 +54,10 @@ struct JoinReorderingContext {
     const JoinGraph& joinGraph;
     const std::vector<ResolvedPath>& resolvedPaths;
     SingleTableAccessPlansResult singleTableAccess;
-    AvailableIndexes perCollIdxs;
+
+    // The INLJ-eligible indexes of every collection in the join.
+    const AvailableIndexes& perCollIdxs;
+
     CatalogStats catStats;
 
     // The information about what combinations are fields are unique based on index metadata. If

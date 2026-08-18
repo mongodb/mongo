@@ -244,30 +244,8 @@ bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
  * Pre-process indexes to filter out those ineligible for conversion to INLJ, and output a map of
  * collection namespaces to indexes available.
  */
-AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& cbrCqQsns,
+AvailableIndexes extractINLJEligibleIndexes(const JoinGraph& graph,
                                             const MultipleCollectionAccessor& mca) {
-    AvailableIndexes perCollIdxs;
-    for (const auto& [cq, _] : cbrCqQsns) {
-        const auto& ns = cq->nss();
-        if (perCollIdxs.contains(ns)) {
-            // We've already pre-processed this collection's indexes.
-            continue;
-        }
-
-        const auto& indexCatalog = *mca.lookupCollection(ns)->getIndexCatalog();
-        std::vector<std::shared_ptr<const IndexCatalogEntry>> entries;
-        for (auto&& ice : indexCatalog.getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
-            if (indexIsValidForINLJ(ice)) {
-                entries.emplace_back(ice);
-            }
-        }
-        perCollIdxs.emplace(ns, std::move(entries));
-    }
-    return perCollIdxs;
-}
-
-AvailableIndexes extractINLJEligibleIndexesFromGraph(const JoinGraph& graph,
-                                                     const MultipleCollectionAccessor& mca) {
     AvailableIndexes perCollIdxs;
     for (size_t n = 0; n < graph.numNodes(); ++n) {
         const NamespaceString& ns = graph.getNode(n).collectionName;
@@ -582,14 +560,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         qkc.getJoinReorderMode() != JoinReorderModeEnum::kRandom && qkc.getEnableJoinPlanCache() &&
         !expCtx->getExplain().has_value();
 
-    // 'cacheKey' and 'cacheEligibleIdxs' are set iff 'useJoinPlanCache' is true.
+    // Set iff 'useJoinPlanCache' is true.
     boost::optional<JoinPlanCacheKey> cacheKey;
-    boost::optional<AvailableIndexes> cacheEligibleIdxs;
+
+    const auto eligibleIdxs = extractINLJEligibleIndexes(model.getGraph(), mca);
+
     if (useJoinPlanCache) {
         cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
-        cacheEligibleIdxs = extractINLJEligibleIndexesFromGraph(model.getGraph(), mca);
-        auto exec = checkPlanCacheForPlan(
-            opCtx, *cacheKey, mca, model, *cacheEligibleIdxs, yieldPolicy, metrics);
+        auto exec =
+            checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, eligibleIdxs, yieldPolicy, metrics);
         if (exec) {
             joinPlanCacheHits.increment(1);
             return JoinReorderedExecutorResult{.executor = std::move(exec),
@@ -623,18 +602,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         std::all_of(singleTableAccess.cbrCqQsns.cbegin(),
                     singleTableAccess.cbrCqQsns.cend(),
                     [](const auto& cqQsn) { return cqQsn.second->cacheData != nullptr; });
-
-    // Pre-process indexes per collection to facilitate INLJ enumeration.
-    auto indexesPerColl = extractINLJEligibleIndexes(singleTableAccess.cbrCqQsns, mca);
     PerCollUniqueFieldInfo uniqueFieldInfo;
     if (qkc.getEnableJoinOptimizationUseIndexUniqueness()) {
-        uniqueFieldInfo = buildUniqueFieldInfo(indexesPerColl);
+        uniqueFieldInfo = buildUniqueFieldInfo(eligibleIdxs);
     }
 
     JoinReorderingContext ctx{.joinGraph = model.getGraph(),
                               .resolvedPaths = model.getResolvedPaths(),
                               .singleTableAccess = std::move(singleTableAccess),
-                              .perCollIdxs = std::move(indexesPerColl),
+                              .perCollIdxs = eligibleIdxs,
                               .catStats = createCatalogStats(opCtx, mca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .samplingEstimators = &samplingEstimators,
@@ -701,15 +677,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         tassert(13036804,
                 "Join plan cache key must be set when the join plan cache is in use",
                 cacheKey.has_value());
-        tassert(13036805,
-                "Join plan cache eligible indexes must be set when the join plan cache is in use",
-                cacheEligibleIdxs.has_value());
 
         auto entry = std::make_unique<JoinPlanCacheEntry>(
             std::move(reordered.cachedJoinPlan),
             reordered.baseNode,
             makeCollectionTags(mca),
-            makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), *cacheEligibleIdxs));
+            makeNodeFingerprints(model.getGraph(), model.getResolvedPaths(), eligibleIdxs));
         JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
     }
 
