@@ -17,6 +17,8 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   # TODO (SERVER-133476): Relies on a specific beginFetchingTimestamp being set.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

@@ -15,6 +15,9 @@
  *   # TODO SERVER-94948: Remove this tag once the test is fixed to handle arbitrary listCollection
  *   # ordering.
  *   does_not_support_config_fuzzer,
+ *   # TODO (SERVER-133476): Relies on specific oplog batches being applied which breaks when
+ *   # beginFetchingTimestamp is moved back
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
