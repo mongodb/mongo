@@ -68,6 +68,11 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -98,6 +103,19 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
+
+auto& batchedWriteApplyOpsChainsTotalCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsTotal,
+        "Total number of batched writes split into a chain of multiple applyOps entries",
+        otel::metrics::MetricUnit::kEvents);
+
+auto& batchedWriteApplyOpsChainsWithContainerOpsCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsWithContainerOps,
+        "Number of batched writes split into a chain of multiple applyOps entries that contained "
+        "at least one container operation",
+        otel::metrics::MetricUnit::kEvents);
 
 constexpr auto kNumRecordsFieldName = "numRecords"sv;
 constexpr auto kMsgFieldName = "msg"sv;
@@ -2595,6 +2613,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
         // timestamps, violating the multi timestamp constraint. It's safe to ignore the multi
         // timestamp constraints here.
         shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
+
+        // Count this applyOps chain, plus the subset of chains that carried a container write.
+        batchedWriteApplyOpsChainsTotalCounter.add(1);
+        if (batchedWriteContext.hasContainerWrites()) {
+            batchedWriteApplyOpsChainsWithContainerOpsCounter.add(1);
+        }
     }
 
     // Storage transaction commit is the last place inside a transaction that can throw an

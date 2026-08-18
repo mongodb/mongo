@@ -83,6 +83,13 @@ public:
         return _hasAtomicOperationGroups;
     }
 
+    /**
+     * Returns true if a container operation was staged in this batch.
+     */
+    bool hasContainerWrites() const {
+        return _containerOpStaged;
+    }
+
 private:
     // Sets the group record id stamped on operations staged while an AtomicOperationGroup is
     // active.
@@ -101,6 +108,8 @@ private:
     // Whether any staged operation was stamped with a group record id. Gates group-aware packing at
     // commit.
     bool _hasAtomicOperationGroups = false;
+    // Whether a container operation was staged in this batch.
+    bool _containerOpStaged = false;
 
     /**
      * Holds oplog data for operations which have been applied in the current batched

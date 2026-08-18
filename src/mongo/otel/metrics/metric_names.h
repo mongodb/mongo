@@ -533,6 +533,10 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.memUsage");
     static constexpr MetricName kIndexBulkBuilderSpilledRanges =
         MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.spilledRanges");
+    static constexpr MetricName kBatchedWriteApplyOpsChainsTotal =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.batchedWrites.applyOpsChains.total");
+    static constexpr MetricName kBatchedWriteApplyOpsChainsWithContainerOps = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.batchedWrites.applyOpsChains.withContainerOps");
 
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes =

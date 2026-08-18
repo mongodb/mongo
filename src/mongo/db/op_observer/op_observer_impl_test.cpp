@@ -82,6 +82,8 @@
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -96,6 +98,7 @@
 #include <functional>
 #include <limits>
 #include <ostream>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -5354,6 +5357,236 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
         ASSERT_EQ(innerEntry.getStatementIds(), std::vector{StmtId(nDocsToInsert0 + opIdx)});
         ASSERT_BSONOBJ_EQ(innerEntry.getObject(), docsToInsert1[opIdx]);
     }
+}
+
+int64_t readApplyOpsChainsTotal(otel::metrics::OtelMetricsCapturer& capturer) {
+    return capturer.readInt64Counter(otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsTotal);
+}
+
+int64_t readApplyOpsChainsWithContainerOps(otel::metrics::OtelMetricsCapturer& capturer) {
+    return capturer.readInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsWithContainerOps);
+}
+
+// A batched write too large for a single applyOps entry increments the
+// batchedWrites.applyOpsChains.total metric once, on both the plain and retryable write paths.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnMultiApplyOps) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto runScenario = [&](bool retryable) {
+        const auto before = readApplyOpsChainsTotal(capturer);
+        const auto withContainerOpsBefore = readApplyOpsChainsWithContainerOps(capturer);
+
+        // max=2 ops/entry with 3 inserts forces the batch across multiple applyOps entries.
+        unittest::ServerParameterGuard batchReducer(
+            "maxNumberOfBatchedOperationsInSingleOplogEntry", 2);
+
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> session;
+        if (retryable) {
+            beginRetryableWriteWithTxnNumber(opCtx, TxnNumber(1), session);
+        }
+
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+            std::vector<InsertStatement> inserts;
+            for (int i = 0; i < 3; i++) {
+                // stmtIds only belong on the retryable path.
+                inserts.push_back(retryable ? InsertStatement(i, BSON("_id" << i))
+                                            : InsertStatement(BSON("_id" << i)));
+            }
+            opCtx->getServiceContext()->getOpObserver()->onInserts(
+                opCtx,
+                *autoColl,
+                inserts.begin(),
+                inserts.end(),
+                /*recordIds=*/{},
+                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                /*defaultFromMigrate=*/false);
+            wuow.commit();
+        }
+
+        EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1) << "retryable=" << retryable;
+        // No container op was staged, so the withContainerOps subset counter is untouched.
+        EXPECT_EQ(readApplyOpsChainsWithContainerOps(capturer), withContainerOpsBefore)
+            << "retryable=" << retryable;
+    };
+
+    runScenario(/*retryable=*/false);
+    runScenario(/*retryable=*/true);
+}
+
+// The metric increments once when an oversized kGroupForRetryableAtomicWrite batch is split into an
+// applyOps chain.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnRetryableAtomicWriteChain) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    // max=1 op/entry splits the batch into a chain of one-op entries.
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> session;
+    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, session);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForRetryableAtomicWrite);
+        // Exactly one op carries a stmtId, as a kGroupForRetryableAtomicWrite batch requires.
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(i == 0 ? StmtId(0) : kUninitializedStmtId, BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1);
+}
+
+// The metric increments once when an oversized kGroupForTransaction batch (a non-retryable one-shot
+// batched write) is split into an applyOps chain.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnTransactionBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    // max=1 op/entry splits the batch into a chain of one-op entries.
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        // kGroupForTransaction carries no session, so the inserts carry no stmtId.
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1);
+}
+
+// A batched write that fits in a single applyOps entry does not increment the metric.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricDoesNotIncrementForSingleEntryBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    // Roomy limit: the inserts fit in one applyOps entry, so no chain forms.
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                10);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before);
+}
+
+// A split batch carrying an index build side-table (container) write increments the
+// withContainerOps counter, in addition to the total.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricCountsContainerWrites) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto withContainerOpsBefore = readApplyOpsChainsWithContainerOps(capturer);
+    const auto totalBefore = readApplyOpsChainsTotal(capturer);
+
+    // max=2 ops/entry: two collection inserts plus a container write span multiple applyOps
+    // entries.
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                2);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    const char kContainerValue[] = {'v'};
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+        std::vector<InsertStatement> inserts{InsertStatement(BSON("_id" << 0)),
+                                             InsertStatement(BSON("_id" << 1))};
+        opObserver->onInserts(opCtx,
+                              *autoColl,
+                              inserts.begin(),
+                              inserts.end(),
+                              /*recordIds=*/{},
+                              /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                              /*defaultFromMigrate=*/false);
+        // A container (index build side-table) write staged in the same batch.
+        opObserver->onContainerInsert(
+            opCtx, "sideWritesIdent", int64_t{0}, std::span<const char>(kContainerValue));
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsWithContainerOps(capturer), withContainerOpsBefore + 1);
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), totalBefore + 1);
 }
 
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This

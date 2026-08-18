@@ -47,6 +47,12 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx, BatchedOp
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
+    if (operation.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+        operation.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
+        operation.getOpType() == repl::OpTypeEnum::kContainerDelete) {
+        _containerOpStaged = true;
+    }
+
     if (_currentGroupRecordId) {
         // Stamp the operation with its record so the packer keeps a record's operations in one
         // entry.
@@ -88,6 +94,7 @@ void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
     _ddlOperationOccurred = false;
     _currentGroupRecordId = boost::none;
     _hasAtomicOperationGroups = false;
+    _containerOpStaged = false;
 }
 
 bool BatchedWriteContext::writesAreBatched() const {

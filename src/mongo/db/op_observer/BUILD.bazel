@@ -159,6 +159,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/s:grid",
     ],
 )
@@ -246,6 +247,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/topology/user_write_block:user_write_block_bypass",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
