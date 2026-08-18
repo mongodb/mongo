@@ -64,6 +64,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
@@ -131,6 +132,21 @@ Database* openDbDuringStartup(OperationContext* opCtx,
                 "databaseNameBytes"_attr = hexblob::encode(name),
                 "error"_attr = redact(ex));
     throw;
+}
+
+/**
+ * Opens a database for offline validation, returning false if it could not be opened.
+ * Notably, by catching naming exceptions during database opening, validate can
+ * continue operating.
+ */
+bool openDbForOfflineValidation(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                DatabaseHolder* databaseHolder) try {
+    openDbDuringStartup(opCtx, dbName, databaseHolder);
+    return true;
+} catch (const ExceptionFor<ErrorCodes::BadValue>&) {
+    LOGV2_WARNING(13340101, "Skipping validation of a database that could not be opened");
+    return false;
 }
 
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
@@ -840,9 +856,15 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
     serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
-        openDbDuringStartup(opCtx, dbName, databaseHolder);
-    }
+    const auto unopenedDbNames = std::invoke([&] {
+        stdx::unordered_set<DatabaseName> unopenedDbNames;
+        for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
+            if (MONGO_unlikely(!openDbForOfflineValidation(opCtx, dbName, databaseHolder))) {
+                unopenedDbNames.insert(dbName);
+            }
+        }
+        return unopenedDbNames;
+    });
 
     SingleProducerMultiConsumerQueue<NamespaceString> queue{
         {.maxQueueDepth = maxThreadCount * 4ULL}};
@@ -860,9 +882,11 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     });
     threadPool->startup();
 
+    // A database that could not be opened was not examined, so validation neither completed nor
+    // came back clean.
     synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
-        .allValidationComplete = true,
-        .allResultsValid = true,
+        .allValidationComplete = unopenedDbNames.empty(),
+        .allResultsValid = unopenedDbNames.empty(),
     }};
 
     // Create worker threads
@@ -919,12 +943,18 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 
     if (!gValidateDbName.empty()) {
         const boost::optional<TenantId>& tenantId = boost::none;
-        collectDb(DatabaseNameUtil::deserialize(
+        const auto dbName = DatabaseNameUtil::deserialize(
             tenantId,
             gValidateDbName.data(),
-            SerializationContext(SerializationContext::Source::Catalog)));
+            SerializationContext(SerializationContext::Source::Catalog));
+        if (!MONGO_unlikely(unopenedDbNames.contains(dbName))) {
+            collectDb(dbName);
+        }
     } else {
         for (const auto& dbName : catalog->getAllDbNames()) {
+            if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
+                continue;
+            }
             collectDb(dbName);
         }
     }
@@ -997,10 +1027,19 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
             SerializationContext(SerializationContext::Source::Catalog))};
     });
     auto databaseHolder = DatabaseHolder::get(opCtx);
+    stdx::unordered_set<DatabaseName> unopenedDbNames;
     for (const auto& dbName : dbNames) {
-        openDbDuringStartup(opCtx, dbName, databaseHolder);
+        if (MONGO_unlikely(!openDbForOfflineValidation(opCtx, dbName, databaseHolder))) {
+            // The database was not examined, so validation neither completed nor came back clean.
+            unopenedDbNames.insert(dbName);
+            offlineValidateResults.allValidationComplete = false;
+            offlineValidateResults.allResultsValid = false;
+        }
     }
     for (const auto& dbName : dbNames) {
+        if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
+            continue;
+        }
         const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
         offlineValidateResults.allValidationComplete =
             offlineValidateResults.allValidationComplete && isComplete;

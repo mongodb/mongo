@@ -21,6 +21,8 @@ const dbName = "invalidUtf8Dbp";
 const collName = "coll";
 const dbpath = MongoRunner.dataPath + "invalid_utf8_db_name/";
 
+const logIdRegex = (id) => new RegExp(`"id"\\s*:\\s*${id}\\s*,`);
+
 const toHex = (str) =>
     str
         .split("")
@@ -70,20 +72,20 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
         });
 
         assert.soon(
-            () => rawMongoProgramOutput("(20557|13340100)").search(/20557/) >= 0,
+            () => logIdRegex(20557).test(rawMongoProgramOutput('"id":20557')),
             "mongod did not fail to start up with a corrupt database name",
         );
 
         const output = rawMongoProgramOutput(".*");
 
         // Check the logs for the various errors that point to the bad db name.
-        assert.gte(output.search(/13340100/), 0, "missing the startup diagnostic");
+        assert(logIdRegex(13340100).test(output), "missing the startup diagnostic");
         assert.gte(
             output.search(/durable catalog is likely corrupt/),
             0,
             "startup diagnostic did not explain the corruption",
         );
-        assert.gte(output.search(/11379210/), 0, "missing the case-folding diagnostic");
+        assert(logIdRegex(11379210).test(output), "missing the case-folding diagnostic");
         assert.gte(
             output.search(new RegExp(toHex(dbName).slice(0, -2) + "80", "i")),
             0,
@@ -98,22 +100,42 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
         });
     });
 
-    // Each of these modes walks every database in the catalog, so all of them must explain the
-    // corruption rather than failing opaquely. --repair reaches a database through
-    // repair::repairDatabase, which closes and reopens it directly rather than going through the
-    // startup helper, so it only logs the case-folding diagnostic.
-    const modalStartups = {
-        "--repair": {args: ["--repair"], expectStartupDiagnostic: false},
-        "--validate": {args: ["--validate"], expectStartupDiagnostic: true},
-        "--validateParallel": {args: ["--validateParallel", "2"], expectStartupDiagnostic: true},
+    it("makes --repair fail", function () {
+        const modeDbpath = MongoRunner.dataPath + "invalid_utf8_db_name_repair/";
+        makeCorruptDbpath(modeDbpath);
+
+        clearRawMongoProgramOutput();
+        assert.neq(
+            0,
+            runMongoProgram("mongod", "--repair", "--port", allocatePort(), "--dbpath", modeDbpath),
+            "mongod --repair unexpectedly succeeded on a corrupt database name",
+        );
+
+        // --repair reaches a database through repair::repairDatabase, which closes and reopens it
+        // directly rather than going through the startup helper, so only the case-folding
+        // diagnostic is logged.
+        assert(
+            logIdRegex(11379210).test(rawMongoProgramOutput(".*")),
+            "missing the case-folding diagnostic under --repair",
+        );
+    });
+
+    // Validation is a diagnostic mode, so it reports the database it cannot open and validates the
+    // rest instead of ending startup at the first corrupt name.
+    const validateModes = {
+        "--validate": {args: ["--validate"], expectSummary: true},
+        "--validateParallel": {args: ["--validateParallel", "2"], expectSummary: false},
     };
 
-    for (const [mode, {args, expectStartupDiagnostic}] of Object.entries(modalStartups)) {
-        it(`makes ${mode} fail the same way`, function () {
+    for (const [mode, {args, expectSummary}] of Object.entries(validateModes)) {
+        it(`makes ${mode} skip the database and validate the rest`, function () {
             const modeDbpath = MongoRunner.dataPath + "invalid_utf8_db_name" + mode + "/";
             makeCorruptDbpath(modeDbpath);
 
             clearRawMongoProgramOutput();
+
+            // Validation could not complete for every database, so the exit code is still a
+            // failure.
             assert.neq(
                 0,
                 runMongoProgram(
@@ -128,18 +150,39 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
             );
 
             const output = rawMongoProgramOutput(".*");
-            assert.gte(
-                output.search(/11379210/),
-                0,
+
+            // The database that could not be opened is reported and skipped, not fatal.
+            assert(
+                logIdRegex(11379210).test(output),
                 `missing the case-folding diagnostic under ${mode}`,
             );
-            if (expectStartupDiagnostic) {
-                assert.gte(
-                    output.search(/13340100/),
-                    0,
-                    `missing the startup diagnostic under ${mode}`,
+            assert(
+                logIdRegex(13340100).test(output),
+                `missing the startup diagnostic under ${mode}`,
+            );
+            assert(
+                logIdRegex(13340101).test(output),
+                `${mode} did not report skipping the database`,
+            );
+            assert(
+                !logIdRegex(20557).test(output),
+                `${mode} should not terminate startup with an uncaught exception`,
+            );
+
+            // Every other database was still validated, and validation reported its own completion
+            // rather than being cut short.
+            assert.gte(
+                output.search(/"ns":"validDb\.coll"/),
+                0,
+                `${mode} did not validate the database with a valid name`,
+            );
+            if (expectSummary) {
+                assert(
+                    logIdRegex(9437304).test(output),
+                    `${mode} did not report that validation found issues`,
                 );
             }
+            assert(logIdRegex(9437300).test(output), `${mode} did not report validation failure`);
         });
     }
 });
