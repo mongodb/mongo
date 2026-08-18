@@ -102,6 +102,15 @@ void VersionContext::markDecorationAsLongRunning(ClientLock& /* lk */, Operation
     decoration._isLongRunningOperation = true;
 }
 
+void VersionContext::clearDecorationLongRunningMarker(ClientLock& /* lk */,
+                                                      OperationContext* opCtx) {
+    auto& decoration = _getDecoration(opCtx);
+    tassert(13342600,
+            "clearDecorationLongRunningMarker must be called after an OFCV has been set",
+            decoration.hasOperationFCV());
+    decoration._isLongRunningOperation = false;
+}
+
 void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,
                                                           const VersionContext& expectedVCtx,
                                                           const Date_t deadline) {

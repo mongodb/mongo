@@ -748,6 +748,25 @@ void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& tim
     _metrics.commitIndexOplogEntryTime = time;
 }
 
+SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> ReplIndexBuildState::getOutcomeFuture()
+    const {
+    return _outcomePromise.getFuture();
+}
+
+void ReplIndexBuildState::fulfillOutcome(OperationContext* opCtx,
+                                         StatusWith<IndexCatalogStats> result) {
+    if (VersionContext::getDecoration(opCtx).isLongRunningOperation()) {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::clearDecorationLongRunningMarker(lk, opCtx);
+    }
+
+    if (result.isOK()) {
+        _outcomePromise.emplaceValue(std::move(result.getValue()));
+    } else {
+        _outcomePromise.setError(result.getStatus());
+    }
+}
+
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet() && protocol == IndexBuildProtocol::kTwoPhase) {

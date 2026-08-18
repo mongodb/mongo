@@ -1287,7 +1287,7 @@ bool forceSelfAbortIndexBuild(OperationContext* opCtx,
         return false;
     }
 
-    auto fut = replState->sharedPromise.getFuture();
+    auto fut = replState->getOutcomeFuture();
     auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
     auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
     LOGV2(7419401,
@@ -1557,7 +1557,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(100));
     }
 
-    auto fut = replState->sharedPromise.getFuture();
+    auto fut = replState->getOutcomeFuture();
     auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
     auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
     LOGV2(20654,
@@ -2073,7 +2073,7 @@ void IndexBuildsCoordinator::_completeExternalAbort(OperationContext* opCtx,
     // Wait for the builder thread to receive the signal before unregistering. Don't release the
     // Collection lock until this happens, guaranteeing the thread has stopped making progress
     // and has exited.
-    auto fut = replState->sharedPromise.getFuture();
+    auto fut = replState->getOutcomeFuture();
     auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
     auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
     LOGV2(20655,
@@ -3033,7 +3033,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     // The index has been registered on the Coordinator in an unstarted state. Return an
     // uninitialized Future so that the caller can set up the index build by calling
     // _setUpIndexBuild(). The completion of the index build will be communicated via a Future
-    // obtained from 'replIndexBuildState->sharedPromise'.
+    // obtained from 'replIndexBuildState->getOutcomeFuture()'.
     return boost::none;
 }
 
@@ -3247,7 +3247,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
 
         // Setup is done within the index builder thread, signal to any waiters that an error
         // occurred.
-        replState->sharedPromise.setError(replState->getAbortStatus());
+        replState->fulfillOutcome(opCtx, replState->getAbortStatus());
         return replState->getAbortStatus();
     }
 
@@ -3271,7 +3271,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     int numIndexes = replState->stats.numIndexesBefore;
     indexCatalogStats.numIndexesBefore = numIndexes;
     indexCatalogStats.numIndexesAfter = numIndexes;
-    replState->sharedPromise.emplaceValue(indexCatalogStats);
+    replState->fulfillOutcome(opCtx, indexCatalogStats);
     return Status::OK();
 }
 
@@ -3329,13 +3329,13 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         // Unregister first so that when we fulfill the future, the build is not observed as active.
         activeIndexBuilds.unregisterIndexBuild(
             &_indexBuildsManager, replState, IndexBuildOutcome::kSuccess);
-        replState->sharedPromise.emplaceValue(replState->stats);
+        replState->fulfillOutcome(opCtx, replState->stats);
         return;
     }
 
     // During a failure, unregistering is handled by either the caller or the current thread,
     // depending on where the error originated. Signal to any waiters that an error occurred.
-    replState->sharedPromise.setError(status);
+    replState->fulfillOutcome(opCtx, status);
 }
 
 namespace {

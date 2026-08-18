@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -664,9 +665,17 @@ public:
     // Used only by the thread pool task for the index build. No synchronization necessary.
     IndexCatalogStats stats;
 
-    // Communicates the final outcome of the index build to any callers waiting upon the associated
-    // SharedSemiFuture(s).
-    SharedPromise<IndexCatalogStats> sharedPromise;
+    /**
+     * Returns a future that callers can use to wait for the final outcome of the index build.
+     */
+    SharedSemiFuture<IndexCatalogStats> getOutcomeFuture() const;
+
+    /**
+     * Clears the worker thread's long-running index build marker and fulfills the outcome promise
+     * so createIndexes callers are notified. Must be used for every path that exposes the build
+     * outcome to its caller while the worker OperationContext may still be winding down.
+     */
+    void fulfillOutcome(OperationContext* opCtx, StatusWith<IndexCatalogStats> result);
 
 private:
     /*
@@ -703,6 +712,10 @@ private:
 
     // Primary and secondaries gets their commit or abort signal via this promise future pair.
     std::unique_ptr<SharedPromise<IndexBuildAction>> _waitForNextAction;
+
+    // Communicates the final outcome of the index build to any callers waiting upon the associated
+    // SharedSemiFuture(s).
+    SharedPromise<IndexCatalogStats> _outcomePromise;
 
     // Maintains the state of the index build.
     index_build_internal::IndexBuildState _indexBuildState;

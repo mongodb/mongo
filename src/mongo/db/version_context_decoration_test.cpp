@@ -492,6 +492,29 @@ TEST_F(VersionContextDecorationTest, LongRunningOperationFlagContract) {
 }
 
 /**
+ * Verifies that clearDecorationLongRunningMarker removes only the long-running marker while
+ * preserving the pinned Operation FCV.
+ */
+TEST_F(VersionContextDecorationTest, ClearDecorationLongRunningMarkerPreservesOfcv) {
+    {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::setDecoration(lk, opCtx, kLatestVersionContext);
+        VersionContext::markDecorationAsLongRunning(lk, opCtx);
+    }
+    ASSERT_TRUE(VersionContext::getDecoration(opCtx).isLongRunningOperation());
+
+    {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::clearDecorationLongRunningMarker(lk, opCtx);
+    }
+    ASSERT_FALSE(VersionContext::getDecoration(opCtx).isLongRunningOperation());
+    ASSERT_TRUE(VersionContext::getDecoration(opCtx).hasOperationFCV());
+    ASSERT_EQ(kLatestVersionContext, VersionContext::getDecoration(opCtx));
+    ASSERT_BSONOBJ_EQ(kLatestVersionContext.toBSON(),
+                      VersionContext::getDecoration(opCtx).toBSON());
+}
+
+/**
  * Verifies that ForwardableOperationMetadata::setOn propagates _isLongRunningOperation to the
  * target opCtx. This is the production path for background index build threads: the primary
  * opCtx marks itself as long-running, and the async thread inherits the flag via setOn.

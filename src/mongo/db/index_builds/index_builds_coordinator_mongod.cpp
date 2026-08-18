@@ -534,7 +534,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 startPromise.setError(status);
                 // Do not exit with an incomplete future, even if setup fails, we should still
                 // signal waiters.
-                invariant(replState->sharedPromise.getFuture().isReady());
+                invariant(replState->getOutcomeFuture().isReady());
                 return;
             }
         } else if (resumeInfo &&
@@ -543,8 +543,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 opCtx.get(), buildUUID, *resumeInfo, indexBuildOptions.indexBuildProtocol);
             if (!status.isOK()) {
                 startPromise.setError(status);
-                replState->sharedPromise.setError(status);
-                invariant(replState->sharedPromise.getFuture().isReady());
+                replState->fulfillOutcome(opCtx.get(), status);
+                invariant(replState->getOutcomeFuture().isReady());
                 return;
             }
         }
@@ -559,7 +559,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions, resumeInfo);
 
         // Do not exit with an incomplete future.
-        invariant(replState->sharedPromise.getFuture().isReady());
+        invariant(replState->getOutcomeFuture().isReady());
 
         try {
             // Logs the index build statistics if it took longer than the server parameter
@@ -578,12 +578,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // Waits until the index build has either been started or failed to start.
     // Ignore any interruption state in 'opCtx'.
     // If 'opCtx' is interrupted, the caller will be notified after startIndexBuild() returns when
-    // it checks the future associated with 'sharedPromise'.
+    // it checks the future associated with the index build outcome.
     auto status = startFuture.getNoThrow(Interruptible::notInterruptible());
     if (!status.isOK()) {
         return status;
     }
-    return replState->sharedPromise.getFuture();
+    return replState->getOutcomeFuture();
 }
 
 Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx,

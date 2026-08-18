@@ -177,6 +177,15 @@ public:
      */
     static void markDecorationAsLongRunning(ClientLock& lk, OperationContext* opCtx);
 
+    /**
+     * Clears the long-running marker on 'opCtx' while preserving its pinned Operation FCV and all
+     * other VersionContext metadata.
+     *
+     * Must be called after the OFCV has been set on 'opCtx'. The Client lock must be held to
+     * serialize with concurrent readers such as $currentOp.
+     */
+    static void clearDecorationLongRunningMarker(ClientLock& lk, OperationContext* opCtx);
+
 private:
     static VersionContext& _getDecoration(OperationContext* opCtx);
 
