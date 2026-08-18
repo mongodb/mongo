@@ -24,6 +24,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -153,6 +154,13 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         Timer timer;
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream()
+                    << "dbHash command is not supported for direct usage in this storage mode: "
+                    << provider.name(),
+                provider.supportsDBHashExternalCall() || getTestCommandsEnabled());
 
         // We want the dbCheck command to be allowed via direct shard connections despite the fact
         // that it acquires a collection lock on a user collection. This is an exception, and should

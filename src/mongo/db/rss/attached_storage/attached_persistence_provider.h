@@ -244,6 +244,11 @@ public:
     bool supportsLegacyReplSetCommands() const override;
 
     /**
+     * Attached storage supports external usage of dbHash.
+     */
+    bool supportsDBHashExternalCall() const override;
+
+    /**
      * Returns a FixedIntervalPolicy that schedules checkpoints at a fixed interval controlled by
      * the syncdelay parameter.
      */

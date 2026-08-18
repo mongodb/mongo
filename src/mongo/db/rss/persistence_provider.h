@@ -296,6 +296,11 @@ public:
     virtual bool supportsLegacyReplSetCommands() const = 0;
 
     /**
+     * If true, the provider supports external usage of dbHash.
+     */
+    virtual bool supportsDBHashExternalCall() const = 0;
+
+    /**
      * Creates and returns a new policy that governs checkpoint scheduling for this provider.
      */
     virtual std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const = 0;

@@ -234,6 +234,10 @@ bool AttachedPersistenceProvider::supportsLegacyReplSetCommands() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsDBHashExternalCall() const {
+    return true;
+}
+
 std::unique_ptr<CheckpointSchedulePolicy>
 AttachedPersistenceProvider::makeCheckpointSchedulePolicy() const {
     return createFixedIntervalPolicy();
