@@ -175,6 +175,10 @@ const char* AttachedPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() co
     return "10m";  // 10MB
 }
 
+double AttachedPersistenceProvider::getMinOplogSizeMB() const {
+    return 990;
+}
+
 bool AttachedPersistenceProvider::supportsCompaction() const {
     return true;
 }

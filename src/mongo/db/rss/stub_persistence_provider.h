@@ -195,6 +195,11 @@ public:
             "StubPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() method not implemented");
     }
 
+    double getMinOplogSizeMB() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::getMinOplogSizeMB() method not implemented");
+    }
+
     bool supportsCompaction() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsCompaction() method not implemented");

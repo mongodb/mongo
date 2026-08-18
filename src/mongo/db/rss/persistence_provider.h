@@ -213,6 +213,12 @@ public:
     virtual const char* getWTMemoryPageMaxForOplogStrValue() const = 0;
 
     /**
+     * The smallest oplog size, in MB, that the provider accepts when the oplog is resized via
+     * replSetResizeOplog.
+     */
+    virtual double getMinOplogSizeMB() const = 0;
+
+    /**
      * If true, the provider supports compaction.
      */
     virtual bool supportsCompaction() const = 0;

@@ -163,11 +163,15 @@ public:
      */
     multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override;
 
-
     /**
      * The default memory_page_max value to set on WT for the oplog in string format.
      */
     const char* getWTMemoryPageMaxForOplogStrValue() const override;
+
+    /**
+     * The lowest size the oplog collection can be resized to via replSetResizeOplog.
+     */
+    double getMinOplogSizeMB() const override;
 
     /**
      * We can support compaction.

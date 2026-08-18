@@ -24,9 +24,9 @@ assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 50 * MB);
 let serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 24);
 
-// Too small: 990MB
+// Too small: 0.5 MB
 assert.commandFailedWithCode(
-    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 900}),
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 0.5}),
     [ErrorCodes.BadValue, 51024], // getting BadValue when binary is > 7.1, else 51024
     "Expected replSetResizeOplog to fail because the size was too small",
 );
