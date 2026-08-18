@@ -135,6 +135,23 @@ public:
     static ResumeToken parse(const Document& document);
 
     /**
+     * Extracts the timestamp value directly from the hex-encoded value 'hex'. This is a fast path
+     * for accessing the timestamp value without parsing, decoding and validating the full resume
+     * token. Only some residual checks are performed on the input value. The function will uassert
+     * if the timestamp part of the input is malformed.
+     */
+    static Timestamp extractClusterTimeFromHexData(std::string_view hex);
+
+    /**
+     * Extracts the timestamp value directly from the resume token 'token'. This is a fast path for
+     * accessing the timestamp value without parsing, decoding and validating the full resume token.
+     * Only some residual checks are performed on the input value. The function will uassert if the
+     * timestamp part of the input is malformed.
+     */
+    static Timestamp extractClusterTime(const BSONObj& token);
+    static Timestamp extractClusterTime(const Document& token);
+
+    /**
      * Generate a high-water-mark token for 'clusterTime', with no UUID or documentKey.
      */
     static ResumeToken makeHighWaterMarkToken(Timestamp clusterTime, int version);

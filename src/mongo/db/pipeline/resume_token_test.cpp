@@ -524,5 +524,99 @@ TEST(ResumeToken, FragmentNumInV1Throws) {
     resumeTokenDataV1.fragmentNum = 0ULL;
     ASSERT_THROWS_CODE(ResumeToken(resumeTokenDataV1), DBException, 7182504);
 }
+
+TEST(ResumeToken, ExtractClusterTimeFromHexDataThrowsOnInvalidInputs) {
+    const auto strings = {"",
+                          " ",
+                          "f",
+                          "ff",
+                          "0",
+                          "00",
+                          "fff",
+                          "ffff",
+                          "z",
+                          "82",
+                          "820000000000000",
+                          "82abababababababaz",
+                          " 820000000000000000",
+                          "ff0000000000000000",
+                          "830000000000000000"};
+
+    for (const auto& hex : strings) {
+        ASSERT_THROWS_CODE(ResumeToken::extractClusterTimeFromHexData(hex),
+                           DBException,
+                           ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(ResumeToken, ExtractClusterTimeFromHexDataWorksWithValidInputs) {
+    const auto values = {
+        std::make_pair("820000000000000000", Timestamp(0, 0)),
+        std::make_pair("820000000000000001", Timestamp(0, 1)),
+        std::make_pair("820000000100000000", Timestamp(1, 0)),
+        std::make_pair("82000000ff00000000", Timestamp(255, 0)),
+        std::make_pair("82000000FF00000000", Timestamp(255, 0)),
+        std::make_pair(
+            "82ffffffffffffffff",
+            Timestamp(std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max())),
+        std::make_pair("82ffffffff00000000", Timestamp(std::numeric_limits<uint32_t>::max(), 0)),
+        std::make_pair("8200000000FFFFFFFF", Timestamp(0, std::numeric_limits<uint32_t>::max())),
+        std::make_pair("8269B03187000000022B0429296E1404", Timestamp(1773154695, 2)),
+        std::make_pair("820123456789AbCdeF", Timestamp(19088743, 2309737967)),
+        std::make_pair("82abCDEf0123456789", Timestamp(2882400001, 591751049)),
+        // Technically invalid resume token, but extra bytes after the timestamp are
+        // deliberately ignored by the fast path
+        std::make_pair("82abCDEf0123456789zzzzz", Timestamp(2882400001, 591751049)),
+    };
+
+    for (const auto& value : values) {
+        ASSERT_EQ(ResumeToken::extractClusterTimeFromHexData(value.first), value.second);
+    }
+}
+
+TEST(ResumeToken, ExtractClusterTimeFromResumeTokenThrowsOnInvalidInputs) {
+    const auto values = {BSONObj(),
+                         BSON("data" << "820000000000000000"),
+                         BSON("_data" << 1234),
+                         BSON("_data" << false),
+                         BSON("_data" << BSONArray()),
+                         BSON("_data" << BSONObj())};
+
+    for (const auto& token : values) {
+        ASSERT_THROWS_CODE(
+            ResumeToken::extractClusterTime(token), DBException, ErrorCodes::FailedToParse);
+        ASSERT_THROWS_CODE(ResumeToken::extractClusterTime(Document{token}),
+                           DBException,
+                           ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(ResumeToken, ExtractClusterTimeFromResumeTokenWorksWithValidInputs) {
+    const auto values = {
+        std::make_pair("820000000000000000", Timestamp(0, 0)),
+        std::make_pair("820000000000000001", Timestamp(0, 1)),
+        std::make_pair("820000000100000000", Timestamp(1, 0)),
+        std::make_pair("82000000ff00000000", Timestamp(255, 0)),
+        std::make_pair("82000000FF00000000", Timestamp(255, 0)),
+        std::make_pair(
+            "82ffffffffffffffff",
+            Timestamp(std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max())),
+        std::make_pair("82ffffffff00000000", Timestamp(std::numeric_limits<uint32_t>::max(), 0)),
+        std::make_pair("8200000000FFFFFFFF", Timestamp(0, std::numeric_limits<uint32_t>::max())),
+        std::make_pair("8269B03187000000022B0429296E1404", Timestamp(1773154695, 2)),
+        std::make_pair("820123456789AbCdeF", Timestamp(19088743, 2309737967)),
+        std::make_pair("82abCDEf0123456789", Timestamp(2882400001, 591751049)),
+        // Technically invalid resume token, but extra bytes after the timestamp are
+        // deliberately ignored by the fast path
+        std::make_pair("82abCDEf0123456789zzzzz", Timestamp(2882400001, 591751049)),
+    };
+
+    for (const auto& value : values) {
+        ASSERT_EQ(ResumeToken::extractClusterTime(BSON("_data" << value.first)), value.second);
+        ASSERT_EQ(ResumeToken::extractClusterTime(Document{BSON("_data" << value.first)}),
+                  value.second);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

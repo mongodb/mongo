@@ -500,7 +500,7 @@ ReshardingChangeStreamsMonitor::EventBatch::getResumeTokenClusterTimeSecs() cons
     if (_resumeToken.isEmpty()) {
         return boost::none;
     }
-    return ResumeToken::parse(_resumeToken).getClusterTime().getSecs();
+    return ResumeToken::extractClusterTime(_resumeToken).getSecs();
 }
 
 }  // namespace mongo

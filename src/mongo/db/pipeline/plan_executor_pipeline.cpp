@@ -185,8 +185,7 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         // already returned any events at this timestamp. We can set _postBatchResumeToken to a new
         // high-water-mark token at the current clusterTime.
         if (!_postBatchResumeTokenTimestamp) {
-            _postBatchResumeTokenTimestamp =
-                ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            _postBatchResumeTokenTimestamp = ResumeToken::extractClusterTime(_postBatchResumeToken);
         }
         auto highWaterMark = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
         if (highWaterMark > *_postBatchResumeTokenTimestamp) {
@@ -255,8 +254,7 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
                     "expected initialPostBatchResumeToken to be not empty",
                     !_expCtx->getInitialPostBatchResumeToken().isEmpty());
             _postBatchResumeToken = _expCtx->getInitialPostBatchResumeToken().getOwned();
-            _postBatchResumeTokenTimestamp =
-                ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            _postBatchResumeTokenTimestamp = ResumeToken::extractClusterTime(_postBatchResumeToken);
             _latestOplogTimestamp = *_postBatchResumeTokenTimestamp;
             break;
         case ResumableScanType::kOplogScan:

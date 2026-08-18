@@ -260,7 +260,7 @@ public:
         // The high water mark returned by the 'AsyncResultsMerger' has the format
         // {"_data":"..."}, so we can parse it directly.
         BSONObj highWaterMark = _mergeCursors->getHighWaterMark();
-        return ResumeToken::parse(highWaterMark).getData().clusterTime;
+        return ResumeToken::extractClusterTime(highWaterMark);
     }
 
 private:
@@ -855,7 +855,7 @@ Timestamp ChangeStreamHandleTopologyChangeV2Stage::extractTimestampFromDocument(
     const Document& input) {
     // Extract cluster time from the current event via the sortkey metadata field. This does not
     // rely on the "_id" field being present in the event.
-    return ResumeToken::parse(input.metadata().getSortKey().getDocument()).getData().clusterTime;
+    return ResumeToken::extractClusterTime(input.metadata().getSortKey().getDocument());
 }
 
 DocumentSource::GetNextResult ChangeStreamHandleTopologyChangeV2Stage::doGetNext() {

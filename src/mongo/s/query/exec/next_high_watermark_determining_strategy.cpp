@@ -81,13 +81,13 @@ public:
                 "Expected sortKey to be an object",
                 nextResumeToken.firstElement().type() == BSONType::object);
         const auto nextEventClusterTime =
-            ResumeToken::parse(nextResumeToken.firstElement().Obj()).getData().clusterTime;
+            ResumeToken::extractClusterTime(nextResumeToken.firstElement().Obj());
         tassert(10359103,
                 "Expected existing high water mark to be an object",
                 currentHighWaterMark.firstElement().type() == BSONType::object);
 
         const auto currentHighWaterMarkClusterTime =
-            ResumeToken::parse(currentHighWaterMark.firstElement().Obj()).getData().clusterTime;
+            ResumeToken::extractClusterTime(currentHighWaterMark.firstElement().Obj());
         if (currentHighWaterMarkClusterTime < nextEventClusterTime) {
             return BSON(
                 "" << ResumeToken::makeHighWaterMarkToken(nextEventClusterTime, 2 /* version */)

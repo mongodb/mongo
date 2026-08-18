@@ -143,7 +143,7 @@ void ensureNoRemovedShardsForChangeStreamV1(const ExpressionContext& expCtx) {
     }
 
     const auto changeStreamOpeningTime =
-        ResumeToken::parse(expCtx.getInitialPostBatchResumeToken()).getData().clusterTime;
+        ResumeToken::extractClusterTime(expCtx.getInitialPostBatchResumeToken());
     uassert(ErrorCodes::ChangeStreamHistoryLost,
             "Change stream events no longer available due to removed shard",
             !Grid::get(expCtx.getOperationContext())

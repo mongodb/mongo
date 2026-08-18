@@ -615,7 +615,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         tassert(12552800,
                 "expected a post batch resume token for change stream query on the sharded cluster",
                 !pbrt.isEmpty());
-        opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+        opDebug.changeStreamMetrics.setOptime(ResumeToken::extractClusterTime(pbrt));
     }
 
     if (exhausted) {
@@ -1128,7 +1128,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                     "expected a postBatchResumeToken in the shard response for a change stream "
                     "$_passthroughToShard cursor",
                     !pbrt.isEmpty());
-            opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+            opDebug.changeStreamMetrics.setOptime(ResumeToken::extractClusterTime(pbrt));
         }
         result = uassertStatusOK(storePossibleCursor(
             opCtx,

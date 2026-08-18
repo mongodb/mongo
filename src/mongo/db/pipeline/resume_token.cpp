@@ -309,6 +309,46 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
+Timestamp ResumeToken::extractClusterTimeFromHexData(std::string_view hex) {
+    uassert(ErrorCodes::FailedToParse, "resume token too short", hex.size() >= 18);
+
+    auto byteAt = [&](size_t pos) -> uint8_t {
+        return hexblob::decodePair(hex.substr(pos, 2));
+    };
+
+    // The 0x82 here is equivalent to the kTimestamp = 130 value in key_string.cpp
+    uassert(ErrorCodes::FailedToParse,
+            "resume token does not start with a timestamp",
+            byteAt(0) == 0x82);
+
+    auto readValue = [&](size_t offset) -> uint32_t {
+        uint32_t value = 0;
+        for (size_t i = 0; i < sizeof(uint32_t); ++i)
+            value = (value << 8) | byteAt(offset + i * 2);
+        return value;
+    };
+
+    uint32_t secs = readValue(2);
+    uint32_t inc = readValue(10);
+    return Timestamp(secs, inc);
+}
+
+Timestamp ResumeToken::extractClusterTime(const BSONObj& token) {
+    auto dataElem = token[kDataFieldName];
+    uassert(ErrorCodes::FailedToParse,
+            "Bad resume token: _data missing or wrong type",
+            dataElem.type() == BSONType::string);
+    return extractClusterTimeFromHexData(dataElem.valueStringData());
+}
+
+Timestamp ResumeToken::extractClusterTime(const Document& token) {
+    const auto& dataElem = token[kDataFieldName];
+    uassert(ErrorCodes::FailedToParse,
+            "Bad resume token: _data missing or wrong type",
+            dataElem.getType() == BSONType::string);
+    return extractClusterTimeFromHexData(dataElem.getStringData());
+}
+
 ResumeTokenData ResumeToken::makeHighWaterMarkTokenData(Timestamp clusterTime, int version) {
     ResumeTokenData tokenData;
     tokenData.version = version;

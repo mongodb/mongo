@@ -1223,7 +1223,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                 "expected a post batch resume token for change stream query on the sharded cluster",
                 !postBatchResumeToken.isEmpty());
         opDebug.changeStreamMetrics.setOptime(
-            ResumeToken::parse(postBatchResumeToken).getClusterTime());
+            ResumeToken::extractClusterTime(postBatchResumeToken));
     }
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
