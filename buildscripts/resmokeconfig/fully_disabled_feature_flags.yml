@@ -38,7 +38,8 @@
 - featureFlagContinuousInternodeValidationPerDocument
 # TODO SERVER-131999: Enable in the all-feature-flags variant.
 - featureFlagContinuousInternodeValidationPerCollection
-# TODO (SERVER-131692): Enable metrics filtering feature flags in all-feature-flags variants.
+# Metrics filtering cannot be enabled by default in tests because that is expected to cause
+# tests that depend on metrics not in the allowlists to fail.
 - featureFlagMetricsFiltering
 - featureFlagServerStatusMetricsFiltering
 - featureFlagReplSetGetStatusMetricsFiltering
