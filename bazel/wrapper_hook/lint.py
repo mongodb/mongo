@@ -336,6 +336,14 @@ class LintRunner:
             return False
         return True
 
+    def check_copybara_forbidden_text(self, files_to_lint: list[str]) -> None:
+        print("Checking Copybara-synced files for forbidden text...")
+        # No file args means the checker scans the whole tracked tree; otherwise it
+        # restricts itself to the given changed files. Non-synced files are ignored
+        # by the checker either way.
+        if self.run_bazel("//buildscripts/copybara:forbidden_text_check", files_to_lint):
+            print("No forbidden text found in Copybara-synced files")
+
     def check_copybara_generated_evergreen(self, *, fix: bool, dry_run: bool) -> None:
         print("Checking generated Copybara Evergreen yaml...")
         if fix and not dry_run:
@@ -848,6 +856,9 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     )
     lint_all = parsed_args.all or "..." in args or "//..." in args
     files_to_lint = [arg for arg in args if not arg.startswith("-")]
+    if lint_all or files_to_lint:
+        lr.check_copybara_forbidden_text([] if lint_all else files_to_lint)
+
     if not lint_all and not files_to_lint:
         origin_branch = parsed_args.origin_branch
         max_distance = 100
