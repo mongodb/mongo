@@ -9,12 +9,14 @@
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/test_chunk_operation_sharding_coordinator_document_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/util/time_support.h"
 
 #include <memory>
 
@@ -302,6 +304,32 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SuccessfulRunRecordsCommittedStati
                   .getObjectField("chunkOperationsStatistics")
                   .getIntField("countSplitChunkCommitted"),
               committedBefore + 1);
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, StepdownReleasesActiveMigrationsRegistry) {
+    auto hangBeforeRunningCoordinator =
+        globalFailPointRegistry().find("hangBeforeRunningCoordinatorInstance");
+    const auto timesEntered = hangBeforeRunningCoordinator->setMode(FailPoint::alwaysOn);
+
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), kTestShardId, ShardId{"recipient-shard"});
+    auto coordinator = checked_pointer_cast<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service)->getOrCreateInstance(
+            _opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{_opCtx}));
+
+    hangBeforeRunningCoordinator->waitForTimesEntered(timesEntered + 1);
+    ASSERT_EQ(ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss(),
+              coordinatorDoc.getShardingCoordinatorMetadata().getId().getNss());
+
+    stepDown();
+    hangBeforeRunningCoordinator->setMode(FailPoint::off);
+
+    Timer timer;
+    while (ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss() &&
+           timer.elapsed() < Seconds(2)) {
+        sleepFor(Milliseconds(10));
+    }
+    ASSERT_FALSE(ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss());
 }
 
 TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictSameParams) {
