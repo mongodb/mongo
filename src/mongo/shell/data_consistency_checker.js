@@ -479,6 +479,17 @@ class DataConsistencyChecker {
         }
     }
 
+    /**
+     * Compares the source and syncing nodes and returns whether they were found to agree.
+     *
+     * If a command needed to collect the comparison data failed, no conclusion could be reached
+     * about whether the nodes agree, so this throws with its own message rather than folding the
+     * failure into the returned value, where callers would report it as a hash mismatch.
+     *
+     * An inconsistency detected by this same call takes precedence: in that case this returns false
+     * as usual and the command failure is only logged, so callers cannot assume that every command
+     * failure is raised.
+     */
     static checkDBHash(
         sourceDBHash,
         sourceCollInfos,
@@ -491,6 +502,32 @@ class DataConsistencyChecker {
         shouldCheckDifferencesInPreImagesCollection,
     ) {
         let success = true;
+        const commandFailures = [];
+
+        // A genuine inconsistency found by this call takes precedence over a command failure, so
+        // that a command failure cannot hide one.
+        //
+        // Note that 'success' only covers the single (database, node) pair this call compares. A
+        // mismatch that a previous call already found is tracked by the caller and is not visible
+        // here, so throwing below can report a command failure even though a real inconsistency was
+        // found elsewhere in the run. Both are printed above and the run fails either way, so the
+        // consequence is limited to which one the failure message names. Closing that gap requires
+        // the caller to hold the command failures and pick the final error only after it has an
+        // accumulated verdict.
+        const finish = () => {
+            if (success && commandFailures.length > 0) {
+                assert(
+                    false,
+                    "data consistency check command failure: could not collect the data needed to" +
+                        " compare the nodes, so no conclusion was reached about whether their data" +
+                        " matches. The check stopped here, so any remaining databases and nodes" +
+                        " were not compared and a data inconsistency elsewhere would not have been" +
+                        " detected.",
+                    {commandFailures},
+                );
+            }
+            return success;
+        };
 
         const sourceDBName = sourceCollInfos.dbName;
         const syncingDBName = syncingCollInfos.dbName;
@@ -751,7 +788,34 @@ class DataConsistencyChecker {
                 }
                 sourceCollInfos.print(collectionPrinted, collName);
                 syncingCollInfos.print(collectionPrinted, collName);
-                success = false;
+
+                // Failing to run collStats means we could not gather the state to compare, so we
+                // have no evidence either way about whether the nodes agree. Record it as a command
+                // failure rather than as a data inconsistency, deferring the report until the end
+                // so that a genuine inconsistency found elsewhere still takes precedence.
+                for (const [collInfos, res] of [
+                    [sourceCollInfos, sourceCollStats],
+                    [syncingCollInfos, syncingCollStats],
+                ]) {
+                    if (res.ok === 1) {
+                        continue;
+                    }
+                    const failure = {
+                        command: "collStats",
+                        role: collInfos.connName,
+                        host: collInfos.conn.host,
+                        ns: collInfos.ns(collName),
+                        code: res.code,
+                        codeName: res.codeName,
+                        errmsg: res.errmsg,
+                    };
+                    prettyPrint(
+                        `failed to run ${failure.command} on ${failure.role}(${failure.host}) ` +
+                            `for ${failure.ns}, so the two nodes could not be compared: ` +
+                            `${tojsononeline(failure)}`,
+                    );
+                    commandFailures.push(failure);
+                }
                 return;
             }
 
@@ -831,12 +895,12 @@ class DataConsistencyChecker {
                         `inconsistencies in 'config.image_collection' or ` +
                         `'config.system.preimages' can be expected`,
                 );
-                return success;
+                return finish();
             }
             success = false;
         }
 
-        return success;
+        return finish();
     }
 }
 
