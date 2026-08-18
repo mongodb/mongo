@@ -53,7 +53,6 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/router_role/router_role.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -137,10 +136,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         expCtx, queryShapeHash, nss, distinctCommandRequest.getQuerySettings());
 
     // We do not collect queryStats on explain for distinct.
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !verbosity.has_value()) {
+    if (!verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
             uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::DistinctKey>(

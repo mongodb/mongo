@@ -125,15 +125,11 @@ inline void createShapeAndRegisterQueryStats(const boost::intrusive_ptr<Expressi
             return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
         });
 
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        query_stats::registerRequest(opCtx, nss, [&]() {
-            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
-            return std::make_unique<query_stats::CountKey>(
-                expCtx, countRequest, std::move(deferredShape->getValue()));
-        });
-    }
+    query_stats::registerRequest(opCtx, nss, [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::CountKey>(
+            expCtx, countRequest, std::move(deferredShape->getValue()));
+    });
 }
 
 /**

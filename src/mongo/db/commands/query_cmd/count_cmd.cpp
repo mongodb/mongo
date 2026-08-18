@@ -38,7 +38,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/count_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
@@ -51,7 +50,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -518,23 +516,18 @@ public:
                     return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
                 });
 
-            if (feature_flags::gFeatureFlagQueryStatsCountDistinct
-                    .isEnabledUseLastLTSFCVWhenUninitialized(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                query_stats::registerRequest(opCtx, _ns, [&]() {
-                    uassertStatusOKWithContext(deferredShape->getStatus(),
-                                               "Failed to compute query shape");
-                    return std::make_unique<query_stats::CountKey>(
-                        expCtx,
-                        req,
-                        std::move(deferredShape->getValue()),
-                        collectionOrView.getCollectionType());
-                });
+            query_stats::registerRequest(opCtx, _ns, [&]() {
+                uassertStatusOKWithContext(deferredShape->getStatus(),
+                                           "Failed to compute query shape");
+                return std::make_unique<query_stats::CountKey>(
+                    expCtx,
+                    req,
+                    std::move(deferredShape->getValue()),
+                    collectionOrView.getCollectionType());
+            });
 
-                if (req.getIncludeQueryStatsMetrics()) {
-                    curOp->debug().getQueryStatsInfo().metricsRequested = true;
-                }
+            if (req.getIncludeQueryStatsMetrics()) {
+                curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
         }
 

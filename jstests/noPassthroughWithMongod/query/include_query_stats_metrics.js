@@ -249,108 +249,106 @@ function assertWriteMetricsEqual(
         });
     }
 
-    if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "QueryStatsCountDistinct")) {
-        {
-            // Distinct command without metrics requested.
-            const result = testDB.runCommand({
-                distinct: coll.getName(),
-                key: "b",
-                includeQueryStatsMetrics: false,
-            });
-            assert.commandWorked(result);
-            assert(!result.hasOwnProperty("metrics"));
-        }
+    {
+        // Distinct command without metrics requested.
+        const result = testDB.runCommand({
+            distinct: coll.getName(),
+            key: "b",
+            includeQueryStatsMetrics: false,
+        });
+        assert.commandWorked(result);
+        assert(!result.hasOwnProperty("metrics"));
+    }
 
-        {
-            // Distinct command with metrics requested.
-            const result = testDB.runCommand({
-                distinct: coll.getName(),
-                key: "b",
-                includeQueryStatsMetrics: true,
-            });
-            assert.commandWorked(result);
-            assertMetricsEqual(result, {
-                keysExamined: 0,
-                docsExamined: 5,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-            });
-        }
+    {
+        // Distinct command with metrics requested.
+        const result = testDB.runCommand({
+            distinct: coll.getName(),
+            key: "b",
+            includeQueryStatsMetrics: true,
+        });
+        assert.commandWorked(result);
+        assertMetricsEqual(result, {
+            keysExamined: 0,
+            docsExamined: 5,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+        });
+    }
 
-        {
-            // Distinct command against a view - internally rewritten to an aggregate.
-            var viewName = jsTestName() + "_distinct_view";
-            assert.commandWorked(testDB.createView(viewName, coll.getName(), []));
-            const result = testDB.runCommand({
-                distinct: viewName,
-                key: "b",
-                includeQueryStatsMetrics: true,
-            });
-            assert.commandWorked(result);
-            const spillParameter = testDB.adminCommand({
-                getParameter: 1,
-                internalQueryEnableAggressiveSpillsInGroup: 1,
-            });
-            const aggressiveSpillsInGroup =
-                spillParameter["internalQueryEnableAggressiveSpillsInGroup"];
-            assertMetricsEqual(result, {
-                keysExamined: 0,
-                docsExamined: 5,
-                hasSortStage: false,
-                usedDisk: aggressiveSpillsInGroup,
-                fromMultiPlanner: false,
-            });
-        }
+    {
+        // Distinct command against a view - internally rewritten to an aggregate.
+        var viewName = jsTestName() + "_distinct_view";
+        assert.commandWorked(testDB.createView(viewName, coll.getName(), []));
+        const result = testDB.runCommand({
+            distinct: viewName,
+            key: "b",
+            includeQueryStatsMetrics: true,
+        });
+        assert.commandWorked(result);
+        const spillParameter = testDB.adminCommand({
+            getParameter: 1,
+            internalQueryEnableAggressiveSpillsInGroup: 1,
+        });
+        const aggressiveSpillsInGroup =
+            spillParameter["internalQueryEnableAggressiveSpillsInGroup"];
+        assertMetricsEqual(result, {
+            keysExamined: 0,
+            docsExamined: 5,
+            hasSortStage: false,
+            usedDisk: aggressiveSpillsInGroup,
+            fromMultiPlanner: false,
+        });
+    }
 
-        {
-            // includeQueryStatsMetrics is false, no metrics should be included.
-            const result = testDB.runCommand({
-                count: coll.getName(),
-                query: {a: 1},
-                includeQueryStatsMetrics: false,
-            });
-            assert.commandWorked(result);
-            assert(!result.hasOwnProperty("metrics"));
-        }
+    {
+        // includeQueryStatsMetrics is false, no metrics should be included.
+        const result = testDB.runCommand({
+            count: coll.getName(),
+            query: {a: 1},
+            includeQueryStatsMetrics: false,
+        });
+        assert.commandWorked(result);
+        assert(!result.hasOwnProperty("metrics"));
+    }
 
-        {
-            // Basic count command with includeQueryStatsMetrics, metrics should appear.
-            const result = testDB.runCommand({
-                count: coll.getName(),
-                query: {a: 1},
-                includeQueryStatsMetrics: true,
-            });
-            assert.commandWorked(result);
-            assertMetricsEqual(result, {
-                keysExamined: 0,
-                docsExamined: 5,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-            });
-        }
+    {
+        // Basic count command with includeQueryStatsMetrics, metrics should appear.
+        const result = testDB.runCommand({
+            count: coll.getName(),
+            query: {a: 1},
+            includeQueryStatsMetrics: true,
+        });
+        assert.commandWorked(result);
+        assertMetricsEqual(result, {
+            keysExamined: 0,
+            docsExamined: 5,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+        });
+    }
 
-        {
-            // Count command against a non-existent collection, metrics should still appear.
-            const collName = jsTestName() + "_does_not_exist";
-            const nonExistentCollection = testDB[collName];
-            nonExistentCollection.drop();
-            const result = testDB.runCommand({
-                count: nonExistentCollection.getName(),
-                query: {a: 1},
-                includeQueryStatsMetrics: true,
-            });
-            assert.commandWorked(result);
-            assertMetricsEqual(result, {
-                keysExamined: 0,
-                docsExamined: 0,
-                hasSortStage: false,
-                usedDisk: false,
-                fromMultiPlanner: false,
-                fromPlanCache: false,
-            });
-        }
+    {
+        // Count command against a non-existent collection, metrics should still appear.
+        const collName = jsTestName() + "_does_not_exist";
+        const nonExistentCollection = testDB[collName];
+        nonExistentCollection.drop();
+        const result = testDB.runCommand({
+            count: nonExistentCollection.getName(),
+            query: {a: 1},
+            includeQueryStatsMetrics: true,
+        });
+        assert.commandWorked(result);
+        assertMetricsEqual(result, {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false,
+        });
     }
 
     // Update command tests

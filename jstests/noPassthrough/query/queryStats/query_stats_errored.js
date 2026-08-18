@@ -6,7 +6,7 @@
  * mongod and mongos. Errors should be recorded for find/aggregate that error during the first batch
  * and count/distinct, which are inherently non-cursor.
  *
- * @tags: [featureFlagQueryStatsErrors, featureFlagQueryStatsCountDistinct, requires_sharding]
+ * @tags: [featureFlagQueryStatsErrors, requires_sharding]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -23,7 +23,6 @@ const kPlanExecutorFailCodeName = `Location${kPlanExecutorFailCode}`;
 function queryStatsOptions() {
     const options = getQueryStatsServerParameters();
     options.setParameter.featureFlagQueryStatsErrors = true;
-    options.setParameter.featureFlagQueryStatsCountDistinct = true;
     return options;
 }
 
