@@ -212,41 +212,12 @@ test_cache_bazel_output_base_uses_plain_info_once() {
     assert_eq "info output_base" "${invocations[0]}" "output_base lookup should use plain bazel info"
 }
 
-test_should_disable_gdb_index_for_pr_and_commit_queue_builds() {
-    is_patch="true"
-    is_commit_queue="false"
-    requester="github_pr"
-    if ! bazel_evergreen_shutils::should_disable_gdb_index archive_dist_test_debug; then
-        fail "PR debug archive builds should disable GDB index generation"
-    fi
-
-    is_patch="false"
-    is_commit_queue="true"
-    requester="commit"
-    if ! bazel_evergreen_shutils::should_disable_gdb_index archive_dist_test_debug; then
-        fail "commit-queue debug archive builds should disable GDB index generation"
-    fi
-
-    is_patch="false"
-    is_commit_queue="false"
-    requester="github_merge_queue"
-    if ! bazel_evergreen_shutils::should_disable_gdb_index archive_dist_test_debug; then
-        fail "merge-queue debug archive builds should disable GDB index generation"
-    fi
-}
-
-test_should_keep_gdb_index_for_mainline_and_other_tasks() {
-    is_patch="false"
-    is_commit_queue="false"
-    requester="commit"
-    if bazel_evergreen_shutils::should_disable_gdb_index archive_dist_test_debug; then
-        fail "mainline debug archive builds should retain GDB index generation"
-    fi
-
-    is_patch="true"
-    if bazel_evergreen_shutils::should_disable_gdb_index archive_dist_test; then
-        fail "non-debug archive tasks should not be affected"
-    fi
+test_should_disable_gdb_index_for_all_ci_builds() {
+    for task_name_to_check in archive_dist_test archive_dist_test_debug unit_tests; do
+        if ! bazel_evergreen_shutils::should_disable_gdb_index "$task_name_to_check"; then
+            fail "${task_name_to_check} should disable GDB index generation in CI"
+        fi
+    done
 }
 
 test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
@@ -362,8 +333,7 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
 }
 
 test_cache_bazel_output_base_uses_plain_info_once
-test_should_disable_gdb_index_for_pr_and_commit_queue_builds
-test_should_keep_gdb_index_for_mainline_and_other_tasks
+test_should_disable_gdb_index_for_all_ci_builds
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
 test_retry_bazel_cmd_reuses_healthy_server_after_regular_failure
 test_retry_bazel_cmd_starts_missing_server_with_neutral_message

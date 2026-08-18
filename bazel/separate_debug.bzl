@@ -14,7 +14,7 @@ MAC_DEBUG_FOLDER_EXTENSION = ".dSYM"
 
 def _gdb_index_message_impl(ctx):
     if not ctx.attr.enabled:
-        print("WARNING: GDB index generation is disabled for this build. To add an index to a binary, run: bazel run gdb-add-index -- <path-to-binary>. Use --config=evg in CI to add indexes automatically.")
+        print("WARNING: GDB index generation is disabled for this build. To add an index to a binary, run: bazel run gdb-add-index -- <path-to-binary>. CI compile tasks disable index generation explicitly.")
     return [DefaultInfo()]
 
 gdb_index_message = rule(
