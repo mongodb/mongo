@@ -18,6 +18,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_gen.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_helpers.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/keypattern.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/metadata_consistency_checks/database_metadata_checks.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -979,58 +981,6 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                 inconsistencies);
 }
 
-/**
- * Allows optimistic checks under the assumption that a FCV-gated feature flag is stable.
- * This does not prevent the feature flag from changing, it merely allows detecting the change.
- * Unlike two feature flag checks, this class detects a full FCV upgrade+downgrade (ABA problem).
- *
- * Sample usage:
- * ```cpp
- * OptimisticFCVFeatureFlagGuard flagGuard(opCtx, myFlag);
- * if (flagGuard.wasEnabled()) {
- *   auto work = doCheckAssumingMyFlagIsEnabled();
- *   if (flagGuard.validateUnchanged()) {
- *     return work;
- *   } else {
- *     return {}; // The flag was disabled during the check, so discard the result.
- *   }
- * }
- * ```
- *
- * TODO(SERVER-98118): remove once 9.0 is last LTS
- */
-class OptimisticFCVFeatureFlagGuard {
-public:
-    explicit OptimisticFCVFeatureFlagGuard(OperationContext* opCtx,
-                                           FCVGatedFeatureFlag& featureFlag)
-        : _opCtx(opCtx), _featureFlag(featureFlag) {
-        const auto initialFcvDoc = readFCVDocument(opCtx);
-        _initialEnabled = _featureFlag.isEnabledOnVersion(initialFcvDoc.getVersion());
-        _initialChangeTimestamp = initialFcvDoc.getChangeTimestamp();
-    }
-
-    bool wasEnabled() const {
-        return _initialEnabled;
-    }
-
-    bool validateUnchanged() const {
-        const auto currentFcvDoc = readFCVDocument(_opCtx);
-        return _featureFlag.isEnabledOnVersion(currentFcvDoc.getVersion()) == _initialEnabled &&
-            currentFcvDoc.getChangeTimestamp() == _initialChangeTimestamp;
-    }
-
-private:
-    static FeatureCompatibilityVersionDocument readFCVDocument(OperationContext* opCtx) {
-        return FeatureCompatibilityVersionDocument::parse(uassertStatusOK(
-            FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx)));
-    }
-
-    OperationContext* _opCtx;
-    FCVGatedFeatureFlag& _featureFlag;
-    bool _initialEnabled;
-    boost::optional<Timestamp> _initialChangeTimestamp;
-};
-
 void checkCollectionMetadataInShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1045,7 +995,7 @@ void checkCollectionMetadataInShardCatalog(
     ChunkVersion collectionPlacementVersion;
     bool csrIsUnowned = false;
 
-    const OptimisticFCVFeatureFlagGuard authoritativeShardsCRUD(
+    const metadata_consistency_internal::OptimisticFCVFeatureFlagGuard authoritativeShardsCRUD(
         opCtx, feature_flags::gAuthoritativeShardsCRUD);
 
     // Any inconsistency in this vector is discarded if AuthoritativeShardsCRUD gets disabled
@@ -1873,50 +1823,6 @@ std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* clien
         false /* useExhaust */));
 }
 
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCatalogCache(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const DatabaseVersion& dbVersionInShardCatalog,
-    const ShardId& primaryShard) {
-    std::vector<MetadataInconsistencyItem> inconsistencies;
-
-    const auto dbVersion = [&]() {
-        const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
-
-        // Ensure we do not access the DSS if a concurrent DDL operation (e.g., dropDatabase) is
-        // holding the critical section. This race condition can occur if this command is sent by a
-        // stale primary while the real primary commits changes to the catalog. Accessing the DSS
-        // during a critical section violates the contract and triggers an assertion.
-        scopedDsr->checkCriticalSectionOrThrow(opCtx, dbVersionInGlobalCatalog);
-
-        return scopedDsr->getDbVersion(opCtx);
-    }();
-
-    if (!dbVersion) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalogCache,
-            MissingDatabaseMetadataInShardCatalogCacheDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog}));
-        return inconsistencies;
-    }
-
-    const auto dbVersionInCache = *dbVersion;
-
-    if (dbVersionInGlobalCatalog != dbVersionInCache ||
-        dbVersionInShardCatalog != dbVersionInCache) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalogCache,
-            InconsistentDatabaseVersionInShardCatalogCacheDetails{dbName,
-                                                                  primaryShard,
-                                                                  dbVersionInGlobalCatalog,
-                                                                  dbVersionInShardCatalog,
-                                                                  dbVersionInCache}));
-    }
-
-    return inconsistencies;
-}
-
 std::vector<MetadataInconsistencyItem> _checkShardedCollectionUniqueIndexConsistency(
     OperationContext* opCtx,
     const CollectionPtr& localColl,
@@ -1951,100 +1857,6 @@ std::vector<MetadataInconsistencyItem> _checkShardedCollectionUniqueIndexConsist
                 InconsistentIndexDetails{nss, info.toBSON()}));
         }
     }
-    return inconsistencies;
-}
-
-boost::optional<DatabaseType> readDatabaseFromDurableShardCatalog(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const ShardId& primaryShard,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    DBDirectClient client(opCtx);
-    FindCommandRequest findOp{NamespaceString::kConfigShardCatalogDatabasesNamespace};
-    findOp.setFilter(BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
-                              dbName, SerializationContext::stateDefault())));
-    auto cursor = client.find(std::move(findOp));
-
-    tassert(
-        10078301,
-        str::stream() << "Failed to retrieve cursor while reading database metadata for database: "
-                      << dbName.toStringForErrorMsg(),
-        cursor);
-
-    if (!cursor->more()) {
-        inconsistencies.emplace_back(
-            makeInconsistency(MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
-                              MissingDatabaseMetadataInShardCatalogDetails{
-                                  dbName, primaryShard, dbVersionInGlobalCatalog}));
-        return boost::none;
-    }
-
-    auto dbDoc = cursor->nextSafe().getOwned();
-    auto dbInShardCatalog = parseDurableCatalogObject(
-        [&] { return DatabaseType::parse(dbDoc, IDLParserContext("DatabaseType")); },
-        [&](const std::string& reason) {
-            MissingDatabaseMetadataInShardCatalogDetails details{
-                dbName, primaryShard, dbVersionInGlobalCatalog};
-            details.setReason(reason);
-            return makeInconsistency(
-                MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
-                std::move(details));
-        },
-        inconsistencies);
-    if (!dbInShardCatalog) {
-        return boost::none;
-    }
-
-    tassert(9980501,
-            "Found duplicated database metadata in the shard catalog with the same _id value",
-            !cursor->more());
-
-    return dbInShardCatalog;
-}
-
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCatalog(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const ShardId& primaryShard,
-    RSNodeMode rsMode) {
-    std::vector<MetadataInconsistencyItem> inconsistencies;
-
-    auto dbInShardCatalog = readDatabaseFromDurableShardCatalog(
-        opCtx, dbName, dbVersionInGlobalCatalog, primaryShard, inconsistencies);
-    if (!dbInShardCatalog) {
-        return inconsistencies;
-    }
-
-    auto shardInLocalCatalog = dbInShardCatalog->getPrimary();
-    if (shardInLocalCatalog != primaryShard) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog,
-            MisplacedDatabaseMetadataInShardCatalogDetails{
-                dbName, primaryShard, shardInLocalCatalog}));
-    }
-
-    auto dbVersionInShardCatalog = dbInShardCatalog->getVersion();
-    if (dbVersionInGlobalCatalog != dbVersionInShardCatalog) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog,
-            InconsistentDatabaseVersionInShardCatalogDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardCatalog}));
-    }
-
-    // There is currently no way to retrieve a DSR from a given timestamp, so we skip this check on
-    // delayed secondaries.
-    // TODO (SERVER-130947): maybe you can.
-    if (rsMode != RSNodeMode::kDelayedSecondary) {
-        auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardCatalogCache(
-            opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardCatalog, primaryShard);
-
-        inconsistencies.insert(inconsistencies.end(),
-                               std::make_move_iterator(cacheInconsistencies.begin()),
-                               std::make_move_iterator(cacheInconsistencies.end()));
-    }
-
     return inconsistencies;
 }
 
@@ -3076,45 +2888,6 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
-    OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog, RSNodeMode rsMode) {
-    const auto dbName = dbInGlobalCatalog.getDbName();
-    const auto dbVersionInGlobalCatalog = dbInGlobalCatalog.getVersion();
-    const auto primaryShard = dbInGlobalCatalog.getPrimary();
-
-    // TODO (SERVER-98118): Unconditionally return the inconsistencies found when we check for the
-    // database metadata consistency optimistically - without serializing with the FCV.
-
-    // Happy path: Check the consistency of the database metadata without serializing with the FCV.
-    // In the most probable case, there is no concurrent FCV downgrade that could interfere with
-    // this check and potentially result in false positives.
-    //
-    // If the database metadata is checked during an FCV downgrade, the execution may begin under
-    // the assumption that shards are database-authoritative, but complete after the downgrade,
-    // when the shard is no longer database-authoritative. This leads to fewer guarantees — for
-    // example, the shard catalog may not be in sync with the global catalog.
-
-    if (checkDatabaseMetadataConsistencyInShardCatalog(
-            opCtx, dbName, dbVersionInGlobalCatalog, primaryShard, rsMode)
-            .empty()) {
-        return {};
-    }
-
-    // Fallback path: Recheck database metadata consistency, this time serializing with the FCV.
-    // This ensures that there are no concurrent FCV downgrades that might incorrectly invalidate
-    // the assumption that the shard catalog is authoritative.
-
-    FixedFCVRegion fixedFcvRegion(opCtx);
-
-    if (!feature_flags::gAuthoritativeShardsCRUD.isEnabled(VersionContext::getDecoration(opCtx),
-                                                           fixedFcvRegion->acquireFCVSnapshot())) {
-        return {};
-    }
-
-    return checkDatabaseMetadataConsistencyInShardCatalog(
-        opCtx, dbName, dbVersionInGlobalCatalog, primaryShard, rsMode);
-}
-
 namespace {
 
 // Returns a MetadataInconsistencyItem for each config collection on this shard matching 'filter'.
@@ -3273,23 +3046,29 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
     // Get the list of collections from configsvr sorted by namespace
     const auto configsvrCollections = getCollectionsListFromConfigServer(opCtx, nss, commandLevel);
 
+    const auto dbInGlobalCatalog = [&]() {
+        try {
+            return Grid::get(opCtx)->catalogClient()->getDatabase(
+                opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx));
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
+            if (rsMode == RSNodeMode::kDelayedSecondary) {
+                // The collection didn't exist at the current snapshot, so return a snapshot error.
+                uasserted(
+                    ErrorCodes::SnapshotUnavailable,
+                    fmt::format("Database not found at the current optime: {}", e.toString()));
+            } else {
+                throw;
+            }
+        }
+    }();
+
     const auto currentPrimaryShardId = [&] {
         if (rsMode != RSNodeMode::kDelayedSecondary) {
             return primaryShardId;
         }
         // On a delayed secondary, the primaryShardId as reported in the command arguments can be
         // stale. In that case, trust the CSRS and get the primary shardID from it.
-        try {
-            return ShardId(
-                Grid::get(opCtx)
-                    ->catalogClient()
-                    ->getDatabase(opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx))
-                    .getPrimary());
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
-            // The collection didn't exist at the current snapshot, so return a snapshot error.
-            uasserted(ErrorCodes::SnapshotUnavailable,
-                      fmt::format("Database not found at the current optime: {}", e.toString()));
-        }
+        return dbInGlobalCatalog.getPrimary();
     }();
 
     auto inconsistencies = checkCollectionMetadataConsistency(opCtx,
@@ -3323,21 +3102,15 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
                                    std::make_move_iterator(collMetadataInconsistencies.begin()),
                                    std::make_move_iterator(collMetadataInconsistencies.end()));
         }
-
-        if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            !nss.isConfigDB()) {
-            const auto dbInGlobalCatalog = Grid::get(opCtx)->catalogClient()->getDatabase(
-                opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx));
-
-            auto dbMetadataInconsistencies =
-                checkDatabaseMetadataConsistency(opCtx, dbInGlobalCatalog, rsMode);
-            inconsistencies.insert(inconsistencies.end(),
-                                   std::make_move_iterator(dbMetadataInconsistencies.begin()),
-                                   std::make_move_iterator(dbMetadataInconsistencies.end()));
-        }
     }
+
+    // Check the database metadata.
+    auto dbMetadataInconsistencies =
+        database_metadata_consistency_checks::checkDatabaseMetadataConsistency(
+            opCtx, dbInGlobalCatalog, shardId, rsMode);
+    inconsistencies.insert(inconsistencies.end(),
+                           std::make_move_iterator(dbMetadataInconsistencies.begin()),
+                           std::make_move_iterator(dbMetadataInconsistencies.end()));
 
     ShardingStatistics::get(opCtx).checkMetadataStatistics.incrementInconsistenciesFound(
         inconsistencies.size());

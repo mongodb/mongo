@@ -116,12 +116,6 @@ public:
     private:
         void _invokeCommandOnSecondaries(OperationContext* opCtx,
                                          const mongo::ShardId& primaryShardId) {
-            if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
-                AuthoritativeMetadataAccessLevelEnum::kNone) {
-                return;
-            }
             if (!TestingProctor::instance().isEnabled() || !getTestCommandsEnabled()) {
                 return;
             }
@@ -270,6 +264,19 @@ public:
                                   "Secondary node was interrupted",
                                   "hostAndPort"_attr = hostAndPort,
                                   "error"_attr = cursorWithStatus.getStatus());
+                    continue;
+                }
+
+                // TODO SERVER-98118 Remove this. Secondary replicas may be running a version that
+                // does not support the _shardsvrCheckMetadataConsistencySecondaryParticipant
+                // command yet.
+                if (cursorWithStatus.getStatus().code() == ErrorCodes::CommandNotFound) {
+                    LOGV2_DEBUG(13310700,
+                                2,
+                                "Secondary does not support the "
+                                "_shardsvrCheckMetadataConsistencySecondaryParticipant command",
+                                "hostAndPort"_attr = hostAndPort,
+                                "error"_attr = cursorWithStatus.getStatus());
                     continue;
                 }
 

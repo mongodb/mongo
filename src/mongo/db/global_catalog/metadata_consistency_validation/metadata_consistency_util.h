@@ -6,7 +6,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -25,7 +24,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace metadata_consistency_util {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] metadata_consistency_util {
 
 /**
  * The replica set status of this node.
@@ -182,18 +181,6 @@ std::vector<MetadataInconsistencyItem> checkZonesConsistency(OperationContext* o
  */
 std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistency(
     OperationContext* opCtx, const CollectionType& collection);
-
-/**
- * Checks for inconsistencies in the database's metadata between the global catalog and the
- * shard catalog.
- *
- * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
- * there is no inconsistency, it returns an empty vector.
- */
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
-    OperationContext* opCtx,
-    const DatabaseType& dbInGlobalCatalog,
-    RSNodeMode rsMode = RSNodeMode::kPrimary);
 
 /**
  * Checks that this shard's config database shard catalog collections match the current FCV
