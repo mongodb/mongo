@@ -1,6 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
@@ -951,6 +953,28 @@ BSONObj callStatsToBSON(const QuerySolutionNode* node) {
     return bob.obj();
 }
 }  // namespace
+
+TEST_F(PlanExplainerTest, StatsToBSONTruncatesPlanExceedingMaxBSONDepth) {
+    // Build a plan tree that is deeper than the max BSON depth allowed for user storage.
+    std::unique_ptr<QuerySolutionNode> root = makeCollScanNode("testdb.explain");
+    for (std::uint32_t i = 0; i < BSONDepth::getMaxDepthForUserStorage(); ++i) {
+        root = std::make_unique<FetchNode>(
+            std::move(root), NamespaceString::createNamespaceString_forTest("testdb.explain"));
+    }
+
+    auto obj = callStatsToBSON(root.get());
+
+    // The serialized plan must not exceed the BSON nesting depth limit.
+    ASSERT_OK(validateBSONDepthForUserStorage(obj));
+
+    // The deepest serialized stage must carry the truncation warning.
+    BSONObj current = obj;
+    while (current.hasField("inputStage")) {
+        current = current["inputStage"].Obj();
+    }
+    ASSERT_EQ(current["warning"].str(),
+              "stats tree exceeded BSON depth limit; omitting the rest of the tree");
+}
 
 TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
     auto outerScanNode = makeCollScanNode("testdb.explain");

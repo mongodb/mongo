@@ -22,6 +22,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
@@ -172,5 +173,6 @@ private:
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob,
-                 const cost_based_ranker::EstimateMap& estimates = {});
+                 const cost_based_ranker::EstimateMap& estimates = {},
+                 std::uint32_t currentDepth = 0);
 }  // namespace mongo

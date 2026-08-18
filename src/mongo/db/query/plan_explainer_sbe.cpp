@@ -244,13 +244,23 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob,
-                 const cost_based_ranker::EstimateMap& estimates) {
+                 const cost_based_ranker::EstimateMap& estimates,
+                 std::uint32_t currentDepth) {
     tassert(9378604, "encountered unexpected nullptr for BSONObjBuilder", bob);
     tassert(9378605, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
+    }
+
+    // Stop as soon as the BSON object we're building becomes too deep. Use the worst-case (+2)
+    // depth increment to account for stages which emit children under an array.
+    const auto maxDepth = BSONDepth::getMaxDepthForUserStorage();
+    if (currentDepth + 2 >= maxDepth) {
+        bob->append("warning",
+                    "stats tree exceeded BSON depth limit; omitting the rest of the tree");
         return;
     }
 
@@ -549,7 +559,7 @@ void statsToBSON(const QuerySolutionNode* node,
     // rather than 'inputStages'.
     if (node->children.size() == 1) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(node->children[0].get(), &childBob, topLevelBob, estimates);
+        statsToBSON(node->children[0].get(), &childBob, topLevelBob, estimates, currentDepth + 1);
         return;
     }
 
@@ -558,7 +568,7 @@ void statsToBSON(const QuerySolutionNode* node,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto&& child : node->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child.get(), &childBob, topLevelBob, estimates);
+        statsToBSON(child.get(), &childBob, topLevelBob, estimates, currentDepth + 2);
     }
     childrenBob.doneFast();
 }
