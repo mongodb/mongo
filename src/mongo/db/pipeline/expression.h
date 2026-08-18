@@ -770,6 +770,13 @@ inline constexpr bool isAccumulatorExpressionImplementedInSbe =
     std::is_same_v<AccumulatorState, AccumulatorStdDevSamp>;
 
 /**
+ * Returns whether 'featureFlagSbeAccumulatorExpressions' is enabled for the current operation. Read
+ * through the IFR context so that the value stays stable for the duration of the operation. Defined
+ * out-of-line to keep the feature flag definitions out of this header.
+ */
+bool isSbeAccumulatorExpressionEnabled(ExpressionContext* expCtx);
+
+/**
  * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
  * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
  */
@@ -779,14 +786,14 @@ class ExpressionFromAccumulator
 public:
     explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
-        expCtx->capSbeCompatibility(getSbeCompatibility());
+        expCtx->capSbeCompatibility(getSbeCompatibility(expCtx));
     }
 
     ExpressionFromAccumulator(ExpressionContext* const expCtx,
                               Expression::ExpressionVector&& children)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx,
                                                                           std::move(children)) {
-        expCtx->capSbeCompatibility(getSbeCompatibility());
+        expCtx->capSbeCompatibility(getSbeCompatibility(expCtx));
     }
 
     Value evaluate(const Document& root,
@@ -824,10 +831,10 @@ public:
     }
 
 private:
-    static constexpr SbeCompatibility getSbeCompatibility() {
+    static SbeCompatibility getSbeCompatibility(ExpressionContext* const expCtx) {
         if constexpr (isAccumulatorExpressionImplementedInSbe<AccumulatorState>) {
-            // TODO SERVER-132588: Enable expression-form accumulators in trySbeRestricted.
-            return SbeCompatibility::requiresSbeFull;
+            return isSbeAccumulatorExpressionEnabled(expCtx) ? SbeCompatibility::noRequirements
+                                                             : SbeCompatibility::requiresSbeFull;
         } else {
             return SbeCompatibility::notCompatible;
         }

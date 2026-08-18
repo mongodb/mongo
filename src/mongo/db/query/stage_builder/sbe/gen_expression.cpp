@@ -1840,10 +1840,12 @@ public:
         // "timezone" parameter validation.
         if (timezoneExpression.isConstantExpr()) {
             auto [timezoneTag, timezoneVal] = timezoneExpression.getConstantValue();
-            tassert(7157928,
+            // These are user errors rather than invariants: with pipeline optimization disabled
+            // constant folding does not run, so an invalid constant reaches stage building.
+            uassert(7157928,
                     "$dateTrunc parameter 'timezone' must be a string",
                     sbe::value::isString(timezoneTag));
-            tassert(7157929,
+            uassert(7157929,
                     "$dateTrunc parameter 'timezone' must be a valid timezone",
                     sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
         } else {
@@ -1864,11 +1866,11 @@ public:
         // "unit" parameter validation.
         if (unitExpression.isConstantExpr()) {
             auto [unitTag, unitVal] = unitExpression.getConstantValue();
-            tassert(7157933,
+            uassert(7157933,
                     "$dateTrunc parameter 'unit' must be a string",
                     sbe::value::isString(unitTag));
             auto unitString = sbe::value::getStringView(unitTag, unitVal);
-            tassert(7157934,
+            uassert(7157934,
                     "$dateTrunc parameter 'unit' must be a valid time unit",
                     isValidTimeUnit(unitString));
         } else {
@@ -1886,18 +1888,18 @@ public:
         if (expr->isBinSizeSpecified()) {
             if (binSizeExpression.isConstantExpr()) {
                 auto [binSizeTag, binSizeValue] = binSizeExpression.getConstantValue();
-                tassert(7157937,
+                uassert(7157937,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         sbe::value::isNumber(binSizeTag));
                 auto binSizeLong = sbe::value::genericNumConvert(
                     binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
-                tassert(7157938,
+                uassert(7157938,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         binSizeLong.tag() != sbe::value::TypeTags::Nothing);
                 auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLong.value());
-                tassert(7157939,
+                uassert(7157939,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         binSize > 0);
@@ -1926,11 +1928,11 @@ public:
         if (expr->isStartOfWeekSpecified()) {
             if (startOfWeekExpression.isConstantExpr()) {
                 auto [startOfWeekTag, startOfWeekVal] = startOfWeekExpression.getConstantValue();
-                tassert(7157941,
+                uassert(7157941,
                         "$dateTrunc parameter 'startOfWeek' must be a string",
                         sbe::value::isString(startOfWeekTag));
                 auto startOfWeekString = sbe::value::getStringView(startOfWeekTag, startOfWeekVal);
-                tassert(7157942,
+                uassert(7157942,
                         "$dateTrunc parameter 'startOfWeek' must be a valid day of the week",
                         isValidDayOfWeek(startOfWeekString));
             } else {

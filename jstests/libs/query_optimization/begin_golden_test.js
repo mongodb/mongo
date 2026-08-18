@@ -1,5 +1,9 @@
 import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeStatus, checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeAccumulatorExpressionsEnabled,
+    checkSbeStatus,
+    checkJoinOptimizationStatus,
+} from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
 // definition, so that individual tests don't need to remember to call it.
@@ -42,6 +46,13 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName,
     );
 
+    const sbeAccumulatorExpressionsEnabled = checkSbeAccumulatorExpressionsEnabled(
+        typeof db === "undefined" ? null : db,
+    );
+    const sbeAccumulatorExpressionsExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/featureFlagSbeAccumulatorExpressions/" + outputName,
+    );
+
     const outputDirPlanRanking = (() => {
         switch (planRanker) {
             case "multiPlanning":
@@ -58,7 +69,9 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const joinOptimizationExpectedExists = fileExists(
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
-    if (joinOptimizationStatus && joinOptimizationExpectedExists) {
+    if (sbeAccumulatorExpressionsEnabled && sbeAccumulatorExpressionsExpectedExists) {
+        relativePathToExpectedOutput += "/featureFlagSbeAccumulatorExpressions";
+    } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.

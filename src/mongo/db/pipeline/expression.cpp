@@ -58,6 +58,12 @@ using std::pair;
 using std::string;
 using std::vector;
 
+bool isSbeAccumulatorExpressionEnabled(ExpressionContext* const expCtx) {
+    const auto& ifrContext = expCtx->getIfrContext();
+    return ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSbeAccumulatorExpressions);
+}
+
 Expression::ExpressionVector Expression::cloneChildren(ExpressionContext& expCtx) const {
     if (_children.empty()) {
         return {};

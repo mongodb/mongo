@@ -30,6 +30,15 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: release
 
+    featureFlagSbeAccumulatorExpressions:
+        description:
+            "Feature flag to enable SBE lowering of accumulators used as expressions, i.e. $sum,
+            $min, $max, $avg, $stdDevPop and $stdDevSamp outside of $group."
+        cpp_varname: gFeatureFlagSbeAccumulatorExpressions
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagSbeFull:
         description:
             "Feature flag for SBE behaviors, features, or extensions that are not yet enabled

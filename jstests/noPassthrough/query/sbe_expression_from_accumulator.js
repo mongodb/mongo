@@ -1,22 +1,28 @@
 /**
  * Tests that the $sum, $avg, $min, $max, $stdDevPop, and $stdDevSamp expressions
- * (ExpressionFromAccumulator<AccumulatorState>) are supported in SBE when featureFlagSbeFull is
- * enabled, and that they return the same results as the classic engine, with and without
- * collation.
+ * (ExpressionFromAccumulator<AccumulatorState>) are supported in SBE under both "trySbeEngine" and
+ * "trySbeRestricted", and that they return the same results as the classic engine, with and without
+ * collation. Under "trySbeRestricted" the pipeline is anchored with a $group, since only pipelines
+ * whose pushed-down prefix contains a $group/$lookup are eligible for SBE in that mode.
  */
 
-import {getEngine} from "jstests/libs/query/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("expressions from accumulators in SBE", function () {
     let conn;
     let db;
     let coll;
+    // When 'featureFlagSbeAccumulatorExpressions' is disabled these expressions stay
+    // 'notCompatible', so only the classic/SBE result equivalence is meaningful.
+    let sbeLoweringEnabled;
 
     before(function () {
-        conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true}});
+        conn = MongoRunner.runMongod({});
         db = conn.getDB(jsTestName());
         coll = db[jsTestName()];
+        sbeLoweringEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeAccumulatorExpressions");
 
         assert.commandWorked(
             coll.insert([
@@ -39,6 +45,19 @@ describe("expressions from accumulators in SBE", function () {
         MongoRunner.stopMongod(conn);
     });
 
+    // Carries the fields referenced by the test projections through a $group so that the pipeline
+    // qualifies for SBE pushdown under "trySbeRestricted". The computed group key prevents the
+    // classic-only DISTINCT_SCAN rewrite from consuming the $group.
+    const groupAnchor = {
+        $group: {
+            _id: {docId: {$add: ["$_id", 0]}},
+            arr: {$first: "$arr"},
+            a: {$first: "$a"},
+            b: {$first: "$b"},
+            nested: {$first: "$nested"},
+        },
+    };
+
     function runWithFramework(pipeline, frameworkControl, options) {
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: frameworkControl}),
@@ -46,19 +65,35 @@ describe("expressions from accumulators in SBE", function () {
         return coll.aggregate(pipeline, options).toArray();
     }
 
-    function assertUsesSbe(pipeline, options) {
+    function assertUsesSbe(pipeline, frameworkControl, options) {
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}),
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: frameworkControl}),
         );
+        if (!sbeLoweringEnabled) {
+            return;
+        }
         const explain = coll.explain().aggregate(pipeline, options);
         assert.eq(getEngine(explain), "sbe", explain);
+        assert(!aggPlanHasStage(explain, "$project"), explain);
     }
 
     function assertSbeMatchesClassic(pipeline, options) {
-        assertUsesSbe(pipeline, options);
-        const sbeResults = runWithFramework(pipeline, "trySbeEngine", options);
         const classicResults = runWithFramework(pipeline, "forceClassicEngine", options);
-        assert.eq(sbeResults, classicResults);
+
+        assertUsesSbe(pipeline, "trySbeEngine", options);
+        assert.eq(runWithFramework(pipeline, "trySbeEngine", options), classicResults);
+
+        const anchoredPipeline = [groupAnchor, ...pipeline];
+        const anchoredClassicResults = runWithFramework(
+            anchoredPipeline,
+            "forceClassicEngine",
+            options,
+        );
+        assertUsesSbe(anchoredPipeline, "trySbeRestricted", options);
+        assert.eq(
+            runWithFramework(anchoredPipeline, "trySbeRestricted", options),
+            anchoredClassicResults,
+        );
     }
 
     for (const op of ["$sum", "$avg", "$min", "$max", "$stdDevPop", "$stdDevSamp"]) {

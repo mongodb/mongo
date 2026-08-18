@@ -109,6 +109,17 @@ assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 //
 resetCollection();
 
+// When featureFlagSbeAccumulatorExpressions is enabled, the $avg group key makes this $group
+// eligible for SBE, whose hash agg spills eagerly in debug builds and obeys its own memory knob
+// rather than 'internalDocumentSourceGroupMaxMemoryBytes'. Pin its spilling behavior so the
+// assertions below hold in either engine.
+assert.commandWorked(
+    testDB.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+    }),
+);
+
 coll.aggregate([{$group: {"_id": {$avg: "$a"}}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
@@ -473,6 +484,17 @@ function restartProfiler() {
 assert.commandWorked(
     shard0DB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}),
 );
+// As above, pin SBE hash agg spilling in case featureFlagSbeAccumulatorExpressions pushes the
+// $avg-keyed $group stages below into SBE on the shards. The spill threshold mirrors the classic
+// knob and is only set on shard0, which is where the assertions below expect spilling.
+for (let shardDB of [shard0DB, shard1DB]) {
+    assert.commandWorked(
+        shardDB.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+        }),
+    );
+}
 assert.commandWorked(
     shard0DB.adminCommand({
         setParameter: 1,
