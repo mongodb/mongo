@@ -1,0 +1,4 @@
+# no_passthrough copy with the QEMP IFR no-NLM-transform feature flags
+base_suite: no_passthrough
+overrides:
+  - "qemp_ifr_no_nlm_transform.enable_qemp_ifr_no_nlm_transform_feature_flags_testdata_parameter_mongod"

@@ -1,0 +1,4 @@
+# aggregation copy with the QEMP IFR no-NLM-transform feature flags
+base_suite: aggregation
+overrides:
+  - "qemp_ifr_no_nlm_transform.enable_qemp_ifr_no_nlm_transform_feature_flags_mongod"

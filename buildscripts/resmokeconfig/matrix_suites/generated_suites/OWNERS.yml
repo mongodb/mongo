@@ -28,6 +28,9 @@ filters:
   - "/aggregation_qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution
+  - "/aggregation_qemp_ifr_no_nlm_transform.yml":
+    approvers:
+      - 10gen/query-execution
   - "/aggregation_sharded_collections_passthrough_qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution
@@ -38,6 +41,9 @@ filters:
     approvers:
       - 10gen/query-execution
   - "/core_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
+  - "/core_qemp_ifr_no_nlm_transform.yml":
     approvers:
       - 10gen/query-execution
   - "/jstestfuzz_replication_last_continuous_new_new_old.yml":
@@ -88,7 +94,13 @@ filters:
   - "/no_passthrough_qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution
+  - "/no_passthrough_qemp_ifr_no_nlm_transform.yml":
+    approvers:
+      - 10gen/query-execution
   - "/no_passthrough_with_mongod_qemp_ifr_batch1.yml":
+    approvers:
+      - 10gen/query-execution
+  - "/no_passthrough_with_mongod_qemp_ifr_no_nlm_transform.yml":
     approvers:
       - 10gen/query-execution
   - "/replica_sets_ese.yml":

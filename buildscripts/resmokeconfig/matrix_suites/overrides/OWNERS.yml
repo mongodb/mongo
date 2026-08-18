@@ -21,6 +21,9 @@ filters:
   - "qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution
+  - "qemp_ifr_no_nlm_transform.yml":
+    approvers:
+      - 10gen/query-execution
   - "query_settings.yml":
     approvers:
       - 10gen/query-execution-query-settings

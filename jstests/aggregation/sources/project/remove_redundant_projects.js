@@ -17,6 +17,7 @@ import {
     checkSbeCompletelyDisabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
+    checkSbeTransformStagesEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 let coll = db.remove_redundant_projects;
@@ -28,6 +29,7 @@ let indexSpec = {a: 1, "c.d": 1, "e.0": 1};
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
+const sbeRestrictedWithTransform = sbeRestricted && checkSbeTransformStagesEnabled(db);
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an
@@ -181,9 +183,11 @@ assertResultsMatch({
 // aggregation subsystem's dependency analysis logic.
 assertResultsMatch({
     pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-    expectProjectToCoalesce: checkSbeCompletelyDisabled(db) || sbeRestricted,
-    expectedCoalescedProjects: sbeRestricted ? [{"_id": true, "arr": true}] : [{"_id": 1, "a": 1}],
-    pipelineOptimizedAway: sbeRestricted,
+    expectProjectToCoalesce: checkSbeCompletelyDisabled(db) || sbeRestrictedWithTransform,
+    expectedCoalescedProjects: sbeRestrictedWithTransform
+        ? [{"_id": true, "arr": true}]
+        : [{"_id": 1, "a": 1}],
+    pipelineOptimizedAway: sbeRestrictedWithTransform || sbeFullyEnabled,
 });
 
 // Test that projections with computed fields are removed from the pipeline.
@@ -225,11 +229,12 @@ assertResultsMatch({
         {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
         {$project: {_id: 0}},
     ],
+    // The pipeline is only fully optimized away if the SBE transform stage flag is on.
     expectProjectToCoalesce: true,
-    expectedCoalescedProjects: sbeRestricted
+    expectedCoalescedProjects: sbeRestrictedWithTransform
         ? [{"a": true, "_id": false}, {"_id": false}]
         : [{"a": true, "_id": false}],
-    pipelineOptimizedAway: sbeRestricted,
+    pipelineOptimizedAway: sbeRestrictedWithTransform || sbeFullyEnabled,
 });
 
 // Test that projections on _id with nested fields are removed from pipeline.

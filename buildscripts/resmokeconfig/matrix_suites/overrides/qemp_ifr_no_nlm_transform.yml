@@ -1,0 +1,36 @@
+# Feature flag settings for the QEMP IFR rollout with non-leading match and transform stages
+# disabled, but with all other flags enabled.
+- name: enable_qemp_ifr_no_nlm_transform_feature_flags_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagGetExecutorDeferredEngineChoice: true
+            featureFlagSbeTransformStages: false
+            featureFlagSbeNonLeadingMatch: false
+            featureFlagSbeEqLookupUnwindHashJoin: true
+            featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+            featureFlagSbeEqLookupUnwindLocalCollscan: true
+            featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+            featureFlagSbeEqLookupUnwindIndexedLoopJoin: true
+            featureFlagSbeEqLookupUnwindNestedLoopJoin: true
+            featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: true
+- name: enable_qemp_ifr_no_nlm_transform_feature_flags_testdata_parameter_mongod
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                featureFlagGetExecutorDeferredEngineChoice: true
+                featureFlagSbeTransformStages: false
+                featureFlagSbeNonLeadingMatch: false
+                featureFlagSbeEqLookupUnwindHashJoin: true
+                featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+                featureFlagSbeEqLookupUnwindLocalCollscan: true
+                featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+                featureFlagSbeEqLookupUnwindIndexedLoopJoin: true
+                featureFlagSbeEqLookupUnwindNestedLoopJoin: true
+                featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: true
