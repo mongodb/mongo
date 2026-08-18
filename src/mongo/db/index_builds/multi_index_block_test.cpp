@@ -1127,24 +1127,24 @@ TEST_F(MultiIndexBlockTest, InitFailureAfterResumableTableCreationDropsResumeTab
     CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-    IndexBuildInfo indexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
-                                             << "a_1"
-                                             << "v"
-                                             << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                                  "index-1",
-                                  *storageEngine);
+    auto spec = BSON("key" << BSON("a" << 1) << "name"
+                           << "a_1"
+                           << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion));
+    // Requesting the same spec twice fails the second index build block, which runs after the
+    // internal index build table has been created.
+    IndexBuildInfo indexBuildInfo(spec, "index-1", *storageEngine);
+    IndexBuildInfo duplicateIndexBuildInfo(spec, "index-2", *storageEngine);
 
     // This ident is what init() generates internally for the resume table
-    const auto resumeTableIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    auto resumeTableIdent = ident::generateNewIndexBuildIdent(buildUUID);
 
     ASSERT_NOT_OK(indexer
-                      ->init(
-                          operationContext(),
-                          coll,
-                          {indexBuildInfo},
-                          [] { uasserted(ErrorCodes::InternalError, "force init failure"); },
-                          MultiIndexBlock::InitMode::SteadyState,
-                          boost::none)
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo, duplicateIndexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none)
                       .getStatus());
 
     // The resume table should have been created
@@ -1156,6 +1156,55 @@ TEST_F(MultiIndexBlockTest, InitFailureAfterResumableTableCreationDropsResumeTab
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), resumeTableIdent));
     EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), resumeTableIdent));
+}
+
+TEST_F(MultiIndexBlockTest, ResumablePrimaryDrivenIndexBuildTableIsCreatedAfterOnInit) {
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    bool onInitRan = false;
+    auto specs = unittest::assertGet(indexer->init(
+        operationContext(),
+        coll,
+        {indexBuildInfo},
+        [&] {
+            onInitRan = true;
+            EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
+                *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+        },
+        MultiIndexBlock::InitMode::SteadyState,
+        boost::none));
+    EXPECT_EQ(specs.size(), 1);
+    EXPECT_TRUE(onInitRan);
+
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 // With resumable PDIB enabled, the first call to drainBackgroundWrites must

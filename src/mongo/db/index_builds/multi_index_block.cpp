@@ -390,24 +390,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             _buildIsCleanedUp = true;
         });
 
-        // When we're replicating container writes, we need to create the table immediately since
-        // that means its creation is being replicated by the start of the index build. On resume,
-        // the table was already created (and persisted) by the original start, so reopen it
-        // instead. Otherwise, we can wait to create it until its first use in case it's not
-        // needed.
-        if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate && _isResumable) {
-            _resumeStateTempRecordStore.emplace(opCtx,
-                                                ident::generateNewIndexBuildIdent(*_buildUUID),
-                                                resumeInfo
-                                                    ? LazyRecordStore::CreateMode::openExisting
-                                                    : LazyRecordStore::CreateMode::immediate);
-        } else if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
-            _resumeStateTempRecordStore.emplace(
-                opCtx,
-                ident::generateNewInternalIdent(kResumableIndexIdentStem),
-                LazyRecordStore::CreateMode::deferred);
-        }
-
         for (const auto& indexBuildInfo : indexes) {
             const auto& info = indexBuildInfo.spec;
             if (info["background"].isBoolean() && !info["background"].Bool()) {
@@ -447,6 +429,24 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // the same time as onStartIndexBuild() is to avoid rollback issues.
         if (onInit) {
             onInit();
+        }
+
+        // When we're replicating container writes, we need to create the table immediately since
+        // that means its creation is being replicated by the start of the index build. On resume,
+        // the table was already created (and persisted) by the original start, so reopen it
+        // instead. Otherwise, we can wait to create it until its first use in case it's not
+        // needed. This must happen after onInit(), which is what timestamps this operation.
+        if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate && _isResumable) {
+            _resumeStateTempRecordStore.emplace(opCtx,
+                                                ident::generateNewIndexBuildIdent(*_buildUUID),
+                                                resumeInfo
+                                                    ? LazyRecordStore::CreateMode::openExisting
+                                                    : LazyRecordStore::CreateMode::immediate);
+        } else if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
+            _resumeStateTempRecordStore.emplace(
+                opCtx,
+                ident::generateNewInternalIdent(kResumableIndexIdentStem),
+                LazyRecordStore::CreateMode::deferred);
         }
 
         // Then proceed to start the index builds. If we encounter conflicts for the index specs at
