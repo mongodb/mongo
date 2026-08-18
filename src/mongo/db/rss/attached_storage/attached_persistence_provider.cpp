@@ -231,4 +231,8 @@ AttachedPersistenceProvider::makeCheckpointSchedulePolicy() const {
     return createFixedIntervalPolicy();
 }
 
+bool AttachedPersistenceProvider::supportsApplyOpsCommand() const {
+    return true;
+}
+
 }  // namespace mongo::rss

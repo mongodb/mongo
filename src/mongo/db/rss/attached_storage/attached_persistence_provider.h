@@ -238,6 +238,11 @@ public:
      * the syncdelay parameter.
      */
     std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const override;
+
+    /**
+     * Attached storage supports the apply ops user-facing command.
+     */
+    bool supportsApplyOpsCommand() const override;
 };
 
 }  // namespace mongo::rss

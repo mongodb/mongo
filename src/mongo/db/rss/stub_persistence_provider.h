@@ -272,6 +272,11 @@ public:
     std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const override {
         return createFixedIntervalPolicy();
     }
+
+    bool supportsApplyOpsCommand() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsApplyOpsCommand() method not implemented");
+    }
 };
 
 }  // namespace mongo::rss

@@ -17,6 +17,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -69,7 +70,15 @@ bool checkCOperationType(const BSONObj& opObj, const std::string_view opName) {
  *
  * May throw exceptions if the input is malformed.
  */
-OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
+OplogApplicationValidity validateApplyOpsCommand(OperationContext* opCtx, const BSONObj& cmdObj) {
+
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    uassert(ErrorCodes::CommandNotSupported,
+            str::stream() << "applyOps command is not supported in this storage mode: "
+                          << provider.name(),
+            provider.supportsApplyOpsCommand() || getTestCommandsEnabled());
+
+
     const size_t maxApplyOpsDepth = 10;
     std::stack<std::pair<size_t, BSONObj>> toCheck;
 
@@ -279,7 +288,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
-        OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
+        OplogApplicationValidity validity = validateApplyOpsCommand(opCtx, cmdObj);
         return OplogApplicationChecks::checkAuthForOperation(opCtx, dbName, cmdObj, validity);
     }
 
@@ -291,7 +300,7 @@ public:
         ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
             opCtx, std::vector<NamespaceString>{});
 
-        validateApplyOpsCommand(cmdObj);
+        validateApplyOpsCommand(opCtx, cmdObj);
 
         boost::optional<DisableDocumentValidationForInternalOp> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
