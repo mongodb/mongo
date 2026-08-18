@@ -111,7 +111,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "index_builds_coordinator",
     srcs = [
-        "abort.cpp",
         "active_index_builds.cpp",
         "index_builds_coordinator.cpp",
         "index_builds_manager.cpp",
@@ -349,7 +348,6 @@ mongo_cc_unit_test(
     name = "index_builds_test",
     size = "large",
     srcs = [
-        "abort_test.cpp",
         "commit_quorum_options_test.cpp",
         "index_build_entry_helpers_test.cpp",
         "index_build_entry_test.cpp",
