@@ -10,22 +10,46 @@ void Registry::add(UUID buildUUID,
                    UUID collectionUUID,
                    std::vector<IndexBuildInfo> indexes,
                    boost::optional<std::string> indexBuildIdent) {
-    std::lock_guard lock{_mutex};
-    _entries.try_emplace(buildUUID,
-                         std::move(dbName),
-                         collectionUUID,
-                         std::move(indexes),
-                         std::move(indexBuildIdent));
+    {
+        std::lock_guard lock{_mutex};
+        _entries.try_emplace(buildUUID,
+                             std::move(dbName),
+                             collectionUUID,
+                             std::move(indexes),
+                             std::move(indexBuildIdent));
+    }
+    _onChange();
 }
 
 void Registry::remove(UUID buildUUID) {
-    std::lock_guard lock{_mutex};
-    _entries.erase(buildUUID);
+    {
+        std::lock_guard lock{_mutex};
+        _entries.erase(buildUUID);
+    }
+    _onChange();
 }
 
 void Registry::clear() {
+    {
+        std::lock_guard lock{_mutex};
+        _entries.clear();
+    }
+    _onChange();
+}
+
+void Registry::setOnChangeHandler(std::function<void()> handler) {
     std::lock_guard lock{_mutex};
-    _entries.clear();
+    _onChangeHandler = std::move(handler);
+}
+
+void Registry::_onChange() const noexcept {
+    auto handler = [&] {
+        std::lock_guard lock{_mutex};
+        return _onChangeHandler;
+    }();
+    if (handler) {
+        handler();
+    }
 }
 
 bool Registry::contains(const UUID& buildUUID) const {
