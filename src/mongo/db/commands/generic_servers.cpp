@@ -235,6 +235,19 @@ GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* op
     GetCmdLineOptsReply reply;
     reply.setArgv(serverGlobalParams.argvArray);
     reply.setParsed(serverGlobalParams.parsedOpts);
+
+    auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+    bool requireFiltering = metricsPolicyManager.requiresFiltering(
+        opCtx, MetricsCategoryEnum::kGetCmdLineOpts, /*forceFiltered=*/false);
+
+    if (requireFiltering) {
+        const auto& matcher =
+            metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kGetCmdLineOpts);
+        BSONObjBuilder bob;
+        metrics_filtering_util::appendPaths(bob, reply.toBSON(), matcher);
+        reply = GetCmdLineOptsReply::parseOwned(bob.obj());
+    }
+
     return reply;
 }
 MONGO_REGISTER_COMMAND(GetCmdLineOptsCmd).forRouter().forShard();

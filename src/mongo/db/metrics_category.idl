@@ -16,3 +16,4 @@ enums:
             kDbStats: "dbStats"
             kBuildInfo: "buildInfo"
             kHostInfo: "hostInfo"
+            kGetCmdLineOpts: "getCmdLineOpts"

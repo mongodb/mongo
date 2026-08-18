@@ -85,7 +85,9 @@ structs:
         description: "Command line options as passed to the server executable on startup"
         is_command_reply: true
         fields:
-            argv: array
+            argv:
+                type: array
+                optional: true
             parsed: object
 
 commands:
