@@ -14,6 +14,11 @@ from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
 )
 
 
+def setUpModule():
+    if not sys.platform.startswith("linux"):
+        raise unittest.SkipTest("Core analysis is only support on linux")
+
+
 class TestCorePidExtraction(unittest.TestCase):
     """Unit tests for get_core_pid function."""
 
@@ -38,10 +43,6 @@ class TestCorePidExtraction(unittest.TestCase):
             get_core_pid("dump_mongod.notanumber.core")
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestGetCoreAnalyzerCommands(unittest.TestCase):
     """Unit tests for get_core_analyzer_commands function."""
 
@@ -223,10 +224,6 @@ class TestGetCoreAnalyzerCommands(unittest.TestCase):
             self.assertIn(expected_str, args)
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for CoreAnalysisTaskGenerator base class."""
 
@@ -325,10 +322,6 @@ class TestCoreAnalysisTaskGenerator(unittest.TestCase):
             self.assertFalse(generator._should_skip_task(mock_task))
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for ResmokeCoreAnalysisTaskGenerator."""
 
@@ -436,10 +429,50 @@ class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
             self.assertTrue(cores[0].marked_boring)
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
+class TestBazelCoreAnalysisTaskDependencies(unittest.TestCase):
+    """The generated core analysis task must wait for the runner's debug binaries."""
+
+    def setUp(self):
+        self.expansions = {
+            "task_name": "//jstests/suites/core:core",
+            "task_id": "test_task_123",
+            "execution": "0",
+            "build_variant": "ubuntu2204",
+            "distro_id": "ubuntu2204-large",
+            "core_analyzer_results_url": "s3://bucket/results.tgz",
+            "compile_variant": "ubuntu2204-compile",
+            "workdir": "/data/mci",
+        }
+
+    def _generate(self, built_own_binaries=False):
+        cores = [CoreInfo(path="/tmp/c.core", binary_name="mongod", pid="1", marked_boring=False)]
+        with (
+            patch(
+                "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.read_config_file",
+                return_value=self.expansions,
+            ),
+            patch(
+                "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.os.path.isdir",
+                return_value=built_own_binaries,
+            ),
+        ):
+            with patch.object(BazelCoreAnalysisTaskGenerator, "find_cores", return_value=cores):
+                generator = BazelCoreAnalysisTaskGenerator("expansions.yml", use_mock_tasks=True)
+                return generator.generate()["buildvariants"][0]["tasks"][0]
+
+    def test_depends_on_runner_task_in_same_variant(self):
+        task = self._generate()
+        self.assertEqual(task["depends_on"], [{"name": "resmoke_tests", "variant": "ubuntu2204"}])
+
+    def test_depends_on_burn_in_runner_for_burn_in_tasks(self):
+        self.expansions["task_name"] = "//jstests/suites/core:core_burn_in_0"
+        task = self._generate()
+        self.assertEqual(
+            task["depends_on"],
+            [{"name": "resmoke_tests_burn_in_ubuntu2204", "variant": "ubuntu2204"}],
+        )
+
+
 class TestBazelCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for BazelCoreAnalysisTaskGenerator."""
 

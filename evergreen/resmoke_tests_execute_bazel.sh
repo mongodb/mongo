@@ -181,6 +181,25 @@ targets_for_build_phase() {
     done
 }
 
+STREAMED_TASKS_FILE="streamed_result_tasks.txt"
+
+# Start the process that tails build_events.json and activates each result task
+# as soon as its target's remote execution completes, instead of waiting for the whole invocation.
+start_streaming_activation() {
+    local bazel_pid=$1
+    stream_pid=""
+    if [[ -n "$result_task" || "${resmoke_disable_rbe}" == "true" || "${generate_burn_in_targets}" == "true" ]]; then
+        return
+    fi
+    echo "Starting streaming result task activation..."
+    AWS_ACCESS_KEY_ID="${aws_key_new}" AWS_SECRET_ACCESS_KEY="${aws_secret}" \
+        python buildscripts/stream_result_task_activation.py \
+        --expansion-file ../expansions.yml \
+        --build-events-file build_events.json \
+        --bazel-pid "$bazel_pid" &
+    stream_pid=$!
+}
+
 # Build with retries, then test. Leaves the result in the global RET.
 run_build_and_test() {
     local build_attempts=3
@@ -235,9 +254,24 @@ run_build_and_test() {
     # Set the timeout for the test phase independently from the build phase above:
     build_timeout_seconds="${test_timeout_seconds:-${build_timeout_seconds:-}}"
     export build_timeout_seconds
+
+    # Drop any BEP left by a previous execution of this task or by another bazel command.
+    rm -f build_events.json "$STREAMED_TASKS_FILE"
+
     bazel_evergreen_shutils::retry_bazel_cmd $test_attempts "$BAZEL_BINARY" \
-        test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets}
+        test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets} &
+    local bazel_bg_pid=$!
+
+    start_streaming_activation "$bazel_bg_pid"
+
+    wait "$bazel_bg_pid"
     RET=$?
+
+    if [[ -n "${stream_pid:-}" ]]; then
+        # Let the watcher do its final pass; it exits on its own once the bazel
+        # process above is gone.
+        wait "$stream_pid" || echo "WARNING: streaming activation watcher exited with an error."
+    fi
 
     if [[ "$RET" -eq 124 ]]; then
         echo "Bazel timed out after ${build_timeout_seconds:-<unspecified>} seconds."

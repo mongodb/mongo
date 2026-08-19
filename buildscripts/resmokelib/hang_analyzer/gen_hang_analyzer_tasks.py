@@ -31,6 +31,7 @@ from buildscripts.util.read_config import read_config_file
 GENERATED_TASK_PREFIX = "core_analysis"
 RANDOM_STRING_LENGTH = 5
 LOCAL_BIN_DIR = os.path.join("dist-test", "bin")
+GATHERED_BIN_DIR = os.path.join("dist-tests", "bin")
 MULTIVERSION_BIN_DIR = os.path.normpath("/data/multiversion")
 
 
@@ -260,6 +261,19 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
 
 
 class BazelCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
+    def get_core_analysis_task_dependencies(self, compile_variant: str) -> set[TaskDependency]:
+        """Depend on the runner task only when this result task did not build its own binaries."""
+        if os.path.isdir(GATHERED_BIN_DIR):
+            return []
+
+        variant = self.expansions.get("build_variant")
+        current_task_name = self.expansions.get("task_name", "")
+        if "_burn_in_" in current_task_name:
+            runner = f"resmoke_tests_burn_in_{variant}"
+        else:
+            runner = "resmoke_tests"
+        return {TaskDependency(runner, variant)}
+
     def get_core_analyzer_commands(
         self,
         task_id: str,

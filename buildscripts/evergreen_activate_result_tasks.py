@@ -21,6 +21,7 @@ from buildscripts.util.fileops import read_yaml_file
 LOGGER = structlog.getLogger(__name__)
 
 EVG_CONFIG_FILE = "./.evergreen.yml"
+STREAMED_TASKS_FILE = "streamed_result_tasks.txt"
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -65,11 +66,24 @@ def get_local_tasks(evg_api, build_id):
     ]
 
 
-def activate_or_restart_tasks(evg_api, tasks, version_id, build_variant):
+def get_streamed_labels(path: str = STREAMED_TASKS_FILE) -> set[str]:
+    """Labels the streaming watcher already activated or restarted during this execution."""
+    if not os.path.exists(path):
+        return set()
+    try:
+        with open(path) as f:
+            return {line.strip() for line in f if line.strip()}
+    except OSError:
+        LOGGER.warning("Failed to read streamed result tasks; may re-activate", exc_info=True)
+        return set()
+
+
+def activate_or_restart_tasks(evg_api, tasks, version_id, build_variant, allow_restart=False):
     activate = []
     for task in tasks:
         if task.activated:
-            evg_api.restart_task(task.task_id)
+            if allow_restart:
+                evg_api.restart_task(task.task_id)
         else:
             activate.append(task.display_name)
 
@@ -103,6 +117,7 @@ def activate_result_task_group(
     evg_api: EvergreenApi,
     build_events_file: Optional[str] = None,
     local_only: bool = False,
+    allow_restart: bool = False,
 ) -> None:
     """
     Activate result tasks for the given variant.
@@ -116,6 +131,9 @@ def activate_result_task_group(
     :param local_only: When True, activate only the standalone local-exec tasks (the runner calls
         this early so they run concurrently with remote execution). When False, activate the RBE
         result tasks (late, after the runner produces build_events.json).
+    :param allow_restart: When True (runner execution > 0), restart already-activated tasks so
+        they re-run against this execution's results. When False, skip them — on a first
+        execution they were activated by the streaming watcher during the run.
     """
 
     try:
@@ -135,9 +153,22 @@ def activate_result_task_group(
         else:
             tasks = get_result_tasks(evg_api, build_id)
             if build_events_file:
+                # Assert over every result task, before dropping the ones already streamed.
                 assert_all_tests_have_tasks(tasks, build_events_file)
+            # The watcher already activated (execution 0) or restarted (execution > 0) these
+            # during the run. Restarting again here would discard the run it started.
+            streamed = get_streamed_labels()
+            if streamed:
+                tasks = [task for task in tasks if task.display_name not in streamed]
+                LOGGER.info(
+                    "Skipping result tasks already handled by the streaming watcher",
+                    skipped=len(streamed),
+                    remaining=len(tasks),
+                )
 
-        activate_or_restart_tasks(evg_api, tasks, version_id, build_variant)
+        activate_or_restart_tasks(
+            evg_api, tasks, version_id, build_variant, allow_restart=allow_restart
+        )
 
     except Exception:
         LOGGER.error(
@@ -184,6 +215,7 @@ def main(
     build_variant = expansions.get("build_variant")
     task_name = expansions.get("task_name")
     version_id = expansions.get("version_id")
+    execution = int(expansions.get("execution", 0))
 
     if not all([build_variant, task_name, version_id]):
         LOGGER.error(
@@ -197,7 +229,13 @@ def main(
     evg_api = get_extra_retry_evergreen_api(evergreen_config)
 
     activate_result_task_group(
-        build_variant, task_name, version_id, evg_api, build_events_file, local_only=local_only
+        build_variant,
+        task_name,
+        version_id,
+        evg_api,
+        build_events_file,
+        local_only=local_only,
+        allow_restart=execution > 0,
     )
 
 

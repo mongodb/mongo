@@ -82,6 +82,15 @@ py_test(
 )
 
 py_test(
+    name = "test_stream_result_task_activation",
+    srcs = ["test_stream_result_task_activation.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:stream_result_task_activation",
+    ],
+)
+
+py_test(
     name = "test_bazel_plus_test_interface",
     srcs = ["test_bazel_plus_test_interface.py"],
     visibility = ["//visibility:public"],
