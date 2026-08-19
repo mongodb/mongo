@@ -44,13 +44,19 @@ public:
     void incrementCurrentOpen();
 
     unsigned long long getTotalStarted() const;
-    void incrementTotalStarted();
+    unsigned long long getTotalInternalStarted() const;
+    unsigned long long getTotalExternalStarted() const;
+    void incrementTotalStarted(bool isServerInitiated);
 
     unsigned long long getTotalAborted() const;
-    void incrementTotalAborted();
+    unsigned long long getTotalInternalAborted() const;
+    unsigned long long getTotalExternalAborted() const;
+    void incrementTotalAborted(bool isServerInitiated);
 
     unsigned long long getTotalCommitted() const;
-    void incrementTotalCommitted();
+    unsigned long long getTotalInternalCommitted() const;
+    unsigned long long getTotalExternalCommitted() const;
+    void incrementTotalCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPrepared() const;
     void incrementTotalPrepared();
@@ -91,14 +97,20 @@ private:
     // The total number of open transactions.
     Atomic<unsigned long long> _currentOpen{0};
 
+    // Total counts are classified as "external" if the transactions were started explicitly
+    // by a user and "internal" if they were server-initiated.
+
     // The total number of multi-document transactions started since the last server startup.
-    Atomic<unsigned long long> _totalStarted{0};
+    Atomic<unsigned long long> _totalStartedInternal{0};
+    Atomic<unsigned long long> _totalStartedExternal{0};
 
     // The total number of multi-document transaction aborts.
-    Atomic<unsigned long long> _totalAborted{0};
+    Atomic<unsigned long long> _totalAbortedInternal{0};
+    Atomic<unsigned long long> _totalAbortedExternal{0};
 
     // The total number of multi-document transaction commits.
-    Atomic<unsigned long long> _totalCommitted{0};
+    Atomic<unsigned long long> _totalCommittedInternal{0};
+    Atomic<unsigned long long> _totalCommittedExternal{0};
 
     // The total number of prepared transactions since the last server startup.
     Atomic<unsigned long long> _totalPrepared{0};

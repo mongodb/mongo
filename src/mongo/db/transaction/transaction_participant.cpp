@@ -1113,13 +1113,15 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
         auto tickSource = opCtx->getServiceContext()->getTickSource();
 
         o(lk).transactionExpireDate = now + Seconds(gTransactionLifetimeLimitSeconds.load());
+        bool isServerInitiatedTransaction = !opCtx->getClient()->session();
 
         o(lk).transactionMetricsObserver.onStart(
             ServerTransactionsMetrics::get(opCtx->getServiceContext()),
             *p().autoCommit,
             tickSource,
             now,
-            *o().transactionExpireDate);
+            *o().transactionExpireDate,
+            isServerInitiatedTransaction);
         o(lk).readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
         if (o(lk).transactionRuntimeContext.has_value() &&

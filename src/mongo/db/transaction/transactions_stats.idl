@@ -76,10 +76,28 @@ structs:
             totalAborted:
                 type: long
                 default: 0
+            totalAbortedInternal:
+                type: long
+                default: 0
+            totalAbortedExternal:
+                type: long
+                default: 0
             totalCommitted:
                 type: long
                 default: 0
+            totalCommittedInternal:
+                type: long
+                default: 0
+            totalCommittedExternal:
+                type: long
+                default: 0
             totalStarted:
+                type: long
+                default: 0
+            totalStartedInternal:
+                type: long
+                default: 0
+            totalStartedExternal:
                 type: long
                 default: 0
             totalPrepared:

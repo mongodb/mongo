@@ -69,27 +69,51 @@ void ServerTransactionsMetrics::incrementCurrentOpen() {
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
-    return _totalStarted.loadRelaxed();
+    return _totalStartedInternal.loadRelaxed() + _totalStartedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalStarted() {
-    _totalStarted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalInternalStarted() const {
+    return _totalStartedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalExternalStarted() const {
+    return _totalStartedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalStarted(bool isServerInitiated) {
+    (isServerInitiated ? _totalStartedInternal : _totalStartedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalAborted() const {
-    return _totalAborted.loadRelaxed();
+    return _totalAbortedInternal.loadRelaxed() + _totalAbortedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalAborted() {
-    _totalAborted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalInternalAborted() const {
+    return _totalAbortedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalExternalAborted() const {
+    return _totalAbortedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalAborted(bool isServerInitiated) {
+    (isServerInitiated ? _totalAbortedInternal : _totalAbortedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalCommitted() const {
-    return _totalCommitted.loadRelaxed();
+    return _totalCommittedInternal.loadRelaxed() + _totalCommittedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalCommitted() {
-    _totalCommitted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalInternalCommitted() const {
+    return _totalCommittedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalExternalCommitted() const {
+    return _totalCommittedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalCommitted(bool isServerInitiated) {
+    (isServerInitiated ? _totalCommittedInternal : _totalCommittedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPrepared() const {
@@ -160,9 +184,18 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, bool inclu
     stats->setCurrentActive(_currentActive.loadRelaxed());
     stats->setCurrentInactive(_currentInactive.loadRelaxed());
     stats->setCurrentOpen(_currentOpen.loadRelaxed());
-    stats->setTotalAborted(_totalAborted.loadRelaxed());
-    stats->setTotalCommitted(_totalCommitted.loadRelaxed());
-    stats->setTotalStarted(_totalStarted.loadRelaxed());
+    stats->setTotalAborted(_totalAbortedInternal.loadRelaxed() +
+                           _totalAbortedExternal.loadRelaxed());
+    stats->setTotalAbortedInternal(_totalAbortedInternal.loadRelaxed());
+    stats->setTotalAbortedExternal(_totalAbortedExternal.loadRelaxed());
+    stats->setTotalCommitted(_totalCommittedInternal.loadRelaxed() +
+                             _totalCommittedExternal.loadRelaxed());
+    stats->setTotalCommittedInternal(_totalCommittedInternal.loadRelaxed());
+    stats->setTotalCommittedExternal(_totalCommittedExternal.loadRelaxed());
+    stats->setTotalStarted(_totalStartedInternal.loadRelaxed() +
+                           _totalStartedExternal.loadRelaxed());
+    stats->setTotalStartedInternal(_totalStartedInternal.loadRelaxed());
+    stats->setTotalStartedExternal(_totalStartedExternal.loadRelaxed());
     stats->setTotalPrepared(_totalPrepared.loadRelaxed());
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.loadRelaxed());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.loadRelaxed());

@@ -30,7 +30,8 @@ public:
                  bool isAutoCommit,
                  TickSource* tickSource,
                  Date_t curWallClockTime,
-                 Date_t expireDate);
+                 Date_t expireDate,
+                 bool isServerInitiated);
 
     /**
      * Updates relevant metrics when a storage timestamp is chosen for a transaction.

@@ -27,18 +27,21 @@ void TransactionMetricsObserver::onStart(ServerTransactionsMetrics* serverTransa
                                          bool isAutoCommit,
                                          TickSource* tickSource,
                                          Date_t curWallClockTime,
-                                         Date_t expireDate) {
+                                         Date_t expireDate,
+                                         bool isServerInitiated) {
     //
     // Per transaction metrics.
     //
     _singleTransactionStats.setStartTime(tickSource->getTicks(), curWallClockTime);
     _singleTransactionStats.setAutoCommit(isAutoCommit);
     _singleTransactionStats.setExpireDate(expireDate);
+    _singleTransactionStats.setIsServerInitiatedTransaction(isServerInitiated);
 
     //
     // Server wide transactions metrics.
     //
-    serverTransactionsMetrics->incrementTotalStarted();
+    serverTransactionsMetrics->incrementTotalStarted(
+        _singleTransactionStats.isServerInitiatedTransaction());
     serverTransactionsMetrics->incrementCurrentOpen();
     serverTransactionsMetrics->incrementCurrentInactive();
 }
@@ -114,7 +117,8 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
     //
     // Server wide transactions metrics.
     //
-    serverTransactionsMetrics->incrementTotalCommitted();
+    serverTransactionsMetrics->incrementTotalCommitted(
+        _singleTransactionStats.isServerInitiatedTransaction());
     serverTransactionsMetrics->decrementCurrentOpen();
     serverTransactionsMetrics->decrementCurrentActive();
 
@@ -232,7 +236,8 @@ void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
     //
     // Server wide transactions metrics.
     //
-    serverTransactionsMetrics->incrementTotalAborted();
+    serverTransactionsMetrics->incrementTotalAborted(
+        _singleTransactionStats.isServerInitiatedTransaction());
     serverTransactionsMetrics->decrementCurrentOpen();
 
     if (_singleTransactionStats.isPrepared()) {

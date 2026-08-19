@@ -2885,6 +2885,10 @@ protected:
 TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
     unsigned long long beforeTransactionStart =
         ServerTransactionsMetrics::get(opCtx())->getTotalStarted();
+    unsigned long long beforeStartedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalInternalStarted();
+    unsigned long long beforeStartedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalExternalStarted();
 
     auto sessionCheckout = checkOutSession();
 
@@ -2892,6 +2896,13 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
     // is started.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStarted(),
               beforeTransactionStart + 1U);
+
+    // The test fixture's client has no transport session, so the transaction is classified as
+    // server-initiated and only the internal counter moves.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalStarted(),
+              beforeStartedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalStarted(),
+              beforeStartedExternal);
 }
 
 TEST_F(TransactionsMetricsTest, IncrementPreparedTransaction) {
@@ -2912,11 +2923,22 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
 
     unsigned long long beforeCommitCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalCommitted();
+    unsigned long long beforeCommittedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalInternalCommitted();
+    unsigned long long beforeCommittedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalExternalCommitted();
 
     txnParticipant.commitUnpreparedTransaction(opCtx());
 
     // Assert that the committed counter is incremented by 1.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommitted(), beforeCommitCount + 1U);
+
+    // The test fixture's client has no transport session, so the transaction was classified as
+    // server-initiated when it started and must be counted out of the same bucket on commit.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalCommitted(),
+              beforeCommittedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalCommitted(),
+              beforeCommittedExternal);
 }
 
 TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommitted) {
@@ -2944,11 +2966,22 @@ TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
 
     unsigned long long beforeAbortCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
+    unsigned long long beforeAbortedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalInternalAborted();
+    unsigned long long beforeAbortedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalExternalAborted();
 
     txnParticipant.abortTransaction(opCtx());
 
     // Assert that the aborted counter is incremented by 1.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
+
+    // The test fixture's client has no transport session, so the transaction was classified as
+    // server-initiated when it started and must be counted out of the same bucket on abort.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalAborted(),
+              beforeAbortedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalAborted(),
+              beforeAbortedExternal);
 }
 
 TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAborted) {

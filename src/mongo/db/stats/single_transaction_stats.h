@@ -223,6 +223,14 @@ public:
         return _recoveredFromPreciseCheckpoint;
     }
 
+    void setIsServerInitiatedTransaction(bool isServerInitiated) {
+        _isServerInitiatedTransaction = isServerInitiated;
+    }
+
+    bool isServerInitiatedTransaction() const {
+        return _isServerInitiatedTransaction;
+    }
+
     /**
      * Set the autoCommit field.  If this field is unset, this is not a transaction but a
      * retryable write and other values will not be meaningful.
@@ -328,6 +336,10 @@ private:
     TicketHolderQueueStats _queueStats;
 
     bool _recoveredFromPreciseCheckpoint{false};
+
+    // Indicates if the current transaction was started by the server itself (internal transaction)
+    // rather than explicitly by a user. Set when the transaction starts.
+    bool _isServerInitiatedTransaction{true};
 };
 
 }  // namespace mongo

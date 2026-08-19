@@ -946,7 +946,8 @@ public:
                 /* isAutoCommit */ false,
                 ticksource,
                 curWallClockTime,
-                expireDate);
+                expireDate,
+                !opCtx->getClient()->session());
         }
 
         /**
