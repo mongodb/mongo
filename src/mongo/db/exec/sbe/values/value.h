@@ -1902,22 +1902,6 @@ inline size_t getStringOrSymbolLength(TypeTags tag, const Value& val) noexcept {
     return getStringLength(tag, val);
 }
 
-/*
- * Using MONGO_COMPILER_ALWAYS_INLINE on a free function does not always play well between
- * compilers because some require the 'inline' keyword be used while others prohibit it. To get
- * around this, we wrap the custom strlen() function in a struct.
- */
-struct TinyStrHelpers {
-    // Often calling the shared library strlen() function is more expensive than a small loop
-    // for small strings.
-    MONGO_COMPILER_ALWAYS_INLINE static size_t strlen(const char* s) {
-        const char* begin = s;
-        while (*s++)
-            ;
-        return s - begin - 1;
-    }
-};
-
 /**
  * getStringView() should be preferred over getRawStringView() where possible.
  */

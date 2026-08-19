@@ -154,7 +154,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             const auto obj = value::getObjectView(val);
 
             while (be != objEnd - 1) {
-                auto sv = bson::fieldNameAndLength(be);
+                auto sv = bson::fieldNameAndLength(be, objEnd);
 
                 auto [tag, val] = convertFrom<false>(be, end, sv.size());
                 obj->push_back_raw(sv, tag, val);
@@ -174,7 +174,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             auto arr = value::getArrayView(val);
 
             while (be != arrEnd - 1) {
-                auto sv = bson::fieldNameAndLength(be);
+                auto sv = bson::fieldNameAndLength(be, arrEnd);
 
                 auto [tag, val] = convertFrom<false>(be, end, sv.size());
                 arr->push_back_raw(tag, val);

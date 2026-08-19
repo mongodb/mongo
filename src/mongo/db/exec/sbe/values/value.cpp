@@ -807,7 +807,8 @@ bool ArrayEnumerator::advance() {
         if (_arrayCurrent != _arrayEnd - 1) {
             _arrayCurrent = bson::advance(_arrayCurrent, _fieldNameSize);
             if (_arrayCurrent != _arrayEnd - 1) {
-                _fieldNameSize = TinyStrHelpers::strlen(bson::fieldNameRaw(_arrayCurrent));
+                _fieldNameSize =
+                    bson::fieldNameLength(bson::fieldNameRaw(_arrayCurrent), _arrayEnd);
             }
         }
 
@@ -819,7 +820,7 @@ TagValueView ObjectEnumerator::getViewOfValue() const {
     if (_object) {
         return _object->getAt(_index);
     } else {
-        auto sv = bson::fieldNameAndLength(_objectCurrent);
+        auto sv = bson::fieldNameAndLength(_objectCurrent, _objectEnd);
         return bson::convertToView(_objectCurrent, _objectEnd, sv.size());
     }
 }
@@ -833,7 +834,7 @@ bool ObjectEnumerator::advance() {
         return _index < _object->size();
     } else {
         if (*_objectCurrent != 0) {
-            auto sv = bson::fieldNameAndLength(_objectCurrent);
+            auto sv = bson::fieldNameAndLength(_objectCurrent, _objectEnd);
             _objectCurrent = bson::advance(_objectCurrent, sv.size());
         }
 
@@ -851,7 +852,7 @@ std::string_view ObjectEnumerator::getFieldName() const {
         }
     } else {
         if (*_objectCurrent != 0) {
-            return bson::fieldNameAndLength(_objectCurrent);
+            return bson::fieldNameAndLength(_objectCurrent, _objectEnd);
         } else {
             return ""sv;
         }

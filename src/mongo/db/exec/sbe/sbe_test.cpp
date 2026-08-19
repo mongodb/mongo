@@ -569,14 +569,14 @@ TEST(SBEBson, FieldNameAndLength) {
         ASSERT_EQ(name.size(), view.size()) << "name: '" << name << "'";
         ASSERT_EQ(name, std::string(view)) << "name: '" << name << "'";
 
-        // The unbounded overload still uses libc, so it is a direct oracle for the bounded one.
-        ASSERT_EQ(bson::fieldNameAndLength(be), view) << "name: '" << name << "'";
+        // libc is a direct oracle for the bounded scan.
+        ASSERT_EQ(std::string_view(be + 1, std::strlen(be + 1)), view) << "name: '" << name << "'";
 
         // 'BSONElement' is the independent oracle for both the name and where the value starts,
         // which is what 'getValue()' derives from the same length.
         BSONElement elem = obj.firstElement();
         ASSERT_EQ(std::string_view{elem.fieldName()}, view);
-        ASSERT_EQ(elem.value(), bson::getValue(be));
+        ASSERT_EQ(elem.value(), bson::getValue(be, end));
     }
 }
 

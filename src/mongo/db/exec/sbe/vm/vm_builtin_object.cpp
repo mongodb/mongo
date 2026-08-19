@@ -41,7 +41,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
         // Skip document length.
         be += 4;
         while (be != end - 1) {
-            auto sv = bson::fieldNameAndLength(be);
+            auto sv = bson::fieldNameAndLength(be, end);
 
             if (restrictFieldsSet.count(sv) == 0) {
                 auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
@@ -96,7 +96,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
         // Skip document length.
         be += 4;
         while (be != end - 1) {
-            auto sv = bson::fieldNameAndLength(be);
+            auto sv = bson::fieldNameAndLength(be, end);
 
             if (keepFieldsSet.count(sv) == 1) {
                 auto [tag, val] = bson::convertToView(be, end, sv.size());

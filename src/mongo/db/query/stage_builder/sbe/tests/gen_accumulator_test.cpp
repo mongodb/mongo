@@ -2516,9 +2516,9 @@ public:
 
         // Find the first element by skipping the length.
         const char* bsonElt = valuesToAgg.objdata() + 4;
-        const char* bsonEnd = bsonElt + valuesToAgg.objsize();
+        const char* bsonEnd = valuesToAgg.objdata() + valuesToAgg.objsize();
         while (*bsonElt != 0) {
-            auto fieldName = sbe::bson::fieldNameAndLength(bsonElt);
+            auto fieldName = sbe::bson::fieldNameAndLength(bsonElt, bsonEnd);
 
             // Convert the BSON value to an SBE value and put it inside the input slot.
             auto input = sbe::bson::convertToOwned(bsonElt, bsonEnd, fieldName.size());

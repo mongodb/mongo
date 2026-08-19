@@ -186,18 +186,19 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
     std::vector<const char*> bsonPointers;
 
     // Callback to record pointer values in bsonPointers.
-    auto recordValuePointer =
-        [&bsonPointers](ObjectWalkNode<BlockProjectionPositionInfoRecorder>* node,
-                        value::TypeTags eltTag,
-                        Value eltVal,
-                        const char* bson) {
-            if (node->filterRecorder) {
-                bsonPointers.push_back(bson::getValue(bson));
-            }
-            if (node->projRecorder) {
-                bsonPointers.push_back(bson::getValue(bson));
-            }
-        };
+    const char* objEnd = obj.objdata() + obj.objsize();
+    auto recordValuePointer = [&bsonPointers,
+                               objEnd](ObjectWalkNode<BlockProjectionPositionInfoRecorder>* node,
+                                       value::TypeTags eltTag,
+                                       Value eltVal,
+                                       const char* bson) {
+        if (node->filterRecorder) {
+            bsonPointers.push_back(bson::getValue(bson, objEnd));
+        }
+        if (node->projRecorder) {
+            bsonPointers.push_back(bson::getValue(bson, objEnd));
+        }
+    };
 
     walkBsonObj<BlockProjectionPositionInfoRecorder>(extractor.getRoot(),
                                                      bitcastFrom<const char*>(obj.objdata()),

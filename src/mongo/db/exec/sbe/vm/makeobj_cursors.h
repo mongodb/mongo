@@ -33,7 +33,7 @@ public:
         _be += 4;
         if (_be != _last) {
             // Initialize '_name' and '_nextBe'.
-            _name = bson::fieldNameAndLength(_be);
+            _name = bson::fieldNameAndLength(_be, _last + 1);
             _nextBe = bson::advance(_be, _name.size());
         }
     }
@@ -45,7 +45,7 @@ public:
         _be = _nextBe;
         if (_be != _last) {
             // Update '_name' and '_nextBe'.
-            _name = bson::fieldNameAndLength(_be);
+            _name = bson::fieldNameAndLength(_be, _last + 1);
             _nextBe = bson::advance(_be, _name.size());
         }
     }
