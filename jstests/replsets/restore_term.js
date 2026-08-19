@@ -8,7 +8,6 @@
 // storage engines.
 // @tags: [requires_persistence]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {getLatestOp} from "jstests/replsets/rslib.js";
 
 function getCurrentTerm(primary) {
     let res = primary.adminCommand({replSetGetStatus: 1});
@@ -32,10 +31,13 @@ assert.gte(firstSuccessfulTerm, 1);
 assert.commandWorked(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
 assert.eq(getCurrentTerm(primary), firstSuccessfulTerm);
 
-// Check that the insert op has the initial term.
-let latestOp = getLatestOp(primary);
-assert.eq(latestOp.op, "i");
-assert.eq(latestOp.t, firstSuccessfulTerm);
+// Check that the insert op has the initial term. Look up this test's own insert rather than the
+// oplog tip, since unrelated background writes can land after it and move the tip.
+let insertOp = rst
+    .findOplog(primary, {op: "i", ns: primaryColl.getFullName(), "o.x": 1}, 1)
+    .toArray()[0];
+assert(insertOp, "could not find the oplog entry for the inserted document");
+assert.eq(insertOp.t, firstSuccessfulTerm);
 
 // Step down to increase the term.
 assert.commandWorked(primary.adminCommand({replSetStepDown: 0}));
