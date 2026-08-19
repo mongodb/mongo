@@ -78,7 +78,7 @@ void validateRseqKernelCompat() {
         LOGV2_FATAL_OPTIONS(
             12257600,
             logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-            "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known "
+            "MongoDB cannot start: Linux kernel versions 6.19.0 through 7.0.13 have a known "
             "incompatibility with this version of MongoDB. See "
             "https://jira.mongodb.org/browse/SERVER-121912 for more information.");
         quickExit(ExitCode::fail);
