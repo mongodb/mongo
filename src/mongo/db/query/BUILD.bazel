@@ -799,6 +799,7 @@ mongo_cc_unit_test(
         "getmore_request_test.cpp",
         "hint_parser_test.cpp",
         "plan_executor_impl_test.cpp",
+        "plan_insert_listener_test.cpp",
     ],
     data = [
         "//src/mongo/db/test_output/query/canonical_query_encoder_test:test_data",

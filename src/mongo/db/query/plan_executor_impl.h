@@ -319,8 +319,6 @@ private:
     void doWaitDuringYield();
     void logWriteConflictAndBackoff(size_t numAttempts);
 
-    std::unique_ptr<insert_listener::Notifier> makeNotifier();
-
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx;

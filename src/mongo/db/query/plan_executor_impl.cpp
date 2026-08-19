@@ -426,10 +426,13 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     // any function-exit path (return / EOF / exception).
     WriteConflictRetryState retryState;
 
-    // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
-    // insert notifier the entire time we are in the loop.  Holding a shared pointer to the
-    // capped insert notifier is necessary for the notifierVersion to advance.
-    auto notifier = makeNotifier();
+    // Capped insert notifier; declared outside the loop so that it (and thus the capped-insert
+    // version tracking) persists across the two-EOF wait handshake in _handleEOFAndExit(). It is
+    // created lazily on the first EOF that actually needs to wait, rather than on every call, to
+    // avoid allocating a notifier on the common path where _getNextImpl returns a document without
+    // ever waiting. Holding the shared pointer while we wait is what allows the notifier version
+    // to advance; that requirement is only relevant once we are blocking.
+    std::unique_ptr<insert_listener::Notifier> notifier;
 
     // This callback is used by the yielding code once all storage resources are released.
     const auto afterSnapshotAndLocksRelinquishedCb = [&]() {
@@ -538,14 +541,6 @@ BSONObj makeBsonWithMetadata(Document& doc, WorkingSetMember* member) {
     return doc.toBsonWithMetaData();
 }
 }  // namespace
-
-std::unique_ptr<insert_listener::Notifier> PlanExecutorImpl::makeNotifier() {
-    if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        // We always construct the insert_listener::Notifier for awaitData cursors.
-        return insert_listener::getCappedInsertNotifier(_opCtx, _collection, _yieldPolicy.get());
-    }
-    return nullptr;
-}
 
 boost::optional<Date_t> PlanExecutorImpl::_calculateResponseDeadlineValue() const {
     if (_responseDeadlineType == ResponseDeadlineType::kNone || !_opCtx) {
@@ -685,15 +680,26 @@ bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
             PlanStage::IS_EOF == code);
     hangBeforeShouldWaitForInsertsIfFailpointEnabled(this);
 
-    // The !notifier check is necessary because shouldWaitForInserts can return 'true' when
-    // shouldListenForInserts returned 'false' (above) in the case of a deadline becoming
-    // "unexpired" due to the system clock going backwards.
-    if (!notifier ||
-        !insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
+    if (!insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
+        return true;
+    }
+
+    if (!insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
         // Time to exit.
         return true;
     }
 
+    // Create the notifier lazily the first time we are about to wait, and reuse it on subsequent
+    // EOFs within this call so the two-EOF version comparison works. Because shouldWaitForInserts
+    // implies shouldListenForInserts, makeNotifier() is guaranteed to return a non-null notifier
+    // here, so the previous separate !notifier guard (which existed only to handle construction
+    // and the wait-decision happening at different times) is no longer needed.
+    if (!notifier) {
+        notifier =
+            insert_listener::getCappedInsertNotifier(_opCtx, _collection, _yieldPolicy.get());
+    }
+
+    invariant(notifier);
     insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), notifier);
     return false;
 }
@@ -712,7 +718,10 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     const auto whileYieldingFn = [this]() {
         return doWaitDuringYield();
     };
-    auto notifier = makeNotifier();
+
+    // Capped insert notifier; created lazily in _handleEOFAndExit() the first time we actually
+    // need to wait, rather than on every call. See the comment in _getNextImpl().
+    std::unique_ptr<insert_listener::Notifier> notifier;
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
