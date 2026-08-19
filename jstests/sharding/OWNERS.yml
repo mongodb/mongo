@@ -224,6 +224,9 @@ filters:
   - "invalid_shard_identity_doc.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "mongos_waits_for_signing_keys_before_serving.js":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "retryable_find_and_modify_remove_by_id_chunk_migration.js":
     approvers:
       - 10gen/query-execution-router
