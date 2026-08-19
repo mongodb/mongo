@@ -12,6 +12,7 @@
 #include "mongo/util/uuid.h"
 
 #include <list>
+#include <memory>
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
@@ -446,4 +447,20 @@ std::span<const char> uuidSpan(const UUID& u);
  * Creates a char span for a given BSONObj.
  */
 std::span<const char> bsonSpan(const BSONObj& obj);
+
+/**
+ * The container-backed fast count stores, which are always created as a pair.
+ */
+struct ContainerFastCountStores {
+    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
+    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+};
+
+/**
+ * Creates the internal fast count containers and returns container-backed stores over them.
+ *
+ * Requires a fixture whose persistence provider mandates container writes, such as
+ * `ReplicatedFastCountTestPersistenceProvider`.
+ */
+ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx);
 }  // namespace mongo::replicated_fast_count::test_helpers

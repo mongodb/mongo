@@ -319,6 +319,47 @@ TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCou
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
 
+// A scan that resumes after a mid-scan write conflict folds each entry's hash exactly once. XOR is
+// its own inverse, so re-consuming an already-buffered record would cancel its contribution rather
+// than produce an obviously wrong value. The three hashes overlap in their set bits, so the
+// expectation does not also hold for a sum or a bitwise or.
+TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictFoldsEachHashOnce) {
+    constexpr int64_t kHashA = 0x0123456789ABCDEF;
+    constexpr int64_t kHashB = static_cast<int64_t>(0xF0E1D2C3B4A59687);
+    constexpr int64_t kHashC = 0x00FF00FF00FF00FF;
+
+    const UUID oplogUuid = UUID::gen();
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    const std::list<repl::OplogEntry> entries{
+        makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10, kHashA),
+        makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20, kHashB),
+        makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30, kHashC),
+    };
+
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+
+    // The first scan fails after consuming one entry, so the resumed scan must skip that entry's
+    // hash rather than fold it a second time.
+    {
+        OplogCursorMock cursor(entries, /*throwWriteConflictOnNthCall=*/2);
+        ASSERT_THROWS_CODE(buffer.scanToNoHolesEOF(cursor), DBException, ErrorCodes::WriteConflict);
+    }
+    {
+        OplogCursorMock cursor(entries);
+        buffer.scanToNoHolesEOF(cursor);
+    }
+
+    const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
+    ASSERT_TRUE(checkedOutBuffer.has_value());
+    ASSERT_TRUE(checkedOutBuffer->deltas.contains(coll.uuid));
+    EXPECT_EQ(
+        checkedOutBuffer->deltas.at(coll.uuid).metadata,
+        (CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 60, .count = 3},
+                                      .hash = kHashA ^ kHashB ^ kHashC}));
+}
+
 TEST(SizeCountCheckpointBufferTest, SeekExactDoesNotDoubleCountLastBufferedRid) {
     const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),

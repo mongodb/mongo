@@ -840,6 +840,30 @@ std::span<const char> uuidSpan(const UUID& u) {
     return std::span<const char>{reinterpret_cast<const char*>(cdr.data()), cdr.length()};
 }
 
+ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx) {
+    ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/false));
+    KVEngine* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    return ContainerFastCountStores{
+        .sizeCountStore = std::make_unique<ContainerSizeCountStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none)),
+        .timestampStore = std::make_unique<ContainerSizeCountTimestampStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none))};
+}
+
 std::span<const char> bsonSpan(const BSONObj& obj) {
     return std::span<const char>{obj.objdata(), static_cast<size_t>(obj.objsize())};
 };
