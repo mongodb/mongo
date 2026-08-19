@@ -740,37 +740,11 @@ py_library(
     ],
 )
 
-py_library(
+py_binary(
     name = "evergreen_activate_gen_tasks",
     srcs = ["evergreen_activate_gen_tasks.py"],
+    main = "evergreen_activate_gen_tasks.py",
     visibility = ["//visibility:public"],
-    deps = [
-        "//buildscripts/util",
-        dependency(
-            "click",
-            group = "evergreen",
-        ),
-        dependency(
-            "requests",
-            group = "core",
-        ),
-        dependency(
-            "structlog",
-            group = "evergreen",
-        ),
-        dependency(
-            "pydantic",
-            group = "evergreen",
-        ),
-        dependency(
-            "retry",
-            group = "testing",
-        ),
-        dependency(
-            "evergreen-py",
-            group = "testing",
-        ),
-    ],
 )
 
 py_library(

@@ -215,11 +215,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "gen_tasks_activate",
-    srcs = ["gen_tasks_activate.sh"],
-)
-
-sh_binary(
     name = "generate_buildid_debug_symbols_mapping",
     srcs = ["generate_buildid_debug_symbols_mapping.sh"],
 )

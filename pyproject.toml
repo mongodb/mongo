@@ -384,6 +384,9 @@ ignore = [
 # This file needs to support Python 3.5+ for old OS package testing
 "buildscripts/package_test/package_test_internal.py" = ["UP"]
 
+# This file needs to support old Python versions, and so it cannot use newer type annotations.
+"buildscripts/evergreen_activate_gen_tasks.py" = ["UP006", "UP035"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]
 
