@@ -94,6 +94,8 @@ public:
                 }
                 builder.appendNumber("truncateMarkersCount",
                                      static_cast<long long>(truncateMarkers->numMarkers()));
+                builder.appendNumber("minBytesPerMarker",
+                                     static_cast<long long>(truncateMarkers->minBytesPerMarker()));
             }
         }
 

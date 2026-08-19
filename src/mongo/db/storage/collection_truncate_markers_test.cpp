@@ -286,6 +286,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         auto opCtx = fixture->getClient()->makeOperationContext();
 
         EXPECT_EQ(0U, testMarkers->numMarkers());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
 
         // Inserting a record smaller than 'minBytesPerMarker' shouldn't create a new collection
         // marker.
@@ -295,6 +296,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         EXPECT_EQ(0U, testMarkers->numMarkers());
         EXPECT_EQ(1, testMarkers->currentRecords_forTest());
         EXPECT_EQ(99, testMarkers->currentBytes_forTest());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
 
         // Inserting another record such that their combined size exceeds 'minBytesPerMarker' should
         // cause a new marker to be created.
@@ -304,6 +306,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         EXPECT_EQ(1U, testMarkers->numMarkers());
         EXPECT_EQ(0, testMarkers->currentRecords_forTest());
         EXPECT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one exceed 'minBytesPerMarker' shouldn't cause a new marker to be created because we've
@@ -314,6 +317,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         EXPECT_EQ(1U, testMarkers->numMarkers());
         EXPECT_EQ(1, testMarkers->currentRecords_forTest());
         EXPECT_EQ(50, testMarkers->currentBytes_forTest());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one is exactly equal to 'minBytesPerMarker' should cause a new marker to be created.
@@ -323,6 +327,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         EXPECT_EQ(2U, testMarkers->numMarkers());
         EXPECT_EQ(0, testMarkers->currentRecords_forTest());
         EXPECT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
 
         // Inserting a single record that exceeds 'minBytesPerMarker' should cause a new marker to
         // be created.
@@ -332,6 +337,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
         EXPECT_EQ(3U, testMarkers->numMarkers());
         EXPECT_EQ(0, testMarkers->currentRecords_forTest());
         EXPECT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_LT(0, testMarkers->minBytesPerMarker());
     }
 }
 

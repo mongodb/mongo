@@ -127,13 +127,17 @@ assert.commandWorked(
 );
 
 // Verify sampling is selected as the marker generation method
+let truncationStatus;
 assert.soon(() => {
-    method = assert.commandWorked(restartedPrimary.adminCommand({serverStatus: 1})).oplogTruncation
-        .processingMethod;
-    return method !== undefined;
+    truncationStatus = assert.commandWorked(
+        restartedPrimary.adminCommand({serverStatus: 1}),
+    ).oplogTruncation;
+    return truncationStatus.processingMethod !== undefined;
 }, "Oplog truncation marker generation method was never chosen");
-assert.eq(method, "sampling");
+assert.eq(truncationStatus.processingMethod, "sampling");
 jsTest.log.info("Sampling selected as the marker generation method!");
+
+assert.gt(truncationStatus.minBytesPerMarker, 0, tojson(truncationStatus));
 
 // Verify truncate markers are created and logged
 checkLog.containsJson(restartedPrimary, 22382); // Log ID: Oplog truncate markers calculated

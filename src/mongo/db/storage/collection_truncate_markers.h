@@ -286,6 +286,10 @@ public:
         return _markers.size();
     }
 
+    int64_t minBytesPerMarker() const {
+        return _minBytesPerMarker.load();
+    }
+
     //
     // The following methods are public only for use in tests.
     //
