@@ -16,6 +16,7 @@ py_library(
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
+        "quality_checks.py",
         "query_failure_diagnostic.py",
         "wrapper_debug.py",
         "wrapper_hook.py",
@@ -79,6 +80,29 @@ py_test(
     deps = [
         ":wrapper_hook",
     ],
+)
+
+py_test(
+    name = "quality_checks_test",
+    srcs = [
+        "quality_checks_test.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "wrapper_scripts_test",
+    srcs = [
+        "wrapper_scripts_test.py",
+    ],
+    data = [
+        "//tools:bazel",
+        "//tools:bazel.bat",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 py_test(

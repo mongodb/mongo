@@ -5,11 +5,19 @@ import subprocess
 import sys
 import tempfile
 from functools import cache
+from pathlib import Path
 from typing import Optional
 
 import yaml
-from codeowners.parsers import owners_v1, owners_v2
-from codeowners.validate_codeowners import run_validator
+
+# Bazel executes this file as __main__ from a generated runfiles tree. Add the
+# local source directories explicitly so the bundled parsers are not shadowed
+# by the third-party package with the same top-level name.
+_CODEOWNERS_SOURCE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_CODEOWNERS_SOURCE_DIR))
+sys.path.insert(0, str(_CODEOWNERS_SOURCE_DIR.parent))
+from parsers import owners_v1, owners_v2
+from validate_codeowners import run_validator
 from utils import evergreen_git
 
 OWNERS_FILE_NAMES = ("OWNERS.yml", "OWNERS.yaml")

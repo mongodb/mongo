@@ -730,7 +730,8 @@ def main() -> int:
             print_missing_tag_snippets()
         if violations:
             print(
-                f"\n{len(violations)} parity violation(s). Run `bazel run lint --fix` to "
+                f"\n{len(violations)} parity violation(s). Run "
+                "`bazel run lint --fix` to "
                 "reconcile tag-only issues."
             )
             return 1

@@ -1,5 +1,36 @@
 # Linting in the MongoDB codebase
 
+## Repository quality checks
+
+Use `bazel run checks` to run the checks that apply to files changed on the current branch, in the
+index, in the working tree, or added as untracked files. The command checks without modifying files;
+pass `--fix` to apply available fixes. Each applicable check runs once: fix-capable checks run in
+fix mode, while checks without fix support run in check mode.
+
+```sh
+# Check all applicable groups for changed files.
+bazel run checks
+
+# Apply available format and lint fixes and run checks without fix support.
+bazel run checks -- --fix --group format --group lint
+
+# Check every file in the repository.
+bazel run checks -- --all
+
+# Display available stable check IDs.
+bazel run checks -- --list
+```
+
+Use repeatable `--group` values to narrow the run, `--only` or `--skip` with the stable IDs shown by
+`--list`, and `--files` for an explicit set of repository-relative paths. `--origin-branch`,
+`--jobs`, `--verbose`, and `--show-skipped` control branch selection, read-only concurrency, and
+output. Run `bazel run checks -- --help` for the complete interface.
+
+The compatibility commands `bazel run format`, `bazel run lint`, and `bazel run codeowners` remain
+available with their historical defaults: format and CODEOWNERS fix by default, while lint only
+checks. New automation should use `bazel run checks` so check selection, progress, and telemetry are
+consistent.
+
 ## C++ Linters
 
 ### `clang-tidy`

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from collections import deque
+from collections.abc import Sequence
 from pathlib import Path
 
 sys.path.append(".")
@@ -37,6 +38,37 @@ TCMALLOC_SHADOW_EXCLUDED_LABELS = {
     # built or run here without adding new fixture binaries.
     "//src/third_party/tcmalloc:upstream_tcmalloc_internal_profile_builder_test",
 }
+
+
+def _get_bazel_query_options(bazel_options: Sequence[str]) -> tuple[str, ...]:
+    """Return Bazel options that are valid for the query command."""
+    query_options: list[str] = []
+    skip_value = False
+    for option in bazel_options:
+        if skip_value:
+            skip_value = False
+            continue
+        if option in {
+            "--jobs",
+            "-j",
+            "--local_resources",
+            "--local_cpu_resources",
+            "--local_ram_resources",
+        }:
+            skip_value = True
+            continue
+        if option in {
+            "--verbose_failures",
+            "--noverbose_failures",
+            "--jobs=auto",
+        } or option.startswith(("--verbose_failures=", "--jobs=", "-j=")):
+            continue
+        if option.startswith(
+            ("--local_resources=", "--local_cpu_resources=", "--local_ram_resources=")
+        ):
+            continue
+        query_options.append(option)
+    return tuple(query_options)
 
 
 def _put_failure_report(test_name: str, msg: str) -> None:
@@ -146,8 +178,10 @@ def iter_clang_tidy_files(root: str | Path) -> list[Path]:
     return results
 
 
-def validate_clang_tidy_configs(generate_report, fix):
-    buildozer = install_buildozer()
+def validate_clang_tidy_configs(
+    generate_report: bool, fix: bool, buildozer: str | None = None
+) -> bool:
+    buildozer = buildozer or install_buildozer()
 
     mongo_dir = "src/mongo"
 
@@ -173,9 +207,7 @@ def validate_clang_tidy_configs(generate_report, fix):
 
     all_targets = []
     for tidy_file in tidy_files:
-        tidy_file_target = (
-            "//" + os.path.dirname(os.path.join(mongo_dir, tidy_file)) + ":clang_tidy_config"
-        )
+        tidy_file_target = f"//{(Path(mongo_dir) / tidy_file).parent.as_posix()}:clang_tidy_config"
         all_targets.append(tidy_file_target)
 
     if all_targets != tidy_targets:
@@ -184,16 +216,26 @@ def validate_clang_tidy_configs(generate_report, fix):
         if generate_report:
             _put_failure_report("//:clang_tidy_config_files", msg)
 
-    if fix:
-        subprocess.run(
-            [buildozer, f"set srcs {' '.join(all_targets)}", "//:clang_tidy_config_files"]
-        )
+        if fix:
+            result = subprocess.run(
+                [buildozer, f"set srcs {' '.join(all_targets)}", "//:clang_tidy_config_files"]
+            )
+            return result.returncode == 0
+        return False
+
+    return True
 
 
-def validate_bazel_groups(generate_report, fix):
-    buildozer = install_buildozer()
-
-    bazel_bin = install_bazel(".")
+def validate_bazel_groups(
+    generate_report: bool,
+    fix: bool,
+    buildozer: str | None = None,
+    bazel_bin: str | None = None,
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
+) -> bool:
+    buildozer = buildozer or install_buildozer()
+    bazel_bin = bazel_bin or install_bazel(".")
 
     query_opts = [
         "--implicit_deps=False",
@@ -202,6 +244,7 @@ def validate_bazel_groups(generate_report, fix):
         "--bes_backend=",
         "--bes_results_url=",
     ]
+    query_bazel_options = _get_bazel_query_options(bazel_options)
 
     try:
         start = time.time()
@@ -210,7 +253,9 @@ def validate_bazel_groups(generate_report, fix):
         query_proc = subprocess.run(
             [
                 bazel_bin,
+                *bazel_startup_options,
                 "query",
+                *query_bazel_options,
                 r'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))'
                 r' except kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_unittest[,\]]", //src/...))',
             ]
@@ -225,7 +270,7 @@ def validate_bazel_groups(generate_report, fix):
         print("BAZEL ERROR:")
         print(exc.stdout)
         print(exc.stderr)
-        sys.exit(exc.returncode)
+        return False
 
     buildozer_update_cmds = []
 
@@ -239,7 +284,9 @@ def validate_bazel_groups(generate_report, fix):
             query_proc = subprocess.run(
                 [
                     bazel_bin,
+                    *bazel_startup_options,
                     "query",
+                    *query_bazel_options,
                     rf'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest_{group}_group[,\]]", //src/...))',
                 ]
                 + query_opts,
@@ -253,7 +300,7 @@ def validate_bazel_groups(generate_report, fix):
             print("BAZEL ERROR:")
             print(exc.stdout)
             print(exc.stderr)
-            sys.exit(exc.returncode)
+            return False
 
         if groups[group] != group_tests:
             for test in group_tests:
@@ -293,19 +340,26 @@ def validate_bazel_groups(generate_report, fix):
                             [f"remove tags mongo_unittest_{group}_group", test]
                         ]
 
+    fixes_succeeded = True
     if fix:
         for cmd in buildozer_update_cmds:
-            subprocess.run([buildozer] + cmd)
+            fixes_succeeded = subprocess.run([buildozer] + cmd).returncode == 0 and fixes_succeeded
 
     if failures:
         for failure in failures:
             if generate_report:
                 _put_failure_report(failure[0], failure[1])
 
+    return fixes_succeeded and (fix or not failures)
+
 
 def validate_tcmalloc_cc_test_coverage(
-    generate_report: bool, fix: bool, bazel_bin: str | None = None
-) -> None:
+    generate_report: bool,
+    fix: bool,
+    bazel_bin: str | None = None,
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
+) -> bool:
     del fix
 
     if bazel_bin is None:
@@ -317,6 +371,7 @@ def validate_tcmalloc_cc_test_coverage(
         "--bes_backend=",
         "--bes_results_url=",
     ]
+    query_bazel_options = _get_bazel_query_options(bazel_options)
 
     try:
         start = time.time()
@@ -325,7 +380,9 @@ def validate_tcmalloc_cc_test_coverage(
         query_proc = subprocess.run(
             [
                 bazel_bin,
+                *bazel_startup_options,
                 "query",
+                *query_bazel_options,
                 rf'kind("cc_test rule", {TCMALLOC_UPSTREAM_TEST_SCOPE})',
             ]
             + query_opts,
@@ -343,7 +400,7 @@ def validate_tcmalloc_cc_test_coverage(
         print("BAZEL ERROR:")
         print(exc.stdout)
         print(exc.stderr)
-        sys.exit(exc.returncode)
+        return False
 
     try:
         start = time.time()
@@ -352,7 +409,9 @@ def validate_tcmalloc_cc_test_coverage(
         query_proc = subprocess.run(
             [
                 bazel_bin,
+                *bazel_startup_options,
                 "query",
+                *query_bazel_options,
                 rf'kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_unittest[,\]]", {TCMALLOC_SHADOW_TEST_SCOPE}))'
                 rf' union kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_known_failure[,\]]", {TCMALLOC_SHADOW_TEST_SCOPE}))',
             ]
@@ -367,11 +426,11 @@ def validate_tcmalloc_cc_test_coverage(
         print("BAZEL ERROR:")
         print(exc.stdout)
         print(exc.stderr)
-        sys.exit(exc.returncode)
+        return False
 
     missing = [label for label in expected if label not in actual]
     if not missing:
-        return
+        return True
 
     for label in missing:
         msg = f"{label} is missing a tcmalloc shadow target."
@@ -379,10 +438,16 @@ def validate_tcmalloc_cc_test_coverage(
         if generate_report:
             _put_failure_report(label, msg)
 
-    sys.exit(1)
+    return False
 
 
-def validate_idl_naming(generate_report: bool, fix: bool) -> None:
+def validate_idl_naming(
+    generate_report: bool,
+    fix: bool,
+    bazel_bin: str | None = None,
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
+) -> bool:
     """
     Enforce:
       idl_generator(
@@ -393,7 +458,7 @@ def validate_idl_naming(generate_report: bool, fix: bool) -> None:
     """
     import xml.etree.ElementTree as ET
 
-    bazel_bin = install_bazel(".")
+    bazel_bin = bazel_bin or install_bazel(".")
     qopts = [
         "--implicit_deps=False",
         "--tool_deps=False",
@@ -401,13 +466,16 @@ def validate_idl_naming(generate_report: bool, fix: bool) -> None:
         "--bes_backend=",
         "--bes_results_url=",
     ]
+    query_bazel_options = _get_bazel_query_options(bazel_options)
 
     # One narrowed query: only rules created by the idl_generator macro
     try:
         proc = subprocess.run(
             [
                 bazel_bin,
+                *bazel_startup_options,
                 "query",
+                *query_bazel_options,
                 "attr(generator_function, idl_generator, //src/...)",
                 "--output=xml",
             ]
@@ -420,7 +488,7 @@ def validate_idl_naming(generate_report: bool, fix: bool) -> None:
         print("BAZEL ERROR (narrowed xml):")
         print(exc.stdout)
         print(exc.stderr)
-        sys.exit(exc.returncode)
+        return False
 
     root = ET.fromstring(proc.stdout)
     failures: list[tuple[str, str]] = []
@@ -531,12 +599,14 @@ def validate_idl_naming(generate_report: bool, fix: bool) -> None:
             if generate_report:
                 _put_failure_report(lbl, msg)
 
-    # print(time.time() - start)
-    if fix and failures:
-        sys.exit(1)
+    # This validation has no automatic fix. Report failure in either mode.
+    del fix
+    return not failures
 
 
-def validate_private_headers(generate_report: bool, fix: bool) -> None:
+def validate_private_headers(
+    generate_report: bool, fix: bool, buildozer: str | None = None
+) -> bool:
     """
     Fast header linter/fixer using concurrent buildozer reads:
       buildozer print label srcs //<scope>:%<macro>
@@ -573,7 +643,7 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
     # If True, exit(1) whenever a header is found only via select()/glob()
     FAIL_ON_STRUCTURED = True
 
-    buildozer = install_buildozer()
+    buildozer = buildozer or install_buildozer()
 
     def _run_print(selector: str) -> tuple[str, str]:
         """Run one buildozer print invocation; return (selector, stdout)."""
@@ -602,7 +672,7 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
                 outputs.append(stdout)
 
     if not outputs:
-        return
+        return True
 
     combined = "\n".join(outputs)
 
@@ -710,6 +780,7 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
                 fixes.append((f"remove srcs {h}", canon_target))
 
     # 3) Apply fixes (dedupe)
+    fixes_succeeded = True
     if fix and fixes:
         seen = set()
         for cmd, tgt in fixes:
@@ -717,7 +788,9 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
             if key in seen:
                 continue
             seen.add(key)
-            subprocess.run([buildozer, cmd, tgt])
+            fixes_succeeded = (
+                subprocess.run([buildozer, cmd, tgt]).returncode == 0 and fixes_succeeded
+            )
 
     # 4) CI reports
     if failures and generate_report:
@@ -728,7 +801,8 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
     # - Always fail if any violation and not fixing (your existing behavior)
     # - Also fail if we saw non-concrete (structured) headers anywhere (requested)
     if (failures and not fix) or (structured_fail_found and FAIL_ON_STRUCTURED):
-        sys.exit(1)
+        return False
+    return fixes_succeeded
 
 
 def main():
@@ -737,11 +811,15 @@ def main():
     parser.add_argument("--generate-report", default=False, action="store_true")
     parser.add_argument("--fix", default=False, action="store_true")
     args = parser.parse_args()
-    validate_clang_tidy_configs(args.generate_report, args.fix)
-    validate_bazel_groups(args.generate_report, args.fix)
-    validate_tcmalloc_cc_test_coverage(args.generate_report, args.fix)
-    validate_idl_naming(args.generate_report, args.fix)
-    validate_private_headers(args.generate_report, args.fix)
+    results = [
+        validate_clang_tidy_configs(args.generate_report, args.fix),
+        validate_bazel_groups(args.generate_report, args.fix),
+        validate_tcmalloc_cc_test_coverage(args.generate_report, args.fix),
+        validate_idl_naming(args.generate_report, args.fix),
+        validate_private_headers(args.generate_report, args.fix),
+    ]
+    if not all(results):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

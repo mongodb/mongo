@@ -20,6 +20,9 @@ DEFAULT_EVG_PROJECT_NAME = "mongodb-mongo-master"
 DEFAULT_EVG_NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
 DEFAULT_EVG_PROJECT_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
+# Quality-check callers use this distinct status to skip the Evergreen
+# validation check when the local OAuth/device-auth flow is unavailable.
+AUTHENTICATION_FAILURE_EXIT_CODE = 75
 
 # SET TO TRUE IN RAPID RELEASE BRANCHES - see docs/branching/README.md
 RELEASE_BRANCH = False
@@ -92,7 +95,7 @@ def ensure_authenticated(evergreen_bin, evg_auth_config):
     cmd = [evergreen_bin, "--config", evg_auth_config, "login"]
     LOGGER.info(f"Logging in to evergreen: {' '.join(cmd)}")
     if subprocess.run(cmd).returncode:
-        sys.exit(1)
+        sys.exit(AUTHENTICATION_FAILURE_EXIT_CODE)
     LOGGER.info("Logged in to evergreen.")
 
 

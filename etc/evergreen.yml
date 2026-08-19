@@ -131,6 +131,10 @@ commit_queue_aliases:
     task: ".*"
     variant_tags: []
     task_tags: []
+  - variant: "^(windows-compile-required)$"
+    task: "^(bazel_run_format|bazel_run_lint)$"
+    variant_tags: []
+    task_tags: []
   - variant: "^(commit-queue-atlas)$"
     task: ".*"
     variant_tags: []
@@ -155,6 +159,10 @@ github_pr_aliases:
     task_tags: ["benchmarks_sep"]
   - variant: "^(commit-queue-monorepo)$"
     task: ".*"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(windows-compile-required)$"
+    task: "^(bazel_run_format|bazel_run_lint)$"
     variant_tags: []
     task_tags: []
   - variant: "^(commit-queue-atlas)$"

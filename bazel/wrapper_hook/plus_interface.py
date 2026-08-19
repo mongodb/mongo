@@ -20,7 +20,6 @@ from bazel.wrapper_hook.compiledb import (
 from bazel.wrapper_hook.hermetic_container_integration import (
     CROSS_HOST_FLAGS_WITH_SEPARATE_VALUE,
 )
-from bazel.wrapper_hook.lint import run_rules_lint
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 
@@ -239,12 +238,10 @@ def test_runner_interface(
     compiledb_config = False
     setup_clang_tidy = False
     clang_tidy = False
-    lint_target = False
     persistent_compdb = True
     compiledb_targets = ["//:compiledb", ":compiledb", "compiledb"]
     compiledb_only_targets = ["//:compiledb_only", ":compiledb_only", "compiledb_only"]
     compiledb_target_scope = None
-    lint_targets = ["//:lint", ":lint", "lint"]
     sources_to_bin = {}
     duplicate_sources = {}
     select_sources = {}
@@ -287,8 +284,6 @@ def test_runner_interface(
             compiledb_target = True
             replacements[arg] = []
             skip_plus_interface = False
-        if arg in lint_targets:
-            lint_target = True
         if arg.startswith("--compiledb-target-scope="):
             compiledb_target_scope = arg.split("=", 1)[1]
             replacements[arg] = []
@@ -411,20 +406,6 @@ def test_runner_interface(
             target_scope_override=compiledb_target_scope,
             setup_clang_tidy=setup_clang_tidy,
             startup_args=startup_args,
-        )
-
-    if lint_target:
-        for lint_arg in lint_targets:
-            try:
-                command_start_index = args.index(lint_arg) + 1
-            except ValueError:
-                pass
-        run_rules_lint(args[0], args[command_start_index:])
-
-        return (
-            ["run", "lint"]
-            + ([f"--config={config_mode}"] if config_mode else [])
-            + ["--", "ALL_PASSING"]
         )
 
     if compiledb_config and not compiledb_target and current_bazel_command == "build":

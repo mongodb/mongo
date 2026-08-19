@@ -3,6 +3,10 @@
 After modifying any OWNERS files, the overall ownership database (`.github/CODEOWNERS`) must be
 rebuilt. This is done by running `bazel run codeowners`.
 
+The group also validates GitHub's parsed CODEOWNERS result when CI supplies an expansions file with
+credentials. That remote validation is reported as skipped during local runs without credentials;
+generation and local validation still run.
+
 ## OWNERS.yml File Format
 
 This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owners/) and

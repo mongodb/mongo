@@ -1484,6 +1484,9 @@ testing = [
 wrapper-hook = [
     { name = "boto3" },
     { name = "gitpython" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "platform_machine != 'ppc64le' and platform_machine != 's390x'" },
+    { name = "opentelemetry-sdk" },
     { name = "pymongo" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1660,6 +1663,9 @@ testing = [
 wrapper-hook = [
     { name = "boto3", specifier = ">=1.34.156,<2" },
     { name = "gitpython", specifier = ">=3.1.43,<4" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "platform_machine != 'ppc64le' and platform_machine != 's390x'" },
+    { name = "opentelemetry-sdk" },
     { name = "pymongo", specifier = "==4.12.0" },
     { name = "pyyaml", specifier = ">=6.0.2,<7" },
     { name = "requests", specifier = ">=2.32.3,<3" },

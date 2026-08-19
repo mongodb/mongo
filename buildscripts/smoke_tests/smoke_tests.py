@@ -474,23 +474,19 @@ def run_smoke_tests(
 
     formatters = [
         runner.command(
-            name="misc. lint",
+            name="quality checks",
             args=[
                 BAZEL,
                 "run",
-                "//:lint",
+                "checks",
+                "--",
+                "--fix",
+                "--group",
+                "format",
+                "--group",
+                "lint",
             ],
-            log_file="misc_lint.log",
-        ),
-        runner.command(
-            # catch-all for other bazel-driven formatters
-            name="misc. format",
-            args=[
-                BAZEL,
-                "run",
-                "//:format",
-            ],
-            log_file="misc_format.log",
+            log_file="quality_checks.log",
         ),
     ]
 

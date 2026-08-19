@@ -164,7 +164,9 @@ if not defined python (
 rem === Call Python wrapper, log to file ===
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
 set "MONGO_COMPILEDB_POSTHOOK_STATE=%MONGO_BAZEL_WRAPPER_ARGS%.compiledb"
-echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
+break > "%MONGO_BAZEL_WRAPPER_ARGS%"
+set "MONGO_BAZEL_WRAPPER_STATUS=%tmp%\bat~%RANDOM%.status.tmp"
+break > "%MONGO_BAZEL_WRAPPER_STATUS%"
 
 rem Print info message to terminal (equivalent to bash echo to FD 4)
 echo %ESC%[0;32mINFO:%ESC%[0m running wrapper hook... 1>&2
@@ -206,23 +208,47 @@ if not defined hook_python (
 (
     "!hook_python!" %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
 ) >> "%LOGFILE%" 2>&1
-if !ERRORLEVEL! NEQ 0 (
+set "exit_code=!ERRORLEVEL!"
+if !exit_code! NEQ 0 (
     echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
     type "%LOGFILE%"
     call :cleanup_logfile
-    exit /b !ERRORLEVEL!
+    exit /b !exit_code!
 )
 
-set "exit_code=%ERRORLEVEL%"
+set "handled=0"
+set "handled_exit_code="
+for /F "usebackq tokens=1,* delims==" %%a in ("%MONGO_BAZEL_WRAPPER_STATUS%") do (
+    if "%%a"=="handled" set "handled=%%b"
+    if "%%a"=="exit_code" set "handled_exit_code=%%b"
+)
+
+if "!handled!"=="1" (
+    set "show_log=0"
+    if not "%CI%"=="" set "show_log=1"
+    if not "%MONGO_WRAPPER_OUTPUT_ALL%"=="" set "show_log=1"
+    if "!show_log!"=="1" type "%LOGFILE%" 1>&2
+
+    if "!handled_exit_code!"=="" set "handled_exit_code=2"
+    if "!handled_exit_code!"=="3" (
+        echo %ESC%[0;31mERROR:%ESC%[0m Linter run failed, see details above 1>&2
+        echo %ESC%[0;32mINFO:%ESC%[0m Run the following to try to auto-fix the errors: 1>&2
+        echo. 1>&2
+        echo bazel run lint --fix 1>&2
+    )
+    set "quality_checks_exit=!handled_exit_code!"
+    call :cleanup_logfile
+    exit /b !quality_checks_exit!
+)
 
 rem Linter fails preempt bazel run (exit code 3)
-if %exit_code% EQU 3 (
+if !exit_code! EQU 3 (
     echo %ESC%[0;31mERROR:%ESC%[0m Linter run failed, see details above 1>&2
     echo %ESC%[0;32mINFO:%ESC%[0m Run the following to try to auto-fix the errors: 1>&2
     echo. 1>&2
     echo bazel run lint --fix 1>&2
     call :cleanup_logfile
-    exit /b %exit_code%
+    exit /b !exit_code!
 )
 
 rem Calculate duration for summary (equivalent to bash print_summary)
@@ -240,13 +266,13 @@ IF %mm% lss 10 SET mm=0%mm%
 IF %ss% lss 10 SET ss=0%ss%
 IF %cc% lss 10 SET cc=0%cc%
 
-if %exit_code% NEQ 0 (  
+if !exit_code! NEQ 0 (
     echo %ESC%[1;31mERROR:%ESC%[0m wrapper hook failed: 1>&2
     type "%LOGFILE%" 1>&2
     
     if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
         call :cleanup_logfile
-        exit /b %exit_code%
+        exit /b !exit_code!
     )
     echo wrapper script failed; retrying the final native Bazel invocation... 1>&2
     if "!is_query_command!"=="1" (
@@ -256,7 +282,7 @@ if %exit_code% NEQ 0 (
     )
     set "fallback_exit=!ERRORLEVEL!"
     call :cleanup_logfile
-    exit /b %fallback_exit%
+    exit /b !fallback_exit!
 )
 
 rem === Read new args back in ===
@@ -266,7 +292,8 @@ for /F "delims=" %%a in (%MONGO_BAZEL_WRAPPER_ARGS%) do (
     call set str=!str: =^ !
     set "new_args=!new_args! !str!"
 )
-del %MONGO_BAZEL_WRAPPER_ARGS%
+del "%MONGO_BAZEL_WRAPPER_ARGS%"
+del "%MONGO_BAZEL_WRAPPER_STATUS%"
 
 if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" (
     echo [WRAPPER_HOOK_DEBUG]: wrapper hook script input args: %* 1>&2
@@ -290,7 +317,7 @@ set "NO_FLAG_SYNC=1"
 set "posthook_exit=%ERRORLEVEL%"
 if "!bazel_exit!"=="0" set "bazel_exit=!posthook_exit!"
 call :cleanup_logfile
-exit /b %bazel_exit%
+exit /b !bazel_exit!
 
 
 :: Functions
@@ -304,6 +331,8 @@ exit /b 0
 
 :cleanup_logfile
 if defined LOGFILE if exist "!LOGFILE!" del "!LOGFILE!" >nul 2>&1
+if defined MONGO_BAZEL_WRAPPER_ARGS if exist "!MONGO_BAZEL_WRAPPER_ARGS!" del "!MONGO_BAZEL_WRAPPER_ARGS!" >nul 2>&1
+if defined MONGO_BAZEL_WRAPPER_STATUS if exist "!MONGO_BAZEL_WRAPPER_STATUS!" del "!MONGO_BAZEL_WRAPPER_STATUS!" >nul 2>&1
 goto :eof
 
 :copy_pyhost_python

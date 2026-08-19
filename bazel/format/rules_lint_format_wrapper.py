@@ -10,13 +10,6 @@ from utils.evergreen_git import get_default_origin_branch
 from bazel.toolchains.cc.mongo_linux.gdb_python_version_check import (
     check_gdb_wrapper_python_version,
 )
-from buildscripts.bazel_custom_formatter import (
-    validate_bazel_groups,
-    validate_clang_tidy_configs,
-    validate_idl_naming,
-    validate_private_headers,
-    validate_tcmalloc_cc_test_coverage,
-)
 from buildscripts.sort_backport_multiversion import sort_backport_multiversion
 
 
@@ -169,7 +162,7 @@ def run_prettier(
             print(e.stdout.decode())
         if e.stderr:
             print(e.stderr.decode())
-        print("Found formatting errors. Run 'bazel run //:format' to fix")
+        print("Found formatting errors. Run 'bazel run format' to fix")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
 
@@ -189,7 +182,9 @@ def main() -> int:
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if not default_dir:
-        print("This script must be run though bazel. Please run 'bazel run //:format' instead")
+        # The formatter needs Bazel's workspace environment to locate the
+        # checkout and its runfiles; direct Python execution is unsupported.
+        print("This script must be run through Bazel. Please run 'bazel run format' instead")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
         return 1
@@ -267,7 +262,10 @@ def main() -> int:
             )
             print("WARNING!!! Defaulting to formatting all files, this may take a while.")
             print(
-                "Please update your local branch with the latest changes from origin, or use `bazel run format -- --origin-branch other_branch` to select a different origin branch"
+                "Please update your local branch with the latest changes from origin, or use "
+                "`bazel run format --origin-branch=other_branch` to select a different origin "
+                "branch. The legacy `bazel run format -- --origin-branch other_branch` form "
+                "is also supported."
             )
             args.all = True
         else:
@@ -287,21 +285,7 @@ def main() -> int:
             )
             files_to_format = "all"
 
-    def files_to_format_contains_bazel_file(files: Union[list[str], str]) -> bool:
-        if files == "all":
-            return True
-        return any(file.endswith(".bazel") or "BUILD" in file for file in files)
-
-    if files_to_format_contains_bazel_file(files_to_format):
-        validate_clang_tidy_configs(generate_report=True, fix=not args.check)
-        validate_bazel_groups(generate_report=True, fix=not args.check)
-        validate_tcmalloc_cc_test_coverage(generate_report=True, fix=not args.check)
-        validate_idl_naming(generate_report=True, fix=not args.check)
-        validate_private_headers(generate_report=True, fix=not args.check)
-
-    if files_to_format == "all":
-        print("Formatting all files in the repository")
-    else:
+    if files_to_format != "all":
         files_to_format = [str(file) for file in files_to_format if os.path.isfile(file)]
         print(f"Formatting {len(files_to_format)} file(s)")
 

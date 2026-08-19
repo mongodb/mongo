@@ -68,7 +68,7 @@ def sort_backport_multiversion(check: bool = False, path: Path = BACKPORTS_FILE)
         if backports_file_str != sorted_content:
             print(
                 "etc/backports_required_for_multiversion_tests.yml is not sorted.\n"
-                "Run 'bazel run //:format' to fix it."
+                "Run 'bazel run format' to fix it."
             )
             return False
         return True

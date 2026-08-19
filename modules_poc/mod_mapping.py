@@ -70,6 +70,7 @@ def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
         return normpath_for_file(f.location.file)
 
     name = f.name if type(f) == ClangFile else f
+    name = name.replace("\\", "/")
     if "/third_party/" in name:
         return None
 
@@ -78,7 +79,7 @@ def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
         return None
 
     name = name[offset:]
-    return os.path.normpath(name)  # fix up a/X/../b/c.h -> a/b/c.h
+    return os.path.normpath(name).replace("\\", "/")  # fix up a/X/../b/c.h -> a/b/c.h
 
 
 file_mod_map: dict[str, str] = {}
@@ -137,6 +138,7 @@ def teams_for_file(f: ClangFile | str | None):
 def glob_paths():
     repo_root = os.environ.get("BUILD_WORKSPACE_DIRECTORY", ".")
     for path in glob("src/mongo/**/*", recursive=True, root_dir=repo_root):
+        path = path.replace("\\", "/")
         if "/third_party/" in path:
             continue
         extensions = ("h", "cpp", "idl", "c", "defs", "inl", "hpp")

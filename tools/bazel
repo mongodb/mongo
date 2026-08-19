@@ -402,15 +402,50 @@ fi
 rm -f /tmp/mongo_autocomplete_plus_targets
 MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 export MONGO_COMPILEDB_POSTHOOK_STATE="${MONGO_BAZEL_WRAPPER_ARGS}.compiledb"
+MONGO_BAZEL_WRAPPER_STATUS=$(mktemp)
 
 # A fresh wrapper-hook environment invokes uv_sync.sh -f.  That script uses
 # PYTHON3 to create python3-venv, so keep it on the Bazel-managed Python
 # rather than falling back to a system interpreter that may lack ensurepip.
-MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
+MONGO_BAZEL_WRAPPER_ARGS="$MONGO_BAZEL_WRAPPER_ARGS" \
+MONGO_BAZEL_WRAPPER_STATUS="$MONGO_BAZEL_WRAPPER_STATUS" \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 PYTHON3="$python" \
 >&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
-exit_code=$?
+wrapper_exit_code=$?
+
+handled=0
+handled_exit_code=""
+while IFS='=' read -r key value; do
+  case "$key" in
+    handled) handled="$value" ;;
+    exit_code) handled_exit_code="$value" ;;
+  esac
+done < "$MONGO_BAZEL_WRAPPER_STATUS"
+
+if [[ "$handled" == "1" ]]; then
+  if ! [[ "$handled_exit_code" =~ ^[0-9]+$ ]]; then
+    handled_exit_code=2
+  fi
+
+  rm -f "$MONGO_BAZEL_WRAPPER_ARGS" "$MONGO_BAZEL_WRAPPER_STATUS"
+  trap 'cleanup_logfile' EXIT
+  if [[ "$wrapper_redirect_output" == "1" ]]; then
+    exec 1>&3 2>&4
+  fi
+
+  if [[ "$handled_exit_code" == "3" ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    NO_COLOR='\033[0m'
+    echo -e "${RED}ERROR:${NO_COLOR} Linter run failed, see details above" >&2
+    echo -e "${GREEN}INFO:${NO_COLOR} Run the following to try to auto-fix the errors:\n\nbazel run lint --fix" >&2
+  fi
+  exit "$handled_exit_code"
+fi
+
+rm -f "$MONGO_BAZEL_WRAPPER_STATUS"
+exit_code=$wrapper_exit_code
 # Linter fails preempt bazel run.
 if [[ $exit_code == 3 ]]; then
   RED='\033[0;31m'
@@ -418,15 +453,17 @@ if [[ $exit_code == 3 ]]; then
   NO_COLOR='\033[0m'
   echo -e "${RED}ERROR:${NO_COLOR} Linter run failed, see details above"
   echo -e "${GREEN}INFO:${NO_COLOR} Run the following to try to auto-fix the errors:\n\nbazel run lint --fix"
+  rm -f "$MONGO_BAZEL_WRAPPER_ARGS"
   exit $exit_code
 fi
 if [[ $exit_code != 0 ]]; then
+  rm -f "$MONGO_BAZEL_WRAPPER_ARGS"
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
     run_bazel_command "$@"
     exit $?
   else
-    exit $? 
+    exit "$exit_code"
   fi
 fi
 
@@ -434,6 +471,7 @@ new_args=()
 while IFS= read -r line; do
   new_args+=("$line")
 done < $MONGO_BAZEL_WRAPPER_ARGS
+rm -f "$MONGO_BAZEL_WRAPPER_ARGS"
 
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]] && [[ $autocomplete_query == 0 ]]; then
   wrapper_end_time="$(date -u +%s.%N)"

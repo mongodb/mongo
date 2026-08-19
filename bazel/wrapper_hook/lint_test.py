@@ -46,16 +46,33 @@ class BazelCustomFormatterImportTest(unittest.TestCase):
                     sys.modules[name] = saved_modules[name]
 
 
+class BazelCustomFormatterOptionsTest(unittest.TestCase):
+    def test_query_options_exclude_build_only_options(self):
+        from buildscripts import bazel_custom_formatter
+
+        self.assertEqual(
+            bazel_custom_formatter._get_bazel_query_options(
+                (
+                    "--verbose_failures",
+                    "--verbose_failures=false",
+                    "--jobs=auto",
+                    "--local_resources=cpu=HOST_CPUS*.5",
+                    "--config=local",
+                )
+            ),
+            ("--config=local",),
+        )
+
+
 class RefreshModuleLockfileTest(unittest.TestCase):
-    def test_check_mode_fails_when_refresh_changes_lockfile(self):
+    def test_check_mode_fails_without_modifying_stale_lockfile(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
             lockfile.write_text("before\n", encoding="utf-8")
 
             def fake_run(args, **kwargs):
-                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=refresh"])
-                lockfile.write_text("after\n", encoding="utf-8")
-                return subprocess.CompletedProcess(args, 0)
+                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=error"])
+                return subprocess.CompletedProcess(args, 1)
 
             runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
             with mock.patch.object(lint.subprocess, "run", side_effect=fake_run):
@@ -69,12 +86,10 @@ class RefreshModuleLockfileTest(unittest.TestCase):
                         )
 
             self.assertTrue(runner.fail)
-            self.assertEqual(lockfile.read_text(encoding="utf-8"), "after\n")
-            self.assertIn("--- a/tmp/", stdout.getvalue())
-            self.assertIn("+++ b/tmp/", stdout.getvalue())
-            self.assertIn("-before\n+after\n", stdout.getvalue())
+            self.assertEqual(lockfile.read_text(encoding="utf-8"), "before\n")
+            self.assertIn(f"{lockfile} is out of date.", stdout.getvalue())
 
-    def test_check_mode_records_lockfile_diff_for_wrapper_footer(self):
+    def test_check_mode_records_stale_lockfile_for_wrapper_footer(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
             lockfile.write_text("before\n", encoding="utf-8")
@@ -82,9 +97,8 @@ class RefreshModuleLockfileTest(unittest.TestCase):
             detail_path.write_text("", encoding="utf-8")
 
             def fake_run(args, **kwargs):
-                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=refresh"])
-                lockfile.write_text("after\n", encoding="utf-8")
-                return subprocess.CompletedProcess(args, 0)
+                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=error"])
+                return subprocess.CompletedProcess(args, 1)
 
             runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
             with (
@@ -107,22 +121,17 @@ class RefreshModuleLockfileTest(unittest.TestCase):
             self.assertTrue(runner.fail)
             self.assertEqual(
                 detail_path.read_text(encoding="utf-8"),
-                f"{lockfile} has diffs after refresh\n\n"
-                f"--- a/{str(lockfile).lstrip('/\\\\')}\n"
-                f"+++ b/{str(lockfile).lstrip('/\\\\')}\n"
-                "@@ -1 +1 @@\n"
-                "-before\n"
-                "+after",
+                f"{lockfile} is out of date",
             )
-            self.assertNotIn("--- a/tmp/", stdout.getvalue())
+            self.assertEqual(lockfile.read_text(encoding="utf-8"), "before\n")
 
-    def test_check_mode_passes_when_refresh_keeps_patch_applied_lockfile(self):
+    def test_check_mode_passes_when_lockfile_is_current(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
             lockfile.write_text("after\n", encoding="utf-8")
 
             def fake_run(args, **kwargs):
-                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=refresh"])
+                self.assertEqual(args, ["bazel", "mod", "deps", "--lockfile_mode=error"])
                 return subprocess.CompletedProcess(args, 0)
 
             runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
@@ -510,6 +519,8 @@ class ExistingPythonFilesTest(unittest.TestCase):
         mock_get_targets.assert_called_once_with(
             "bazel",
             ["//buildscripts/copybara:generate_evergreen.py"],
+            (),
+            (),
         )
 
 
@@ -573,6 +584,99 @@ class CopybaraGeneratedEvergreenCheckTest(unittest.TestCase):
             "//buildscripts/copybara:generate_evergreen",
             ["--check"],
         )
+
+
+class GranularLintStageTest(unittest.TestCase):
+    def test_authentication_failure_can_skip_a_check(self):
+        runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
+        with mock.patch.object(
+            lint.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], lint.AUTHENTICATION_FAILURE_EXIT_CODE),
+        ):
+            result = runner.run_bazel(
+                "buildscripts:validate_evg_project_config",
+                skip_on_auth_failure=True,
+            )
+
+        self.assertFalse(result)
+        self.assertFalse(runner.fail)
+        self.assertIn("authentication is unavailable", runner.skipped_reason or "")
+
+    def test_rules_lint_is_skipped_on_windows(self):
+        with mock.patch.object(lint.platform, "system", return_value="Windows"):
+            reason = lint.run_rules_lint(
+                "bazel",
+                ["--origin-branch", "origin/master"],
+                enabled_checks=frozenset({lint.LINT_RULES_LINT}),
+            )
+
+        self.assertEqual(reason, "rules_lint is unsupported on Windows")
+
+    def test_source_target_query_excludes_build_only_options(self):
+        result = subprocess.CompletedProcess(
+            ["bazel", "query"],
+            0,
+            stdout="//buildscripts:example.py\n",
+        )
+        with mock.patch.object(lint.subprocess, "run", return_value=result) as run:
+            self.assertEqual(
+                lint.list_files_with_targets(
+                    "bazel",
+                    [
+                        "--verbose_failures",
+                        "--verbose_failures=false",
+                        "--jobs=auto",
+                        "--local_resources=cpu=HOST_CPUS*.5",
+                        "--config=local",
+                    ],
+                ),
+                ["//buildscripts:example.py"],
+            )
+
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "bazel",
+                "query",
+                "--config=local",
+                'kind("source file", deps(//...))',
+                "--keep_going",
+            ],
+        )
+
+    def test_deleted_uv_lock_trigger_still_runs_validator(self):
+        with mock.patch.object(lint, "LintRunner") as runner_type:
+            runner_type.return_value.fail = False
+            lint.run_rules_lint(
+                "bazel",
+                ["--origin-branch", "origin/master"],
+                candidate_files=[],
+                enabled_checks=frozenset({lint.LINT_UV_LOCKFILE}),
+            )
+
+        runner_type.return_value.run_bazel.assert_called_once_with("//buildscripts:uv_lock_check")
+
+    def test_source_target_query_uses_partial_keep_going_results(self):
+        result = subprocess.CompletedProcess(
+            ["bazel", "query"],
+            3,
+            stdout="//buildscripts:example.py\n",
+            stderr="unrelated package failed\n",
+        )
+        with mock.patch.object(lint.subprocess, "run", return_value=result):
+            self.assertEqual(lint.list_files_with_targets("bazel"), ["//buildscripts:example.py"])
+
+    def test_source_target_query_failure_without_results_is_not_ignored(self):
+        result = subprocess.CompletedProcess(
+            ["bazel", "query"],
+            3,
+            stdout="",
+            stderr="query failed\n",
+        )
+        with mock.patch.object(lint.subprocess, "run", return_value=result):
+            with self.assertRaises(subprocess.CalledProcessError):
+                lint.list_files_with_targets("bazel")
 
 
 if __name__ == "__main__":
