@@ -165,6 +165,16 @@ __wt_block_disagg_addr_unpack(WT_SESSION_IMPL *session, const uint8_t **buf, siz
 
     /* Unpack the address version. */
     WT_RET(__block_disagg_addr_unpack_version(buf, 0, &version, &version_min));
+
+    /*
+     * Diagnostic builds only: a version this far ahead of the format version is corruption rather
+     * than one we might meet, and a core localizes it where the error reported below cannot. The
+     * bound is loose to leave room for upgrade and downgrade testing.
+     */
+    WT_ASSERT(session,
+      version <= WT_BLOCK_DISAGG_ADDR_VERSION + 4 &&
+        version_min <= WT_BLOCK_DISAGG_ADDR_VERSION + 4);
+
     if (version_min > current_version)
         WT_RET_MSG(session, ENOTSUP,
           "Unsupported disaggregated address cookie version %" PRIu8 ", min %" PRIu8, version,

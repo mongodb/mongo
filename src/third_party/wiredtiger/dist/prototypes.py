@@ -22,7 +22,7 @@ from collections import defaultdict
 # This is the list of modules that have their respective headers located in the src/module/ folder
 # instead of in src/include/. As a result all relevant code is contained to a single folder.
 # Adding modules to this list will automatically generate those headers, and we expect this list to
-# grow as we modularise the code base.
+# grow as we split the code base into modules.
 SELF_CONTAINED_MODULES = ["checkpoint", "evict", "log", "reconcile", "live_restore"]
 
 DO_NOT_EDIT_BEGIN = "/* DO NOT EDIT: automatically built by prototypes.py: BEGIN */\n"
@@ -226,7 +226,7 @@ def write_header_files(public_fns_dict, private_fns_dict, tests_dict):
             output(public_fns_dict[mod], tests_dict[mod], f"../src/{mod}/{mod}.h")
             if len(private_fns_dict[mod]) > 0:
                 # The second argument (tests_dict) is empty. These test functions are defined to
-                # expose module internals outside the module, so it doens't make sense for them
+                # expose module internals outside the module, so it doesn't make sense for them
                 # to be private.
                 output(private_fns_dict[mod], {}, f"../src/{mod}/{mod}_private.h")
 

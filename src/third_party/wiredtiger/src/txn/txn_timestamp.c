@@ -347,8 +347,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t durable_ts, oldest_ts, stable_disagg_epoch, stable_ts, step_down_epoch,
       step_down_ts;
-    wt_timestamp_t last_durable_ts, last_oldest_ts, last_stable_disagg_epoch, last_stable_ts,
-      current_step_down_epoch, current_step_down_ts;
+    wt_timestamp_t last_ckpt_disagg_epoch, last_durable_ts, last_oldest_ts,
+      last_stable_disagg_epoch, last_stable_ts, current_step_down_epoch, current_step_down_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool epochs_in_use, force, has_durable, has_oldest, has_stable, has_stable_disagg_epoch,
       has_step_down, has_step_down_epoch;
@@ -480,6 +480,25 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
           "stable disaggregated schema epoch %s",
           __wt_timestamp_to_string(stable_disagg_epoch, ts_string[0]),
           __wt_timestamp_to_string(last_stable_disagg_epoch, ts_string[1]));
+    }
+
+    /*
+     * An era that starts below an epoch the database already recorded would hand out epochs a
+     * previous era used, so the checkpoint's epoch is a floor on what the application may set. It
+     * survives a period with the feature turned off because the epoch written to a checkpoint never
+     * moves backwards.
+     */
+    last_ckpt_disagg_epoch = __wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_schema_epoch);
+    if (has_stable_disagg_epoch &&
+      __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) &&
+      stable_disagg_epoch < last_ckpt_disagg_epoch) {
+        __wt_readunlock(session, &txn_global->rwlock);
+        WT_RET_MSG(session, EINVAL,
+          "set_timestamp: stable disaggregated schema epoch %s must not be older than the schema "
+          "epoch %s recorded in the last checkpoint",
+          __wt_timestamp_to_string(stable_disagg_epoch, ts_string[0]),
+          __wt_timestamp_to_string(last_ckpt_disagg_epoch, ts_string[1]));
     }
 
     /*

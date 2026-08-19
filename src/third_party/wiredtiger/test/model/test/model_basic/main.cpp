@@ -42,6 +42,7 @@ extern "C" {
 #include "model/test/util.h"
 #include "model/test/wiredtiger_util.h"
 #include "model/kv_database.h"
+#include "model/util.h"
 
 /*
  * Command-line arguments.
@@ -163,6 +164,54 @@ test_data_value(void)
 
     testutil_assert(key1_Q < key2_Q);
     testutil_assert(key2_Q > key1_Q);
+}
+
+/*
+ * test_decode_utf8 --
+ *     Test decoding the UTF-8 strings that "wt printlog" produces.
+ */
+static void
+test_decode_utf8(void)
+{
+    using namespace std::string_literals;
+
+    /* UTF-8 encodings of the code points that a JSON parser hands us for a single byte. */
+    const std::string utf8_0081{(char)0xc2, (char)0x81};
+    const std::string utf8_00ff{(char)0xc3, (char)0xbf};
+    const std::string utf8_20ac{(char)0xe2, (char)0x82, (char)0xac};
+
+    testutil_assert(model::decode_utf8("") == "");
+    testutil_assert(model::decode_utf8("Key 1") == "Key 1");
+
+    /* Byte values above 0x7f arrive as two-byte sequences. */
+    testutil_assert(model::decode_utf8(utf8_0081) == std::string(1, (char)0x81));
+    testutil_assert(model::decode_utf8(utf8_00ff) == std::string(1, (char)0xff));
+
+    /*
+     * NUL bytes must survive the round trip: a metadata key unpacks with format "S", which requires
+     * the terminator to be within the buffer.
+     */
+    testutil_assert(model::decode_utf8("file:WiredTigerHS.wt\0"s) == "file:WiredTigerHS.wt\0"s);
+    testutil_assert(model::decode_utf8("a\0b"s) == "a\0b"s);
+    testutil_assert(model::decode_utf8("\0"s) == "\0"s);
+
+    /* The model only handles byte-long code points, so anything wider must be rejected. */
+    bool caught = false;
+    try {
+        (void)model::decode_utf8(utf8_20ac);
+    } catch (std::exception &) {
+        caught = true;
+    }
+    testutil_assert(caught);
+
+    /* Malformed input must be rejected rather than silently truncated. */
+    caught = false;
+    try {
+        (void)model::decode_utf8(utf8_0081.substr(0, 1));
+    } catch (std::exception &) {
+        caught = true;
+    }
+    testutil_assert(caught);
 }
 
 /*
@@ -1151,6 +1200,7 @@ main(int argc, char *argv[])
     try {
         ret = EXIT_SUCCESS;
         test_data_value();
+        test_decode_utf8();
         test_model_basic();
         test_model_basic_wt();
         test_model_basic_column_wt();

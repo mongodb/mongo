@@ -23,6 +23,15 @@ type aspell > /dev/null 2>&1 || {
 #    Run aspell with the correct mode for a given file type.
 run_aspell_for() {
     case "$1" in
+    dist/*.py)
+        # The dist scripts hold the config and statistics descriptions that become the
+        # public documentation, so check triple-quoted strings as well as comments. The
+        # test suite is deliberately excluded: its triple-quoted strings hold code and
+        # config data, not prose, and checking them would swamp the custom word list.
+        aspell --clear-filter --add-filter=url --add-filter=context \
+            --clear-context-delimiters --add-context-delimiters='# \0' \
+            --add-context-delimiters="''' '''" --add-context-delimiters='""" """' \
+            --lang=en_US list;;
     *.yml|*.yaml|*.py)
         # aspell's built-in --mode=comment is broken
         # (see https://github.com/GNUAspell/aspell/issues/505). This combines the
@@ -55,7 +64,8 @@ check() {
     # Strip out double quote char literals ('"'), they confuse aspell.
     # Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
     # Strip out C-style hex constants.
-    sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$1 |
+    # Strip out backslash escapes, the dist scripts embed generated C in string literals.
+    sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' -e 's/\\[ntr]/ /g' ../$1 |
     run_aspell_for $1 |
     sort -u |
     comm -23 /dev/stdin $custom_words > $t
@@ -70,6 +80,7 @@ l=$(
   {
     cd ..
     find bench dist examples ext src test tools/checksum_bitflip -name '*.[chsy]' | grep -v 'test/3rdparty'
+    find dist -name '*.py'
     find src -name '*.in'
     find test -name '*.cpp' | grep -v 'test/3rdparty'
     find test -name '*.py' | grep -v 'test/3rdparty'

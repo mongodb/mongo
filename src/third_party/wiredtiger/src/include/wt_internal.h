@@ -379,8 +379,6 @@ struct __wt_prefetch_queue_entry;
 typedef struct __wt_prefetch_queue_entry WT_PREFETCH_QUEUE_ENTRY;
 struct __wt_process;
 typedef struct __wt_process WT_PROCESS;
-struct __wt_reconcile_stats;
-typedef struct __wt_reconcile_stats WT_RECONCILE_STATS;
 struct __wt_reconcile_timeline;
 typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
 struct __wt_recovery_timeline;
@@ -631,6 +629,7 @@ typedef uint64_t wt_timestamp_t;
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"
+#include "../reconcile/reconcile.h"
 #include "../evict/evict.h"
 #include "capacity.h"
 #include "cell.h"
@@ -651,7 +650,6 @@ typedef uint64_t wt_timestamp_t;
 #include "meta.h" /* required by block.h */
 #include "optrack.h"
 #include "os.h"
-#include "../reconcile/reconcile.h"
 #include "rollback_to_stable.h"
 #include "schema.h"
 #include "tiered.h"

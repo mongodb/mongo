@@ -24,7 +24,7 @@ from stat_data import dsrc_stats, conn_stats, conn_dsrc_stats, session_stats
 
 ##########################################
 # Check for duplicate stat descriptions:
-# Duplicate stat descpriptions within a category are not allowed.
+# Duplicate stat descriptions within a category are not allowed.
 # The list must be sorted by description.
 ##########################################
 def check_unique_description(sorted_list):
@@ -37,7 +37,7 @@ def check_unique_description(sorted_list):
 ##########################################
 # Check the description format.
 # Removes prefix from description before checking.
-# Checks for leading/trailing whitespace, newlines, and leading/trailing punctation.
+# Checks for leading/trailing whitespace, newlines, and leading/trailing punctuation.
 ##########################################
 def check_description_format(stat):
     desc = stat.desc.split(': ', 1)[1]

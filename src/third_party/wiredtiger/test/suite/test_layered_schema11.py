@@ -151,9 +151,10 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
     def test_recreate_after_drop_then_create(self):
         """
-        When the queue contains REMOVE followed by CREATE for the same table, the latest entry
-        is CREATE, so the table must be picked up on the next checkpoint (not blocked by the
-        REMOVE).
+        When the queue contains REMOVE followed by CREATE for the same table, a checkpoint
+        below the CREATE's epoch must not resurrect the dropped incarnation's stable
+        constituent, and a checkpoint covering the CREATE must pick the table up (not
+        blocked by the REMOVE).
         """
         # Step 1: Leader creates uri and checkpoints at epoch 10.
         self.set_stable_epoch(1)
@@ -183,8 +184,16 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.set_stable_epoch(10)
         self.leader_checkpoint(2)
 
-        # Step 5: Follower picks up. Because the latest queue entry is CREATE(40) (not REMOVE),
-        # the REMOVE check does not block pickup; uri must be present in local metadata.
+        # Step 5: Follower picks up. The latest queue entry CREATE(40) sits above the
+        # checkpoint's epoch, so the checkpoint's stable constituent belongs to the dropped
+        # incarnation and must not be adopted under the recreated table.
+        self.disagg_advance_checkpoint(conn_follow)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+
+        # Step 6: A checkpoint covering CREATE(40) supplies the recreated table's own
+        # constituent; the pending REMOVE(25) does not block it.
+        self.set_stable_epoch(40)
+        self.leader_checkpoint(3)
         self.disagg_advance_checkpoint(conn_follow)
         self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 

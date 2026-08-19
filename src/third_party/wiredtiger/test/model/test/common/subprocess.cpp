@@ -27,6 +27,7 @@
  */
 
 #include <sys/types.h>
+#include <cerrno>
 #include <cstdlib>
 #include <signal.h>
 #include <vector>
@@ -142,6 +143,14 @@ subprocess_helper::wait_if_parent()
 {
     if (parent()) {
         int status;
-        testutil_assert(waitpid(_child_pid, &status, 0) > 0);
+        pid_t pid;
+
+        /*
+         * The SIGCHLD handler reaps the child itself, and it is installed without SA_RESTART, so
+         * this wait can either be interrupted by the signal or find the child already gone.
+         */
+        while ((pid = waitpid(_child_pid, &status, 0)) < 0 && errno == EINTR)
+            ;
+        testutil_assert(pid > 0 || errno == ECHILD);
     }
 }

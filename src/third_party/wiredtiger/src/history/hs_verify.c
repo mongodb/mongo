@@ -233,8 +233,7 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
     WT_ERR(__wt_btcur_close(&ds_cbt, false));
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
+    WT_TRET(hs_cursor->close(hs_cursor));
     return (ret);
 }
 

@@ -84,6 +84,8 @@
  */
 #define WT_IS_METADATA(dh) F_ISSET((dh), WT_DHANDLE_IS_METADATA)
 #define WT_IS_DISAGG_META(dh) F_ISSET(dh, WT_DHANDLE_DISAGG_META)
+/* Either metadata tree: prefer this unless one of them alone is meant. */
+#define WT_IS_ANY_METADATA(dh) F_ISSET((dh), WT_DHANDLE_DISAGG_META | WT_DHANDLE_IS_METADATA)
 
 /*
  * Optimize comparisons against the history store URI, flag handles that reference the history store

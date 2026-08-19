@@ -1266,7 +1266,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
     /* Write the new version of the leaf page to disk. */
     WT_ERR(__slvg_modify_init(session, page));
-    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR));
+    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
 
     /* Reset the page. */
     page->pg_var = save_col_var;
@@ -1917,7 +1917,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
 
     /* Write the new version of the leaf page to disk. */
     WT_ERR(__slvg_modify_init(session, page));
-    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR));
+    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
 
     /* Reset the page. */
     page->entries += skip_stop;

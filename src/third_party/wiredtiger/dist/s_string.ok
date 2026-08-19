@@ -31,6 +31,7 @@ AssertionError
 Async
 Athlon
 Auth
+Autocommit
 AwsManager
 Axxx
 BBBBB
@@ -66,6 +67,7 @@ Buildvariants
 Bxxx
 C'd
 CACHEABLE
+CALLGRAPH
 CAS
 CBT
 CCCCCCCCCCCCCCCCCC
@@ -111,6 +113,7 @@ CloseHandle
 Cmd
 Codec
 Comparator
+Comparators
 ComplexDataSet
 ComplexDataStore
 ConcurrencyTestSuite
@@ -125,6 +128,7 @@ Crt
 Crummey
 CustomersPhone
 Cygwin
+DECL
 DENABLE
 DESC
 DEST
@@ -143,6 +147,7 @@ Decrementing
 Decrypt
 DeleteFileW
 Deterministically
+Dhandle
 DisAgg
 Disagg
 DisaggCorruptionMixin
@@ -191,6 +196,7 @@ FH
 FILEOPS
 FILETIME
 FIXME
+FIXMEs
 FLCS
 FLD
 FLSv
@@ -200,8 +206,10 @@ FOREACH
 FS
 FTDC
 FULLFSYNC
+FUNC
 FUNCSIG
 Failpoint
+FieldType
 FindClose
 FindFirstFile
 FindNextFileW
@@ -270,6 +278,7 @@ JSON
 Jira
 Jyrki
 KEK
+KNF
 KV
 Kanowski's
 Keyedness
@@ -312,6 +321,7 @@ MALLOC
 MByte
 MEM
 MERCHANTABILITY
+MODULARITY
 MONGODB
 MOVEFILE
 MRXB
@@ -330,6 +340,7 @@ Mellor
 MemorySanitizer
 Metrix
 Moby
+ModifyFile
 MongoDB
 MoveFileExW
 MultiByteToWideChar
@@ -364,6 +375,8 @@ OOM
 OOO
 OPLOG
 OPTRACK
+OPTYPE
+OR'd
 OVFL
 ObWgfvgw
 Og
@@ -382,12 +395,15 @@ PPC
 PREFETCH
 PRELOAD
 PREV
+PRINTLOG
 PRId
 PRIu
+PRIuPTR
 PRNG
 PSD
 PSE
 PTR
+PTRDIFF
 PYTHONMALLOC
 Palite
 Palites
@@ -424,6 +440,7 @@ REALLOC
 RECNO
 REF's
 REFs
+REMOVE's
 REPAIR
 REPO
 RET
@@ -456,6 +473,7 @@ SCons
 SDK
 SIGABRT
 SIGBUS
+SIGCHLD
 SIGKILL
 SIGKILLed
 SIGKILLs
@@ -516,6 +534,7 @@ TXN
 TerminateProcess
 TestSuiteConnection
 Testcases
+TextWrapper
 ThreadList
 ThreadListWrapper
 ThreadsafeForwardingResult
@@ -533,8 +552,10 @@ UIDs
 UINT
 ULF
 ULINE
+ULL
 UNC
 UNCOND
+UNITTEST
 UNSKIPPED
 UPD
 URI
@@ -547,7 +568,9 @@ Unadopted
 Unbuffered
 Uncomment
 Unencrypted
+Unformatted
 Unhandled
+Unittest
 UnixLib
 Unlink
 UnlockFile
@@ -660,10 +683,12 @@ allocator's
 allocators
 allocfile
 allocsize
+allowlist
 analytics
 aor
 ap
 api
+apis
 arg
 argc
 args
@@ -754,15 +779,20 @@ buildvariant
 builtins
 bulkload
 bursty
+bytecode
 bytestring
 byteswap
 byvalue
 bzip
+bzl
 cX
 cacheable
 calc
+callee
+callgraph
 calloc
 cancelling
+capname
 cas
 catfmt
 cb
@@ -918,6 +948,7 @@ dec
 decile
 deciles
 decl
+decls
 decodable
 decompressor
 decr
@@ -974,6 +1005,8 @@ dlsym
 dmalloc
 dmb
 dmsg
+docstring
+doxygen
 drealloc
 dropUntilSuccess
 droppable
@@ -1024,12 +1057,15 @@ entlist
 enum
 env
 eof
+ep
+epp
 eq
 equalp
 errline
 errno
 errx
 esc
+escapedp
 et
 ev
 evd
@@ -1072,20 +1108,25 @@ fh
 fhandle
 fid
 fifo
+fileAliases
 filecmp
 filefrag
 fileid
+filelist
 fileop
 fileops
 filesize
 filesystem
 filesystems
+fini
 firstfit
+fixme
 fixup
 floatnum
 fmt
 fmterr
 fn
+fns
 fnv
 fnvhash
 foc
@@ -1112,6 +1153,7 @@ fsyncing
 ftruncate
 func
 funcid
+funcs
 futex
 fuzzer
 fuzzutil
@@ -1178,6 +1220,7 @@ iSh
 iaa
 iaaInterface
 icecream
+iconv
 icount
 idstr
 idx
@@ -1186,9 +1229,11 @@ idxname
 ie
 iface
 ifdef
+ifdef'd
 ifdef's
 ifdefs
 iff
+ifndef
 iiSii
 iiiS
 ikey
@@ -1241,6 +1286,7 @@ isascii
 isb
 isdigit
 ish
+ishex
 ishld
 ishst
 islocked
@@ -1278,6 +1324,7 @@ lN
 lang
 las
 latin
+layercparse
 lazyfs
 lbrace
 lbracket
@@ -1294,6 +1341,7 @@ lexically
 lexicographically
 lf
 libdatasource
+libmagic
 libmemkind
 libpthread
 libpython
@@ -1326,6 +1374,7 @@ logop
 logpath
 logread
 logrec
+logrecp
 logsize
 logslot
 logtest
@@ -1387,6 +1436,7 @@ mmap
 mmrand
 mn
 mnt
+modularity
 mongo
 mongod
 mongodb
@@ -1417,6 +1467,7 @@ nTemp
 namespace
 namespaced
 namespaces
+nb
 nbits
 nclose
 nclr
@@ -1487,6 +1538,7 @@ nuris
 nvram
 objectid
 offpage
+offsetof
 offsetp
 ok
 olddir
@@ -1505,9 +1557,13 @@ opendir
 openfile
 oplist
 oplog
+opsize
+opsizep
 optrack
 optwt
 optype
+optypep
+opvar
 orchestrator
 ord
 ori
@@ -1542,6 +1598,7 @@ pipefail
 plh
 pluggable
 pmem
+png
 poptable
 popthreads
 portably
@@ -1551,6 +1608,7 @@ posix
 postrun
 postsize
 powershell
+pragma
 pre
 pread
 prealloc
@@ -1595,6 +1653,7 @@ pthread
 ptr
 ptrdiff
 pv
+pval
 pwrite
 py
 pygit
@@ -1617,8 +1676,10 @@ rbrace
 rbracket
 rc
 rdlock
+rdparty
 rdtsc
 rduppo
+reachability
 readdir
 readgen
 readline
@@ -1642,6 +1703,7 @@ reconfiguring
 reconfigwt
 recsize
 rectype
+rectypep
 recurse
 reentrant
 refp
@@ -1736,6 +1798,7 @@ spinlock
 spinlocks
 sqlite
 src
+srcfile
 srch
 srv
 ss
@@ -1759,6 +1822,7 @@ stepup
 stlr
 stlrb
 stlrh
+storer
 str
 strace
 strcat
@@ -1842,6 +1906,7 @@ testutil
 th
 there'll
 tid
+timeseries
 timeslice
 timespec
 timestamper
@@ -1850,6 +1915,7 @@ tinfo
 tlb
 tmalloc
 tmp
+tmpp
 tmstmp
 tnum
 tod
@@ -1943,6 +2009,7 @@ unnamespaced
 unpackv
 unposition
 unpositioned
+unreachability
 unredact
 unredacted
 unredacts
@@ -2017,6 +2084,8 @@ wakeup
 wakeups
 warmup
 whitespace
+whitespace's
+whitespaces
 wiredTiger
 wiredTigerTables
 wiredtiger

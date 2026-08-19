@@ -220,7 +220,7 @@ for line in open('../src/include/wiredtiger.h.in', 'r'):
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.h.in')
 
-# Output the wiredtiger_strerror and wiredtiger_sterror_r code.
+# Output the wiredtiger_strerror and __wt_wiredtiger_error code.
 tmp_file = '__tmp_api_err' + str(os.getpid())
 tfile = open(tmp_file, 'w')
 tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */

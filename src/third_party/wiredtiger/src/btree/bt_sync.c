@@ -94,8 +94,8 @@ __sync_scrub_checkpoint_enabled(WT_SESSION_IMPL *session)
     if (F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT))
         return (false);
 
-    /* Skip the metadata file when generating images. */
-    if (WT_IS_METADATA(S2BT(session)->dhandle) || WT_IS_DISAGG_META(S2BT(session)->dhandle))
+    /* Skip the metadata trees when generating images. */
+    if (WT_IS_ANY_METADATA(S2BT(session)->dhandle))
         return (false);
 
     switch (__wt_atomic_load_uint8_relaxed(
@@ -368,7 +368,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 ++leaf_pages;
                 reconcile_start = __wt_clock(session);
                 WT_ERR(__wt_reconcile(session, walk, NULL,
-                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub)));
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), NULL));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
         }
@@ -421,7 +421,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
         /* Add in history store reconciliation for standard files. */
         rec_flags = WT_REC_CHECKPOINT;
-        if (!is_hs && !WT_IS_METADATA(btree->dhandle) && !WT_IS_DISAGG_META(btree->dhandle))
+        if (!is_hs && !WT_IS_ANY_METADATA(btree->dhandle))
             rec_flags |= WT_REC_HS;
 
         /* Write all dirty in-cache pages. */
@@ -552,7 +552,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             } else {
                 reconcile_start = __wt_clock(session);
                 WT_ERR(__wt_reconcile(session, walk, NULL,
-                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub)));
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), NULL));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
 

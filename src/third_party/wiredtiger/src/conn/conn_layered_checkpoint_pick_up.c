@@ -948,13 +948,31 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
                  */
                 WT_ERR(__disagg_update_file_meta(
                   session, sh_cursors[WT_DISAGG_CURSOR_FILE], md_cursors[WT_DISAGG_CURSOR_FILE]));
-            else
+            else {
+                /*
+                 * FIXME-WT-18284: A create queued above the checkpoint's schema epoch means the
+                 * checkpoint's stable component is a dropped incarnation's; defer adopting it to a
+                 * checkpoint that covers the local create.
+                 */
+                __wt_spin_lock(
+                  session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
+                latest_entry = __wti_disagg_table_latest_create_remove(session, current);
+                latest_op =
+                  latest_entry == NULL ? WT_SHARED_METADATA_NONE : latest_entry->metadata_op;
+                latest_epoch =
+                  latest_entry == NULL ? WT_SCHEMA_EPOCH_NONE : latest_entry->schema_epoch;
+                __wt_spin_unlock(
+                  session, &S2C(session)->disaggregated_storage.shared_metadata_queue_lock);
+                if (ckpt_schema_epoch != WT_SCHEMA_EPOCH_NONE &&
+                  latest_op == WT_SHARED_METADATA_CREATE && latest_epoch > ckpt_schema_epoch)
+                    continue;
                 /*
                  * We already have the layered table in the local metadata; we are just picking up
                  * the stable component.
                  */
                 WT_ERR(__disagg_insert_meta(
                   session, sh_cursors[WT_DISAGG_CURSOR_FILE], &stable_btree_ids));
+            }
             ++existing_tables;
         } else if (!md_has[WT_DISAGG_CURSOR_LAYERED] && sh_has[WT_DISAGG_CURSOR_LAYERED]) {
             /*
@@ -1760,8 +1778,14 @@ __disagg_pick_up_checkpoint(
 
     /*
      * Part 3: Do the bookkeeping.
+     *
+     * A node with no live stable epoch is not gating schema operations, so the adopted checkpoint
+     * covers the whole queue and it is cleared.
      */
-    __wti_disagg_shared_metadata_queue_prune(session, metadata.schema_epoch);
+    __wti_disagg_shared_metadata_queue_prune(session,
+      __wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE ?
+        WT_SCHEMA_EPOCH_NONE :
+        metadata.schema_epoch);
 
     /*
      * The merge is complete: a failure from here leaves the local metadata resolving to the new

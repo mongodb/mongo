@@ -778,12 +778,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
             txnid = upd->upd_saved_txnid;
         }
 
-        /*
-         * Give up if the update is from this transaction and on the metadata file or disaggregated
-         * shared metadata file.
-         */
-        if ((WT_IS_METADATA(session->dhandle) || WT_IS_DISAGG_META(session->dhandle)) &&
-          session_txnid != WT_TXN_NONE && txnid == session_txnid)
+        /* Give up if the update is from this transaction and on a metadata tree. */
+        if (WT_IS_ANY_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
+          txnid == session_txnid)
             return (__wt_set_return(session, EBUSY));
 
         /*

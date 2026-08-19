@@ -195,6 +195,39 @@ class test_layered_schema21(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.set_stable_epoch(8)
         self.leader_checkpoint(11)
 
+    def test_drop_published_with_uncheckpointed_stable_data(self):
+        # Create and publish at epoch 5.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+
+        # Write and checkpoint at ts 10, epoch 6. Epoch 6 > publish epoch 5, so
+        # the checkpoint covers the create and clears AWAITS_PUBLISH.
+        self.write_rows(commit_ts=10)
+        self.set_stable_epoch(6)
+        self.leader_checkpoint(10)
+
+        # Write new data at ts 11 and set stable ts to 11 -- stable, but uncheckpointed data.
+        self.write_rows(commit_ts=11)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(11))
+
+        # The drop must be refused: Deferring a drop to a later checkpoint is only safe when the
+        # table is fully checkpointed. A checkpoint taken before the drop's epoch becomes stable
+        # would still owe the writes at ts 11, which no existing checkpoint holds and a dropped
+        # table can no longer produce.
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.uri))
+        err, sub, msg = self.session.get_last_error()
+        self.assertEqual(err, errno.EBUSY)
+        self.assertEqual(sub, wiredtiger.WT_DIRTY_DATA)
+        self.assertTrue('dirty data' in msg)
+
+        # Checkpoint to quiesce dirty state so teardown can close cleanly.
+        self.set_stable_epoch(8)
+        self.leader_checkpoint(12)
+
     def test_drop_with_drained_data_is_refused(self):
         # The step-up drain moves follower-era ingest rows into a stable constituent created
         # awaiting publication, so until a checkpoint publishes the table those rows exist only in

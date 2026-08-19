@@ -301,6 +301,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(truncate, float);
 
         UPDATE_SPEC(checkpoint, float);
+        UPDATE_SPEC(checkpoint_crash, float);
         UPDATE_SPEC(crash, float);
         UPDATE_SPEC(evict, float);
         UPDATE_SPEC(restart, float);
@@ -887,8 +888,8 @@ main(int argc, char *argv[])
         for (uint64_t iteration = 1;; iteration++) {
             uint64_t seed = next_seed;
             std::string wt_conn_config = conn_config;
-            wt_conn_config = model::join(
-              wt_conn_config, model::kv_workload_generator::generate_log_configurations(seed));
+            wt_conn_config = model::join(wt_conn_config,
+              model::kv_workload_generator::generate_log_configurations(spec, seed));
 
             next_seed = model::random::next_seed(next_seed);
 
@@ -907,7 +908,7 @@ main(int argc, char *argv[])
             /* Generate random timing stress configurations and add it to the WiredTiger config. */
             if (generate_timing_stress_configurations) {
                 std::string rand_stress_config =
-                  model::kv_workload_generator::generate_stress_configurations(seed);
+                  model::kv_workload_generator::generate_stress_configurations(spec, seed);
                 wt_conn_config = model::join(wt_conn_config, rand_stress_config);
             }
 

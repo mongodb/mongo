@@ -32,6 +32,7 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #include "wiredtiger.h"
 extern "C" {
@@ -295,6 +296,8 @@ static void
 test_workload_generator(void)
 {
     int retries = 0;
+    uint64_t seed = 0;
+    std::string last_issue;
 
     while (true) {
         try {
@@ -303,19 +306,22 @@ test_workload_generator(void)
             spec.disaggregated = 0;
 
             std::shared_ptr<model::kv_workload> workload =
-              model::kv_workload_generator::generate(spec);
+              model::kv_workload_generator::generate(spec, seed);
 
             /* Run the workload in the model and in WiredTiger, then verify. */
             std::string test_home = std::string(home) + DIR_DELIM_STR + "generator";
             verify_workload(*workload, opts, test_home, ENV_CONFIG);
 
             break;
-        } catch (model::known_issue_exception &) {
-            /* Try again. */
+        } catch (model::known_issue_exception &e) {
+            /* Retry with a different workload; the same seed would hit the same issue. */
+            last_issue = e.issue();
+            seed = model::random::next_seed(seed);
         }
 
         if (retries++ > 10)
-            throw model::model_exception("Too many retries for workload generation");
+            throw model::model_exception(
+              "Too many retries for workload generation; last known issue: " + last_issue);
     }
 }
 

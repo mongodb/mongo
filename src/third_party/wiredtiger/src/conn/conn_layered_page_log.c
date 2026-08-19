@@ -810,6 +810,12 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
+    WT_ASSERT_ALWAYS(session,
+      schema_epoch >= __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_schema_epoch),
+      "checkpoint writes schema epoch %" PRIu64 ", older than the schema epoch %" PRIu64
+      " already in shared storage",
+      schema_epoch, __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_schema_epoch));
+
     if (checkpoint_root == NULL) {
         WT_ASSERT(session, checkpoint_root_size == 0);
         checkpoint_root = "";

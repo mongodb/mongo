@@ -32,7 +32,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <iconv.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -308,53 +307,41 @@ decode_utf8(const std::string &str)
      * a two-byte string C2 81. This function decodes this string back to 81, which the caller can
      * then use in data_value::unpack to get the original integer 1.
      *
-     * We do this in two steps:
-     *   1. Convert the UTF-8 string to a WCHAR_T array.
-     *   2. Convert the WCHAR_T array to a char array.
+     * We decode by hand rather than through iconv: converting to WCHAR_T goes through the C
+     * library's character conversion routines, which are locale-dependent and, on macOS, silently
+     * drop NUL code points. Losing the NUL matters because a metadata key unpacks with format "S",
+     * which requires the terminator to fall inside the buffer.
+     *
+     * We only accept code points up to U+00FF, so we never need to decode a sequence longer than
+     * two bytes.
      */
+    std::string decoded;
+    decoded.reserve(str.length());
 
-    /* Initialize the conversion. */
-    iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
-    if (conv == (iconv_t)-1)
-        throw std::runtime_error(
-          "Cannot initialize charset conversion: " + std::string(wiredtiger_strerror(errno)));
-    at_cleanup close_conv([conv] { (void)iconv_close(conv); });
+    for (size_t i = 0; i < str.length();) {
+        uint8_t b = (uint8_t)str[i];
+        uint32_t code_point;
 
-    /* Copy the input buffer, since the conversion library needs a mutable buffer. */
-    size_t src_size = str.size();
-    std::vector<char> src(str.begin(), str.end());
+        if (b < 0x80) {
+            code_point = b;
+            i++;
+        } else if (b == 0xC2 || b == 0xC3) {
+            if (i + 1 >= str.length())
+                throw std::runtime_error("Truncated UTF-8 sequence");
+            uint8_t b2 = (uint8_t)str[i + 1];
+            if ((b2 & 0xC0) != 0x80)
+                throw std::runtime_error(
+                  "Invalid UTF-8 continuation byte: " + std::to_string((uint32_t)b2));
+            code_point = (uint32_t)(b & 0x1F) << 6 | (b2 & 0x3F);
+            i += 2;
+        } else
+            /* Any other leading byte starts a sequence encoding U+0100 or above, or is invalid. */
+            throw std::runtime_error("Not byte-long code point: " + std::to_string((uint32_t)b));
 
-    /* Allocate the output buffer. */
-    size_t dest_size = src_size + 4; /* Big enough because we're using 1-byte code points. */
-    std::vector<wchar_t> dest(dest_size, 0);
-
-    /* Now do the actual conversion. */
-    char *p_src = src.data();
-    char *p_dest = (char *)dest.data();
-    size_t src_bytes = src_size;
-    size_t dest_bytes = dest_size * sizeof(wchar_t);
-    size_t dest_bytes_start = dest_bytes;
-    size_t r = iconv(conv, &p_src, &src_bytes, &p_dest, &dest_bytes);
-    if (r == (size_t)-1)
-        throw std::runtime_error(
-          "Charset conversion failed: " + std::string(wiredtiger_strerror(errno)));
-    if (src_bytes != 0)
-        throw std::runtime_error(
-          "Charset conversion did not decode " + std::to_string(src_bytes) + " byte(s)");
-
-    /* Figure out how many code points were actually decoded. */
-    size_t decoded_size = (dest_bytes_start - dest_bytes) / sizeof(wchar_t);
-
-    /* Extract the byte-long code points from the WCHAR_T array into a char array. */
-    std::vector<char> decoded(decoded_size, 0);
-    for (size_t i = 0; i < decoded_size; i++) {
-        if (dest[i] > 0xFF)
-            throw std::runtime_error(
-              "Not byte-long code point: " + std::to_string((uint64_t)dest[i]));
-        decoded[i] = (char)dest[i];
+        decoded.push_back((char)code_point);
     }
 
-    return std::string(decoded.data(), decoded_size);
+    return decoded;
 }
 
 /*

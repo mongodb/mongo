@@ -1008,7 +1008,8 @@ __checkpoint_update_disagg_database_size(
      * Apply the accumulated size delta to the in-memory database_size now that the checkpoint has
      * succeeded, unless the recompute above already replaced it. Positive deltas occur when data is
      * added during the checkpoint. Negative deltas occur when data is removed reducing the total
-     * storage footprint. Guard against overflow/underflow in both cases.
+     * storage footprint. Undershooting the checkpoint buffer is an accounting bug: diagnostic
+     * builds abort, production logs an error and clamps so a wrapped uint64 is not published.
      */
     if (!recomputed && session->ckpt.ckpt_size_delta != 0) {
         uint64_t db;
@@ -1021,9 +1022,22 @@ __checkpoint_update_disagg_database_size(
         if (delta > 0) {
             WT_ASSERT(session, UINT64_MAX - db >= (uint64_t)delta);
             __wt_disagg_set_database_size(session, db + (uint64_t)delta);
-        } else {
-            WT_ASSERT(session, db >= (uint64_t)(-delta));
-            __wt_disagg_set_database_size(session, db - (uint64_t)(-delta));
+        } else if (delta < 0) {
+            uint64_t sub, new_size;
+
+            sub = (uint64_t)(-delta);
+            WT_ASSERT(session, db >= sub && db - sub >= WT_DISAGG_CHECKPOINT_SIZE_BUFFER);
+            /* FIXME-WT-18039: Replace this clamp and the assert above with WT_ASSERT_ALWAYS. */
+            if (db < sub || db - sub < WT_DISAGG_CHECKPOINT_SIZE_BUFFER) {
+                __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+                  "disaggregated database size would fall below the checkpoint buffer: "
+                  "decrementing %" PRIu64 " from %" PRIu64
+                  ", clamped to the checkpoint size buffer %" PRIu64,
+                  sub, db, (uint64_t)WT_DISAGG_CHECKPOINT_SIZE_BUFFER);
+                new_size = WT_DISAGG_CHECKPOINT_SIZE_BUFFER;
+            } else
+                new_size = db - sub;
+            __wt_disagg_set_database_size(session, new_size);
         }
     }
 
@@ -1358,7 +1372,7 @@ __checkpoint_can_skip(WT_SESSION_IMPL *session, WT_CHECKPOINT_DB_CONFIG *ckpt_cf
 {
     WT_CONNECTION_IMPL *conn;
     WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t last_ckpt_ts;
+    wt_timestamp_t last_ckpt_ts, stable_disagg_epoch;
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
@@ -1371,14 +1385,17 @@ __checkpoint_can_skip(WT_SESSION_IMPL *session, WT_CHECKPOINT_DB_CONFIG *ckpt_cf
      * If the checkpoint is using timestamps, and the stable timestamp hasn't been updated since the
      * last checkpoint there is nothing more that could be written. Except when a non timestamped
      * file has been modified, as such if the connection has been modified it is currently unsafe to
-     * skip checkpoints. Also, don't skip if the stable disaggregated schema epoch changed, as the
-     * metadata operation queue may have entries to flush even without new committed data.
+     * skip checkpoints. Also, don't skip if this node gates schema operations and the stable
+     * disaggregated schema epoch changed, as the metadata operation queue may have entries to flush
+     * even without new committed data. A node with no live stable epoch carries the last written
+     * epoch forward, so the epoch cannot have changed.
      */
     last_ckpt_ts = __wt_atomic_load_uint64_relaxed(&txn_global->last_ckpt_timestamp);
+    stable_disagg_epoch = __wt_get_stable_disaggregated_schema_epoch(session);
     if (!conn->modified && ckpt_cfg->use_timestamp && last_ckpt_ts != WT_TS_NONE &&
       last_ckpt_ts == __wt_get_stable_timestamp(session) &&
-      txn_global->last_ckpt_disaggregated_schema_epoch ==
-        __wt_get_stable_disaggregated_schema_epoch(session)) {
+      (stable_disagg_epoch == WT_SCHEMA_EPOCH_NONE ||
+        txn_global->last_ckpt_disaggregated_schema_epoch == stable_disagg_epoch)) {
         ckpt_cfg->can_skip = true;
         return (0);
     }
@@ -1765,6 +1782,41 @@ __checkpoint_eviction_snapshot_retire(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __checkpoint_disagg_get_write_epoch --
+ *     Return the schema epoch this checkpoint writes to its metadata. Only a leader writes one, and
+ *     a follower's epoch legitimately sits below the last checkpoint's.
+ */
+static int
+__checkpoint_disagg_get_write_epoch(
+  WT_SESSION_IMPL *session, wt_timestamp_t ckpt_disagg_schema_epoch, wt_timestamp_t *write_epochp)
+{
+    WT_CONNECTION_IMPL *conn;
+    wt_timestamp_t last_ckpt_epoch;
+    char epoch_string[2][WT_TS_INT_STRING_SIZE];
+
+    conn = S2C(session);
+    last_ckpt_epoch =
+      __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_schema_epoch);
+
+    if (ckpt_disagg_schema_epoch == WT_SCHEMA_EPOCH_NONE)
+        /*
+         * The application has stopped gating schema operations, so carry the epoch forward.
+         * Clearing it would tell every reader this is the legacy world.
+         */
+        *write_epochp = last_ckpt_epoch;
+    else if (ckpt_disagg_schema_epoch >= last_ckpt_epoch)
+        *write_epochp = ckpt_disagg_schema_epoch;
+    else
+        WT_RET_MSG(session, EINVAL,
+          "the stable disaggregated schema epoch %s is older than the schema epoch %s written by "
+          "the last checkpoint",
+          __wt_timestamp_to_string(ckpt_disagg_schema_epoch, epoch_string[0]),
+          __wt_timestamp_to_string(last_ckpt_epoch, epoch_string[1]));
+
+    return (0);
+}
+
+/*
  * __checkpoint_db_internal --
  *     Checkpoint a database or a list of objects in the database.
  */
@@ -1781,15 +1833,15 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
     wt_off_t hs_size;
-    wt_timestamp_t ckpt_tmp_ts, ckpt_disagg_schema_epoch;
+    wt_timestamp_t ckpt_tmp_ts, ckpt_disagg_schema_epoch, ckpt_disagg_write_epoch;
     uint64_t drop_size, generation;
-    char schema_epoch_string[WT_TS_INT_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
+    char epoch_string[2][WT_TS_INT_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
     bool failed, tracking;
 
     WT_CLEAR(ckpt_cfg);
     WT_CLEAR(precise_ckpt_saved_triggers);
     conn = S2C(session);
-    ckpt_disagg_schema_epoch = WT_TS_NONE;
+    ckpt_disagg_write_epoch = WT_TS_NONE;
     ckpt_tmp_ts = WT_TS_NONE;
     drop_size = 0;
     hs_size = 0;
@@ -1910,13 +1962,20 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     conn->disaggregated_storage.cur_checkpoint_timestamp = ckpt_tmp_ts;
     conn->disaggregated_storage.cur_schema_epoch = ckpt_disagg_schema_epoch;
+    ckpt_disagg_write_epoch = ckpt_disagg_schema_epoch;
     if (__wt_conn_is_disagg(session) &&
-      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
+        WT_ERR(__checkpoint_disagg_get_write_epoch(
+          session, ckpt_disagg_schema_epoch, &ckpt_disagg_write_epoch));
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Starting disaggregated storage checkpoint with timestamp: %" PRIu64
-          " %s and schema epoch: %" PRIu64 " %s",
+          " %s, stable schema epoch: %" PRIu64 " %s and write schema epoch: %" PRIu64 " %s",
           ckpt_tmp_ts, __wt_timestamp_to_string(ckpt_tmp_ts, ts_string), ckpt_disagg_schema_epoch,
-          __wt_timestamp_to_string(ckpt_disagg_schema_epoch, schema_epoch_string));
+          __wt_timestamp_to_string(ckpt_disagg_schema_epoch, epoch_string[0]),
+          ckpt_disagg_write_epoch,
+          __wt_timestamp_to_string(ckpt_disagg_write_epoch, epoch_string[1]));
+    }
+    conn->disaggregated_storage.cur_write_schema_epoch = ckpt_disagg_write_epoch;
 
     WT_ASSERT(session, txn->isolation == WT_ISO_SNAPSHOT);
 
@@ -2080,7 +2139,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * WT_CONNECTION.rollback_to_stable is an allowed operation.
      */
     if (ckpt_cfg.use_timestamp) {
-        conn->txn_global.last_ckpt_disaggregated_schema_epoch = ckpt_disagg_schema_epoch;
+        conn->txn_global.last_ckpt_disaggregated_schema_epoch = ckpt_disagg_write_epoch;
         /*
          * MongoDB assumes the checkpoint timestamp will be initialized with WT_TS_NONE. In such
          * cases it queries the recovery timestamp to determine the last stable recovery timestamp.
@@ -2170,7 +2229,7 @@ err:
       "%s", "Checkpoint log stage operation failed");
 
     if (!failed)
-        WT_TRET(__checkpoint_disagg_put(session, ckpt_tmp_ts, ckpt_disagg_schema_epoch));
+        WT_TRET(__checkpoint_disagg_put(session, ckpt_tmp_ts, ckpt_disagg_write_epoch));
     WT_TRET(__checkpoint_disagg_advance(session, ckpt_tmp_ts, !failed && ret == 0));
 
     WT_TRET(__checkpoint_teardown(session, failed, saved_isolation));
@@ -3015,7 +3074,7 @@ err:
  */
 static int
 __checkpoint_disagg_put(
-  WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts, wt_timestamp_t ckpt_disagg_schema_epoch)
+  WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts, wt_timestamp_t write_epoch)
 {
     WT_DECL_RET;
 
@@ -3033,7 +3092,7 @@ __checkpoint_disagg_put(
     if (conn->disaggregated_storage.num_meta_put_at_ckpt_begin ==
         conn->disaggregated_storage.num_meta_put &&
       (ckpt_ts != conn->disaggregated_storage.last_checkpoint_timestamp ||
-        ckpt_disagg_schema_epoch != conn->disaggregated_storage.last_checkpoint_schema_epoch)) {
+        write_epoch != conn->disaggregated_storage.last_checkpoint_schema_epoch)) {
         __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
           "Update requested for disaggregated storage checkpoint metadata because the stable "
           "timestamp advanced");
@@ -3046,8 +3105,8 @@ __checkpoint_disagg_put(
             WT_TRET_MSG(session, __wt_disagg_put_crypt_helper(session), "%s",
               "Disaggregated storage checkpoint failed to write encryption metadata");
         WT_TRET_MSG(session,
-          __wt_disagg_put_checkpoint_meta(session, conn->disaggregated_storage.last_checkpoint_root,
-            0, ckpt_ts, ckpt_disagg_schema_epoch),
+          __wt_disagg_put_checkpoint_meta(
+            session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_ts, write_epoch),
           "%s", "Disaggregated storage checkpoint failed to write checkpoint metadata");
     }
 

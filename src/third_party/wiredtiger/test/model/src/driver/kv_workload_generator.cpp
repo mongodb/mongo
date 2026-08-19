@@ -108,12 +108,6 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 }
 
 /*
- * kv_workload_generator::_default_spec --
- *     The default workload specification.
- */
-const kv_workload_generator_spec kv_workload_generator::_default_spec;
-
-/*
  * kv_workload_generator::kv_workload_generator --
  *     Create a new workload generator.
  */

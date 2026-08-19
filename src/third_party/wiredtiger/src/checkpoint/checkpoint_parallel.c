@@ -233,7 +233,7 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
         time_rec_start = __wt_clock(session);
         WT_WITH_DHANDLE(session, entry->dhandle,
-          ret = __wt_reconcile(session, entry->ref, NULL, reconcile_flags));
+          ret = __wt_reconcile(session, entry->ref, NULL, reconcile_flags, NULL));
 
         /* Update the reconciliation time and the statistics. */
         entry->reconcile_time = __wt_clock(session) - time_rec_start;

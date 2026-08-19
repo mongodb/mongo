@@ -10,6 +10,21 @@
 
 #include "evict_private.h"
 
+/*
+ * The important timestamps of each stage in an eviction. If an eviction takes a long time and times
+ * out, we can trace the time usage of each stage from this information.
+ */
+struct __wt_evict_timeline {
+    uint64_t evict_start;
+    uint64_t evict_finish;
+    uint64_t reentry_hs_evict_start;
+    uint64_t reentry_hs_evict_finish;
+    bool reentry_hs_eviction;
+
+    /* Filled in by the reconciliation this eviction drove, if it ran one. */
+    WT_RECONCILE_TIMELINE reconcile;
+};
+
 struct __wt_evict {
     wt_shared volatile uint64_t eviction_progress; /* Eviction progress count */
     uint64_t last_eviction_progress;               /* Tracked eviction progress */

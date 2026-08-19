@@ -575,7 +575,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 
     /* Track prev calls during HS wrapup */
     if (F_ISSET(session, WT_SESSION_HS_WRAPUP))
-        session->reconcile_stats.hs_wrapup_next_prev_calls++;
+        WT_STAT_CONN_INCR(session, rec_hs_wrapup_next_prev_calls);
 
     /* tree walk flags */
     flags = WT_READ_NO_SPLIT | WT_READ_PREV | WT_READ_SKIP_INTL;
