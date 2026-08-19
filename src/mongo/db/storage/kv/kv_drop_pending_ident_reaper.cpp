@@ -222,11 +222,13 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
     auto oldestTs = timestamps.oldest;
     auto stableTs = timestamps.stable;
 
-    // If we have no checkpoint timestamp, then we cannot rollback to stable and don't need to keep
-    // tables required for RTS. If we do, then we can't drop tables which need to return to being
-    // present after a RTS even if they're otherwise expired.
-    // TODO(SERVER-122163): once schema epochs are fully implemented we don't need to defer drops
-    // until after a checkpoint when schema epochs are used.
+    // On ASC, we need a checkpoint at or after the drop timestamp to ensure that rollback to stable
+    // will not attempt to roll back to a point before we dropped the table. However, if we've never
+    // taken a checkpoint then we have nothing to roll back to at all and this doesn't apply.
+    // On DSC, we need a table to not have any uncheckpointed writes to avoid a race where we try to
+    // checkpoint the final writes concurrently with dropping the table and can't because the data
+    // is gone. Requiring a checkpoint at or after the drop timestamp is more conservative than
+    // needed for this, but there isn't any obvious upside to making it more precise.
     if (!timestamps.checkpoint.isNull()) {
         oldestTs = std::min(oldestTs, timestamps.checkpoint);
         stableTs = std::min(stableTs, timestamps.checkpoint);
