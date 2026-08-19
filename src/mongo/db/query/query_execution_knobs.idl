@@ -1269,6 +1269,27 @@ server_parameters:
             gte: 0
         redact: false
 
+    internalQueryEnableChangeStreamMatchExpressionReordering:
+        description: >-
+            If true, change stream match expressions dynamically reorder the child predicates of
+            their $and/$or/$nor nodes at runtime, so that the predicate observed to terminate
+            evaluation earliest is evaluated first. Set to false to keep the predicates in the order
+            in which they were generated.
+            The value is read when a change stream cursor is created, so changing it at runtime
+            affects change stream cursors opened from that point on and not cursors that are already
+            open.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryEnableChangeStreamMatchExpressionReordering"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableChangeStreamMatchExpressionReordering
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalChangeStreamRespectsReadPreference:
         description: "Enables change stream cursors to respect readPreference after replica set elections."
         set_at: [startup, runtime]

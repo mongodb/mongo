@@ -49,9 +49,11 @@ public:
         _result = true;
     }
     void visit(const AndMatchExpression* expr) override {
-        for (auto&& child : expr->getChildren()) {
-            child->acceptVisitor(this);
+        const auto& children = expr->getChildren();
+        for (auto it = children.begin(); it != children.end(); ++it) {
+            (*it)->acceptVisitor(this);
             if (!_result) {
+                expr->recordMatch(it);
                 if (_details) {
                     _details->resetOutput();
                 }
@@ -178,9 +180,11 @@ public:
     }
     void visit(const NorMatchExpression* expr) override {
         MatchExpressionEvaluator childVisitor(_doc, nullptr, _ctx);
-        for (auto&& child : expr->getChildren()) {
-            child->acceptVisitor(&childVisitor);
+        const auto& children = expr->getChildren();
+        for (auto it = children.begin(); it != children.end(); ++it) {
+            (*it)->acceptVisitor(&childVisitor);
             if (childVisitor.getResult()) {
+                expr->recordMatch(it);
                 _result = false;
                 return;
             }
@@ -190,9 +194,11 @@ public:
     void visit(const NotMatchExpression* expr) override;
     void visit(const OrMatchExpression* expr) override {
         MatchExpressionEvaluator childVisitor(_doc, nullptr, _ctx);
-        for (auto&& child : expr->getChildren()) {
-            child->acceptVisitor(&childVisitor);
+        const auto& children = expr->getChildren();
+        for (auto it = children.begin(); it != children.end(); ++it) {
+            (*it)->acceptVisitor(&childVisitor);
             if (childVisitor.getResult()) {
+                expr->recordMatch(it);
                 _result = true;
                 return;
             }

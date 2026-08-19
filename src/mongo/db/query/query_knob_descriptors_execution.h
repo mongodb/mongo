@@ -57,6 +57,10 @@
          kInternalChangeStreamRespectsReadPreferenceName,                                 \
          internalChangeStreamRespectsReadPreference,                                      \
          getChangeStreamRespectsReadPreference)                                           \
+    KNOB(kEnableChangeStreamMatchExpressionReordering,                                    \
+         kInternalQueryEnableChangeStreamMatchExpressionReorderingName,                   \
+         internalQueryEnableChangeStreamMatchExpressionReordering,                        \
+         getEnableChangeStreamMatchExpressionReordering)                                  \
     KNOB(kDisableLookupExecutionUsingHashJoin,                                            \
          kInternalQueryDisableLookupExecutionUsingHashJoinName,                           \
          internalQueryDisableLookupExecutionUsingHashJoin,                                \

@@ -7,6 +7,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_reordering.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
@@ -67,6 +68,11 @@ ChangeStreamUnwindTransactionStage::ChangeStreamUnwindTransactionStage(
             str::stream() << DocumentSourceChangeStreamUnwindTransaction::kStageName
                           << " cannot be executed from router",
             !pExpCtx->getInRouter());
+
+    // This filter is applied to every individual operation unwound from an 'applyOps' entry, so a
+    // single large transaction can evaluate it many times. The expression belongs to this execution
+    // stage and is not serialized back out, so it is safe to reorder.
+    allowReordering(pExpCtx->getOperationContext(), _expression.get());
 }
 
 GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {

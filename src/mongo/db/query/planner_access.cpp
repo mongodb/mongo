@@ -20,6 +20,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_reordering.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
@@ -539,10 +540,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const NamespaceString& nss = query.nss();
     const bool isOplog = nss.isOplog();
 
+    // Restricted to the change stream oplog scan for now: its filter is a large disjunction
+    // evaluated against every oplog entry on the server, the vast majority of which do not match,
+    // so the order of the branches dominates the cost.
+    auto clonedFilter = root->clone();
+    if (isOplog && tailable && query.getExpCtx()->getChangeStreamSpec()) {
+        allowReordering(query.getOpCtx(), clonedFilter.get());
+    }
+
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
     csn->nss = nss;
-    csn->filter = root->clone();
+    csn->filter = std::move(clonedFilter);
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
         params.mainCollectionInfo.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;

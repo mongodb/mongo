@@ -11,10 +11,12 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -31,9 +33,17 @@ using namespace std::literals::string_view_literals;
 
 class ListOfMatchExpression : public MatchExpression {
 public:
+    using Expressions = std::vector<std::unique_ptr<MatchExpression>>;
+
+    /**
+     * Number of short-circuits recorded across this node's children after which the children are
+     * reordered and their counters reset.
+     */
+    static constexpr std::uint32_t kReorderIterations = 4096;
+
     ListOfMatchExpression(MatchType type,
                           clonable_ptr<ErrorAnnotation> annotation,
-                          std::vector<std::unique_ptr<MatchExpression>> expressions)
+                          Expressions expressions)
         : MatchExpression(type, std::move(annotation)), _expressions(std::move(expressions)) {}
 
     void add(std::unique_ptr<MatchExpression> e) {
@@ -55,7 +65,7 @@ public:
     /**
      * Returns the unmodifiable vector of the children of the current node.
      */
-    const std::vector<std::unique_ptr<MatchExpression>>& getChildren() const {
+    const Expressions& getChildren() const {
         return _expressions;
     }
 
@@ -85,11 +95,11 @@ public:
         return child;
     }
 
-    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+    Expressions* getChildVector() final {
         return &_expressions;
     }
 
-    const std::vector<std::unique_ptr<MatchExpression>>& getChildVector() const {
+    const Expressions& getChildVector() const {
         return _expressions;
     }
 
@@ -99,6 +109,34 @@ public:
         return MatchCategory::kLogical;
     }
 
+    /**
+     * Enables dynamic reordering of this node's child predicates based on their observed
+     * selectivity.
+     * Has no effect for nodes with fewer than two children, where there is nothing to reorder.
+     */
+    void allowReordering();
+
+    /**
+     * Records that the child pointed to by 'it' short-circuited the evaluation of this node, and
+     * reorders the children once 'kReorderIterations' short-circuits have accumulated.
+     *
+     * Called from the match expression evaluator on the hot path. No-op unless reordering was
+     * enabled via 'allowReordering()'.
+     *
+     * The reorder mutates the child vector that the caller is currently iterating over,
+     * which invalidates 'it' and the caller's loop iterators. This is safe only because every
+     * caller in 'exec/matcher/matcher.h' returns immediately after calling this function. Any
+     * caller that wants to keep iterating afterwards must re-obtain its iterators.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void recordMatch(Expressions::const_iterator it) const {
+        if (_reorderingEnabled) {
+            (*it)->incrementShortCircuitCounter();
+            if (++_reorderHits >= kReorderIterations) {
+                _reorderPredicates();
+            }
+        }
+    }
+
 protected:
     void _debugList(StringBuilder& debug, int indentationLevel) const;
 
@@ -106,8 +144,25 @@ protected:
                      const query_shape::SerializationOptions& opts = {},
                      bool includePath = true) const;
 
+    bool _isReorderingEnabled() const {
+        return _reorderingEnabled;
+    }
+
+    /**
+     * Reorders the child predicates by observed short-circuit frequency, so that the child most
+     * likely to terminate evaluation early is evaluated first, then clears the counters to start a
+     * fresh measurement window.
+     */
+    void _reorderPredicates() const;
+
 private:
-    std::vector<std::unique_ptr<MatchExpression>> _expressions;
+    // Mutable because both statistics gathering and reordering operate on a const expression tree.
+    mutable Expressions _expressions;
+
+    // Short-circuits recorded across all children since the last reorder.
+    mutable std::uint32_t _reorderHits = 0;
+
+    bool _reorderingEnabled = false;
 };
 
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] AndMatchExpression : public ListOfMatchExpression {
@@ -132,6 +187,9 @@ public:
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
+        }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
         }
         return self;
     }
@@ -176,6 +234,9 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
+        }
         return self;
     }
 
@@ -218,6 +279,9 @@ public:
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
+        }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
         }
         return self;
     }

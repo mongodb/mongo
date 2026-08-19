@@ -497,6 +497,30 @@ public:
      */
     static bool isInternalNodeWithPath(MatchType m);
 
+    //
+    // Dynamic predicate reordering: selectivity accounting.
+    //
+    // A node that is the child of a reordering-enabled AND/OR/NOR node accumulates the number of
+    // times it short-circuited its parent's evaluation. The parent periodically sorts its children
+    // by this counter so that the child most likely to terminate evaluation early is tried first.
+    // See 'ListOfMatchExpression::allowReordering()'.
+
+    /**
+     * Records that this node short-circuited the evaluation of its parent. Called on the hot path,
+     * once per evaluated document at most.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void incrementShortCircuitCounter() const {
+        ++_shortCircuitCounter;
+    }
+
+    std::uint32_t getShortCircuitCounter() const {
+        return _shortCircuitCounter;
+    }
+
+    void resetShortCircuitCounter() const {
+        _shortCircuitCounter = 0;
+    }
+
 protected:
     /**
      * Subclasses that are collation-aware must implement this method in order to capture changes
@@ -520,6 +544,12 @@ protected:
 
 private:
     MatchType _matchType;
+
+    // Number of times this node short-circuited the evaluation of its parent since the parent last
+    // reordered its children. It stays zero for a node whose parent does not
+    // have reordering enabled, which is every node of every non-change-stream query.
+    mutable std::uint32_t _shortCircuitCounter = 0;
+
     std::unique_ptr<TagData> _tagData;
 };
 

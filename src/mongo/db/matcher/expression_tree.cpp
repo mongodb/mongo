@@ -121,6 +121,30 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
 };
 }  // namespace
 
+void ListOfMatchExpression::allowReordering() {
+    // Nothing to reorder with fewer than two children.
+    _reorderingEnabled = numChildren() > 1;
+    _reorderHits = 0;
+    for (auto&& expr : _expressions) {
+        expr->resetShortCircuitCounter();
+    }
+}
+
+void ListOfMatchExpression::_reorderPredicates() const {
+    if (_reorderingEnabled) {
+        std::sort(_expressions.begin(), _expressions.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs->getShortCircuitCounter() > rhs->getShortCircuitCounter();
+        });
+    }
+
+    // Reset counters unconditionally
+    for (auto&& expr : _expressions) {
+        expr->resetShortCircuitCounter();
+    }
+
+    _reorderHits = 0;
+}
+
 void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLevel) const {
     for (unsigned i = 0; i < _expressions.size(); i++) {
         _expressions[i]->debugString(debug, indentationLevel + 1);

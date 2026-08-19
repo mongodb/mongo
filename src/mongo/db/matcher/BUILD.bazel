@@ -41,10 +41,12 @@ mongo_cc_library(
     name = "expression_algo",
     srcs = [
         "expression_algo.cpp",
+        "expression_reordering.cpp",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/dependency_analysis",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
     ],
 )
 
