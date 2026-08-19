@@ -88,7 +88,57 @@ class TestActivateTask(unittest.TestCase):
 
     @patch.object(under_test.evergreen_conn, "get_evergreen_api")
     @patch.object(under_test, "read_config_file")
-    def test_missing_task_raises_runtime_error_with_build_variant(
+    def test_missing_version_task_is_scheduled_with_build_variant(
+        self, mock_read_config_file, mock_get_evergreen_api
+    ):
+        mock_read_config_file.return_value = {
+            "build_id": "build_id",
+            "version_id": "version_id",
+            "build_variant": "linux-debug",
+            "is_patch": False,
+        }
+        mock_variant = MagicMock()
+        mock_variant.build_variant = None
+        mock_variant.get_tasks.return_value = [build_mock_task("some_other_task")]
+        mock_evg_api = MagicMock()
+        mock_evg_api.build_by_id.return_value = mock_variant
+        mock_get_evergreen_api.return_value = mock_evg_api
+
+        under_test.main("archive_dist_test_debug")
+
+        mock_evg_api.activate_version_tasks.assert_called_once_with(
+            "version_id",
+            [{"name": "linux-debug", "tasks": ["archive_dist_test_debug"]}],
+        )
+
+    @patch.object(under_test.evergreen_conn, "get_evergreen_api")
+    @patch.object(under_test, "read_config_file")
+    def test_missing_version_task_raises_when_variant_name_absent(
+        self, mock_read_config_file, mock_get_evergreen_api
+    ):
+        mock_read_config_file.return_value = {
+            "build_id": "build_id",
+            "version_id": "version_id",
+            "is_patch": False,
+        }
+        mock_variant = MagicMock()
+        mock_variant.build_variant = None
+        mock_variant.get_tasks.return_value = [build_mock_task("some_other_task")]
+        mock_evg_api = MagicMock()
+        mock_evg_api.build_by_id.return_value = mock_variant
+        mock_get_evergreen_api.return_value = mock_evg_api
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Could not determine the build variant for version activation from build build_id",
+        ):
+            under_test.main("archive_dist_test_debug")
+
+        mock_evg_api.activate_version_tasks.assert_not_called()
+
+    @patch.object(under_test.evergreen_conn, "get_evergreen_api")
+    @patch.object(under_test, "read_config_file")
+    def test_missing_version_task_raises_when_version_id_absent(
         self, mock_read_config_file, mock_get_evergreen_api
     ):
         mock_read_config_file.return_value = {
@@ -105,31 +155,11 @@ class TestActivateTask(unittest.TestCase):
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "The archive_dist_test_debug task could not be found in the linux-debug variant",
+            "Could not determine the version for activation from build build_id",
         ):
             under_test.main("archive_dist_test_debug")
 
-    @patch.object(under_test.evergreen_conn, "get_evergreen_api")
-    @patch.object(under_test, "read_config_file")
-    def test_missing_task_falls_back_to_build_id_when_variant_name_absent(
-        self, mock_read_config_file, mock_get_evergreen_api
-    ):
-        mock_read_config_file.return_value = {
-            "build_id": "build_id",
-            "is_patch": False,
-        }
-        mock_variant = MagicMock()
-        mock_variant.build_variant = None
-        mock_variant.get_tasks.return_value = [build_mock_task("some_other_task")]
-        mock_evg_api = MagicMock()
-        mock_evg_api.build_by_id.return_value = mock_variant
-        mock_get_evergreen_api.return_value = mock_evg_api
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "The archive_dist_test_debug task could not be found in the build_id variant",
-        ):
-            under_test.main("archive_dist_test_debug")
+        mock_evg_api.activate_version_tasks.assert_not_called()
 
     @patch.object(under_test.evergreen_conn, "get_evergreen_api")
     @patch.object(under_test, "read_config_file")

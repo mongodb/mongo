@@ -33,7 +33,6 @@ def main(
     resolved_build_variant = expansions.get("build_variant") or getattr(
         variant, "build_variant", None
     )
-    display_build_variant = resolved_build_variant or variant_id
     found_task = None
     for task in variant.get_tasks():
         if task.display_name == task_name:
@@ -59,8 +58,19 @@ def main(
         patch_id = expansions.get("version_id")
         evg_api.configure_patch(patch_id, [{"id": resolved_build_variant, "tasks": [task_name]}])
     else:
-        raise RuntimeError(
-            f"The {task_name} task could not be found in the {display_build_variant} variant"
+        # Tasks on waterfall versions may not be materialized until they are activated. Use the
+        # version endpoint to schedule the task when it is not already present in the build.
+        if not resolved_build_variant:
+            raise RuntimeError(
+                f"Could not determine the build variant for version activation from build {variant_id}"
+            )
+        version_id = expansions.get("version_id")
+        if not version_id:
+            raise RuntimeError(
+                f"Could not determine the version for activation from build {variant_id}"
+            )
+        evg_api.activate_version_tasks(
+            version_id, [{"name": resolved_build_variant, "tasks": [task_name]}]
         )
 
 
