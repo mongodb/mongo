@@ -74,7 +74,16 @@ def get_tags() -> list[str]:
                     # version instead.
                     results[major_minor_version] = (tag, version.is_prerelease)
 
-        for tag, _ in results.values():
+        for fcv, (tag, _) in results.items():
+            if tag is None:
+                # No release tag exists locally for this FCV. This happens when a new latest FCV
+                # is introduced before its first tag is visible to this clone. For example, when
+                # LATEST_FCV became 9.1, tasks running on that revision saw no r9.1.* tag until
+                # r9.1.0-alpha0 had propagated. Skip such an FCV rather than yielding None, which
+                # would fail deep inside a subprocess call.
+                LOGGER.warning("No release tag found for FCV %s; skipping it", fcv)
+                continue
+
             yield tag
 
     return list(gen_tags())
@@ -145,7 +154,10 @@ def main():
 
     tags = get_tags()
     LOGGER.info("Fetching IDL files for past tags: %s", tags)
-    assert len(tags) >= 2, "we must always have at least two tags to check"
+    assert len(tags) >= 2, (
+        f"we must always have at least two tags to check, but only found {tags}; a release tag for "
+        "one of the generic FCVs is missing from this clone"
+    )
 
     make_idl_directories(tags, args.destination)
 
