@@ -1,12 +1,16 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/version/releases.h"
@@ -19,6 +23,12 @@
 
 namespace mongo::repl {
 namespace {
+
+// The auth initializers pulled in transitively by the replication coordinator mock expect
+// startup option storage to have run. This benchmark parses no options, so stub the node out
+// to keep the initializer graph satisfiable.
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
+(InitializerContext*) {}
 
 // Document sizes swept by the hashing benchmarks (64B up to 2MB in powers of two). The hash is
 // calculated over the raw BSON bytes, so cost depends only on objsize() and not on the document's
@@ -66,7 +76,15 @@ public:
         // (Generic FCV reference): This reference is needed for the feature flag check API.
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
         setGlobalServiceContext(ServiceContext::make());
-        _client = getGlobalServiceContext()->getService()->makeClient("internodeValidationHashBm");
+        auto* service = getGlobalServiceContext();
+
+        // The enablement check reads the replication settings, so a replication coordinator has to
+        // exist. Default-constructed settings are not a replica set, which is enough for the check
+        // to return without consulting the persistence provider this fixture does not set.
+        ReplicationCoordinator::set(
+            service, std::make_unique<ReplicationCoordinatorMock>(service, ReplSettings{}));
+
+        _client = service->getService()->makeClient("internodeValidationHashBm");
     }
 
     ServiceContext::UniqueOperationContext makeOpCtx() {
