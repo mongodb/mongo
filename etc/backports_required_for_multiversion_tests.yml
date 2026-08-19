@@ -713,6 +713,8 @@ last-continuous:
     ticket: SERVER-131326
   - test_file: jstests/noPassthrough/min_wait_streaming_hello_mongos.js
     ticket: SERVER-132650
+  - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
+    ticket: SERVER-104343
   suites: null
 last-lts:
   all:
@@ -1478,4 +1480,6 @@ last-lts:
     ticket: SERVER-131326
   - test_file: jstests/noPassthrough/min_wait_streaming_hello_mongos.js
     ticket: SERVER-132650
+  - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
+    ticket: SERVER-104343
   suites: null
