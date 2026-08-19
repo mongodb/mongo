@@ -212,7 +212,9 @@ public:
                                             const InsertDeleteOptions& options,
                                             KeyHandlerFn&& onDuplicateKey,
                                             int64_t* keysInserted,
-                                            int64_t* keysDeleted) = 0;
+                                            int64_t* keysDeleted,
+                                            int64_t* bytesInserted,
+                                            int64_t* bytesDeleted) = 0;
 
     //
     // Bulk operations support
@@ -683,7 +685,9 @@ public:
                                     const InsertDeleteOptions& options,
                                     KeyHandlerFn&& onDuplicateKey,
                                     int64_t* keysInserted,
-                                    int64_t* keysDeleted) final;
+                                    int64_t* keysDeleted,
+                                    int64_t* bytesInserted,
+                                    int64_t* bytesDeleted) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(
         OperationContext* opCtx,
@@ -774,5 +778,11 @@ private:
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };
+
+/**
+ * Records updates to the metrics tracking keys and key bytes processed during an index build's side
+ * write drain process, directly incrementing the counters.
+ */
+void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed, int64_t bytesProcessed);
 
 }  // namespace mongo

@@ -269,6 +269,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
         WriteUnitOfWork wuow(opCtx);
 
+        int64_t batchKeyBytesInserted = 0;
+        int64_t batchKeyBytesDeleted = 0;
+
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
 
@@ -314,7 +317,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
                     options,
                     std::move(onDuplicateKeyUniqueFn),
                     &totalInserted,
-                    &totalDeleted);
+                    &totalDeleted,
+                    &batchKeyBytesInserted,
+                    &batchKeyBytesDeleted);
                 !status.isOK()) {
                 return status;
             }
@@ -370,6 +375,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
         _numApplied += batchSize;
         sideWritesDrainedCounter.add(batchSize);
         totalBytesDrained += batchSizeBytes;
+
+        recordIndexBuildSideWritesProcessedStats(batchSize,
+                                                 batchKeyBytesInserted + batchKeyBytesDeleted);
 
         // Lock yielding will be directed by the yield policy provided.
         // We will typically yield locks during the draining phase if we are holding intent

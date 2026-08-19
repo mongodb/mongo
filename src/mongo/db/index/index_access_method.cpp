@@ -119,12 +119,52 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
 }
 
 namespace {
-auto& keysInsertedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
-    otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan,
-    "Total number of keys inserted to indexes from collection scan",
-    otel::metrics::MetricUnit::kEvents);
+otel::metrics::AttributeDefinition<std::string_view> makeIndexBuildPhaseAttribute() {
+    return {.name = "phase",
+            .values = {idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                       idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
+                       idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}};
+}
+
+auto& keysProcessedCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+        "Total number of index keys processed during index builds",
+        otel::metrics::MetricUnit::kCount,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.keysProcessed",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
+auto& bytesProcessedCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+        "Total number of index key bytes processed during index builds",
+        otel::metrics::MetricUnit::kBytes,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.bytesProcessed",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
 
 constexpr int32_t kMetricUpdateIntervalKeyCount = 1000;
+constexpr int32_t kMetricUpdateIntervalBytes = 1024 * 1024;  // 1 MiB
+
+inline void updateProcessedMetrics(int64_t* const keysCounted,
+                                   int64_t* const bytesCounted,
+                                   IndexBuildPhaseEnum phase,
+                                   bool force = false) {
+    if (force || *keysCounted >= kMetricUpdateIntervalKeyCount ||
+        *bytesCounted >= kMetricUpdateIntervalBytes) {
+        keysProcessedCounter.add(*keysCounted, {idl::serialize(phase)});
+        bytesProcessedCounter.add(*bytesCounted, {idl::serialize(phase)});
+        *keysCounted = 0;
+        *bytesCounted = 0;
+    }
+}
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
@@ -158,6 +198,11 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 
 auto& insertFailedDueToDuplicateKeyError =
     *MetricBuilder<Counter64>{"operation.insertFailedDueToDuplicateKeyError"};
+
+void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed, int64_t bytesProcessed) {
+    keysProcessedCounter.add(keysProcessed, {idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+    bytesProcessedCounter.add(bytesProcessed, {idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+}
 
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                          std::unique_ptr<SortedDataInterface> btree)
@@ -777,7 +822,9 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                                              const InsertDeleteOptions& options,
                                                              KeyHandlerFn&& onDuplicateKey,
                                                              int64_t* const keysInserted,
-                                                             int64_t* const keysDeleted) {
+                                                             int64_t* const keysDeleted,
+                                                             int64_t* const bytesInserted,
+                                                             int64_t* const bytesDeleted) {
     auto opType = [&operation] {
         switch (operation.getStringField("op")[0]) {
             case 'i':
@@ -800,6 +847,7 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
+    const auto keySize = keyString.getSize();
 
     bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
         opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
@@ -824,8 +872,11 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
 
         *keysInserted += numInserted;
-        ru.onRollback(
-            [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
+        *bytesInserted += keySize;
+        ru.onRollback([keysInserted, bytesInserted, numInserted, keySize](OperationContext*) {
+            *keysInserted -= numInserted;
+            *bytesInserted -= keySize;
+        });
     } else {
         int64_t numDeleted;
         Status s =
@@ -843,7 +894,11 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
 
         *keysDeleted += numDeleted;
-        ru.onRollback([keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
+        *bytesDeleted += keySize;
+        ru.onRollback([keysDeleted, bytesDeleted, numDeleted, keySize](OperationContext*) {
+            *keysDeleted -= numDeleted;
+            *bytesDeleted -= keySize;
+        });
     }
     return Status::OK();
 }
@@ -934,6 +989,9 @@ protected:
                        const MultikeyPaths& multikeyPaths);
 
     int64_t _keysInserted = 0;
+
+    int64_t _keysInsertedCounted = 0;
+    int64_t _bytesInsertedCounted = 0;
 
     SortedDataIndexAccessMethod* _iam;
 
@@ -1167,12 +1225,18 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
 
     for (const auto& keyString : *keys) {
         ++_keysInserted;
+        ++_keysInsertedCounted;
+        _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
     for (const auto& keyString : multikeyMetadataKeys) {
         ++_keysInserted;
+        ++_keysInsertedCounted;
+        _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
+    updateProcessedMetrics(
+        &_keysInsertedCounted, &_bytesInsertedCounted, IndexBuildPhaseEnum::kCollectionScan);
 
     setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
 
@@ -1186,6 +1250,8 @@ void BulkBuilderImpl::done(bool forceSpill) {
         _sorter->spill();
     }
     _sortedIterator = _sorter->done();
+    updateProcessedMetrics(
+        &_keysInsertedCounted, &_bytesInsertedCounted, IndexBuildPhaseEnum::kCollectionScan, true);
 }
 
 Status BulkBuilderImpl::commit(OperationContext* opCtx,
@@ -1228,6 +1294,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     size_t bytesInBatch = 0;
     int64_t nKeys = 0;
     int64_t keysCounted = 0;
+    int64_t bytesCounted = 0;
 
     auto commitBatch = [&]() {
         if (batch.empty()) {
@@ -1240,20 +1307,20 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             return keysAdded;
         });
         nKeys += keysInserted;
-        keysCounted += keysInserted;
+        keysCounted += batch.size();
+        bytesCounted += bytesInBatch;
         batch.clear();
         bytesInBatch = 0;
-        if (keysCounted >= kMetricUpdateIntervalKeyCount) {
-            keysInsertedCounter.add(keysCounted);
-            keysCounted = 0;
-        }
+        updateProcessedMetrics(&keysCounted, &bytesCounted, IndexBuildPhaseEnum::kBulkLoad);
         if (nKeys >= onNKeysLoadedFnInterval) {
             onNKeysLoaded();
             nKeys = 0;
         }
     };
 
-    ON_BLOCK_EXIT([&] { keysInsertedCounter.add(keysCounted); });
+    ON_BLOCK_EXIT([&] {
+        updateProcessedMetrics(&keysCounted, &bytesCounted, IndexBuildPhaseEnum::kBulkLoad, true);
+    });
 
     while (it && it->more()) {
         opCtx->checkForInterrupt();

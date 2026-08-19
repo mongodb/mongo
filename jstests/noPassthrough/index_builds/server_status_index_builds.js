@@ -21,6 +21,60 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 const collName = "t";
 const dbName = "test";
 
+describe("index build throughput metrics", function () {
+    before(() => {
+        this.conn = MongoRunner.runMongod();
+        this.db = this.conn.getDB(dbName);
+    });
+
+    beforeEach(() => {
+        this.coll = this.db.getCollection(collName);
+
+        assert.commandWorked(
+            this.coll.insertMany(Array.from({length: 10}, (_, i) => ({a: `foo${i}`}))),
+        );
+    });
+
+    it("keys and bytes processed", () => {
+        const before = this.db.serverStatus().metrics.indexBuilds;
+
+        const fp = configureFailPoint(this.db, "hangIndexBuildDuringBulkLoadPhase", {
+            iteration: 0,
+            indexNames: ["a_1"],
+        });
+
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+            this.conn,
+            this.coll.getFullName(),
+            {a: 1},
+        );
+
+        fp.wait();
+        const during = this.db.serverStatus().metrics.indexBuilds;
+
+        assert.eq(during.keysProcessed, before.keysProcessed + 10 /*keys*/);
+        assert.gte(during.bytesProcessed, before.bytesProcessed + 10 /*keys*/ * 4 /*bytesPerKey*/);
+
+        fp.off();
+        awaitCreateIndex();
+        const after = this.db.serverStatus().metrics.indexBuilds;
+
+        assert.eq(after.keysProcessed, before.keysProcessed + 10 /*keys*/ * 2 /*phases*/);
+        assert.gte(
+            after.bytesProcessed,
+            before.bytesProcessed + 10 /*keys*/ * 4 /*bytesPerKey*/ * 2 /*phases*/,
+        );
+    });
+
+    afterEach(() => {
+        this.coll.drop();
+    });
+
+    after(() => {
+        MongoRunner.stopMongod(this.conn);
+    });
+});
+
 describe("index build failures", function () {
     before(() => {
         this.conn = MongoRunner.runMongod();

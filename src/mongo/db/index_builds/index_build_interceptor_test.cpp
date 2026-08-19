@@ -387,11 +387,19 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven) {
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
+    int64_t keysProcessedBefore = 0;
+    int64_t bytesProcessedBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
     HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+        keysProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        bytesProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         drainDurationBefore = readHistogramOrZero(
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         drainBytesBefore = readHistogramOrZero(
@@ -450,6 +458,14 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
             drainedBefore + 1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  keysProcessedBefore + 1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  bytesProcessedBefore + keyString.getSize());
         const auto drainDurationAfter = capturer.readInt64Histogram(
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);
@@ -464,11 +480,19 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
 TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven) {
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
+    int64_t keysProcessedBefore = 0;
+    int64_t bytesProcessedBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
     HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+        keysProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        bytesProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         drainDurationBefore = readHistogramOrZero(
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         drainBytesBefore = readHistogramOrZero(
@@ -544,6 +568,14 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
             drainedBefore + 1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  keysProcessedBefore + 1);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  bytesProcessedBefore + keyString.getSize());
         const auto drainDurationAfter = capturer.readInt64Histogram(
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);
@@ -596,9 +628,17 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
 
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
+    int64_t keysProcessedBefore = 0;
+    int64_t bytesProcessedBefore = 0;
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+        keysProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        bytesProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
     }
 
     {
@@ -639,6 +679,14 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
             drainedBefore + kNumKeys);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  keysProcessedBefore + kNumKeys);
+        EXPECT_GT(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  bytesProcessedBefore);
     }
 }
 
@@ -683,9 +731,17 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
 
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
+    int64_t keysProcessedBefore = 0;
+    int64_t bytesProcessedBefore = 0;
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+        keysProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        bytesProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
     }
 
     {
@@ -724,6 +780,14 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
             drainedBefore + kNumKeys);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  keysProcessedBefore + kNumKeys);
+        EXPECT_GT(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  bytesProcessedBefore);
     }
 }
 

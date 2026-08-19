@@ -1753,12 +1753,25 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
 
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t scannedBefore = 0;
+    int64_t keysGeneratedBefore = 0;
+    int64_t bytesGeneratedBefore = 0;
     int64_t keysInsertedBefore = 0;
+    int64_t bytesInsertedBefore = 0;
     if (capturer.canReadMetrics()) {
         scannedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned);
+        keysGeneratedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)});
+        bytesGeneratedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)});
         keysInsertedBefore =
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan);
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)});
+        bytesInsertedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)});
     }
 
     auto acq =
@@ -1812,9 +1825,22 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)}),
+                  keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)}),
+                  bytesGeneratedBefore);
         EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)}),
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)}),
+            bytesInsertedBefore);
     }
 
     {
@@ -1830,8 +1856,13 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)}),
+                  keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
         EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)}),
             keysInsertedBefore + (numDocsInColl * numIndexSpecs));
     }
 }

@@ -464,8 +464,11 @@ public:
     static constexpr MetricName kInternodeConsistencyHashMismatchDelete = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.delete");
 
-    static constexpr MetricName kIndexBuildKeysInsertedFromScan =
-        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.keysInsertedFromScan");
+    static constexpr MetricName kIndexBuildKeysProcessed =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.keysProcessed");
+    static constexpr MetricName kIndexBuildBytesProcessed =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.bytesProcessed");
+
     static constexpr MetricName kIndexBuildDocsScanned =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.docsScanned");
     static constexpr MetricName kIndexBuildResumeSucceeded =
