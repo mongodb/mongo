@@ -21,7 +21,7 @@ build --incompatible_default_to_explicit_init_py
 # there is WIP to allow users to inject constraints
 # this flag is required because the default for BZLMOD is @platform//host:host
 build --platforms=@internal_platforms_do_not_use//host
-common --enable_workspace=true
+common --enable_workspace=false
 
 # Improves build performance after first clean pull by
 # about 1 minute on developer machines

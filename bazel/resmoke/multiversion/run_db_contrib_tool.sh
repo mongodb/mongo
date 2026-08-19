@@ -20,7 +20,7 @@ trap 'rm -f "$log"' EXIT
 # Point git at the real repository so tag lookups (needed for patch versions
 # like 8.0.16) work when db-contrib-tool runs from a Bazel output directory
 # that has no .git ancestor.
-export GIT_DIR="$(dirname "$(readlink -f "$root/WORKSPACE.bazel")")/.git"
+export GIT_DIR="$(dirname "$(readlink -f "$root/MODULE.bazel")")/.git"
 
 # cd into the per-invocation output dir so that db-contrib-tool's temporary
 # 'multiversion-config.yml' is isolated from parallel invocations.  The output

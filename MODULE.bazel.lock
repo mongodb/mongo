@@ -242,7 +242,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%bazel_features_deps": {
       "general": {
-        "bzlTransitiveDigest": "Is3jR+jsN7gXmxveF5zveWNUTUdS0GKrfm4+OAnnbXI=",
+        "bzlTransitiveDigest": "li0WpGoRg/bE4u9YqFecxjNRQtl7u1i1lRl/OA9kSMY=",
         "usagesDigest": "c91kQ0HotoA1cfwWU4KaqCoQU7lT6pGi6XPGIiMGkb0=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -353,7 +353,7 @@
     },
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "Is3jR+jsN7gXmxveF5zveWNUTUdS0GKrfm4+OAnnbXI=",
+        "bzlTransitiveDigest": "li0WpGoRg/bE4u9YqFecxjNRQtl7u1i1lRl/OA9kSMY=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -447,6 +447,45 @@
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-x86_64-apple-darwin-install_only.tar.gz"
               ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "bazel_features",
+            "bazel_features~"
+          ],
+          [
+            "bazel_features~",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
+    "//bazel:bzlmod.bzl%setup_mongo_toolchains": {
+      "general": {
+        "bzlTransitiveDigest": "li0WpGoRg/bE4u9YqFecxjNRQtl7u1i1lRl/OA9kSMY=",
+        "usagesDigest": "MGOQwrQ4ZotZBZYdRVCjpuGi3weA+XtV/sK4untSEE8=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "mongo_toolchain_v5": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl",
+            "ruleClassName": "toolchain_download",
+            "attributes": {
+              "version": "v5",
+              "flags_tpl": "@@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl"
+            }
+          },
+          "gdb_v5": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl",
+            "ruleClassName": "gdb_v5_download",
+            "attributes": {
+              "version": "v5",
+              "mongo_toolchain": "@@_main~setup_mongo_toolchains~mongo_toolchain_v5//:all_files"
             }
           }
         },
@@ -569,7 +608,7 @@
     },
     "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%setup_mongo_linux_cross_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "i8veTyvh0WxS989tuTeSdfJR9nPzs1u9+FUjGWDPrIc=",
+        "bzlTransitiveDigest": "EGRHgXKHXsBV2uQWHqLtR9qvhTiAA1nzXBnFwTe7gDA=",
         "usagesDigest": "B9JdMmagXv+H97m1bCwaGiKktIVCPGeH/qokO4Hpx1A=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -809,6 +848,40 @@
             "bazel_features~~version_extension~bazel_features_version"
           ]
         ]
+      }
+    },
+    "@@bazel_rules_mongo~//codeowners:codeowners_binary.bzl%codeowners_binary_extension": {
+      "general": {
+        "bzlTransitiveDigest": "CWyptog6+HHNYA/q2HpgyU5CZBVdLjO/GBGop1ggDjs=",
+        "usagesDigest": "wduO2cR5KqDQtKCBgXwJsrwYVSVoLbBaPVcjSb97q9o=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "codeowners_binary": {
+            "bzlFile": "@@bazel_rules_mongo~//codeowners:codeowners_binary.bzl",
+            "ruleClassName": "_codeowners_binary",
+            "attributes": {}
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
+    "@@bazel_rules_mongo~//codeowners:codeowners_validator.bzl%codeowners_validator_extension": {
+      "general": {
+        "bzlTransitiveDigest": "kYa8U9np+k6KX9scgW+iA+nlQhCLheaOqJVkCbyftmc=",
+        "usagesDigest": "Gba+7lS6dMxSedHaUnGTqiYZJJYt1ZuUlUvY/aMZ8yU=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "codeowners_validator": {
+            "bzlFile": "@@bazel_rules_mongo~//codeowners:codeowners_validator.bzl",
+            "ruleClassName": "_codeowners_validator",
+            "attributes": {}
+          }
+        },
+        "recordedRepoMappingEntries": []
       }
     },
     "@@buildifier_prebuilt~//:defs.bzl%buildifier_prebuilt_deps_extension": {
@@ -1671,11 +1744,130 @@
     "@@rules_nodejs~//nodejs:extensions.bzl%node": {
       "general": {
         "bzlTransitiveDigest": "SqbzUarOVzAfK28Ca5+NIU3LUwnW/b3h0xXBUS97oyI=",
-        "usagesDigest": "BNh/7aYgUWaz5YBRurco7ePSFFUgEOO6q70+pUXr1Oc=",
+        "usagesDigest": "WW+OaCixo/bGiIgW44xAfQVbAHmbAxV4dljI6/e5134=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
         "generatedRepoSpecs": {
+          "nodejs16_linux_amd64": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "linux_amd64"
+            }
+          },
+          "nodejs16_linux_arm64": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "linux_arm64"
+            }
+          },
+          "nodejs16_linux_s390x": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "linux_s390x"
+            }
+          },
+          "nodejs16_linux_ppc64le": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "linux_ppc64le"
+            }
+          },
+          "nodejs16_darwin_amd64": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "darwin_amd64"
+            }
+          },
+          "nodejs16_darwin_arm64": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "darwin_arm64"
+            }
+          },
+          "nodejs16_windows_amd64": {
+            "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
+            "ruleClassName": "_nodejs_repositories",
+            "attributes": {
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "16.18.1",
+              "include_headers": false,
+              "platform": "windows_amd64"
+            }
+          },
+          "nodejs16": {
+            "bzlFile": "@@rules_nodejs~//nodejs/private:nodejs_repo_host_os_alias.bzl",
+            "ruleClassName": "nodejs_repo_host_os_alias",
+            "attributes": {
+              "user_node_repository_name": "nodejs16"
+            }
+          },
+          "nodejs16_host": {
+            "bzlFile": "@@rules_nodejs~//nodejs/private:nodejs_repo_host_os_alias.bzl",
+            "ruleClassName": "nodejs_repo_host_os_alias",
+            "attributes": {
+              "user_node_repository_name": "nodejs16"
+            }
+          },
+          "nodejs16_toolchains": {
+            "bzlFile": "@@rules_nodejs~//nodejs/private:nodejs_toolchains_repo.bzl",
+            "ruleClassName": "nodejs_toolchains_repo",
+            "attributes": {
+              "user_node_repository_name": "nodejs16"
+            }
+          },
           "nodejs_linux_amd64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
             "ruleClassName": "_nodejs_repositories",

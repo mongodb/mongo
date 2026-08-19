@@ -22,6 +22,7 @@ def _coverity_toolchain(ctx):
 
 coverity_toolchain = repository_rule(
     implementation = _coverity_toolchain,
+    environ = ["COVERITY_INSTALL_ROOT"],
     attrs = {
         "build_tpl": attr.label(
             default = "//bazel/coverity:coverity_toolchain.BUILD",

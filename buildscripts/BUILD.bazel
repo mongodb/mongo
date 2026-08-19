@@ -95,6 +95,18 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "setup_clang_tidy_lib",
+    srcs = ["setup_clang_tidy.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "bazel-runfiles",
+            group = "testing",
+        ),
+    ],
+)
+
 py_binary(
     name = "setup_clang_tidy",
     srcs = ["setup_clang_tidy.py"],
@@ -168,6 +180,7 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//bazel:bazelisk_lib",
         dependency(
             "typer",
             group = "core",
@@ -185,6 +198,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "mongo_toolchain",
+        "setup_clang_tidy_lib",
         "simple_report",
     ],
 )

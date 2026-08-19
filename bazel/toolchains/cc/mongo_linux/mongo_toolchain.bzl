@@ -145,7 +145,12 @@ toolchain_download = repository_rule(
 )
 
 def setup_mongo_toolchains(name = "setup_toolchains"):
-    """Download/register the MongoDB C/C++ toolchain repositories.
+    """Declare the MongoDB C/C++ toolchain repositories.
+
+    Called from the `setup_mongo_toolchains` module extension in
+    //bazel:bzlmod.bzl. Registration is *not* done here — module extensions
+    cannot call `native.register_toolchains` — so //MODULE.bazel registers
+    `@mongo_toolchain_v5//:mongo_toolchain` itself.
 
     Args:
         name: Unused. Present to match public macro conventions.
@@ -154,10 +159,6 @@ def setup_mongo_toolchains(name = "setup_toolchains"):
         name = "mongo_toolchain_v5",
         version = "v5",
         flags_tpl = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl",
-    )
-
-    native.register_toolchains(
-        "@mongo_toolchain_v5//:mongo_toolchain",
     )
 
 # Defines aliases for key targets inside the toolchain the user has chosen via
@@ -193,7 +194,3 @@ def setup_mongo_toolchain_aliases(name = "setup_aliases"):
             name = local_alias,
             actual = select(selects[target]),
         )
-
-setup_mongo_toolchains_extension = module_extension(
-    implementation = lambda ctx: setup_mongo_toolchains(),
-)

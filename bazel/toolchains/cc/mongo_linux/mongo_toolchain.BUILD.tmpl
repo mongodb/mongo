@@ -47,6 +47,7 @@ cc_library(
         "stow/llvm-{version}/include/**/*.inc",
         "stow/llvm-{version}/include/**/*.def",
     ]),
+    includes = ["stow/llvm-{version}/include"],
     visibility = ["//visibility:public"],
 )
 
@@ -210,7 +211,7 @@ LIBVOIDSTAR_FILES = select({
     "@//conditions:default": [],
 })
 
-MOLD_BIN_DIR = "./external/{toolchain_repo_name}/" + MOLD_MAP["{arch}"]["bin_dir"]
+MOLD_BIN_DIR = "./{toolchain_repo_dir}/" + MOLD_MAP["{arch}"]["bin_dir"]
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
 
@@ -282,6 +283,7 @@ mongo_linux_cc_toolchain_config(
     dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
     mold_bin_dir = MOLD_BIN_DIR,
+    toolchain_repo_dir = "{toolchain_repo_dir}",
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     builtin_sysroot = BUILTIN_SYSROOT,
@@ -331,6 +333,7 @@ mongo_linux_cc_toolchain_config(
     dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
     mold_bin_dir = MOLD_BIN_DIR,
+    toolchain_repo_dir = "{toolchain_repo_dir}",
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     builtin_sysroot = BUILTIN_SYSROOT,

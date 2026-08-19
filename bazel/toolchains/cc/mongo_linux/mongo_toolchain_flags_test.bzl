@@ -6,7 +6,7 @@ def _clang_resource_dir_test_impl(ctx):
     asserts.equals(
         env,
         "external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/",
-        clang_resource_dir("mongo_toolchain_v5"),
+        clang_resource_dir("external/mongo_toolchain_v5"),
     )
     return unittest.end(env)
 

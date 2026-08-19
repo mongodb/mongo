@@ -863,17 +863,18 @@ def parseTU(args: list[str] | str):
     if not Config.loaded:
         Config.set_compatibility_check(False)
         external = "external" if os.path.exists("external") else "bazel-out/../../../external"
-        paths_to_try = [
-            f"{external}/mongo_toolchain_v5/v5/lib/libclang.so",
-            f"{external}/mongo_toolchain_v4/v4/lib/libclang.so",
-            f"{external}/mongo_toolchain/v4/lib/libclang.so",
+        globs_to_try = [
+            f"{external}/*mongo_toolchain_v5/v5/lib/libclang.so",
+            f"{external}/*mongo_toolchain_v4/v4/lib/libclang.so",
+            f"{external}/*mongo_toolchain/v4/lib/libclang.so",
         ]
-        for path in paths_to_try:
-            if os.path.exists(path):
-                Config.set_library_file(path)
+        for pattern in globs_to_try:
+            matches = sorted(glob(pattern))
+            if matches:
+                Config.set_library_file(matches[0])
                 break
         else:
-            path_lines = "\n\t".join(paths_to_try)  # can't have \ in f-string expr
+            path_lines = "\n\t".join(globs_to_try)  # can't have \ in f-string expr
             perr_exit(f"Unable to find libclang.so. Paths tried:\n\t{path_lines}")
 
         # Config.set_library_file("/home/ubuntu/clang+llvm-19.1.1-aarch64-linux-gnu/lib/libclang.so")

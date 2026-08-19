@@ -1,7 +1,7 @@
 COMMON_LINK_FLAGS = [
-    "external/{toolchain_repo_name}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0",
-    "external/{toolchain_repo_name}/v5/lib",
-    "external/{toolchain_repo_name}/v5/lib64",
+    "{toolchain_repo_dir}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0",
+    "{toolchain_repo_dir}/v5/lib",
+    "{toolchain_repo_dir}/v5/lib64",
 ]
 
 COMMON_BUILTIN_INCLUDE_DIRECTORIES = [
@@ -11,26 +11,26 @@ COMMON_BUILTIN_INCLUDE_DIRECTORIES = [
 ]
 
 COMMON_INCLUDE_DIRECTORIES = [
-    "external/{toolchain_repo_name}/stow/gcc-v5/include/c++/14.2.0",
-    "external/{toolchain_repo_name}/stow/gcc-v5/include/c++/14.2.0/{arch}-mongodb-linux",
+    "{toolchain_repo_dir}/stow/gcc-v5/include/c++/14.2.0",
+    "{toolchain_repo_dir}/stow/gcc-v5/include/c++/14.2.0/{arch}-mongodb-linux",
 ]
 
 COMMON_BINDIRS = [
-    "external/{toolchain_repo_name}/v5/bin",
-    "external/{toolchain_repo_name}/stow/gcc-v5/libexec/gcc/{arch}-mongodb-linux/14.2.0",
-    "external/{toolchain_repo_name}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0",
-    "external/{toolchain_repo_name}/stow/llvm-v5/bin",
+    "{toolchain_repo_dir}/v5/bin",
+    "{toolchain_repo_dir}/stow/gcc-v5/libexec/gcc/{arch}-mongodb-linux/14.2.0",
+    "{toolchain_repo_dir}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0",
+    "{toolchain_repo_dir}/stow/llvm-v5/bin",
 ]
 
 GCC_INCLUDE_DIRS = [
-    "external/{toolchain_repo_name}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0/include",
-    "external/{toolchain_repo_name}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0/include-fixed",
+    "{toolchain_repo_dir}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0/include",
+    "{toolchain_repo_dir}/stow/gcc-v5/lib/gcc/{arch}-mongodb-linux/14.2.0/include-fixed",
 ]
 
 CLANG_INCLUDE_DIRS = [
-    "external/{toolchain_repo_name}/stow/gcc-v5/include/c++/14.2.0/backward",
-    "external/{toolchain_repo_name}/stow/llvm-v5/lib/clang/19/include",
+    "{toolchain_repo_dir}/stow/gcc-v5/include/c++/14.2.0/backward",
+    "{toolchain_repo_dir}/stow/llvm-v5/lib/clang/19/include",
 ]
 
-def clang_resource_dir(toolchain_repo_name):
-    return "external/{}/stow/llvm-v5/lib/clang/19/".format(toolchain_repo_name)
+def clang_resource_dir(toolchain_repo_dir):
+    return toolchain_repo_dir + "/stow/llvm-v5/lib/clang/19/"

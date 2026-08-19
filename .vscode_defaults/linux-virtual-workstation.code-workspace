@@ -7,7 +7,7 @@
 	"settings": {
 		"clangd.checkUpdates": true,
 		"clangd.path": "${workspaceFolder}/buildscripts/clangd_vscode.sh",
-		"clang-format.executable": "${workspaceRoot}/bazel-out/../../../external/mongo_toolchain_v5/v5/bin/clang-format",
+		"clang-format.executable": "${workspaceRoot}/bazel-out/../../../external/_main~setup_mongo_toolchains~mongo_toolchain_v5/v5/bin/clang-format",
 		"prettier.prettierPath": "bazel-bin/node_modules/.aspect_rules_js/prettier@3.4.2/node_modules/prettier",
 		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {

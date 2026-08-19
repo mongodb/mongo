@@ -61,14 +61,7 @@ single_version_override(
     version = "0.0.11",
 )
 
-# TODO SERVER-122884: move over from WORKSPACE
-# buf does not support s390x
-#bazel_dep(name = "aspect_rules_lint", version = "1.1.0")
-#single_version_override(
-#    module_name = "aspect_rules_lint",
-#    version = "1.1.0",
-#)
-
+bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_multirun", version = "0.9.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.13.0")
 single_version_override(
@@ -257,39 +250,49 @@ multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitoo
 multitool.hub(lockfile = "//tools/lint:multitool.lock.json")
 use_repo(multitool, "multitool")
 
-# TODO SERVER-122885: port over from WORKSPACE
-# currently breaks pyright
-##node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
-##node.toolchain(node_version = "18.20.4")
+###################### NODE / NPM ######################
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 
-##
-##npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
-##npm.npm_translate_lock(
-##    name = "npm",
-##    npmrc = "//:.npmrc",
-##    pnpm_lock = "//:pnpm-lock.yaml",
-##    verify_node_modules_ignored = "//:.bazelignore",
-##)
-##use_repo(npm, "npm")
-##
-##pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
-##use_repo(pnpm, "pnpm")
-#
+# Node.js runtime pinned to jstestfuzz's .nvmrc version. Only the root module
+# may name a node toolchain. The extension always passes register = False, so
+# this never competes with the default toolchain above; //bazel/resmoke selects
+# the platform repos explicitly.
+node.toolchain(
+    name = "nodejs16",
+    node_version = "16.18.1",
+)
+use_repo(
+    node,
+    "nodejs16_linux_amd64",
+    "nodejs16_linux_arm64",
+)
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
+###################### END NODE / NPM ######################
+
 setup_local_config_platform = use_repo_rule("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 
 setup_local_config_platform(name = "internal_platforms_do_not_use")
 
 register_execution_platforms("@internal_platforms_do_not_use//host:host")
 
-# TODO SERVER-122886: port over from WORKSPACE
-# cannot be moved without changing the path or creating a symlink
-# to _main~setup_mongo_toolchains~mongo_toolchain_v4 and _main~setup_mongo_toolchains~mongo_toolchain_v5
-##setup_mongo_toolchains_extension = use_extension("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains_extension")
-##use_repo(
-##    setup_mongo_toolchains_extension,
-##    "mongo_toolchain_v4",
-##    "mongo_toolchain_v5",
-##)
+# The hermetic C/C++ toolchain, plus the gdb build that is pinned against it.
+setup_mongo_toolchains_extension = use_extension("//bazel:bzlmod.bzl", "setup_mongo_toolchains")
+use_repo(
+    setup_mongo_toolchains_extension,
+    "gdb_v5",
+    "mongo_toolchain_v5",
+)
+
+register_toolchains("@mongo_toolchain_v5//:mongo_toolchain")
+
 #
 # Native/third-party system-compiler toolchain. Only matches the host platform
 # when it is generated with USE_NATIVE_TOOLCHAIN=1 (which adds the
@@ -339,6 +342,10 @@ mongot_extension_signing_key_repo = use_repo_rule(
 
 mongot_extension_signing_key_repo(name = "mongot_extension_signing_key")
 
+coverity_toolchain = use_repo_rule("//bazel/coverity:coverity_toolchain.bzl", "coverity_toolchain")
+
+coverity_toolchain(name = "rules_coverity")
+
 # Prebuilt Windows Cyrus SASL. Not a bare http_archive because its generated
 # BUILD file has to embed this repo's canonical directory in a /LIBPATH: flag;
 # see the module docstring in windows_sasl.bzl.
@@ -352,6 +359,9 @@ windows_msvc = use_repo_rule("//bazel/install_rules:windows_msvc.bzl", "windows_
 
 windows_msvc(name = "local_windows_msvc")
 
+# aspect_rules_lint is pulled in as a plain http_archive rather
+# than as a bazel_dep: the module pulls in buf, which has no s390x build, and
+# a bazel_dep would drag that into the graph on every platform.
 http_archive(
     name = "aspect_rules_lint",
     sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
@@ -895,3 +905,15 @@ lock_import.package(
 lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
 use_repo(lock_repos, "pypi")
 ###################### END PYTHON DEPS ######################
+
+bazel_dep(name = "bazel_rules_mongo", version = "0.0.0")
+local_path_override(
+    module_name = "bazel_rules_mongo",
+    path = "buildscripts/bazel_rules_mongo",
+)
+
+codeowners_validator_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator_extension")
+use_repo(codeowners_validator_extension, "codeowners_validator")
+
+codeowners_binary_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary_extension")
+use_repo(codeowners_binary_extension, "codeowners_binary")

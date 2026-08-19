@@ -93,9 +93,6 @@ filters:
   - "MODULE.bazel*":
     approvers:
       - 10gen/devprod-build
-  - "WORKSPACE.bazel":
-    approvers:
-      - 10gen/devprod-build
   - ".tmp/*":
     approvers:
       - 10gen/devprod-build

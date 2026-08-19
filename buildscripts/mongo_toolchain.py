@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import time
@@ -111,18 +112,49 @@ def _fetch_bazel_toolchain(version: str) -> None:
         )
 
 
-def _get_bazel_output_base() -> Path:
-    try:
-        output_base_str = _execute_bazel(["info", "output_base"])
-    except subprocess.CalledProcessError as e:
+def _parse_query_location(location: str) -> str:
+    """Return the file path from a `bazel query --output=location` line.
+
+    The line looks like
+    "<path>/BUILD.bazel:<line>:<col>: filegroup rule @mongo_toolchain_vN//:clang_tidy".
+    Splitting on the first colon is wrong on Windows, where the path starts with
+    a drive letter ("C:\\src\\..."), so match the trailing ":<line>:<col>:" instead.
+    """
+    first_line = location.strip().splitlines()[0]
+    match = re.match(r"^(?P<path>.+?):\d+:\d+:", first_line)
+    if not match:
         raise MongoToolchainNotFoundError(
-            f"Couldn't find bazel output base: `{e.cmd}` exited with code {e.returncode}"
+            f"Couldn't parse bazel query location output: {first_line!r}"
         )
-    return Path(output_base_str)
+    return match.group("path")
 
 
 def _get_bazel_toolchain_path(version: str) -> Path:
-    return _get_bazel_output_base() / "external" / f"mongo_toolchain_{version}" / version
+    """Return the directory the mongo toolchain repository was fetched into.
+
+    The repo is created by the `setup_mongo_toolchains` module extension, so the
+    directory it lands in is named after the *canonical* repo name — e.g.
+    "_main~setup_mongo_toolchains~mongo_toolchain_v5" — rather than
+    "mongo_toolchain_<version>". The exact spelling also differs between Bazel
+    versions, so ask Bazel where the repo's BUILD file is instead of building
+    the path out of the apparent repo name.
+    """
+    try:
+        location = _execute_bazel(
+            [
+                "query",
+                "--bes_backend=",
+                "--bes_results_url=",
+                "--output=location",
+                f"@mongo_toolchain_{version}//:clang_tidy",
+            ]
+        )
+    except subprocess.CalledProcessError as e:
+        raise MongoToolchainNotFoundError(
+            f"Couldn't locate bazel toolchain: `{e.cmd}` exited with code {e.returncode}"
+        )
+
+    return Path(_parse_query_location(location)).parent / version
 
 
 def _get_toolchain_from_path(path: str | Path) -> MongoToolchain:

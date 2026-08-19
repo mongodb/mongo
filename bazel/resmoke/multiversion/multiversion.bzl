@@ -133,7 +133,7 @@ _log=$(mktemp)
 trap 'rm -f "$_log"' EXIT
 if ! (
     set -e
-    export GIT_DIR=$(dirname "$(readlink -f WORKSPACE.bazel)")/.git
+    export GIT_DIR=$(dirname "$(readlink -f MODULE.bazel)")/.git
     {resmoke} \
         --mongoVersionFile {version_file} \
         generate-multiversion-exclude-tags \

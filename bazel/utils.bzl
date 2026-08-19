@@ -191,6 +191,8 @@ def get_toolchain_subs(ctx):
         generate_noop_toolchain(ctx, substitutions)
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
 
+    substitutions["{toolchain_repo_dir}"] = "external/" + ctx.name
+
     return distro, arch, substitutions
 
 def _get_amazon_linux_2023_minor_version(repository_ctx):

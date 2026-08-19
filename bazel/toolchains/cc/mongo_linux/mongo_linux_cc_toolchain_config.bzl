@@ -1168,7 +1168,7 @@ def _impl(ctx):
                 actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
-                        flags = ["-resource-dir=" + clang_resource_dir(ctx.attr.toolchain_repo_name)],
+                        flags = ["-resource-dir=" + clang_resource_dir(ctx.attr.toolchain_repo_dir)],
                     ),
                 ],
             ),
@@ -1187,7 +1187,7 @@ def _impl(ctx):
     # Some of the linux versions are missing libatomic.so.1. When using mold, prefer the copy in the
     # mongo toolchain rather than relying on one being installed on the host.
     mold_linker_env_entries = [
-        env_entry(key = "LD_LIBRARY_PATH", value = "external/{}/stow/gcc-v5/lib64/".format(ctx.attr.toolchain_repo_name)),
+        env_entry(key = "LD_LIBRARY_PATH", value = ctx.attr.toolchain_repo_dir + "/stow/gcc-v5/lib64/"),
     ] if ctx.attr.hermetic else []
 
     default_linker_lld_feature = feature(
@@ -2277,6 +2277,9 @@ mongo_linux_cc_toolchain_config = rule(
         "linker": attr.string(mandatory = True),
         "libvoidstar": attr.label(allow_single_file = True),
         "mold_bin_dir": attr.string(mandatory = False),
+        # Execroot-relative directory of the toolchain repo, e.g.
+        # "external/_main~setup_mongo_toolchains~mongo_toolchain_v5".
+        "toolchain_repo_dir": attr.string(mandatory = False),
         "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
         "extra_cxxflags": attr.string_list(mandatory = False),

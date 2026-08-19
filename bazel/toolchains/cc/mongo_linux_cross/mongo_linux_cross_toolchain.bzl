@@ -79,6 +79,7 @@ def _substitutions(ctx):
         "{exec_distro_constraint}": "\"@//bazel/platforms:{}\",".format(ctx.attr.exec_distro),
         "{target_distro_constraint}": "\"@//bazel/platforms:{}\",".format(ctx.attr.target_distro),
         "{toolchain_repo_name}": ctx.name,
+        "{toolchain_repo_dir}": "external/" + ctx.name,
         "{arch}": ctx.attr.target_arch,
         "{version}": ctx.attr.version,
         "{distro}": ctx.attr.target_distro,
@@ -197,11 +198,6 @@ def setup_mongo_linux_cross_toolchains(register_toolchains = True):
             "@{}//:mongo_toolchain".format(name)
             for name in names
         ])
-
-def setup_mongo_linux_cross_toolchains_legacy():
-    """Set up cross toolchains only when using the legacy WORKSPACE path."""
-    if not str(Label("@//:BUILD.bazel")).startswith("@@"):
-        setup_mongo_linux_cross_toolchains()
 
 def _setup_mongo_linux_cross_toolchains_extension(_ctx):
     setup_mongo_linux_cross_toolchains(register_toolchains = False)

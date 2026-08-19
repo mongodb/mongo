@@ -167,7 +167,7 @@ def main():
         "--exclude",
         ".*bazel-out/.*",
         "--exclude",
-        ".*external/mongo_toolchain/.*",
+        ".*external/.*mongo_toolchain.*",
         "--exclude",
         r".*src/.*_gen\.(h|hpp|cpp)",
         "--exclude",

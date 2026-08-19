@@ -2,6 +2,7 @@
 """Script to run pyright linter on Python files."""
 
 import argparse
+import glob
 import logging
 import os
 import runpy
@@ -20,6 +21,28 @@ if __name__ == "__main__" and __package__ is None:
 
 from buildscripts.linter import pyrightlinter, runner
 from buildscripts.linter.filediff import gather_changed_files_for_lint
+
+NODE_BIN_GLOB = "bazel-bin/eslint_/eslint.runfiles/*nodejs_*/bin/nodejs/bin"
+
+
+def _find_hermetic_node_bin_dir() -> str:
+    """Return the directory holding the bazel-provided `node`, or exit with an error.
+
+    Falling back to a `node` found on PATH is deliberately not done: hosts often
+    have one far too old to run pyright, which fails with a confusing syntax
+    error deep inside pyright's bundled javascript rather than a clear message.
+    """
+    matches = sorted(glob.glob(os.path.join(REPO_ROOT, NODE_BIN_GLOB)))
+    for match in matches:
+        if os.path.exists(os.path.join(match, "node")):
+            return match
+
+    print(
+        f"ERROR: could not find a bazel-provided node under {NODE_BIN_GLOB}.\n"
+        "       `bazel build //:eslint` should have produced it.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def is_interesting_file(filename: str) -> bool:
@@ -141,9 +164,7 @@ def main():
             check=True,
             cwd=REPO_ROOT,
         )
-    os.environ["PATH"] = (
-        "bazel-bin/eslint_/eslint.runfiles/nodejs_linux_arm64/bin/nodejs/bin/" + os.pathsep
-    ) + os.environ["PATH"]
+    os.environ["PATH"] = _find_hermetic_node_bin_dir() + os.pathsep + os.environ["PATH"]
 
     args.func(args.paths if hasattr(args, "paths") else [])
 

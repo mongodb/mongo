@@ -2,14 +2,25 @@
 
 def _relative_source_path(file, repository_names):
     """Return the path of an external file relative to its repository root."""
-    for repository_name in repository_names:
-        for prefix in [
-            "../%s/" % repository_name,
-            "external/%s/" % repository_name,
-            "%s/" % repository_name,
-        ]:
-            if file.short_path.startswith(prefix):
-                return file.short_path[len(prefix):]
+    path = file.short_path
+    for prefix in ["../", "external/"]:
+        if path.startswith(prefix):
+            path = path[len(prefix):]
+            break
+
+    parts = path.split("/", 1)
+    if len(parts) == 2:
+        repository_dir, relative_path = parts
+        for repository_name in repository_names:
+            # Repositories created by a module extension are materialized under
+            # their canonical name rather than the apparent one, e.g.
+            # "_main~setup_mongo_toolchains~gdb_v5" on Bazel 7 and
+            # "+setup_mongo_toolchains+gdb_v5" on Bazel 8. Match the trailing
+            # segment so both spellings work.
+            if repository_dir == repository_name or \
+               repository_dir.endswith("~" + repository_name) or \
+               repository_dir.endswith("+" + repository_name):
+                return relative_path
 
     fail(
         "{} is not under one of the declared external repositories: {}".format(

@@ -20,7 +20,7 @@ genrule(
     srcs = [":resmoke_mongo_version"],
     outs = [".multiversion_config.yml"],
     cmd = """
-export GIT_DIR=$$(dirname "$$(readlink -f WORKSPACE.bazel)")/.git
+export GIT_DIR=$$(dirname "$$(readlink -f MODULE.bazel)")/.git
 # The multiversion-config command imports GitPython through resmoke's shared
 # setup, but this invocation does not execute any Git commands. The hermetic
 # Linux action image intentionally omits git.

@@ -182,10 +182,10 @@ def find_workspace_root() -> pathlib.Path:
     """Return the real repository root.
 
     Bazel actions run from the output tree, so relative paths do not reach the checkout. The
-    execroot does hold a WORKSPACE.bazel symlink into the real repository, which
+    execroot does hold a MODULE.bazel symlink into the real repository, which
     bazel/resmoke/multiversion/run_db_contrib_tool.sh uses the same way to find the checkout.
     """
-    return pathlib.Path(os.path.realpath("WORKSPACE.bazel")).parent
+    return pathlib.Path(os.path.realpath("MODULE.bazel")).parent
 
 
 def read_expansions() -> dict:

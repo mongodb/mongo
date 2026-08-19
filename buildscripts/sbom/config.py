@@ -147,16 +147,16 @@ def get_version_from_wiredtiger_release_info(wt_dir: str) -> str:
 
 
 def get_version_sasl_from_workspace(file_path: str) -> str:
-    """Determine the version that is pulled for Windows Cyrus SASL by searching WORKSPACE.bazel"""
+    """Determine the version that is pulled for Windows Cyrus SASL by searching the given file."""
     # e.g.,
-    #         "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+    #         URL = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip"
+    #
+    marker = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-"
     try:
         with open(file_path, "r") as file:
             for line in file:
-                if line.strip().startswith(
-                    '"https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-'
-                ):
-                    return line.strip().split("windows_cyrus_sasl-")[1].split(".zip")[0]
+                if marker in line:
+                    return line.split("windows_cyrus_sasl-")[1].split(".zip")[0]
     except Exception as e:
         logger.warning(f"Unable to load {file_path}")
         logger.warning(e)
@@ -170,13 +170,13 @@ def process_component_special_cases(
     ## Special case for Cyrus SASL ##
     if component_key == "pkg:github/cyrusimap/cyrus-sasl":
         # Cycrus SASL is optionally loaded as a Windows library, when needed. There is no source code for Endor Labs to scan.
-        # The version of Cyrus SASL that is used is defined in the WORKSPACE.bazel file:
-        #         "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+        # The version of Cyrus SASL that is used is defined in bazel/install_rules/windows_sasl.bzl:
+        #         URL = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip"
         # Rather than add the complexity of Bazel queries to this script, we just search the text.
-
-        versions["import_script"] = get_version_sasl_from_workspace(repo_root + "/WORKSPACE.bazel")
+        sasl_source = "bazel/install_rules/windows_sasl.bzl"
+        versions["import_script"] = get_version_sasl_from_workspace(repo_root + "/" + sasl_source)
         logger.info(
-            f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'WORKSPACE.bazel' file"
+            f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in '{sasl_source}'"
         )
 
     ## Special case for wiredtiger ##

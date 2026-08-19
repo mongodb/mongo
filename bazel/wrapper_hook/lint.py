@@ -770,6 +770,8 @@ def _source_label_to_workspace_path(label: str) -> str | None:
     local_repository_prefixes = {
         "@bazel_rules_mongo": "buildscripts/bazel_rules_mongo",
         "@@bazel_rules_mongo": "buildscripts/bazel_rules_mongo",
+        "@@bazel_rules_mongo~": "buildscripts/bazel_rules_mongo",
+        "@@bazel_rules_mongo+": "buildscripts/bazel_rules_mongo",
     }
 
     if label.startswith("//"):

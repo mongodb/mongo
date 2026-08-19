@@ -35,11 +35,19 @@ def _gdb_download(ctx):
     ctx.report_progress("generating gdb " + ctx.attr.version + " build file")
 
     external = str(ctx.path(".."))
-    pythonhome = external + "/gdb_" + ctx.attr.version + "/stow/python313-" + ctx.attr.version
 
-    gdb_prefix = external + "/gdb_" + ctx.attr.version + "/" + ctx.attr.version
+    # Both repos are created by the `setup_mongo_toolchains` module extension,
+    # so their directory (and runfiles) names are the canonical, mangled ones
+    # — e.g. "_main~setup_mongo_toolchains~gdb_v5", not "gdb_v5". Derive them
+    # rather than rebuilding "gdb_" + version, which no longer matches.
+    gdb_repo = ctx.name
+    toolchain_repo = ctx.attr.mongo_toolchain.workspace_name
 
-    mongodb_toolchain_path = external + "/mongo_toolchain_" + ctx.attr.version
+    pythonhome = external + "/" + gdb_repo + "/stow/python313-" + ctx.attr.version
+
+    gdb_prefix = external + "/" + gdb_repo + "/" + ctx.attr.version
+
+    mongodb_toolchain_path = external + "/" + toolchain_repo
     stdlib_pp_dir = mongodb_toolchain_path + "/stow/gcc-" + ctx.attr.version + "/share"
     readelf = mongodb_toolchain_path + "/" + ctx.attr.version + "/bin/llvm-readelf"
     objcopy = mongodb_toolchain_path + "/" + ctx.attr.version + "/bin/llvm-objcopy"
@@ -123,10 +131,10 @@ export LD_LIBRARY_PATH="${PYTHONHOME}/lib:${PYTHONHOME}/lib64:${LD_LIBRARY_PATH:
     # GDB itself is dynamically linked against its own runtime libraries (e.g. libopcodes). Ensure those are
     # available in runfiles and on the loader path regardless of platform.
     wrapper_gdb_setup = """
-GDB_PREFIX="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s"
-GDBHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/gdb-%s"
+GDB_PREFIX="${RUNFILES_WORKING_DIRECTORY}/../%s/%s"
+GDBHOME="${RUNFILES_WORKING_DIRECTORY}/../%s/stow/gdb-%s"
 export LD_LIBRARY_PATH="${GDB_PREFIX}/lib:${GDBHOME}/lib:${LD_LIBRARY_PATH:-}"
-""" % (ctx.attr.version, ctx.attr.version, ctx.attr.version, ctx.attr.version)
+""" % (gdb_repo, ctx.attr.version, gdb_repo, ctx.attr.version)
 
     # Ensure GDB (and our in-GDB python helpers) use binutils that match the MongoDB toolchain.
     #
@@ -165,9 +173,9 @@ else
     }
 fi
 
-READELF="$(rlocation mongo_toolchain_%s/%s/bin/llvm-readelf)"
+READELF="$(rlocation %s/%s/bin/llvm-readelf)"
 if [ -z "${READELF}" ] || [ ! -x "${READELF}" ]; then
-    READELF="$(rlocation mongo_toolchain_%s/%s/bin/readelf)"
+    READELF="$(rlocation %s/%s/bin/readelf)"
 fi
 if [ -z "${READELF}" ] || [ ! -x "${READELF}" ]; then
     READELF="readelf"
@@ -175,16 +183,16 @@ fi
 export READELF
 export MONGO_GDB_READELF="${READELF}"
 
-OBJCOPY="$(rlocation mongo_toolchain_%s/%s/bin/llvm-objcopy)"
+OBJCOPY="$(rlocation %s/%s/bin/llvm-objcopy)"
 if [ -z "${OBJCOPY}" ] || [ ! -x "${OBJCOPY}" ]; then
-    OBJCOPY="$(rlocation mongo_toolchain_%s/%s/bin/objcopy)"
+    OBJCOPY="$(rlocation %s/%s/bin/objcopy)"
 fi
 if [ -z "${OBJCOPY}" ] || [ ! -x "${OBJCOPY}" ]; then
     OBJCOPY="objcopy"
 fi
 export OBJCOPY
 
-GDB="$(rlocation gdb_%s/%s/bin/gdb)"
+GDB="$(rlocation %s/%s/bin/gdb)"
 if [ ! -x "${GDB}" ]; then
     # Best-effort fallback; the wrapper still execs a concrete gdb path below.
     GDB="gdb"
@@ -201,15 +209,15 @@ else
 fi
 export GDB_ADD_INDEX
 """ % (
+        toolchain_repo,
         ctx.attr.version,
+        toolchain_repo,
         ctx.attr.version,
+        toolchain_repo,
         ctx.attr.version,
+        toolchain_repo,
         ctx.attr.version,
-        ctx.attr.version,
-        ctx.attr.version,
-        ctx.attr.version,
-        ctx.attr.version,
-        ctx.attr.version,
+        gdb_repo,
         ctx.attr.version,
     )
 
@@ -350,12 +358,12 @@ fi
 GDB_INDEX_CACHE_DIRECTORY="${XDG_CACHE_HOME}/gdb"
 mkdir -p "${GDB_INDEX_CACHE_DIRECTORY}"
 
-exec ${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb \\
+exec ${RUNFILES_WORKING_DIRECTORY}/../%s/%s/bin/gdb \\
     -iex "set index-cache directory ${GDB_INDEX_CACHE_DIRECTORY}" \\
     -iex "set index-cache enabled on" \\
     -iex "set auto-load safe-path %s/.gdbinit" \\
     "$@"
-""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version, str(ctx.workspace_root)),
+""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, gdb_repo, ctx.attr.version, str(ctx.workspace_root)),
     )
 
     ctx.file(
@@ -379,8 +387,8 @@ original_args="${@:1}"
 %s
 %s
 %s
-${RUNFILES_WORKING_DIRECTORY}/external/gdb_%s/%s/bin/gdbserver localhost:1234 ${TEST_SRCDIR}/_main/${original_args[0]} "${@:2}"
-""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version),
+${RUNFILES_WORKING_DIRECTORY}/external/%s/%s/bin/gdbserver localhost:1234 ${TEST_SRCDIR}/_main/${original_args[0]} "${@:2}"
+""" % (wrapper_gdb_setup, wrapper_binutils_setup, wrapper_python_setup, gdb_repo, ctx.attr.version),
     )
 
     ctx.file(

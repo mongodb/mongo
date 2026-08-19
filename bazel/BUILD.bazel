@@ -1,6 +1,6 @@
 load("//bazel/uv:defs.bzl", "dependency")
 load(":separate_debug.bzl", "gdb_index_message")
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])
@@ -47,6 +47,12 @@ gdb_index_message(
 py_binary(
     name = "bazelisk",
     srcs = ["bazelisk.py"],
+)
+
+py_library(
+    name = "bazelisk_lib",
+    srcs = ["bazelisk.py"],
+    imports = ["."],
 )
 
 py_binary(

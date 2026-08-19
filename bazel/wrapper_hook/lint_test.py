@@ -466,6 +466,14 @@ class ExistingPythonFilesTest(unittest.TestCase):
             "buildscripts/bazel_rules_mongo/codeowners/parsers/foo.py",
         )
 
+    def test_maps_module_suffixed_canonical_source_label_to_workspace_path(self):
+        for canonical in ("@@bazel_rules_mongo~", "@@bazel_rules_mongo+"):
+            with self.subTest(canonical=canonical):
+                self.assertEqual(
+                    lint._source_label_to_workspace_path(f"{canonical}//codeowners:parsers/foo.py"),
+                    "buildscripts/bazel_rules_mongo/codeowners/parsers/foo.py",
+                )
+
     def test_get_rules_lint_targets_for_source_labels_queries_owner_rules(self):
         def fake_run(args, **kwargs):
             self.assertEqual(
