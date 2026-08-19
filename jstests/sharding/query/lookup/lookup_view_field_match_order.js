@@ -154,8 +154,9 @@ function runInternalClientAggregate(internalTestDB, lookupSpec) {
             aggregate: "local",
             pipeline: [{$lookup: lookupSpec}],
             cursor: {},
-            // internalClient connections must specify an explicit writeConcern on every command
-            // that accepts one.
+            // internalClient connections must specify explicit read and write concerns, even
+            // empty ones, on replica-set nodes (uassert 4569200).
+            readConcern: {},
             writeConcern: {w: "majority"},
         }),
     );
