@@ -242,7 +242,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%bazel_features_deps": {
       "general": {
-        "bzlTransitiveDigest": "0Ls83w+99VX3FWHqU5lq38/OKk0eyea+/nKnrX+KqKU=",
+        "bzlTransitiveDigest": "Is3jR+jsN7gXmxveF5zveWNUTUdS0GKrfm4+OAnnbXI=",
         "usagesDigest": "c91kQ0HotoA1cfwWU4KaqCoQU7lT6pGi6XPGIiMGkb0=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -353,7 +353,7 @@
     },
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "0Ls83w+99VX3FWHqU5lq38/OKk0eyea+/nKnrX+KqKU=",
+        "bzlTransitiveDigest": "Is3jR+jsN7gXmxveF5zveWNUTUdS0GKrfm4+OAnnbXI=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

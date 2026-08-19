@@ -54,8 +54,8 @@ TOOLCHAIN_MAP_V5 = {
     },
     "rhel8_ppc64le": {
         "platform_name": "rhel81-ppc64le",
-        "sha": "4d7f05fbc368794b5598e391e56e7e209cae71cc034e93d307b7f84d0c60e8b2",
-        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel81-ppc64le-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+        "sha": "a22aec8955cec3a9597d9267ece0319d51b2837520e6078638d16d7c4c974cb6",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel81-ppc64le-2a5f4757b341f678def9fda281807dd2243d9bc2.tar.gz",
     },
     "rhel8_s390x": {
         "platform_name": "rhel80-zseries",

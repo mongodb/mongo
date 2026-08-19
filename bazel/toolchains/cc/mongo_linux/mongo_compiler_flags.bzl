@@ -25,6 +25,7 @@ visibility("//bazel/toolchains/cc")
 # build and strip the debug symbols inside the container, or patch the compilers to properly order gdwarf32 symbols
 # before gdwarf64 symbols. See https://reviews.llvm.org/D96144
 LIBGCC_LINKFLAGS = select({
+    "//bazel/config:rhel8_ppc64le_gcc_linkstatic": ["-static-libgcc"],
     "//bazel/config:rhel9_ppc64le_gcc_linkstatic": ["-static-libgcc"],
     "//bazel/config:rhel10_ppc64le_gcc_linkstatic": ["-static-libgcc"],
     "//conditions:default": [],
