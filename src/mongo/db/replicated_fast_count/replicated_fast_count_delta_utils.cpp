@@ -301,7 +301,7 @@ int extractReplicatedMetadataDeltasForCommitTxn(
     const auto& multiMd = std::get<std::vector<MultiOpSizeMetadata>>(sizeMd.value());
     int processed = 0;
     for (const auto& meta : multiMd) {
-        // TODO SERVER-131796: Fold the transaction's accumulated hash in from MultiOpSizeMetadata's
+        // TODO SERVER-133315: Fold the transaction's accumulated hash in from MultiOpSizeMetadata's
         // `h` field.
         recordCollectionReplicatedMetadataDelta(
             meta.getUuid(),

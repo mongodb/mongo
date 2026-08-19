@@ -2539,7 +2539,7 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnCommitInvalidate
     // A prepared transaction's per-operation hashes are dropped at the prepare, and the
     // commitTransaction entry summarizes only size and count. The collection hash therefore goes
     // absent rather than keeping a value that is missing the transaction's contributions.
-    // TODO SERVER-131796: Carry the transaction's accumulated hash on the commitTransaction entry.
+    // TODO SERVER-133315: Carry the transaction's accumulated hash on the commitTransaction entry.
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const Timestamp ts3{1, 3};
