@@ -48,7 +48,7 @@ local_args="--edition $edition \
   ${last_lts_arg} \
   ${last_continuous_arg} \
   ${last_patch_arg} \
-  7.0 8.0.16"
+  7.0 8.0 8.0.16"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"

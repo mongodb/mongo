@@ -85,12 +85,6 @@ selector:
     # binary-download config level.
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/major_version_upgrade.js
 
-    # TODO SERVER-132955: this test iterates every entry in allSupportedVersions, including
-    # the static 8.0 binary. Now that last-LTS is 9.0, the 8.0 binary is no longer provisioned in the
-    # multiversion task ("Unable to start program mongod-8.0: No such file or directory"). Re-enable
-    # once the supported-version selection or binary provisioning is updated.
-    - src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/major_version_upgrade_backup_cursor.js
-
     # TODO SERVER-132996: this test launches every entry in allSupportedVersions, including the
     # static 8.0 binary. Now that last-LTS is 9.0, the 8.0 binary is no longer provisioned in the
     # multiversion task ("Unable to start program mongod-8.0: No such file or directory"). Re-enable

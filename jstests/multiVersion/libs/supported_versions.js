@@ -4,6 +4,7 @@
 export const allSupportedVersions = [
     {binVersion: "7.0", featureCompatibilityVersion: "7.0", testCollection: "seven_zero"},
     {binVersion: "8.0", featureCompatibilityVersion: "8.0", testCollection: "eight_zero"},
+    {binVersion: "9.0", featureCompatibilityVersion: "9.0", testCollection: "nine_zero"},
     {binVersion: "last-lts", featureCompatibilityVersion: lastLTSFCV, testCollection: "last_lts"},
     {
         binVersion: "last-continuous",
