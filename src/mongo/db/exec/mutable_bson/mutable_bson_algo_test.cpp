@@ -188,7 +188,7 @@ TEST_F(ManyChildrenTest, getNthSibling) {
     ASSERT_TRUE(target.ok());
     ASSERT_EQUALS(target, query);
 
-    // Ensure that walking more chidren than we have gets us past the end
+    // Ensure that walking more children than we have gets us past the end.
     const int children = countChildren(doc().root());
     query = getNthSibling(leftChild, children);
     ASSERT_FALSE(query.ok());

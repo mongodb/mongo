@@ -440,7 +440,7 @@ struct ElementRep {
         Element::RepIdx right;
     } sibling;
 
-    // The indexes of our left and right chidren in the Document.
+    // The indexes of our left and right children in the Document.
     struct {
         Element::RepIdx left;
         Element::RepIdx right;
