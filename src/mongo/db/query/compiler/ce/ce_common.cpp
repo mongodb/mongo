@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/ce/ce_common.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -35,6 +36,13 @@ public:
         return false;
     }
 };
+
+// Comparator that ignores field names, matching the semantics of BSONElementSet
+// (BSONElementCmpWithoutField) that countUniqueDocuments() relied on. The comparator must
+// outlive any set it backs. It has no dependencies on other objects with static storage
+// duration, so it cannot be caught in a static-initialization-order fiasco.
+const BSONElementComparator kIgnoreFieldNameComparator{
+    BSONElementComparator::FieldNamesMode::kIgnore, nullptr /* stringComparator */};
 }  // namespace
 
 BSONObj FieldPathAndEqSemantics::toBSON() const {
@@ -328,7 +336,8 @@ KeyCountResult countNDVMultiKey(const std::vector<FieldPathAndEqSemantics>& fiel
 }
 
 size_t countUniqueDocuments(const std::vector<BSONObj>& docs) {
-    BSONElementSet uniqueIds;
+    auto uniqueIds = kIgnoreFieldNameComparator.makeBSONEltUnorderedSet();
+    uniqueIds.reserve(docs.size());
     for (const auto& doc : docs) {
         uniqueIds.insert(doc["_id"]);
     }
