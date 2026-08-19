@@ -34,6 +34,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/static_immortal.h"
 
+#include <set>
+
 namespace mongo {
 MutexStats operator+(const MutexStats& lhs, const ObservableMutexRegistry::StatsRecord& rhs) {
     return {lhs + rhs.data};
@@ -97,7 +99,14 @@ void serialize(BSONArrayBuilder& builder, const ObservableMutexRegistry::StatsRe
 BSONObj serializeStats(StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>& statsMap,
                        bool listAll) {
     BSONObjBuilder bob;
-    for (const auto& [tag, stats] : statsMap) {
+    // Using a `set` to store tags and ensure the serialized stats are sorted by their tags.
+    std::set<StringData> tags;
+    for (const auto& [tag, _] : statsMap) {
+        tags.insert(tag);
+    }
+
+    for (auto tag : tags) {
+        auto& stats = statsMap[tag];
         BSONObjBuilder tagSubObj(bob.subobjStart(tag));
         const auto sum = std::accumulate(stats.begin(), stats.end(), MutexStats{});
         serialize(tagSubObj, sum);
