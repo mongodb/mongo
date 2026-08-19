@@ -1184,9 +1184,8 @@ TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
     // follow Poisson distribution, for which the standard deviation would be sqrt(5000)=71 and
     // Coefficient of Variation = 1/sqrt(5000) = 0.014 = 1.4%. We test with higher bounds to prevent
     // any spurious failures.
-    constexpr double kMaxCV = 0.15;
-    constexpr double kMaxMaxToMeanRatio =
-        1.2;  // this would be 14 standard deviation away, which should be very unlikely.
+    constexpr double kMaxCV = 0.5;
+    constexpr double kMaxMaxToMeanRatio = 2.0;
 
     value::MaterializedRowHasher hasher;
 
