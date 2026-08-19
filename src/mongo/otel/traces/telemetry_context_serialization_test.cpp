@@ -3,8 +3,6 @@
 
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 
-#include "mongo/idl/generic_argument_gen.h"
-#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
 #include "mongo/otel/traces/sampler/sampler.h"
@@ -44,38 +42,6 @@ TEST_F(TelemetryContextSerializationTest, RoundTrip) {
     BSONObj bson = TelemetryContextSerializer::toBSON(context);
     auto rehydratedContext = TelemetryContextSerializer::fromBSON(bson);
     ASSERT_BSONOBJ_EQ_UNORDERED(bson, TelemetryContextSerializer::toBSON(rehydratedContext));
-}
-
-TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextReturnsIfNoTelemetryContext) {
-    BSONObj originalBson = BSON("key" << "value");
-    auto opCtx = makeOperationContext();
-    BSONObj resultBson =
-        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
-    ASSERT_BSONOBJ_EQ(originalBson, resultBson);
-}
-
-TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextAddsTelemetryContextIfExists) {
-    BSONObj originalBson = BSON("key" << "value");
-    auto opCtx = makeOperationContext();
-    auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
-    telemetryContextHolder.setTelemetryContext(traces::Span::createTelemetryContext());
-    BSONObj resultBson =
-        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
-    ASSERT_BSONOBJ_NE(originalBson, resultBson);
-    ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
-}
-
-TEST_F(TelemetryContextSerializationTest,
-       AppendTelemetryContextAddsTelemetryContextIfExistsAndReplacesBSONFieldIfExists) {
-    BSONObj originalBson =
-        BSON("key" << "value" << GenericArguments::kTraceCtxFieldName << "old_value");
-    auto opCtx = makeOperationContext();
-    auto& telemetryContextHolder = TelemetryContextHolder::getDecoration(opCtx.get());
-    telemetryContextHolder.setTelemetryContext(traces::Span::createTelemetryContext());
-    BSONObj resultBson =
-        TelemetryContextSerializer::appendTelemetryContext(opCtx.get(), originalBson);
-    ASSERT_BSONOBJ_NE(originalBson, resultBson);
-    ASSERT_TRUE(resultBson.hasField(GenericArguments::kTraceCtxFieldName));
 }
 
 TEST_F(TelemetryContextSerializationTest, FromSectionReturnsNulloptIfNoSection) {

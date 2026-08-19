@@ -764,7 +764,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setDemoMode(request.getDemoMode());
     auto telemetryContext =
         otel::TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
-    // TODO(SERVER-107128): The telemetry context should not be on the sharding document.
+    // TODO(SERVER-133103): The telemetry context should not be on the sharding document.
     if (telemetryContext && telemetryContext->hasActiveTrace()) {
         auto telemetryCtxBSON = otel::traces::TelemetryContextSerializer::toBSON(telemetryContext);
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);

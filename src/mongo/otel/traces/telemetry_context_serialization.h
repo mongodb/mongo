@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/modules.h"
@@ -18,13 +17,13 @@ namespace traces {
 #ifdef MONGO_CONFIG_OTEL
 
 /**
- * Converts a TelemetryContext to and from its representation as a BSON object.
+ * Converts a TelemetryContext to and from its BSON and OpMsg telemetry-section representations.
  */
 class TelemetryContextSerializer {
 public:
+    // TODO(SERVER-133103): Remove toBSON and fromBSON.
     static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson);
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
-    static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson);
     static std::shared_ptr<TelemetryContext> fromSection(
         const boost::optional<mongo::TelemetryContextSection>& section);
     static boost::optional<mongo::TelemetryContextSection> toSection(
@@ -40,18 +39,16 @@ boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx)
 #else
 
 /**
- * Converts a TelemetryContext to and from its representation as a BSON object.
+ * Converts a TelemetryContext to and from its BSON and OpMsg telemetry-section representations.
  */
 class TelemetryContextSerializer {
 public:
+    // TODO(SERVER-133103): Remove toBSON and fromBSON.
     static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson) {
         return std::make_shared<TelemetryContext>();
     }
     static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context) {
         return BSONObj();
-    }
-    static BSONObj appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
-        return bson;
     }
     static std::shared_ptr<TelemetryContext> fromSection(
         const boost::optional<mongo::TelemetryContextSection>& section) {

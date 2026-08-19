@@ -4,9 +4,6 @@
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/idl/generic_argument_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 #include "mongo/otel/traces/traceparent.h"
@@ -15,8 +12,6 @@
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/context.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
 namespace otel {
@@ -91,26 +86,6 @@ std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromBSON(const BSO
 BSONObj TelemetryContextSerializer::toBSON(const std::shared_ptr<TelemetryContext>& context) {
     auto propagator = getPropagator();
     return traces::toBSON(*context, propagator);
-}
-
-BSONObj TelemetryContextSerializer::appendTelemetryContext(OperationContext* opCtx, BSONObj bson) {
-    invariant(opCtx);
-    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
-    if (!telemetryCtxHolder.getTelemetryContext()) {
-        return bson;
-    }
-
-    BSONObjBuilder bob;
-    for (const auto& field : bson) {
-        if (field.fieldName() == GenericArguments::kTraceCtxFieldName) {
-            continue;
-        }
-        bob.append(field);
-    }
-    bob.append(GenericArguments::kTraceCtxFieldName,
-               TelemetryContextSerializer::toBSON(telemetryCtxHolder.getTelemetryContext()));
-
-    return bob.obj();
 }
 
 std::shared_ptr<TelemetryContext> TelemetryContextSerializer::fromSection(
