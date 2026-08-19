@@ -782,15 +782,15 @@ def _resmoke_test_impl(ctx):
         ["export {}={}\n".format(k, sh_quote(v)) for k, v in expanded_env.items()],
     )
 
-    # Route each instrumented server process's counters into COVERAGE_DIR using
-    # continuous mode (%c) + per-module (%m) online merging. Continuous mode mmaps
-    # counters live so they persist across quickExit()'s _exit() (which skips the
-    # profile runtime's atexit flush); %m gives each DSO its own file and enables the
-    # merge pool across concurrent processes. COVERAGE_DIR is exported at runtime by
-    # Bazel's collect_coverage.sh, so the value must expand there (not at analysis time).
+    # Route instrumented server counters into COVERAGE_DIR (exported at runtime by Bazel's
+    # collect_coverage.sh, hence the deferred expansion). "%c" is continuous mode, which mmaps
+    # counters so they survive quickExit()'s _exit(); bare "%m" (no "%p") caps output at one
+    # merged file per module regardless of process count, keeping collect_cc_coverage.sh's
+    # *.profraw glob under ARG_MAX -- with "%p" a full suite emitted ~20k files, and the glob
+    # blew up with E2BIG, silently yielding a 0-byte coverage.dat.
     profile_override = (
         'if [[ -n "${COVERAGE_DIR:-}" ]]; then\n' +
-        '  export LLVM_PROFILE_FILE="${COVERAGE_DIR}/server-%p-%m%c.profraw"\n' +
+        '  export LLVM_PROFILE_FILE="${COVERAGE_DIR}/server-%m%c.profraw"\n' +
         "fi\n"
     )
 

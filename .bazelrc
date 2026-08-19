@@ -488,21 +488,38 @@ common:remote_unittest --define MFP_VERSION=nogitversion
 test:remote_unittest --test_tag_filters=mongo_unittest,-intermediate_debug,-incompatible_with_bazel_remote_test
 
 # Coverage
-coverage --//bazel/config:coverage=True
-coverage --config=dbg
-coverage --compiler_type=clang
-coverage --linkstatic=False
-coverage --combined_report=lcov
-coverage --experimental_use_llvm_covmap
-coverage --experimental_generate_llvm_lcov
+#
+# Single source of truth for every flag that affects how instrumented artifacts COMPILE. Both the
+# `coverage` command config and the build-only `coverage_compile` config below pull this in via
+# `--config=coverage_base`, so their C++ compile action keys are identical by construction and the
+# `bazel_coverage_compile` task's cache warms real hits for the downstream `bazel coverage` tasks.
+# Only put compile-affecting flags here; report-generation flags stay on `coverage` below.
+common:coverage_base --//bazel/config:coverage=True
+common:coverage_base --config=dbg
+common:coverage_base --compiler_type=clang
+common:coverage_base --linkstatic=False
 # Only pull the coverage reports back from remote execution, not every instrumented output
-coverage --remote_download_regex=.*coverage.*\.dat$
-coverage --fission=no
-coverage --build_runfile_links
-coverage --legacy_external_runfiles
-coverage --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]
+common:coverage_base --remote_download_regex=.*coverage.*\.dat$
+common:coverage_base --fission=no
+common:coverage_base --build_runfile_links
+common:coverage_base --legacy_external_runfiles
+common:coverage_base --collect_code_coverage
+common:coverage_base --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]
+common:coverage_base --experimental_use_llvm_covmap
+
+# The `bazel coverage` command: shared compile flags + report generation.
+coverage --config=coverage_base
+coverage --combined_report=lcov
+coverage --experimental_generate_llvm_lcov
+coverage --experimental_fetch_all_coverage_outputs
 # This is set in .bazelrc.evergreen:
 # coverage --config=no-remote-exec
+
+# Build-only config used by the `bazel_coverage_compile` task to pre-build the instrumented
+# artifacts and warm the remote cache, so downstream `bazel coverage` tasks get compile cache hits
+# instead of every host re-compiling the instrumented server from cold. Because it shares
+# `coverage_base` with the coverage command, the compile action keys avoid drift.
+build:coverage_compile --config=coverage_base
 
 # code ownership configuration
 common --define codeowners_add_auto_approve_user=True

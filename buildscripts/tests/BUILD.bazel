@@ -73,6 +73,17 @@ py_test(
 )
 
 py_test(
+    name = "test_code_coverage_data_process",
+    srcs = ["test_code_coverage_data_process.py"],
+    data = ["//evergreen/functions:all_python_files"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        "//evergreen/functions:all_python_files",
+    ],
+)
+
+py_test(
     name = "test_generate_result_tasks",
     srcs = ["test_generate_result_tasks.py"],
     visibility = ["//visibility:public"],
