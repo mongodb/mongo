@@ -670,6 +670,112 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsZeroWhenFullyReleased) {
     ASSERT_EQ(lastReportedInUse, 0);
 }
 
+
+constexpr int64_t kChunkSizeForTest = 100;
+
+/**
+ * The chunk-crossing path reaches the new lower bound by stepping one chunk when the crossing is to
+ * an adjacent chunk and by dividing otherwise. Walk usage across boundaries in both directions, by
+ * one chunk and by many, and assert that every crossing reports the exact total -- i.e. that all
+ * three ways of computing the bound agree.
+ */
+std::pair<int64_t, int64_t> getLastReportedValues(int64_t initialValue, int64_t nextValue) {
+    constexpr int64_t kBig = 10 * 1024 * 1024;
+
+    int64_t lastReportedInUse = -1;
+
+    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}};
+    opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) { lastReportedInUse = inUse; });
+    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}, kChunkSizeForTest};
+
+    stageTracker.add(initialValue);
+    stageTracker.add(nextValue);
+    return {lastReportedInUse, stageTracker.inUseTrackedMemoryBytes()};
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsInitialCrossing) {
+    ASSERT_THAT(getLastReportedValues(0, kChunkSizeForTest + 20),
+                std::pair(kChunkSizeForTest + 20, kChunkSizeForTest + 20))
+        << "Single chunk up, from chunk [0, 100) to [100, 200).";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsUpwardCrossing) {
+    ASSERT_THAT(getLastReportedValues(kChunkSizeForTest + 20, 8 * kChunkSizeForTest + 30),
+                std::pair(9 * kChunkSizeForTest + 50, 9 * kChunkSizeForTest + 50))
+        << "Several chunks up at once: [100, 200) to [900, 1000). Too far to step, so this "
+           "divides.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportNonCrossing) {
+    ASSERT_THAT(getLastReportedValues(9 * kChunkSizeForTest + 50, 20),
+                std::pair(9 * kChunkSizeForTest + 50, 9 * kChunkSizeForTest + 70))
+        << "Within the new chunk: no crossing, no report.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsDownwardCrossing) {
+    ASSERT_THAT(getLastReportedValues(9 * kChunkSizeForTest + 70, -kChunkSizeForTest),
+                std::pair(8 * kChunkSizeForTest + 70, 8 * kChunkSizeForTest + 70))
+        << "Single chunk down, to [800, 900).";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportDownwardCrossingOnBoundary) {
+    ASSERT_THAT(getLastReportedValues(8 * kChunkSizeForTest + 70, -70),
+                std::pair(8 * kChunkSizeForTest + 70, 8 * kChunkSizeForTest))
+        << "Exactly onto a boundary: 800 is the base of [800, 900), which is the chunk already "
+           "reported, so this is not a crossing.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsDownwardCrossingFromBoundary) {
+    ASSERT_THAT(getLastReportedValues(8 * kChunkSizeForTest, -1),
+                std::pair(8 * kChunkSizeForTest - 1, 8 * kChunkSizeForTest - 1))
+        << "One byte below that boundary crosses down into [700, 800).";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsDownwardCrossingAcrossMultipleChunks) {
+    ASSERT_THAT(getLastReportedValues(8 * kChunkSizeForTest - 1, -7 * kChunkSizeForTest - 49),
+                std::pair(50, 50))
+        << "Several chunks down at once, back into the first chunk but not to zero.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportGoingToZeroInSameChunk) {
+    ASSERT_THAT(getLastReportedValues(50, -50), std::pair(0, 0))
+        << "From within the first chunk down to zero.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsWhenCrossingMultipleBoundariesAtOnce) {
+    ASSERT_THAT(getLastReportedValues(0, 50 * kChunkSizeForTest),
+                std::pair(50 * kChunkSizeForTest, 50 * kChunkSizeForTest))
+        << "Many chunk crossings up at once.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsWhenCrossingSingleBoundaryAtChunkSize) {
+    ASSERT_THAT(getLastReportedValues(kChunkSizeForTest, kChunkSizeForTest),
+                std::pair(2 * kChunkSizeForTest, 2 * kChunkSizeForTest))
+        << "Single chunk crossing up, from boundary to next boundary.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportWhenAddingOneBelowChunkSize) {
+    ASSERT_THAT(getLastReportedValues(kChunkSizeForTest, kChunkSizeForTest - 1),
+                std::pair(kChunkSizeForTest, 2 * kChunkSizeForTest - 1))
+        << "Adding one less then chunkSize.";
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportWhenAddingZero) {
+    ASSERT_THAT(getLastReportedValues(kChunkSizeForTest, 0),
+                std::pair(kChunkSizeForTest, kChunkSizeForTest))
+        << "Adding zero does not report.";
+}
+
+/**
+ * A release from far above straight to zero crosses many chunks at once and lands exactly on the
+ * boundary at zero. This is the one case where the divide-based bound and the return-to-zero rule
+ * both apply, so it must still report exactly once.
+ */
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsZeroWhenReleasedFromManyChunksAbove) {
+    ASSERT_THAT(getLastReportedValues(5000, -5000), std::pair(0, 0))
+        << "Many chunk crossings down at once, back to zero.";
+}
+
 TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotThrowWhenUnderLimit) {
     SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1000}};
     tracker.add(500);

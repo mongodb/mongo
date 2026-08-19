@@ -47,7 +47,8 @@ public:
      * running total and the peak untouched, and leaves the chunk lower bound equal to
      * '_lastReportedLowerBound' (that field is updated exactly when the bound moves), so no CurOp
      * report is due either. Skipping it here avoids both the call and the walk up the base chain,
-     * each level of which does an integer division for the chunk check.
+     * including the integer division for the chunk check done by whichever level has chunking
+     * enabled.
      *
      * Fixed-size accumulators make this the common case: $group calls add() once per input
      * document with 'accumulator->getMemUsage() - prevMemUsage', which is always 0 for $sum and
@@ -170,16 +171,31 @@ private:
      * boundary was crossed. The root tracker performs the actual CurOp write (reporting the exact
      * in-use total) when 'report' is true.
      */
-    void addInternal(int64_t diff, bool report);
+    MONGO_COMPILER_NOINLINE void addInternal(int64_t diff, bool report);
+
+    /**
+     * Invokes '_writeToCurOp' with the current totals. Kept out of line so that addInternal() has
+     * no address-taken locals: std::function's invoker takes its arguments by reference, which
+     * would otherwise put the totals on the stack and, because '-fstack-protector-strong' is
+     * enabled globally, add a canary prologue/epilogue to every update including those that do not
+     * report. It does not save the stack frame itself -- '-fno-omit-frame-pointer' is also global.
+     *
+     * The canary is then suppressed here as well, which is what keeps the out-of-lining from simply
+     * moving the cost onto the reporting path: with it, an update that does report was measured
+     * ~11% slower than not out-of-lining at all, and without it that path is at parity while the
+     * non-reporting paths keep the full benefit. Safe to suppress because this function has no
+     * buffer on its stack -- it passes two int64_t by reference to the callback and nothing else.
+     */
+    MONGO_COMPILER_NO_STACK_PROTECTOR void reportToCurOp() const;
 
     /**
      * Called after the memory limit has already been checked to assert that the current usage
      * exceeds the limit, including a name, stageName (optional), current usage, and limit in
      * the error message.
      */
-    void uassertedMemoryLimitExceeded(OperationContext* opCtx,
-                                      std::string_view name,
-                                      std::string_view stageName) const;
+    MONGO_COMPILER_NORETURN void uassertedMemoryLimitExceeded(OperationContext* opCtx,
+                                                              std::string_view name,
+                                                              std::string_view stageName) const;
 
     SimpleMemoryUsageTracker* _base = nullptr;
 
@@ -188,6 +204,17 @@ private:
     // Tracks the current memory footprint.
     int64_t _inUseTrackedMemoryBytes = 0;
 
+    // If set to a value > 0, memory usage updates will only be written to CurOp if the usage
+    // surpasses this size. Writing to CurOp involves lock contention, so in performance-sensitive
+    // situations, we should set a non-zero size. If 0, no chunking is performed.
+    //
+    // Kept adjacent to the counters above rather than after '_writeToCurOp' so that every field
+    // touched by the addInternal() hot path lies within the first bytes of the object.
+    int64_t _chunkSize = 0;
+
+    // Last lower-bound chunk reported to CurOp.
+    int64_t _lastReportedLowerBound = 0;
+
     MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 
     // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
@@ -195,13 +222,6 @@ private:
     // to avoid making add() virtual, since it has been shown to have an effect on performance in
     // some cases.
     std::function<void(int64_t, int64_t)> _writeToCurOp;
-
-    // If set, memory usage updates will only be written to CurOp if the usage surpasses this
-    // size. Writing to CurOp involves lock contention, so in performance-sensitive situations,
-    // we should set a non-zero size. If 0, no chunking is performed.
-    int64_t _chunkSize;
-    // Last lower-bound chunk reported to CurOp.
-    int64_t _lastReportedLowerBound = 0;
 };
 
 /**
@@ -332,10 +352,6 @@ private:
     int64_t _inUseTrackedMemoryBytes = 0;
     int64_t _inUseRecordIdCount = 0;
 
-    // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
-    // be invoked with _inUseTrackedMemoryBytes and _inUseRecordIdCount.
-    std::function<void(int64_t, int64_t)> _reportCallback;
-
     // If set, memory usage updates will only be written to serverStatus if the usage surpasses this
     // size. Writing to serverStatus involves lock contention, so in performance-sensitive
     // situations, we should set a non-one size. If 1, no chunking is performed.
@@ -344,6 +360,10 @@ private:
     // _inUseRecordIdCount if _chunkSize is 1 (no chunking).
     int64_t _lastReportedLowerBound = 0;
     int64_t _lastReportedRecordIdCount = 0;
+
+    // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
+    // be invoked with _inUseTrackedMemoryBytes and _inUseRecordIdCount.
+    std::function<void(int64_t, int64_t)> _reportCallback;
 };
 
 /**

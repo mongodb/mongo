@@ -13,11 +13,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <limits>
 #include <string>
 #include <string_view>
 
 #include <absl/strings/string_view.h>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -41,14 +43,27 @@ auto& operationsFailedDueToMemoryLimit =
         {.serverStatusOptions = otel::metrics::ServerStatusOptions{
              .dottedPath = "query.operationsFailedDueToMemoryLimit", .role = ClusterRole::None}});
 
+MONGO_COMPILER_NORETURN void memoryTrackingUnderflowFailed(int64_t diff, int64_t available);
+
+// Intentionally out-of-line here and not inlined as a simple 'tassert()' inside 'addInternal()' for
+// performance reasons. Re-inling the function into 'addInternal()' may result in a performance
+// degradation on some platforms.
+MONGO_COMPILER_NOINLINE void memoryTrackingUnderflowFailed(int64_t diff, int64_t available) {
+    tasserted(6128100,
+              fmt::format("Underflow in memory tracking, "
+                          "attempting to add {} but only {} available",
+                          diff,
+                          available));
+}
+
 }  // namespace
 
 SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
                                                    MemoryUsageLimit maxAllowedMemoryUsageBytes,
                                                    int64_t chunkSize)
     : _base(base),
-      _maxAllowedMemoryUsageBytes(std::move(maxAllowedMemoryUsageBytes)),
-      _chunkSize(chunkSize) {}
+      _chunkSize(chunkSize),
+      _maxAllowedMemoryUsageBytes(std::move(maxAllowedMemoryUsageBytes)) {}
 
 SimpleMemoryUsageTracker::SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMemoryUsageBytes,
                                                    int64_t chunkSize)
@@ -82,19 +97,20 @@ void MemoryUsageTracker::add(std::string_view name, int64_t diff) {
 
 DeduplicatorReporter::DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback,
                                            int64_t chunkSize)
-    : _reportCallback(std::move(callback)), _chunkSize(chunkSize) {
+    : _chunkSize(chunkSize), _reportCallback(std::move(callback)) {
     tassert(11114200, "Expected positive value for chunkSize", _chunkSize > 0);
 }
 
 void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
-    _inUseTrackedMemoryBytes += diff;
-    tassert(6128100,
-            str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                          << " but only " << _inUseTrackedMemoryBytes - diff << " available",
-            _inUseTrackedMemoryBytes >= 0);
-    if (_inUseTrackedMemoryBytes > _peakTrackedMemoryBytes) {
-        _peakTrackedMemoryBytes = _inUseTrackedMemoryBytes;
+    // The public 'add()' only calls internal 'addInternal()' function for diff values != 0.
+    dassert(diff != 0);
+
+    int64_t inUse = _inUseTrackedMemoryBytes + diff;
+    _inUseTrackedMemoryBytes = inUse;
+    if (MONGO_unlikely(inUse < 0)) {
+        memoryTrackingUnderflowFailed(diff, inUse - diff);
     }
+    _peakTrackedMemoryBytes = std::max(_peakTrackedMemoryBytes, inUse);
 
     // When chunking is enabled we report to CurOp only when usage crosses a chunk boundary (0,
     // chunkSize, 2*chunkSize, ...), and also whenever it returns to zero so CurOp does not keep a
@@ -103,19 +119,48 @@ void SimpleMemoryUsageTracker::addInternal(int64_t diff, bool report) {
     // root, so the decision is computed here and carried in 'report' to the root, which performs
     // the CurOp write.
     if (_chunkSize) {
-        int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
-        report = newLowerBound != _lastReportedLowerBound ||
-            (_inUseTrackedMemoryBytes == 0 && diff != 0);
-        if (report) {
-            _lastReportedLowerBound = newLowerBound;
+        // '_lastReportedLowerBound' is only ever assigned a multiple of '_chunkSize', and 'inUse'
+        // is known to be non-negative here, so 'offsetSinceLastReported' locates 'inUse' relative
+        // to the chunk we last reported: [0, chunkSize) is that same chunk, and anything else is a
+        // boundary crossing.
+        //
+        // Note this fires at one level of the chain only: the per-accumulator child trackers
+        // ('MemoryUsageTracker::operator[]') and the root operation tracker are both built with
+        // 'chunkSize == 0', so only a stage's own base tracker gets here.
+        const int64_t offsetSinceLastReported = inUse - _lastReportedLowerBound;
+
+        if (static_cast<uint64_t>(offsetSinceLastReported) < static_cast<uint64_t>(_chunkSize)) {
+            // 'diff' is always non-zero, as add() is the only entry point and it filters those
+            // out, so returning to zero always means a transition to zero.
+            report = (inUse == 0);
+        } else {
+            // A crossing, so the bound moves and a report is always due. ('inUse == 0' is included:
+            // zero is only outside the chunk last reported when that chunk was not the one starting
+            // at zero, and the return-to-zero case inside that chunk is handled above.)
+            //
+            // Stepping the bound by one chunk instead of dividing was measured here and did not
+            // pay: it trades the divide for data-dependent branches, which is a wash even when
+            // every update crosses. Not worth the extra code.
+            _lastReportedLowerBound = (inUse / _chunkSize) * _chunkSize;
+            report = true;
         }
     }
 
     if (_base) {
         _base->addInternal(diff, report);
-    } else if (_writeToCurOp && report) {
-        _writeToCurOp(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
+    } else if (report && _writeToCurOp) {
+        // 'report' is tested first so that the common non-reporting case does not have to load
+        // the std::function's target pointer.
+        reportToCurOp();
     }
+}
+
+// This function is often used on the hot path of memory tracking. Don't add an unnecessary stack
+// protector to save a few instructions here. The function only spills two int64_t values and passes
+// their addresses to the callback function.
+MONGO_COMPILER_NOINLINE MONGO_COMPILER_NO_STACK_PROTECTOR void
+SimpleMemoryUsageTracker::reportToCurOp() const {
+    _writeToCurOp(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
 }
 
 void SimpleMemoryUsageTracker::resetBase(SimpleMemoryUsageTracker* base) {
@@ -173,7 +218,6 @@ MemoryUsageTracker MemoryUsageTracker::makeFreshMemoryUsageTracker() const {
 }
 
 void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
-
     _inUseTrackedMemoryBytes += bytesDiff;
     _inUseRecordIdCount += recordsDiff;
     tassert(12579700,

@@ -175,6 +175,20 @@
     MONGO_COMPILER_IF_GNUC([[gnu::noinline]])
 
 /**
+ * Omits the stack-protector canary from a function, overriding '-fstack-protector-strong'.
+ *
+ * Use this only on a function that is both hot and provably not a place a canary would help: no
+ * arrays or other buffers on its stack, and nothing that writes through a pointer derived from a
+ * caller-supplied index or length. A function typically acquires a canary because it has an
+ * address-taken local (for example one passed by reference to a callee), which is not by itself a
+ * reason to suppress the check. Prefer restructuring the code so that the canary is not emitted in
+ * the hot function at all; reach for this only when that is not possible.
+ *
+ * No effect on MSVC, which has no equivalent per-function opt-out.
+ */
+#define MONGO_COMPILER_NO_STACK_PROTECTOR MONGO_COMPILER_IF_GNUC([[gnu::no_stack_protector]])
+
+/**
  * Tells the compiler that the function always returns a non-null value, potentially allowing
  * additional optimizations at call sites.
  */

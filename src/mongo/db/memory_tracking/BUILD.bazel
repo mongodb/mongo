@@ -96,6 +96,13 @@ mongo_cc_library(
 )
 
 mongo_cc_benchmark(
+    name = "memory_usage_tracker_bm",
+    srcs = ["memory_usage_tracker_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [":memory_tracking"],
+)
+
+mongo_cc_benchmark(
     name = "query_memory_load_shedding_bm",
     srcs = ["query_memory_load_shedding_bm.cpp"],
     tags = ["query_bm"],
