@@ -85,10 +85,6 @@ bool AttachedPersistenceProvider::shouldUseReplicatedFastCount() const {
     return false;
 }
 
-bool AttachedPersistenceProvider::shouldUseContinuousInternodeValidation() const {
-    return false;
-}
-
 bool AttachedPersistenceProvider::relaxContainerOplogConstraints() const {
     return true;
 }

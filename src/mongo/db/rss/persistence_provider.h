@@ -99,12 +99,6 @@ public:
     virtual bool shouldUseReplicatedFastCount() const = 0;
 
     /**
-     * If true, per-document validation hashes are stored on oplog entries and verified against the
-     * applied document during oplog application.
-     */
-    virtual bool shouldUseContinuousInternodeValidation() const = 0;
-
-    /**
      * If true, applying replicated container operations (ci/cu/cd) tolerates state mismatches by
      * converting between insert/update and ignoring deletes of missing keys.
      */

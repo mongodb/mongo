@@ -53,12 +53,6 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
-    // The write path consults this on every operation. These tests target fast count, not
-    // continuous internode validation, so leave validation off.
-    bool shouldUseContinuousInternodeValidation() const override {
-        return false;
-    }
-
     bool shouldUseReplicatedRecordIds() const override {
         return false;
     }

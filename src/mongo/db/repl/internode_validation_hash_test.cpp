@@ -14,11 +14,6 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -359,110 +354,6 @@ TEST_F(VerifyValidationHashTest, PerCollectionDisabledWithoutPerDocument) {
     unittest::ServerParameterGuard disablePerDocument(
         "featureFlagContinuousInternodeValidationPerDocument", false);
 
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
-
-// Minimal stub provider for which continuous internode validation is part of the storage model.
-class StubProviderRequiringContinuousInternodeValidation : public rss::StubPersistenceProvider {
-public:
-    std::string name() const override {
-        return "StubProviderRequiringContinuousInternodeValidation";
-    }
-    bool shouldUseContinuousInternodeValidation() const override {
-        return true;
-    }
-};
-
-// The persistence provider enables validation on its own, so the FCV-gated feature flags are not
-// consulted. Both the per-document and per-collection hashes are enabled together.
-class ProviderDrivenValidationTest : public OplogApplierImplTest {
-protected:
-    void setUp() override {
-        OplogApplierImplTest::setUp();
-        rss::ReplicatedStorageService::get(_opCtx->getServiceContext())
-            .setPersistenceProvider(
-                std::make_unique<StubProviderRequiringContinuousInternodeValidation>());
-    }
-
-    unittest::ServerParameterGuard _perDocumentFlag{
-        "featureFlagContinuousInternodeValidationPerDocument", false};
-    unittest::ServerParameterGuard _perCollectionFlag{
-        "featureFlagContinuousInternodeValidationPerCollection", false};
-};
-
-TEST_F(ProviderDrivenValidationTest, PerDocumentEnabledByProviderWithoutFeatureFlag) {
-    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-}
-
-TEST_F(ProviderDrivenValidationTest, PerCollectionEnabledByProviderWithoutFeatureFlag) {
-    EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
-
-// The override is the mitigation lever, so it has to win against a provider that mandates
-// validation, which is the only way validation is on in production.
-TEST_F(ProviderDrivenValidationTest, OverrideDisablesValidationMandatedByProvider) {
-    unittest::ServerParameterGuard disableValidation("disableContinuousInternodeValidation", true);
-
-    EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
-
-// The override is settable at runtime, and takes effect on the next operation to consult it in
-// either direction.
-TEST_F(ProviderDrivenValidationTest, OverrideTakesEffectAtRuntime) {
-    // Restores whatever the override held on the way out, including the store() calls below.
-    unittest::ServerParameterGuard restoreOverride("disableContinuousInternodeValidation", false);
-
-    ASSERT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-
-    disableContinuousInternodeValidation.store(true);
-    EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-
-    disableContinuousInternodeValidation.store(false);
-    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-    EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
-
-// The feature flag enables validation on providers that do not mandate it. The fixture-installed
-// provider for the rest of these tests leaves the decision to the flag.
-TEST_F(VerifyValidationHashTest, PerDocumentEnabledByFeatureFlagWithoutProvider) {
-    ASSERT_FALSE(rss::ReplicatedStorageService::get(_opCtx->getServiceContext())
-                     .getPersistenceProvider()
-                     .shouldUseContinuousInternodeValidation());
-    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-}
-
-// The mitigation this override exists for: a hash this node disagrees with would otherwise be
-// fatal, since 'continuousInternodeValidationFatalOnMismatch' defaults to true and this fixture
-// leaves it there. With validation disabled the entry applies, and nothing is reported.
-TEST_F(VerifyValidationHashTest, OverrideSkipsVerificationOfMismatchedHash) {
-    unittest::ServerParameterGuard disableValidation("disableContinuousInternodeValidation", true);
-
-    const RecordId rid(1);
-    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
-    const OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
-        nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
-
-    unittest::LogCaptureGuard logs;
-    ASSERT_OK(runOpSteadyState(op));
-    logs.stop();
-
-    assertDocumentIs(rid, doc);
-    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMismatchLogId)), 0);
-}
-
-// Validation hashes travel on the oplog and are checked as it is applied, so they are meaningless
-// outside a replica set.
-TEST_F(VerifyValidationHashTest, DisabledWhenNotAReplicaSet) {
-    ReplicationCoordinator::set(
-        _opCtx->getServiceContext(),
-        std::make_unique<ReplicationCoordinatorMock>(_opCtx->getServiceContext(), ReplSettings{}));
-
-    unittest::ServerParameterGuard enablePerCollection(
-        "featureFlagContinuousInternodeValidationPerCollection", true);
-
-    EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
     EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
 }
 
