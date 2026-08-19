@@ -21,13 +21,11 @@ using otel::metrics::MetricNames;
 using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 
-auto& numSortedMetric =
-    MetricsService::instance().createInt64Counter(MetricNames::kIndexBulkBuilderNumSorted,
-                                                  "The total number of sorted documents",
-                                                  MetricUnit::kCount);
+auto& numSortedMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kIndexBulkBuilderNumSorted, "The total number of sorted keys", MetricUnit::kCount);
 auto& bytesSortedMetric =
     MetricsService::instance().createInt64Counter(MetricNames::kIndexBulkBuilderBytesSorted,
-                                                  "The total number of bytes for sorted documents",
+                                                  "The total number of bytes for sorted keys",
                                                   MetricUnit::kBytes);
 auto& bytesSpilledMetric = MetricsService::instance().createInt64Counter(
     MetricNames::kIndexBulkBuilderBytesSpilled,
