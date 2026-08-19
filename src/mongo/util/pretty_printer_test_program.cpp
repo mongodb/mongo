@@ -7,6 +7,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/string_map.h"
@@ -18,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
@@ -54,8 +57,8 @@ struct NonEmptyMapEq {
     // This using directive activates heterogeneous lookup in the hash table
     using is_transparent = void;
 
-    bool operator()(std::string lhs, std::string rhs) const {
-        return true;
+    bool operator()(std::string_view lhs, std::string_view rhs) const {
+        return lhs == rhs;
     }
 
     int x = 0;
@@ -72,10 +75,17 @@ public:
     constexpr NonEmptyAlloc(const NonEmptyAlloc<U>&) noexcept {}
 
     T* allocate(std::size_t n) {
-        return nullptr;
+        return std::allocator<T>{}.allocate(n);
     }
 
-    void deallocate(T* p, std::size_t n) noexcept {}
+    void deallocate(T* p, std::size_t n) noexcept {
+        std::allocator<T>{}.deallocate(p, n);
+    }
+
+    template <typename U>
+    bool operator==(const NonEmptyAlloc<U>&) const {
+        return true;
+    }
 
     int x = 0;
 };
@@ -95,9 +105,178 @@ auto str2 = MyDecorable::declareDecoration<std::string>();
 constexpr auto testData = mongo::namespace_string_data::makeNsData<9, 4>("constexpr", "name");
 constexpr mongo::NamespaceString kConstNs(testData.data(), testData.size());
 
+template <typename T>
+struct ContainerValue;
+
+template <>
+struct ContainerValue<int> {
+    static int make(int i) {
+        return i;
+    }
+};
+
+template <>
+struct ContainerValue<std::string> {
+    // Produces "a", "b", ... "z", then "aa", "bb", and so on, so that arbitrarily many
+    // distinct strings are available.
+    static std::string make(int i) {
+        invariant(i >= 0);
+        return std::string(i / 26 + 1, static_cast<char>('a' + i % 26));
+    }
+};
+
+template <typename K, typename V>
+struct ContainerValue<std::pair<K, V>> {
+    static std::pair<K, V> make(int i) {
+        return {ContainerValue<std::remove_const_t<K>>::make(i),
+                ContainerValue<std::remove_const_t<V>>::make(i)};
+    }
+};
+
+// The part of an element that identifies it for erase(). For a set that is the element
+// itself, and for a map it is the key.
+template <typename T>
+struct ContainerKey {
+    using type = T;
+
+    static type make(int i) {
+        return ContainerValue<type>::make(i);
+    }
+};
+
+template <typename K, typename V>
+struct ContainerKey<std::pair<K, V>> {
+    using type = std::remove_const_t<K>;
+
+    static type make(int i) {
+        return ContainerValue<type>::make(i);
+    }
+};
+
+// A bunch of containers with content that pretty_printer_test.py expects. Each member is
+// constructed and mutated in a different way to cover a range of possible states such as
+// containers with few elements that may be in small-object optimization mode and containers
+// that contain tombstones for deleted elements.
+template <typename Container>
+class AbslContainerStates {
+public:
+    using Element = Container::value_type;
+
+    static Element elem(int i) {
+        return ContainerValue<Element>::make(i);
+    }
+
+    static void insertRange(Container& c, int first, int last) {
+        for (int i = first; i < last; i++) {
+            c.insert(elem(i));
+        }
+    }
+
+    // Erases elements [first, last), all of which must be present.
+    static void eraseRange(Container& c, int first, int last) {
+        for (int i = first; i < last; i++) {
+            invariant(c.erase(ContainerKey<Element>::make(i)) == 1);
+        }
+    }
+
+    AbslContainerStates() {
+        insertRange(movedFrom, 0, 3);
+        auto movedTo = std::move(movedFrom);
+
+        insert1.insert(elem(0));
+
+        insert1ThenDelete.insert(elem(0));
+        insert1ThenDelete.erase(insert1ThenDelete.begin());
+
+        insert1ThenClear.insert(elem(0));
+        insert1ThenClear.clear();
+
+        insert1ThenDeleteThenInsert.insert(elem(0));
+        insert1ThenDeleteThenInsert.erase(insert1ThenDeleteThenInsert.begin());
+        insert1ThenDeleteThenInsert.insert(elem(1));
+
+        insert1ThenClearThenInsert.insert(elem(0));
+        insert1ThenClearThenInsert.clear();
+        insert1ThenClearThenInsert.insert(elem(1));
+
+        // A container with more than one element is never in SOO mode, so these cover the
+        // smallest heap-allocated (i.e., non-SOO) tables for SOO-eligible container types.
+        insertRange(insert2, 0, 2);
+
+        insertRange(insert3, 0, 3);
+
+        insertRange(insert3Delete1, 0, 3);
+        eraseRange(insert3Delete1, 0, 1);
+
+        // Size one but not in SOO mode, as the capacity is still three.
+        insertRange(insert3Delete2, 0, 3);
+        eraseRange(insert3Delete2, 0, 2);
+
+        insertRange(insert3DeleteAll, 0, 3);
+        eraseRange(insert3DeleteAll, 0, 3);
+
+        insertRange(insert3DeleteAllReinsert, 0, 3);
+        eraseRange(insert3DeleteAllReinsert, 0, 3);
+        insert3DeleteAllReinsert.insert(elem(3));
+
+        insertRange(insert8, 0, 8);
+
+        insertRange(insert8Delete4, 0, 8);
+        eraseRange(insert8Delete4, 0, 4);
+
+        insertRange(insert8Delete4Reinsert, 0, 8);
+        eraseRange(insert8Delete4Reinsert, 0, 4);
+        insertRange(insert8Delete4Reinsert, 8, 12);
+
+        insertRange(insert8DeleteAll, 0, 8);
+        eraseRange(insert8DeleteAll, 0, 8);
+
+        insertRange(insert8DeleteAllReinsert, 0, 8);
+        eraseRange(insert8DeleteAllReinsert, 0, 8);
+        insert8DeleteAllReinsert.insert(elem(8));
+
+        // A table holding 28 elements has a capacity of 31, while a table with 29 elements
+        // goes to the next capacity up (63). The condition for using tombstones is that
+        // the capacity exceeds the size of a "probing group", and 31 should be big enough
+        // for that (the size of a group is platform-specific depending on available SIMD
+        // primitives).
+        insertRange(insert28, 0, 28);
+
+        // This table should have tombstones.
+        insertRange(insert28Delete4, 0, 28);
+        eraseRange(insert28Delete4, 0, 4);
+
+        // This table should exercise tombstones being reclaimed.
+        insertRange(insert28Delete4Reinsert, 0, 28);
+        eraseRange(insert28Delete4Reinsert, 0, 4);
+        insertRange(insert28Delete4Reinsert, 28, 32);
+    }
+
+    Container empty;
+    Container movedFrom;
+    Container insert1;
+    Container insert1ThenDelete;
+    Container insert1ThenClear;
+    Container insert1ThenDeleteThenInsert;
+    Container insert1ThenClearThenInsert;
+    Container insert2;
+    Container insert3;
+    Container insert3Delete1;
+    Container insert3Delete2;
+    Container insert3DeleteAll;
+    Container insert3DeleteAllReinsert;
+    Container insert8;
+    Container insert8Delete4;
+    Container insert8Delete4Reinsert;
+    Container insert8DeleteAll;
+    Container insert8DeleteAllReinsert;
+    Container insert28;
+    Container insert28Delete4;
+    Container insert28Delete4Reinsert;
+};
+
 MyDecorable d1;
 int clang_optnone main(int argc, char** argv) {
-
     std::set<int> set_type = {1, 2, 3, 4};
     std::unique_ptr<int> up(new int);
     intVec(d1) = {123, 213, 312};
@@ -116,26 +295,40 @@ int clang_optnone main(int argc, char** argv) {
         boost::none, "longdatabasenamewithoutsmallstring.longcollection");
     mongo::NamespaceString constCopy = kConstNs;
 
-    // Tests for various abseil containers.
-    mongo::StringMap<int> emptyMap;
+    // A container uses the small object optimization (SOO) when its slot type fits in the space
+    // otherwise occupied by two pointers, that is when sizeof(slot_type) <= 16 and
+    // alignof(slot_type) <= 8. The flat containers store their elements directly in the
+    // slots while the node containers store a pointer in each slot. As a result,
+    // flat containers are only SOO-eligible when their keys and values are small enough,
+    // node containers are always SOO-eligible as a single pointer is small enough.
+    AbslContainerStates<mongo::StringMap<int>> stringIntMaps;
+    AbslContainerStates<mongo::StringMap<std::string>> stringStringMaps;
+    AbslContainerStates<absl::flat_hash_map<int, std::string>> intStringMaps;
+    AbslContainerStates<mongo::StringSet> stringSets;
 
-    mongo::StringMap<int> intMap;
-    intMap["a"] = 1;
-    intMap["b"] = 1;
+    // These two should be small enough to be SOO-eligible.
+    AbslContainerStates<absl::flat_hash_map<int, int>> intIntMaps;
+    AbslContainerStates<absl::flat_hash_set<int>> intSets;
 
-    mongo::StringMap<std::string> strMap;
-    strMap["a"] = "a_value";
+    // The node containers hold a pointer in each slot, so they are always SOO-eligible.
+    AbslContainerStates<absl::node_hash_map<std::string, int>> stringIntNodeMaps;
+    AbslContainerStates<absl::node_hash_map<std::string, std::string>> stringStringNodeMaps;
+    AbslContainerStates<absl::node_hash_map<int, int>> intIntNodeMaps;
+    AbslContainerStates<absl::node_hash_map<int, std::string>> intStringNodeMaps;
+    AbslContainerStates<absl::node_hash_set<std::string>> stringNodeSets;
+    AbslContainerStates<absl::node_hash_set<int>> intNodeSets;
 
-    mongo::StringSet strSet;
-    strSet.insert("a");
-
-    absl::flat_hash_set<std::string, NonEmptyHash, mongo::StringMapEq> checkNonEmptyHash;
-    absl::flat_hash_set<std::string, mongo::StringMapHasher, NonEmptyMapEq> checkNonEmptyEq;
-    absl::flat_hash_set<std::string,
-                        mongo::StringMapHasher,
-                        mongo::StringMapEq,
-                        NonEmptyAlloc<std::string>>
-        checkNonEmptyAlloc;
+    // A custom hasher shouldn't break printers. This one makes everything collide, but
+    // that doesn't break printing.
+    AbslContainerStates<absl::flat_hash_set<std::string, NonEmptyHash, mongo::StringMapEq>>
+        nonEmptyHashSets;
+    AbslContainerStates<absl::flat_hash_set<std::string, mongo::StringMapHasher, NonEmptyMapEq>>
+        nonEmptyEqSets;
+    AbslContainerStates<absl::flat_hash_set<std::string,
+                                            mongo::StringMapHasher,
+                                            mongo::StringMapEq,
+                                            NonEmptyAlloc<std::string>>>
+        nonEmptyAllocSets;
 
     boost::optional<int> optTypeNone;
     boost::optional<int> optTypeValue{1};

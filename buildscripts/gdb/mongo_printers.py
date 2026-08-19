@@ -917,7 +917,7 @@ class AbslFlatHashSetPrinter(AbslHashSetPrinterBase):
         """Children."""
         count = 0
         for val in absl_get_nodes(self.val):
-            yield (str(count), val.reference_value())
+            yield (str(count), val)
             count += 1
 
 

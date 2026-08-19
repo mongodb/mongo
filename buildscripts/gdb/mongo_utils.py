@@ -385,6 +385,25 @@ def absl_container_size(settings):
     return settings["size_"]["data_"] >> 17
 
 
+# The capacity of a container using the small object optimization. Abseil only ever stores a
+# single element inline.
+_ABSL_SOO_CAPACITY = 1
+
+
+def _absl_soo_enabled(settings, slot_type):
+    """Returns whether an abseil container is eligible for the small object optimization (SOO).
+
+    This mirrors raw_hash_set::SooEnabled(). The logic is basically this: PolicyTraits::soo_enabled
+    AND a slot can fit in the heap_or_soo_ member. Every policy leaves PolicyTraits::soo_enabled(),
+    so eligibility is determined by the size and alignment of a slot.
+    """
+    heap_or_soo_type = settings["heap_or_soo_"].type
+    return (
+        slot_type.sizeof <= heap_or_soo_type.sizeof
+        and slot_type.alignof <= heap_or_soo_type.alignof
+    )
+
+
 def absl_get_nodes(val):
     """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
     settings = absl_get_settings(val)
@@ -394,11 +413,18 @@ def absl_get_nodes(val):
         return
 
     capacity = int(settings["capacity_"])
-    heap = settings["heap_or_soo_"]["heap"]
-    ctrl = heap["control"]
 
     # Derive the underlying type stored in the container.
     slot_type = lookup_type(str(val.type.strip_typedefs().name) + "::slot_type").strip_typedefs()
+
+    # A container using the small object optimization holds its only element inline, where
+    # the heap pointers would otherwise be.
+    if capacity == _ABSL_SOO_CAPACITY and _absl_soo_enabled(settings, slot_type):
+        yield settings["heap_or_soo_"].address.cast(slot_type.pointer()).dereference()
+        return
+
+    heap = settings["heap_or_soo_"]["heap"]
+    ctrl = heap["control"]
 
     # Using the array of ctrl bytes, search for in-use slots and return them
     # https://github.com/abseil/abseil-cpp/blob/8a3caf7dea955b513a6c1b572a2423c6b4213402/absl/container/internal/raw_hash_set.h#L2108-L2113
