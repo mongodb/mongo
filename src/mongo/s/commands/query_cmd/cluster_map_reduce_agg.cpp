@@ -86,12 +86,14 @@ auto makeExpressionContext(OperationContext* opCtx,
     // necessary for mapReduce commands because we will always be merging on the _id field. As such,
     // the collection default collation has no impact on the selection of fields to merge on.
     const auto requiresCollationForParsingUnshardedAggregate = false;
-    auto [collationObj, collationMatchesDefault] =
-        cluster_aggregation_planner::getCollation(opCtx,
-                                                  cri,
-                                                  nss,
-                                                  parsedMr.getCollation().get_value_or(BSONObj()),
-                                                  requiresCollationForParsingUnshardedAggregate);
+    const auto collectionInfo = cluster_aggregation_planner::resolveCollectionInfo(
+        opCtx,
+        cri,
+        nss,
+        parsedMr.getCollation().get_value_or(BSONObj()),
+        requiresCollationForParsingUnshardedAggregate);
+    const BSONObj& collationObj = collectionInfo.collation;
+    const auto collationMatchesDefault = collectionInfo.collationMatchesDefault;
 
     std::unique_ptr<CollatorInterface> resolvedCollator;
     if (!collationObj.isEmpty()) {
