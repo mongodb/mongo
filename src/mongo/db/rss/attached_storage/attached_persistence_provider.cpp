@@ -125,6 +125,10 @@ bool AttachedPersistenceProvider::supportsPreservingPreparedTxnInPreciseCheckpoi
     return false;
 }
 
+bool AttachedPersistenceProvider::supportsVersionCursor() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::supportsTableLogging() const {
     return true;
 }

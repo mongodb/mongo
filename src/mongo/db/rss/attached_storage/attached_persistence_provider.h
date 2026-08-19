@@ -123,6 +123,11 @@ public:
     bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override;
 
     /**
+     * We can support version cursors.
+     */
+    bool supportsVersionCursor() const override;
+
+    /**
      * We can support table logging.
      */
     bool supportsTableLogging() const override;

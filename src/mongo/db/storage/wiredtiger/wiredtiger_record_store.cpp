@@ -998,6 +998,16 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(
 
 void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
                                                 std::set<Timestamp>* recordTimestamps) const {
+    if (!rss::ReplicatedStorageService::get(getGlobalServiceContext())
+             .getPersistenceProvider()
+             .supportsVersionCursor()) {
+        LOGV2_WARNING(13351201,
+                      "Skipping printing record metadata because the persistence provider does not "
+                      "support version cursors",
+                      "recordId"_attr = recordId);
+        return;
+    }
+
     // Printing the record metadata requires a new session. We cannot open other cursors when there
     // are open history store cursors in the session.
     WiredTigerSession session(&_kvEngine->getConnection());

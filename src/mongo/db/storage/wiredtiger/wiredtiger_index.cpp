@@ -417,6 +417,16 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx, RecoveryUnit& ru) {
 void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
                                               RecoveryUnit& ru,
                                               const key_string::View& keyString) const {
+    if (!rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .supportsVersionCursor()) {
+        LOGV2_WARNING(13351202,
+                      "Skipping printing index entry metadata because the persistence provider "
+                      "does not support version cursors",
+                      "index"_attr = _indexName);
+        return;
+    }
+
     // Printing the index entry metadata requires a new session. We cannot open other cursors when
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.

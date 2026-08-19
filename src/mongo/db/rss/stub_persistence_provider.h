@@ -134,6 +134,11 @@ public:
                   "method not implemented");
     }
 
+    bool supportsVersionCursor() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsVersionCursor() method not implemented");
+    }
+
     bool supportsTableLogging() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsTableLogging() method not implemented");

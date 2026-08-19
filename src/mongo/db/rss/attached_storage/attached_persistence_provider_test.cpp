@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -33,6 +34,11 @@ TEST(AttachedPersistenceProviderTest, SupportsOplogSampling) {
 TEST(AttachedPersistenceProviderTest, SupportsOplogScanning) {
     rss::AttachedPersistenceProvider provider;
     ASSERT_TRUE(provider.supportsOplogScanning());
+}
+
+TEST(AttachedPersistenceProviderTest, SupportsVersionCursors) {
+    rss::AttachedPersistenceProvider provider;
+    ASSERT_TRUE(provider.supportsVersionCursor());
 }
 
 }  // namespace

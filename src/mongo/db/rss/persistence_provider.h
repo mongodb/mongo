@@ -164,6 +164,13 @@ public:
     virtual bool supportsTableLogging() const = 0;
 
     /**
+     * If true, the provider supports opening WiredTiger version cursors, which iterate the history
+     * of values for a given key. These are debug-only cursors, used to print record and index entry
+     * metadata when validation finds an inconsistency.
+     */
+    virtual bool supportsVersionCursor() const = 0;
+
+    /**
      * If true, the provider supports cross-shard transactions.
      */
     virtual bool supportsCrossShardTransactions() const = 0;
