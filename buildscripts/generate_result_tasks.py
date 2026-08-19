@@ -48,7 +48,10 @@ NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 # Result tasks in a task group share a host. Remove the test logs and outputs between tasks, as
 # leaving them can cause a task to report test logs from another bazel target, and remove the
 # relinked binaries staged by gather_failed_tests so one task never uploads another's.
-_RESULT_TASK_CLEANUP = "rm -rf build/ results/ report.json src/dist-tests/ mongo-tests.tgz"
+_RESULT_TASK_CLEANUP = (
+    "rm -rf build/ results/ report.json src/dist-tests/ mongo-tests.tgz "
+    "src/.failed_unittest_repro.txt src/.bazel_build_invocation src/.engflow_link"
+)
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
