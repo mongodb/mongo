@@ -679,6 +679,21 @@ def run_test(test: Test, client: DockerClient) -> Result:
     log_external_path = Path.joinpath(test_external_root, log_name)
     commands: list[str] = ["export PYTHONIOENCODING=UTF-8"]
 
+    # Custom builds (see etc/evergreen_yml_components/custom_builds/README.md) may
+    # link the produced packages against libraries installed on the host but not in
+    # the stock container image (e.g. a system OpenSSL 3, mounted into the container
+    # below). Register the library directories with the dynamic linker so the
+    # installed binaries resolve them no matter how they are launched (the test
+    # starts mongod via a systemctl emulator, which does not propagate this
+    # process's environment). A no-op unless the variant sets the
+    # custom_ld_library_path expansion.
+    custom_ld_library_path = os.environ.get("custom_ld_library_path")
+    if custom_ld_library_path:
+        ld_dirs = " ".join(f"'{d}'" for d in custom_ld_library_path.split(":"))
+        commands.append(
+            f"printf '%s\n' {ld_dirs} > /etc/ld.so.conf.d/zz-mongo-custom-build.conf && ldconfig"
+        )
+
     if test.os_name.startswith("rhel"):
         # RHEL distros need EPEL for Compass dependencies
         commands += [
@@ -737,18 +752,25 @@ def run_test(test: Test, client: DockerClient) -> Result:
     container: Container | None = None
     try:
         image = get_image(test, client)
+        # Mount the custom build's library prefix (e.g. a system OpenSSL 3) into the
+        # container; the ld.so.conf.d command above makes the linker find it.
+        # A no-op unless the variant sets the mongo_openssl_root expansion.
+        volumes = [
+            f"{test_external_root}:{test_docker_root}",
+            "/etc/pki/entitlement/:/run/secrets/etc-pki-entitlement",
+            "/etc/rhsm:/run/secrets/rhsm",
+            "/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo",
+            "/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo",
+        ]
+        openssl_root = os.environ.get("mongo_openssl_root")
+        if openssl_root:
+            volumes.append(f"{openssl_root}:{openssl_root}:ro")
         container = client.containers.run(
             image,
             command=f'bash -c "{join_commands(commands)}"',
             auto_remove=True,
             detach=True,
-            volumes=[
-                f"{test_external_root}:{test_docker_root}",
-                "/etc/pki/entitlement/:/run/secrets/etc-pki-entitlement",
-                "/etc/rhsm:/run/secrets/rhsm",
-                "/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo",
-                "/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo",
-            ],
+            volumes=volumes,
         )
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode("UTF-8")

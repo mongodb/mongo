@@ -63,6 +63,26 @@ def _toolchain_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
     substitutions.update(_sysroot_substitutions(ctx))
 
+    # Builds that must link against a system OpenSSL installed outside the toolchain
+    # (for example custom builds) can set MONGO_OPENSSL_ROOT in the environment to the
+    # installation prefix. The prefix's include/lib directories are then prepended to
+    # the toolchain's search paths (see the OPENSSL_* lists in the flags template).
+    openssl_root = ctx.os.environ.get("MONGO_OPENSSL_ROOT", "")
+    if openssl_root:
+        ctx.report_progress("MONGO_OPENSSL_ROOT set, prepending {} to toolchain search paths".format(openssl_root))
+    openssl_link_dirs = []
+    openssl_include_dirs = []
+    if openssl_root:
+        openssl_link_dirs = ["{}/lib64".format(openssl_root), "{}/lib".format(openssl_root)]
+        openssl_include_dirs = ["{}/include".format(openssl_root)]
+    ctx.file(
+        "openssl_overrides.bzl",
+        "OPENSSL_LINK_DIRS = {}\nOPENSSL_INCLUDE_DIRS = {}\n".format(
+            repr(openssl_link_dirs),
+            repr(openssl_include_dirs),
+        ),
+    )
+
     skip_toolchain = ctx.os.environ.get(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE, None)
     if skip_toolchain:
         generate_noop_toolchain(ctx, substitutions)
@@ -113,11 +133,14 @@ def _toolchain_download(ctx):
 
 toolchain_download = repository_rule(
     implementation = _toolchain_download,
+    # Changes to these environment variables must re-run the repository rule so the
+    # generated toolchain picks up the new values.
     environ = [
         SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE,
         # The generated BUILD file's sysroot fragments depend on whether the
         # RBE sysroot dump is enabled, which is keyed on this variable.
         SYSROOT_ENV_VAR,
+        "MONGO_OPENSSL_ROOT",
     ],
     attrs = {
         "os": attr.string(

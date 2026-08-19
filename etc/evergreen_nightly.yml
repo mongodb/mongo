@@ -51,6 +51,8 @@ include:
   - filename: etc/evergreen_yml_components/tasks/coverity_tasks.yml
   - filename: etc/evergreen_yml_components/variants/coverity.yml
   - filename: etc/evergreen_yml_components/tasks/release_tasks.yml
+  - filename: etc/evergreen_yml_components/custom_builds/tasks.yml
+  - filename: etc/evergreen_yml_components/custom_builds/variants.yml
   ### Uncomment when using this file for a release branch. ###
   # - filename: etc/evergreen_yml_components/variants/release/release.yml
 

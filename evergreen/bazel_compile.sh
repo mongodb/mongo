@@ -20,6 +20,15 @@ set -o pipefail
 bazel_evergreen_shutils::activate_and_cd_src
 bazel_evergreen_shutils::export_ssl_paths_if_needed
 
+# Builds that must link against a system OpenSSL installed outside the toolchain (for
+# example custom builds) can set the mongo_openssl_root expansion to the installation
+# prefix; the toolchain repository rules then prepend its include/lib directories to the
+# toolchain's search paths. This must be exported because repository rules read the
+# environment of the Bazel server process.
+if [[ -n "${mongo_openssl_root:-}" ]]; then
+    export MONGO_OPENSSL_ROOT="${mongo_openssl_root}"
+fi
+
 # if build_patch_id is passed, try to download binaries from specified
 # evergreen patch.
 build_patch_id="${build_patch_id:-${reuse_compile_from}}"
