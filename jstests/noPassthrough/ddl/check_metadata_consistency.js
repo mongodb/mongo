@@ -2054,6 +2054,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 })();
 
 (function testTransientSnapshotReadsErrorsDoNotBubbleUp() {
+    const comment = "checkMetadataConsistencySnapshotReads";
     const db = getNewDb();
 
     jsTest.log("Executing testTransientSnapshotReadsErrorsDoNotBubbleUp");
@@ -2067,10 +2068,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     const allNodes = [st.configRS, ...st.getAllShards()].flatMap((rs) => rs.nodes);
     const failPoints = allNodes.map((node) =>
-        configureFailPoint(node, "failSnapshotReads", {}, {times: 2}),
+        configureFailPoint(node, "failSnapshotReads", {comment}, {times: 2}),
     );
 
-    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"));
+    let inconsistencies = checkMetadataConsistency(mongos.getDB("admin"), {comment});
     assert.eq(0, inconsistencies.length, {inconsistencies});
 
     const retriedOnSomeNode = allNodes.some((node) =>
@@ -2078,10 +2079,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     );
     assert(retriedOnSomeNode, "Expected a metadata consistency check retry to be logged");
 
-    inconsistencies = checkMetadataConsistency(db);
+    inconsistencies = checkMetadataConsistency(db, {comment});
     assert.eq(0, inconsistencies.length, {inconsistencies});
 
-    inconsistencies = checkMetadataConsistency(db.coll);
+    inconsistencies = checkMetadataConsistency(db.coll, {comment});
     assert.eq(0, inconsistencies.length, {inconsistencies});
 
     failPoints.forEach((fp) => fp.off());

@@ -327,7 +327,11 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use readConcern: snapshot"};
         }
-        if (MONGO_unlikely(failSnapshotReads.shouldFail())) {
+        if (MONGO_unlikely(failSnapshotReads.shouldFail([&](const BSONObj& data) {
+                const auto comment = opCtx->getComment();
+                return !data.hasField("comment") ||
+                    (comment && comment->checkAndGetStringData() == data.getStringField("comment"));
+            }))) {
             return {ErrorCodes::SnapshotUnavailable, "failSnapshotReads failpoint is on"};
         }
     }
