@@ -48,6 +48,13 @@ public:
         template <typename BSONTraits = BSONObj::DefaultSizeTrait>
         BSONObj appendToBson(BSONObj doc) const;
         Document appendToDocument(Document doc) const;
+
+        // Whether or not any metadata accessor are initialized.
+        bool anyAccessorsInitialized() const {
+            return metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
+                metadataSearchSortValues || metadataSearchSequenceToken || sortKey;
+        }
+
         // Only for $search queries, holds the metadata returned from mongot.
         sbe::value::SlotAccessor* metadataSearchScore{nullptr};
         sbe::value::SlotAccessor* metadataSearchHighlights{nullptr};
@@ -217,6 +224,7 @@ private:
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
     MetaDataAccessor _metadataAccessors;
+    bool _useMetadataAccessors{false};
 
     // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
     // documents received from the plan during multiplanning. This means that the documents
