@@ -9,6 +9,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/shared_buffer.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -49,6 +50,36 @@ void assertHashEqualityMatchesWoCompare(const BSONObj& obj) {
                                                            nullptr /* comparator */) == 0;
             ASSERT_EQ(hashes[i] == hashes[j], valuesEqual)
                 << "lhs=" << elements[i] << " rhs=" << elements[j];
+        }
+    }
+
+    // The composite property over the same elements: pair tuples hash equal iff their elements
+    // are pairwise equal, and a one-element tuple hashes like the single-value overload. The
+    // single-value hashes asserted above stand in for woCompare equality of the elements.
+    // Comparing all tuple pairs is quartic, so use a smaller prefix.
+    constexpr size_t kMaxTupleElements = 12;
+    const size_t numTupleElements = std::min(elements.size(), kMaxTupleElements);
+    std::vector<uint64_t> tupleHashes(numTupleElements * numTupleElements);
+    for (size_t i = 0; i < numTupleElements; ++i) {
+        const BSONElement single[] = {elements[i]};
+        ASSERT_EQ(hashValuesForNdv(single), hashes[i]) << "element=" << elements[i];
+        for (size_t j = 0; j < numTupleElements; ++j) {
+            const BSONElement pair[] = {elements[i], elements[j]};
+            tupleHashes[i * numTupleElements + j] = hashValuesForNdv(pair);
+        }
+    }
+    for (size_t i = 0; i < numTupleElements; ++i) {
+        for (size_t j = 0; j < numTupleElements; ++j) {
+            for (size_t k = 0; k < numTupleElements; ++k) {
+                for (size_t l = 0; l < numTupleElements; ++l) {
+                    const bool elementsEqual = hashes[i] == hashes[k] && hashes[j] == hashes[l];
+                    const bool tuplesEqual = tupleHashes[i * numTupleElements + j] ==
+                        tupleHashes[k * numTupleElements + l];
+                    ASSERT_EQ(tuplesEqual, elementsEqual)
+                        << "lhs=(" << elements[i] << ", " << elements[j] << ") rhs=(" << elements[k]
+                        << ", " << elements[l] << ")";
+                }
+            }
         }
     }
 }

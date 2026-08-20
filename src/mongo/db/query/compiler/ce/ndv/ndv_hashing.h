@@ -7,6 +7,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <span>
 
 namespace mongo::ce {
 
@@ -19,5 +20,14 @@ namespace mongo::ce {
  * Fixed-seed and non-cryptographic: estimation only, no resistance to crafted collisions.
  */
 uint64_t hashValueForNdv(const BSONElement& value);
+
+/**
+ * Hashes a tuple of non-array BSON values for composite NDV estimation by concatenating their
+ * KeyString encodings, in the order given, and hashing the result once. Tuples hash equal iff
+ * they are pairwise woCompare-equal (modulo 64-bit collisions); KeyString encodings are
+ * self-delimiting, so values cannot bleed across tuple positions. Per-element rules match
+ * hashValueForNdv(), and a one-element tuple hashes identically to it.
+ */
+uint64_t hashValuesForNdv(std::span<const BSONElement> values);
 
 }  // namespace mongo::ce

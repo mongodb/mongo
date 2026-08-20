@@ -42,12 +42,21 @@ protected:
         accumulator.process(Value(Document{{"val", doc.freezeToValue()}}), false /* merging */);
     }
 
+    // Composite counterpart of add(): feeds a whole document as 'val'.
+    void addDoc(AccumulatorInternalConstructNdvSketch& accumulator, Document doc) {
+        accumulator.process(Value(Document{{"val", Value(std::move(doc))}}), false /* merging */);
+    }
+
     Value sketches(AccumulatorInternalConstructNdvSketch& accumulator) {
         return accumulator.getValue(false /* toBeMerged */);
     }
 
     long long ndv(AccumulatorInternalConstructNdvSketch& accumulator) {
         return sketches(accumulator)[0][NdvSketch::kNdvFieldName].coerceToLong();
+    }
+
+    long long ndvAt(AccumulatorInternalConstructNdvSketch& accumulator, size_t index) {
+        return sketches(accumulator)[index][NdvSketch::kNdvFieldName].coerceToLong();
     }
 
     QueryTestServiceContext _serviceContext;
@@ -193,6 +202,150 @@ TEST_F(InternalConstructNdvSketchTest, ResetClearsState) {
     add(*accumulator, Value(1));
     accumulator->reset();
     ASSERT_EQ(ndv(*accumulator), 0);
+}
+
+// --- Composite NDV (SERVER-131763) ---
+
+TEST_F(InternalConstructNdvSketchTest, CompositeEmitsOnePlusNSketches) {
+    // n >= 2 fields emit n+1 folding variants; a single field stays at exactly one.
+    ASSERT_EQ(sketches(*makeAccumulator({"a"})).getArrayLength(), 1);
+    ASSERT_EQ(sketches(*makeAccumulator({"a", "b"})).getArrayLength(), 3);
+    ASSERT_EQ(sketches(*makeAccumulator({"a", "b", "c"})).getArrayLength(), 4);
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeCountsTuples) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    // The countNDV() doc-comment example: NDV(a, b) of these four documents is 3.
+    addDoc(*accumulator, Document{{"a", 1}, {"b", 1}});
+    addDoc(*accumulator, Document{{"a", 1}, {"b", 2}});
+    addDoc(*accumulator, Document{{"a", 2}, {"b", 2}});
+    addDoc(*accumulator, Document{{"a", 2}, {"b", 2}});
+    ASSERT_EQ(ndvAt(*accumulator, 0), 3);
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeFoldingVariants) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    addDoc(*accumulator, Document{{"a", 1}, {"b", Value(BSONNULL)}});
+    addDoc(*accumulator, Document{{"a", 1}});
+    addDoc(*accumulator, Document{{"b", 7}});
+    addDoc(*accumulator, Document{{"a", Value(BSONNULL)}, {"b", 7}});
+
+    // Strict tuples: (1, null), (1, missing), (missing, 7), (null, 7) are all distinct.
+    ASSERT_EQ(ndvAt(*accumulator, 0), 4);
+    // Folding "a" (missing counts as null) merges (missing, 7) into (null, 7).
+    ASSERT_EQ(ndvAt(*accumulator, 1), 3);
+    // Folding "b" merges (1, missing) into (1, null).
+    ASSERT_EQ(ndvAt(*accumulator, 2), 3);
+}
+
+TEST_F(InternalConstructNdvSketchTest, ThreeFieldFoldingVariants) {
+    auto accumulator = makeAccumulator({"a", "b", "c"});
+    // One merge pair for folding "a", two for "b", three for "c": every variant produces a
+    // different count, so a duplicated or misordered sketch cannot go unnoticed.
+    addDoc(*accumulator, Document{{"b", 1}, {"c", 1}});
+    addDoc(*accumulator, Document{{"a", Value(BSONNULL)}, {"b", 1}, {"c", 1}});
+    for (int i = 2; i <= 3; ++i) {
+        addDoc(*accumulator, Document{{"a", i}, {"c", i}});
+        addDoc(*accumulator, Document{{"a", i}, {"b", Value(BSONNULL)}, {"c", i}});
+    }
+    for (int i = 4; i <= 6; ++i) {
+        addDoc(*accumulator, Document{{"a", i}, {"b", i}});
+        addDoc(*accumulator, Document{{"a", i}, {"b", i}, {"c", Value(BSONNULL)}});
+    }
+
+    ASSERT_EQ(ndvAt(*accumulator, 0), 12);  // All strict: every tuple distinct.
+    ASSERT_EQ(ndvAt(*accumulator, 1), 11);  // Folding "a" merges one pair.
+    ASSERT_EQ(ndvAt(*accumulator, 2), 10);  // Folding "b" merges two pairs.
+    ASSERT_EQ(ndvAt(*accumulator, 3), 9);   // Folding "c" merges three pairs.
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeExtractsDottedPaths) {
+    auto accumulator = makeAccumulator({"a.b", "c"});
+    addDoc(*accumulator, Document{{"a", Value(Document{{"b", 1}})}, {"c", 1}});
+    addDoc(*accumulator, Document{{"a", Value(Document{{"b", 1}})}, {"c", 2}});
+    addDoc(*accumulator, Document{{"c", 2}});
+    ASSERT_EQ(ndvAt(*accumulator, 0), 3);
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeRejectsArrayInAnyField) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    const Value doc{
+        Document{{"val", Value(Document{{"a", 1}, {"b", Value(std::vector<Value>{Value(1)})}})}}};
+    ASSERT_THROWS_CODE(accumulator->process(doc, false /* merging */), DBException, 13175701);
+}
+
+TEST_F(InternalConstructNdvSketchTest, ParseRejectsBadFieldCounts) {
+    auto parse = [&](const BSONArray& fields) {
+        const BSONObj spec = BSON("sketch" << BSON("$_internalConstructNdvSketch" << BSON(
+                                                       "val" << "$$ROOT" << "fields" << fields)));
+        AccumulationStatement::parseAccumulationStatement(
+            _expCtx.get(), spec.firstElement(), _expCtx->variablesParseState);
+    };
+    ASSERT_THROWS_CODE(parse(BSONArray()), DBException, 13176301);
+    ASSERT_THROWS_CODE(parse(BSON_ARRAY("a" << "b" << "c" << "d")), DBException, 13176301);
+}
+
+TEST_F(InternalConstructNdvSketchTest, ConstructorRevalidatesFields) {
+    // Defense in depth: the accumulator is constructible without going through parsing.
+    ASSERT_THROWS_CODE(makeAccumulator({}), DBException, 13176301);
+    ASSERT_THROWS_CODE(makeAccumulator({"a", "b", "c", "d"}), DBException, 13176301);
+    ASSERT_THROWS_CODE(makeAccumulator({"b", "a"}), DBException, 13176302);
+    ASSERT_THROWS_CODE(makeAccumulator({"a", "a"}), DBException, 13176302);
+}
+
+TEST_F(InternalConstructNdvSketchTest, ParseRejectsUnsortedOrDuplicateFields) {
+    auto parse = [&](const BSONArray& fields) {
+        const BSONObj spec = BSON("sketch" << BSON("$_internalConstructNdvSketch" << BSON(
+                                                       "val" << "$$ROOT" << "fields" << fields)));
+        AccumulationStatement::parseAccumulationStatement(
+            _expCtx.get(), spec.firstElement(), _expCtx->variablesParseState);
+    };
+    ASSERT_THROWS_CODE(parse(BSON_ARRAY("b" << "a")), DBException, 13176302);
+    ASSERT_THROWS_CODE(parse(BSON_ARRAY("a" << "a")), DBException, 13176302);
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeRoundTripsEverySketch) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    for (int i = 0; i < 1000; ++i) {
+        addDoc(*accumulator, Document{{"a", i}, {"b", i % 10}});
+    }
+    const auto result = sketches(*accumulator);
+    ASSERT_EQ(result.getArrayLength(), 3);
+    for (size_t i = 0; i < 3; ++i) {
+        const auto sketch =
+            NdvSketch::parse(result[i].getDocument().toBson(), IDLParserContext("NdvSketch"));
+        const auto registers = sketch.getRegisters();
+        auto swSketch = ce::HyperLogLog::create(
+            static_cast<size_t>(sketch.getPrecision()),
+            ce::HyperLogLog::Registers(reinterpret_cast<const uint8_t*>(registers.data()),
+                                       registers.length()));
+        ASSERT_OK(swSketch.getStatus());
+        ASSERT_EQ(static_cast<long long>(std::llround(swSketch.getValue().estimate())),
+                  sketch.getNdv());
+        // No document has null or missing fields, so every variant counts the same tuples.
+        ASSERT_APPROX_EQUAL(static_cast<double>(sketch.getNdv()), 1000, 0.02 * 1000);
+    }
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeTracksConstantSketchMemory) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    // Three variants own 2^14 single-byte registers each.
+    const auto initial = accumulator->getMemUsage();
+    ASSERT_GTE(initial, 3 * 16384);
+
+    for (int i = 0; i < 10'000; ++i) {
+        addDoc(*accumulator, Document{{"a", i}, {"b", i}});
+    }
+    ASSERT_EQ(accumulator->getMemUsage(), initial);
+}
+
+TEST_F(InternalConstructNdvSketchTest, CompositeResetClearsState) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    addDoc(*accumulator, Document{{"a", 1}, {"b", 2}});
+    accumulator->reset();
+    for (size_t i = 0; i < 3; ++i) {
+        ASSERT_EQ(ndvAt(*accumulator, i), 0);
+    }
 }
 
 }  // namespace

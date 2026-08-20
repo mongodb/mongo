@@ -5,12 +5,17 @@
 
 #include "mongo/util/uuid.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
 namespace mongo::ce {
 
 inline constexpr int kFieldStatsSchemaVersion = 1;
+
+// Maximum number of fields a composite NDV statistic may cover. Enforced on user input by the
+// analyze command and defensively by the $_internalConstructNdvSketch accumulator.
+inline constexpr size_t kNdvMaxFields = 3;
 
 /**
  * Builds the '_id' string for a field-stats document, e.g. "1|<collection uuid>|<field path>".

@@ -8,6 +8,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -217,6 +218,97 @@ TEST(NdvHashingTest, HashesAreStable) {
     ASSERT_EQ(hashValueForNdv(bob.obj().firstElement()), 6'893'204'474'022'492'526ULL);
     ASSERT_EQ(hashValueForNdv(BSONElement{}),
               5'663'883'736'451'043'293ULL);  // Missing, identical to Undefined.
+}
+
+TEST(NdvHashingTest, SingleElementTupleMatchesSingleValueHash) {
+    // A one-element tuple must hash exactly like the single-value overload: the single-field
+    // sketches persisted before composite NDV existed rely on this staying true.
+    for (const auto& doc : corpus()) {
+        const BSONElement elem = doc.firstElement();
+        ASSERT_EQ(hashValuesForNdv(std::span<const BSONElement>{&elem, 1}), hashValueForNdv(elem))
+            << "doc=" << doc;
+    }
+}
+
+TEST(NdvHashingTest, TupleHashEqualityMatchesElementwiseEquality) {
+    // The composite analogue of the corpus property: two tuples hash equal iff their elements
+    // are pairwise woCompare-equal. Comparing all tuple pairs is quartic in the corpus size;
+    // precomputing the tuple hashes keeps the loop body trivial.
+    const auto docs = corpus();
+    std::vector<uint64_t> elementHashes;
+    elementHashes.reserve(docs.size());
+    for (const auto& doc : docs) {
+        elementHashes.push_back(hashValueForNdv(doc.firstElement()));
+    }
+
+    std::vector<uint64_t> tupleHashes;
+    tupleHashes.reserve(docs.size() * docs.size());
+    for (const auto& first : docs) {
+        for (const auto& second : docs) {
+            const BSONElement elems[] = {first.firstElement(), second.firstElement()};
+            tupleHashes.push_back(hashValuesForNdv(elems));
+        }
+    }
+
+    for (size_t i = 0; i < docs.size(); ++i) {
+        for (size_t j = 0; j < docs.size(); ++j) {
+            for (size_t k = 0; k < docs.size(); ++k) {
+                for (size_t l = 0; l < docs.size(); ++l) {
+                    // The single-value hasher is woCompare-faithful (pinned above), so
+                    // elementwise hash equality stands in for elementwise woCompare equality.
+                    const bool elementsEqual = elementHashes[i] == elementHashes[k] &&
+                        elementHashes[j] == elementHashes[l];
+                    const bool tuplesEqual =
+                        tupleHashes[i * docs.size() + j] == tupleHashes[k * docs.size() + l];
+                    ASSERT_EQ(tuplesEqual, elementsEqual)
+                        << "lhs=(" << docs[i] << ", " << docs[j] << ") rhs=(" << docs[k] << ", "
+                        << docs[l] << ")";
+                }
+            }
+        }
+    }
+}
+
+TEST(NdvHashingTest, TupleValuesDoNotBleedAcrossPositions) {
+    // KeyString encodings are self-delimiting: a value must not be able to shift bytes into its
+    // neighbor and collide with a differently split tuple.
+    const BSONObj ab = BSON("" << "ab");
+    const BSONObj c = BSON("" << "c");
+    const BSONObj a = BSON("" << "a");
+    const BSONObj bc = BSON("" << "bc");
+    const BSONElement lhs[] = {ab.firstElement(), c.firstElement()};
+    const BSONElement rhs[] = {a.firstElement(), bc.firstElement()};
+    ASSERT_NE(hashValuesForNdv(lhs), hashValuesForNdv(rhs));
+}
+
+TEST(NdvHashingTest, TupleMissingStaysDistinctFromNull) {
+    // Strict ($expr) semantics per position: missing (EOO) folds into Undefined, never null.
+    const BSONObj one = BSON("" << 1);
+    BSONObjBuilder nullBob;
+    nullBob.appendNull("");
+    const BSONObj nullObj = nullBob.obj();
+
+    const BSONElement withMissing[] = {one.firstElement(), BSONElement{}};
+    const BSONElement withNull[] = {one.firstElement(), nullObj.firstElement()};
+    ASSERT_NE(hashValuesForNdv(withMissing), hashValuesForNdv(withNull));
+}
+
+TEST(NdvHashingTest, CompositeHashesAreStable) {
+    // On-disk contract for composite sketches, like HashesAreStable above: don't update these
+    // without a schema version bump.
+    const BSONObj one = BSON("" << 1);
+    const BSONObj abc = BSON("" << "abc");
+    const BSONElement pair[] = {one.firstElement(), abc.firstElement()};
+    ASSERT_EQ(hashValuesForNdv(pair), 16'528'856'387'735'475'136ULL);
+
+    const BSONElement withMissing[] = {one.firstElement(), BSONElement{}};
+    ASSERT_EQ(hashValuesForNdv(withMissing), 9'211'770'145'777'054'297ULL);
+
+    BSONObjBuilder nullBob;
+    nullBob.appendNull("");
+    const BSONObj nullObj = nullBob.obj();
+    const BSONElement triple[] = {one.firstElement(), abc.firstElement(), nullObj.firstElement()};
+    ASSERT_EQ(hashValuesForNdv(triple), 18'414'316'036'967'930'181ULL);
 }
 
 }  // namespace

@@ -615,6 +615,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/compiler/ce/ndv:field_stats",
         "//src/mongo/db/query/compiler/ce/ndv:hyperloglog",
         "//src/mongo/db/query/compiler/ce/ndv:ndv_hashing",
         "//src/mongo/db/query/compiler/ce/ndv:ndv_sketch_gen_lib",

@@ -14,8 +14,11 @@ structs:
         strict: true
         fields:
             sketches:
-                # One sketch per null/missing folding variant: exactly one for a single field.
-                # TODO SERVER-131763: composite NDV adds the other variants.
+                # One sketch per null/missing folding variant, positionally keyed off the
+                # canonically sorted field paths: a single field persists exactly one strict
+                # sketch ($expr semantics, missing distinct from null); n >= 2 fields persist
+                # n + 1, the all-strict tuple sketch first, then per field the variant folding
+                # that field's missing values into null (regular $eq semantics).
                 type: array<NdvSketch>
 
     FieldStatsDoc:

@@ -19,13 +19,10 @@ namespace {
 constexpr auto kKeyStringVersion = key_string::Version::V1;
 constexpr size_t kHashSeed = 0;
 
-}  // namespace
-
-uint64_t hashValueForNdv(const BSONElement& value) {
+void appendValueForNdv(key_string::Builder& builder, const BSONElement& value) {
     // NDV rejects arrays upstream, and their KeyString encoding drops the element field names
     // that woCompare compares, so we can't promise woCompare equivalence for them.
     tassert(11207614, "NDV hashing does not support array values", value.type() != BSONType::array);
-    key_string::Builder builder(kKeyStringVersion, key_string::ALL_ASCENDING);
     if (value.eoo()) {
         // Missing has no KeyString encoding. Undefined is woCompare-equal to missing and
         // distinct from null, so encode it as that.
@@ -43,6 +40,20 @@ uint64_t hashValueForNdv(const BSONElement& value) {
         // to TypeBits, which the finished buffer excludes; that's what makes woCompare-equal
         // values byte-identical.
         builder.appendBSONElement(value);
+    }
+}
+
+}  // namespace
+
+uint64_t hashValueForNdv(const BSONElement& value) {
+    return hashValuesForNdv(std::span<const BSONElement>{&value, 1});
+}
+
+uint64_t hashValuesForNdv(std::span<const BSONElement> values) {
+    tassert(13176300, "NDV hashing requires at least one value", !values.empty());
+    key_string::Builder builder(kKeyStringVersion, key_string::ALL_ASCENDING);
+    for (const auto& value : values) {
+        appendValueForNdv(builder, value);
     }
     const auto bytes = builder.finishAndGetBuffer();
     static_assert(sizeof(size_t) == sizeof(uint64_t),

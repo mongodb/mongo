@@ -25,9 +25,11 @@ namespace mongo {
  *     sketches: [{ndv: 2, registers: BinData(0, "..."), precision: 14}]
  * where each element is an NdvSketch (ndv_sketch.idl).
  *
- * The output is an array of sketch documents, one per null/missing folding variant. A single
- * field needs exactly one variant ($expr semantics).
- * TODO SERVER-131763: composite NDV emits the other variants as further array elements.
+ * The output is an array of sketch documents, one per null/missing folding variant, in the
+ * positional convention shared with the read path (see NdvStats in field_stats.idl): a single
+ * field emits exactly one strict ($expr semantics) sketch, while n >= 2 canonically sorted
+ * fields emit n+1, the all-strict tuple sketch first and then, per field, the variant that
+ * folds that field's missing values into null (regular $eq semantics).
  */
 class AccumulatorInternalConstructNdvSketch final : public AccumulatorState {
 public:
@@ -52,7 +54,8 @@ private:
     void _setMemoryUsage();
 
     std::vector<FieldPath> _fieldPaths;
-    ce::HyperLogLog _hll;
+    // One sketch per folding variant: 1 for a single field, _fieldPaths.size() + 1 otherwise.
+    std::vector<ce::HyperLogLog> _sketches;
 };
 
 }  // namespace mongo
