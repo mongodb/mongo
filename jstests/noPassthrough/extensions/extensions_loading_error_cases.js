@@ -12,7 +12,7 @@
 // This flag must remain true at test end so resmoke cleans up the dump in its post-test scan.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     generateExtensionConfigs,

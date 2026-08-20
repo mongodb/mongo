@@ -15,7 +15,7 @@
  */
 
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
-import {windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
+import {windowsSupportsTLS13} from "jstests/libs/server_security/os_helpers.js";
 
 if (determineSSLProvider() !== "windows" || !windowsSupportsTLS13()) {
     jsTest.log.info("Skipping: not running on Windows with TLS 1.3 support.");

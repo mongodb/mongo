@@ -6,7 +6,7 @@
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 
 function assertMetricEqual(metrics, name, expectedValue) {
     if (typeof expectedValue === "undefined") {

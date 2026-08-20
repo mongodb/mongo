@@ -26,7 +26,7 @@
  *   incompatible_with_windows_tls,
  * ]
  */
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {
     assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
     assertFooViewAndExtensionVectorSearchUsed,

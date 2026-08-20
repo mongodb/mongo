@@ -6,7 +6,7 @@ import {
     isUbuntu,
     isUbuntu2004,
     windowsSupportsTLS13,
-} from "jstests/libs/os_helpers.js";
+} from "jstests/libs/server_security/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 

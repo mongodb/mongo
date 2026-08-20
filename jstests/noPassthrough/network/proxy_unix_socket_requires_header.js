@@ -16,7 +16,7 @@ if (_isWindows()) {
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isMacOS} from "jstests/libs/os_helpers.js";
+import {isMacOS} from "jstests/libs/server_security/os_helpers.js";
 
 const kInternalErrorCode = 1;
 const kExpectedGid = getCurrentGid();

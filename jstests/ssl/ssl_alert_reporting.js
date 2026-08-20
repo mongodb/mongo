@@ -9,7 +9,7 @@
 // Ensure that TLS version alerts are correctly propagated
 
 import {determineSSLProvider, sslProviderSupportsTLS1_1} from "jstests/ssl/libs/ssl_helpers.js";
-import {windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
+import {windowsSupportsTLS13} from "jstests/libs/server_security/os_helpers.js";
 
 const clientOptions = [
     "--tls",

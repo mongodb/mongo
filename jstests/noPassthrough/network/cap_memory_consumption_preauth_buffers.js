@@ -9,7 +9,7 @@
  */
 
 import {findMatchingLogLine} from "jstests/libs/log.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 
 if (!isLinux()) {
     jsTest.log("Skipping test since it requires Linux-specific features.");

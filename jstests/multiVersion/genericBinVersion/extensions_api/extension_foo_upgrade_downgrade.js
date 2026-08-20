@@ -35,7 +35,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";
 
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {
     assertFooStageAcceptedEitherVersion,
     assertFooStageAcceptedV1AndV2,
