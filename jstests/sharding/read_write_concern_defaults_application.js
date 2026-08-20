@@ -1065,14 +1065,27 @@ function checkLogEntryRWC(
 ) {
     // Some commands (e.g. bulkWrite, createRole) propagate the comment to inner write sub-ops,
     // which are also logged with the same comment but without a top-level writeConcern/readConcern
-    // in the log attr. Require those fields to be present so we skip inner-op entries and land on
-    // the outer command log entry.
+    // in the log attr. Slow in-progress query logs (SLOWPROG) can contain the same comment and a
+    // nested command.writeConcern before wait-for-WC has populated attr.writeConcern. Skip those
+    // in-progress entries unless applied attr.writeConcern.w is already present, and require the
+    // attr-level fields so we land on the completed outer command log otherwise.
     const logs = checkLog.getGlobalLog(checkConn);
     const logLine =
         logs?.find((l) => {
             if (!l.includes(targetId)) return false;
-            if (test.checkWriteConcern && !l.includes('"writeConcern"')) return false;
-            if (test.checkReadConcern && !l.includes('"readConcern"')) return false;
+            let entry;
+            try {
+                entry = JSON.parse(l);
+            } catch (e) {
+                return false;
+            }
+            const attr = entry.attr;
+            // Exclude Slow in-progress query unless it has already reported applied attr.writeConcern.w.
+            if (entry.msg === "Slow in-progress query" && attr?.writeConcern?.w === undefined) {
+                return false;
+            }
+            if (test.checkWriteConcern && attr?.writeConcern === undefined) return false;
+            if (test.checkReadConcern && attr?.readConcern === undefined) return false;
             return true;
         }) ?? null;
     assert(
