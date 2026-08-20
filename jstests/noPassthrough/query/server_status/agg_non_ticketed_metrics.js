@@ -90,18 +90,26 @@ describe("query.aggregation.nonTicketed serverStatus metrics", function () {
         const statsAfter = assert.commandWorked(db.adminCommand({serverStatus: 1})).metrics.query
             .aggregation.nonTicketed;
 
-        assert.eq(statsAfter.queries, statsBefore.queries + 1, "queries should increase by 1");
+        assert.eq(statsAfter.queries, statsBefore.queries + 1, "queries should increase by 1", {
+            statsBefore,
+            statsAfter,
+        });
         assert.eq(
             statsAfter.intervals,
             statsBefore.intervals + 1,
             "intervals should increase by 1",
+            {statsBefore, statsAfter},
         );
-        assert.gt(statsAfter.totalMillis, statsBefore.totalMillis, "totalMillis should increase");
+        assert.gt(statsAfter.totalMillis, statsBefore.totalMillis, "totalMillis should increase", {
+            statsBefore,
+            statsAfter,
+        });
     });
 
     it("multiple delayed release cycles in one aggregate count multiple intervals", function () {
-        // With batch size 32 the 100 docs load in three batches, so we get three delayed
-        // releases and three intervals over the threshold.
+        // The batch size doubles each time a batch fills, so an initial size of 32 loads the 100
+        // docs in three batches (32, then 64, then the remaining 4) rather than four. That gives
+        // three delayed releases and three intervals over the threshold.
         runWithParamsAllNonConfigNodes(
             db,
             {internalDocumentSourceCursorInitialBatchSize: 32},
@@ -130,16 +138,19 @@ describe("query.aggregation.nonTicketed serverStatus metrics", function () {
                     statsAfter.queries,
                     statsBefore.queries + 1,
                     "queries should increase by 1",
+                    {statsBefore, statsAfter},
                 );
                 assert.eq(
                     statsAfter.intervals,
                     statsBefore.intervals + 3,
                     "intervals should increase by 3",
+                    {statsBefore, statsAfter},
                 );
                 assert.gte(
                     statsAfter.totalMillis,
                     statsBefore.totalMillis + 150,
                     "each of the three intervals should contribute at least the 50ms delay",
+                    {statsBefore, statsAfter},
                 );
             },
         );
@@ -283,11 +294,13 @@ describe("query.aggregation.nonTicketed serverStatus metrics", function () {
                     statsAfter.queries,
                     statsBefore.queries + 1,
                     "queries should increase by 1",
+                    {statsBefore, statsAfter},
                 );
                 assert.eq(
                     statsAfter.intervals,
                     statsBefore.intervals + 1,
                     "intervals should increase by 1",
+                    {statsBefore, statsAfter},
                 );
             } finally {
                 assert.commandWorked(
