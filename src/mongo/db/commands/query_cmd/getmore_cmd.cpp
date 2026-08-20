@@ -45,6 +45,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_latency_accumulator.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -717,6 +719,16 @@ public:
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
             postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
             postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
+
+            // Attribute this getMore's time here, while the cursor's QueryLifespan is still bound:
+            // it unbinds before completeOperation, so that chokepoint can't see getMores.
+            if (auto strategy = postExecutionStats.planSelectionStrategy;
+                strategy && shouldRecordLatencyStats(opCtx)) {
+                auto& queryLatency = QueryLatencyAccumulator::get(opCtx);
+                queryLatency.recordStrategy(*strategy);
+                queryLatency.addLatency(curOp->elapsedTimeExcludingPauses());
+            }
+
             curOp->debug().setPlanSummaryMetrics(std::move(postExecutionStats));
 
             // We do not report 'execStats' for aggregation or other cursors with the

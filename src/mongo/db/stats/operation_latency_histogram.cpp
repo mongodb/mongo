@@ -5,11 +5,13 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/platform/bits.h"
+#include "mongo/util/assert_util.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -268,6 +270,17 @@ void appendHistograms(HistogramsType& histograms,
 namespace operation_latency_histogram_details {
 std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> getLowerBounds() {
     return kLowerBounds;
+}
+
+std::vector<double> makeOperationLatencyBucketBoundaries() {
+    const auto& lowerBounds = getLowerBounds();
+    std::vector<double> boundaries;
+    invariant(!lowerBounds.empty(), "OperationLatencyHistogram lower bounds must be non-empty");
+    boundaries.reserve(lowerBounds.size() - 1);
+    for (size_t i = 1; i < lowerBounds.size(); ++i) {
+        boundaries.push_back(static_cast<double>(lowerBounds[i]));
+    }
+    return boundaries;
 }
 }  // namespace operation_latency_histogram_details
 

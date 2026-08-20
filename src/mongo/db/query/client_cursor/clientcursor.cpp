@@ -12,6 +12,7 @@
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_latency_accumulator.h"
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
@@ -156,6 +157,12 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     invariant(_operationUsingCursor);
 
     _queryLifespan = QueryLifespan::get(operationUsingCursor).handle();
+
+    // Exclude tailable and change-stream cursors from queryLatencies since they can stay open
+    // indefinitely.
+    if (_tailableMode != TailableModeEnum::kNormal) {
+        QueryLatencyAccumulator::get(operationUsingCursor).exclude();
+    }
 
     cursorStats().open.increment();
     cursorStats().totalOpened.increment();

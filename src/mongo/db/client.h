@@ -244,6 +244,14 @@ public:
     }
 
     /**
+     * Returns true if this client is an external network connection and is not
+     * running under DBDirectClient -- the notion of "user traffic" used for statistics.
+     */
+    bool isExternalUserConnection() const {
+        return isFromUserConnection() && !isInDirectClient();
+    }
+
+    /**
      * Returns whether this thread should be excluded from _globalKill interrupt at shutdown.
      */
     bool shouldExcludeFromInterruptAtShutdown() const {

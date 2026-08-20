@@ -25,6 +25,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_latency_accumulator.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
@@ -89,6 +91,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
@@ -273,6 +276,13 @@ void collectQueryStats(const AggExState& aggExState,
     PlanSummaryStats stats;
     planExplainer.getSummaryStats(&stats);
     curOp->setEndOfOpMetrics(stats.nReturned);
+    // Record the plan-selection strategy onto the query's latency accumulator, which persists
+    // across getMore via QueryLifespan and emits one observation when the query completes.
+    if (shouldRecordLatencyStats(opCtx)) {
+        if (auto strategy = stats.planSelectionStrategy) {
+            QueryLatencyAccumulator::get(opCtx).recordStrategy(*strategy);
+        }
+    }
     curOp->debug().setPlanSummaryMetrics(std::move(stats));
 
     if (maybePinnedCursor) {

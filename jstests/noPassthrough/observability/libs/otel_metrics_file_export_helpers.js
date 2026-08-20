@@ -192,9 +192,13 @@ function findDataPointByAttribute(record, metricName, attrKey, attrValue, getDat
     for (const metric of getFlatMetricsList(record)) {
         if (metric.name !== metricName) continue;
         for (const dp of getDataPoints(metric)) {
-            const match = (dp.attributes ?? []).some(
-                (a) => a.key === attrKey && a.value?.stringValue === attrValue,
-            );
+            // A null/undefined attrKey means the metric has no attributes to key on, so the first
+            // data point is the only one.
+            const match =
+                attrKey == null ||
+                (dp.attributes ?? []).some(
+                    (a) => a.key === attrKey && a.value?.stringValue === attrValue,
+                );
             if (match) return Number(getValue(dp));
         }
     }
@@ -221,7 +225,8 @@ export function getCounterByAttribute(metricsDir, metricName, attrKey, attrValue
 /**
  * Returns the histogram data point count for a specific metric name and attribute key/value pair
  * from the latest metrics snapshot, or 0 if not found. Useful for histograms with multiple data
- * points keyed by an attribute (e.g. op_type: "read").
+ * points keyed by an attribute (e.g. op_type: "read"). Omit `attrKey` for a histogram that carries
+ * no attributes.
  */
 export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
     const record = getLatestRawRecord(metricsDir);
@@ -451,7 +456,8 @@ export function assertCounterMetricIncreases({metricsDir, metricName, minIncreas
 
 /**
  * Asserts that the data point count for `metricName` with attribute `attrKey=attrValue` increases
- * by at least `minIncrease` after `fn` runs.
+ * by at least `minIncrease` after `fn` runs. Omit `attrKey` for a histogram that carries no
+ * attributes.
  */
 export function assertHistogramMetricIncreases({
     metricsDir,

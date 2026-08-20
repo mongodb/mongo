@@ -33,6 +33,12 @@
 namespace mongo {
 
 /**
+ * Returns true if latency statistics should be recorded for 'opCtx': collection is enabled for the
+ * operation and it came from an external user connection.
+ */
+[[MONGO_MOD_PUBLIC]] bool shouldRecordLatencyStats(OperationContext* opCtx);
+
+/**
  * Tracks cumulative latency statistics for a Service (shard-role or router-role).
  */
 class [[MONGO_MOD_PUBLIC]] ServiceLatencyTracker {

@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace mongo {
 namespace operation_latency_histogram_details {
@@ -19,6 +20,13 @@ constexpr int kHistogramsCount = static_cast<int>(Command::ReadWriteType::kLast)
 
 // Retuns the inclusive lower bounds of the histogram buckets.
 std::array<uint64_t, kMaxBuckets> getLowerBounds();
+
+/**
+ * Returns the same bucket edges as explicit OTel bucket boundaries, in microseconds, for OTel
+ * histograms that should stay comparable with opLatencies. Lower bound [0] (value 0) is omitted:
+ * OTel's implicit first bucket covers (-inf, 2].
+ */
+std::vector<double> makeOperationLatencyBucketBoundaries();
 
 template <typename DataType>
 struct HistogramData {

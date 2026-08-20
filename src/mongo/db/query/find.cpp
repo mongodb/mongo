@@ -5,6 +5,7 @@
 #include "mongo/db/query/find.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
@@ -14,6 +15,8 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_latency_accumulator.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point.h"
 
 #include <memory>
@@ -82,6 +85,13 @@ void endQueryOp(OperationContext* opCtx,
             summaryStats.indexesUsed);
     }
 
+    // Record the plan-selection strategy onto the query's latency accumulator, which is shared via
+    // QueryLifespan (persists across getMore) and emits one observation when the query completes.
+    if (shouldRecordLatencyStats(opCtx)) {
+        if (auto strategy = summaryStats.planSelectionStrategy) {
+            QueryLatencyAccumulator::get(opCtx).recordStrategy(*strategy);
+        }
+    }
     curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
     curOp->setEndOfOpMetrics(numResults);
 

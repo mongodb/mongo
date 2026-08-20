@@ -51,6 +51,8 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
+#include "mongo/db/query/query_latency_accumulator.h"
+#include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -2485,6 +2487,13 @@ void HandleRequest::completeOperation(DbResponse& response) {
                    currentOp.elapsedTimeExcludingPauses(),
                    currentOp.debug().workingTimeMillis,
                    readWriteType);
+
+    // Add this op's time toward its query's total; the originating find/aggregate already recorded
+    // the strategy on the accumulator (shared via QueryLifespan). getIfExists lets non-query ops
+    // skip cheaply.
+    if (shouldRecordLatencyStats(opCtx) && QueryLifespan::getIfExists(opCtx)) {
+        QueryLatencyAccumulator::get(opCtx).addLatency(currentOp.elapsedTimeExcludingPauses());
+    }
 
     if (shouldProfile) {
         // Performance profiling is on

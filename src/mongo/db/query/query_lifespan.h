@@ -60,8 +60,9 @@ namespace mongo {
  *              return decoration(opCtx);
  *          }
  */
-class QueryLifespan final : public Decorable<QueryLifespan>,
-                            public std::enable_shared_from_this<QueryLifespan> {
+class [[MONGO_MOD_PUBLIC]] QueryLifespan final
+    : public Decorable<QueryLifespan>,
+      public std::enable_shared_from_this<QueryLifespan> {
     struct Passkey {
         explicit Passkey() = default;
     };
@@ -79,6 +80,13 @@ public:
      * to outlive the current scope.
      */
     static QueryLifespan& get(OperationContext* opCtx);
+
+    /**
+     * Returns the QueryLifespan currently bound to 'opCtx', or nullptr if none is bound. Unlike
+     * 'get', this never creates one, so callers on hot paths can cheaply skip work for operations
+     * that have no query lifespan.
+     */
+    static QueryLifespan* getIfExists(OperationContext* opCtx);
 
     /**
      * Binds this lifespan onto 'opCtx', making its decorations accessible through that

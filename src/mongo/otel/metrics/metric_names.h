@@ -629,6 +629,16 @@ public:
     static constexpr MetricName kOperationLatency =
         MetricNameMaker::make("mongodb.serverStatus.opLatencies.latency");
 
+    // Query latency histograms for plan selection strategies.
+    static constexpr MetricName kQueryLatencyMultiPlanner =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.multiPlanner");
+    static constexpr MetricName kQueryLatencyCostBased =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.costBased");
+    static constexpr MetricName kQueryLatencySinglePlan =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.singlePlan");
+    static constexpr MetricName kQueryLatencyCachedPlan =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.cachedPlan");
+
     // Op Counters
     static constexpr MetricName kInsertOpCount =
         MetricNameMaker::make("mongodb.serverStatus.opcounters.insert");

@@ -41,20 +41,6 @@ const auto getServiceLatencyTracker = Service::declareDecoration<ServiceLatencyT
 const otel::metrics::AttributeDefinition<std::string_view> kOpTypeAttrDef{
     .name = "op_type", .values = {"read"sv, "write"sv, "command"sv}};
 
-// Build explicit OTel bucket boundaries from OperationLatencyHistogram's lower bounds.
-// We use lower bounds [1..N-1] as OTel upper bounds, giving the same bucket edges.
-// Lower bound [0] (value 0) is omitted: OTel's implicit first bucket covers (-inf, 2].
-std::vector<double> makeOperationLatencyBucketBoundaries() {
-    const auto& lowerBounds = operation_latency_histogram_details::getLowerBounds();
-    std::vector<double> boundaries;
-    invariant(!lowerBounds.empty(), "OperationLatencyHistogram lower bounds must be non-empty");
-    boundaries.reserve(lowerBounds.size() - 1);
-    for (size_t i = 1; i < lowerBounds.size(); ++i) {
-        boundaries.push_back(static_cast<double>(lowerBounds[i]));
-    }
-    return boundaries;
-}
-
 otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
     otel::metrics::MetricsService::instance().createInt64Histogram<std::string_view>(
         otel::metrics::MetricNames::kOperationLatency,
@@ -62,7 +48,8 @@ otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
         "broken down by operation type (read/write/command).",
         otel::metrics::MetricUnit::kMicroseconds,
         kOpTypeAttrDef,
-        {.explicitBucketBoundaries = makeOperationLatencyBucketBoundaries()});
+        {.explicitBucketBoundaries =
+             operation_latency_histogram_details::makeOperationLatencyBucketBoundaries()});
 
 // Returns the op_type attribute string for OTel recording, or nullopt for op types excluded from
 // this histogram. kTransaction is tracked separately via incrementForTransaction and is
@@ -82,16 +69,6 @@ std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
     }
 }
 
-// Returns true if the operation came from a network client connection (connectionId > 0)
-// and is not running under DBDirectClient.
-// Note: QE (Queryable Encryption) operations ARE included here; the isQE flag is passed separately
-// to OperationLatencyHistogram::increment so that queryableEncryptionLatencyMicros is tracked
-// correctly.
-bool isUserConnection(OperationContext* opCtx) {
-    auto* c = opCtx->getClient();
-    return c->isFromUserConnection() && !c->isInDirectClient();
-}
-
 template <typename HistogramType>
 void incrementHistogram(OperationContext* opCtx,
                         long long latency,
@@ -107,7 +84,7 @@ void incrementHistogramForUser(OperationContext* opCtx,
                                long long latency,
                                HistogramType& histogram,
                                Command::ReadWriteType readWriteType) {
-    if (!isUserConnection(opCtx))
+    if (!opCtx->getClient()->isExternalUserConnection())
         return;
     incrementHistogram(opCtx, latency, histogram, readWriteType);
 }
@@ -172,6 +149,10 @@ void updateCollectionData(OperationContext* opCtx,
 ServiceLatencyTracker::ServiceLatencyTracker()
     : _totalTime({.includeEmptyBuckets = true, .logBucketScalingFactor = 3}) {}
 
+bool shouldRecordLatencyStats(OperationContext* opCtx) {
+    return opCtx->shouldIncrementLatencyStats() && opCtx->getClient()->isExternalUserConnection();
+}
+
 ServiceLatencyTracker& ServiceLatencyTracker::getDecoration(Service* service) {
     return getServiceLatencyTracker(service);
 }
@@ -180,10 +161,7 @@ void ServiceLatencyTracker::increment(OperationContext* opCtx,
                                       Microseconds latency,
                                       Microseconds workingTime,
                                       Command::ReadWriteType readWriteType) {
-    if (!opCtx->shouldIncrementLatencyStats())
-        return;
-
-    if (!isUserConnection(opCtx))
+    if (!shouldRecordLatencyStats(opCtx))
         return;
 
     const bool isQE = CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp::get(opCtx));
