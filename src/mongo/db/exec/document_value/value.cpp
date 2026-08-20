@@ -197,25 +197,25 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
 Value::Value(const BSONArray& arr) : _storage(BSONType::array) {
     auto vec = make_intrusive<RCVector<Value>>();
     for (auto&& sub : arr) {
-        vec->vec.push_back(Value(sub));
+        vec->vec.emplace_back(sub);
     }
     _storage.putVector(std::move(vec));
 }
 
-Value::Value(const vector<BSONObj>& vec) : _storage(BSONType::array) {
+Value::Value(const std::vector<BSONObj>& vec) : _storage(BSONType::array) {
     auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
-        storageVec->vec.push_back(Value(obj));
+        storageVec->vec.emplace_back(obj);
     }
     _storage.putVector(std::move(storageVec));
 }
 
-Value::Value(const vector<Document>& vec) : _storage(BSONType::array) {
+Value::Value(const std::vector<Document>& vec) : _storage(BSONType::array) {
     auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
-        storageVec->vec.push_back(Value(obj));
+        storageVec->vec.emplace_back(obj);
     }
     _storage.putVector(std::move(storageVec));
 }
