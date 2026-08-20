@@ -37,8 +37,12 @@ commands:
         reply_type: OkReply
         fields:
             key:
-                description: "The possibly dotted field path for which to create or update stats."
-                type: string
+                description: >-
+                    The possibly dotted field path for which to create or update stats. Mode
+                    "ndv" also accepts an array of paths, building one composite NDV statistic
+                    over the tuple of fields.
+                type:
+                    variant: [string, array<string>]
                 optional: true
             sampleRate:
                 description: >-

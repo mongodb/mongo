@@ -58,10 +58,12 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -70,6 +72,8 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <variant>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 namespace mongo {
@@ -124,6 +128,46 @@ void validateKeyPath(std::string_view key) {
             str::stream() << "Key path contains numeric component "
                           << keyFieldRef.getPart(*(numericPathComponents.begin())),
             numericPathComponents.empty());
+}
+
+/**
+ * Normalizes and validates the ndv-mode 'key' argument: the string form becomes a one-path
+ * vector, the array form carries up to kNdvMaxFields distinct paths for one composite NDV
+ * statistic. Returns the paths canonically sorted, the order the statistic is keyed and
+ * persisted in (NDV is insensitive to field order).
+ */
+std::vector<std::string> normalizeNdvKeyPaths(
+    const std::variant<std::string, std::vector<std::string>>& key) {
+    std::vector<std::string> paths =
+        visit(OverloadedVisitor{
+                  [](const std::string& single) { return std::vector<std::string>{single}; },
+                  [](const std::vector<std::string>& multiple) {
+                      return multiple;
+                  }},
+              key);
+    uassert(13176201,
+            str::stream() << "ndv mode supports between 1 and " << ce::kNdvMaxFields
+                          << " key paths",
+            !paths.empty() && paths.size() <= ce::kNdvMaxFields);
+    for (const auto& path : paths) {
+        validateKeyPath(path);
+    }
+    std::sort(paths.begin(), paths.end());
+    uassert(13176202,
+            "ndv mode key paths must be distinct",
+            std::adjacent_find(paths.begin(), paths.end()) == paths.end());
+    // A path that prefixes another would collide in the inclusion $project of the ndv pipeline;
+    // NDV over such a pair is degenerate anyway, so reject it with a clear message. A path
+    // prefix is also a string prefix, so after the sort it can only precede its extensions.
+    for (size_t i = 0; i + 1 < paths.size(); ++i) {
+        for (size_t j = i + 1; j < paths.size(); ++j) {
+            uassert(13176203,
+                    str::stream() << "ndv mode key paths may not overlap: '" << paths[i]
+                                  << "' is a prefix of '" << paths[j] << "'",
+                    !FieldRef(paths[i]).isPrefixOf(FieldRef(paths[j])));
+        }
+    }
+    return paths;
 }
 
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
@@ -187,18 +231,20 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
 }
 
 /**
- * Builds the ndv-mode aggregation. For the key "a.b" the pipeline looks like this:
+ * Builds the ndv-mode aggregation. For the sorted key paths ["a.b", "c"] the pipeline looks
+ * like this:
  *
  *      [
- *          { $project: { _id: 0, "a.b": 1 } },
+ *          { $project: { _id: 0, "a.b": 1, "c": 1 } },
  *          { $group: {
- *              _id: "1|<collection uuid>|a.b",
- *              sketches: { $_internalConstructNdvSketch: { val: "$$ROOT", fields: ["a.b"] } }
+ *              _id: "1|<collection uuid>|a.b|c",
+ *              sketches: { $_internalConstructNdvSketch: { val: "$$ROOT",
+ *                                                          fields: ["a.b", "c"] } }
  *          } },
  *          { $project: {
  *              schemaVersion: {$literal: 1},
  *              collectionUuid: <UUID>,
- *              sortedFieldPaths: {$literal: ["a.b"]},
+ *              sortedFieldPaths: {$literal: ["a.b", "c"]},
  *              createdAt: "$$NOW",
  *              ndv: { sketches: "$sketches" }
  *          } },
@@ -207,26 +253,30 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
  *      ]
  */
 BSONObj analyzeNdvModeAsAggregationCommand(std::string_view collection,
-                                           const std::string& keyPath,
+                                           const std::vector<std::string>& keyPaths,
                                            const UUID& collUuid,
                                            const std::string& docId) {
     BSONArrayBuilder pipelineBuilder;
     {
-        // Narrow the stream to the analyzed field. An inclusion projection preserves document
+        // Narrow the stream to the analyzed fields. An inclusion projection preserves document
         // structure and missing-ness, both of which the accumulator relies on. _id can only be
-        // excluded when it is not the analyzed field itself.
+        // excluded when it is not among the analyzed fields itself.
         BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
         BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
-        if (FieldRef(keyPath).getPart(0) != "_id") {
+        if (std::none_of(keyPaths.begin(), keyPaths.end(), [](const std::string& path) {
+                return FieldRef(path).getPart(0) == "_id";
+            })) {
             projectBob.append("_id", 0);
         }
-        projectBob.append(keyPath, 1);
+        for (const auto& path : keyPaths) {
+            projectBob.append(path, 1);
+        }
     }
     {
         // The sketch-building $group.
         InternalConstructNdvSketchAccumulatorParams sketchParams;
         sketchParams.setVal("$$ROOT");
-        sketchParams.setFields(std::vector<std::string>{keyPath});
+        sketchParams.setFields(keyPaths);
 
         BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
         BSONObjBuilder groupBob(stageBob.subobjStart("$group"));
@@ -243,7 +293,13 @@ BSONObj analyzeNdvModeAsAggregationCommand(std::string_view collection,
         BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
         projectBob.append("schemaVersion", BSON("$literal" << ce::kFieldStatsSchemaVersion));
         collUuid.appendToBuilder(&projectBob, "collectionUuid");
-        projectBob.append("sortedFieldPaths", BSON("$literal" << BSON_ARRAY(keyPath)));
+        {
+            BSONArrayBuilder pathsBob;
+            for (const auto& path : keyPaths) {
+                pathsBob.append(path);
+            }
+            projectBob.append("sortedFieldPaths", BSON("$literal" << pathsBob.arr()));
+        }
         projectBob.append("createdAt", "$$NOW");
         projectBob.append("ndv", BSON("sketches" << "$sketches"));
     }
@@ -299,7 +355,9 @@ CollectionAcquisition acquireAndValidateCollection(OperationContext* opCtx,
     return coll;
 }
 
-void runNdvMode(OperationContext* opCtx, const NamespaceString& nss, const std::string& key) {
+void runNdvMode(OperationContext* opCtx,
+                const NamespaceString& nss,
+                const std::variant<std::string, std::vector<std::string>>& key) {
     uassert(ErrorCodes::CommandNotSupported,
             "The analyze command with ndv mode requires featureFlagPersistentStats to be enabled",
             feature_flags::gFeatureFlagPersistentStats.isEnabled(
@@ -313,7 +371,9 @@ void runNdvMode(OperationContext* opCtx, const NamespaceString& nss, const std::
             "be enabled",
             QueryKnobConfiguration(query_settings::QuerySettings{}).getEnablePersistentNDVStats());
 
-    validateKeyPath(key);
+    // Validated only after the feature gates above: without them the command must fail with
+    // CommandNotSupported, not with key validation errors for a disabled feature.
+    const std::vector<std::string> keyPaths = normalizeNdvKeyPaths(key);
 
     boost::optional<UUID> collUuid;
     {
@@ -349,14 +409,14 @@ void runNdvMode(OperationContext* opCtx, const NamespaceString& nss, const std::
     });
 
     DBDirectClient client(opCtx);
-    const std::string docId = ce::makeFieldStatsId(*collUuid, {key});
+    const std::string docId = ce::makeFieldStatsId(*collUuid, keyPaths);
 
     // Note: an empty collection produces no $group output, so a previous stats document is left
     // in place. Stats invalidation (also after emptying or dropping a collection) is out of
     // scope for now; the read path guards against staleness instead.
     BSONObj result;
     client.runCommand(nss.dbName(),
-                      analyzeNdvModeAsAggregationCommand(nss.coll(), key, *collUuid, docId),
+                      analyzeNdvModeAsAggregationCommand(nss.coll(), keyPaths, *collUuid, docId),
                       result);
     uassertStatusOK(getStatusFromCommandResult(result));
 }
@@ -676,25 +736,33 @@ public:
             // TODO SERVER-133120: Model the analyze command as an abstract class with one
             // implementation per mode instead of dispatching here.
             const auto mode = cmd.getMode();
+            const auto& key = cmd.getKey();
+            // Only ndv mode gives the array form of 'key' a meaning.
+            uassert(13176200,
+                    "an array of key paths is only supported with mode: \"ndv\"",
+                    !key || std::holds_alternative<std::string>(*key) ||
+                        (mode && *mode == AnalyzeModeEnum::kNdv));
             if (mode && *mode == AnalyzeModeEnum::kSample) {
                 runSampleMode(
                     opCtx, nss, cmd.getSampleSize(), cmd.getSamplingMethod(), cmd.getNumChunks());
             } else if (mode && *mode == AnalyzeModeEnum::kNdv) {
-                uassert(13175800, "ndv mode requires a key to be specified", cmd.getKey());
+                uassert(13175800, "ndv mode requires a key to be specified", key);
                 uassert(13175801,
                         "sampleRate, sampleSize, numberBuckets, samplingMethod and numChunks "
                         "are not supported with ndv mode",
                         !cmd.getSampleRate() && !cmd.getSampleSize() && !cmd.getNumberBuckets() &&
                             !cmd.getSamplingMethod() && !cmd.getNumChunks());
-                runNdvMode(opCtx, nss, std::string{*cmd.getKey()});
+                runNdvMode(opCtx, nss, *key);
             } else {
-                runHistogramsMode(opCtx,
-                                  nss,
-                                  mode.has_value() /* explicitHistogramsMode */,
-                                  cmd.getKey(),
-                                  cmd.getSampleRate(),
-                                  cmd.getSampleSize(),
-                                  cmd.getNumberBuckets());
+                runHistogramsMode(
+                    opCtx,
+                    nss,
+                    mode.has_value() /* explicitHistogramsMode */,
+                    key ? boost::optional<std::string_view>(std::get<std::string>(*key))
+                        : boost::none,
+                    cmd.getSampleRate(),
+                    cmd.getSampleSize(),
+                    cmd.getNumberBuckets());
             }
         }
 

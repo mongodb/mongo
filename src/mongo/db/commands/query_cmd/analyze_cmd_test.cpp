@@ -15,6 +15,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <string>
+#include <variant>
+#include <vector>
+
 namespace mongo {
 namespace {
 
@@ -88,7 +92,18 @@ TEST(AnalyzeCommandParseTest, NdvModeParses) {
                               << "key" << "a.b");
     auto request = AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze"));
     ASSERT(request.getMode() == AnalyzeModeEnum::kNdv);
-    ASSERT_EQ(*request.getKey(), "a.b");
+    ASSERT_EQ(std::get<std::string>(*request.getKey()), "a.b");
+}
+
+TEST(AnalyzeCommandParseTest, NdvModeParsesTupleKey) {
+    auto cmd = BSON("analyze" << "myColl"
+                              << "$db" << "test"
+                              << "mode" << "ndv"
+                              << "key" << BSON_ARRAY("a.b" << "c"));
+    auto request = AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze"));
+    ASSERT(request.getMode() == AnalyzeModeEnum::kNdv);
+    const auto& paths = std::get<std::vector<std::string>>(*request.getKey());
+    ASSERT_EQ(paths, (std::vector<std::string>{"a.b", "c"}));
 }
 
 }  // namespace

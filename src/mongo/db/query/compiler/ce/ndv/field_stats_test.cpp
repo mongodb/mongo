@@ -38,6 +38,22 @@ TEST(FieldStatsIdTest, EscapesSeparatorsInFieldPaths) {
     ASSERT_NE(makeFieldStatsId(uuid, {"a\\|b"}), makeFieldStatsId(uuid, {"a|b"}));
 }
 
+TEST(FieldStatsIdTest, PinsCompositeIdFormat) {
+    // Composite ids join the sorted paths with the same separator.
+    const UUID uuid = UUID::gen();
+    ASSERT_EQ(makeFieldStatsId(uuid, {"c", "a.b"}),
+              std::string(str::stream()
+                          << kFieldStatsSchemaVersion << "|" << uuid.toString() << "|a.b|c"));
+}
+
+TEST(FieldStatsIdTest, CompositeIdsStayInjectiveUnderEscaping) {
+    // A '|' inside one path of a composite tuple must not collide with a differently split
+    // tuple of the same characters.
+    const UUID uuid = UUID::gen();
+    ASSERT_NE(makeFieldStatsId(uuid, {"a", "b|c"}), makeFieldStatsId(uuid, {"a", "b", "c"}));
+    ASSERT_NE(makeFieldStatsId(uuid, {"a|b", "c"}), makeFieldStatsId(uuid, {"a", "b|c"}));
+}
+
 TEST(FieldStatsDocTest, SerializationGolden) {
     // Deterministic inputs so the golden below pins the exact persisted format; any schema
     // change breaks this test visibly.

@@ -167,6 +167,74 @@ describe("analyze mode: ndv", function () {
         assert.eq(dottedDoc.ndv.sketches[0].ndv, NumberLong(2), "unexpected ndv", {dottedDoc});
     });
 
+    it("persists a composite document with n+1 sketches for a tuple key", function () {
+        // Four extra documents make all three sketches produce pairwise different counts, so a
+        // duplicated or misordered sketch in the persisted array cannot go unnoticed. Tuples of
+        // (a, other): (7, missing) x2, (8, missing), ({b: 1}, missing), (missing, true),
+        // (null, missing), (missing, missing), (7, null) and (null, true).
+        assert.commandWorked(
+            this.coll.insert([{a: null}, {x: 1}, {a: 7, other: null}, {a: null, other: true}]),
+        );
+
+        // Deliberately unsorted: the command canonicalizes the order.
+        assert.commandWorked(this.analyze({mode: "ndv", key: ["other", "a"]}));
+
+        const docs = this.statsDocs();
+        assert.eq(docs.length, 1, "expected exactly one field-stats doc", {docs});
+        const doc = docs[0];
+
+        const collUuid = this.coll.getUUID();
+        assert.eq(
+            doc._id,
+            `${kExpectedSchemaVersion}|${extractUUIDFromObject(collUuid)}|a|other`,
+            "unexpected _id",
+            {doc},
+        );
+        assert.eq(doc.sortedFieldPaths, ["a", "other"], "unexpected doc", {doc});
+
+        // n+1 sketches for n = 2 fields, positionally keyed off the sorted paths: the strict
+        // tuple sketch first, then the variant folding "a" (which merges two tuple pairs), then
+        // the variant folding "other" (which merges one).
+        const sketches = doc.ndv.sketches;
+        assert.eq(sketches.length, 3, "expected n+1 sketches", {doc});
+        assert.eq(sketches[0].ndv, NumberLong(8), "unexpected strict ndv", {doc});
+        assert.eq(sketches[1].ndv, NumberLong(6), "unexpected ndv folding 'a'", {doc});
+        assert.eq(sketches[2].ndv, NumberLong(7), "unexpected ndv folding 'other'", {doc});
+        for (const sketch of sketches) {
+            assert.eq(sketch.precision, kExpectedPrecision, "unexpected precision", {doc});
+            assert(sketch.registers instanceof BinData, "registers must be BinData", {doc});
+        }
+    });
+
+    it("stores one document per tuple regardless of key order", function () {
+        assert.commandWorked(this.analyze({mode: "ndv", key: ["a", "other"]}));
+        assert.commandWorked(this.analyze({mode: "ndv", key: ["other", "a"]}));
+        // The reversed order replaces the same document rather than creating a second one.
+        assert.eq(this.statsDocs().length, 1, "expected a single doc per tuple");
+    });
+
+    it("rejects invalid composite keys", function () {
+        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: []}), 13176201);
+        assert.commandFailedWithCode(
+            this.analyze({mode: "ndv", key: ["a", "b", "c", "d"]}),
+            13176201,
+        );
+        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a"]}), 13176202);
+        // A path prefixing another would collide in the pipeline's inclusion projection.
+        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a.b"]}), 13176203);
+        // Per-path validation applies to every tuple element.
+        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", ""]}), 6799703);
+    });
+
+    it("rejects the array key form outside ndv mode", function () {
+        assert.commandFailedWithCode(this.analyze({key: ["a", "other"]}), 13176200);
+        assert.commandFailedWithCode(
+            this.analyze({mode: "histograms", key: ["a", "other"]}),
+            13176200,
+        );
+        assert.commandFailedWithCode(this.analyze({mode: "sample", key: ["a", "other"]}), 13176200);
+    });
+
     it("keys stats by collection UUID across drop and recreate", function () {
         assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
         const oldUuid = this.coll.getUUID();
