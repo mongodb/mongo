@@ -104,6 +104,11 @@ auto& docsScannedCounter = otel::metrics::MetricsService::instance().createInt64
     "Total number of documents scanned during collection scan",
     otel::metrics::MetricUnit::kOperations);
 
+auto& bytesScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildBytesScanned,
+    "Total number of document bytes scanned during collection scan",
+    otel::metrics::MetricUnit::kBytes);
+
 constexpr int32_t kMetricUpdateIntervalDocCount = 1000;
 
 constexpr int64_t indexBuildMetadataKey = 1;
@@ -1001,8 +1006,13 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
 
     int64_t docsScanned{0};
     int64_t docsScannedSinceUpdate{0};
+    int64_t bytesScanned{0};
+    int64_t bytesScannedSinceUpdate{0};
     int64_t docsIndexedFromScan{0};
-    ON_BLOCK_EXIT([&] { docsScannedCounter.add(docsScannedSinceUpdate); });
+    ON_BLOCK_EXIT([&] {
+        docsScannedCounter.add(docsScannedSinceUpdate);
+        bytesScannedCounter.add(bytesScannedSinceUpdate);
+    });
 
     RecordId loc;
     PlanExecutor::ExecState state;
@@ -1014,11 +1024,16 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             continue;
         }
 
+        auto byteSize = _objToIndex.objsize();
         docsScanned++;
         docsScannedSinceUpdate++;
+        bytesScanned += byteSize;
+        bytesScannedSinceUpdate += byteSize;
         if (docsScannedSinceUpdate >= kMetricUpdateIntervalDocCount) {
             docsScannedCounter.add(docsScannedSinceUpdate);
+            bytesScannedCounter.add(bytesScannedSinceUpdate);
             docsScannedSinceUpdate = 0;
+            bytesScannedSinceUpdate = 0;
             {
                 // We use the number of records to track progress, so it should be fine to read from
                 // latest and get a potentially slightly incorrect value here. Without this block,
@@ -1073,6 +1088,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
           logAttrs(collection.getCollectionPtr()->uuid()),
           "buildUUID"_attr = _buildUUID,
           "numDocsScanned"_attr = docsScanned,
+          "numBytesScanned"_attr = bytesScanned,
           "numDocsIndexed"_attr = docsIndexedFromScan,
           "numIndexesToBuild"_attr = _indexes.size());
 }
