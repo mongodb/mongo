@@ -50,7 +50,7 @@ public:
         return std::holds_alternative<std::span<const char>>(_key);
     }
 
-    std::vector<std::span<const char>> getArrayKey() const;
+    const std::vector<std::span<const char>>& getArrayKey() const;
 
     int64_t getIntKey() const;
 
@@ -101,7 +101,7 @@ public:
         return std::holds_alternative<std::vector<std::span<const char>>>(_data);
     }
 
-    std::vector<std::span<const char>> getArrayVal() const;
+    const std::vector<std::span<const char>>& getArrayVal() const;
 
     std::span<const char> data() const;
 

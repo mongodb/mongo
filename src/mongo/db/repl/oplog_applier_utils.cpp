@@ -329,7 +329,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
             const auto& maybeVal = insertO.getValue();
 
             if (maybeVal && maybeVal->isArrayVal()) {
-                const auto values = maybeVal->getArrayVal();
+                const auto& values = maybeVal->getArrayVal();
                 if (key.isIntKey()) {
                     // A single int key with an array of values inserts at the consecutive keys
                     // starting at that key, matching applyContainerOperations().
@@ -346,7 +346,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
                 }
                 // Otherwise keys and values are paired off; DurableOplogEntry's constructor has
                 // already checked that the two arrays are the same length.
-                const auto keys = key.getArrayKey();
+                const auto& keys = key.getArrayKey();
                 invariant(keys.size() == values.size(), op.toStringForLogging());
                 reserveAdditional(expanded, keys.size());
                 for (size_t i = 0; i < keys.size(); ++i) {
@@ -360,7 +360,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
 
             // An array of keys sharing one (possibly absent) value.
             invariant(key.isArrayKey(), op.toStringForLogging());
-            const auto keys = key.getArrayKey();
+            const auto& keys = key.getArrayKey();
             reserveAdditional(expanded, keys.size());
             for (auto&& singleKey : keys) {
                 expanded.emplace_back(
@@ -371,7 +371,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
         case OpTypeEnum::kContainerDelete: {
             const auto deleteO = ContainerDeleteOplogEntryO::parse(
                 o, IDLParserContext("ContainerDeleteOplogEntryO"));
-            const auto keys = deleteO.getKey().getArrayKey();
+            const auto& keys = deleteO.getKey().getArrayKey();
             reserveAdditional(expanded, keys.size());
             for (auto&& singleKey : keys) {
                 ContainerDeleteOplogEntryO singleO;

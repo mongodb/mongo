@@ -138,7 +138,7 @@ TEST_F(ContainerWriteTest, IntegerKeyedBatchWithContiguousKeysEmitsSingleOplogEn
 
     ASSERT_TRUE(entries[0].getValue().has_value());
     ASSERT_TRUE(entries[0].getValue()->isArrayVal());
-    const auto vals = entries[0].getValue()->getArrayVal();
+    const auto& vals = entries[0].getValue()->getArrayVal();
     ASSERT_EQ(vals.size(), values.size());
     for (size_t i = 0; i < vals.size(); ++i) {
         EXPECT_EQ(view(vals[i]), values[i]);
@@ -163,7 +163,7 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithIdenticalValuesEmitsSingleOplogEn
     const auto entries = getNContainerInsertEntries(1, raw);
 
     ASSERT_TRUE(entries[0].getKey().isArrayKey());
-    const auto parsedKeys = entries[0].getKey().getArrayKey();
+    const auto& parsedKeys = entries[0].getKey().getArrayKey();
     ASSERT_EQ(parsedKeys.size(), keys.size());
     for (size_t i = 0; i < parsedKeys.size(); ++i) {
         EXPECT_EQ(view(parsedKeys[i]), keys[i]);
@@ -210,13 +210,13 @@ TEST_F(ContainerWriteTest, IntegerKeyedBatchWithKeyGapEmitsOneOplogEntryPerRun) 
     const auto entries = getNContainerInsertEntries(2, raw);
 
     ASSERT_EQ(entries[0].getKey().getIntKey(), 100);
-    const auto firstVals = entries[0].getValue()->getArrayVal();
+    const auto& firstVals = entries[0].getValue()->getArrayVal();
     ASSERT_EQ(firstVals.size(), 2u);
     EXPECT_EQ(view(firstVals[0]), "a");
     EXPECT_EQ(view(firstVals[1]), "b");
 
     ASSERT_EQ(entries[1].getKey().getIntKey(), 200);
-    const auto secondVals = entries[1].getValue()->getArrayVal();
+    const auto& secondVals = entries[1].getValue()->getArrayVal();
     ASSERT_EQ(secondVals.size(), 3u);
     EXPECT_EQ(view(secondVals[0]), "c");
     EXPECT_EQ(view(secondVals[1]), "d");
@@ -238,14 +238,14 @@ TEST_F(ContainerWriteTest, IntegerKeyedBatchWithKeyGapBeforeLastKeyEmitsOneOplog
     const auto entries = getNContainerInsertEntries(2, raw);
 
     ASSERT_EQ(entries[0].getKey().getIntKey(), 100);
-    const auto firstVals = entries[0].getValue()->getArrayVal();
+    const auto& firstVals = entries[0].getValue()->getArrayVal();
     ASSERT_EQ(firstVals.size(), 2u);
     EXPECT_EQ(view(firstVals[0]), "a");
     EXPECT_EQ(view(firstVals[1]), "b");
 
     ASSERT_EQ(entries[1].getKey().getIntKey(), 200);
     ASSERT_TRUE(entries[1].getValue()->isArrayVal());
-    const auto secondVals = entries[1].getValue()->getArrayVal();
+    const auto& secondVals = entries[1].getValue()->getArrayVal();
     ASSERT_EQ(secondVals.size(), 1u);
     EXPECT_EQ(view(secondVals[0]), "c");
 }
@@ -266,7 +266,7 @@ TEST_F(ContainerWriteTest, IntegerKeyedBatchWithNoContiguousKeysEmitsOneOplogEnt
 
     for (size_t i = 0; i < entries.size(); ++i) {
         EXPECT_EQ(entries[i].getKey().getIntKey(), keys[i]);
-        const auto vals = entries[i].getValue()->getArrayVal();
+        const auto& vals = entries[i].getValue()->getArrayVal();
         ASSERT_EQ(vals.size(), 1u);
         EXPECT_EQ(view(vals[0]), values[i]);
     }
@@ -288,13 +288,13 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithDifferingValuesEmitsOneOplogEntry
     std::vector<BSONObj> raw;
     const auto entries = getNContainerInsertEntries(2, raw);
 
-    const auto firstKeys = entries[0].getKey().getArrayKey();
+    const auto& firstKeys = entries[0].getKey().getArrayKey();
     ASSERT_EQ(firstKeys.size(), 2u);
     EXPECT_EQ(view(firstKeys[0]), "k0");
     EXPECT_EQ(view(firstKeys[1]), "k1");
     EXPECT_EQ(view(entries[0].getValue()->data()), "v1");
 
-    const auto secondKeys = entries[1].getKey().getArrayKey();
+    const auto& secondKeys = entries[1].getKey().getArrayKey();
     ASSERT_EQ(secondKeys.size(), 2u);
     EXPECT_EQ(view(secondKeys[0]), "k2");
     EXPECT_EQ(view(secondKeys[1]), "k3");
@@ -316,13 +316,13 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithDifferingLastValueEmitsOneOplogEn
     std::vector<BSONObj> raw;
     const auto entries = getNContainerInsertEntries(2, raw);
 
-    const auto firstKeys = entries[0].getKey().getArrayKey();
+    const auto& firstKeys = entries[0].getKey().getArrayKey();
     ASSERT_EQ(firstKeys.size(), 2u);
     EXPECT_EQ(view(firstKeys[0]), "k0");
     EXPECT_EQ(view(firstKeys[1]), "k1");
     EXPECT_EQ(view(entries[0].getValue()->data()), "v1");
 
-    const auto secondKeys = entries[1].getKey().getArrayKey();
+    const auto& secondKeys = entries[1].getKey().getArrayKey();
     ASSERT_EQ(secondKeys.size(), 1u);
     EXPECT_EQ(view(secondKeys[0]), "k2");
     EXPECT_EQ(view(entries[1].getValue()->data()), "v2");
@@ -342,7 +342,7 @@ TEST_F(ContainerWriteTest, SingleElementBatchesEmitOneOplogEntry) {
     std::vector<BSONObj> raw;
     const auto entries = getNContainerInsertEntries(1, raw);
     ASSERT_EQ(entries[0].getKey().getIntKey(), 7);
-    const auto vals = entries[0].getValue()->getArrayVal();
+    const auto& vals = entries[0].getValue()->getArrayVal();
     ASSERT_EQ(vals.size(), 1u);
     EXPECT_EQ(view(vals[0]), "only");
 }

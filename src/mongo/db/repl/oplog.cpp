@@ -3417,7 +3417,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                         // value for all keys, or an array of values, with one for each key. The
                         // batch commits together with the enclosing wuow.
                         if (maybeVal && maybeVal->isArrayVal()) {
-                            const auto values = maybeVal->getArrayVal();
+                            const auto& values = maybeVal->getArrayVal();
                             uassert(13064104,
                                     "A container insert with arrays of keys and values must be of "
                                     "matching length",
@@ -3449,7 +3449,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                         if (maybeVal && maybeVal->isArrayVal()) {
                             // Int-keyed range insert (SERVER-130643): the i-th value is written at
                             // key (base + i), so keys auto-increment.
-                            const auto values = maybeVal->getArrayVal();
+                            const auto& values = maybeVal->getArrayVal();
                             int64_t i = 0;
                             for (const auto& v : values) {
                                 auto status = cursor->insert(*ru, key + i, v);

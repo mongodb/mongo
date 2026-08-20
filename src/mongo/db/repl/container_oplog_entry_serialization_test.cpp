@@ -176,7 +176,7 @@ TEST(ContainerOplogEntrySerializationTest, RangeInsertForStringKeyedContainer) {
         rangeInsertStringKeyed, IDLParserContext("RangeInsertForStringKeyedContainer"));
 
     EXPECT_TRUE(parsed.getKey().isArrayKey());
-    const auto keys = parsed.getKey().getArrayKey();
+    const auto& keys = parsed.getKey().getArrayKey();
     ASSERT_EQ(keys.size(), 3u);
     EXPECT_EQ(std::string_view(keys[0].data(), keys[0].size()), "a"sv);
     EXPECT_EQ(std::string_view(keys[1].data(), keys[1].size()), "b"sv);

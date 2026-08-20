@@ -96,7 +96,7 @@ void ContainerKey::serialize(std::string_view fieldName, BSONObjBuilder* builder
 }
 
 
-std::vector<std::span<const char>> ContainerKey::getArrayKey() const {
+const std::vector<std::span<const char>>& ContainerKey::getArrayKey() const {
     return assertedGet<std::vector<std::span<const char>>>(_key);
 }
 
@@ -152,7 +152,7 @@ void ContainerVal::serialize(std::string_view fieldName, BSONObjBuilder* builder
 }
 
 
-std::vector<std::span<const char>> ContainerVal::getArrayVal() const {
+const std::vector<std::span<const char>>& ContainerVal::getArrayVal() const {
     return assertedGet<std::vector<std::span<const char>>>(_data);
 }
 
