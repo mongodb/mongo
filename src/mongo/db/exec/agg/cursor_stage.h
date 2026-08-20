@@ -88,6 +88,14 @@ protected:
         return std::move(doc);
     }
 
+    /**
+     * Returns true if the 'transformDoc()' function throws on certain invalid inputs.
+     * Defaults to false, but derived cursor stages can override this.
+     */
+    virtual bool transformDocCanThrow() const {
+        return false;
+    }
+
 private:
     GetNextResult doGetNext() final;
 
@@ -100,7 +108,11 @@ private:
      */
     class Batch {
     public:
-        Batch(CursorType type) : _type(type) {}
+        explicit Batch(CursorType type) : _type(type) {}
+
+        CursorType getType() const {
+            return _type;
+        }
 
         /**
          * Adds a new document to the batch.
@@ -108,6 +120,12 @@ private:
          * queries.
          */
         void enqueue(Document&& doc, boost::optional<BSONObj> resumeToken);
+
+        /**
+         * Count the addition of a document to the batch, without supplying an actual document.
+         * Can only be used with the 'kEmptyDocuments' type.
+         */
+        void enqueue();
 
         /**
          * Removes the first document from the batch.

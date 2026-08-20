@@ -96,7 +96,6 @@ public:
     }
 };
 
-
 /**
  * Base class for a MockPlanExecutor that returns BSON objects from a pre-canned vector.
  */
@@ -212,12 +211,12 @@ public:
 
 private:
     OperationContext* _opCtx;
-
-    std::vector<BSONObj> _data;
-    size_t _idx = 0;
-
     MockPlanExplainer _mockExplainer;
     bool _isDisposed = false;
+
+protected:
+    std::vector<BSONObj> _data;
+    size_t _idx = 0;
 };
 
 /**
@@ -372,5 +371,66 @@ TEST_F(DSCursorTest, TestSaveAndRestoreThrowing) {
               "testsThatDidNotThrow"_attr = testsThatDidNotThrow);
     }
 }
+
+/**
+ * MockPlanExecutor instance used for count-only queries.
+ */
+class MockPlanExecutorForCount : public MockPlanExecutorBase {
+public:
+    MockPlanExecutorForCount(OperationContext* opCtx,
+                             std::vector<BSONObj> data,
+                             std::shared_ptr<bool> calledGetNextWithoutOutput)
+        : MockPlanExecutorBase(opCtx, std::move(data)),
+          _calledGetNextWithoutOutput(std::move(calledGetNextWithoutOutput)) {}
+
+    ExecState getNext(BSONObj* out, RecordId* dlOut) override {
+        if (_idx >= _data.size()) {
+            return ExecState::IS_EOF;
+        }
+        invariant(out == nullptr);
+        *_calledGetNextWithoutOutput = true;
+        ++_idx;
+        return ExecState::ADVANCED;
+    }
+
+    void saveState() override {}
+
+    void restoreState(const RestoreContext& context) override {}
+
+    void detachFromOperationContext() override {}
+
+    void reattachToOperationContext(OperationContext* opCtx) override {}
+
+private:
+    std::shared_ptr<bool> _calledGetNextWithoutOutput;
+};
+
+TEST_F(DSCursorTest, EmptyDocumentsUsesCountOnlyPlanExecutorInterface) {
+    std::vector<BSONObj> bsons = {BSON("foo" << 1), BSON("foo" << 2), BSON("foo" << 3)};
+    auto calledGetNextWithoutOutput = std::make_shared<bool>(false);
+    auto exec =
+        std::make_unique<MockPlanExecutorForCount>(getOpCtx(), bsons, calledGetNextWithoutOutput);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
+        std::move(exec).release(), PlanExecutor::Deleter{getOpCtx()});
+
+    MultipleCollectionAccessor collections;
+    auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto cursor = DocumentSourceCursor::create(
+        std::move(execWithDeleter), getExpCtx(), DocumentSourceCursor::CursorType::kEmptyDocuments);
+    cursor->bindCatalogInfo(collections, stasher);
+    cursor->setCatalogResourceHandle_forTest(
+        make_intrusive<MockDSCursorCatalogResourceHandle>(std::make_shared<bool>(false)));
+
+    auto cursorStage = exec::agg::buildStage(cursor);
+    for (size_t i = 0; i < bsons.size(); ++i) {
+        auto next = cursorStage->getNext();
+        ASSERT(next.isAdvanced());
+        ASSERT(next.getDocument().toBson().isEmpty());
+    }
+    ASSERT(cursorStage->getNext().isEOF());
+    ASSERT(*calledGetNextWithoutOutput);
+    cursorStage->dispose();
+}
+
 }  // namespace
 }  // namespace mongo

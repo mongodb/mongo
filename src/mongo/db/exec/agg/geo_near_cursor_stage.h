@@ -36,6 +36,13 @@ private:
      */
     Document transformDoc(Document&& obj) const final;
 
+    /**
+     * Indicates that this stage's 'transformDoc()' function can throw on invalid inputs.
+     */
+    bool transformDocCanThrow() const override {
+        return true;
+    }
+
     // The output field in which to store the computed distance, if specified.
     boost::optional<FieldPath> _distanceField;
 

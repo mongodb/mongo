@@ -392,7 +392,8 @@ void PlanExecutorImpl::_waitForAllEarlierOplogWritesToBeVisible() {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
-    ExecState state = _getNextImpl(&_docOutput, dlOut);
+    auto* docOut = objOut ? &_docOutput : nullptr;
+    ExecState state = _getNextImpl(docOut, dlOut);
 
     if (objOut && state == ExecState::ADVANCED) {
         const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
