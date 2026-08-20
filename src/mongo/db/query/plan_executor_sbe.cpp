@@ -199,22 +199,10 @@ void PlanExecutorSBE::stashResult(const BSONObj& obj) {
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document& objOut) {
-    tassert(11321406,
-            "Invalid call to PlanExecutorSBE::getNextDocument() on a disposed executor",
-            !_isDisposed);
-
-    checkFailPointPlanExecAlwaysFails(nss());
-
     return getNextImpl(&objOut, nullptr);
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) {
-    tassert(11321407,
-            "Invalid call to PlanExecutorSBE::getNext() on a disposed executor",
-            !_isDisposed);
-
-    checkFailPointPlanExecAlwaysFails(nss());
-
     BSONObj obj;
     auto result = getNextImpl(&obj, dlOut);
     if (out && result == PlanExecutor::ExecState::ADVANCED) {

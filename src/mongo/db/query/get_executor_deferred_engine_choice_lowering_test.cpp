@@ -22,6 +22,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -319,5 +321,70 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
     }
 }
+
+using DeferredEngineChoiceLoweringDeathTest = DeferredEngineChoiceLoweringTest;
+
+DEATH_TEST_REGEX_F(DeferredEngineChoiceLoweringDeathTest,
+                   GetNextDocumentOnDisposedExecutor,
+                   "Tripwire assertion.*11321408") {
+    auto [cq, plannerData] = createPlannerData();
+
+    PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
+                                    .plannerParams = plannerData.plannerParams};
+
+    auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), pipeline.get(), collections()};
+
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       planner.extractPlanRankingResult(),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       pipeline.get());
+
+    ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+
+    exec->dispose(operationContext());
+
+    Document doc;
+    ASSERT_THROWS_CODE(exec->getNextDocument(doc), AssertionException, 11321408);
+}
+
+DEATH_TEST_REGEX_F(DeferredEngineChoiceLoweringDeathTest,
+                   GetNextOnDisposedExecutor,
+                   "Tripwire assertion.*11321408") {
+    auto [cq, plannerData] = createPlannerData();
+
+    PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
+                                    .plannerParams = plannerData.plannerParams};
+
+    auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), pipeline.get(), collections()};
+
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       planner.extractPlanRankingResult(),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       pipeline.get());
+
+    ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+
+    exec->dispose(operationContext());
+
+    BSONObj out;
+    ASSERT_THROWS_CODE(exec->getNext(&out, nullptr), AssertionException, 11321408);
+}
+
 }  // namespace
 }  // namespace mongo::exec_deferred_engine_choice
