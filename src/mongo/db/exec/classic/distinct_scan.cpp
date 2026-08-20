@@ -39,6 +39,7 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexEntry, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
+      _ordering(Ordering::make(_keyPattern)),
       _scanDirection(params.scanDirection),
       _bounds(std::move(params.bounds)),
       _fieldNo(params.fieldNo),
@@ -121,7 +122,8 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
 
-    boost::optional<IndexKeyEntry> kv;
+    // A view of the next index entry, if any. Valid until the cursor is advanced.
+    SortedDataKeyValueView view;
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DistinctScan",
@@ -132,7 +134,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             }
 
             if (_needsSequentialScan) {
-                kv = _cursor->next(ru);
+                view = _cursor->nextKeyValueView(ru);
                 _needsSequentialScan = false;
                 return PlanStage::ADVANCED;
             }
@@ -140,9 +142,10 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             key_string::Builder builder(
                 indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                 indexAccessMethod()->getSortedDataInterface()->getOrdering());
-            kv = _cursor->seek(ru,
-                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                   _seekPoint, _scanDirection == 1, builder));
+            view = _cursor->seekForKeyValueView(
+                ru,
+                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                    _seekPoint, _scanDirection == 1, builder));
             return PlanStage::ADVANCED;
         },
         [&] {
@@ -153,14 +156,19 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
         return ret;
     }
 
-    if (!kv) {
+    if (view.isEmpty()) {
         _commonStats.isEOF = true;
         return PlanStage::IS_EOF;
     }
 
     ++_specificStats.keysExamined;
 
-    switch (_checker.checkKey(kv->key, &_seekPoint)) {
+    BSONObj dehydratedKey = key_string::toBson(view.getKeyStringWithoutRecordIdView(),
+                                               _ordering,
+                                               view.getTypeBitsView(),
+                                               view.getVersion());
+
+    switch (_checker.checkKey(dehydratedKey, &_seekPoint)) {
         case IndexBoundsChecker::MUST_ADVANCE: {
             // Try again next time. The checker has adjusted the _seekPoint.
             return PlanStage::NEED_TIME;
@@ -172,9 +180,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             return IS_EOF;
         }
         case IndexBoundsChecker::VALID: {
-            if (!kv->key.isOwned())
-                kv->key = kv->key.getOwned();
-
             // If we are retrying a fetch that yielded, reuse the existing working set member;
             // otherwise allocate a new one.
             WorkingSetID id;
@@ -185,10 +190,10 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             } else {
                 id = _workingSet->allocate();
                 member = _workingSet->get(id);
-                member->recordId = kv->loc;
+                member->recordId = *view.getRecordId();
                 member->keyData.push_back(
                     IndexKeyDatum(_keyPattern,
-                                  kv->key,
+                                  dehydratedKey,
                                   workingSetIndexId(),
                                   shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
                 _workingSet->transitionToRecordIdAndIdx(id);
@@ -229,7 +234,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                         // the prefix leading up to the shard key. Adjust the _seekPoint so that it
                         // is exclusive on the field we are using, in case the next prefix matches
                         // more owned chunks.
-                        _seekPoint.keyPrefix = kv->key;
+                        _seekPoint.keyPrefix = dehydratedKey;
                         _seekPoint.prefixLen = _fieldNo + 1;
                         _seekPoint.firstExclusive = _fieldNo;
                         _workingSet->free(id);
@@ -257,7 +262,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             switch (belongs) {
                 case ShardFilterer::DocumentBelongsResult::kBelongs: {
                     // Adjust the _seekPoint so that it is exclusive on the field we are using.
-                    _seekPoint.keyPrefix = kv->key;
+                    _seekPoint.keyPrefix = dehydratedKey;
                     _seekPoint.prefixLen = _fieldNo + 1;
                     _seekPoint.firstExclusive = _fieldNo;
 

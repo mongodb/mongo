@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
@@ -128,6 +129,7 @@ private:
     WorkingSet* _workingSet;
 
     const BSONObj _keyPattern;
+    const Ordering _ordering;
 
     const int _scanDirection = 1;
 

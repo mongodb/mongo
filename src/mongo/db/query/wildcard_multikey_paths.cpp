@@ -130,40 +130,48 @@ static void scanWildcardMetadataKeys(OperationContext* opCtx,
     auto cursor = wam->newCursor(opCtx, ru);
 
     constexpr int kForward = 1;
+    const auto* sortedDataInterface = wam->getSortedDataInterface();
     IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
     IndexSeekPoint seekPoint;
     if (!checker.getStartSeekPoint(&seekPoint)) {
         return;
     }
 
-    key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion(),
-                                wam->getSortedDataInterface()->getOrdering());
+    key_string::Builder builder(sortedDataInterface->getKeyStringVersion(),
+                                sortedDataInterface->getOrdering());
 
-    auto entry = cursor->seek(
+    auto view = cursor->seekForKeyValueView(
         ru, IndexEntryComparison::makeKeyStringFromSeekPointForSeek(seekPoint, kForward, builder));
 
     ++stats->numSeeks;
-    while (entry) {
+    while (!view.isEmpty()) {
         ++stats->keysExamined;
 
-        switch (checker.checkKey(entry->key, &seekPoint)) {
+        BSONObj dehydratedKey = key_string::toBson(view.getKeyStringWithoutRecordIdView(),
+                                                   sortedDataInterface->getOrdering(),
+                                                   view.getTypeBitsView(),
+                                                   view.getVersion());
+
+        switch (checker.checkKey(dehydratedKey, &seekPoint)) {
             case IndexBoundsChecker::VALID:
-                multikeyPaths->emplace(extractMultikeyPathFromIndexKey(*entry));
-                entry = cursor->next(ru);
+                multikeyPaths->emplace(extractMultikeyPathFromIndexKey(
+                    {.key = dehydratedKey, .loc = *view.getRecordId()}));
+                view = cursor->nextKeyValueView(ru);
                 break;
 
             case IndexBoundsChecker::MUST_ADVANCE: {
                 ++stats->numSeeks;
-                key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion(),
-                                            wam->getSortedDataInterface()->getOrdering());
-                entry = cursor->seek(ru,
-                                     IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                         seekPoint, kForward, builder));
+                key_string::Builder builder(sortedDataInterface->getKeyStringVersion(),
+                                            sortedDataInterface->getOrdering());
+                view = cursor->seekForKeyValueView(
+                    ru,
+                    IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                        seekPoint, kForward, builder));
                 break;
             }
 
             case IndexBoundsChecker::DONE:
-                entry = boost::none;
+                view.reset();
                 break;
 
             default:

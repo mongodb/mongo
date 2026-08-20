@@ -45,6 +45,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexEntry, workingSet),
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
+      _ordering(Ordering::make(_keyPattern)),
       _bounds(std::move(params.bounds)),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _direction(params.direction),
@@ -75,7 +76,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
                                    .getOwned();
 }
 
-boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
+SortedDataKeyValueView IndexScan::initIndexScan() {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
     _indexCursor = indexAccessMethod()->newCursor(opCtx(), ru, _forward);
@@ -83,21 +84,18 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     // We always seek once to establish the cursor position.
     ++_specificStats.seeks;
 
+    const auto* sortedDataInterface = indexAccessMethod()->getSortedDataInterface();
+
     if (_bounds.isSimpleRange) {
         // Start at one key, end at another.
         _startKey = _bounds.startKey;
         _endKey = _bounds.endKey;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
 
-        key_string::Builder builder(
-            indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion());
+        key_string::Builder builder(sortedDataInterface->getKeyStringVersion());
         auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-            _startKey,
-            indexAccessMethod()->getSortedDataInterface()->getOrdering(),
-            _forward,
-            _startKeyInclusive,
-            builder);
-        return _indexCursor->seek(ru, keyStringForSeek);
+            _startKey, sortedDataInterface->getOrdering(), _forward, _startKeyInclusive, builder);
+        return _indexCursor->seekForKeyValueView(ru, keyStringForSeek);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
         // of an end cursor.  For all other index scans, we fall back on using
@@ -106,33 +104,32 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
                 _bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
 
-            key_string::Builder builder(
-                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion());
+            key_string::Builder builder(sortedDataInterface->getKeyStringVersion());
             auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
                 _startKey,
-                indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                sortedDataInterface->getOrdering(),
                 _forward,
                 _startKeyInclusive,
                 builder);
-            return _indexCursor->seek(ru, keyStringForSeek);
+            return _indexCursor->seekForKeyValueView(ru, keyStringForSeek);
         } else {
             _checker.reset(new IndexBoundsChecker(&_bounds, _keyPattern, _direction));
 
             if (!_checker->getStartSeekPoint(&_seekPoint))
-                return boost::none;
-            key_string::Builder builder(
-                indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
-                indexAccessMethod()->getSortedDataInterface()->getOrdering());
-            return _indexCursor->seek(ru,
-                                      IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                          _seekPoint, _forward, builder));
+                return {};
+            key_string::Builder builder(sortedDataInterface->getKeyStringVersion(),
+                                        sortedDataInterface->getOrdering());
+            return _indexCursor->seekForKeyValueView(
+                ru,
+                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                    _seekPoint, _forward, builder));
         }
     }
 }
 
 PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
-    // Get the next kv pair from the index, if any.
-    boost::optional<IndexKeyEntry> kv;
+    // A view of the next index entry, if any. Valid until the cursor is advanced.
+    SortedDataKeyValueView view;
 
     const auto ret = handlePlanStageYield(
         expCtx(),
@@ -141,19 +138,20 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
             switch (_scanState) {
                 case INITIALIZING:
-                    kv = initIndexScan();
+                    view = initIndexScan();
                     break;
                 case GETTING_NEXT:
-                    kv = _indexCursor->next(ru);
+                    view = _indexCursor->nextKeyValueView(ru);
                     break;
                 case NEED_SEEK: {
                     ++_specificStats.seeks;
                     key_string::Builder builder(
                         indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                         indexAccessMethod()->getSortedDataInterface()->getOrdering());
-                    kv = _indexCursor->seek(ru,
-                                            IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                                _seekPoint, _forward, builder));
+                    view = _indexCursor->seekForKeyValueView(
+                        ru,
+                        IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                            _seekPoint, _forward, builder));
                     break;
                 }
                 case HIT_END:
@@ -170,21 +168,23 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         return ret;
     }
 
-    if (kv) {
+    BSONObj dehydratedKey;
+    if (!view.isEmpty()) {
+        dehydratedKey = key_string::toBson(view.getKeyStringWithoutRecordIdView(),
+                                           _ordering,
+                                           view.getTypeBitsView(),
+                                           view.getVersion());
+
         // In debug mode, check that the cursor isn't lying to us.
         if (kDebugBuild && !_startKey.isEmpty()) {
-            int cmp = kv->key.woCompare(_startKey,
-                                        Ordering::make(_keyPattern),
-                                        /*compareFieldNames*/ false);
+            int cmp = dehydratedKey.woCompare(_startKey, _ordering, /*compareFieldNames*/ false);
             if (cmp == 0)
                 dassert(_startKeyInclusive);
             dassert(_forward ? cmp >= 0 : cmp <= 0);
         }
 
         if (kDebugBuild && !_endKey.isEmpty()) {
-            int cmp = kv->key.woCompare(_endKey,
-                                        Ordering::make(_keyPattern),
-                                        /*compareFieldNames*/ false);
+            int cmp = dehydratedKey.woCompare(_endKey, _ordering, /*compareFieldNames*/ false);
             if (cmp == 0)
                 dassert(_endKeyInclusive);
             dassert(_forward ? cmp <= 0 : cmp >= 0);
@@ -193,13 +193,13 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         ++_specificStats.keysExamined;
     }
 
-    if (kv && _checker) {
-        switch (_checker->checkKey(kv->key, &_seekPoint)) {
+    if (!view.isEmpty() && _checker) {
+        switch (_checker->checkKey(dehydratedKey, &_seekPoint)) {
             case IndexBoundsChecker::VALID:
                 break;
 
             case IndexBoundsChecker::DONE:
-                kv = boost::none;
+                view.reset();
                 break;
 
             case IndexBoundsChecker::MUST_ADVANCE:
@@ -208,7 +208,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         }
     }
 
-    if (!kv) {
+    if (view.isEmpty()) {
         _scanState = HIT_END;
         _commonStats.isEOF = true;
         _indexCursor.reset();
@@ -218,6 +218,9 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     _scanState = GETTING_NEXT;
 
+    tassert(13180100, "Expected non-null record id", view.getRecordId());
+    RecordId recordId = *view.getRecordId();
+
     // If we're deduping
     if (_dedup) {
         ++_specificStats.dupsTested;
@@ -226,8 +229,8 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         // Do not add the recordId to recordIdDeduplicator unless we know that the
         // scan will return the recordId.
         uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
-        bool duplicate = _filter == nullptr ? !_recordIdDeduplicator.insert(kv->loc)
-                                            : _recordIdDeduplicator.contains(kv->loc);
+        bool duplicate = _filter == nullptr ? !_recordIdDeduplicator.insert(recordId)
+                                            : _recordIdDeduplicator.contains(recordId);
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
@@ -245,7 +248,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         }
     }
 
-    if (!Filter::passes(kv->key, _keyPattern, _filter)) {
+    if (!Filter::passes(dehydratedKey, _keyPattern, _filter)) {
         return PlanStage::NEED_TIME;
     }
 
@@ -253,7 +256,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     if (_dedup && _filter != nullptr) {
         // ... now we can add the RecordId to the Deduplicator.
         uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
-        _recordIdDeduplicator.insert(kv->loc);
+        _recordIdDeduplicator.insert(recordId);
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
         _dedupReporter.add(dedupBytes - dedupBytesPrev);
@@ -263,22 +266,19 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                 _memoryTracker.withinMemoryLimit(opCtx()));
     }
 
-    if (!kv->key.isOwned())
-        kv->key = kv->key.getOwned();
-
     // We found something to return, so fill out the WSM.
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->recordId = std::move(kv->loc);
+    member->recordId = std::move(recordId);
     member->keyData.push_back(
         IndexKeyDatum(_keyPattern,
-                      kv->key,
+                      dehydratedKey,
                       workingSetIndexId(),
                       shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {
-        member->metadata().setIndexKey(IndexKeyEntry::rehydrateKey(_keyPattern, kv->key));
+        member->metadata().setIndexKey(IndexKeyEntry::rehydrateKey(_keyPattern, dehydratedKey));
     }
 
     *out = id;

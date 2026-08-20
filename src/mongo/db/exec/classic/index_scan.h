@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
@@ -152,15 +153,16 @@ protected:
 
 private:
     /**
-     * Initialize the underlying index Cursor, returning first result if any.
+     * Initialize the underlying index Cursor, returning a view of the first entry if any.
      */
-    boost::optional<IndexKeyEntry> initIndexScan();
+    SortedDataKeyValueView initIndexScan();
 
     // The WorkingSet we fill with results.  Not owned by us.
     WorkingSet* const _workingSet;
 
     std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
     const BSONObj _keyPattern;
+    const Ordering _ordering;
 
     const IndexBounds _bounds;
 
