@@ -97,9 +97,9 @@ bool BigSimplePolygon::Contains(S2Point const& point) const {
 }
 
 bool BigSimplePolygon::Intersects(const S2Polygon& polygon) const {
+    std::lock_guard<std::mutex> lk(_borderMu);
     // If the loop area is at most 2*Pi, treat it as a simple Polygon.
     if (_isNormalized) {
-        std::lock_guard<std::mutex> lk(_borderMu);
         return _getPolygonBorderLocked().Intersects(&polygon);
     }
 
