@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -74,31 +75,31 @@ public:
     }
 };
 
+size_t liftSubpipelineStageExpander(LiteParsedPipeline* pipeline,
+                                    size_t index,
+                                    LiteParsedDocumentSource& stage) {
+    auto* subpipelinesPtr = stage.getMutableSubPipelines();
+    tassert(8084900,
+            "$liftSubpipeline must have exactly one subpipeline",
+            subpipelinesPtr && subpipelinesPtr->size() == 1);
+    StageSpecs lifted;
+    for (const auto& s : (*subpipelinesPtr)[0]->getStages()) {
+        lifted.push_back(s->clone());
+    }
+    return pipeline->replaceStageWith(index, std::move(lifted));
+}
+
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(liftSubpipeline,
+                                              LiftSubpipelineStageParams::id,
+                                              liftSubpipelineStageExpander);
+
 }  // namespace
 
 class LiteParsedDesugarerTest : public AggregationContextFixture {
 public:
     LiteParsedDesugarerTest() : LiteParsedDesugarerTest(_nss) {}
     explicit LiteParsedDesugarerTest(NamespaceString nsString)
-        : AggregationContextFixture(std::move(nsString)) {
-        LiteParsedDesugarer::registerStageExpander(
-            extension::host::ExpandableStageParams::id,
-            extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpandable::
-                stageExpander);
-        LiteParsedDesugarer::registerStageExpander(
-            LiftSubpipelineStageParams::id,
-            [](LiteParsedPipeline* pipeline, size_t index, LiteParsedDocumentSource& stage) {
-                auto* subpipelinesPtr = stage.getMutableSubPipelines();
-                tassert(8084900,
-                        "$liftSubpipeline must have exactly one subpipeline",
-                        subpipelinesPtr && subpipelinesPtr->size() == 1);
-                StageSpecs lifted;
-                for (const auto& s : (*subpipelinesPtr)[0]->getStages()) {
-                    lifted.push_back(s->clone());
-                }
-                return pipeline->replaceStageWith(index, std::move(lifted));
-            });
-    }
+        : AggregationContextFixture(std::move(nsString)) {}
 
     void registerParser(extension::AggStageDescriptorHandle descriptor) {
         auto nameStringData = descriptor->getName();
@@ -768,6 +769,27 @@ TEST_F(LiteParsedDesugarerTest, ScoreFusionExpandsWithFlagOn) {
     for (const auto& stage : lpp.getStages()) {
         ASSERT_NE(stage->getParseTimeName(), "$scoreFusion");
     }
+}
+
+using LiteParsedDesugarerDeathTest = LiteParsedDesugarerTest;
+
+/**
+ * Test that duplicate calls to registerStageExpander() for the same stage lead to an
+ * assertion error. 'LiftSubpipelineStageParams::id' was already registered in the call
+ * to 'REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER' above.
+ */
+DEATH_TEST_REGEX_F(LiteParsedDesugarerDeathTest,
+                   DuplicateStageExpanderRegistrationFails,
+                   "12880500") {
+    LiteParsedDesugarer::registerStageExpander(
+        LiftSubpipelineStageParams::id, liftSubpipelineStageExpander, "liftSubpipeline");
+}
+
+DEATH_TEST_REGEX_F(LiteParsedDesugarerDeathTest,
+                   UnallocatedStageParamsIdRegistrationFails,
+                   "12880501") {
+    LiteParsedDesugarer::registerStageExpander(
+        StageParams::kUnallocatedId, liftSubpipelineStageExpander, "unallocated");
 }
 
 }  // namespace mongo

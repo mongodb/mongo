@@ -6,6 +6,8 @@
 #include "mongo/base/init.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -13,6 +15,21 @@ namespace mongo {
 // stages in view definitions without a direct dependency on the lite_parsed_desugarer target.
 MONGO_INITIALIZER(RegisterViewPipelineDesugarer)(InitializerContext*) {
     ResolvedNamespace::setViewPipelineDesugarer(&LiteParsedDesugarer::desugar);
+}
+
+void LiteParsedDesugarer::registerStageExpander(StageParams::Id id,
+                                                StageExpander stageExpander,
+                                                std::string_view name) {
+    tassert(
+        12880501,
+        str::stream() << "StageParams::id not allocated for lite-parsed desugarer stage expander '"
+                      << name << "'",
+        id != StageParams::kUnallocatedId);
+    const auto [_, inserted] = _stageExpanders.insert({id, std::move(stageExpander)});
+    tassert(12880500,
+            str::stream() << "Duplicate lite-parsed desugarer stage expander registered for '"
+                          << name << "'",
+            inserted);
 }
 
 bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
@@ -53,5 +70,12 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
 
     return modified;
 }
+
+MONGO_INITIALIZER_GROUP(BeginLiteParsedDesugarerStageExpanderRegistration,
+                        ("EndStageIdAllocation"),
+                        ("EndLiteParsedDesugarerStageExpanderRegistration"))
+MONGO_INITIALIZER_GROUP(EndLiteParsedDesugarerStageExpanderRegistration,
+                        ("BeginLiteParsedDesugarerStageExpanderRegistration"),
+                        ())
 
 }  // namespace mongo

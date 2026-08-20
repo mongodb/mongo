@@ -276,22 +276,14 @@ size_t scoreFusionStageExpander(LiteParsedPipeline* pipeline,
 
 namespace mongo {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterRankFusionStageExpander, ("EndStageIdAllocation"))
-(InitializerContext*) {
-    tassert(12197000,
-            "RankFusionStageParams::id not allocated",
-            RankFusionStageParams::id != StageParams::kUnallocatedId);
-    LiteParsedDesugarer::registerStageExpander(
-        RankFusionStageParams::id, lite_parsed_hybrid_search_desugarer::rankFusionStageExpander);
-}
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(
+    rankFusion,
+    RankFusionStageParams::id,
+    lite_parsed_hybrid_search_desugarer::rankFusionStageExpander);
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterScoreFusionStageExpander, ("EndStageIdAllocation"))
-(InitializerContext*) {
-    tassert(12197400,
-            "ScoreFusionStageParams::id not allocated",
-            ScoreFusionStageParams::id != StageParams::kUnallocatedId);
-    LiteParsedDesugarer::registerStageExpander(
-        ScoreFusionStageParams::id, lite_parsed_hybrid_search_desugarer::scoreFusionStageExpander);
-}
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(
+    scoreFusion,
+    ScoreFusionStageParams::id,
+    lite_parsed_hybrid_search_desugarer::scoreFusionStageExpander);
 
 }  // namespace mongo

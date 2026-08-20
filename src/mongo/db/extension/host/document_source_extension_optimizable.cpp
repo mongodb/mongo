@@ -169,16 +169,10 @@ LiteParsedDesugarer::StageExpander
             return pipeline->replaceStageWith(index, std::move(expanded));
         };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtensionExpandable,
-                                     ("EndStageIdAllocation"))
-(InitializerContext*) {
-    tassert(11533001,
-            "ExpandableStageParams::id must be allocated before registering expander",
-            ExpandableStageParams::id != StageParams::kUnallocatedId);
-    LiteParsedDesugarer::registerStageExpander(
-        ExpandableStageParams::id,
-        DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
-}
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(
+    extensionExpandable,
+    ExpandableStageParams::id,
+    DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
 
 // TODO SERVER-121094 Remove this check when the extension can do this through
 // bindResolvedNamespace().
