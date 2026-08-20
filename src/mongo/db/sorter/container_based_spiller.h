@@ -673,8 +673,8 @@ private:
             // outer pass even after we erase them from _iterators below.
             auto oldIters = this->_iterators;
             for (size_t i = 0; i < oldIters.size(); i += maxSpillsPerMerge) {
-                auto count = std::min(maxSpillsPerMerge, oldIters.size() - i);
-                auto spillsToMerge = std::span(oldIters).subspan(i, count);
+                const auto count = std::min(maxSpillsPerMerge, oldIters.size() - i);
+                const auto spillsToMerge = std::span(oldIters).subspan(i, count);
                 validateMergeSpillRanges<Key, Value>(spillsToMerge);
 
                 // For container-based spilling we append merged data back into the same container
@@ -687,45 +687,52 @@ private:
                 auto mergeIterator = sorter::merge<Key, Value>(spillsToMerge, opts, comp);
                 auto writer = this->_storage->makeWriter(opts, settings);
 
-                int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStart();
-                int64_t deleteRangeEnd = spillsToMerge.back()->getRange().getEnd();
+                const int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStart();
+                const int64_t deleteRangeEnd = spillsToMerge.back()->getRange().getEnd();
                 const int64_t numSourceRows = deleteRangeEnd - deleteRangeStart;
 
                 int64_t numSpilled = 0;
 
                 std::vector<std::pair<Key, Value>> batch;
+                batch.reserve(_batchSize);
                 auto& containerWriter =
                     *static_cast<SortedContainerWriter<Key, Value>*>(writer.get());
                 while (mergeIterator->more()) {
+                    // Drain the merge iterator into the buffer under its own write conflict retry,
+                    // separate from the writes below, so that a retried write re-writes the same
+                    // pairs rather than consuming more from the iterator. 'batch' is cleared
+                    // outside the retry and the loop is bounded by its size, so a retried read
+                    // tops the buffer back up rather than dropping already-consumed pairs.
                     batch.clear();
-                    writeConflictRetry(
-                        &_opCtx,
-                        _ru,
-                        "ContainerBasedSpiller::mergeSpills_insert",
-                        NamespaceString::kEmpty,
-                        [&] {
-                            int64_t bytesInBatch = 0;
+                    writeConflictRetry(&_opCtx,
+                                       _ru,
+                                       "ContainerBasedSpiller::mergeSpills_read"sv,
+                                       NamespaceString::kEmpty,
+                                       [&] {
+                                           while (mergeIterator->more() &&
+                                                  static_cast<int64_t>(batch.size()) < _batchSize) {
+                                               batch.push_back(mergeIterator->next());
+                                           }
+                                       });
 
-                            WriteUnitOfWork wuow{&_opCtx};
-
-                            // In the case of a write conflict, re-add any buffered
-                            // items from the batch before getting more from the
-                            // merge iterator.
-                            for (const auto& [k, v] : batch) {
-                                bytesInBatch +=
-                                    containerWriter.addAlreadySortedWrapper(k, v).bytesWritten;
-                            }
-
-                            while (mergeIterator->more() &&
-                                   static_cast<int64_t>(batch.size()) < _batchSize &&
-                                   bytesInBatch < _batchBytes) {
-                                const auto& [k, v] = batch.emplace_back(mergeIterator->next());
-                                bytesInBatch +=
-                                    containerWriter.addAlreadySortedWrapper(k, v).bytesWritten;
-                            }
-
-                            wuow.commit();
-                        });
+                    // A byte-heavy buffer may take more than one batched write, since
+                    // addAlreadySortedBatch stops once it reaches '_batchBytes'.
+                    for (size_t i = 0, written = 0; i < batch.size(); i += written) {
+                        const std::span<const std::pair<Key, Value>> pairsToWrite =
+                            std::span(batch).subspan(i);
+                        writeConflictRetry(&_opCtx,
+                                           _ru,
+                                           "ContainerBasedSpiller::mergeSpills_insert"sv,
+                                           NamespaceString::kEmpty,
+                                           [&] {
+                                               WriteUnitOfWork wuow{&_opCtx};
+                                               written = containerWriter
+                                                             .addAlreadySortedBatch(pairsToWrite,
+                                                                                    _batchBytes)
+                                                             .kvPairsWritten;
+                                               wuow.commit();
+                                           });
+                    }
                     numSpilled += batch.size();
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
