@@ -239,6 +239,9 @@ filters:
   - "plan_insert_listener*":
     approvers:
       - 10gen/query-execution-classic
+  - "write_conflict_backoff*":
+    approvers:
+      - 10gen/query-execution-write-exec
   - "sbe*":
     approvers:
       - 10gen/query-execution-sbe
