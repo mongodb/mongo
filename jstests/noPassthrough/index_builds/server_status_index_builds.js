@@ -22,6 +22,9 @@ const collName = "t";
 const dbName = "test";
 
 describe("index build throughput metrics", function () {
+    const keyCount = 1000;
+    const minBytesPerKey = 4; // The fields are 4 bytes, so the index keys generated must be >= 4 bytes each.
+
     before(() => {
         this.conn = MongoRunner.runMongod();
         this.db = this.conn.getDB(dbName);
@@ -31,11 +34,43 @@ describe("index build throughput metrics", function () {
         this.coll = this.db.getCollection(collName);
 
         assert.commandWorked(
-            this.coll.insertMany(Array.from({length: 10}, (_, i) => ({a: `foo${i}`}))),
+            this.coll.insertMany(Array.from({length: keyCount}, (_, i) => ({a: `foo${i}`}))),
         );
     });
 
     it("keys and bytes processed", () => {
+        const before = this.db.serverStatus().metrics.indexBuilds;
+
+        const fp = configureFailPoint(this.db, "hangIndexBuildDuringBulkLoadPhase", {
+            iteration: 0,
+            indexNames: ["a_1"],
+        });
+
+        const checkIndexBuildMetrics = (current, original, phasesCompleted) => {
+            assert.eq(current.keysProcessed, original.keysProcessed + keyCount * phasesCompleted);
+            assert.gte(
+                current.bytesProcessed,
+                original.bytesProcessed + keyCount * minBytesPerKey * phasesCompleted,
+            );
+        };
+
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+            this.conn,
+            this.coll.getFullName(),
+            {a: 1},
+        );
+
+        fp.wait();
+        const during = this.db.serverStatus().metrics.indexBuilds;
+        checkIndexBuildMetrics(during, before, 1);
+
+        fp.off();
+        awaitCreateIndex();
+        const after = this.db.serverStatus().metrics.indexBuilds;
+        checkIndexBuildMetrics(after, before, 2);
+    });
+
+    it("phase durations", () => {
         const before = this.db.serverStatus().metrics.indexBuilds;
 
         const fp = configureFailPoint(this.db, "hangIndexBuildDuringBulkLoadPhase", {
@@ -51,19 +86,12 @@ describe("index build throughput metrics", function () {
 
         fp.wait();
         const during = this.db.serverStatus().metrics.indexBuilds;
-
-        assert.eq(during.keysProcessed, before.keysProcessed + 10 /*keys*/);
-        assert.gte(during.bytesProcessed, before.bytesProcessed + 10 /*keys*/ * 4 /*bytesPerKey*/);
+        assert.gt(during.phaseDurationMicros, before.phaseDurationMicros);
 
         fp.off();
         awaitCreateIndex();
         const after = this.db.serverStatus().metrics.indexBuilds;
-
-        assert.eq(after.keysProcessed, before.keysProcessed + 10 /*keys*/ * 2 /*phases*/);
-        assert.gte(
-            after.bytesProcessed,
-            before.bytesProcessed + 10 /*keys*/ * 4 /*bytesPerKey*/ * 2 /*phases*/,
-        );
+        assert.gt(after.phaseDurationMicros, during.phaseDurationMicros);
     });
 
     afterEach(() => {

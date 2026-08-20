@@ -781,8 +781,10 @@ private:
 
 /**
  * Records updates to the metrics tracking keys and key bytes processed during an index build's side
- * write drain process, directly incrementing the counters.
+ * write drain process, as well as time spent, directly incrementing the counters.
  */
-void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed, int64_t bytesProcessed);
+void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed,
+                                              int64_t bytesProcessed,
+                                              Microseconds durationMicros);
 
 }  // namespace mongo

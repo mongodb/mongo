@@ -468,7 +468,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.keysProcessed");
     static constexpr MetricName kIndexBuildBytesProcessed =
         MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.bytesProcessed");
-
+    static constexpr MetricName kIndexBuildPhasesDuration =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.phaseDurationMicros");
     static constexpr MetricName kIndexBuildDocsScanned =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.docsScanned");
     static constexpr MetricName kIndexBuildResumeSucceeded =

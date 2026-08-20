@@ -389,6 +389,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
     int64_t drainedBefore = 0;
     int64_t keysProcessedBefore = 0;
     int64_t bytesProcessedBefore = 0;
+    int64_t drainPhaseMicrosBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
     HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
@@ -399,6 +400,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
             std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         bytesProcessedBefore = capturer.readInt64Counter(
             otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        drainPhaseMicrosBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildPhasesDuration,
             std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         drainDurationBefore = readHistogramOrZero(
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
@@ -466,6 +470,10 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                       otel::metrics::MetricNames::kIndexBuildBytesProcessed,
                       std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
                   bytesProcessedBefore + keyString.getSize());
+        EXPECT_GT(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  drainPhaseMicrosBefore);
         const auto drainDurationAfter = capturer.readInt64Histogram(
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);
@@ -482,6 +490,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
     int64_t drainedBefore = 0;
     int64_t keysProcessedBefore = 0;
     int64_t bytesProcessedBefore = 0;
+    int64_t drainPhaseMicrosBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
     HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
@@ -492,6 +501,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
             std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         bytesProcessedBefore = capturer.readInt64Counter(
             otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        drainPhaseMicrosBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildPhasesDuration,
             std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
         drainDurationBefore = readHistogramOrZero(
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
@@ -576,6 +588,10 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                       otel::metrics::MetricNames::kIndexBuildBytesProcessed,
                       std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
                   bytesProcessedBefore + keyString.getSize());
+        EXPECT_GT(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                      std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                  drainPhaseMicrosBefore);
         const auto drainDurationAfter = capturer.readInt64Histogram(
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);

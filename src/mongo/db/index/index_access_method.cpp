@@ -150,17 +150,35 @@ auto& bytesProcessedCounter =
                                                    .role = ClusterRole::None},
             .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
 
+auto& indexBuildPhasesDurationCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+        "The cumulative amount of time spent during index build phases.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.phaseDurationMicros",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
 constexpr int32_t kMetricUpdateIntervalKeyCount = 1000;
 constexpr int32_t kMetricUpdateIntervalBytes = 1024 * 1024;  // 1 MiB
 
-inline void updateProcessedMetrics(int64_t* const keysCounted,
+inline void updateProcessedMetrics(std::string_view phase,
+                                   const Timer& timer,
+                                   int64_t* const keysCounted,
                                    int64_t* const bytesCounted,
-                                   IndexBuildPhaseEnum phase,
+                                   Microseconds* const durationLastUpdated,
                                    bool force = false) {
     if (force || *keysCounted >= kMetricUpdateIntervalKeyCount ||
         *bytesCounted >= kMetricUpdateIntervalBytes) {
-        keysProcessedCounter.add(*keysCounted, {idl::serialize(phase)});
-        bytesProcessedCounter.add(*bytesCounted, {idl::serialize(phase)});
+        keysProcessedCounter.add(*keysCounted, {phase});
+        bytesProcessedCounter.add(*bytesCounted, {phase});
+        auto timeElapsed = timer.elapsed();
+        indexBuildPhasesDurationCounter.add(
+            durationCount<Microseconds>(timeElapsed - *durationLastUpdated), {phase});
+        *durationLastUpdated = timeElapsed;
         *keysCounted = 0;
         *bytesCounted = 0;
     }
@@ -199,9 +217,13 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 auto& insertFailedDueToDuplicateKeyError =
     *MetricBuilder<Counter64>{"operation.insertFailedDueToDuplicateKeyError"};
 
-void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed, int64_t bytesProcessed) {
-    keysProcessedCounter.add(keysProcessed, {idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
-    bytesProcessedCounter.add(bytesProcessed, {idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed,
+                                              int64_t bytesProcessed,
+                                              Microseconds durationMicros) {
+    auto attr = std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)};
+    keysProcessedCounter.add(keysProcessed, attr);
+    bytesProcessedCounter.add(bytesProcessed, attr);
+    indexBuildPhasesDurationCounter.add(durationMicros.count(), attr);
 }
 
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
@@ -992,6 +1014,8 @@ protected:
 
     int64_t _keysInsertedCounted = 0;
     int64_t _bytesInsertedCounted = 0;
+    Timer _timer;
+    Microseconds _durationLastUpdated{0};
 
     SortedDataIndexAccessMethod* _iam;
 
@@ -1235,8 +1259,9 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
+    auto phase = idl::serialize(IndexBuildPhaseEnum::kCollectionScan);
     updateProcessedMetrics(
-        &_keysInsertedCounted, &_bytesInsertedCounted, IndexBuildPhaseEnum::kCollectionScan);
+        phase, _timer, &_keysInsertedCounted, &_bytesInsertedCounted, &_durationLastUpdated);
 
     setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
 
@@ -1250,8 +1275,12 @@ void BulkBuilderImpl::done(bool forceSpill) {
         _sorter->spill();
     }
     _sortedIterator = _sorter->done();
-    updateProcessedMetrics(
-        &_keysInsertedCounted, &_bytesInsertedCounted, IndexBuildPhaseEnum::kCollectionScan, true);
+    updateProcessedMetrics(idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                           _timer,
+                           &_keysInsertedCounted,
+                           &_bytesInsertedCounted,
+                           &_durationLastUpdated,
+                           true);
 }
 
 Status BulkBuilderImpl::commit(OperationContext* opCtx,
@@ -1271,6 +1300,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         ErrorCodes::BadValue, "onNKeysLoadedFnInterval must be >= 1", onNKeysLoadedFnInterval >= 1);
     tassert(12723201, "BulkBuilder::done must be called before commit", _sortedIterator);
     Timer timer;
+    auto phase = idl::serialize(IndexBuildPhaseEnum::kBulkLoad);
 
     _ns = entry->getNSSFromCatalog(opCtx);
     auto it = std::move(_sortedIterator);
@@ -1295,6 +1325,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     int64_t nKeys = 0;
     int64_t keysCounted = 0;
     int64_t bytesCounted = 0;
+    Microseconds durationLastUpdated{0};
 
     auto commitBatch = [&]() {
         if (batch.empty()) {
@@ -1311,7 +1342,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         bytesCounted += bytesInBatch;
         batch.clear();
         bytesInBatch = 0;
-        updateProcessedMetrics(&keysCounted, &bytesCounted, IndexBuildPhaseEnum::kBulkLoad);
+        updateProcessedMetrics(phase, timer, &keysCounted, &bytesCounted, &durationLastUpdated);
         if (nKeys >= onNKeysLoadedFnInterval) {
             onNKeysLoaded();
             nKeys = 0;
@@ -1319,7 +1350,8 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     };
 
     ON_BLOCK_EXIT([&] {
-        updateProcessedMetrics(&keysCounted, &bytesCounted, IndexBuildPhaseEnum::kBulkLoad, true);
+        updateProcessedMetrics(
+            phase, timer, &keysCounted, &bytesCounted, &durationLastUpdated, true);
     });
 
     while (it && it->more()) {
