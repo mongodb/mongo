@@ -29,6 +29,11 @@ let timestamps;
 
 const collNs = `test.${jsTestName()}`;
 
+// Disagg suites checkpoint every second under write load, and each checkpoint writes replicated
+// fast count entries to the oplog. Due to sanitizer overhead, a single populate attempt can take
+// more than 1s, making periodic checkpointing incompatible with the test.
+assert.commandWorked(conn.adminCommand({setParameter: 1, syncdelay: 0}));
+
 // Internal writers triggered by step-up (e.g. key generation, query analysis setup) may interleave
 // their oplog entries with ours, breaking the docsExamined expectations below. Retry until our
 // inserts form a contiguous window of oplog entries.
