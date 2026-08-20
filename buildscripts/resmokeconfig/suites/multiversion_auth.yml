@@ -19,9 +19,7 @@ selector:
     # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
 
-    # TODO SERVER-132954: this test exists only to cover the last-LTS < 9.0 coordination
-    # path and is documented (SERVER-94362) to be deleted once 9.0 becomes last LTS, which this
-    # version bump does.
+    # TODO SERVER-94362: now that last-LTS is 9.0, this test is obsolete and should be deleted
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/create_and_drop_database_multiversion_coordination.js
 
     # TODO SERVER-132998: this test pins oldVersion "8.0.16" and relies on it being an
@@ -44,11 +42,7 @@ selector:
     # so the downgrade no longer trips the v4 restriction and the CannotDowngrade expectation fails.
     - jstests/multiVersion/genericSetFCVUsage/s2_index_v4_downgrade.js
 
-    # TODO SERVER-132954: featureFlagEnableReplicasetTransitionToCSRS is FCV-gated at 8.3.
-    # The test starts a node at last-LTS FCV expecting the flag to be disabled, so that
-    # replicaSetConfigShardMaintenanceMode startup is incompatible and crashes. Now that last-LTS is
-    # 9.0 (>= 8.3), the flag is enabled at last-LTS, the node starts successfully, and the assert.throws
-    # expectation fails.
+    # TODO SERVER-109312: now that last-LTS is 9.0, this test is obsolete and should be deleted
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js
 
     # TODO SERVER-132998: featureFlagConvertObjectToBinData is FCV-gated at 9.0. The test
