@@ -390,13 +390,7 @@ public:
     }
 
     // The function adds up all iterator counts. Exp. runtime is O(N).
-    size_t computeSize() const {
-        // can't use _numFields because it includes removed Fields
-        size_t count = 0;
-        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())
-            count++;
-        return count;
-    }
+    size_t computeSize() const;
 
     /// Returns the position of the next field to be inserted
     Position getNextPosition() const {
@@ -505,6 +499,10 @@ public:
 
     auto bsonObjSize() const {
         return _bson.objsize();
+    }
+
+    bool bsonObjIsEmpty() const {
+        return _bson.isEmpty();
     }
 
     /**

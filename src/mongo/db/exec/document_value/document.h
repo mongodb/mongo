@@ -206,7 +206,17 @@ public:
 
     /// True if this document has no fields.
     bool empty() const {
-        return !_storage || storage().iterator().atEnd();
+        if (!_storage) {
+            return true;
+        }
+        // Fast path: an unmodified document has no cached fields other than mirrors of fields that
+        // are still in the backing BSON, so it is empty exactly when its BSON is. This avoids
+        // constructing a full DocumentStorageIterator. Documents whose BSON carries metadata are
+        // excluded because those fields are hidden from iteration but still counted by isEmpty().
+        if (!_storage->isModified() && !_storage->bsonHasMetadata()) {
+            return _storage->bsonObjIsEmpty();
+        }
+        return storage().iterator().atEnd();
     }
 
     /// Create a new FieldIterator that can be used to examine the Document's fields in order.

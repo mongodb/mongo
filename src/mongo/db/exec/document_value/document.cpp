@@ -124,6 +124,17 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
         if (_storage->bsonHasMetadata() && Document::isMetadataFieldName(fieldName)) {
             return true;
         }
+
+        // '_first == _end' means the cache holds no fields at all (both are null when nothing has
+        // been allocated yet). There is then no point in hashing the field name just to look it up
+        // and miss. Note that this has to be re-checked for every field rather than hoisted out of
+        // the iteration, because 'get()' can populate the cache part-way through.
+        if (_first == _end) {
+            // See the comment in the 'else' branch below for why this is set to nullptr.
+            _it = nullptr;
+            return false;
+        }
+
         // Check if the field is in the cache and if so then check if it has been deleted (i.e. the
         // val.missing() is true).
         if (auto pos = _storage->findFieldInCache(fieldName); pos.found()) {
@@ -377,6 +388,31 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     out->_snapshottedSize = _snapshottedSize;
 
     return out;
+}
+
+size_t DocumentStorage::computeSize() const {
+    size_t count = 0;
+
+    // When the storage is unmodified, every cache entry is a 'kCached' mirror of a field that is
+    // still present in '_bson': nothing has been inserted and nothing has been logically removed.
+    // (Fields are only ever inserted through 'appendField()', which marks the storage modified via
+    // the non-const 'getField(Position)' overload it returns through. 'constructInCache()' is the
+    // sole caller that deliberately saves and restores the flag around that.) The field count is
+    // therefore just the number of non-metadata fields in the backing BSON, which we can count
+    // without consulting the cache at all.
+    if (!_modified) {
+        for (auto&& elem : _bson) {
+            if (_bsonHasMetadata && Document::isMetadataFieldName(elem.fieldNameStringData())) {
+                continue;
+            }
+            ++count;
+        }
+    } else {
+        // can't use _numFields because it includes removed fields.
+        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())
+            count++;
+    }
+    return count;
 }
 
 size_t DocumentStorage::getMetadataApproximateSize() const {
