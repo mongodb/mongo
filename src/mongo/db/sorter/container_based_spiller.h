@@ -6,7 +6,6 @@
 #include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/container.h"
@@ -22,7 +21,6 @@
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <span>
@@ -33,6 +31,22 @@
 
 [[MONGO_MOD_PUBLIC]];
 namespace mongo::sorter {
+
+/**
+ * Callbacks to be run upon spilling, including merging spills.
+ */
+struct [[MONGO_MOD_OPEN]] SpillCallbacks {
+    virtual ~SpillCallbacks() = default;
+    // Run before performing any spilling.
+    virtual void preSpill() {}
+    // Run after completing spilling.
+    virtual void postSpill() {}
+    // Run after each spilled range is complete. While merging spills this happens before deleting
+    // the merged-from ranges.
+    virtual void onSpill() {}
+    // Run in between each batch boundary while spilling.
+    virtual void onSpillBatch() {}
+};
 
 template <typename Key, typename Value>
 class ContainerIterator : public Iterator<Key, Value> {
@@ -436,7 +450,7 @@ private:
 };
 
 template <typename Key, typename Value>
-class ContainerBasedStorage : public StorageBase<Key, Value> {
+class ContainerBasedStorage final : public StorageBase<Key, Value> {
 public:
     using Settings = StorageBase<Key, Value>::Settings;
 
@@ -528,19 +542,7 @@ private:
 template <typename Key, typename Value, typename Comparator>
 class ContainerBasedSpiller : public SpillerBase<Key, Value, Comparator> {
 public:
-    using SpillCallback = std::function<void()>;
-
-    /**
-     * Callbacks to be run upon spilling, including merging spills.
-     */
-    struct SpillCallbacks {
-        // Run before spilling or merging spills.
-        SpillCallback preSpill;
-        // Run after spilling. Run while merging spills before deleting the merged-from ranges.
-        SpillCallback onSpill;
-        // Run after spilling or merging spills.
-        SpillCallback postSpill;
-    };
+    using Settings = SpillerBase<Key, Value, Comparator>::Settings;
 
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
@@ -549,7 +551,7 @@ public:
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
-                          SpillCallbacks callbacks,
+                          std::unique_ptr<SpillCallbacks> callbacks,
                           int64_t batchSize,
                           int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
@@ -570,7 +572,7 @@ public:
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
-                          SpillCallbacks callbacks,
+                          std::unique_ptr<SpillCallbacks> callbacks,
                           int64_t batchSize,
                           int64_t batchBytes,
                           int64_t minAvailableDiskBytesToSpill)
@@ -587,7 +589,7 @@ public:
                                 minAvailableDiskBytesToSpill) {}
 
     void spill(const SortOptions& opts,
-               const SpillerBase<Key, Value, Comparator>::Settings& settings,
+               const Settings& settings,
                std::span<std::pair<Key, Value>> data) override {
         _runWithSpillCallbacks([&] {
             SpillerBase<Key, Value, Comparator>::spill(opts, settings, data);
@@ -596,7 +598,7 @@ public:
     }
 
     void mergeSpills(const SortOptions& opts,
-                     const SpillerBase<Key, Value, Comparator>::Settings& settings,
+                     const Settings& settings,
                      SorterStats& stats,
                      Comparator comp,
                      std::size_t numTargetedSpills,
@@ -619,7 +621,7 @@ public:
     // TODO SERVER-125808: Tighten the memory consumption bounds of container-based spillWithHeap().
     std::shared_ptr<sorter::Iterator<Key, Value>> spillWithHeap(
         const SortOptions& opts,
-        const SpillerBase<Key, Value, Comparator>::Settings& settings,
+        const Settings& settings,
         std::priority_queue<std::pair<Key, Value>,
                             std::vector<std::pair<Key, Value>>,
                             Greater<Key, Value, Comparator>>& heap) override {
@@ -629,41 +631,39 @@ public:
             data.push_back(heap.top());
             heap.pop();
         }
-        std::shared_ptr<sorter::Iterator<Key, Value>> result;
         // Using _spill() allows us to re-use the _current bookkeeping required by the
         // container-based spiller.
-        _runWithSpillCallbacks([&] { result = _spill(opts, settings, data)->done(); });
-        return result;
+        return _runWithSpillCallbacks([&] { return _spill(opts, settings, data)->done(); });
     }
 
 private:
-    void _runPreSpill() {
-        if (_callbacks.preSpill) {
-            _callbacks.preSpill();
-        }
-    }
-
     void _runOnSpill() {
-        if (_callbacks.onSpill) {
-            _callbacks.onSpill();
+        if (_callbacks) {
+            _callbacks->onSpill();
         }
     }
 
-    void _runPostSpill() {
-        if (_callbacks.postSpill) {
-            _callbacks.postSpill();
+    void _runOnSpillBatch() {
+        if (_callbacks) {
+            _callbacks->onSpillBatch();
         }
     }
 
     template <typename Fn>
-    void _runWithSpillCallbacks(Fn&& fn) {
-        _runPreSpill();
-        ScopeGuard postGuard([this] { _runPostSpill(); });
-        fn();
+    auto _runWithSpillCallbacks(Fn&& fn) {
+        if (_callbacks) {
+            _callbacks->preSpill();
+        }
+        ScopeGuard postGuard([this] {
+            if (_callbacks) {
+                _callbacks->postSpill();
+            }
+        });
+        return fn();
     }
 
     void _mergeSpills(const SortOptions& opts,
-                      const SpillerBase<Key, Value, Comparator>::Settings& settings,
+                      const Settings& settings,
                       SorterStats& stats,
                       Comparator comp,
                       std::size_t numTargetedSpills,
@@ -776,7 +776,7 @@ private:
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
-        const SpillerBase<Key, Value, Comparator>::Settings& settings,
+        const Settings& settings,
         std::span<std::pair<Key, Value>> data) override {
 
         auto writer = this->_storage->makeWriter(opts, settings);
@@ -794,6 +794,10 @@ private:
                         containerWriter.addAlreadySortedBatch(batch, _batchBytes).kvPairsWritten;
                     wuow.commit();
                 });
+
+            if (i + lastBatchSize < data.size()) {
+                _runOnSpillBatch();
+            }
         }
 
         _current += data.size();
@@ -804,7 +808,7 @@ private:
 
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
-    SpillCallbacks _callbacks;
+    std::unique_ptr<SpillCallbacks> _callbacks;
     int64_t _batchSize;
     int64_t _batchBytes;
     int64_t _current;

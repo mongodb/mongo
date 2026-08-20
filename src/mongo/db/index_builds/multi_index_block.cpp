@@ -95,6 +95,7 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSpillBeforeStatePersisted);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildSpillYield);
 
 namespace {
 
@@ -184,10 +185,6 @@ DataThrottle makeBulkLoadContainerWriteThrottle(OperationContext* opCtx) {
     });
 }
 
-using SpillCallbacks = sorter::ContainerBasedSpiller<key_string::Value,
-                                                     mongo::NullValue,
-                                                     BtreeExternalSortComparison>::SpillCallbacks;
-
 std::shared_ptr<sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
 makeSpiller(OperationContext* opCtx,
             const IndexCatalogEntry* entry,
@@ -196,7 +193,7 @@ makeSpiller(OperationContext* opCtx,
             SorterContainerStats& containerStats,
             const DatabaseName& dbName,
             ContainerWriteBehavior containerWriteBehavior,
-            SpillCallbacks callbacks) {
+            std::unique_ptr<sorter::SpillCallbacks> callbacks) {
     if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         return stateInfo && stateInfo->getRanges() && !stateInfo->getRanges()->empty()
             ? std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
@@ -228,8 +225,8 @@ makeSpiller(OperationContext* opCtx,
                   primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
                   static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
-    invariant(!callbacks.preSpill && !callbacks.onSpill && !callbacks.postSpill);
 
+    invariant(!callbacks);
     using FileBasedSpiller =
         sorter::FileBasedSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
@@ -560,34 +557,65 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
-            SpillCallbacks spillCallbacks;
+            struct ContainerSpillYielder final : public sorter::SpillCallbacks {
+                ContainerSpillYielder(OperationContext* opCtx,
+                                      MultiIndexBlock& block,
+                                      boost::optional<RecordId>& lastSpilledRecordId,
+                                      size_t i)
+                    : opCtx(opCtx), block(block), lastSpilledRecordId(lastSpilledRecordId), i(i) {}
+
+                void preSpill() override {
+                    if (!block._exec) {
+                        return;
+                    }
+                    block._objToIndex = block._objToIndex.getOwned();
+                    block._exec->saveState();
+                }
+
+                void onSpill() override {
+                    hangAfterIndexBuildSpillBeforeStatePersisted.pauseWhileSet();
+                    block._anyIndexSpilled = true;
+                    lastSpilledRecordId = block._lastRecordIdInserted;
+                    if (block._isResumable) {
+                        block._writeIndexStateInfoToContainer(opCtx, i);
+                    }
+                }
+
+                void postSpill() override {
+                    if (!block._exec || interrupted) {
+                        return;
+                    }
+                    block._exec->restoreState(nullptr);
+                }
+
+                void onSpillBatch() override {
+                    interrupted = true;
+                    auto resources = yieldTransactionResourcesFromOperationContext(opCtx);
+
+                    CurOp::get(opCtx)->yielded();
+
+                    try {
+                        hangDuringIndexBuildSpillYield.pauseWhileSet(opCtx);
+                    } catch (...) {
+                        resources.transitionTransactionResourcesToFailedState(opCtx);
+                        throw;
+                    }
+
+                    restoreTransactionResourcesToOperationContext(opCtx, std::move(resources));
+                    interrupted = false;
+                }
+
+                OperationContext* opCtx;
+                MultiIndexBlock& block;
+                boost::optional<RecordId>& lastSpilledRecordId;
+                size_t i;
+                bool interrupted = false;
+            };
+
+            std::unique_ptr<sorter::SpillCallbacks> spillCallbacks;
             if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-                spillCallbacks = {
-                    .preSpill =
-                        [this] {
-                            if (!_exec) {
-                                return;
-                            }
-                            _objToIndex = _objToIndex.getOwned();
-                            _exec->saveState();
-                        },
-                    .onSpill =
-                        [this, opCtx, i, &lastSpilledRecordId = index.lastSpilledRecordId] {
-                            hangAfterIndexBuildSpillBeforeStatePersisted.pauseWhileSet();
-                            _anyIndexSpilled = true;
-                            lastSpilledRecordId = _lastRecordIdInserted;
-                            if (_isResumable) {
-                                _writeIndexStateInfoToContainer(opCtx, i);
-                            }
-                        },
-                    .postSpill =
-                        [this] {
-                            if (!_exec) {
-                                return;
-                            }
-                            _exec->restoreState(nullptr);
-                        },
-                };
+                spillCallbacks = std::make_unique<ContainerSpillYielder>(
+                    opCtx, *this, index.lastSpilledRecordId, i);
             }
             index.bulk = index.real->initiateBulk(opCtx,
                                                   collection.get(),
@@ -824,7 +852,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                             index.real->getSorterContainerStats(),
                             collection->nss().dbName(),
                             _containerWriteBehavior,
-                            SpillCallbacks{}),
+                            nullptr),
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
                 collection->nss().dbName(),

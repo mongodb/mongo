@@ -3,9 +3,6 @@
 
 #pragma once
 
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"

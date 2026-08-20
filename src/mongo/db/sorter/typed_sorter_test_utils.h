@@ -267,18 +267,17 @@ private:
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
         auto owner = std::make_shared<SpillerOwner<K2, V2, C2>>(SpillerOwner<K2, V2, C2>{
             .table = std::move(table),
-            .spiller = ContainerBasedSpiller<K2, V2, C2>(
-                *_opCtx,
-                ru,
-                container,
-                startingKey,
-                _containerStats,
-                boost::none,
-                checksumVersion,
-                typename ContainerBasedSpiller<K2, V2, C2>::SpillCallbacks{},
-                kInsertionBatchSize,
-                std::numeric_limits<int64_t>::max(),
-                testSpillingMinAvailableDiskSpaceBytes),
+            .spiller = ContainerBasedSpiller<K2, V2, C2>(*_opCtx,
+                                                         ru,
+                                                         container,
+                                                         startingKey,
+                                                         _containerStats,
+                                                         boost::none,
+                                                         checksumVersion,
+                                                         nullptr,
+                                                         kInsertionBatchSize,
+                                                         std::numeric_limits<int64_t>::max(),
+                                                         testSpillingMinAvailableDiskSpaceBytes),
         });
         return std::shared_ptr<Spiller<K2, V2, C2>>(owner, &owner->spiller);
     }
