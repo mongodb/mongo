@@ -2,7 +2,6 @@
  * Utilities for shard versioning testing.
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export var ShardVersioningUtil = (function () {
@@ -105,28 +104,6 @@ export var ShardVersioningUtil = (function () {
     };
 
     /*
-     * Moves the chunk that matches the given query to toShard. Forces the recipient to skip the
-     * metadata refresh post-migration commit.
-     *
-     * TODO (SERVER-129875): Analyze all usages of this function and determine if we need to add a
-     * similar failpoint for the donor when the shard is authoritative.
-     */
-    let moveChunkNotRefreshRecipient = function (mongos, ns, fromShard, toShard, findQuery) {
-        let failPoint = configureFailPoint(toShard, "migrationRecipientFailPostCommitRefresh");
-
-        assert.commandWorked(
-            mongos.adminCommand({
-                moveChunk: ns,
-                find: findQuery,
-                to: toShard.shardName,
-                _waitForDelete: true,
-            }),
-        );
-
-        failPoint.off();
-    };
-
-    /*
      * Reproduces a stale-routing scenario by leaving a *router* stale rather than a shard. A shard
      * can never be ignorant of its own filtering metadata under authoritative shards (the migration
      * installs it directly on both shards at commit), so the only remaining legitimate source of
@@ -225,7 +202,6 @@ export var ShardVersioningUtil = (function () {
         assertCollectionVersionEquals,
         assertCollectionVersionOlderThan,
         assertShardVersionEquals,
-        moveChunkNotRefreshRecipient,
         runOperationOnStaleRouterAfterMoveChunk,
         getDbVersion,
     };
