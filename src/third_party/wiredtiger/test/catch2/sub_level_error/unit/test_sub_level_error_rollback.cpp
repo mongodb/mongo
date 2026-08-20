@@ -195,6 +195,63 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         session_impl->txn->mod_count = 0;
     }
 
+    SECTION("Test WT_TXN_TOO_LARGE_FOR_CACHE in __wt_txn_is_blocking - dirty content footprint")
+    {
+        WT_TXN *txn = session_impl->txn;
+
+        // Pick a threshold of 100 bytes: the lower of the two triggers is 10% of the cache size.
+        conn_impl->cache_size = 1000;
+        conn_impl->evict->eviction_dirty_trigger = 20;
+        conn_impl->evict->eviction_updates_trigger = 10;
+
+        // The check requires a modification, otherwise a reader could be rolled back.
+        txn->mod_count = 1;
+
+        // A footprint at or below the threshold is not grounds for rollback.
+        txn->update_dirty_bytes = 60;
+        txn->truncate_dirty_bytes = 40;
+        CHECK(__wt_txn_is_blocking(session_impl) == 0);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+
+        // Neither half exceeds the threshold alone, but together they do. The updates half is the
+        // larger one, so the rollback is reported as a transaction that wrote too much.
+        txn->update_dirty_bytes = 60;
+        txn->truncate_dirty_bytes = 41;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Transaction dirty content alone exceeds the eviction updates or dirty trigger");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // Same condition and sub-error code, but now the truncate half dominates, so the rollback
+        // is attributed to the truncate instead.
+        txn->update_dirty_bytes = 41;
+        txn->truncate_dirty_bytes = 60;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Truncate pinned too much dirty cache in the transaction");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // A truncate footprint on its own is enough to trip the bound.
+        txn->update_dirty_bytes = 0;
+        txn->truncate_dirty_bytes = 101;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Truncate pinned too much dirty cache in the transaction");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // A zero trigger is treated as a value we raced with, not a threshold to enforce.
+        conn_impl->evict->eviction_updates_trigger = 0;
+        CHECK(__wt_txn_is_blocking(session_impl) == 0);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+
+        // Reset to the initial values.
+        txn->update_dirty_bytes = txn->truncate_dirty_bytes = 0;
+        txn->mod_count = 0;
+    }
+
     SECTION(
       "Test WT_MODIFY_READ_UNCOMMITTED in __wt_modify_reconstruct_from_upd_list - reader with "
       "uncommitted isolation")

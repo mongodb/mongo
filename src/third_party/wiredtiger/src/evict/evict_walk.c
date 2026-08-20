@@ -1218,7 +1218,7 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
      * Since there is no history store for metadata, we won't be able to serve an older reader if we
      * evict this page.
      */
-    if (WT_IS_METADATA(session->dhandle) && F_ISSET(evict, WT_EVICT_CACHE_CLEAN_HARD) &&
+    if (WT_IS_ANY_METADATA(session->dhandle) && F_ISSET(evict, WT_EVICT_CACHE_CLEAN_HARD) &&
       F_ISSET(ref, WT_REF_FLAG_LEAF) && !modified && page->modify != NULL &&
       !__wt_txn_visible_all(session, page->modify->rec_max_txn, page->modify->rec_max_timestamp)) {
         WT_STAT_CONN_INCR(session, eviction_server_skip_metatdata_with_history);
@@ -1249,6 +1249,22 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
     /* Evaluate dirty page candidacy, when eviction is not aggressive. */
     if (!__wt_evict_aggressive(session) && modified && __evict_skip_dirty_candidate(session, page))
         return;
+
+    /*
+     * An outdated-disagg page that is not clean-evictable is ignored for queuing. Unlike ordinary
+     * pages, whose content remains readable from storage after eviction, this page's content cannot
+     * be reproduced once discarded: it belongs to an outdated checkpoint that shared storage no
+     * longer serves. A reader positioned elsewhere on this tree may still navigate back to it, so
+     * any reader on the tree, not just one holding this page, must be treated as blocking eviction;
+     * that tree-wide state is tracked by session_inuse rather than this page's own hazard pointer.
+     * The walk itself holds one session_inuse reference on the tree it is currently visiting, so a
+     * genuine external reader shows up as a count greater than one.
+     */
+    if (__wt_btree_is_outdated_disagg(session) && !__wt_page_evict_clean(page) &&
+      __wt_atomic_load_int32_relaxed(&session->dhandle->session_inuse) > 1) {
+        WT_STAT_CONN_INCR(session, eviction_server_skip_stale_disagg_pages);
+        return;
+    }
 
 fast:
     /* If the page can't be evicted, give up. */

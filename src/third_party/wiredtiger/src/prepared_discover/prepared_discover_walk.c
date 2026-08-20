@@ -445,8 +445,8 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
 
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &uri));
-        /* Only interested in btree handles that aren't the metadata */
-        if (!WT_BTREE_PREFIX(uri) || strcmp(uri, WT_METAFILE_URI) == 0)
+        /* Only interested in btree handles that aren't a metadata tree */
+        if (!WT_BTREE_PREFIX(uri) || WT_IS_URI_METADATA(uri))
             continue;
         WT_ERR_NOTFOUND_OK(cursor->get_value(cursor, &config), true);
         if (ret == WT_NOTFOUND)

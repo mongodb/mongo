@@ -783,8 +783,7 @@ class test_layered_follower21(wttest.WiredTigerTestCase):
         # snapshot the node happens to hold, including the ones the adoption itself takes, defers
         # the delivery to the server, so wait for it before reading.
         self.session.checkpoint()
-        self.disagg_advance_checkpoint(conn_follow)
-        self.disagg_wait_for_adoption(conn_follow)
+        self.disagg_advance_checkpoint_and_wait(conn_follow)
 
         session = conn_follow.open_session('')
         session.begin_transaction()

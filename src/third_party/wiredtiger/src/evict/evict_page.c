@@ -474,7 +474,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
      * from the gate: its disk image is fully described by the page's address, so it can be re-read
      * from storage and eviction may discard it normally even with readers present.
      */
-    if (__wt_btree_is_stale_disagg(session) && !__wt_page_evict_clean(page)) {
+    if (__wt_btree_is_outdated_disagg(session) && !__wt_page_evict_clean(page)) {
         if (__wt_atomic_load_int32_relaxed(&session->dhandle->session_inuse) > 0) {
             ret = __wt_set_return(session, EBUSY);
             goto err;
@@ -535,13 +535,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_internal);
 
     /*
-     * Figure out whether reconciliation was done on the page. A stale disaggregated page has had
-     * its dirty flag cleared above, but a non-zero reconciliation result left over from the leader
-     * era keeps the clean check false and would route the page to a dirty split that can never
-     * write back to shared storage. Force clean eviction so the page is discarded instead of
+     * Figure out whether reconciliation was done on the page. An outdated disaggregated page has
+     * had its dirty flag cleared above, but a non-zero reconciliation result left over from the
+     * leader era keeps the clean check false and would route the page to a dirty split that can
+     * never write back to shared storage. Force clean eviction so the page is discarded instead of
      * trapped in cache.
      */
-    if (__wt_page_evict_clean(page) || __wt_btree_is_stale_disagg(session)) {
+    if (__wt_page_evict_clean(page) || __wt_btree_is_outdated_disagg(session)) {
         evict_clean = true;
         FLD_SET(stats_flags, WT_EVICT_STATS_CLEAN);
     }

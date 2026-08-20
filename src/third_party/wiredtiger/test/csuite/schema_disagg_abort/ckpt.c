@@ -64,8 +64,29 @@ ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session)
 }
 
 /*
+ * ckpt_lsn_stat --
+ *     Return one of the connection's checkpoint metadata LSN statistics.
+ */
+static uint64_t
+ckpt_lsn_stat(WT_SESSION *session, int stat_key)
+{
+    WT_CURSOR *stat_cursor;
+    testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &stat_cursor));
+    stat_cursor->set_key(stat_cursor, stat_key);
+    testutil_check(stat_cursor->search(stat_cursor));
+
+    int64_t value;
+    const char *desc, *pvalue;
+    testutil_check(stat_cursor->get_value(stat_cursor, &desc, &pvalue, &value));
+    testutil_check(stat_cursor->close(stat_cursor));
+
+    return ((uint64_t)value);
+}
+
+/*
  * ckpt_adopt_latest --
- *     Adopt the latest complete checkpoint.
+ *     Adopt the latest checkpoint before stepping up. A pick-up can be deferred, and stepping up
+ *     discards a pending deferral, so wait for the adopted LSN to catch up with the delivered one.
  */
 void
 ckpt_adopt_latest(WORKLOAD_STATE *state)
@@ -75,7 +96,26 @@ ckpt_adopt_latest(WORKLOAD_STATE *state)
     WT_SESSION *session;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    (void)ckpt_pick_up(state, session);
+    struct timespec start;
+    __wt_epoch(NULL, &start);
+    for (;;) {
+        (void)ckpt_pick_up(state, session);
+
+        const uint64_t delivered =
+          ckpt_lsn_stat(session, WT_STAT_CONN_DISAGG_CHECKPOINT_DELIVERED_LSN);
+        const uint64_t adopted = ckpt_lsn_stat(session, WT_STAT_CONN_DISAGG_CHECKPOINT_META_LSN);
+        if (adopted >= delivered)
+            break;
+
+        struct timespec now;
+        __wt_epoch(NULL, &now);
+        if (WT_TIMEDIFF_SEC(now, start) > MAX_OP_WAIT)
+            testutil_die(ETIMEDOUT,
+              "Node %" PRIu32 ": checkpoint metadata LSN %" PRIu64
+              " not adopted in %d seconds, stalled at %" PRIu64,
+              state->cfg->node_id, delivered, MAX_OP_WAIT, adopted);
+        __wt_sleep(0, 10 * WT_THOUSAND);
+    }
 
     testutil_check(session->close(session, NULL));
 
@@ -219,11 +259,11 @@ follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 {
     WT_UNUSED(ckpt);
 
+    /* Adopted LSN is 0 until a checkpoint is picked up, so read it before the pick-up. */
+    const bool first_ckpt = state->adopted_ckpt_lsn == 0;
+
     if (!ckpt_pick_up(state, session))
         return;
-
-    /* Adopted LSN is 0 at the beginning. */
-    const bool first_ckpt = state->adopted_ckpt_lsn == 0;
 
     /* Each adoption is reported for a stepping-down peer. */
     adopted_lsn_publish(state->cfg->node_id, state->adopted_ckpt_lsn);

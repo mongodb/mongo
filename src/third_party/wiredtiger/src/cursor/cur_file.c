@@ -1200,7 +1200,11 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __wt_version_gte(S2C(session)->compat_version, WT_LOG_V2_VERSION))
         cursor->modify = __curfile_modify;
 
-    /* Cursors on metadata should not be cached, doing so interferes with named checkpoints. */
+    /*
+     * Cursors on metadata should not be cached, doing so interferes with named checkpoints. The
+     * shared metadata is cached instead: it has no per-session cursor of its own and a cursor is
+     * opened and closed for every key it writes.
+     */
     if (cacheable && strcmp(WT_METAFILE_URI, cursor->internal_uri) != 0)
         F_SET(cursor, WT_CURSTD_CACHEABLE);
 

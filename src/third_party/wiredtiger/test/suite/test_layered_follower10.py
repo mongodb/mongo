@@ -142,8 +142,7 @@ class test_layered_follower10(wttest.WiredTigerTestCase):
         # Now eviction should remove all the items from the ingest table, but it can't
         # until we pick up another checkpoint.
         self.session.checkpoint()
-        self.disagg_advance_checkpoint(conn_follow)
-        self.disagg_wait_for_adoption(conn_follow)
+        self.disagg_advance_checkpoint_and_wait(conn_follow)
 
         self.evict_ingest(session_follow, ts)
         count = self.count_ingest(session_follow)
@@ -240,8 +239,7 @@ class test_layered_follower10(wttest.WiredTigerTestCase):
 
         # Trigger advance checkpoint code again to set the prune timestamp to the last
         # checkpoint timestamp. We couldn't do that because there was a cursor holding the old content.
-        self.disagg_advance_checkpoint(conn_follow)
-        self.disagg_wait_for_adoption(conn_follow)
+        self.disagg_advance_checkpoint_and_wait(conn_follow)
 
         # Now eviction should remove all the items from the ingest table.
         self.evict_ingest(session_follow, ts)
@@ -296,8 +294,7 @@ class test_layered_follower10(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Pickup the last checkpoint and perform the final garbage collection
-        self.disagg_advance_checkpoint(conn_follow)
-        self.disagg_wait_for_adoption(conn_follow)
+        self.disagg_advance_checkpoint_and_wait(conn_follow)
 
         # Now eviction should remove all the items from the ingest table.
         self.evict_ingest(session_follow, ts)
@@ -328,8 +325,7 @@ class test_layered_follower10(wttest.WiredTigerTestCase):
         oplog.check(self, session_follow, 0, self.nitems)
 
         # Take a checkpoint and advance it, make sure everything is garbage collected
-        self.disagg_advance_checkpoint(conn_follow)
-        self.disagg_wait_for_adoption(conn_follow)
+        self.disagg_advance_checkpoint_and_wait(conn_follow)
         oplog.check(self, session_follow, 0, self.nitems)
 
         # Now eviction should remove all the items from the ingest table.

@@ -89,8 +89,11 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
+    WT_PAGE *parent;
     WT_REF_STATE previous_state;
+    size_t footprint;
     WT_BTREE *btree = S2BT(session);
+    bool parent_was_clean;
 
     *skipp = false;
 
@@ -179,6 +182,11 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * This action dirties the parent page: mark it dirty now, there's no future reconciliation of
      * the child leaf page that will dirty it as we write the tree.
      */
+    parent = ref->home;
+
+    /* If we are the first to dirty the parent, this truncate pulled it into dirty cache. */
+    parent_was_clean = !__wt_page_is_modified(parent);
+
     WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
     /*
@@ -205,7 +213,40 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
     /* Set the page to its new state. */
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
-    return (0);
+
+    /*
+     * A newly dirtied parent internal page stays pinned until the truncate is stable. Account for
+     * it and let the transaction's cache-pressure check roll the truncate back if it has pinned too
+     * much; the delete just performed unwinds normally on rollback.
+     *
+     * Skipped for the history store, whose truncation is non-transactional: there would be no
+     * transaction to bound, and none to resolve and give back the bytes counted below.
+     */
+    if (parent_was_clean && !WT_IS_HS(session->dhandle)) {
+        footprint = __wt_atomic_load_size_relaxed(&parent->memory_footprint);
+        session->txn->truncate_dirty_bytes += footprint;
+
+        /*
+         * These pages are dirty content the transaction has not resolved, tracked separately from
+         * update content: a truncate creates no updates.
+         */
+        WT_STAT_CONN_INCRV_ATOMIC(
+          session, cache_truncate_txn_uncommitted_bytes, (int64_t)footprint);
+        WT_STAT_SESSION_INCRV(session, txn_truncate_bytes_dirty, (int64_t)footprint);
+        WT_STAT_SESSION_INCRV(session, txn_bytes_dirty, (int64_t)footprint);
+
+        /*
+         * The delete is complete and registered as a transaction operation, so transaction rollback
+         * frees page_del and restores the ref: return directly rather than through the error path
+         * below.
+         */
+        ret = __wt_txn_is_blocking(session);
+        if (ret == WT_ROLLBACK)
+            __wt_verbose_warning(session, WT_VERB_TRANSACTION, "%s",
+              "rolling back a truncate that is pinning too much dirty cache");
+    }
+
+    return (ret);
 
 err:
     __wt_free(session, ref->page_del);

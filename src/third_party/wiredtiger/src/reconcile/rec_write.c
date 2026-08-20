@@ -155,7 +155,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
 
     /* Can't do history store eviction for history store itself or for metadata. */
     WT_ASSERT(session,
-      !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle)));
+      !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree->dhandle) && !WT_IS_ANY_METADATA(btree->dhandle)));
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(btree);
 
@@ -980,7 +980,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
      */
     r->hs_clear_on_tombstone = F_ISSET(r, WT_REC_HS) &&
       !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
+      !WT_IS_ANY_METADATA(btree->dhandle);
 
 /*
  * If we allocated the reconciliation structure and there was an error, clean up. If our caller

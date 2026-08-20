@@ -38,9 +38,9 @@ static bool
 parse_record_uri(
   const char *rec_uri, uint32_t node, uint32_t t, uint32_t pool_size, uint32_t *slotp)
 {
-    uint32_t n2, s, t2;
+    uint32_t g, n2, s, t2;
 
-    if (sscanf(rec_uri, SCHEMA_TABLE_FMT, &n2, &t2, &s) != 3 || n2 != node || t2 != t ||
+    if (sscanf(rec_uri, SCHEMA_TABLE_FMT, &n2, &t2, &s, &g) != 4 || n2 != node || t2 != t ||
       s >= pool_size)
         return (false);
     *slotp = s;

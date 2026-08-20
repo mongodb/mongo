@@ -274,7 +274,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
     }
 
     /* Append the new entry into the update list. */
-    WT_RELEASE_WRITE_WITH_BARRIER(upd->next, append);
+    __wt_atomic_store_ptr_release(&upd->next, append);
 
     __wt_cache_page_inmem_incr(session, page, total_size, false);
 
@@ -1064,8 +1064,8 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
             continue;
         }
-        /* Give up if the update is from this transaction and on the metadata file. */
-        if (WT_IS_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
+        /* Give up if the update is from this transaction and on a metadata tree. */
+        if (WT_IS_ANY_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
           upd->txnid == session_txnid)
             return (__wt_set_return(session, EBUSY));
         /* Track the first update in the chain that is not aborted */
@@ -1601,7 +1601,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * checkpoint in a concurrent session.
      */
     WT_ASSERT_ALWAYS(session,
-      !WT_IS_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
+      !WT_IS_ANY_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
         upd->txnid !=
           __wt_atomic_load_uint64_v_relaxed(&S2C(session)->txn_global.checkpoint_txn_shared.id) ||
         WT_SESSION_IS_CHECKPOINT(session),

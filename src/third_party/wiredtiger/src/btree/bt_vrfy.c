@@ -613,7 +613,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
      * - the debug flag is set where we do not clear the record's txn IDs. Visibility rules may not
      * work correctly when we do not clear the record's txn IDs.
      */
-    skip_hs = strcmp(name, WT_METAFILE_URI) == 0 || WT_IS_URI_HS(name) ||
+    skip_hs = WT_IS_URI_METADATA(name) || WT_IS_URI_HS(name) ||
       F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID);
 
     /* Loop through the file's checkpoints, verifying each one. */
@@ -1256,11 +1256,13 @@ __verify_row_int_key_order(
     btree = S2BT(session);
 
     /*
-     * The maximum key is usually set from the leaf page first. If the first leaf page is corrupted,
-     * it is possible that the key is not set. In that case skip this check.
+     * The maximum key is usually set from the leaf page first. It can legitimately be unset here:
+     * the first leaf page is corrupted, or every leaf visited so far rebuilt from a base image and
+     * deltas with all of its keys dropped as globally visible deletes. In either case there is
+     * nothing to compare against, and the comparison below is skipped.
      */
     if (!vs->verify_err)
-        WT_ASSERT(session, vs->max_addr->size != 0);
+        WT_ASSERT(session, vs->max_addr->size != 0 || WT_DELTA_LEAF_ENABLED(session));
 
     /* Get the parent page's internal key. */
     __wt_ref_key(parent, ref, &item.data, &item.size);
@@ -1305,7 +1307,9 @@ __verify_row_leaf_key_order(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs
     page = ref->page;
 
     /*
-     * If a tree is empty (just created), it won't have keys; if there are no keys, we're done.
+     * A page has no keys when the tree is empty (just created), or when it was rebuilt from a base
+     * image and deltas and the merge dropped every key whose stop is globally visible. Either way
+     * there is nothing to compare, and the largest key we've seen so far stands.
      */
     if (page->entries == 0)
         return (0);

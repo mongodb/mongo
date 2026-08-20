@@ -77,7 +77,11 @@
 /* URI / file name patterns; tables and record files are namespaced by owning node. */
 #define DATA_KEY_MIN 0
 #define DATA_KEY_MAX 9
-#define SCHEMA_TABLE_FMT "table:schema_%" PRIu32 "_%" PRIu32 "_%" PRIu32 /* node, thread, slot */
+/*
+ * node, thread, slot, generation. The generation stays zero unless -q asks for unique table names,
+ * so the name is the slot's whatever the mode, and the verifier parses one format either way.
+ */
+#define SCHEMA_TABLE_FMT "table:schema_%" PRIu32 "_%" PRIu32 "_%" PRIu32 "_%" PRIu32
 
 /*
  * Per-node, per-thread record files: "<records dir>/node<node>-<role>-<thread>", named for the role
@@ -162,6 +166,8 @@ typedef struct {
     char page_log_home[PATH_MAX];
     uint32_t nth;
     uint32_t pool_size;
+    /* FIXME-WT-18403: Remove -q once all the known create/drop/create issues are gone. */
+    bool unique_tables;               /* -q: never reuse a table name */
     uint32_t total_time;              /* -t: graceful stop after this many seconds */
     uint32_t switch_interval;         /* -s: switch roles every N seconds; 0: never */
     uint32_t kill_time[KILL_TARGETS]; /* -k [l|f]N: SIGKILL the target at N; 0: never */
@@ -239,6 +245,8 @@ typedef struct {
         uint64_t completed_ts; /* the latest published or committed timestamp; atomic access */
         /* Table state is carried across leader-follower transitions. */
         TABLE_STATE table_state[MAX_POOL_SIZE];
+        /* Advanced by every create under -q, so a slot's table name is never reused. */
+        uint32_t slot_gen[MAX_POOL_SIZE];
         /* Slot took an insert while stepping down; not droppable until the step-down completes. */
         bool stepdown_insert[MAX_POOL_SIZE];
     } workers[MAX_TH];

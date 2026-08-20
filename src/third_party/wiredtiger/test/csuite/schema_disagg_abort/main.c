@@ -130,7 +130,7 @@ usage(void)
 {
     fprintf(stderr,
       "usage: %s [-b build-dir] [-h dir] [-k [l|f]N] [-p] [-r l|f|lf] [-s N] [-T threads] "
-      "[-t time] [-u pool] [-v]\n",
+      "[-t time] [-q] [-u pool] [-v]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-b build directory (required for PALite extension)\n"
@@ -142,6 +142,7 @@ usage(void)
       "\t-s switch roles every N seconds\n"
       "\t-T number of schema threads\n"
       "\t-t total run time in seconds; the nodes stop gracefully unless killed\n"
+      "\t-q give every create a fresh table name, so no name is ever reused\n"
       "\t-u URI pool size per thread\n"
       "\t-v verify only\n");
     exit(EXIT_FAILURE);
@@ -225,10 +226,10 @@ parse_args(TEST_CONFIG *cfg, int argc, char *argv[], bool *rand_thp, bool *rand_
 
     *rand_thp = *rand_timep = true;
 
-    testutil_parse_begin_opt(argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:", cfg->opts);
+    testutil_parse_begin_opt(argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:q", cfg->opts);
 
     int ch;
-    while ((ch = __wt_getopt(progname, argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "A:b:h:i:k:pP:r:R:s:t:T:u:vW:q")) != EOF)
         switch (ch) {
         case 'A':
             if (strcmp(__wt_optarg, "l") == 0)
@@ -260,6 +261,9 @@ parse_args(TEST_CONFIG *cfg, int argc, char *argv[], bool *rand_thp, bool *rand_
         case 'T':
             *rand_thp = false;
             cfg->nth = parse_uint_in_range(__wt_optarg, 1, MAX_TH, "Thread count");
+            break;
+        case 'q':
+            cfg->unique_tables = true;
             break;
         case 'u':
             pool_size_set = true;

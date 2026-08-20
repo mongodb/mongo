@@ -2210,6 +2210,8 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server skips ingest btrees in disagg",
   "cache: eviction server skips internal pages as it has an active child",
   "cache: eviction server skips metadata pages with history",
+  "cache: eviction server skips pages on an outdated disaggregated read-only btree that a reader "
+  "still has open",
   "cache: eviction server skips pages that are written with transactions greater than the "
   "checkpoint timestamp",
   "cache: eviction server skips pages that are written with transactions greater than the last "
@@ -2380,6 +2382,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages currently held in the cache",
   "cache: pages currently held in the cache from the ingest btrees",
   "cache: pages currently held in the cache from the stable btrees",
+  "cache: pages dirtied by fast-truncate in uncommitted txn - bytes",
   "cache: pages dirtied due to obsolete time window by eviction",
   "cache: pages evicted ahead of the page materialization frontier",
   "cache: pages evicted in parallel with checkpoint",
@@ -3152,6 +3155,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transactions rolled back",
   "transaction: transactions rolled back because their own dirty content exceeds the eviction "
   "updates or dirty trigger",
+  "transaction: truncate operations rolled back because they pinned too much dirty cache",
   "transaction: update conflicts",
   "transaction: write transactions rolled back for straddling the step-down timestamp setting "
   "boundary",
@@ -3359,6 +3363,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_server_skip_ingest_trees = 0;
     stats->eviction_server_skip_intl_page_with_active_child = 0;
     stats->eviction_server_skip_metatdata_with_history = 0;
+    stats->eviction_server_skip_stale_disagg_pages = 0;
     stats->eviction_server_skip_pages_checkpoint_timestamp = 0;
     stats->eviction_server_skip_pages_last_running = 0;
     stats->eviction_server_skip_pages_prune_timestamp = 0;
@@ -3510,6 +3515,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing cache_pages_inuse */
     /* not clearing cache_pages_inuse_ingest */
     /* not clearing cache_pages_inuse_stable */
+    /* not clearing cache_truncate_txn_uncommitted_bytes */
     stats->cache_eviction_dirty_obsolete_tw = 0;
     stats->cache_eviction_ahead_of_last_materialized_lsn = 0;
     stats->eviction_pages_in_parallel_with_checkpoint = 0;
@@ -4259,6 +4265,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_commit = 0;
     stats->txn_rollback = 0;
     stats->txn_rollback_too_large_for_cache = 0;
+    stats->txn_truncate_dirty_cache_rollback = 0;
     stats->txn_update_conflict = 0;
     stats->txn_rollback_stepdown = 0;
 }
@@ -4494,6 +4501,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, eviction_server_skip_intl_page_with_active_child);
     to->eviction_server_skip_metatdata_with_history +=
       WT_STAT_CONN_READ(from, eviction_server_skip_metatdata_with_history);
+    to->eviction_server_skip_stale_disagg_pages +=
+      WT_STAT_CONN_READ(from, eviction_server_skip_stale_disagg_pages);
     to->eviction_server_skip_pages_checkpoint_timestamp +=
       WT_STAT_CONN_READ(from, eviction_server_skip_pages_checkpoint_timestamp);
     to->eviction_server_skip_pages_last_running +=
@@ -4706,6 +4715,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_pages_inuse += WT_STAT_CONN_READ(from, cache_pages_inuse);
     to->cache_pages_inuse_ingest += WT_STAT_CONN_READ(from, cache_pages_inuse_ingest);
     to->cache_pages_inuse_stable += WT_STAT_CONN_READ(from, cache_pages_inuse_stable);
+    to->cache_truncate_txn_uncommitted_bytes +=
+      WT_STAT_CONN_READ(from, cache_truncate_txn_uncommitted_bytes);
     to->cache_eviction_dirty_obsolete_tw +=
       WT_STAT_CONN_READ(from, cache_eviction_dirty_obsolete_tw);
     to->cache_eviction_ahead_of_last_materialized_lsn +=
@@ -5646,6 +5657,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_rollback += WT_STAT_CONN_READ(from, txn_rollback);
     to->txn_rollback_too_large_for_cache +=
       WT_STAT_CONN_READ(from, txn_rollback_too_large_for_cache);
+    to->txn_truncate_dirty_cache_rollback +=
+      WT_STAT_CONN_READ(from, txn_truncate_dirty_cache_rollback);
     to->txn_update_conflict += WT_STAT_CONN_READ(from, txn_update_conflict);
     to->txn_rollback_stepdown += WT_STAT_CONN_READ(from, txn_rollback_stepdown);
 }
@@ -5654,7 +5667,9 @@ static const char *const __stats_session_desc[] = {
   "session: bytes read into cache",
   "session: bytes written from cache",
   "session: dhandle lock wait time (usecs)",
-  "session: dirty bytes in this txn",
+  "session: dirty bytes from updates in this txn",
+  "session: dirty bytes in this txn, from both updates and fast-truncate",
+  "session: dirty bytes pinned by fast-truncate in this txn",
   "session: number of updates in this txn",
   "session: page read from disk to cache time (usecs)",
   "session: page write from cache to disk time (usecs)",
@@ -5684,7 +5699,9 @@ __wt_stat_session_clear_single(WT_SESSION_STATS *stats)
     stats->bytes_read = 0;
     stats->bytes_write = 0;
     stats->lock_dhandle_wait = 0;
+    /* not clearing txn_updates_bytes_dirty */
     /* not clearing txn_bytes_dirty */
+    /* not clearing txn_truncate_bytes_dirty */
     /* not clearing txn_updates */
     stats->read_time = 0;
     stats->write_time = 0;

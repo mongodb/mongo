@@ -39,6 +39,9 @@ from wtscenario import make_scenarios
 class test_cc02(test_cc_base):
     # Useful for debugging:
     # conn_config = "verbose=[checkpoint_cleanup:4]"
+    # Use an oversized cache so background eviction cannot flip a clean page to on-disk between
+    # the populate/checkpoint and the cleanup walk; keeps each scenario purely in-memory or on-disk.
+    conn_config = "cache_size=1GB"
     cleanup_flows = [
         # Keep everything in memory, obsolete cleanup should mark obsolete data dirty so it is evicted.
         ('eviction', dict(in_memory=True)),

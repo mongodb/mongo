@@ -549,6 +549,21 @@ functions:
           fi
         done
 
+  "schema disagg abort":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        build_dir=$(cd ../../../ && pwd)
+        for i in $(seq ${times|10}); do
+          echo "Iteration $i/${times|10}"
+          ./test_schema_disagg_abort -b "$build_dir" ${schema_args} -T 12 -u 64 -t 300
+        done
+
   "timestamp abort disagg":
     command: shell.exec
     params:
@@ -658,181 +673,6 @@ variables:
         vars:
           times: 50
 
-  - &schema-disagg-abort-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # One node leading throughout. Max out the schema threads (-T) and the per-thread
-              # URI pool (-u) for maximum schema churn.
-              ./test_schema_disagg_abort -b "$build_dir" -r l -T 12 -u 64 -t 300
-            done
-
-  - &schema-disagg-abort-switch-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # One node stepping down and back up every 30 seconds (-s).
-              ./test_schema_disagg_abort -b "$build_dir" -r l -s 30 -T 12 -u 64 -t 300
-            done
-
-  - &schema-disagg-abort-crash-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # SIGKILL the lone node at 150s (-k), then recover and verify at the timeout.
-              ./test_schema_disagg_abort -b "$build_dir" -r l -k 150 -T 12 -u 64 -t 300
-            done
-
-  - &schema-disagg-abort-multi-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # Leader and follower (-r lf): the follower applies the relayed stream and picks up
-              # the leader's checkpoints.
-              ./test_schema_disagg_abort -b "$build_dir" -r lf -T 12 -u 64 -t 300
-            done
-
-  - &schema-disagg-abort-multi-crash-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # Kill the leader at 100s and the follower at 200s; each survivor carries on alone.
-              ./test_schema_disagg_abort -b "$build_dir" -r lf -k l100 -k f200 -T 12 -u 64 -t 300
-            done
-
-  # Two-node role switches. A step-up over a table the peer created.
-  - &schema-disagg-abort-multi-switch-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # The two nodes swap roles every 30 seconds.
-              ./test_schema_disagg_abort -b "$build_dir" -r lf -s 30 -T 12 -u 64 -t 300
-            done
-
-  # Same step-up exposure as above, with a kill on top.
-  - &schema-disagg-abort-multi-switch-crash-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # Swap roles every 30s and kill whoever leads at 150s; the survivor keeps switching
-              # by sentinel.
-              ./test_schema_disagg_abort -b "$build_dir" -r lf -s 30 -k l150 -T 12 -u 64 -t 300
-            done
-
-  - &schema-disagg-abort-follower-stepup-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            build_dir=$(cd ../../../ && pwd)
-            for i in $(seq ${times|10}); do
-              echo "Iteration $i/${times|10}"
-              # A lone follower generates its own workload and never checkpoints, then steps up over
-              # the operations it accumulated: the way a fresh node bootstraps its own tables before
-              # taking leadership.
-              ./test_schema_disagg_abort -b "$build_dir" -r f -s 30 -T 12 -u 64 -t 300
-            done
-
   - &schema-disagg-abort-smoke-test-disagg
     depends_on:
         - name: compile
@@ -923,37 +763,126 @@ tasks:
     name: timestamp-abort-test-disagg-2
     tags: ["stress-test-disagg-fail"]
 
-  - <<: *schema-disagg-abort-test-disagg
-    name: schema-disagg-abort-test-disagg-1
+  # The schema-disagg-abort matrix. The kill variants cover their graceful counterparts, since a
+  # kill lands halfway through the run and everything before it is the graceful workload.
+  - name: schema-disagg-abort-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # One node leading throughout, SIGKILLed at 150s, then recovered and verified.
+          schema_args: -r l -k 150
 
-  - <<: *schema-disagg-abort-switch-test-disagg
-    name: schema-disagg-abort-switch-test-disagg-1
+  - name: schema-disagg-abort-switch-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # One node stepping down and back up every 30 seconds.
+          schema_args: -r l -s 30
 
-  - <<: *schema-disagg-abort-crash-test-disagg
-    name: schema-disagg-abort-crash-test-disagg-1
+  - name: schema-disagg-abort-multi-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # Leader and follower, each killed in turn, so each survivor carries on alone.
+          schema_args: -r lf -k l100 -k f200
 
-  - <<: *schema-disagg-abort-multi-test-disagg
-    name: schema-disagg-abort-multi-test-disagg-1
+  - name: schema-disagg-abort-multi-switch-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # Two nodes swapping roles every 30s, killing whoever leads at 150s: a step-up over a
+          # table the peer created, with a crash on top.
+          schema_args: -r lf -s 30 -k l150
 
-  - <<: *schema-disagg-abort-multi-crash-test-disagg
-    name: schema-disagg-abort-multi-crash-test-disagg-1
+  - name: schema-disagg-abort-follower-stepup-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # A lone follower generates its own workload and never checkpoints, then steps up over
+          # the operations it accumulated: the way a fresh node bootstraps its own tables before
+          # taking leadership.
+          schema_args: -r f -s 30
 
-  - <<: *schema-disagg-abort-multi-switch-test-disagg
-    name: schema-disagg-abort-multi-switch-test-disagg-1
+  # FIXME-WT-18403: Remove these tasks once all the known create/drop/create issues are gone.
+  - name: schema-disagg-abort-unique-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -r l -k 150 -q
 
-  - <<: *schema-disagg-abort-multi-switch-crash-test-disagg
-    name: schema-disagg-abort-multi-switch-crash-test-disagg-1
+  - name: schema-disagg-abort-unique-switch-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -r l -s 30 -q
 
-  - <<: *schema-disagg-abort-follower-stepup-test-disagg
-    name: schema-disagg-abort-follower-stepup-test-disagg-1
+  - name: schema-disagg-abort-unique-multi-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -r lf -k l100 -k f200 -q
+
+  - name: schema-disagg-abort-unique-multi-switch-crash-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -r lf -s 30 -k l150 -q
+
+  - name: schema-disagg-abort-unique-follower-stepup-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -r f -s 30 -q
 
   - <<: *schema-disagg-abort-smoke-test-disagg
     name: schema-disagg-abort-smoke-test-disagg-1

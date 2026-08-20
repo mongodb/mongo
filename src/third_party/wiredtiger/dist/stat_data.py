@@ -359,6 +359,7 @@ conn_stats = [
     CacheStat('cache_shared_dsk_lock_contention', 'shared disk bucket lock contention count'),
     CacheStat('cache_shared_dsk_miss', 'shared disk miss'),
     CacheStat('cache_tolerance_level', 'cache tolerance configured', 'no_clear,no_scale,size'),
+    CacheStat('cache_truncate_txn_uncommitted_bytes', 'pages dirtied by fast-truncate in uncommitted txn - bytes', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_bytes', 'updates in uncommitted txn - bytes', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_count', 'updates in uncommitted txn - count', 'no_clear,no_scale,size'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
@@ -450,6 +451,7 @@ conn_stats = [
     EvictStat('eviction_server_skip_pages_prune_timestamp_not_move', 'eviction server skips pages that have been reconciled previously at the same prune timestamp'),
     EvictStat('eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
     EvictStat('eviction_server_skip_stable_trees', 'eviction server skips stable btrees in disagg'),
+    EvictStat('eviction_server_skip_stale_disagg_pages', 'eviction server skips pages on an outdated disaggregated read-only btree that a reader still has open'),
     EvictStat('eviction_server_skip_trees_eviction_disabled', 'eviction server skips trees that disable eviction'),
     EvictStat('eviction_server_skip_trees_not_useful_before', 'eviction server skips trees that were not useful before'),
     EvictStat('eviction_server_skip_trees_read_only', 'eviction server skips trees that are read-only if it is not looking for clean pages'),
@@ -1033,6 +1035,7 @@ conn_stats = [
     TxnStat('txn_stepdown_epoch_set', 'step-down disaggregated schema epoch is currently set', 'no_clear,no_scale'),
     TxnStat('txn_stepdown_ts_set', 'step-down timestamp is currently set', 'no_clear,no_scale'),
     TxnStat('txn_timestamp_oldest_active_read', 'transaction read timestamp of the oldest active reader', 'no_clear,no_scale'),
+    TxnStat('txn_truncate_dirty_cache_rollback', 'truncate operations rolled back because they pinned too much dirty cache'),
     TxnStat('txn_walk_sessions', 'transaction walk of concurrent sessions'),
 
     ##########################################
@@ -1608,7 +1611,9 @@ session_stats = [
     SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
     SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),
-    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn', 'no_clear,no_scale,size'),
+    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn, from both updates and fast-truncate', 'no_clear,no_scale,size'),
+    SessionStat('txn_truncate_bytes_dirty', 'dirty bytes pinned by fast-truncate in this txn', 'no_clear,no_scale,size'),
     SessionStat('txn_updates', 'number of updates in this txn', 'no_clear,no_scale,size'),
+    SessionStat('txn_updates_bytes_dirty', 'dirty bytes from updates in this txn', 'no_clear,no_scale,size'),
     SessionStat('write_time', 'page write from cache to disk time (usecs)'),
 ]

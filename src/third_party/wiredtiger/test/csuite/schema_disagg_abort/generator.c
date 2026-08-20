@@ -64,6 +64,8 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         /* The only move: a fresh table; its publish is a later event of its own. */
         ev.type = EVENT_CREATE;
         *slot_state = TABLE_CREATED;
+        if (state->cfg->unique_tables)
+            ++state->workers[t].slot_gen[slot];
         break;
     case TABLE_CREATED:
         switch (__wt_random(rnd) % 3) {
@@ -103,7 +105,8 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         return (false);
 
     ev.thread_id = t;
-    testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot);
+    testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot,
+      state->workers[t].slot_gen[slot]);
     if (ev.type == EVENT_INSERT) {
         ev.key_min = DATA_KEY_MIN;
         ev.key_max = DATA_KEY_MAX;
@@ -192,8 +195,8 @@ generator_flush_publishes(WORKLOAD_STATE *state)
             ev.type = *slot_state == TABLE_CREATED ? EVENT_PUBLISH_CREATE : EVENT_PUBLISH_DROP;
             ev.thread_id = t;
             ev.event_ts = __wt_atomic_add_uint64(&state->current_ts, 1);
-            testutil_snprintf(
-              ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot);
+            testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t,
+              slot, state->workers[t].slot_gen[slot]);
 
             *slot_state = *slot_state == TABLE_CREATED ? TABLE_PUBLISHED : TABLE_NONE;
             generator_emit(state, &ev);

@@ -26,7 +26,7 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
      * Accumulate errors but continue through to the end of the metadata.
      */
     while ((t_ret = cursor->next(cursor)) == 0) {
-        if ((t_ret = cursor->get_key(cursor, &uri)) != 0 || strcmp(uri, WT_METAFILE_URI) == 0) {
+        if ((t_ret = cursor->get_key(cursor, &uri)) != 0 || WT_IS_URI_METADATA(uri)) {
             WT_TRET(t_ret);
             continue;
         }

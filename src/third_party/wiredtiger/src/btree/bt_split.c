@@ -2357,7 +2357,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: split-insert", (void *)ref);
 
-    if (__wt_btree_is_stale_disagg(session))
+    if (__wt_btree_is_outdated_disagg(session))
         return (__wt_set_return(session, EBUSY));
 
     /*
@@ -2484,7 +2484,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: split-multi", (void *)ref);
 
-    if (__wt_btree_is_stale_disagg(session))
+    if (__wt_btree_is_outdated_disagg(session))
         ret = __wt_set_return(session, EBUSY);
     else
         /*
@@ -2526,7 +2526,7 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: reverse-split", (void *)ref);
 
-    if (__wt_btree_is_stale_disagg(session))
+    if (__wt_btree_is_outdated_disagg(session))
         return (__wt_set_return(session, EBUSY));
 
     /*

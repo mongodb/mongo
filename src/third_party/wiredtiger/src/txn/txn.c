@@ -168,8 +168,6 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
     /* Leave the generation after releasing the snapshot. */
     __wt_session_gen_leave(session, WT_GEN_HAS_SNAPSHOT);
-
-    __txn_clear_bytes_dirty(session);
 }
 
 /*
@@ -1009,6 +1007,9 @@ __txn_release(WT_SESSION_IMPL *session)
 
     /* Clear operation timer. */
     txn->operation_timeout_us = 0;
+
+    /* Reset the dirty footprint tracking */
+    __txn_clear_bytes_dirty(session);
 }
 
 /*
@@ -1105,8 +1106,12 @@ __txn_prepare_rollback_restore_hs_update(
             break;
     }
 
-    /* Append the update to the end of the chain. */
-    __wt_atomic_store_ptr_relaxed(&upd_chain->next, upd);
+    /*
+     * Append the update to the end of the chain. Readers walk this chain with relaxed loads, so the
+     * link must be published with a release store to order it after the update's initializing
+     * stores above.
+     */
+    __wt_atomic_store_ptr_release(&upd_chain->next, upd);
 
     __wt_cache_page_inmem_incr(session, page, total_size, false);
 
@@ -1206,7 +1211,11 @@ __txn_prepare_rollback_delete_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UP
     while (upd_chain->next != NULL)
         upd_chain = upd_chain->next;
 
-    __wt_atomic_store_ptr_relaxed(&upd_chain->next, tombstone);
+    /*
+     * Readers walk this chain with relaxed loads, so the link must be published with a release
+     * store to order it after the tombstone's initializing stores above.
+     */
+    __wt_atomic_store_ptr_release(&upd_chain->next, tombstone);
 
     __wt_cache_page_inmem_incr(session, page, size, false);
 
@@ -2896,8 +2905,9 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 
 /*
  * __wt_txn_is_blocking --
- *     Return an error if this transaction is likely blocking eviction from making progress, called
- *     by eviction to determine if a worker thread should be released.
+ *     Return an error if this transaction is likely blocking eviction from making progress. Called
+ *     by eviction to determine if a worker thread should be released, and by fast-truncate to bound
+ *     its own cache footprint.
  */
 int
 __wt_txn_is_blocking(WT_SESSION_IMPL *session)
@@ -2907,7 +2917,7 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
     double trigger;
-    uint64_t global_oldest;
+    uint64_t global_oldest, total_dirty;
     bool is_txn_id_global_oldest;
 
     conn = S2C(session);
@@ -2961,7 +2971,9 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
      * A transaction whose own unresolved dirty content already exceeds the updates trigger (or the
      * dirty trigger, whichever is lower, since the two are not guaranteed to be ordered) can never
      * bring the cache back under that trigger by staying alive, so roll it back now while that is
-     * still legal.
+     * still legal. The dirty internal pages a fast-truncate pins count towards that footprint:
+     * eviction cannot reclaim them either, since they cannot be reconciled until the truncate is
+     * stable.
      *
      * Requires an actual modification: instantiating a fast-truncated column-store page while
      * reading it charges dirty bytes to whichever transaction happens to touch the page
@@ -2975,11 +2987,21 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
          * dirtied anything at all. Configuration never leaves either trigger at zero, so treat it
          * as a value we raced with rather than a threshold to enforce.
          */
-        if (trigger > DBL_EPSILON &&
-          txn->bytes_dirty > (uint64_t)(trigger * conn->cache_size) / 100) {
-            WT_STAT_CONN_INCR(session, txn_rollback_too_large_for_cache);
-            WT_RET_SUB(session, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
-              WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE);
+        total_dirty = txn->update_dirty_bytes + txn->truncate_dirty_bytes;
+        if (trigger > DBL_EPSILON && total_dirty > (uint64_t)(trigger * conn->cache_size) / 100) {
+            /*
+             * The statistic and the reason distinguish a truncate that pinned mostly internal pages
+             * from a transaction that wrote too many updates.
+             */
+            if (txn->truncate_dirty_bytes > txn->update_dirty_bytes) {
+                WT_STAT_CONN_INCR(session, txn_truncate_dirty_cache_rollback);
+                WT_RET_SUB(session, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+                  WT_TXN_ROLLBACK_REASON_TRUNCATE_DIRTY);
+            } else {
+                WT_STAT_CONN_INCR(session, txn_rollback_too_large_for_cache);
+                WT_RET_SUB(session, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+                  WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE);
+            }
         }
     }
     return (0);

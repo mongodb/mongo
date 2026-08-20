@@ -181,6 +181,7 @@ struct __wt_data_handle {
 #define WT_DHANDLE_LOCK_ONLY 0x100u    /* Handle only used as a lock */
 #define WT_DHANDLE_OPEN 0x200u         /* Handle is open */
 #define WT_DHANDLE_OUTDATED 0x400u     /* Handle is outdated */
+#define WT_DHANDLE_SKIP_OPEN 0x800u    /* Do not open a closed handle */
                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 12 */
     uint16_t flags;
 

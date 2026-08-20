@@ -254,6 +254,13 @@ class DisaggConfigMixin:
         finally:
             session.close()
 
+    # Deliver the newest checkpoint to the follower and wait until it is adopted. Use this wherever
+    # the test reads data the new checkpoint carries; the reader's own snapshot does not force the
+    # adoption. Any snapshot that predates the delivery blocks it, so end them first.
+    def disagg_advance_checkpoint_and_wait(self, conn_follower, conn_leader=None, timeout=60):
+        self.disagg_advance_checkpoint(conn_follower, conn_leader)
+        self.disagg_wait_for_adoption(conn_follower, timeout)
+
     # Switch the leader and the follower
     def disagg_switch_follower_and_leader(self, conn_follower, conn_leader=None):
         if conn_leader is None:

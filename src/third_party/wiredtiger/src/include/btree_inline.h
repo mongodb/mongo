@@ -37,11 +37,11 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_btree_is_stale_disagg --
+ * __wt_btree_is_outdated_disagg --
  *     Return whether the current btree belongs to an outdated disaggregated generation.
  */
 static WT_INLINE bool
-__wt_btree_is_stale_disagg(WT_SESSION_IMPL *session)
+__wt_btree_is_outdated_disagg(WT_SESSION_IMPL *session)
 {
     return ((F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) ||
               F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_READONLY)) &&
@@ -2647,7 +2647,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     }
 
     /* If the metadata page is clean but has modifications that appear too new to evict, skip it. */
-    if (WT_IS_METADATA(btree->dhandle) && !modified &&
+    if (WT_IS_ANY_METADATA(btree->dhandle) && !modified &&
       !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_recently_modified);
         return (false);

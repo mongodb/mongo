@@ -141,7 +141,7 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      */
     if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_RECOVERING_METADATA) ||
       F_ISSET(session, WT_SESSION_NO_RECONCILE) ||
-      (session->dhandle != NULL && WT_IS_METADATA(S2BT(session)->dhandle)) ||
+      (session->dhandle != NULL && WT_IS_ANY_METADATA(S2BT(session)->dhandle)) ||
       session == conn->default_session)
         return (0);
 
