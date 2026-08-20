@@ -2,7 +2,7 @@
  * This test checks the lookup cache codepath for $search subpipelines on
  * views.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";

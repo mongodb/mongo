@@ -95,7 +95,6 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
         }
 
         if (auto view = params.getView()) {
-            search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
             search_index_view_validation::validate(*view);
         }
 

@@ -5,7 +5,6 @@
  * on the relevant view/collection as ground truth.
  *
  * @tags: [
- *   featureFlagMongotIndexedViews,
  *   requires_fcv_90,
  * ]
  */

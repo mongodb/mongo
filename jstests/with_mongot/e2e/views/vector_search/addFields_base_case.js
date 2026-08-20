@@ -1,7 +1,7 @@
 /**
  * This test ensures that $vectorSearch works with an $addFields view pipeline.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     createMoviesViewAndIndex,

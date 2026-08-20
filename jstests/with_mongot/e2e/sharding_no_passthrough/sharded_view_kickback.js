@@ -7,7 +7,6 @@
  * results are missing the view's $addFields-added field.
  *
  * @tags: [
- *   featureFlagMongotIndexedViews,
  *   requires_sharding,
  *   assumes_unsharded_collection,
  *   requires_fcv_90,

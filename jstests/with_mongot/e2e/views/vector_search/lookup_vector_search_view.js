@@ -8,7 +8,6 @@
  *  - the $vectorSearch results match a ground-truth top-level aggregate on the view.
  *
  * @tags: [
- *   featureFlagMongotIndexedViews,
  *   requires_fcv_90,
  * ]
  */

@@ -5,7 +5,6 @@
  * $vectorSearch. Ground-truth oracle: top-level $vectorSearch on the view.
  *
  * @tags: [
- *   featureFlagMongotIndexedViews,
  *   requires_fcv_90,
  * ]
  */

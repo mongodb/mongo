@@ -100,7 +100,6 @@ selector:
     - featureFlagRankFusionFull
     - featureFlagSearchHybridScoringFull
     - featureFlagRankFusion
-    - featureFlagMongotIndexedViews
     - uses_transactions
     - requires_fcv_81
     - requires_fcv_82

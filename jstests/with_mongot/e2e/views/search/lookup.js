@@ -4,7 +4,7 @@
  * 2. The outer collection is a view and the inner collection is a collection.
  * 3. The outer collection is a view and the inner collection is a view.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

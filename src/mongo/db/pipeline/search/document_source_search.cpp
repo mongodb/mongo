@@ -142,7 +142,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     }
 
     if (auto view = spec.getView()) {
-        search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
         search_index_view_validation::validate(*view);
     }
 

@@ -735,15 +735,6 @@ void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec) {
     }
 }
 
-void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                  const std::vector<BSONObj>& effectivePipeline) {
-    // Queries on views with empty effective pipelines (i.e. identity views) are treated as queries
-    // on the underlying collection, therefore allowed on all FCV versions that support search.
-    uassert(ErrorCodes::OptionNotSupportedOnView,
-            "search stages are unsupported on views",
-            effectivePipeline.empty() || expCtx->isFeatureFlagMongotIndexedViewsEnabled());
-}
-
 void promoteStoredSourceOrAddIdLookup(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::list<boost::intrusive_ptr<DocumentSource>>& desugaredPipeline,

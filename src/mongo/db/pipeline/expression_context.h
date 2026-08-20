@@ -952,10 +952,6 @@ public:
         return _params.view;
     }
 
-    bool isFeatureFlagMongotIndexedViewsEnabled() const {
-        return _featureFlagMongotIndexedViews.get(versionContextForFeatureFlagCheck());
-    }
-
     void setView(boost::optional<ResolvedNamespace> view) {
         _params.view = std::move(view);
     }
@@ -1460,13 +1456,6 @@ private:
         [](const VersionContext& vCtx) {
             return feature_flags::gFeatureFlagRankFusionBasic
                 .isEnabledUseLastLTSFCVWhenUninitialized(
-                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        }};
-
-    Deferred<bool (*)(const VersionContext&)> _featureFlagMongotIndexedViews{
-        [](const VersionContext& vCtx) {
-            return feature_flags::gFeatureFlagMongotIndexedViews
-                .isEnabledUseLatestFCVWhenUninitialized(
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
 

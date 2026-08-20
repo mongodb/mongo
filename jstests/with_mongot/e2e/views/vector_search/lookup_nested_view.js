@@ -5,7 +5,6 @@
  * transformations are correctly applied in subpipelines.
  *
  * @tags: [
- *   featureFlagMongotIndexedViews,
  *   requires_fcv_90,
  * ]
  */

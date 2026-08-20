@@ -3,7 +3,7 @@
  * top-level aggregation namespace or only exists on the underlying collection, the query returns no
  * results.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

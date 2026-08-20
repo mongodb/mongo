@@ -4,7 +4,7 @@
  * all stages have a $search query on a view. The test verifies that the results are as expected
  * with the respective view definition applied to each document.
  *
- * @tags: [ requires_fcv_81, featureFlagMongotIndexedViews ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertUnionWithSearchSubPipelineAppliedViews} from "jstests/with_mongot/e2e_lib/explain_utils.js";

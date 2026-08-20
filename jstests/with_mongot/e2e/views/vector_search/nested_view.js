@@ -1,7 +1,7 @@
 /**
  * This file tests $vectorSearch with a nested view pipeline.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     actionMoviesViewPipeline,

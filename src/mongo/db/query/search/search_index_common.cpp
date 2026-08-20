@@ -3,14 +3,12 @@
 
 #include "mongo/db/query/search/search_index_common.h"
 
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/query/search/search_index_options_gen.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/query/search/search_task_executors.h"
-#include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -81,14 +79,6 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
 
     boost::optional<SearchQueryViewSpec> view;
     if (auto resolvedView = collUUIDResolvedViewPair.second) {
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            "search index commands on views are not allowed in the current configuration. "
-            "You may need to enable the "
-            "corresponding feature flag",
-            feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         // The request is on a view! Therefore, currentOperationNss refers to the view
         // NS and the namespace on resolvedView refers to the underlying source collection.
         sourceCollectionNss = resolvedView.value().getResolvedNamespace();

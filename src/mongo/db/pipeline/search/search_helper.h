@@ -246,13 +246,6 @@ void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, con
 void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec);
 
 /**
- * Validates that search stages on views are only allowed when the respective feature flag
- * is enabled.
- */
-void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                  const std::vector<BSONObj>& effectivePipeline);
-
-/**
  * This function promotes the fields in storedSource to root if applicable, otherwise adds an
  * internalSearchMongotRemote stage to the desugared pipeline.
  */
