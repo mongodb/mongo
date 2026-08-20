@@ -30,7 +30,9 @@
 #include "mongo/db/repair.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
@@ -297,9 +299,13 @@ auto downgradeError =
  * This validates that required collections have an _id index. If a collection is missing an _id
  * index, this function will build it if EnsureIndexPolicy is kBuildMissing.
  *
+ * kSkipMissingForInitialSync leaves the collection without an _id index. It is only used when
+ * the data is about to be discarded by a (repeated) initial sync, where building the index would
+ * be wasted work.
+ *
  * Returns a MustDowngrade error if any index builds on the required _id field fail.
  */
-enum class EnsureIndexPolicy { kBuildMissing, kError };
+enum class EnsureIndexPolicy { kBuildMissing, kError, kSkipMissingForInitialSync };
 Status ensureCollectionProperties(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   EnsureIndexPolicy ensureIndexPolicy) {
@@ -319,7 +325,12 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         // does not exist before attempting to build it or returning an error.
         if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
             LOGV2(21001, "Collection is missing an _id index", logAttrs(*coll));
-            if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
+            if (EnsureIndexPolicy::kSkipMissingForInitialSync == ensureIndexPolicy) {
+                LOGV2(13350100,
+                      "Not building the missing _id index because this node is about to perform an "
+                      "initial sync, which will drop this collection",
+                      logAttrs(*coll));
+            } else if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto status = buildMissingIdIndex(opCtx, coll->ns());
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
@@ -1101,11 +1112,25 @@ void startupRecovery(OperationContext* opCtx,
     const bool shouldClearNonLocalTmpCollections =
         !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
+    // If the initial sync flag is set, an initial sync from a prior boot did not complete and this
+    // node will restart initial sync after startup recovery completes. Rebuilding the _id index
+    // before the retried initial sync will be wasted work.
+    const auto ensureIndexPolicy = [&] {
+        if (usingReplication &&
+            repl::ReplicationProcess::get(opCtx)->getConsistencyMarkers()->getInitialSyncFlag(
+                opCtx)) {
+            LOGV2(13350101,
+                  "Initial sync flag is set; skipping the build of any missing _id indexes because "
+                  "initial sync will drop all replicated data");
+            return EnsureIndexPolicy::kSkipMissingForInitialSync;
+        }
+        return EnsureIndexPolicy::kBuildMissing;
+    }();
+
     openDatabases(opCtx, [&](const DatabaseName& dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
-        uassertStatusOK(
-            ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
+        uassertStatusOK(ensureCollectionProperties(opCtx, dbName, ensureIndexPolicy));
 
         if (usingReplication) {
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
