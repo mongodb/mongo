@@ -706,6 +706,14 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
         records.push_back({rid, recordData});
     }
 
+    // The lower 3 bytes of an OID are a counter, which is incremented for each OID being generated.
+    // This counter can wrap around and result in the records in the 'records' vector not being
+    // sorted by OID. We sort the vector here so that it matches the order of records returned from
+    // the record store, which will be returned in RecordId order.
+    std::sort(records.begin(), records.end(), [](const Record& a, const Record& b) {
+        return a.id < b.id;
+    });
+
     auto opCtx = harnessHelper->newOperationContext();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     {
