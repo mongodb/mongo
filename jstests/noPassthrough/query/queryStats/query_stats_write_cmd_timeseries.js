@@ -13,6 +13,7 @@
  * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
@@ -369,6 +370,19 @@ describe("time-series query stats (sharded)", function () {
             configOptions: {setParameter: tsUpdatesParam},
         });
         testDB = st.s.getDB("test");
+
+        // TODO SERVER-117924: Remove this early exit and use the feature flag tag in the test.
+        // Disagg suites that start at lastContinuousFCV may not effectively enable this
+        // latest-FCV-gated flag even when the startup parameter is set to true. Skip only the
+        // sharded section in that special case; the standalone tests above remain covered.
+        if (!FeatureFlagUtil.isEnabled(testDB, "TimeseriesUpdatesSupport")) {
+            jsTest.log.info(
+                `Skipping ${jsTestName()} sharded tests: ` +
+                    "featureFlagTimeseriesUpdatesSupport is not enabled",
+            );
+            st.stop();
+            quit();
+        }
     });
 
     after(function () {

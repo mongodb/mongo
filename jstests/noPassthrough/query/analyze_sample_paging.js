@@ -1,6 +1,11 @@
 /**
  * Verifies that the analyze command splits persistent samples exceeding 16MB across multiple contiguous
  * "pages" in the persistent samples collection.
+ *
+ * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
+ * ]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

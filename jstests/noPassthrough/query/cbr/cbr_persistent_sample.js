@@ -6,6 +6,8 @@
  * persistent sample is found.
  *
  * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
  *   requires_fcv_90,
  * ]
  */

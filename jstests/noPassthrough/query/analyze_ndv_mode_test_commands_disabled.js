@@ -9,6 +9,7 @@
  * TODO SERVER-133281: Remove this tag once the shell stops forwarding failpoint setParameters to
  * servers started without test commands.
  * @tags: [
+ *   featureFlagPersistentStats,
  *   disables_test_commands,
  * ]
  */

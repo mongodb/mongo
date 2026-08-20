@@ -1,5 +1,10 @@
 /**
  * Verifies that if the analyze command fails while persisting a sample then the previously-persisted sample is left fully intact.
+ *
+ * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

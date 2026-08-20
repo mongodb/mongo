@@ -1,6 +1,11 @@
 /**
  * Tests the serverStatus metrics for the persistent-samples write path (analyze command in
  * "sample" mode) and read path (SamplingEstimatorImpl loading a persisted sample).
+ *
+ * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
+ * ]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

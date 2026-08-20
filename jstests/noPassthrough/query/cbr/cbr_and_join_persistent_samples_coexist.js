@@ -2,6 +2,8 @@
  * Tests that both CBR and JOO can use persistent samples with different or same sizes.
  *
  * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
  *   requires_sbe,
  * ]
  */

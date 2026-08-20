@@ -1,6 +1,10 @@
 /**
  * Tests the analyze command with mode: "ndv": parameter validation and the shape of the
  * field-stats documents it persists into system.stats.field_stats.
+ *
+ * @tags: [
+ *   featureFlagPersistentStats,
+ * ]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {dropStatsColl} from "jstests/libs/query/persistent_samples_utils.js";

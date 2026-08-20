@@ -1,6 +1,11 @@
 /**
  * Tests that the analyze command with mode: "sample" correctly handles all sampling-related
  * parameters: sampleSize, sampleRate, samplingMethod, numChunks, and mode.
+ *
+ * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
+ * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

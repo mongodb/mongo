@@ -1,5 +1,9 @@
 /**
  * Tests that the analyze command with mode: "ndv" is rejected on sharded collections.
+ *
+ * @tags: [
+ *   featureFlagPersistentStats,
+ * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -2,6 +2,8 @@
  * Validates the join optimization metrics reported in the query stats supplemental metrics section.
  *
  * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
  *   requires_fcv_90,
  *   requires_sbe,
  * ]
@@ -27,6 +29,7 @@ const conn = MongoRunner.runMongod(params);
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
+
 const orders = db.orders;
 const customers = db.customers;
 const items = db.items;

@@ -11,6 +11,10 @@ let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 let node = rst.nodes[0];
 
+const defaultStartupFCV = assert.commandWorked(
+    node.adminCommand({getParameter: 1, defaultStartupFCV: 1}),
+).defaultStartupFCV;
+
 // The featureCompatibilityVersion parameter is initialized during rst.initiate(), so calling
 // getParameter on the fCV before then will attempt to access an uninitialized fCV.
 
@@ -31,6 +35,7 @@ rst.initiate();
 const primary = rst.getPrimary();
 const res = primary.adminCommand(getParamCmd);
 assert.commandWorked(res);
-assert.eq(res.featureCompatibilityVersion.version, latestFCV, tojson(res));
+// The standard replica set fixture does not set defaultStartupFCV and implicitly uses latestFCV.
+assert.eq(res.featureCompatibilityVersion.version, defaultStartupFCV || latestFCV, tojson(res));
 
 rst.stopSet();

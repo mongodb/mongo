@@ -3,7 +3,7 @@
  * transactions.
  * @tags: [
  *   uses_transactions,
- *   requires_fcv_71,
+ *   featureFlagEndOfTransactionChangeEvent,
  * ]
  */
 

@@ -10,6 +10,7 @@
  *   requires_timeseries,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -43,6 +44,21 @@ describe("listCollections fastCount fields", function () {
         this.rst.initiate();
         this.primary = this.rst.getPrimary();
         this.db = this.primary.getDB(jsTestName());
+
+        // TODO SERVER-117454: Remove this explicit check and use the featureFlagReplicatedFastCount
+        // tag once the flag is enabled in all feature flag variants.
+        if (!FeatureFlagUtil.isPresentAndEnabled(this.db, "ReplicatedFastCount")) {
+            jsTest.log.info("Skipping test because featureFlagReplicatedFastCount is disabled");
+            this.rst.stopSet();
+            quit();
+        }
+        // TODO SERVER-108818: Remove this explicit check and use the featureFlagContainerWrites tag
+        // once the flag is enabled in all feature flag variants.
+        if (!FeatureFlagUtil.isPresentAndEnabled(this.db, "ContainerWrites")) {
+            jsTest.log.info("Skipping test because featureFlagContainerWrites is disabled");
+            this.rst.stopSet();
+            quit();
+        }
 
         // Create several collections and insert data so the fast count manager has entries to
         // persist for each one.

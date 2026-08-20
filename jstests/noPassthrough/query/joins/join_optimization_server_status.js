@@ -2,6 +2,7 @@
  * Validates the join optimization metrics reported in serverStatus.
  *
  * @tags: [
+ *   featureFlagPersistentStats,
  *   requires_fcv_90,
  *   requires_sbe,
  *   requires_capped,
