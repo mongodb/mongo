@@ -13,6 +13,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -28,6 +29,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -805,6 +807,72 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                       std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
                   bytesProcessedBefore);
     }
+}
+
+// A drain batch that aborts *after* having applied at least one record must not run its rollback
+// handlers against out-of-scope stack memory. applyIndexBuildSideWrite registers
+// RecoveryUnit::onRollback handlers capturing pointers to applySingleBatch's key/byte counters, so
+// those counters must outlive the batch's WriteUnitOfWork. Since locals are destroyed in reverse
+// declaration order, a counter declared after the WriteUnitOfWork is already gone by the time
+// ~WriteUnitOfWork fires the handlers. Under ASAN that is a stack-use-after-scope.
+TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatch) {
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+
+    // Pin kBatchMaxSize above N so the entire drain is a single batch, and the abort below lands
+    // in the middle of it rather than between batches.
+    constexpr int kNumKeys = 4;
+    unittest::ServerParameterGuard batchSize("maxIndexBuildDrainBatchSize", kNumKeys + 1);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < kNumKeys; ++i) {
+            int64_t numKeys = 0;
+            ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                             _coll->getCollectionPtr(),
+                                             entry,
+                                             {makeKeyString(i, RecordId{i + 1})},
+                                             {},
+                                             {},
+                                             IndexBuildInterceptor::Op::kInsert,
+                                             &numKeys));
+            EXPECT_EQ(1, numKeys);
+        }
+        wuow.commit();
+    }
+
+    // Hang at iteration 1. The iteration counter is evaluated at the top of the record loop before
+    // the record is applied, so at iteration 1 record 0 has already been applied and has registered
+    // its onRollback handler, while the batch's WriteUnitOfWork has not yet committed.
+    FailPointEnableBlock fp("hangIndexBuildDuringDrainWritesPhase",
+                            BSON("iteration" << 1 << "indexNames" << BSON_ARRAY("a_1")));
+    const auto initialTimesEntered = fp.initialTimesEntered();
+
+    auto* opCtx = operationContext();
+    unittest::JoinThread killer([&] {
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+        ClientLock lk(opCtx->getClient());
+        opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
+    });
+
+    // The interrupt propagates out of pauseWhileSet and unwinds applySingleBatch.
+    // writeConflictRetry does not swallow it, so the batch's WriteUnitOfWork aborts and executes
+    // the rollback handlers registered for record 0 on the way out.
+    ASSERT_THROWS_CODE(
+        interceptor->drainWritesIntoIndex(opCtx,
+                                          _coll->getCollectionPtr(),
+                                          entry,
+                                          InsertDeleteOptions{.dupsAllowed = true},
+                                          IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield),
+        DBException,
+        ErrorCodes::Interrupted);
 }
 
 TEST_F(IndexBuilderInterceptorTest, CheckDuplicateKeyConstraintsSurvivesWriteConflict) {

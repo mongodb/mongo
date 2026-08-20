@@ -271,10 +271,10 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // concern. And thus will observe data that can be rolled back via replication.
         shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
 
-        WriteUnitOfWork wuow(opCtx);
-
         int64_t batchKeyBytesInserted = 0;
         int64_t batchKeyBytesDeleted = 0;
+
+        WriteUnitOfWork wuow(opCtx);
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
