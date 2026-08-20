@@ -33,7 +33,7 @@ feature_flags:
     featureFlagSbeAccumulatorExpressions:
         description:
             "Feature flag to enable SBE lowering of accumulators used as expressions, i.e. $sum,
-            $min, $max, $avg, $stdDevPop and $stdDevSamp outside of $group."
+            $min, $max, $avg, $stdDevPop, $stdDevSamp and $mergeObjects outside of $group."
         cpp_varname: gFeatureFlagSbeAccumulatorExpressions
         default: false
         fcv_gated: false

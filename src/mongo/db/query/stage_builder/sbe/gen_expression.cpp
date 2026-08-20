@@ -3333,7 +3333,7 @@ public:
         generateAccumulatorExpression(expr, sbe::EFn::kDoubleDoubleSumFromAcc);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kMergeObjectsForExpr);
     }
     void visit(const ExpressionTests::Testable* expr) final {
         unsupportedExpression("$test");

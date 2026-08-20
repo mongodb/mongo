@@ -264,6 +264,7 @@ static constexpr EFnEntry kEFnByName[] = {
     {"max"sv,                                EFn::kMax},
     {"maxFromAcc"sv,                         EFn::kMaxFromAcc},
     {"mergeObjects"sv,                       EFn::kMergeObjects},
+    {"mergeObjectsForExpr"sv,                EFn::kMergeObjectsForExpr},
     {"millisecond"sv,                        EFn::kMillisecond},
     {"min"sv,                                EFn::kMin},
     {"minFromAcc"sv,                         EFn::kMinFromAcc},

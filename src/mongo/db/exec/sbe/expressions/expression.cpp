@@ -725,6 +725,8 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::addToArrayCapped, true}},
     {EFn::kMergeObjects,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::mergeObjects, true}},
+    {EFn::kMergeObjectsForExpr,
+     BuiltinFn{kAnyNumberOfArgs, vm::Builtin::mergeObjectsForExpr, false}},
     {EFn::kAddToSet, BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToSet, true}},
     {EFn::kAddToSetCapped,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::addToSetCapped, true}},

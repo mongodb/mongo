@@ -290,6 +290,7 @@ enum class EFn : uint16_t {
     kMax,
     kMaxFromAcc,
     kMergeObjects,
+    kMergeObjectsForExpr,
     kMillisecond,
     kMin,
     kMinFromAcc,

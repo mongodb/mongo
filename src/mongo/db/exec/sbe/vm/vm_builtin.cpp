@@ -81,6 +81,8 @@ std::string builtinToString(Builtin b) {
             return "addToArrayCapped";
         case Builtin::mergeObjects:
             return "mergeObjects";
+        case Builtin::mergeObjectsForExpr:
+            return "mergeObjectsForExpr";
         case Builtin::addToSet:
             return "addToSet";
         case Builtin::addToSetCapped:
@@ -692,6 +694,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAddToArrayCapped(arity).releaseToRaw();
         case Builtin::mergeObjects:
             return builtinMergeObjects(arity).releaseToRaw();
+        case Builtin::mergeObjectsForExpr:
+            return builtinMergeObjectsForExpr(arity).releaseToRaw();
         case Builtin::addToSet:
             return builtinAddToSet(arity).releaseToRaw();
         case Builtin::addToSetCapped:

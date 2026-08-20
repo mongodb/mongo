@@ -58,9 +58,10 @@ enum class Builtin : uint16_t {
     addToArrayCapped,  // agg function to append to an array, fails when the array reaches specified
                        // size
     mergeObjects,      // agg function to merge BSON documents
-    addToSet,          // agg function to append to a set
-    addToSetCapped,    // agg function to append to a set, fails when the set reaches specified size
-    collAddToSet,      // agg function to append to a set (with collation)
+    mergeObjectsForExpr,  // expression form of $mergeObjects
+    addToSet,             // agg function to append to a set
+    addToSetCapped,  // agg function to append to a set, fails when the set reaches specified size
+    collAddToSet,    // agg function to append to a set (with collation)
     collAddToSetCapped,  // agg function to append to a set (with collation), fails when the set
                          // reaches specified size
 

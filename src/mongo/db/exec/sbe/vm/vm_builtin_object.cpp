@@ -178,31 +178,15 @@ value::TagValueMaybeOwned ByteCode::builtinNewBsonObj(ArityType arity) {
     return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
 }
 
-value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
-    auto fieldView = viewFromStack(1);
-    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
-    // state we are free to do any in-place update as we see fit.
-    value::TagValueOwned aggState = moveOwnedFromStack(0);
-    // Create a new object if it does not exist yet.
-    if (aggState.tag() == value::TypeTags::Nothing) {
-        aggState = value::TagValueOwned::fromRaw(value::makeNewObject());
-    }
-
-    tassert(
-        11086807, "Unexpected type of Agg parameter", aggState.tag() == value::TypeTags::Object);
-
-    // If our field is nothing or null or it's not an object, return the accumulator state.
-    if (fieldView.tag == value::TypeTags::Nothing || fieldView.tag == value::TypeTags::Null ||
-        (fieldView.tag != value::TypeTags::Object &&
-         fieldView.tag != value::TypeTags::bsonObject)) {
-        return std::move(aggState);
-    }
-
-    auto obj = value::getObjectView(aggState.value());
-
+namespace {
+/**
+ * Merges the fields of the object 'field' into 'obj'. Fields already present in 'obj' are
+ * overwritten in place, preserving their original position, while new fields are appended in the
+ * order they appear in 'field'.
+ */
+void mergeObjectInto(value::Object* obj, value::TagValueView field) {
     StringMap<value::TagValueView> currObjMap;
-    for (auto currObjEnum = value::ObjectEnumerator{fieldView.tag, fieldView.value};
-         !currObjEnum.atEnd();
+    for (auto currObjEnum = value::ObjectEnumerator{field.tag, field.value}; !currObjEnum.atEnd();
          currObjEnum.advance()) {
         currObjMap[currObjEnum.getFieldName()] = currObjEnum.getViewOfValue();
     }
@@ -224,8 +208,7 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
     // Copy the remaining fields of the current object being processed to the
     // accumulator. Fields that were already present in the accumulated fields
     // have been set already. Preserves the relative order of the new fields
-    for (auto currObjEnum = value::ObjectEnumerator{fieldView.tag, fieldView.value};
-         !currObjEnum.atEnd();
+    for (auto currObjEnum = value::ObjectEnumerator{field.tag, field.value}; !currObjEnum.atEnd();
          currObjEnum.advance()) {
         auto it = currObjMap.find(currObjEnum.getFieldName());
         if (it != currObjMap.end()) {
@@ -234,8 +217,55 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
             obj->push_back_raw(currObjEnum.getFieldName(), currObjTagCopy, currObjValCopy);
         }
     }
+}
+}  // namespace
+
+value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
+    auto fieldView = viewFromStack(1);
+    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
+    // state we are free to do any in-place update as we see fit.
+    value::TagValueOwned aggState = moveOwnedFromStack(0);
+    // Create a new object if it does not exist yet.
+    if (aggState.tag() == value::TypeTags::Nothing) {
+        aggState = value::TagValueOwned::fromRaw(value::makeNewObject());
+    }
+
+    tassert(
+        11086807, "Unexpected type of Agg parameter", aggState.tag() == value::TypeTags::Object);
+
+    // If our field is nothing or null or it's not an object, return the accumulator state.
+    if (fieldView.tag == value::TypeTags::Nothing || fieldView.tag == value::TypeTags::Null ||
+        (fieldView.tag != value::TypeTags::Object &&
+         fieldView.tag != value::TypeTags::bsonObject)) {
+        return std::move(aggState);
+    }
+
+    mergeObjectInto(value::getObjectView(aggState.value()), fieldView);
 
     return std::move(aggState);
+}
+
+value::TagValueMaybeOwned ByteCode::builtinMergeObjectsForExpr(ArityType arity) {
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
+    auto obj = value::getObjectView(result.value());
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        // Mirror classic AccumulatorMergeObjects::processInternal: nullish inputs are ignored and
+        // anything else that is not an object is an error.
+        if (value::isNullish(tag)) {
+            return;
+        }
+        uassert(5158600,
+                str::stream() << "$mergeObjects requires object inputs, but input "
+                              << std::make_pair(tag, val) << " is of type " << tag,
+                value::isObject(tag));
+
+        mergeObjectInto(obj, value::TagValueView{tag, val});
+    };
+
+    processStackRange(0, arity, processOne);
+
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinBsonSize(ArityType arity) {

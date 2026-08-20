@@ -1,5 +1,5 @@
 /**
- * Tests that the $sum, $avg, $min, $max, $stdDevPop, and $stdDevSamp expressions
+ * Tests that the $sum, $avg, $min, $max, $stdDevPop, $stdDevSamp, and $mergeObjects expressions
  * (ExpressionFromAccumulator<AccumulatorState>) are supported in SBE under both "trySbeEngine" and
  * "trySbeRestricted", and that they return the same results as the classic engine, with and without
  * collation. Under "trySbeRestricted" the pipeline is anchored with a $group, since only pipelines
@@ -9,6 +9,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 describe("expressions from accumulators in SBE", function () {
     let conn;
@@ -32,10 +33,18 @@ describe("expressions from accumulators in SBE", function () {
                     a: 1,
                     b: 2,
                     nested: {values: [4, 6, null, "str"], x: 5},
+                    o: {x: 1, y: 2},
                 },
-                {_id: 1, arr: [], a: NumberDecimal("2.5"), b: NumberLong(3), nested: {x: 7}},
-                {_id: 2, arr: ["banana", "APPLE"], a: "str", nested: {values: 42}},
-                {_id: 3, arr: "not an array", a: null},
+                {
+                    _id: 1,
+                    arr: [],
+                    a: NumberDecimal("2.5"),
+                    b: NumberLong(3),
+                    nested: {x: 7},
+                    o: {y: 20, z: 30},
+                },
+                {_id: 2, arr: ["banana", "APPLE"], a: "str", nested: {values: 42}, o: {}},
+                {_id: 3, arr: "not an array", a: null, o: null},
                 {_id: 4},
             ]),
         );
@@ -55,6 +64,7 @@ describe("expressions from accumulators in SBE", function () {
             a: {$first: "$a"},
             b: {$first: "$b"},
             nested: {$first: "$nested"},
+            o: {$first: "$o"},
         },
     };
 
@@ -120,4 +130,35 @@ describe("expressions from accumulators in SBE", function () {
             assertSbeMatchesClassic(pipeline, caseInsensitive);
         });
     }
+
+    it("computes $mergeObjects in SBE the same as classic", function () {
+        const pipeline = [
+            {
+                $project: {
+                    mergeOfSingleObjectField: {$mergeObjects: "$o"},
+                    mergeOfMultipleFields: {$mergeObjects: ["$o", {w: "$a"}, "$missing"]},
+                    mergeOfLiteralList: {$mergeObjects: [{x: 1}, {x: 2, y: 3}]},
+                    mergeOfObjectArrayLiteral: {$mergeObjects: [[{x: 1}, {y: 2}]]},
+                    mergeOfEmptyList: {$mergeObjects: []},
+                    mergeOfNull: {$mergeObjects: [null, "$o"]},
+                    mergeOfNestedObjectField: {$mergeObjects: "$nested"},
+                },
+            },
+            {$sort: {_id: 1}},
+        ];
+
+        assertSbeMatchesClassic(pipeline);
+    });
+
+    it("fails on non-object input to $mergeObjects in both engines", function () {
+        const pipeline = [{$project: {result: {$mergeObjects: ["$a"]}}}];
+        for (const framework of ["trySbeEngine", "forceClassicEngine"]) {
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: framework}),
+            );
+            // The sbe_assert_error_override import treats the classic (40400) and SBE (5158600)
+            // error codes as equivalent.
+            assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), 40400);
+        }
+    });
 });

@@ -759,9 +759,11 @@ class AccumulatorMax;
 class AccumulatorAvg;
 class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
+class AccumulatorMergeObjects;
 
 template <typename AccumulatorState>
 inline constexpr bool isAccumulatorExpressionImplementedInSbe =
+    std::is_same_v<AccumulatorState, AccumulatorMergeObjects> ||
     std::is_same_v<AccumulatorState, AccumulatorSum> ||
     std::is_same_v<AccumulatorState, AccumulatorMin> ||
     std::is_same_v<AccumulatorState, AccumulatorMax> ||

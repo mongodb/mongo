@@ -679,6 +679,7 @@ private:
     value::TagValueMaybeOwned builtinAddToArray(ArityType arity);
     value::TagValueMaybeOwned builtinAddToArrayCapped(ArityType arity);
     value::TagValueMaybeOwned builtinMergeObjects(ArityType arity);
+    value::TagValueMaybeOwned builtinMergeObjectsForExpr(ArityType arity);
     value::TagValueMaybeOwned builtinAddToSet(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSet(ArityType arity);
     value::TagValueMaybeOwned isMemberImpl(value::TagValueView expr,
