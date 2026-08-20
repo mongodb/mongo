@@ -43,6 +43,7 @@ rollout:
   featureFlagSbeTransformStages: {}
 
 release:
+  featureFlagCMKRotation: {}
   featureFlagChangeStreamOptimizedUpdateLookup: {}
   featureFlagChangeStreamReaderV2: {}
   featureFlagCostBasedRanker: {}
