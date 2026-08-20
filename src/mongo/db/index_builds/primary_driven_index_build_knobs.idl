@@ -28,3 +28,18 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    primaryDrivenIndexBuildBulkLoadPhaseContainerWriteMBperSec:
+        description:
+            "Max MB per second that the bulk load phase of a primary-driven index build will write
+            from the sorter into the index table. Setting it to 0 turns off throttling. The
+            limit applies to the index build as a whole, not to each index being built. The limit is
+            charged when the build yields, so the longest run of unthrottled writes is bounded by
+            'internalIndexBuildBulkLoadYieldIterations' keys."
+        set_at: [startup, runtime]
+        cpp_varname: bulkLoadPhaseContainerWriteMBperSec
+        cpp_vartype: Atomic<int>
+        default: 0
+        validator:
+            gte: 0
+        redact: false

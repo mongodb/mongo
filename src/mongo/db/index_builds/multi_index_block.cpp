@@ -17,6 +17,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/throttle_cursor.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -169,6 +171,17 @@ bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collec
     // secondary ever becomes primary, it must retry any previously-skipped documents before
     // committing.
     return !isPrimary;
+}
+
+
+/**
+ * Returns a throttle that paces the container writes in the bulk load phase of a primary-driven
+ * index build.
+ */
+DataThrottle makeBulkLoadContainerWriteThrottle(OperationContext* opCtx) {
+    return DataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(), [] {
+        return index_builds::primary_driven::bulkLoadPhaseContainerWriteMBperSec.load();
+    });
 }
 
 using SpillCallbacks = sorter::ContainerBasedSpiller<key_string::Value,
@@ -1174,6 +1187,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     const int32_t kYieldIterations =
         isBackgroundBuilding() ? internalIndexBuildBulkLoadYieldIterations.load() : 0;
 
+    const bool shouldThrottleContainerWrites =
+        _containerWriteBehavior == ContainerWriteBehavior::kReplicate;
+    auto containerWriteThrottle = makeBulkLoadContainerWriteThrottle(opCtx);
+    int64_t bytesSinceLastYield = 0;
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         // When onDuplicateRecord is passed, 'dupsAllowed' should be passed to reflect whether or
         // not the index is unique.
@@ -1195,7 +1213,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
          * Abandon the current snapshot and release then reacquire locks. Tests that target the
          * behavior of bulk index builds that yield can use failpoints to stall this yield.
          */
-        const auto yieldFn = [&collection, indexIdent = entry->getIdent()](OperationContext* opCtx)
+        const auto yieldFn = [&collection,
+                              indexIdent = entry->getIdent(),
+                              &containerWriteThrottle,
+                              &bytesSinceLastYield](OperationContext* opCtx)
             -> std::pair<const CollectionPtr*, const IndexCatalogEntry*> {
             // Releasing locks means a new snapshot should be acquired when restored.
             auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
@@ -1203,6 +1224,20 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
 
             // Track the number of yields in CurOp.
             CurOp::get(opCtx)->yielded();
+
+            // Record the number of bytes that have been written since the last yield, throttle if
+            // necessary. The wait sleeps on an interruptible opCtx->sleepFor, so it throws when the
+            // build is killed; transition the yield resources to failed state before letting the
+            // exception bubble up.
+            if (bytesSinceLastYield > 0) {
+                try {
+                    containerWriteThrottle.awaitIfNeeded(opCtx, bytesSinceLastYield);
+                } catch (...) {
+                    yieldedTransactionResources.transitionTransactionResourcesToFailedState(opCtx);
+                    throw;
+                }
+                bytesSinceLastYield = 0;
+            }
 
             auto failPointHang = [opCtx, ns = collection.nss()](FailPoint* fp) {
                 fp->executeIf(
@@ -1265,6 +1300,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 _writeIndexStateInfoToContainer(opCtx, i);
             })
                                       : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
+            [shouldThrottleContainerWrites, &bytesSinceLastYield](int64_t bytesWritten) {
+                if (shouldThrottleContainerWrites) {
+                    bytesSinceLastYield += bytesWritten;
+                }
+            },
             primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys.load(),
             (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
                 ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()

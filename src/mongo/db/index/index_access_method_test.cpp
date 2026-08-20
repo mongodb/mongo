@@ -395,6 +395,8 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitRejectsZeroInterval) {
                                     IndexAccessMethod::YieldFn{},
                                     IndexAccessMethod::OnNKeysLoadedFn{[]() {
                                     }},
+                                    IndexAccessMethod::OnBytesWrittenFn{[](int64_t) {
+                                    }},
                                     /*onNKeysLoadedFnInterval=*/0,
                                     /*keyBatchSize=*/1,
                                     /*keyBatchBytes=*/1024),
@@ -470,6 +472,8 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitWithoutDoneThrows) {
                                           IndexAccessMethod::RecordIdHandlerFn{},
                                           IndexAccessMethod::YieldFn{},
                                           IndexAccessMethod::OnNKeysLoadedFn{[]() {
+                                          }},
+                                          IndexAccessMethod::OnBytesWrittenFn{[](int64_t) {
                                           }},
                                           /*onNKeysLoadedFnInterval=*/1,
                                           /*keyBatchSize=*/1,

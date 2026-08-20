@@ -9,6 +9,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
@@ -3789,5 +3790,201 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
+
+TEST(PrimaryDrivenIndexBuildKnobs, BulkLoadThrottleRateIsUnsetByDefault) {
+    ASSERT_EQ(index_builds::primary_driven::bulkLoadPhaseContainerWriteMBperSec.load(), 0);
+}
+
+// Tests that the bulk load phase of a primary-driven index build is throttled correctly.
+class MultiIndexBlockBulkLoadThrottleTest : public MultiIndexBlockTest {
+protected:
+    static constexpr auto kErrorMargin = Milliseconds(100);
+
+    void setUp() override {
+        MultiIndexBlockTest::setUp();
+        _containerWritesEnabled.emplace("featureFlagContainerWrites", true);
+        _pdibEnabled.emplace("featureFlagPrimaryDrivenIndexBuilds", true);
+        static_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()))
+            ->alwaysAllowWrites(true);
+        // One key per batch, and a yield after every key, ensuring that the throttling mechanism is
+        // exercised.
+        _yieldIterations.emplace("internalIndexBuildBulkLoadYieldIterations", 1);
+        _batchSize.emplace("primaryDrivenIndexBuildIndexInsertionBatchSize", 1);
+        _rate.emplace("primaryDrivenIndexBuildBulkLoadPhaseContainerWriteMBperSec", 0);
+    }
+
+    void setRate(int mbPerSec) {
+        index_builds::primary_driven::bulkLoadPhaseContainerWriteMBperSec.store(mbPerSec);
+    }
+
+    /**
+     * Inserts 'numDocs' documents, builds 'numIndexes' indexes over them, and reports how long the
+     * build took into 'elapsed'.
+     */
+    void setUpBuild(int numDocs,
+                    int numIndexes,
+                    ContainerWriteBehavior behavior = ContainerWriteBehavior::kReplicate,
+                    IndexBuildMethodEnum method = IndexBuildMethodEnum::kPrimaryDriven) {
+        auto* opCtx = operationContext();
+        auto* indexer = getIndexer();
+        indexer->setBuildUUID(UUID::gen());
+        indexer->setIndexBuildMethod(method);
+        indexer->setContainerWriteBehavior(behavior);
+
+        auto acq = acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx, getNSS(), AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
+        CollectionWriter coll(opCtx, &acq);
+
+        {
+            WriteUnitOfWork wuow(opCtx);
+            for (int i = 0; i < numDocs; i++) {
+                ASSERT_OK(
+                    Helpers::insert(opCtx, coll.get(), BSON("_id" << i << "a" << i << "b" << i)));
+            }
+            wuow.commit();
+        }
+
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        std::vector<IndexBuildInfo> indexBuildInfos;
+        const std::array<std::string, 2> fields{"a", "b"};
+        ASSERT_LTE(numIndexes, static_cast<int>(fields.size()));
+        for (int i = 0; i < numIndexes; i++) {
+            indexBuildInfos.emplace_back(
+                BSON("key" << BSON(fields[i] << 1) << "name" << (fields[i] + "_1") << "v"
+                           << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                std::string("index-") + std::to_string(i + 1),
+                *storageEngine);
+        }
+
+        ASSERT_OK(indexer->init(opCtx,
+                                coll,
+                                indexBuildInfos,
+                                MultiIndexBlock::kNoopOnInitFn,
+                                MultiIndexBlock::InitMode::SteadyState,
+                                boost::none));
+    }
+
+    /**
+     * Cleans up the build set up above, which has to happen before ~MultiIndexBlock().
+     */
+    void cleanUpBuild() {
+        auto* opCtx = operationContext();
+        opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, getNSS(), AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            CollectionWriter coll(opCtx, &acq);
+            getIndexer()->abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
+    }
+
+    /**
+     * Runs a build over 'numDocs' documents with 'numIndexes' indexes and reports how long the scan
+     * and bulk load took into 'elapsed'.
+     */
+    void timeBuild(int numDocs,
+                   int numIndexes,
+                   Milliseconds* elapsed,
+                   ContainerWriteBehavior behavior = ContainerWriteBehavior::kReplicate,
+                   IndexBuildMethodEnum method = IndexBuildMethodEnum::kPrimaryDriven) {
+        setUpBuild(numDocs, numIndexes, behavior, method);
+
+        // insertAllDocumentsInCollection runs the collection scan and the bulk load phase, which is
+        // the phase that we are timing.
+        Timer timer;
+        ASSERT_OK(getIndexer()->insertAllDocumentsInCollection(operationContext(), getNSS()));
+        *elapsed = duration_cast<Milliseconds>(timer.elapsed());
+
+        cleanUpBuild();
+    }
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
+    boost::optional<unittest::ServerParameterGuard> _pdibEnabled;
+    boost::optional<unittest::ServerParameterGuard> _yieldIterations;
+    boost::optional<unittest::ServerParameterGuard> _batchSize;
+    boost::optional<unittest::ServerParameterGuard> _rate;
+};
+
+// A zero rate does not pace anything, even though the failpoint below charges every key as 512KB.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, ZeroRateDoesNotThrottle) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(0);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/1, &elapsed);
+    ASSERT_LT(elapsed, Seconds(1));
+}
+
+// Interrupting a build while it is waiting on the throttle must abort the build, not crash the
+// process.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, InterruptDuringThrottleWaitAbortsBuild) {
+    // Every charge counts as 2MB, so a single key exceeds the 1MB/s throttle rate and should
+    // trigger a wait of at least a second.
+    FailPointEnableBlock fp("fixedCursorDataSizeOf2MBForDataThrottle");
+    setRate(1);
+
+    // Stop the collection scan from yielding by setting the yield parameters to very high numbers.
+    unittest::ServerParameterGuard scanYieldIterations{"internalQueryExecYieldIterations", 1000};
+    unittest::ServerParameterGuard scanYieldPeriod{"internalQueryExecYieldPeriodMS", 60000};
+
+    setUpBuild(/*numDocs=*/2, /*numIndexes=*/1);
+
+    // Set a deadline of half a second for the operation context that the index build will run on,
+    // meaning the operation should be killed before the index build completes.
+    operationContext()->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+
+    const auto status = getIndexer()->insertAllDocumentsInCollection(operationContext(), getNSS());
+    const auto yields = CurOp::get(operationContext())->numYields();
+
+    cleanUpBuild();
+
+    ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
+
+    // Verify that we yielded, which should only come from the bulk phase, to verify that we were
+    // interrupted while throttling.
+    ASSERT_GTE(yields, 1);
+}
+
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, NonReplicatingBuildIsNotThrottled) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10,
+              /*numIndexes=*/1,
+              &elapsed,
+              ContainerWriteBehavior::kDoNotReplicate);
+    ASSERT_LT(elapsed, Seconds(1));
+}
+
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, NonZeroRateThrottlesBulkLoad) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/1, &elapsed);
+    // Generate 10 keys, each 512KB, for a total of 5MB. At a rate of 1MB/s, the build should take
+    // about five seconds.
+    ASSERT_GTE(elapsed, Seconds(3) - kErrorMargin);
+}
+
+// The rate applies to the build, not to each index in it: trying to build twice the number keys
+// with the same throttle rate as the test above should take about twice as long.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, RateAppliesToTheWholeBuildNotEachIndex) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/2, &elapsed);
+    // 20 keys at 512KB each is 10MB. At a rate of 1MB/s, the build should take
+    // about ten seconds.
+    ASSERT_GTE(elapsed, Seconds(10) - kErrorMargin);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -948,6 +948,7 @@ public:
     using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
     using Spiller =
         sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
+    using OnBytesWrittenFn = IndexAccessMethod::OnBytesWrittenFn;
 
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
@@ -987,6 +988,7 @@ public:
                   const RecordIdHandlerFn& onDuplicateRecord,
                   const YieldFn& yieldFn,
                   const OnNKeysLoadedFn& onNKeysLoaded,
+                  const OnBytesWrittenFn& onBytesWritten,
                   int64_t onNKeysLoadedFnInterval,
                   size_t keyBatchSize,
                   size_t keyBatchBytes) final;
@@ -1293,6 +1295,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                const RecordIdHandlerFn& onDuplicateRecord,
                                const YieldFn& yieldFn,
                                const OnNKeysLoadedFn& onNKeysLoaded,
+                               const OnBytesWrittenFn& onBytesWritten,
                                const int64_t onNKeysLoadedFnInterval,
                                const size_t keyBatchSize,
                                const size_t keyBatchBytes) {
@@ -1340,6 +1343,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         nKeys += keysInserted;
         keysCounted += batch.size();
         bytesCounted += bytesInBatch;
+        onBytesWritten(bytesInBatch);
         batch.clear();
         bytesInBatch = 0;
         updateProcessedMetrics(phase, timer, &keysCounted, &bytesCounted, &durationLastUpdated);

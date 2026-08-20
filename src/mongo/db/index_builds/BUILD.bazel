@@ -227,11 +227,13 @@ mongo_cc_library(
     ],
     deps = [
         ":index_build_block",
+        ":index_build_knobs_idl",
         ":resumable_index_builds_idl",
         "//src/mongo/db:multi_key_path_tracker",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db:throttle_cursor",
         "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query:collection_query_info",
