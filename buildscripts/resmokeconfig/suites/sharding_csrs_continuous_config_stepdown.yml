@@ -338,6 +338,12 @@ executor:
           # TODO: SERVER-45994 remove
           skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           skipCheckOrphans: true
+          # Allow internal clients to retry more aggressively, since config server stepdowns make
+          # retriable errors common in this suite.
+          setParameters:
+            defaultClientMaxRetryAttempts: 10
+          setParametersMongos:
+            defaultClientMaxRetryAttempts: 10
       eval: >-
         await import("jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js");
         await import("jstests/libs/override_methods/query/require_change_stream_test_fixture.js");
