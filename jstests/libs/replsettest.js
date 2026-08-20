@@ -3331,8 +3331,6 @@ export class ReplSetTest {
                 MongoRunner.getBinVersionFor("9.0"),
             ) === -1;
         if (olderThan90) {
-            delete options.setParameter
-                .initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs;
             // The MaxKey scan failpoints and the featureFlagMaxKeyDetection parameter were
             // introduced in 9.0. Older binaries do not know them and would fail to start if they
             // were passed as startup parameters.
