@@ -360,6 +360,71 @@ void recordSuffixLoweringMetrics(const Pipeline* suffix,
 }
 
 /**
+ * Identifies the portion of the pipeline not pushed down into the join optimizer, but eligible to
+ * pushdown into SBE. Pushes that portion into SBE, and removes those stages from the pipeline so
+ * they are not executed twice. Also records the resulting lowering metrics.
+ *
+ * Shared by the join plan cache hit path and the full optimization path so that recovering a plan
+ * from the cache produces the same executor as the query that populated the cache.
+ */
+void pushDownSbeEligibleSuffix(OperationContext* opCtx,
+                               const MultipleCollectionAccessor& mca,
+                               const AggJoinModel& model,
+                               NodeId baseNode,
+                               std::unique_ptr<QuerySolution>& soln,
+                               OpDebug::JoinOptimizationMetrics& metrics) {
+    auto* suffix = model.getSuffix();
+    size_t numPushedToSbe = 0;
+    if (suffix && suffix->peekFront()) {
+        auto& prefix = *model.getGraph().getNode(baseNode).accessPath;
+        // This helper identifies the stages in the 'suffix' pipeline that are eligible for running
+        // in SBE and prepend them to prefix.cqPipeline.
+
+        // When we call extendWithAggPipeline() below, it will mutate the existing join reordered
+        // query solution such that the stages in prefix.cqPipeline are placed above the join
+        // optimized stages. Any stages not eligible for join reordering or SBE pushdown remain
+        // in the `suffix` pipeline.
+        attachPipelineStages(
+            mca,
+            suffix,
+            false /* needsMerge */,
+            &prefix,
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
+                .opCtx = opCtx,
+                .canonicalQuery = prefix,
+                .collections = mca,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+            }));
+
+        // 'attachPipelineStages()' prepends the SBE-eligible suffix stages onto
+        // 'prefix.cqPipeline()', so its size is exactly the number of stages we lowered.
+        numPushedToSbe = prefix.cqPipeline().size();
+
+        if (!prefix.cqPipeline().empty()) {
+            QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx,
+                .canonicalQuery = prefix,
+                .collections = mca,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+            });
+
+            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, prefix, mca);
+            plannerParams.setTargetSbeStageBuilder(prefix, mca);
+            // Create the query solution
+            soln = QueryPlanner::extendWithAggPipeline(prefix,
+                                                       std::move(soln),
+                                                       plannerParams.secondaryCollectionsInfo,
+                                                       false /* skipOptimization */);
+        }
+        // Remove any of the stages pushed down via attachPipelineStages, from the pipeline 'suffix'
+        // so they are not executed twice (once in SBE and again in classic). Only the remaining
+        // stages in suffix will be executed in classic.
+        finalizePipelineStages(suffix, &prefix);
+    }
+    recordSuffixLoweringMetrics(suffix, numPushedToSbe, metrics);
+}
+
+/**
  * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
  * if it is stale and the query must be replanned.
  *
@@ -431,8 +496,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
         auto winnerSoln = std::make_unique<QuerySolution>();
         winnerSoln->setRoot(std::move(qsn));
 
-        // TODO SERVER-130469: Pushdown SBE eligible suffix.
-        recordSuffixLoweringMetrics(model.getSuffix(), 0 /* numPushedToSbe */, metrics);
+        pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
+
+        // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+        // PathArraynessChecker monitors them during execution yields.
+        model.getGraph()
+            .accessPathAt(hit->baseNode)
+            ->getExpCtx()
+            ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
+
         auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
                                                                            model.getGraph(),
                                                                            yieldPolicy,
@@ -689,58 +761,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the
     // SBE executor with the join-reordered prefix.
-    if (auto* suffix = model.getSuffix(); suffix && suffix->peekFront()) {
-
-        auto& prefix = *model.getGraph().getNode(reordered.baseNode).accessPath;
-        // This helper identifies the stages in the 'suffix' pipeline that are eligible for running
-        // in SBE and prepend them to prefix.cqPipeline.
-
-        // When we call extendWithAggPipeline() below, it will mutate the existing join reordered
-        // query solution such that the stages in prefix.cqPipeline are grafted above the join
-        // optimized stages. Any stages not eligible for join reordering or SBE pushdown remain
-        // in the `suffix` pipeline.
-        attachPipelineStages(
-            mca,
-            suffix,
-            false /* needsMerge */,
-            &prefix,
-            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
-                .opCtx = opCtx,
-                .canonicalQuery = prefix,
-                .collections = mca,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-            }));
-
-        // 'attachPipelineStages()' prepends the SBE-eligible suffix stages onto
-        // 'prefix.cqPipeline()', so its size is exactly the number of stages we lowered.
-        const size_t numPushed = prefix.cqPipeline().size();
-
-        if (!prefix.cqPipeline().empty()) {
-            QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
-                .opCtx = opCtx,
-                .canonicalQuery = prefix,
-                .collections = mca,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-            });
-
-            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, prefix, mca);
-            plannerParams.setTargetSbeStageBuilder(prefix, mca);
-            // Create the query solution
-            reordered.soln =
-                QueryPlanner::extendWithAggPipeline(prefix,
-                                                    std::move(reordered.soln),
-                                                    plannerParams.secondaryCollectionsInfo,
-                                                    false /* skipOptimization */);
-        }
-        // Remove any of the stages pushed down via attachPipelineStages, from the pipeline 'suffix'
-        // so they are not executed twice (once in SBE and again in classic). Only the remaining
-        // stages in suffix will be executed in classic.
-        finalizePipelineStages(suffix, &prefix);
-
-        recordSuffixLoweringMetrics(suffix, numPushed, metrics);
-    } else {
-        recordSuffixLoweringMetrics(suffix, 0 /* numPushedToSbe */, metrics);
-    }
+    pushDownSbeEligibleSuffix(opCtx, mca, model, reordered.baseNode, reordered.soln, metrics);
 
     // Test hook: all sampling and join reordering is complete at this point.
     hangAfterJoinModelConstruction.pauseWhileSet(opCtx);
