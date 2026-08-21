@@ -167,15 +167,14 @@ describe("Test placementConflictTime", function () {
         st.s.getDB(otherDb).dropDatabase();
 
         const session = st.s.startSession();
-        const sessionDB = session.getDatabase(dbName);
 
         // Start the transaction
         session.startTransaction({readConcern: {level: "local"}});
 
-        // Start the txn with a random operation to setup the placementConflictTime for this txn.
-        assert.eq(1, sessionDB.getCollection(nameCollA).find().itcount());
-
-        // Create a database within the txn.
+        // There is no need to run a dummy statement to establish a placementConflictTime, this
+        // statement will do it. It's important to make sure that createCollection is the first
+        // statement of the txn, otherwise the transaction could be aborted by the StaleConfig
+        // thrown to recover the CollectionMetadata (which was set to UNKNOWN by the DB drop).
         const otherSessionDB = session.getDatabase(otherDb);
         assert.commandWorked(otherSessionDB.createCollection(otherColl));
 
