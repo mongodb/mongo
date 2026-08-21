@@ -14,6 +14,28 @@ class PackageTestCommandsTest(unittest.TestCase):
             f"apt-get -o Acquire::Retries={under_test.APT_RETRIES}", apt_commands["install"]
         )
 
+    def test_release_package_test_args_include_system_library_skip(self):
+        self.assertEqual(
+            [
+                "--edition",
+                "enterprise",
+                "--platform",
+                "ubuntu2404",
+                "--skip-system-library-check",
+                "package.tgz",
+            ],
+            under_test.build_package_test_internal_args(
+                "enterprise", "ubuntu2404", ["package.tgz"], skip_system_library_check=True
+            ),
+        )
+
+    def test_branch_package_test_args_do_not_include_system_library_skip(self):
+        args = under_test.build_package_test_internal_args(
+            "enterprise", "ubuntu2404", ["package.tgz"]
+        )
+
+        self.assertNotIn("--skip-system-library-check", args)
+
 
 if __name__ == "__main__":
     unittest.main()

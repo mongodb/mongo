@@ -19,3 +19,17 @@ PACKAGE_MANAGER_COMMANDS: dict[str, dict[str, str]] = {
         "install": "zypper -n install {}",
     },
 }
+
+
+def build_package_test_internal_args(
+    edition: str,
+    platform: str,
+    package_urls: list[str],
+    skip_system_library_check: bool = False,
+) -> list[str]:
+    """Build the arguments passed to package_test_internal.py."""
+
+    args = ["--edition", edition, "--platform", platform]
+    if skip_system_library_check:
+        args.append("--skip-system-library-check")
+    return args + package_urls

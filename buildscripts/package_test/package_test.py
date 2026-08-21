@@ -25,7 +25,10 @@ from docker.models.containers import Container
 from docker.models.images import Image
 from retry.api import retry_call
 
-from buildscripts.package_test.package_test_commands import PACKAGE_MANAGER_COMMANDS
+from buildscripts.package_test.package_test_commands import (
+    PACKAGE_MANAGER_COMMANDS,
+    build_package_test_internal_args,
+)
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
     RELEASE_BINARY_NAMES,
@@ -740,9 +743,15 @@ def run_test(test: Test, client: DockerClient) -> Result:
         else:
             docker_packages_urls.append(url)
 
+    internal_test_options = build_package_test_internal_args(
+        test.edition,
+        test.os_name,
+        docker_packages_urls,
+        getattr(args, "skip_system_library_check", False),
+    )
     commands.append(
         f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
-        f"--edition {test.edition} --platform {test.os_name} {' '.join(docker_packages_urls)}"
+        f"{' '.join(internal_test_options)}"
     )
     logging.debug(
         "Attempting to run the following docker commands:\n\t%s",
@@ -1005,6 +1014,12 @@ release_test_parser.add_argument(
     help="Version of MongoDB to run tests for",
     choices=["all"] + list(versions),
     default="all",
+)
+release_test_parser.add_argument(
+    "--skip-system-library-check",
+    action="store_true",
+    help="Skip checking the direct system-library dependencies of server binaries.",
+    default=False,
 )
 release_test_parser.add_argument(
     "--evg-project",

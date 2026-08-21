@@ -613,6 +613,17 @@ def test_binary_system_dependencies(test_args: TestArgs) -> None:
         )
 
 
+def run_server_package_tests(
+    test_args: TestArgs, expected_edition: str, skip_system_library_check: bool = False
+) -> None:
+    test_binary_edition(test_args, expected_edition)
+    if not skip_system_library_check:
+        test_binary_system_dependencies(test_args)
+    setup(test_args)
+    install_fake_systemd(test_args)
+    test_start()
+
+
 def download_extract_package(package: str) -> List[str]:
     # Handle local files (file:// protocol) - these are pre-downloaded by package_test.py
     # when using --evg-build-id for private artifacts
@@ -1057,27 +1068,43 @@ def test_uninstall_is_complete(test_args: TestArgs):
             raise RuntimeError("Failed to uninstall cleanly, found: {}".format(path))
 
 
+def parse_package_test_arguments(package_args: List[str]) -> Tuple[str, List[str], bool]:
+    """Parse package_test.py arguments after the log path and edition."""
+
+    skip_system_library_check = "--skip-system-library-check" in package_args
+    package_args = [
+        package_arg for package_arg in package_args if package_arg != "--skip-system-library-check"
+    ]
+    package_platform = ""
+    if package_args and package_args[0] == "--platform":
+        if len(package_args) < 2:
+            raise ValueError("No package platform was provided... Failing test")
+        package_platform = package_args[1]
+        package_args = package_args[2:]
+
+    return package_platform, package_args, skip_system_library_check
+
+
 def main() -> int:
     global test_args
 
     if len(sys.argv) < 5 or sys.argv[2] != "--edition":
         print(
             "Usage: {} <log-path> --edition <edition> [--platform <platform>] "
+            "[--skip-system-library-check] "
             "<package-url> [package-url ...]".format(sys.argv[0])
         )
         return 1
 
     configure_logging(sys.argv[1])
     expected_edition = sys.argv[3]
-    package_args = sys.argv[4:]
-    package_platform = ""
-    if package_args and package_args[0] == "--platform":
-        if len(package_args) < 2:
-            logging.error("No package platform was provided... Failing test")
-            return 1
-        package_platform = package_args[1]
-        package_args = package_args[2:]
-    package_urls = package_args
+    try:
+        package_platform, package_urls, skip_system_library_check = parse_package_test_arguments(
+            sys.argv[4:]
+        )
+    except ValueError as exc:
+        logging.error(str(exc))
+        return 1
 
     if len(package_urls) == 0:
         logging.error("No packages to test... Failing test")
@@ -1108,11 +1135,7 @@ def main() -> int:
     logging.info("Detected package kind: %s", test_args["package_kind"])
 
     if test_args["package_kind"] == "server":
-        test_binary_edition(test_args, expected_edition)
-        test_binary_system_dependencies(test_args)
-        setup(test_args)
-        install_fake_systemd(test_args)
-        test_start()
+        run_server_package_tests(test_args, expected_edition, skip_system_library_check)
 
     test_install_is_complete(test_args)
 
