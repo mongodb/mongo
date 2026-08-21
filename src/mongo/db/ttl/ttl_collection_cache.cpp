@@ -27,14 +27,12 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
-    {
-        std::lock_guard<std::mutex> lock(_ttlInfosLock);
-        _ttlInfos[uuid].push_back(info);
-    }
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock, uuid, info);
+    _ttlInfos[uuid].push_back(info);
 }
 
-void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
-    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+void TTLCollectionCache::_deregisterTTLInfo(WithLock, const UUID& uuid, const Info& info) {
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
         LOGV2_DEBUG(9150100,
@@ -81,12 +79,13 @@ void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
 }
 
 void TTLCollectionCache::deregisterTTLIndexByName(UUID uuid, const IndexName& indexName) {
-    _deregisterTTLInfo(std::move(uuid), TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}});
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock, uuid, TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}});
 }
 
 void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {
-    _deregisterTTLInfo(std::move(uuid),
-                       TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock, uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
 }
 
 void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
