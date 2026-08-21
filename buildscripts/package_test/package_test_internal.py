@@ -4,12 +4,14 @@ This script needs to support older Python versions because package testing runs 
 operating systems. For example, Ubuntu 16.04 uses Python 3.5.
 """
 
+import gzip
 import json
 import logging
 import os
 import pathlib
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -17,7 +19,7 @@ import tarfile
 import time
 import traceback
 from logging.handlers import WatchedFileHandler
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 try:
     import grp
@@ -46,6 +48,196 @@ test_args = {}  # type: TestArgs
 SERVER_PACKAGE_RE = re.compile(r"^mongodb-(?:org|enterprise)(?:-unstable)?(?:-server)?$")
 CRYPT_V1_PACKAGE_RE = re.compile(r"^mongodb-enterprise(?:-unstable)?-crypt-v1$")
 _LOGGING_CONFIGURED = False
+
+SERVER_BINARY_NAMES = ("mongod", "mongos")
+
+# These baselines were verified against the 9.1.0 Linux nightly published on
+# 2026-08-19, with the 8.3.8 Linux release archives used for enterprise and
+# current release targets and the 7.0.40 archives used for legacy targets that
+# do not publish a public nightly archive. The two server binaries have the
+# same direct dependencies for each platform and edition, but both are checked
+# below so that a future divergence is visible.
+_COMMON_SYSTEM_LIBRARIES = frozenset(
+    ["libcurl.so.4", "libm.so.6", "libresolv.so.2", "libgcc_s.so.1", "libc.so.6"]
+)
+_OPENSSL_1_0_SYSTEM_LIBRARIES = _COMMON_SYSTEM_LIBRARIES | frozenset(
+    ["libdl.so.2", "librt.so.1", "libcrypto.so.1.0.0", "libssl.so.1.0.0", "libpthread.so.0"]
+)
+_OPENSSL_1_0_RPM_SYSTEM_LIBRARIES = _COMMON_SYSTEM_LIBRARIES | frozenset(
+    ["libdl.so.2", "librt.so.1", "libcrypto.so.10", "libssl.so.10", "libpthread.so.0"]
+)
+_OPENSSL_1_1_SYSTEM_LIBRARIES = _COMMON_SYSTEM_LIBRARIES | frozenset(
+    ["libdl.so.2", "librt.so.1", "libcrypto.so.1.1", "libssl.so.1.1", "libpthread.so.0"]
+)
+_OPENSSL_3_SYSTEM_LIBRARIES = _COMMON_SYSTEM_LIBRARIES | frozenset(
+    ["libcrypto.so.3", "libssl.so.3"]
+)
+
+_ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES = frozenset(
+    [
+        "libldap_r-2.4.so.2",
+        "liblber-2.4.so.2",
+        "libgssapi_krb5.so.2",
+        "libsasl2.so.2",
+    ]
+)
+_ENTERPRISE_DEBIAN_LDAP_2_5_SYSTEM_LIBRARIES = frozenset(
+    [
+        "libldap-2.5.so.0",
+        "liblber-2.5.so.0",
+        "libgssapi_krb5.so.2",
+        "libsasl2.so.2",
+    ]
+)
+_ENTERPRISE_DEBIAN_LDAP_2_6_SYSTEM_LIBRARIES = frozenset(
+    ["libldap.so.2", "liblber.so.2", "libgssapi_krb5.so.2", "libsasl2.so.2"]
+)
+_ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES = frozenset(
+    [
+        "libldap-2.4.so.2",
+        "liblber-2.4.so.2",
+        "libgssapi_krb5.so.2",
+        "libsasl2.so.3",
+    ]
+)
+_ENTERPRISE_RPM_LDAP_R_2_4_SYSTEM_LIBRARIES = frozenset(
+    [
+        "libldap_r-2.4.so.2",
+        "liblber-2.4.so.2",
+        "libgssapi_krb5.so.2",
+        "libsasl2.so.3",
+    ]
+)
+_ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES = frozenset(
+    ["libldap.so.2", "liblber.so.2", "libgssapi_krb5.so.2", "libsasl2.so.3"]
+)
+
+# The key is the package target, rather than /etc/os-release's ID. For
+# example, the rhel88 package test runs in an almalinux:8 container. Keep the
+# package target here so that the checked-in list describes the binary that
+# was built, not merely the container used to test it.
+EXPECTED_DIRECT_SYSTEM_LIBRARIES = {
+    "amazon2": {
+        "org": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "amazon2023": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_R_2_4_SYSTEM_LIBRARIES,
+    },
+    "debian10": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "debian11": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "debian12": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_5_SYSTEM_LIBRARIES,
+    },
+    "debian13": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+    "debian71": {
+        "org": _OPENSSL_1_0_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "debian81": {
+        "org": _OPENSSL_1_0_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "debian92": {
+        "org": _OPENSSL_1_0_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel70": {
+        "org": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel71": {
+        "org": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel72": {
+        "org": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel79": {
+        "org": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_RPM_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel8": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel80": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel81": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel82": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel83": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel88": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel90": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+    "rhel93": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+    "rhel10": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+    "suse12": {
+        "org": _OPENSSL_1_0_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "suse15": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_R_2_4_SYSTEM_LIBRARIES,
+    },
+    "suse16": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+    "ubuntu1604": {
+        "org": _OPENSSL_1_0_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_0_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "ubuntu1804": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "ubuntu2004": {
+        "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "ubuntu2204": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_5_SYSTEM_LIBRARIES,
+    },
+    "ubuntu2404": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_DEBIAN_LDAP_2_6_SYSTEM_LIBRARIES,
+    },
+}
 
 
 def configure_logging(log_path: str) -> None:
@@ -153,6 +345,7 @@ def get_required_files(test_args: TestArgs) -> List[pathlib.Path]:
         return [
             pathlib.Path("/etc/mongod.conf"),
             pathlib.Path("/usr/bin/mongod"),
+            pathlib.Path("/usr/bin/mongos"),
             pathlib.Path("/var/log/mongodb/mongod.log"),
             pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
         ]
@@ -188,6 +381,7 @@ def get_leftover_files(test_args: TestArgs) -> List[pathlib.Path]:
     if test_args["package_kind"] == "server":
         return [
             pathlib.Path("/usr/bin/mongod"),
+            pathlib.Path("/usr/bin/mongos"),
             pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
         ]
 
@@ -208,6 +402,215 @@ def run_and_log(cmd: str, end_on_error: bool = True) -> subprocess.CompletedProc
         logging.error("Command %s failed, failing test\n", cmd)
         raise RuntimeError("Command failed")
     return proc
+
+
+def write_compressed_text_file(output_path: pathlib.Path, contents: str) -> None:
+    """Write text to a gzip-compressed file."""
+
+    with gzip.open(str(output_path), "wt", encoding="utf-8") as output_file:
+        output_file.write(contents)
+
+
+def get_expected_direct_system_libraries(package_platform: str, edition: str) -> Set[str]:
+    base_edition = get_base_edition(edition)
+    try:
+        expected = EXPECTED_DIRECT_SYSTEM_LIBRARIES[package_platform][base_edition]
+    except KeyError as exc:
+        raise RuntimeError(
+            "No direct system library baseline is defined for package platform `{}` and "
+            "edition `{}`".format(package_platform, base_edition)
+        ) from exc
+
+    return set(expected)
+
+
+def parse_readelf_dependencies(readelf_output: str) -> Set[str]:
+    """Parse the direct shared-library names from readelf's dynamic section."""
+
+    dependencies = set()  # type: Set[str]
+    for line in readelf_output.splitlines():
+        match = re.search(r"Shared library: \[(?P<name>[^]]+)\]", line)
+        if match:
+            dependencies.add(match.group("name"))
+
+    return dependencies
+
+
+def parse_ldd_dependencies(ldd_output: str) -> Dict[str, Optional[str]]:
+    """Parse loaded shared-library names and resolved paths from ldd output."""
+
+    dependencies = {}  # type: Dict[str, Optional[str]]
+    for line in ldd_output.splitlines():
+        line = line.strip()
+        if not line or line.startswith("linux-vdso") or line.startswith("linux-gate"):
+            continue
+
+        if " => " in line:
+            name, resolved = line.split(" => ", 1)
+            resolved = resolved.split(" (", 1)[0].strip()
+            dependencies[name] = None if resolved == "not found" else resolved
+            continue
+
+        if line.startswith("/"):
+            resolved = line.split(" (", 1)[0].strip()
+            dependencies[os.path.basename(resolved)] = resolved
+            continue
+
+        # Keep an unresolved entry for libc implementations whose ldd output
+        # contains a SONAME without an absolute path. This will make the
+        # package check fail with a useful diagnostic rather than silently
+        # omitting the dependency from the report.
+        name = line.split(" ", 1)[0]
+        if name and not name.startswith("("):
+            dependencies[name] = None
+
+    return dependencies
+
+
+def get_binary_system_dependencies(
+    binary_path: pathlib.Path,
+) -> Tuple[Set[str], Set[str], Dict[str, Optional[str]]]:
+    """Return direct and transitive shared libraries loaded by a binary."""
+
+    quoted_binary_path = shlex.quote(str(binary_path))
+    readelf_output = run_and_log(
+        "readelf --dynamic --use-dynamic --wide {}".format(quoted_binary_path)
+    ).stdout.decode("utf-8")
+    direct_dependencies = parse_readelf_dependencies(readelf_output)
+    if not direct_dependencies:
+        raise RuntimeError(
+            "Could not find direct shared-library dependencies for {}".format(binary_path)
+        )
+
+    ldd_output = run_and_log("ldd {}".format(quoted_binary_path)).stdout.decode("utf-8")
+    loaded_dependencies = parse_ldd_dependencies(ldd_output)
+    missing_direct_dependencies = sorted(set(direct_dependencies) - set(loaded_dependencies))
+    if missing_direct_dependencies:
+        raise RuntimeError(
+            "ldd did not report direct dependencies for {}: {}".format(
+                binary_path, ", ".join(missing_direct_dependencies)
+            )
+        )
+
+    unresolved_dependencies = sorted(
+        name for name, resolved_path in loaded_dependencies.items() if resolved_path is None
+    )
+    if unresolved_dependencies:
+        raise RuntimeError(
+            "ldd could not resolve dependencies for {}: {}".format(
+                binary_path, ", ".join(unresolved_dependencies)
+            )
+        )
+
+    transitive_dependencies = set(loaded_dependencies) - direct_dependencies
+    return direct_dependencies, transitive_dependencies, loaded_dependencies
+
+
+def get_system_package_names(test_args: TestArgs, library_path: str) -> List[str]:
+    """Return the installed package(s) that own a resolved system library."""
+
+    quoted_library_path = shlex.quote(library_path)
+    if test_args["package_manager"] == "apt":
+        command = "dpkg-query --search {}".format(quoted_library_path)
+    elif test_args["package_manager"] in ("yum", "zypper"):
+        command = "rpm --query --whatprovides --queryformat '%{{NAME}}\\n' {}".format(
+            quoted_library_path
+        )
+    else:
+        raise RuntimeError(
+            "Don't know how to find the owning package with package manager: {}".format(
+                test_args["package_manager"]
+            )
+        )
+
+    result = run_and_log(command, end_on_error=False)
+    if result.returncode != 0:
+        return []
+
+    package_names = set()  # type: Set[str]
+    for line in result.stdout.decode("utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if test_args["package_manager"] == "apt":
+            package_names.add(line.split(": ", 1)[0])
+        else:
+            package_names.add(line)
+
+    return sorted(package_names)
+
+
+def format_system_dependency_lines(
+    test_args: TestArgs,
+    dependency_names: Set[str],
+    resolved_paths: Dict[str, Optional[str]],
+) -> str:
+    lines = []  # type: List[str]
+    for dependency_name in sorted(dependency_names):
+        resolved_path = resolved_paths.get(dependency_name)
+        package_names = (
+            get_system_package_names(test_args, resolved_path) if resolved_path is not None else []
+        )
+        package_text = ", ".join(package_names) if package_names else "package unknown"
+        lines.append("    {} ({})".format(dependency_name, package_text))
+
+    return "\n".join(lines) if lines else "    (none)"
+
+
+def test_binary_system_dependencies(test_args: TestArgs) -> None:
+    """Check direct ELF dependencies and report the complete loaded dependency set."""
+
+    package_platform = test_args.get("platform") or test_args["os_name"]
+    package_edition = get_package_edition(test_args["package_names"])
+    expected_direct_dependencies = get_expected_direct_system_libraries(
+        package_platform, package_edition
+    )
+    failures = []  # type: List[str]
+
+    logging.info(
+        "Checking direct system library dependencies for %s %s packages.",
+        package_platform,
+        package_edition,
+    )
+
+    for binary_name in SERVER_BINARY_NAMES:
+        binary_path = pathlib.Path("/usr/bin") / binary_name
+        if not binary_path.is_file():
+            failures.append("Required binary missing: {}".format(binary_path))
+            continue
+
+        try:
+            direct_dependencies, transitive_dependencies, resolved_paths = (
+                get_binary_system_dependencies(binary_path)
+            )
+        except RuntimeError as exc:
+            failures.append(str(exc))
+            continue
+
+        logging.info(
+            "System dependencies for %s:\n  Direct:\n%s\n  Transitive:\n%s",
+            binary_path,
+            format_system_dependency_lines(test_args, direct_dependencies, resolved_paths),
+            format_system_dependency_lines(test_args, transitive_dependencies, resolved_paths),
+        )
+
+        if direct_dependencies == expected_direct_dependencies:
+            continue
+
+        missing_dependencies = sorted(expected_direct_dependencies - direct_dependencies)
+        unexpected_dependencies = sorted(direct_dependencies - expected_direct_dependencies)
+        failures.append(
+            "Direct system library dependencies for {} changed. Missing: {}; unexpected: {}".format(
+                binary_path,
+                ", ".join(missing_dependencies) if missing_dependencies else "(none)",
+                ", ".join(unexpected_dependencies) if unexpected_dependencies else "(none)",
+            )
+        )
+
+    if failures:
+        raise RuntimeError(
+            "System library dependency check failed:\n- {}".format("\n- ".join(failures))
+        )
 
 
 def download_extract_package(package: str) -> List[str]:
@@ -363,12 +766,15 @@ def parse_ulimits(pid: int) -> Dict[str, Tuple[int, int, Optional[str]]]:
     return result
 
 
-def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
+def get_test_args(
+    package_manager: str, package_files: List[str], package_platform: str = ""
+) -> TestArgs:
     # Set up data for later tests
     test_args = {}  # type: TestArgs
 
     test_args["package_manager"] = package_manager
     test_args["package_files"] = package_files
+    test_args["platform"] = package_platform
 
     os_name, os_version_major, os_version_minor = get_os_release()
     test_args["os_name"] = os_name
@@ -656,15 +1062,22 @@ def main() -> int:
 
     if len(sys.argv) < 5 or sys.argv[2] != "--edition":
         print(
-            "Usage: {} <log-path> --edition <edition> <package-url> [package-url ...]".format(
-                sys.argv[0]
-            )
+            "Usage: {} <log-path> --edition <edition> [--platform <platform>] "
+            "<package-url> [package-url ...]".format(sys.argv[0])
         )
         return 1
 
     configure_logging(sys.argv[1])
     expected_edition = sys.argv[3]
-    package_urls = sys.argv[4:]
+    package_args = sys.argv[4:]
+    package_platform = ""
+    if package_args and package_args[0] == "--platform":
+        if len(package_args) < 2:
+            logging.error("No package platform was provided... Failing test")
+            return 1
+        package_platform = package_args[1]
+        package_args = package_args[2:]
+    package_urls = package_args
 
     if len(package_urls) == 0:
         logging.error("No packages to test... Failing test")
@@ -690,12 +1103,13 @@ def main() -> int:
         logging.error("Found no supported package manager...Failing Test\n")
         return 1
 
-    test_args = get_test_args(package_manager, package_files)
+    test_args = get_test_args(package_manager, package_files, package_platform)
     logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
     logging.info("Detected package kind: %s", test_args["package_kind"])
 
     if test_args["package_kind"] == "server":
         test_binary_edition(test_args, expected_edition)
+        test_binary_system_dependencies(test_args)
         setup(test_args)
         install_fake_systemd(test_args)
         test_start()

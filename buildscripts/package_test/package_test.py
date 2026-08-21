@@ -26,6 +26,7 @@ from docker.models.images import Image
 from retry.api import retry_call
 
 from buildscripts.package_test.package_test_commands import PACKAGE_MANAGER_COMMANDS
+from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
     RELEASE_BINARY_NAMES,
     combine_execution_log_validation_summaries,
@@ -607,7 +608,7 @@ class Test:
 
         self.base_image = OS_DOCKER_LOOKUP[self.os_name][0]
         self.package_manager = OS_DOCKER_LOOKUP[self.os_name][1]
-        self.base_packages = list(OS_DOCKER_LOOKUP[self.os_name][2])
+        self.base_packages = sorted(set(OS_DOCKER_LOOKUP[self.os_name][2]) | {"binutils"})
         self.python_command = OS_DOCKER_LOOKUP[self.os_name][3]
 
         self.update_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["update"]
@@ -741,7 +742,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
 
     commands.append(
         f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
-        f"--edition {test.edition} {' '.join(docker_packages_urls)}"
+        f"--edition {test.edition} --platform {test.os_name} {' '.join(docker_packages_urls)}"
     )
     logging.debug(
         "Attempting to run the following docker commands:\n\t%s",
@@ -1281,7 +1282,14 @@ if args.command == "branch":
                     text=True,
                 )
                 output_text = p.stdout + p.stderr
-                logging.info(output_text)
+                source_output_path = Path(f"package-test-gdb-sources-{binary_name}.txt.gz")
+                write_compressed_text_file(source_output_path, output_text)
+                logging.info(
+                    "Wrote GDB source output for %s to %s (%d compressed bytes)",
+                    binary_name,
+                    source_output_path,
+                    source_output_path.stat().st_size,
+                )
 
                 validate_no_libdwarf(output_text, args.edition, binfile)
                 validate_enterprise(output_text, args.edition, binfile)

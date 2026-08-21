@@ -1,4 +1,6 @@
+import gzip
 import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -6,6 +8,16 @@ from buildscripts.package_test import package_test_internal as under_test
 
 
 class PackageTestInternalHelpersTest(unittest.TestCase):
+    def test_writes_compressed_text_file(self):
+        contents = "source_one.cpp\nsource_two.h\n"
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_path = pathlib.Path(temporary_directory) / "sources.txt.gz"
+
+            under_test.write_compressed_text_file(output_path, contents)
+
+            with gzip.open(str(output_path), "rt", encoding="utf-8") as output_file:
+                self.assertEqual(contents, output_file.read())
+
     def test_detects_server_package_sets(self):
         package_names = [
             "mongodb-enterprise-unstable",
@@ -85,6 +97,88 @@ class PackageTestInternalHelpersTest(unittest.TestCase):
                     {"package_names": ["mongodb-enterprise"]}, "enterprise"
                 )
 
+    def test_parses_readelf_direct_dependencies(self):
+        readelf_output = """
+ 0x0000000000000001 (NEEDED)             Shared library: [libcurl.so.4]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+"""
+
+        self.assertEqual(
+            {"libcurl.so.4", "libc.so.6"}, under_test.parse_readelf_dependencies(readelf_output)
+        )
+
+    def test_parses_ldd_dependencies(self):
+        ldd_output = """
+linux-vdso.so.1 (0x0000ffff)
+libcurl.so.4 => /lib/aarch64-linux-gnu/libcurl.so.4 (0x0000ffff)
+/lib/ld-linux-aarch64.so.1 (0x0000ffff)
+"""
+
+        self.assertEqual(
+            {
+                "libcurl.so.4": "/lib/aarch64-linux-gnu/libcurl.so.4",
+                "ld-linux-aarch64.so.1": "/lib/ld-linux-aarch64.so.1",
+            },
+            under_test.parse_ldd_dependencies(ldd_output),
+        )
+
+    def test_expected_direct_dependencies_do_not_include_architecture_loader(self):
+        expected = under_test.get_expected_direct_system_libraries("ubuntu2204", "org")
+
+        self.assertIn("libcrypto.so.3", expected)
+        self.assertNotIn("ld-linux-aarch64.so.1", expected)
+        self.assertNotIn("ld-linux-x86-64.so.2", expected)
+
+    def test_system_dependency_check_checks_mongod_and_mongos(self):
+        test_args = {
+            "package_manager": "apt",
+            "package_names": ["mongodb-org"],
+            "package_kind": "server",
+            "platform": "ubuntu2204",
+            "os_name": "ubuntu",
+            "arch": "x86_64",
+        }
+        expected = under_test.get_expected_direct_system_libraries("ubuntu2204", "org")
+        resolved_paths = {dependency: "/lib/" + dependency for dependency in expected}
+
+        with (
+            mock.patch.object(under_test.pathlib.Path, "is_file", return_value=True),
+            mock.patch.object(
+                under_test,
+                "get_binary_system_dependencies",
+                return_value=(expected, set(), resolved_paths),
+            ) as get_dependencies,
+            mock.patch.object(under_test, "get_system_package_names", return_value=["libc6"]),
+        ):
+            under_test.test_binary_system_dependencies(test_args)
+
+        self.assertEqual(2, get_dependencies.call_count)
+
+    def test_system_dependency_check_rejects_unexpected_direct_dependency(self):
+        test_args = {
+            "package_manager": "apt",
+            "package_names": ["mongodb-org"],
+            "package_kind": "server",
+            "platform": "ubuntu2204",
+            "os_name": "ubuntu",
+            "arch": "x86_64",
+        }
+        expected = under_test.get_expected_direct_system_libraries("ubuntu2204", "org")
+        actual = expected | {"libunexpected.so.1"}
+        resolved_paths = {dependency: "/lib/" + dependency for dependency in actual}
+
+        with (
+            mock.patch.object(under_test.pathlib.Path, "is_file", return_value=True),
+            mock.patch.object(
+                under_test,
+                "get_binary_system_dependencies",
+                return_value=(actual, set(), resolved_paths),
+            ),
+            mock.patch.object(under_test, "get_system_package_names", return_value=[]),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "unexpected: libunexpected.so.1"):
+                under_test.test_binary_system_dependencies(test_args)
+
     def test_server_required_files_include_mongod_service(self):
         test_args = {
             "package_kind": "server",
@@ -95,10 +189,20 @@ class PackageTestInternalHelpersTest(unittest.TestCase):
             [
                 pathlib.Path("/etc/mongod.conf"),
                 pathlib.Path("/usr/bin/mongod"),
+                pathlib.Path("/usr/bin/mongos"),
                 pathlib.Path("/var/log/mongodb/mongod.log"),
                 pathlib.Path("/usr/lib/systemd/system/mongod.service"),
             ],
             under_test.get_required_files(test_args),
+        )
+
+        self.assertEqual(
+            [
+                pathlib.Path("/usr/bin/mongod"),
+                pathlib.Path("/usr/bin/mongos"),
+                pathlib.Path("/usr/lib/systemd/system/mongod.service"),
+            ],
+            under_test.get_leftover_files(test_args),
         )
 
     def test_crypt_v1_required_files_follow_libdir(self):
