@@ -155,7 +155,7 @@ public:
         return _indexCursors;
     }
 
-    const std::unique_ptr<SeekableRecordThrottleCursor>& getTraverseRecordStoreCursor() const {
+    std::shared_ptr<SeekableRecordThrottleCursor> getTraverseRecordStoreCursor() {
         return _traverseRecordStoreCursor;
     }
 
@@ -228,7 +228,7 @@ private:
 
     // Shared cursors to be used during validation, created in 'initializeCursors()'.
     StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;
-    std::unique_ptr<SeekableRecordThrottleCursor> _traverseRecordStoreCursor;
+    std::shared_ptr<SeekableRecordThrottleCursor> _traverseRecordStoreCursor;
     std::unique_ptr<SeekableRecordThrottleCursor> _seekRecordStoreCursor;
 
     RecordId _firstRecordId;

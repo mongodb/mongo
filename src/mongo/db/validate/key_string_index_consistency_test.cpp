@@ -9,6 +9,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/validate/collection_validation.h"
+#include "mongo/db/validate/concurrent_progress_meter.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/logv2/log.h"
@@ -584,7 +585,7 @@ KeyStringIndexConsistency runTwoPhaseScan(OperationContext* opCtx,
 
     // traverseIndex() only touches the progress meter while iterating real index entries, but a
     // live meter is still required for collections that have extra index entries to report.
-    ProgressMeterHolder progress;
+    ConcurrentProgressMeterHolder progress;
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(lk, CurOp::get(opCtx)->setProgress(lk, "test validate", 1), opCtx);

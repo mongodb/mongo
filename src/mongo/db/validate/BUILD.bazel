@@ -81,6 +81,7 @@ mongo_cc_library(
         "collection_validation.cpp",
         "concurrent_progress_meter.cpp",
         "key_string_index_consistency.cpp",
+        "record_store_slicer.cpp",
         "validate_adaptor.cpp",
         "validate_timeseries.cpp",
     ],
@@ -108,6 +109,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 
@@ -118,6 +120,7 @@ mongo_cc_unit_test(
         "collection_validation_test.cpp",
         "concurrent_progress_meter_test.cpp",
         "key_string_index_consistency_test.cpp",
+        "record_store_slicer_test.cpp",
         "size_limited_bsonobj_heap_test.cpp",
         "validate_results_test.cpp",
     ],

@@ -368,7 +368,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                 ru.setSizeStatsCursor(false);
             }
         });
-        _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+        _traverseRecordStoreCursor = std::make_shared<SeekableRecordThrottleCursor>(
             opCtx, getCollection()->getRecordStore(), &_dataThrottle);
     }
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(

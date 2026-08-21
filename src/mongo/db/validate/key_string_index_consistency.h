@@ -14,6 +14,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/throttle_cursor.h"
+#include "mongo/db/validate/concurrent_progress_meter.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/util/modules.h"
@@ -112,11 +113,22 @@ public:
     void setSecondPhase();
 
     /**
+     * Whether partial results accumulated by separate instances can be combined with merge().
+     *
+     * Only first-phase state is mergeable: once validation advances to the second phase it records
+     * missing and extra index entries, which have ordering dependencies that merge() rejects. A
+     * caller that wants to accumulate results in parallel must check this first.
+     */
+    bool canMergeResults() const {
+        return _phase == Phase::kFirst;
+    }
+
+    /**
      * Traverses the column-store index via 'cursor' and accumulates the traversal results.
      */
     int64_t traverseIndex(OperationContext* opCtx,
                           const IndexCatalogEntry* index,
-                          ProgressMeterHolder& _progress,
+                          ConcurrentProgressMeterHolder& progress,
                           ValidateResults* results);
 
     /**

@@ -717,7 +717,7 @@ void _validateKeyOrder(OperationContext* opCtx,
 
 int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                                                  const IndexCatalogEntry* index,
-                                                 ProgressMeterHolder& _progress,
+                                                 ConcurrentProgressMeterHolder& progress,
                                                  ValidateResults* results) {
     const IndexDescriptor* descriptor = index->descriptor();
     const auto indexName = descriptor->indexName();
@@ -798,10 +798,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                 results->addError(ss.str());
             }
         }
-        {
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            _progress.get(lk)->hit();
-        }
+        progress.hit();
         numKeys++;
         prevIndexKeyStringEntry = indexEntry;
 

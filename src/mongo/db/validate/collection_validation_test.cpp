@@ -394,6 +394,32 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCountAndSize) {
         {collection_validation::ValidateMode::kForegroundFullEnforceFastCountAndSize});
 }
 
+// Verify that a record store which is empty from the traversal's point of view does not have its
+// zeroed traversal counters compared against the fast count. A record store can look empty to
+// validate's snapshot while the fast count still reflects records in some cases.
+TEST_F(CollectionValidationTest, ValidateEnforceFastCountSkippedWhenTraversalSeesNoRecords) {
+    auto opCtx = operationContext();
+
+    // Skew the fast count so it disagrees with the empty record store, standing in for records that
+    // exist but are invisible to this snapshot.
+    {
+        const AutoGetCollection coll(opCtx, kNss, MODE_X);
+        coll->getRecordStore()->updateStatsAfterRepair(/*numRecords=*/2, /*dataSize=*/64);
+        ASSERT_EQ(2, coll->latestSizeCount(opCtx).count);
+    }
+
+    foregroundValidate(
+        kNss,
+        opCtx,
+        {.valid = true,
+         .numRecords = 0,
+         .numInvalidDocuments = 0,
+         .numErrors = 0,
+         .numWarnings = 0},
+        {collection_validation::ValidateMode::kForegroundFullEnforceFastCount,
+         collection_validation::ValidateMode::kForegroundFullEnforceFastCountAndSize});
+}
+
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeUserLimit) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,

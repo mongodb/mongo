@@ -21,6 +21,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -35,13 +36,17 @@
 #include "mongo/db/throttle_cursor.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
+#include "mongo/db/validate/record_store_slicer.h"
 #include "mongo/db/validate/validate_timeseries.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
@@ -278,6 +283,64 @@ void _validateFastCountAndSize(OperationContext* opCtx,
     }
 }
 
+/**
+ * Reads through the ValidateState's shared cursor, which throttles its reads and yields its
+ * snapshot periodically. This is the policy serial validation has always run under, and it is
+ * single-threaded by construction: neither the cursor nor the DataThrottle behind it is
+ * thread-safe.
+ */
+class ThrottledValidateCursor final : public ValidateCursor {
+public:
+    ThrottledValidateCursor(OperationContext* opCtx,
+                            std::shared_ptr<SeekableRecordThrottleCursor> cursor)
+        : _opCtx(opCtx), _cursor(std::move(cursor)) {}
+
+    boost::optional<Record> seek(const RecordId& recordId) override {
+        // The whole-record-store traversal begins on a RecordId the ValidateState read off the
+        // record store, so the record is required to be there.
+        return _cursor->seekExact(_opCtx, recordId);
+    }
+
+    boost::optional<Record> next() override {
+        return _cursor->next(_opCtx);
+    }
+
+    void yield() override {
+        _cursor->save();
+        uassert(ErrorCodes::Interrupted,
+                "Interrupted due to: failure to restore yielded traverse cursor",
+                _cursor->restore(*shard_role_details::getRecoveryUnit(_opCtx)));
+    }
+
+private:
+    OperationContext* _opCtx;
+    std::shared_ptr<SeekableRecordThrottleCursor> _cursor;
+};
+
+/**
+ * Reads through a cursor of its own, unthrottled and without yielding, so that it can run on a
+ * worker thread alongside the other slices of a parallel scan. The parallel path is restricted to
+ * foreground validation, where throttling is off regardless, so nothing is lost by bypassing it.
+ */
+class SliceValidateCursor final : public ValidateCursor {
+public:
+    SliceValidateCursor(std::unique_ptr<SeekableRecordCursor> cursor)
+        : _cursor(std::move(cursor)) {}
+
+    boost::optional<Record> seek(const RecordId& recordId) override {
+        return _cursor->seek(recordId, SeekableRecordCursor::BoundInclusion::kInclude);
+    }
+
+    boost::optional<Record> next() override {
+        return _cursor->next();
+    }
+
+    void yield() override {}
+
+private:
+    std::unique_ptr<SeekableRecordCursor> _cursor;
+};
+
 }  // namespace
 
 auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -471,10 +534,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
     _numRecords = 0;
     ON_BLOCK_EXIT([&]() {
         results->setNumRecords(_numRecords);
-        {
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            _progress.get(lk)->finished();
-        }
+        _progress.finished();
     });
 
     // Because the progress meter is intended as an approximation, it's sufficient to get the number
@@ -487,8 +547,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
-    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
-        _validateState->getTraverseRecordStoreCursor();
+    auto traverseRecordStoreCursor = _validateState->getTraverseRecordStoreCursor();
 
     // Convert the vector of hashPrefixes provided to a set for easy lookup.
     const stdx::unordered_set<std::string> hashPrefixes(_validateState->getHashPrefixes()->begin(),
@@ -520,10 +579,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
-        {
-            std::unique_lock<Client> lk(*opCtx->getClient());
-            _progress.get(lk)->hit();
-        }
+        _progress.hit();
         ++_numRecords;
         BSONObj recordBson = record->data.toBson();
         auto idField = recordBson["_id"];
@@ -553,69 +609,245 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
     results->setPartialHashes(std::move(partial));
 }
 
+
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
-                                          ValidateResults& results,
+                                          ValidateResults& validateResults,
                                           ValidationVersion validationVersion) {
+    const auto& coll = _validateState->getCollection();
+    const auto totalRecords = coll->getRecordStore()->numRecords();
+
     // In case validation occurs twice and the progress meter persists after index traversal.
-    {
+    const bool progressStillActive = ([&] {
         std::unique_lock<Client> lk(*opCtx->getClient());
-        if (_progress.get(lk) && _progress.get(lk)->isActive()) {
-            _progress.get(lk)->finished();
-        }
+        return _progress.get(lk) && _progress.get(lk)->isActive();
+    })();
+    if (progressStillActive) {
+        _progress.finished();
     }
 
-    // Because the progress meter is intended as an approximation, it's sufficient to get the number
-    // of records when we begin traversing, even if this number may deviate from the final number.
-    const CollectionPtr& coll = _validateState->getCollection();
     const char* curopMessage = "Validate: scanning documents";
-    const auto totalRecords = coll->getRecordStore()->numRecords();
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
-    ON_BLOCK_EXIT([&]() {
-        std::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.get(lk)->finished();
-    });
+    ON_BLOCK_EXIT([&]() { _progress.finished(); });
 
-    // A single traversal covers the whole record store, so there is nothing to merge yet. Once the
-    // record store is split into slices traversed in parallel, the per-slice results will instead
-    // be combined with ValidateResults::merge() and KeyStringIndexConsistency::merge().
-    auto implResults =
-        traverseRecordStoreImpl(opCtx,
-                                results,
-                                _keyBasedIndexConsistency,
-                                {.beginRecordId = _validateState->getFirstRecordId()},
-                                _progress,
-                                validationVersion);
+    _numRecords = 0;
+    int64_t dataSizeTotal{0};
+    int64_t numRecords{0};
 
-    // Adopt the traversal's output even if it failed part-way through, so that whatever was
-    // accumulated before the failure is still reported to the caller.
-    results = std::move(implResults.validateResults);
-    _keyBasedIndexConsistency = std::move(implResults.keyStringIndexConsistency);
-    _numRecords = results.getNumRecords().value_or(0);
-    const int64_t dataSizeTotal = implResults.dataSizeTotal;
-    uassertStatusOK(implResults.status);
+    // Split the record store into slices targeting ~kTargetRecordsPerSlice records each. Small
+    // collections collapse to a single slice and run single-threaded, larger collections are split
+    // into enough slices to keep the worker pool busy and allow "work stealing", as no guarantee
+    // can be made that the cost of each slice is equal.
+
+    static constexpr int64_t kTargetRecordsPerSlice{5000};
+    static constexpr int64_t kTimeseriesSliceDivisor{4};
+    const int64_t targetRecordsPerSlice = coll->isTimeseriesCollection()
+        ? kTargetRecordsPerSlice / kTimeseriesSliceDivisor
+        : kTargetRecordsPerSlice;
+    const size_t sliceCount =
+        std::max<int64_t>(1, (totalRecords + targetRecordsPerSlice - 1) / targetRecordsPerSlice);
+
+    // TODO(SERVER-76346): Remove the feature flag once parallel validation is the permanent
+    // default.
+    const bool hashDrillDown = _validateState->getHashPrefixes().has_value() ||
+        _validateState->getRevealHashedIds().has_value();
+    const bool parallelEligible = gFeatureFlagParallelCollectionValidation.isEnabled() &&
+        !_validateState->isBackground() &&
+        _validateState->getRepairMode() == collection_validation::RepairMode::kNone &&
+        _keyBasedIndexConsistency.canMergeResults() && !hashDrillDown && sliceCount > 1;
+
+    const std::vector<RecordId> rsSlicePivots = parallelEligible
+        ? collection_validation::computeSlicePivots(opCtx,
+                                                    *shard_role_details::getRecoveryUnit(opCtx),
+                                                    *coll->getRecordStore(),
+                                                    sliceCount)
+        : std::vector<RecordId>{};
+    const bool synchronousTraversal = rsSlicePivots.size() <= 1;
+
+    if (synchronousTraversal) {
+        auto implResults = traverseRecordStoreImpl(
+            opCtx,
+            validateResults,
+            _keyBasedIndexConsistency,
+            {.beginRecordId = _validateState->getFirstRecordId(),
+             .cursorFactory =
+                 [this](OperationContext* traversalOpCtx) -> std::unique_ptr<ValidateCursor> {
+                 return std::make_unique<ThrottledValidateCursor>(
+                     traversalOpCtx, _validateState->getTraverseRecordStoreCursor());
+             }},
+            _progress,
+            validationVersion);
+        validateResults = std::move(implResults.validateResults);
+        _keyBasedIndexConsistency = std::move(implResults.keyStringIndexConsistency);
+        dataSizeTotal = implResults.dataSizeTotal;
+        numRecords = validateResults.getNumRecords().value_or(0);
+        uassertStatusOK(implResults.status);
+    } else {
+        // Turn the pivots into half-open [begin, end) ranges, with the final slice left open-ended
+        // so that the ranges cover the whole record store no matter how many pivots the slicer
+        // produced. Deduplication of the pivots means there may be fewer slices than 'sliceCount'.
+        //
+        // Every slice gets the same factory, which each worker calls on its own thread to open a
+        // cursor of its own.
+        const ValidateCursor::Factory sliceCursorFactory =
+            [recordStore = _validateState->getCollection()->getRecordStore()](
+                OperationContext* traversalOpCtx) -> std::unique_ptr<ValidateCursor> {
+            return std::make_unique<SliceValidateCursor>(recordStore->getCursor(
+                traversalOpCtx, *shard_role_details::getRecoveryUnit(traversalOpCtx)));
+        };
+        const auto trsOpts = ([&rsSlicePivots, &sliceCursorFactory] {
+            std::vector<TraverseRecordStoreOptions> trsOpts;
+            auto itRangeBegin = rsSlicePivots.begin();
+            auto itRangeEnd = rsSlicePivots.begin();
+            ++itRangeEnd;
+            while (itRangeEnd != rsSlicePivots.end()) {
+                trsOpts.push_back({.beginRecordId = *itRangeBegin,
+                                   .endRecordId = *itRangeEnd,
+                                   .cursorFactory = sliceCursorFactory});
+                ++itRangeBegin;
+                ++itRangeEnd;
+            }
+            trsOpts.push_back(
+                {.beginRecordId = *itRangeBegin, .cursorFactory = sliceCursorFactory});
+            return trsOpts;
+        })();
+
+        {
+            std::vector<PromiseAndFuture<TraverseRecordStoreResults>> rsSliceResults(
+                trsOpts.size());
+
+            const size_t maxThreads =
+                std::min(trsOpts.size(), static_cast<size_t>(ProcessInfo::getNumAvailableCores()));
+
+            ThreadPool threadPool({.poolName = "ValidateRecordStore",
+                                   .threadNamePrefix = "vrs",
+                                   .maxThreads = maxThreads,
+                                   .onCreateThread = [](const std::string& threadName) {
+                                       Client::initThread(threadName,
+                                                          getGlobalServiceContext()->getService());
+                                   }});
+            threadPool.startup();
+            for (size_t i = 0; i < trsOpts.size(); ++i) {
+                threadPool.schedule(
+                    [this, &rsSliceResults, i, validationVersion, opts = trsOpts[i]](
+                        Status status) {
+                        if (!status.isOK()) {
+                            rsSliceResults[i].promise.setError(status);
+                            return;
+                        }
+                        try {
+                            auto workerOpCtxHolder = cc().makeOperationContext();
+                            auto* workerOpCtx = workerOpCtxHolder.get();
+                            // Slice starts from an empty ValidateResults rather than the
+                            // caller's; traverseRecordStoreImpl() stamps the identity fields that
+                            // merge() requires to match.
+                            auto innerResults = traverseRecordStoreImpl(workerOpCtx,
+                                                                        ValidateResults{},
+                                                                        _keyBasedIndexConsistency,
+                                                                        opts,
+                                                                        _progress,
+                                                                        validationVersion);
+                            rsSliceResults[i].promise.emplaceValue(std::move(innerResults));
+
+                        } catch (const DBException& e) {
+                            rsSliceResults[i].promise.setError(e.toStatus());
+                        }
+                    });
+            }
+            threadPool.waitForIdle();
+            threadPool.shutdown();
+            threadPool.join();
+
+            std::vector<TraverseRecordStoreResults> implResults;
+            implResults.reserve(rsSliceResults.size());
+            std::vector<Status> sliceFailures;
+            for (auto& pf : rsSliceResults) {
+                auto swResults = std::move(pf.future).getNoThrow(opCtx);
+                if (!swResults.isOK()) {
+                    sliceFailures.push_back(swResults.getStatus());
+                    continue;
+                }
+                implResults.push_back(std::move(swResults.getValue()));
+            }
+
+            // Combine the per-slice results before surfacing any slice's failure, so that a partial
+            // failure still reports everything the other slices accumulated.
+            for (const auto& ir : implResults) {
+                validateResults.merge(ir.validateResults);
+                _keyBasedIndexConsistency.merge(ir.keyStringIndexConsistency);
+                dataSizeTotal += ir.dataSizeTotal;
+                numRecords += ir.validateResults.getNumRecords().value_or(0);
+            }
+            for (const auto& ir : implResults) {
+                if (!ir.status.isOK()) {
+                    sliceFailures.push_back(ir.status);
+                }
+            }
+
+            // Surface every slice's failures.
+            if (!sliceFailures.empty()) {
+                for (const auto& status : sliceFailures) {
+                    LOGV2_ERROR(11157101,
+                                "Record store slice traversal failed",
+                                logAttrs(coll->ns()),
+                                "error"_attr = status);
+                }
+                const auto& reported = *std::min_element(
+                    sliceFailures.begin(), sliceFailures.end(), [](const auto& a, const auto& b) {
+                        // An interrupt outranks the failures it caused in the other slices.
+                        return ErrorCodes::isCancellationError(a.code()) &&
+                            !ErrorCodes::isCancellationError(b.code());
+                    });
+                std::vector<std::string> reasons;
+                reasons.reserve(sliceFailures.size());
+                std::transform(sliceFailures.begin(),
+                               sliceFailures.end(),
+                               std::back_inserter(reasons),
+                               [](const Status& status) { return status.toString(); });
+                uasserted(reported.code(),
+                          fmt::format("{} of {} record store slices failed to traverse: {}",
+                                      sliceFailures.size(),
+                                      trsOpts.size(),
+                                      fmt::join(reasons, "; ")));
+            }
+
+            // Sanity check on slice coverage; fast count is an approximation, so this is a warning
+            // rather than an error.
+            if (const auto fastCount = coll->numRecords(opCtx); fastCount != numRecords) {
+                LOGV2_WARNING(11157100,
+                              "Parallel validation traversed a different number of records than "
+                              "the collection's fast count",
+                              logAttrs(coll->ns()),
+                              "recordsTraversed"_attr = numRecords,
+                              "fastCount"_attr = fastCount,
+                              "numSlices"_attr = trsOpts.size());
+            }
+        }
+    }
+
+    _numRecords = numRecords;
 
     if (_validateState->getFirstRecordId().isNull()) {
-        // The record store is empty if the first RecordId isn't initialized. The collection-level
-        // checks below all require the totals from a real traversal, so skip them entirely rather
-        // than run them against zeroed counters.
+        // The collection-level checks below all require the totals from a real traversal, so skip
+        // them entirely rather than run them against zeroed counters. The parallel branch never
+        // reaches here with a null first RecordId.
         return;
     }
 
-    if (results.getNumRemovedCorruptRecords() > 0) {
-        results.addWarning(
-            fmt::format("Removed {} invalid documents.", results.getNumRemovedCorruptRecords()));
+    if (validateResults.getNumRemovedCorruptRecords() > 0) {
+        validateResults.addWarning(fmt::format("Removed {} invalid documents.",
+                                               validateResults.getNumRemovedCorruptRecords()));
     }
 
     _validateFastCountAndSize(
-        opCtx, *_validateState, *coll.get(), _numRecords, dataSizeTotal, results);
+        opCtx, *_validateState, *coll.get(), _numRecords, dataSizeTotal, validateResults);
 
     // TODO(SERVER-119193): Add condition for the fastCountType being valid.
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
-    if (results.isValid() && !_validateState->isBackground()) {
+    if (validateResults.isValid() && !_validateState->isBackground()) {
         coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
 }
@@ -624,45 +856,42 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                               const ValidateResults& baseResults,
                                               const KeyStringIndexConsistency& baseConsistency,
                                               TraverseRecordStoreOptions opts,
-                                              ProgressMeterHolder& progress,
+                                              ConcurrentProgressMeterHolder& progress,
                                               ValidationVersion validationVersion) const
     -> TraverseRecordStoreResults {
     // The traversal accumulates onto copies of the caller's state; the caller decides what to do
     // with them once the traversal returns.
     TraverseRecordStoreResults results{.validateResults = baseResults,
                                        .keyStringIndexConsistency = baseConsistency};
-    auto& validateResults = results.validateResults;
 
-    // These counters describe this traversal alone, so they always start from zero even when the
-    // base results carried values over from a previous traversal.
-    validateResults.setNumRecords(0);
-    validateResults.setNumInvalidDocuments(0);
-    validateResults.setNumNonCompliantDocuments(0);
+    // These identity fields (namespace, UUID, repair mode, read timestamp) are used to match
+    // the results object this gets merged into.
+    results.validateResults.setNamespaceString(_validateState->nss());
+    results.validateResults.setUUID(_validateState->uuid());
+    results.validateResults.setRepairMode(_validateState->getRepairMode());
+    results.validateResults.setReadTimestamp(_validateState->getReadTimestamp());
 
-    int64_t interruptIntervalNumBytes = 0;
-    int64_t numCorruptRecordsSizeBytes = 0;
+    RecordId prevRecordId;
 
-    // Place an empty hash in the results to override later. This result will only be used
-    // for empty collections.
-    if (_validateState->isCollHashValidation()) {
-        validateResults.setCollectionHash(SHA256Block::computeHash({}));
-    }
+    results.validateResults.setNumRecords(0);
+    results.validateResults.setNumInvalidDocuments(0);
+    results.validateResults.setNumNonCompliantDocuments(0);
 
     if (opts.beginRecordId.isNull()) {
-        // The record store is empty if the first RecordId isn't initialized.
+        // The record store is empty if the first RecordId isn't initialized. Stand in an empty
+        // hash, which is the correct collection hash for an empty collection.
+        if (_validateState->isCollHashValidation()) {
+            results.validateResults.setCollectionHash(SHA256Block::computeHash({}));
+        }
         return results;
     }
 
-    const auto& coll = _validateState->getCollection();
-    const auto rs = coll->getRecordStore();
-
-    // This initializes to a null RecordId.
-    RecordId prevRecordId;
-
-    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
-        _validateState->getTraverseRecordStoreCursor();
-
     try {
+        // The caller decides what this traversal reads through, and with it whether reads are
+        // throttled and whether the snapshot is yielded, as record store cursors belong to the
+        // thread that uses them.
+        const std::unique_ptr<ValidateCursor> cursor = opts.cursorFactory(opCtx);
+
         // Accumulates each record's SHA256 block as they are XORed together. Starts off
         // zeroed out.
         SHA256Block accumulatedBlock;
@@ -680,41 +909,44 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         boost::container::small_vector<const IndexCatalogEntry*, kStackAllocatedSize> indexEntries;
         const auto& indexIdents = _validateState->getIndexIdents();
         indexEntries.reserve(indexIdents.size());
+        const auto& coll = _validateState->getCollection();
+        const auto rs = coll->getRecordStore();
+
         for (const auto& indexIdent : indexIdents) {
             indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
         }
 
-        for (auto record = traverseRecordStoreCursor->seekExact(opCtx, opts.beginRecordId);
-             record && record->id != opts.endRecordId;
-             record = traverseRecordStoreCursor->next(opCtx)) {
-            {
-                std::unique_lock<Client> lk(*opCtx->getClient());
-                progress.get(lk)->hit();
-            }
-            validateResults.incrementNumRecords(1);
+        int64_t interruptIntervalNumBytes = 0;
+        int64_t numCorruptRecordsSizeBytes = 0;
+        for (auto record = cursor->seek(opts.beginRecordId);
+             record && (opts.endRecordId.isNull() || record->id < opts.endRecordId);
+             record = cursor->next()) {
+
             const auto dataSize = record->data.size();
             interruptIntervalNumBytes += dataSize;
             results.dataSizeTotal += dataSize;
+            results.validateResults.incrementNumRecords(1);
+            progress.hit();
             const auto [validateRecordStatus,
                         validatedSize,
                         maybeValidateRecordErrorMessage,
                         compliantDocument,
                         validDocument] = validateRecord(opCtx,
                                                         record.value(),
-                                                        validateResults,
+                                                        results.validateResults,
                                                         results.keyStringIndexConsistency,
                                                         indexEntries,
                                                         validationVersion);
-            validateResults.incrementNumNonCompliantDocuments(compliantDocument ? 0 : 1);
-            validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
+            results.validateResults.incrementNumNonCompliantDocuments(compliantDocument ? 0 : 1);
+            results.validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
 
             if (_validateState->isCollHashValidation()) {
-                const SHA256Block block = SHA256Block::computeHash(
+                SHA256Block block = SHA256Block::computeHash(
                     {ConstDataRange(record->data.data(), record->data.size())});
                 accumulatedBlock.xorInline(block);
                 if (revealHashedIds) {
                     const auto idField = record->data.toBson()["_id"];
-                    const auto idBlock = SHA256Block::computeHash(
+                    auto idBlock = SHA256Block::computeHash(
                         {ConstDataRange(idField.value(), idField.valuesize())});
                     for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
                         if (idBlock.toHexString().starts_with(hashPrefix)) {
@@ -727,11 +959,11 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             // Log the out-of-order entries as errors.
             //
             // Validate uses a DataCorruptionDetectionMode::kLogAndContinue mode such that data
-            // corruption errors are logged without throwing, so certain checks must be duplicated
-            // here as well.
+            // corruption errors are logged without throwing, so certain checks must be
+            // duplicated here as well.
             if ((prevRecordId.isValid() && prevRecordId > record->id) ||
                 MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
-                validateResults.addError(kOutOfOrderDocumentError);
+                results.validateResults.addError(kOutOfOrderDocumentError);
             }
 
             // validatedSize = dataSize is not a general requirement as some storage engines may use
@@ -746,13 +978,13 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                         "recordId"_attr = record->id,
                         "error"_attr = validateRecordStatus);
                 } else {
-                    LOGV2_OPTIONS(
-                        4835002,
-                        {logv2::LogTruncation::Disabled},
-                        "Document corruption details - Document validation failure; size mismatch",
-                        "recordId"_attr = record->id,
-                        "validatedBytes"_attr = validatedSize,
-                        "recordBytes"_attr = dataSize);
+                    LOGV2_OPTIONS(4835002,
+                                  {logv2::LogTruncation::Disabled},
+                                  "Document corruption details - Document validation failure; "
+                                  "size mismatch",
+                                  "recordId"_attr = record->id,
+                                  "validatedBytes"_attr = validatedSize,
+                                  "recordBytes"_attr = dataSize);
                 }
 
                 if (_validateState->fixErrors()) {
@@ -760,24 +992,24 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                     rs->deleteRecord(
                         opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
                     wunit.commit();
-                    validateResults.setRepaired(true);
-                    validateResults.addNumRemovedCorruptRecords(1);
-                    validateResults.incrementNumRecords(-1);
+                    results.validateResults.setRepaired(true);
+                    results.validateResults.addNumRemovedCorruptRecords(1);
+                    results.validateResults.incrementNumRecords(-1);
                 } else {
                     // If this is not set up to repair and remove the corrupt records, the error
                     // returned from record Validation should be logged if it exists.
                     if (!validateRecordStatus.isOK()) {
-                        validateResults.addError(
+                        results.validateResults.addError(
                             maybeValidateRecordErrorMessage.value_or(kInvalidDocumentError));
                     }
                     numCorruptRecordsSizeBytes += record->id.memUsage();
                     if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
-                        validateResults.addCorruptRecord(record->id);
+                        results.validateResults.addCorruptRecord(record->id);
                     } else {
-                        validateResults.addWarning(kNotEnoughSpaceToReportCorruptionWarning);
+                        results.validateResults.addWarning(
+                            kNotEnoughSpaceToReportCorruptionWarning);
                     }
-
-                    validateResults.incrementNumInvalidDocuments(1);
+                    results.validateResults.incrementNumInvalidDocuments(1);
                 }
             } else {
                 // If the document is not corrupted, validate the document against this collection's
@@ -799,7 +1031,11 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                             // Checks for time-series collection consistency.
                             const auto timeseriesValidationResult =
                                 collection_validation::validateTimeSeriesBucketRecord(
-                                    opCtx, *_validateState, coll, recordBson, validateResults);
+                                    opCtx,
+                                    *_validateState,
+                                    coll,
+                                    recordBson,
+                                    results.validateResults);
                             // This log id should be kept in sync with the associated warning
                             // messages that are returned to the client.
                             switch (timeseriesValidationResult.result) {
@@ -817,36 +1053,38 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                     LOGV2_WARNING_OPTIONS(
                                         12351700,
                                         {logv2::LogTruncation::Disabled},
-                                        "Document is not compliant with time-series specifications",
+                                        "Document is not compliant with time-series "
+                                        "specifications",
                                         logAttrs(coll->ns()),
                                         "recordId"_attr = record->id,
                                         "record"_attr = record->data.toBson(),
                                         "reason"_attr = timeseriesValidationResult.reason);
-                                    validateResults.incrementNumNonCompliantDocuments(1);
-                                    validateResults.addWarning(
+                                    results.validateResults.incrementNumNonCompliantDocuments(1);
+                                    results.validateResults.addWarning(
                                         collection_validation::describeTimeseriesValidationResult(
                                             timeseriesValidationResult.result));
                                     break;
 
                                 // All remaining result cases are errors
                                 default:
-                                    LOGV2_ERROR_OPTIONS(
-                                        6698300,
-                                        {logv2::LogTruncation::Disabled},
-                                        "Document is not compliant with time-series specifications",
-                                        logAttrs(coll->ns()),
-                                        "recordId"_attr = record->id,
-                                        "record"_attr = record->data.toBson(),
-                                        "reason"_attr = timeseriesValidationResult.reason);
-                                    validateResults.incrementNumNonCompliantDocuments(1);
-                                    validateResults.addError(
+                                    LOGV2_ERROR_OPTIONS(6698300,
+                                                        {logv2::LogTruncation::Disabled},
+                                                        "Document is not compliant with "
+                                                        "time-series specifications",
+                                                        logAttrs(coll->ns()),
+                                                        "recordId"_attr = record->id,
+                                                        "record"_attr = record->data.toBson(),
+                                                        "reason"_attr =
+                                                            timeseriesValidationResult.reason);
+                                    results.validateResults.incrementNumNonCompliantDocuments(1);
+                                    results.validateResults.addError(
                                         collection_validation::describeTimeseriesValidationResult(
                                             timeseriesValidationResult.result));
                             }
                             const auto containsMixedSchemaDataResponse =
                                 coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
                             if (!containsMixedSchemaDataResponse.isOK() &&
-                                validateResults.addError(
+                                results.validateResults.addError(
                                     collection_validation::kMalformedMinMaxTimeseriesBucket)) {
                                 LOGV2_WARNING_OPTIONS(
                                     8469900,
@@ -862,7 +1100,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                     coll->getTimeseriesMixedSchemaBucketsState()
                                         .canStoreMixedSchemaBucketsSafely();
                                 if (mixedSchemaAllowed &&
-                                    validateResults.addWarning(
+                                    results.validateResults.addWarning(
                                         collection_validation::
                                             kExpectedMixedSchemaTimeseriesWarning)) {
                                     LOGV2_WARNING_OPTIONS(8469901,
@@ -872,7 +1110,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                                           logAttrs(coll->ns()),
                                                           "recordId"_attr = record->id);
                                 } else if (!mixedSchemaAllowed &&
-                                           validateResults.addError(
+                                           results.validateResults.addError(
                                                collection_validation::
                                                    kUnexpectedMixedSchemaTimeseriesError)) {
                                     const auto& controlField =
@@ -897,10 +1135,11 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                     case Collection::SchemaValidationResult::kError:
                     case Collection::SchemaValidationResult::kErrorAndLog: {
                         // Non-kPass results indicate a schema validation failure. Do not add
-                        // data-annotated strings to the set, since per-document data can greatly
-                        // increase the number of unique strings stored; this set is not intended
-                        // to scale with the number of documents. Document-specific data is logged.
-                        validateResults.incrementNumNonCompliantDocuments(1);
+                        // data-annotated strings to the set, since per-document data can
+                        // greatly increase the number of unique strings stored; this set is not
+                        // intended to scale with the number of documents. Document-specific
+                        // data is logged.
+                        results.validateResults.incrementNumNonCompliantDocuments(1);
                         const char* description =
                             _describeDocumentValidationResult(checkValidationResult);
                         if (isTimeseries) {
@@ -914,7 +1153,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                 "collectionUUID"_attr = coll->uuid(),
                                 "record"_attr = record->data.toBson(),
                                 "reason"_attr = description);
-                            validateResults.addError(description);
+                            results.validateResults.addError(description);
                         } else {
                             LOGV2_WARNING_OPTIONS(
                                 5363500,
@@ -923,7 +1162,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                 logAttrs(coll->ns()),
                                 "recordId"_attr = record->id,
                                 "reason"_attr = description);
-                            validateResults.addWarning(description);
+                            results.validateResults.addWarning(description);
                         }
                         break;
                     }
@@ -932,13 +1171,12 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
 
             prevRecordId = record->id;
 
-            if (validateResults.getNumRecords().value_or(0) %
+            if (results.validateResults.getNumRecords().value() %
                         KeyStringIndexConsistency::kInterruptIntervalNumRecords ==
                     0 ||
                 interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
-                // Periodically checks for interrupts and yields.
                 opCtx->checkForInterrupt();
-                _validateState->yieldCursors(opCtx);
+                cursor->yield();
 
                 if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
                     interruptIntervalNumBytes = 0;
@@ -947,9 +1185,9 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         }
 
         if (_validateState->isCollHashValidation()) {
-            validateResults.setCollectionHash(accumulatedBlock);
+            results.validateResults.setCollectionHash(accumulatedBlock);
             if (revealHashedIds) {
-                validateResults.setRevealedIds(std::move(revealedIds));
+                results.validateResults.setRevealedIds(std::move(revealedIds));
             }
         }
     } catch (const DBException& e) {
@@ -958,6 +1196,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
 
     return results;
 }
+
 
 void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
                                             const IndexCatalogEntry* index,
@@ -973,7 +1212,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     // message and the total to be set to different values.
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
-        if (!_progress.get(lk)->isActive()) {
+        if (!_progress.get(lk) || !_progress.get(lk)->isActive()) {
             const char* curopMessage = "Validate: scanning index entries";
             _progress.set(lk,
                           CurOp::get(opCtx)->setProgress(

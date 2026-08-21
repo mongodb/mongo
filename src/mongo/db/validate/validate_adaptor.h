@@ -12,6 +12,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/validate/concurrent_progress_meter.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
@@ -20,6 +21,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <span>
 
 namespace mongo {
@@ -46,6 +49,44 @@ size_t getNumberOfAdditionalCharactersForHashDrillDown(size_t numHashPrefixes,
 
 class IndexDescriptor;
 class OperationContext;
+
+/**
+ * The cursor a record store traversal reads through, and with it the throttling and yielding policy
+ * that traversal runs under. Injected so that the traversal itself does not have to know whether it
+ * is scanning the whole record store or one slice of a parallel scan.
+ */
+class ValidateCursor {
+public:
+    /**
+     * Opens the cursor for the thread that runs a traversal. Record store cursors are not thread
+     * safe and so cannot be handed to a worker after the fact; the factory is instead invoked on
+     * the thread that does the traversing, with that thread's own OperationContext.
+     */
+    using Factory = std::function<std::unique_ptr<ValidateCursor>(OperationContext*)>;
+
+    virtual ~ValidateCursor() = default;
+
+    /**
+     * Positions the cursor at the start of the traversal, given its inclusive begin bound, and
+     * returns the first record. Whether a record whose id does not match the bound exactly is
+     * acceptable is left to the implementation, as it depends on where the bound came from.
+     */
+    [[nodiscard]] virtual boost::optional<Record> seek(const RecordId& recordId) = 0;
+
+    /**
+     * Advances the cursor and returns the record it lands on, or boost::none at the end of the
+     * traversal. Marked [[nodiscard]] because the end-of-traversal signal is carried by the return
+     * value alone; advancing without reading the record out is legitimate but has to say so with an
+     * explicit cast to void.
+     */
+    [[nodiscard]] virtual boost::optional<Record> next() = 0;
+
+    /**
+     * Releases the storage snapshot and reacquires it, for implementations whose policy is to
+     * yield; a no-op for those that do not. Throws if the cursor cannot be restored afterwards.
+     */
+    virtual void yield() = 0;
+};
 
 /**
  * The validate adaptor is used to keep track of collection and index consistency during a running
@@ -93,6 +134,15 @@ public:
     struct TraverseRecordStoreOptions {
         RecordId beginRecordId;
         RecordId endRecordId;
+
+        /**
+         * Opens the cursor this traversal reads through. A whole-record-store traversal passes a
+         * factory returning the ValidateState's shared throttled cursor, preserving the throttling
+         * and yielding behaviour of serial validation; a parallel slice passes one returning a
+         * plain, unthrottled cursor of its own, since neither SeekableRecordThrottleCursor nor
+         * DataThrottle is thread-safe.
+         */
+        ValidateCursor::Factory cursorFactory;
     };
 
     /**
@@ -118,17 +168,12 @@ public:
      * This does not mutate any adaptor state: the traversal starts from copies of 'baseResults' and
      * 'baseConsistency' and returns them, mutated, to the caller. 'progress' is the one exception,
      * being purely a reporting side channel.
-     *
-     * TODO(SERVER-127596): Swap 'progress' for the ConcurrentProgressMeterHolder
-     * whose hit() is lock-free. The current ProgressMeterHolder requires the client
-     * lock to be taken once per record, which becomes contended as soon as slices are
-     * traversed in parallel.
      */
     [[nodiscard]] auto traverseRecordStoreImpl(OperationContext* opCtx,
                                                const ValidateResults& baseResults,
                                                const KeyStringIndexConsistency& baseConsistency,
                                                TraverseRecordStoreOptions opts,
-                                               ProgressMeterHolder& progress,
+                                               ConcurrentProgressMeterHolder& progress,
                                                ValidationVersion validationVersion) const
         -> TraverseRecordStoreResults;
 
@@ -207,7 +252,6 @@ private:
     // entries count. Reset every time traverseRecordStore() is called.
     long long _numRecords = 0;
 
-    // For reporting progress during record store and index traversal.
-    ProgressMeterHolder _progress;
+    ConcurrentProgressMeterHolder _progress;
 };
 }  // namespace mongo
