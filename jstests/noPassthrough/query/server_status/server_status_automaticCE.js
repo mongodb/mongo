@@ -31,7 +31,11 @@ import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_u
 const collName = jsTestName();
 const dbName = jsTestName();
 
-const conn = MongoRunner.runMongod({});
+// In replica set suites, cluster-time key generation runs a planned find on admin.system.keys
+// shortly after startup, which would bump planning.invocationCount mid-test. Disable it.
+const conn = MongoRunner.runMongod({
+    setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"},
+});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
