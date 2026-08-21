@@ -46,6 +46,7 @@ class ContinuousStepdown(interface.Hook):
         background_reconfig=False,
         auth_options=None,
         should_downgrade=False,
+        use_stepdown_command=False,
     ):
         """Initialize the ContinuousStepdown.
 
@@ -62,6 +63,10 @@ class ContinuousStepdown(interface.Hook):
             auth_options: dictionary of auth options.
             background_reconfig: whether to conduct reconfig in the background.
             should_downgrade: whether dowgrades should be performed as part of the stepdown.
+            use_stepdown_command: when true, gracefully step down the primary via
+                replSetStepDown and allow a new primary to be elected via handoff. When
+                false (default) we instead run replSetStepUp on a secondary and expect the
+                primary to realize it has been overtaken and step down.
 
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
@@ -90,6 +95,7 @@ class ContinuousStepdown(interface.Hook):
         self._background_reconfig = background_reconfig
         self._auth_options = auth_options
         self._should_downgrade = should_downgrade
+        self._use_stepdown_command = use_stepdown_command
 
         # The action file names need to match the same construction as found in
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
@@ -134,6 +140,7 @@ class ContinuousStepdown(interface.Hook):
             self._fixture,
             self._auth_options,
             self._should_downgrade,
+            self._use_stepdown_command,
         )
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
@@ -190,6 +197,7 @@ class _StepdownThread(threading.Thread):
         fixture,
         auth_options=None,
         should_downgrade=False,
+        use_stepdown_command=False,
     ):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
@@ -210,6 +218,7 @@ class _StepdownThread(threading.Thread):
         self._fixture = fixture
         self._auth_options = auth_options
         self._should_downgrade = should_downgrade
+        self._use_stepdown_command = use_stepdown_command
 
         self._last_exec = time.time()
         self._pause_timeout_secs = fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
@@ -380,6 +389,10 @@ class _StepdownThread(threading.Thread):
                 ):
                     return
 
+            if self._use_stepdown_command and kill_method == ContinuousStepdown.STEPDOWN:
+                self._step_down_via_command(rs_fixture, old_primary)
+                return
+
             if self._should_downgrade:
                 new_primary = rs_fixture.change_version_and_restart_node(
                     old_primary, self._auth_options
@@ -492,3 +505,58 @@ class _StepdownThread(threading.Thread):
                 new_primary.get_internal_connection_string() if secondaries else "none",
             )
             self._step_up_stats[key] += 1
+
+    def _step_down_via_command(self, rs_fixture, old_primary):
+        self.logger.info(
+            "Stepping down the primary on port %d of replica set '%s' via replSetStepDown.",
+            old_primary.port,
+            rs_fixture.replset_name,
+        )
+        client = self._create_client(old_primary)
+        try:
+            client.admin.command({"replSetStepDown": self._stepdown_duration_secs})
+        except pymongo.errors.AutoReconnect:
+            pass
+        except pymongo.errors.PyMongoError:
+            self.logger.exception(
+                "Error while stepping down the primary on port %d of replica set '%s' via"
+                " replSetStepDown.",
+                old_primary.port,
+                rs_fixture.replset_name,
+            )
+            raise
+
+        # Retry replSetFreeze: 0 until it succeeds. The node was stepped down with a 24-hour
+        # freeze, so if the unfreeze is lost due to AutoReconnect, the node cannot participate
+        # in elections for subsequent rounds.
+        unfreeze_client = self._create_client(old_primary)
+        deadline = time.time() + rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+        while True:
+            try:
+                unfreeze_client.admin.command({"replSetFreeze": 0})
+                break
+            except pymongo.errors.AutoReconnect:
+                if time.time() > deadline:
+                    raise
+                self.logger.info(
+                    "AutoReconnect while unfreezing old primary on port %d, retrying...",
+                    old_primary.port,
+                )
+                time.sleep(0.2)
+            except pymongo.errors.PyMongoError:
+                self.logger.exception(
+                    "Error while unfreezing the old primary on port %d of replica set '%s' via"
+                    " replSetFreeze.",
+                    old_primary.port,
+                    rs_fixture.replset_name,
+                )
+                raise
+
+        new_primary = rs_fixture.get_primary(timeout_secs=rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+        self.logger.info(
+            "New primary on port %d of replica set '%s' after replSetStepDown.",
+            new_primary.port,
+            rs_fixture.replset_name,
+        )
+        key = "{}/{}".format(rs_fixture.replset_name, new_primary.get_internal_connection_string())
+        self._step_up_stats[key] += 1
