@@ -520,6 +520,8 @@ conn_stats = [
     CheckpointCleanupStat('checkpoint_cleanup_handle_processed', 'most recent handles processed'),
     CheckpointCleanupStat('checkpoint_cleanup_inmem_pages_visited', 'most recent in-memory pages visited'),
     CheckpointCleanupStat('checkpoint_cleanup_success', 'successful calls'),
+    CheckpointCleanupStat('checkpoint_cleanup_thread_start', 'checkpoint cleanup thread started'),
+    CheckpointCleanupStat('checkpoint_cleanup_thread_stop', 'checkpoint cleanup thread stopped'),
 
     ##########################################
     # Checkpoint statistics
@@ -1130,7 +1132,9 @@ dsrc_stats = [
     BtreeSizeStat('btree_size_leaf_hist_5', 'leaf page-size histogram bucket 5', 'no_scale'),
     BtreeSizeStat('btree_size_leaf_hist_6', 'leaf page-size histogram bucket 6', 'no_scale'),
     BtreeSizeStat('btree_size_leaf_hist_7', 'leaf page-size histogram bucket 7', 'no_scale'),
-    BtreeSizeStat('btree_size_leaf_hist_8', 'leaf page-size histogram bucket 8 (>= maximum leaf page size)', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_8', 'leaf page-size histogram bucket 8 (>= pre-compression leaf page budget)', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_buckets', 'leaf page-size histogram bucket count', 'max_aggregate,no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_ceiling', 'leaf page-size histogram ceiling', 'max_aggregate,no_scale,size'),
     BtreeSizeStat('btree_size_leaf_pages', 'leaf pages', 'no_scale'),
     BtreeSizeStat('btree_size_no_image_pages', 'pages skipped for having no on-disk image', 'no_scale'),
     BtreeSizeStat('btree_size_overflow_bytes', 'overflow page bytes', 'no_scale,size'),

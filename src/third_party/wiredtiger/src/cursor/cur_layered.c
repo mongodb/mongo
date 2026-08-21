@@ -820,6 +820,26 @@ retry:
 
     WT_ERR(ret);
 
+    /*
+     * An adopted checkpoint discards all history below its oldest timestamp, so it cannot serve a
+     * read timestamp below it: reads silently lose keys whose newest visible version was removed as
+     * obsolete.
+     *
+     * The value read here is never older than the bound checkpoint's oldest timestamp: the pickup
+     * publishes it while holding the checkpoint lock, the first open of the checkpoint's stable
+     * dhandle takes that lock (see FIXME-WT-16477 in the dhandle open path), and every later use
+     * acquires the dhandle lock the opener released. A newer pickup completing mid-bind can only
+     * make the comparison stricter, against an oldest timestamp the reader must satisfy on its next
+     * advance anyway.
+     */
+    if (F_ISSET(session->txn, WT_TXN_SHARED_TS_READ)) {
+        WT_ASSERT_ALWAYS(session,
+          WT_SESSION_TXN_SHARED(session)->read_timestamp >=
+            __wt_atomic_load_uint64_acquire(
+              &S2C(session)->disaggregated_storage.last_checkpoint_oldest_timestamp),
+          "advancing stable to a checkpoint that cannot serve the transaction's read timestamp");
+    }
+
 err:
     __wt_scr_free(session, &last_ckpt_uri);
     __wt_free(session, checkpoint_name);
@@ -916,23 +936,10 @@ __clayered_can_advance_stable(
         return (false);
 
     /*
-     * Don't advance while parked on the stable cursor, even under a read timestamp. A newer
-     * checkpoint may no longer hold the parked key once the leader's oldest timestamp has moved
-     * past the key's removal; reopening onto it loses the position and can skip stable keys, and
-     * the history store can't recover the value because the read is now older than that
-     * checkpoint's oldest timestamp. Check this before the read-timestamp fast path below.
-     *
-     * FIXME-WT-17968: This check is only needed here because a follower can adopt a checkpoint
-     * whose oldest timestamp exceeds a pinned reader's read timestamp. Once that is prevented, move
-     * the check back inside the no-read-timestamp branch below.
-     */
-    if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
-      clayered->current_cursor == clayered->stable_cursor)
-        return (false);
-
-    /*
-     * With a read timestamp set and the parked-on-stable case excluded above, it's safe to advance
-     * even during iteration: a timestamped read stays consistent across the checkpoint change.
+     * With a read timestamp set it's safe to advance even during iteration, including while parked
+     * on the stable cursor: an adopted checkpoint's oldest timestamp never passes an active read
+     * timestamp (the stable open refuses such a bind), so a version of any key visible to the read
+     * survives in the newer checkpoint or its history store and a parked position transfers.
      */
     txn_shared = WT_SESSION_TXN_SHARED(session);
     if (txn_shared != NULL && txn_shared->read_timestamp != WT_TS_NONE)
@@ -940,6 +947,14 @@ __clayered_can_advance_stable(
     else {
         /* if this is an iteration, we won't reopen the cursor, we're done. */
         if (iteration)
+            return (false);
+
+        /*
+         * Don't advance while parked on the stable cursor: without a read timestamp, a newer
+         * snapshot may not see the parked key in the newer checkpoint, losing the position.
+         */
+        if (F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) &&
+          clayered->current_cursor == clayered->stable_cursor)
             return (false);
 
         /*

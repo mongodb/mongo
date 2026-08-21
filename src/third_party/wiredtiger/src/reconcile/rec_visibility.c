@@ -264,7 +264,12 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
         append->upd_start_ts = unpack->tw.start_ts;
         append->upd_durable_ts = unpack->tw.durable_start_ts;
         F_SET(append, WT_UPDATE_RESTORED_FROM_DS);
-        if (is_disagg)
+        /*
+         * A fuzzy checkpoint writes a stop that is newer than the stable timestamp, so rollback to
+         * stable can take that stop away and bring the value below it back to life. Only mark the
+         * value durable when there is no stop above it to disappear.
+         */
+        if (is_disagg && !WT_TIME_WINDOW_HAS_STOP(&unpack->tw))
             F_SET(append, WT_UPDATE_DURABLE);
     }
 
@@ -411,9 +416,12 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
             if (F_ISSET(upd_select->tombstone, WT_UPDATE_PREPARE_DURABLE) &&
               !WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw))
                 return (true);
-        }
 
-        if (upd_select->upd->type == WT_UPDATE_TOMBSTONE) {
+            /*
+             * When a tombstone and the value below it are written together, only the tombstone is
+             * marked durable, so there is nothing left to check on the value itself.
+             */
+        } else if (upd_select->upd->type == WT_UPDATE_TOMBSTONE) {
             /*
              * Save the update if we haven't deleted the key from the disk image. We may have
              * written the tombstone to disk already but we still need to do another delta to remove

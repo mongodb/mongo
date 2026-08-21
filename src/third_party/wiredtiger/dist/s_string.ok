@@ -1058,6 +1058,7 @@ enum
 env
 eof
 ep
+epochless
 epp
 eq
 equalp

@@ -30,7 +30,10 @@ import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, Oplog
 from wtscenario import make_scenarios
 
-# Test pinning the content in the ingest table
+# A long-lived timestamped scan starts before the follower adopts its first checkpoint and is
+# served from the ingest table. It must survive the mid-scan bind of the adopted stable table,
+# ingest eviction underneath it, and full key overlap between the constituents (every key has a
+# visible insert and an invisible newer tombstone in both), returning every key exactly once.
 @disagg_test_class
 class test_layered_follower09(wttest.WiredTigerTestCase):
     test_name = __qualname__
@@ -92,8 +95,9 @@ class test_layered_follower09(wttest.WiredTigerTestCase):
         oplog.apply(self, self.session, self.nitems, self.nitems)
         oplog.check(self, self.session, self.nitems, self.nitems)
 
-        # Make all the data obsolete
-        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())},oldest_timestamp={self.timestamp_str(oplog.last_timestamp())}')
+        # Advance oldest only to the reader's timestamp: the removals stay non-obsolete, so the
+        # new checkpoint keeps the history the pinned reader needs.
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())},oldest_timestamp={self.timestamp_str(ts)}')
 
         self.session.checkpoint()
 

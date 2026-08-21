@@ -99,6 +99,9 @@
 /* Duration of the follower run in disagg switch mode. */
 #define DISAGG_SWITCH_FOLLOWER_OPS_SEC 10
 
+/* Post-drain window of continued leader writes (routed to ingest) before the write pause. */
+#define DISAGG_STEPDOWN_INGEST_WINDOW_SEC 10
+
 /* Number of RTS threads to use up to 10 (11 is for NULL config). */
 #define RTS_THREADS_MAX 11
 
@@ -314,7 +317,8 @@ typedef struct {
      */
     RWLOCK timestamp_lock;
 
-    wt_timestamp_t stepdown_ts; /* Boundary timestamp when step-down is active; 0 if not active. */
+    /* Pause worker writes for the step-down checkpoint and role transition. */
+    volatile bool stepdown_pause_writes;
 
     volatile bool checkpoint_quit; /* Signal checkpoint thread to stop before workers finish. */
     volatile bool timestamp_quit;  /* Signal timestamp thread to stop before workers finish. */
@@ -342,12 +346,14 @@ typedef struct {
 #define PREFIX_LEN_CONFIG_MAX 80
     uint32_t prefix_len_max;
 
-    bool disagg_leader; /* If disaggregated storage role is configured as a leader. */
-    pid_t follower_pid; /* For multi-node disagg follower process */
+    volatile bool disagg_leader; /* If disaggregated storage role is configured as a leader. */
+    pid_t follower_pid;          /* For multi-node disagg follower process */
     char checkpoint_metadata[FILENAME_MAX]; /* Last checkpoint metadata picked up by follower. */
     DISAGG_MULTI_DB_HASH *disagg_multi_db_hash; /* Leader and follower database hash */
     int disagg_multi_sync_socket;               /* Socket for leader-follower sync */
 
+    /* Push-mode key rotation history, cleared on step-down; protected by key_push_lock. */
+    pthread_rwlock_t key_push_lock;
     wt_timestamp_t key_push_history[KEY_PUSH_HISTORY_MAX]; /* Push-mode key rotation: timestamps */
     size_t key_push_count; /* Number of pushed timestamps recorded */
 
@@ -414,6 +420,9 @@ typedef struct {
     bool replay_again; /* Need to redo an operation at a timestamp. */
 
     volatile bool quit; /* thread should quit */
+
+    /* Set when the write pause has been observed with no transaction in flight. */
+    volatile bool pause_ack;
 
     uint64_t ops;    /* total operations */
     uint64_t commit; /* operation counts */

@@ -832,6 +832,8 @@ struct __wt_connection_stats {
     int64_t capacity_time_evict;
     int64_t capacity_time_log;
     int64_t capacity_time_read;
+    int64_t checkpoint_cleanup_thread_start;
+    int64_t checkpoint_cleanup_thread_stop;
     int64_t checkpoint_cleanup_duration;
     int64_t checkpoint_cleanup_handle_processed;
     int64_t checkpoint_cleanup_inmem_pages_visited;
@@ -1541,6 +1543,8 @@ struct __wt_dsrc_stats {
     int64_t btree_size_leaf_hist_6;
     int64_t btree_size_leaf_hist_7;
     int64_t btree_size_leaf_hist_8;
+    int64_t btree_size_leaf_hist_buckets;
+    int64_t btree_size_leaf_hist_ceiling;
     int64_t btree_size_leaf_pages;
     int64_t btree_size_overflow_bytes;
     int64_t btree_size_overflow_pages;

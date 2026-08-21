@@ -95,8 +95,12 @@ class test_size_stats01(wttest.WiredTigerTestCase):
             key_count=g(stat.dsrc.btree_size_key_count),
             value_count=g(stat.dsrc.btree_size_value_count),
             maxleaf=g(stat.dsrc.btree_maxleafpage),
+            hist_buckets=g(stat.dsrc.btree_size_leaf_hist_buckets),
+            hist_ceiling=g(stat.dsrc.btree_size_leaf_hist_ceiling),
         )
-        s['hist'] = [g(getattr(stat.dsrc, 'btree_size_leaf_hist_%d' % i)) for i in range(9)]
+        s['hist'] = [
+            g(getattr(stat.dsrc, 'btree_size_leaf_hist_%d' % i)) for i in range(s['hist_buckets'])
+        ]
         statc.close()
 
         s['scanned'] = scanned
@@ -179,9 +183,12 @@ class test_size_stats01(wttest.WiredTigerTestCase):
         self.assertGreaterEqual(s['overhead'], 0)
         self.assertGreaterEqual(s['total'], s['key'] + s['value'])
 
-        # The histogram covers every leaf page exactly once.
+        # The histogram covers every leaf page exactly once. Without a compressor the pre-compression
+        # leaf budget equals the configured leaf page max, so the published ceiling matches it.
         self.assertEqual(sum(s['hist']), s['leaf'])
+        self.assertEqual(s['hist_buckets'], 9)
         self.assertEqual(s['maxleaf'], 32 * 1024)
+        self.assertEqual(s['hist_ceiling'], s['maxleaf'])
 
         # Without the flag, the scan does not touch the size statistics: they stay zero.
         s0 = self.size_summary(enable=False)

@@ -534,3 +534,43 @@ __wti_checkpoint_parallel_commit(WT_SESSION_IMPL *session)
 
     return (0);
 }
+
+/*
+ * __checkpoint_parallel_thread_rollback --
+ *     Roll back the transaction associated with the thread.
+ */
+static int
+__checkpoint_parallel_thread_rollback(WT_SESSION_IMPL *session, WT_THREAD *thread)
+{
+    WT_UNUSED(thread);
+
+    if (F_ISSET(session->txn, WT_TXN_RUNNING)) {
+        __wt_verbose(session, WT_VERB_CHECKPOINT,
+          "Checkpoint page reconciliation thread %u rolling back the transaction", thread->id);
+        WT_RET(__wt_txn_rollback(session, NULL, false));
+    }
+
+    return (0);
+}
+
+/*
+ * __wti_checkpoint_parallel_rollback --
+ *     Roll back all transactions for the checkpoint page reconciliation workers.
+ */
+int
+__wti_checkpoint_parallel_rollback(WT_SESSION_IMPL *session)
+{
+    WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
+
+    if (!WT_PARALLEL_CHECKPOINTS_ENABLED(session))
+        return (0);
+
+    WT_ASSERT_ALWAYS(session, __checkpoint_parallel_work_queue_empty(session),
+      "Checkpoint page reconciliation workers still have work to do");
+
+    ckpt_threads = S2C(session)->ckpt_reconcile_threads;
+    WT_RET(__wt_thread_group_foreach(
+      session, &ckpt_threads->thread_group, __checkpoint_parallel_thread_rollback));
+
+    return (0);
+}

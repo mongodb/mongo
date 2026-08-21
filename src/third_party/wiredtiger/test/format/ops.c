@@ -421,11 +421,12 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
         /*
          * When the timer expires during an async disagg leader phase, spawn the step-down in a
          * background thread. The step-down joins the checkpoint/timestamp threads, drains in-flight
-         * transactions, and takes the step-down checkpoint. Running it in a separate thread keeps
-         * the spin loop ticking (track_ops) so terminal output stays live during the drain (up to
-         * 60 s). fourths is paused at -1 while the thread runs; once it signals done, fourths is
-         * reset to grant workers additional time before operations() returns. The role transition
-         * and follower ops happen via disagg_switch_roles() and the next operations() call in t.c.
+         * transactions, pauses worker writes, takes the step-down checkpoint and completes the
+         * transition to follower. Running it in a separate thread keeps the spin loop ticking
+         * (track_ops) so terminal output stays live during the drain (up to 60 s). fourths is
+         * paused at -1 while the thread runs; once it signals done, fourths is reset to grant the
+         * workers a follower window before operations() returns. disagg_switch_roles() in t.c then
+         * performs the step-up.
          */
         if (fourths == 0 && !stepdown_triggered && disagg_is_mode_switch() && g.disagg_leader &&
           GV(DISAGG_STEPDOWN_ASYNC)) {
@@ -439,7 +440,10 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
             fourths = -1;              /* Pause quit timer until step-down thread signals done. */
         }
 
-        /* Once the step-down thread completes, grant workers additional operation time. */
+        /*
+         * Once the step-down thread completes, the connection is a follower and writes are
+         * re-enabled; grant the workers a follower ops window.
+         */
         if (stepdown_running) {
             bool stepdown_complete;
             WT_ACQUIRE_READ_WITH_BARRIER(stepdown_complete, stepdown_args.done);
@@ -1122,7 +1126,7 @@ ops(void *arg)
     u_int i, rlog_table_id, throttle_delay_max;
     int rlog_ret;
     const char *iso_config, *rlog_op_name;
-    bool greater_than, intxn, prepared, mirrored_truncate;
+    bool greater_than, intxn, pause_writes, prepared, mirrored_truncate;
 
     tinfo = arg;
     mirrored_truncate = false;
@@ -1168,7 +1172,13 @@ ops(void *arg)
     truncate_op = mmrand(&tinfo->data_rnd, 100, 10 * WT_THOUSAND);
 
     for (intxn = false; !tinfo->quit;) {
-        if (GV(OPS_THROTTLE)) {
+        /*
+         * Also throttle while a step-down pauses writes: the workers become full-time readers and,
+         * without a throttle, can monopolize the page log's reader-writer locks and starve the
+         * step-down checkpoint's writes.
+         */
+        WT_ACQUIRE_READ_WITH_BARRIER(pause_writes, g.stepdown_pause_writes);
+        if (GV(OPS_THROTTLE) || pause_writes) {
             /* Sleep first to avoid burst when all threads start. */
             throttle_delay = mmrand(&tinfo->extra_rnd, 0, throttle_delay_max);
             __wt_sleep(throttle_delay / WT_MILLION, throttle_delay % WT_MILLION);
@@ -1243,6 +1253,17 @@ rollback_retry:
         table = tinfo->table = table_select(tinfo, true);
 
         /*
+         * A step-down write pause is acknowledged only when no transaction is in flight: the
+         * acknowledgment guarantees this thread has no unresolved writes and, because the operation
+         * selection below sees the pause, that it will not write again until the pause is lifted.
+         */
+        WT_ACQUIRE_READ_WITH_BARRIER(pause_writes, g.stepdown_pause_writes);
+        if (!pause_writes)
+            WT_RELEASE_WRITE_WITH_BARRIER(tinfo->pause_ack, false);
+        else if (!intxn)
+            WT_RELEASE_WRITE_WITH_BARRIER(tinfo->pause_ack, true);
+
+        /*
          * If not in a transaction and in a timestamp world, start a transaction (which is always at
          * snapshot-isolation).
          *
@@ -1283,9 +1304,12 @@ rollback_retry:
         /*
          * Select an operation: updates cannot happen at lower isolation levels or with
          * ignore_prepare and modify must be in an explicit transaction.
+         *
+         * While pause_writes is set, run read-only: new dirty pages would compete with a concurrent
+         * checkpoint for cache.
          */
         op = READ;
-        if ((iso_level == ISOLATION_IMPLICIT || iso_level == ISOLATION_SNAPSHOT) &&
+        if (!pause_writes && (iso_level == ISOLATION_IMPLICIT || iso_level == ISOLATION_SNAPSHOT) &&
           (tinfo->ignore_prepare == false)) {
             i = mmrand(&tinfo->data_rnd, 1, 100);
             if (i < TV(OPS_PCT_DELETE)) {

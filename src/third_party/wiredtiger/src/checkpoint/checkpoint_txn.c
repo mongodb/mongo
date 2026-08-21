@@ -2186,6 +2186,11 @@ err:
     if (failed) {
         conn->modified = true;
         WT_STAT_CONN_INCR(session, checkpoints_total_failed);
+        /*
+         * Roll back any parallel-checkpoint worker transactions before any early-return path below
+         * can skip the coordinator's own rollback and leave them running until connection teardown.
+         */
+        WT_TRET(__wti_checkpoint_parallel_rollback(session));
     }
 
     session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;

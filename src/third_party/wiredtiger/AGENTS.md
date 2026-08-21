@@ -107,6 +107,32 @@ Mechanics — delimiter style, function-header layout, FIXME tags, wrap width �
 | model | `test/model/` | Lightweight formal verification |
 | wtperf | `bench/wtperf/` | Performance benchmarks |
 
+## Writing Tests
+
+### Determinism
+
+Most flaky tests in this repo come from a short list of causes. Check a new test against all of them.
+
+- **Never assert on state a background thread owns without waiting for it.** Eviction, checkpoint, sweep, garbage collection, and the disaggregated-storage pickup server all run asynchronously; a state change is not visible just because the call that triggered it returned. Poll for the state with a deadline and assert the deadline inside the loop, so a timeout fails as a timeout — see `test_layered_schema25.py` for the pattern.
+- **Do not use a sleep to wait for a state.** A sleep long enough to pass on an idle machine is still too short on an ASan or heavily loaded variant. Sleeping to *advance* time, or to let a thread make progress with no state to poll, is fine.
+- **Assert direction, not exact values, on statistics.** Cache and reconciliation counters move with eviction timing and page splits. Prefer non-zero, monotonic, or bounded-range checks unless the counter is genuinely deterministic.
+- **Seed randomness and record the seed** in the failure output, so a failure can be reproduced.
+- **Do not tune data volumes to barely trigger the condition.** A margin that just works locally disappears on slower variants; size the workload so the condition is reached comfortably.
+- **Do not depend on state another test leaves behind**, including timestamps, cached files, and connection configuration.
+
+### Verifying a New Test
+
+A single green run is not evidence. Before submitting:
+
+1. **Confirm the test fails without the fix.** A test that cannot fail is worse than no test.
+2. **Run it repeatedly** — `for i in $(seq 100); do python3 ../test/suite/run.py <test> || break; done` — for anything touching background threads.
+
+### Style
+
+- Describe behaviour through the public API. Do not explain internal mechanics in test comments.
+- Do not reference Jira tickets in test code; name the scenario by what it exercises.
+- Parameterize over scenarios rather than copying a test body for trivially different data.
+
 ## CI
 
 Runs on MongoDB Evergreen. Config: `test/evergreen.yml` (and `test/evergreen_disagg.yml` for disaggregated storage).

@@ -1477,6 +1477,32 @@ config_disagg_storage(void)
          */
         if (!config_explicit(NULL, "debug.disagg_slow_truncate_follower"))
             config_single(NULL, "debug.disagg_slow_truncate_follower=on", false);
+
+        /*
+         * The async step-down fires off the timer, and its drain needs the workers to keep
+         * committing until it completes. Anything that stops them early stalls the drain: an
+         * operation count, or the global stop timestamp predictable replay posts as it winds down.
+         */
+        if (GV(DISAGG_STEPDOWN_ASYNC)) {
+            if (GV(RUNS_PREDICTABLE_REPLAY))
+                testutil_die(EINVAL,
+                  "Invalid configuration: disagg.stepdown_async is incompatible with "
+                  "runs.predictable_replay.");
+            if (config_explicit(NULL, "runs.ops") && GV(RUNS_OPS) != 0)
+                testutil_die(EINVAL,
+                  "Invalid configuration: disagg.stepdown_async with disagg.mode=switch requires "
+                  "a timer-based run; set runs.ops=0.");
+            if (!config_explicit(NULL, "runs.ops"))
+                config_single(NULL, "runs.ops=0", false);
+
+            /*
+             * Workers are throttled while a step-down pauses their writes, whether or not
+             * ops.throttle is on; pin the sleep so the randomly chosen default cannot make that
+             * throttle meaningless.
+             */
+            if (!config_explicit(NULL, "ops.throttle.sleep_us"))
+                config_single(NULL, "ops.throttle.sleep_us=1000", false);
+        }
     } else {
         g.disagg_leader = strcmp(mode, "leader") == 0;
         /* Leader and follower modes always exercise fast truncate. */

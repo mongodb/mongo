@@ -26,13 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# A follower cursor may be positioned on a key that only exists in an older
-# checkpoint. When the follower moves to a newer checkpoint that no longer
-# contains that key, continuing to iterate under a read timestamp must proceed
-# safely rather than lose the cursor position. This holds whether or not the
-# follower has already locally applied the delete: a reader at an older read
-# timestamp does not see a newer delete, so it stays positioned on the stable
-# value regardless.
+# A follower cursor may be positioned on a key that a newer checkpoint removes
+# at a timestamp above the reader's. Moving to that checkpoint mid-iteration
+# must transfer the position and continue without skipping or duplicating keys.
+# This holds whether or not the follower has already locally applied the
+# delete: a reader at an older read timestamp does not see a newer delete, so
+# it stays positioned on the stable value regardless.
 
 import wiredtiger
 import wttest
@@ -82,15 +81,17 @@ class test_layered_cursor25(wttest.WiredTigerTestCase):
         self.assertEqual(cursor_r.next(), 0)
         self.assertEqual(cursor_r.get_key(), 1)
 
-        # The leader removes the positioned key and ages it out beyond the reader's
-        # timestamp, so the next checkpoint no longer contains it.
+        # The leader removes the positioned key above the reader's timestamp. Oldest stays at
+        # the reader's timestamp: advancing it past an active reader would make the follower
+        # refuse the adoption bind (WT-18408), and the newer checkpoint keeps the history the
+        # reader needs.
         self.session.begin_transaction()
         c.set_key(1)
         self.assertEqual(c.remove(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(30))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20))
         self.session.checkpoint()
 
         # Reflecting the mongo ordering, the follower locally applies the delete before

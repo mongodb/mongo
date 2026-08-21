@@ -107,11 +107,14 @@ class test_compact11(backup_base, compact_util):
         # operation. Only run compaction once to process each table and avoid overwriting stats.
         self.turn_on_bg_compact('free_space_target=1MB,run_once=true')
 
+        # Wait for background compaction to process all the tables, taking an incremental backup
+        # every time it reclaims more space. The whole run-once pass takes about a second, so this
+        # loop may not sample it at all: it is an opportunity to interleave backups with compaction,
+        # not a guarantee of one.
         bytes_recovered = 0
-        # Wait for background compaction to process all the tables.
         while self.get_bg_compaction_success() < self.num_tables:
             new_bytes_recovered = self.get_bytes_recovered()
-            if new_bytes_recovered != bytes_recovered:
+            if new_bytes_recovered > bytes_recovered:
                 # Update the incremental backup ID from the parent class.
                 self.bkup_id += 1
                 shutil.copytree(self.home_tmp, self.backup_incr + str(self.bkup_id))
@@ -120,7 +123,19 @@ class test_compact11(backup_base, compact_util):
                 bytes_recovered = new_bytes_recovered
 
         self.pr(f'Compaction has processed {self.get_bg_compaction_success()} tables.')
-        self.assertTrue(bytes_recovered > 0)
+
+        # Read the statistic again rather than trusting the last value sampled above. The success
+        # counter is incremented after the recovered bytes, so the loop always exits without having
+        # seen the last table's contribution, and it exits having seen none of them at all if the
+        # pass finished before the first sample.
+        self.assertGreater(self.get_bytes_recovered(), 0)
+
+        # Guarantee at least one incremental backup to compare below, otherwise the comparison is
+        # silently skipped whenever the loop above took none.
+        if self.bkup_id == 0:
+            self.bkup_id += 1
+            shutil.copytree(self.home_tmp, self.backup_incr + str(self.bkup_id))
+            self.take_incr_backup(self.backup_incr + str(self.bkup_id), 0, self.bkup_id)
 
         # Compare all the incremental backups against the starting full backup. The idea is that
         # compact should not have changed the contents of the table.

@@ -39,13 +39,15 @@ from wtscenario import make_scenarios
 # checkpoint all tolerate that empty reconstructed page (rather than tripping the
 # mutually-exclusive empty-value page flags during verification), both for a
 # single-leaf tree and for one where the empty page is the leftmost of several
-# children.
+# children. A random cursor is checked separately: it sizes its choice of slot
+# by the entry count, so no entries used to mean a divide by zero.
 @disagg_test_class
 class test_layered_delta17(wttest.WiredTigerTestCase):
     test_name = __qualname__
     uri = test_name
     conn_base_config = ('statistics=(all),transaction_sync=(enabled,method=fsync),'
-                        'page_delta=(delta_pct=100,leaf_page_delta=true),precise_checkpoint=true,')
+                        'page_delta=(delta_pct=100,delete_pct=100,leaf_page_delta=true),'
+                        'precise_checkpoint=true,')
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
@@ -57,7 +59,7 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
     split_keep = 20
 
     def conn_config(self):
-        return self.conn_base_config + 'disaggregated=(role="leader")'
+        return self.conn_base_config + 'disaggregated=(role="leader"),'
 
     def rstat(self, key, uri):
         with wttest.open_cursor(self.session, "statistics:" + uri) as c:
@@ -75,8 +77,11 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
         s.rollback_transaction()
         s.close()
 
-    def test_empty_reconstructed_page(self):
-        uri = 'table:' + self.uri
+    def build_empty_reconstructed_page(self, uri):
+        # Leave the tree with a single leaf that is only reachable by merging a
+        # base image full of tombstones with leaf deltas, once every delete is
+        # globally visible. On return the page is out of cache, so the next
+        # access runs the merge and lands on an image with no entries.
         self.session.create(uri, "key_format=S,value_format=S,block_manager=disagg")
         value = "a" * 20
 
@@ -121,8 +126,12 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
         # merge yields an empty leaf.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20) +
                                 ',stable_timestamp=' + self.timestamp_str(20))
-
         cursor.close()
+
+    def test_empty_reconstructed_page(self):
+        uri = 'table:' + self.uri
+        self.build_empty_reconstructed_page(uri)
+
         cursor = self.session.open_cursor(uri, None, None)
 
         # Forward and backward scans see nothing.
@@ -138,6 +147,28 @@ class test_layered_delta17(wttest.WiredTigerTestCase):
         # The empty reconstructed page verifies and checkpoints cleanly.
         self.session.verify(uri, None)
         self.session.checkpoint()
+
+    def test_empty_reconstructed_page_random_cursor(self):
+        # A random cursor picks a slot by taking the remainder of a random
+        # number over the page's entry count, so an empty reconstructed page
+        # divides by zero. The page has to be selected straight off its disk
+        # image: with no entries there is no insert list to fall back to, and
+        # the page is clean, which is the combination that sends the random
+        # cursor at the disk entries a second time.
+        uri = 'table:' + self.uri
+        self.build_empty_reconstructed_page(uri)
+
+        # Drop the cache so the page has to be rebuilt from the page service:
+        # evicting on its own leaves the newest image a full page write. The
+        # restart resets the oldest timestamp, so push it past the deletes
+        # again before reading.
+        self.reopen_disagg_conn(self.conn_config())
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20) +
+                                ',stable_timestamp=' + self.timestamp_str(20))
+
+        cursor = self.session.open_cursor(uri, None, "next_random=true")
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
     def test_empty_reconstructed_leftmost_page(self):
         # Same empty reconstructed leaf, reached from a tree deep enough for the

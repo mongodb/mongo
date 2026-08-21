@@ -1694,10 +1694,17 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
         WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_step_up(session));
         time_stop = __wt_clock(session);
         WT_ERR_MSG_CHK(session, ret, "Failed to step up to the leader role");
+
+        /* Checkpoint cleanup is leader-only work, start/restart cleanup thread. */
+        WT_ERR(__wt_checkpoint_cleanup_start(session));
+
         WT_STAT_CONN_SET(session, disagg_step_up_time, WT_CLOCKDIFF_MS(time_stop, time_start));
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Step up completed in %" PRIu64 " milliseconds", WT_CLOCKDIFF_MS(time_stop, time_start));
     } else if (was_leader && !leader) {
+        /* Checkpoint cleanup is leader-only work, thread stays down until the next step-up. */
+        WT_ERR(__wt_checkpoint_cleanup_stop(session));
+
         /* Leader step-down. */
         time_start = __wt_clock(session);
         ret = __disagg_step_down(session);

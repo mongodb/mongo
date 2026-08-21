@@ -9,7 +9,7 @@
 /*
  * Unit tests for __verify_compare_page_id_lists.
  *
- * The merge-compares two sorted arrays returning EINVAL on any mismatch.
+ * The merge-compares two sorted arrays returning WT_ERROR on any mismatch.
  */
 
 #include <catch2/catch.hpp>
@@ -40,36 +40,36 @@ TEST_CASE("verify_compare_page_id_lists merge loop", "[verify][disagg]")
 
     SECTION("PALI exhausted first")
     {
-        CHECK(run_compare(ms, {1, 2, 3}, {1, 2}) == EINVAL);
+        CHECK(run_compare(ms, {1, 2, 3}, {1, 2}) == WT_ERROR);
     }
 
     SECTION("btree exhausted first")
     {
-        CHECK(run_compare(ms, {1, 2}, {1, 2, 3}) == EINVAL);
+        CHECK(run_compare(ms, {1, 2}, {1, 2, 3}) == WT_ERROR);
     }
 
     SECTION("interleaved mismatches")
     {
-        CHECK(run_compare(ms, {1, 2, 3}, {1, 3, 4}) == EINVAL);
+        CHECK(run_compare(ms, {1, 2, 3}, {1, 3, 4}) == WT_ERROR);
     }
 
     SECTION("all entries mismatched")
     {
-        CHECK(run_compare(ms, {1, 4}, {2, 3}) == EINVAL);
+        CHECK(run_compare(ms, {1, 4}, {2, 3}) == WT_ERROR);
     }
 
     SECTION("empty PALI")
     {
-        CHECK(run_compare(ms, {1, 2, 3}, {}) == EINVAL);
+        CHECK(run_compare(ms, {1, 2, 3}, {}) == WT_ERROR);
     }
 
     SECTION("empty btree")
     {
-        CHECK(run_compare(ms, {}, {1, 2, 3}) == EINVAL);
+        CHECK(run_compare(ms, {}, {1, 2, 3}) == WT_ERROR);
     }
 
     SECTION("multiple trailing mismatches on each side")
     {
-        CHECK(run_compare(ms, {1, 2, 3, 4}, {1, 2, 5, 6}) == EINVAL);
+        CHECK(run_compare(ms, {1, 2, 3, 4}, {1, 2, 5, 6}) == WT_ERROR);
     }
 }

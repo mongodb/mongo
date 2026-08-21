@@ -36,7 +36,9 @@ from wtscenario import make_scenarios
 #    Operational surfaces: schema ops, cached-cursor reuse and cursor configurations.
 @disagg_test_class
 class test_layered_async_stepdown04(LayeredStepdownMixin, wttest.WiredTigerTestCase):
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    # No periodic statistics-logging thread: it would race with the cursor-cache reopen checks
+    # below, which read a connection-wide stat over a narrow window.
+    conn_base_config = 'statistics=(all),'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -53,11 +55,13 @@ class test_layered_async_stepdown04(LayeredStepdownMixin, wttest.WiredTigerTestC
         stat_cursor.close()
         return count
 
-    # Open a cursor and assert the layered handle came from the session cursor cache.
+    # Open a cursor and assert the layered handle came from the session cursor cache. The stat is
+    # connection-wide, so unrelated cursor-cache sweep activity can add to the delta; require at
+    # least one reopen rather than exactly one.
     def open_cached_cursor(self, uri):
         before = self.cursor_reopen_count()
         cursor = self.session.open_cursor(uri, None, None)
-        self.assertEqual(self.cursor_reopen_count() - before, 1,
+        self.assertGreaterEqual(self.cursor_reopen_count() - before, 1,
             'the layered cursor must be served from the session cursor cache')
         return cursor
 

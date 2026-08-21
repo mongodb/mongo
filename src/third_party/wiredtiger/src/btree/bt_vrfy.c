@@ -1745,13 +1745,13 @@ __verify_compare_page_id_lists(WT_SESSION_IMPL *session, uint64_t *btree_ids, si
             __wt_verbose_error(session, WT_VERB_VERIFY,
               "Unreferenced page was not discarded: PALI[%" PRIu32 "] %" PRIu64, index_in_pali,
               id_in_pali);
-            WT_TRET(EINVAL);
+            WT_TRET(WT_ERROR);
             index_in_pali++;
         } else if (index_in_pali == num_pali || id_in_pali > id_in_btree) {
             __wt_verbose_error(session, WT_VERB_VERIFY,
               "Discarded page is still in use: BTREE[%" PRIu32 "] %" PRIu64, index_in_btree,
               id_in_btree);
-            WT_TRET(EINVAL);
+            WT_TRET(WT_ERROR);
             index_in_btree++;
         } else {
             index_in_pali++;
@@ -1874,7 +1874,7 @@ __verify_page_discard(WT_SESSION_IMPL *session, WT_BM *bm)
           "Mismatch in the number of page IDs found from PALI and btree walk: PALI %" PRIu64
           " Btree walk %" WT_SIZET_FMT,
           (uint64_t)num_pages_found_in_pali, list.count);
-        WT_TRET(EINVAL);
+        WT_TRET(WT_ERROR);
     }
 
     /*
@@ -1883,10 +1883,11 @@ __verify_page_discard(WT_SESSION_IMPL *session, WT_BM *bm)
      */
     __wt_qsort(list.ids, list.count, sizeof(uint64_t), __verify_compare_page_id);
 
-    WT_ERR_MSG_CHK(session,
-      __verify_compare_page_id_lists(
-        session, list.ids, list.count, (const uint64_t *)item->data, num_pages_found_in_pali),
-      "Page discard verification found mismatches");
+    WT_TRET(__verify_compare_page_id_lists(
+      session, list.ids, list.count, (const uint64_t *)item->data, num_pages_found_in_pali));
+    if (ret != 0)
+        WT_ERR_SUB(session, WT_ERROR, WT_VERIFY_PAGE_ID_MISMATCH,
+          "Page discard verification found mismatches");
 
 err:
     __wt_free(session, list.ids);

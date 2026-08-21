@@ -172,7 +172,7 @@ struct __wt_ckpt_snapshot {
 struct __wt_checkpoint_cleanup {
     WT_SESSION_IMPL *session; /* checkpoint cleanup session */
     wt_thread_t tid;          /* checkpoint cleanup thread */
-    int tid_set;              /* checkpoint cleanup thread set */
+    wt_shared bool tid_set;   /* checkpoint cleanup thread set */
     WT_CONDVAR *cond;         /* checkpoint cleanup wait mutex */
     uint64_t interval;        /* Checkpoint cleanup interval */
     uint64_t file_wait_ms;    /* Checkpoint cleanup file wait in milliseconds */

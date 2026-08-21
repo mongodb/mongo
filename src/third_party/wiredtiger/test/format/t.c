@@ -179,7 +179,7 @@ main(int argc, char *argv[])
     READ_SCAN_ARGS scan_args;
     WT_DECL_RET;
     uint64_t now, start;
-    u_int leader_ops_seconds, ops_seconds, reps;
+    u_int leader_ops_seconds, ops_seconds, reps, total_reps;
     int ch;
     const char *config, *home;
     bool is_backup, quiet_flag, verify_only;
@@ -253,6 +253,9 @@ main(int argc, char *argv[])
 
     /* Initialize lock to ensure single threading for lane operations in predictable replay. */
     testutil_check(pthread_rwlock_init(&g.lane_lock, NULL));
+
+    /* Initialize lock protecting the key rotation push history from concurrent step-down. */
+    testutil_check(pthread_rwlock_init(&g.key_push_lock, NULL));
 
     /*
      * Initialize the tables array and default to multi-table testing if not in backward-compatible
@@ -406,12 +409,24 @@ main(int argc, char *argv[])
          * expected to generate minimal cache activity. Content written in follower mode is not
          * evictable, extended time in this role can lead to cache overflow. The leader occupies the
          * remaining time.
+         *
+         * With async step-down, the leader -> follower transition and the follower window both
+         * happen inside operations() (the background step-down thread reconfigures to follower and
+         * grants the workers DISAGG_SWITCH_FOLLOWER_OPS_SEC). A rep can start as leader or as
+         * follower (if the previous rep ended stepped down), and disagg_switch_roles() only
+         * performs the step-up, since step-down is already handled asynchronously.
          */
         leader_ops_seconds = ops_seconds != 0 ? (ops_seconds - DISAGG_SWITCH_FOLLOWER_OPS_SEC) : 0;
 
-        for (reps = 1; reps <= (FORMAT_OPERATION_REPS * 2); ++reps) {
+        /*
+         * With async step-down each rep covers both the leader and follower phases inside
+         * operations(); otherwise a rep runs a single phase, so double the count to alternate.
+         */
+        total_reps =
+          GV(DISAGG_STEPDOWN_ASYNC) ? FORMAT_OPERATION_REPS : (FORMAT_OPERATION_REPS * 2);
+        for (reps = 1; reps <= total_reps; ++reps) {
             ops_seconds = g.disagg_leader ? leader_ops_seconds : DISAGG_SWITCH_FOLLOWER_OPS_SEC;
-            operations(ops_seconds, reps, (FORMAT_OPERATION_REPS * 2));
+            operations(ops_seconds, reps, total_reps);
             disagg_switch_roles();
         }
     }

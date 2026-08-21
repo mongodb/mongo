@@ -38,8 +38,10 @@
 void
 disagg_key_history_clear(void)
 {
+    testutil_check(pthread_rwlock_wrlock(&g.key_push_lock));
     memset(g.key_push_history, 0, sizeof(g.key_push_history));
     g.key_push_count = 0;
+    testutil_check(pthread_rwlock_unlock(&g.key_push_lock));
 }
 
 /*
@@ -49,10 +51,12 @@ disagg_key_history_clear(void)
 static void
 key_push_history_append(wt_timestamp_t ts)
 {
+    testutil_check(pthread_rwlock_wrlock(&g.key_push_lock));
     testutil_assertfmt(g.key_push_count < KEY_PUSH_HISTORY_MAX,
       "key rotation history full at %d entries, cannot push %" PRIu64, KEY_PUSH_HISTORY_MAX,
       (uint64_t)ts);
     g.key_push_history[g.key_push_count++] = ts;
+    testutil_check(pthread_rwlock_unlock(&g.key_push_lock));
 }
 
 /*
@@ -129,11 +133,13 @@ expected_kek_ts(wt_timestamp_t checkpoint_ts)
 {
     wt_timestamp_t expected_ts = WT_TS_NONE;
 
+    testutil_check(pthread_rwlock_rdlock(&g.key_push_lock));
     for (size_t i = 0; i < g.key_push_count; ++i) {
         if (g.key_push_history[i] > checkpoint_ts)
             break;
         expected_ts = g.key_push_history[i];
     }
+    testutil_check(pthread_rwlock_unlock(&g.key_push_lock));
     return (expected_ts);
 }
 

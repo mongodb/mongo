@@ -17,9 +17,10 @@ static void __size_stat_hist_incr(WT_SESSION_IMPL *, size_t);
 static int __size_stat_overflow(WT_SESSION_IMPL *, const uint8_t *, size_t, int);
 
 /*
- * Leaf page-size histogram bucketing for the size summary. All but the last bucket are equal-width
- * slices of [0, leaf page max); the final bucket holds pages at or above the leaf page max. The
- * bucket count must match the number of btree_size_leaf_hist_N statistics.
+ * Leaf page-size histogram bucketing for the size summary. Size-stats measure uncompressed leaf
+ * images (dsk->mem_size). All but the last bucket are equal-width slices of [0, pre-compression
+ * leaf page budget); the final bucket holds pages at or above that budget. The bucket count must
+ * match the number of btree_size_leaf_hist_N statistics.
  */
 #define WT_SIZE_STAT_HIST_BUCKETS 9
 
@@ -472,6 +473,7 @@ void
 __wt_size_stat_reset(WT_SESSION_IMPL *session)
 {
     WT_DSRC_STATS **stats;
+    uint64_t hist_ceiling;
 
     if (session->dhandle == NULL || session->dhandle->stat_array == NULL)
         return;
@@ -497,6 +499,13 @@ __wt_size_stat_reset(WT_SESSION_IMPL *session)
     WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_7, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_8, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_no_image_pages, 0);
+
+    /* Publish the histogram contract; N is fixed named slots, not a growing series. */
+    hist_ceiling = S2BT(session)->maxleafpage_precomp;
+    if (hist_ceiling == 0)
+        hist_ceiling = S2BT(session)->maxleafpage;
+    WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_buckets, WT_SIZE_STAT_HIST_BUCKETS);
+    WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_ceiling, hist_ceiling);
 }
 
 /*
@@ -546,10 +555,21 @@ __wti_size_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_STAT_DSRC_INCRV(session, btree_size_leaf_bytes, page_mem);
 
     /*
-     * Bucket the leaf by uncompressed size: equal-width slices of [0, leaf page max), with the
-     * final bucket for pages at or above the configured maximum.
+     * Bucket the uncompressed leaf image against the pre-compression leaf budget published at
+     * reset. Equal-width slices of [0, ceiling); the final bucket is at or above that ceiling. Use
+     * the first counter slot: summing every slot on each leaf is wasted, and stats may not be
+     * allocated.
      */
-    uint32_t bucket_width = S2BT(session)->maxleafpage / (WT_SIZE_STAT_HIST_BUCKETS - 1);
+    uint64_t ceiling = 0;
+    if (session->dhandle != NULL && session->dhandle->stat_array != NULL &&
+      session->dhandle->stats[0] != NULL)
+        ceiling = (uint64_t)session->dhandle->stats[0]->btree_size_leaf_hist_ceiling;
+    if (ceiling == 0) {
+        ceiling = S2BT(session)->maxleafpage_precomp;
+        if (ceiling == 0)
+            ceiling = S2BT(session)->maxleafpage;
+    }
+    uint64_t bucket_width = ceiling / (WT_SIZE_STAT_HIST_BUCKETS - 1);
     size_t hist_bucket;
     if (bucket_width == 0)
         hist_bucket = 0;

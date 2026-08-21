@@ -88,6 +88,7 @@ track_ops(TINFO *tinfo)
     wt_timestamp_t cur_ts, old_ts, stable_ts;
     size_t len;
     char msg[128], ts_msg[64];
+    bool disagg_leader;
 
     if (GV(QUIET))
         return;
@@ -122,6 +123,7 @@ track_ops(TINFO *tinfo)
           track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
           track_ts_dots(cur_dot_cnt));
     }
+    WT_ACQUIRE_READ_WITH_BARRIER(disagg_leader, g.disagg_leader);
     testutil_snprintf_len_set(msg, sizeof(msg), &len,
       "ops%s: "
       "S %" PRIu64
@@ -135,7 +137,7 @@ track_ops(TINFO *tinfo)
       "M %" PRIu64
       "%s, "
       "T %" PRIu64 "%s%s",
-      g.disagg_storage_config ? g.disagg_leader ? "[Leader]" : "[Follower]" : "",
+      g.disagg_storage_config ? disagg_leader ? "[Leader]" : "[Follower]" : "",
       tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search, tinfo->search > M(9) ? "M" : "",
       tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert, tinfo->insert > M(9) ? "M" : "",
       tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update, tinfo->update > M(9) ? "M" : "",

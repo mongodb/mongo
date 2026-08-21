@@ -2262,6 +2262,17 @@ __rec_build_delta(
 }
 
 /*
+ * __rec_set_upd_durable --
+ *     Mark a written update so a future write can skip it. A prepared update gets a flag of its own
+ *     because a rollback can still take it away.
+ */
+static WT_INLINE void
+__rec_set_upd_durable(WT_UPDATE *upd, bool prepared)
+{
+    F_SET(upd, prepared ? WT_UPDATE_PREPARE_DURABLE : WT_UPDATE_DURABLE);
+}
+
+/*
  * __rec_set_updates_durable --
  *     Set the updates durable. This must be called when the reconciliation can no longer fail.
  */
@@ -2269,6 +2280,7 @@ static void
 __rec_set_updates_durable(WT_SESSION_IMPL *session, WT_MULTI *multi)
 {
     WT_SAVE_UPD *supd;
+    WT_UPDATE *tombstone, *upd;
     uint32_t i;
 
     if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
@@ -2283,39 +2295,30 @@ __rec_set_updates_durable(WT_SESSION_IMPL *session, WT_MULTI *multi)
      * in the next reconciliation if this reconciliation fail.
      */
     for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd) {
-        if (supd->onpage_upd == NULL && supd->onpage_tombstone == NULL)
-            continue;
+        tombstone = supd->onpage_tombstone;
+        upd = supd->onpage_upd;
 
         /*
          * Mark the update that has been written to prevent it from being included in a future
          * delta.
          */
-        if (supd->onpage_upd == NULL)
-            F_SET(supd->onpage_tombstone, WT_UPDATE_DURABLE);
-        else {
-            if (supd->onpage_tombstone != NULL) {
-                if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw)) {
-                    F_SET(supd->onpage_tombstone, WT_UPDATE_PREPARE_DURABLE);
+        if (tombstone != NULL)
+            __rec_set_upd_durable(tombstone, WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw));
 
-                    /* The on page value is also a prepared update from the same transaction. */
-                    if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw))
-                        F_SET(supd->onpage_upd, WT_UPDATE_PREPARE_DURABLE);
+        if (upd == NULL)
+            continue;
 
-                    /*
-                     * Never mark the on-page value as durable to ensure it can be included in a
-                     * future write if the prepared tombstone is rolled back.
-                     */
-                } else {
-                    F_SET(supd->onpage_tombstone, WT_UPDATE_DURABLE);
-                    F_SET(supd->onpage_upd, WT_UPDATE_DURABLE);
-                }
-            } else {
-                if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw))
-                    F_SET(supd->onpage_upd, WT_UPDATE_PREPARE_DURABLE);
-                else
-                    F_SET(supd->onpage_upd, WT_UPDATE_DURABLE);
-            }
-        }
+        /*
+         * When a tombstone and the value below it are written together, mark only the tombstone,
+         * and drop any mark the value was given by an earlier write. A rollback can still take the
+         * tombstone away, whether it is prepared or committed with a stop newer than the stable
+         * timestamp, and the value it brings back to life must then look changed so that the next
+         * write includes it again.
+         */
+        if (tombstone != NULL)
+            F_CLR(upd, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE);
+        else
+            __rec_set_upd_durable(upd, WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw));
     }
 }
 

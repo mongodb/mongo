@@ -168,6 +168,11 @@ updates trigger or the eviction dirty trigger allows. Eviction cannot reclaim co
 uncommitted transaction, so the transaction cannot succeed against the configured cache size and has
 been rolled back.
 
+@par \c WT_VERIFY_PAGE_ID_MISMATCH
+This sub-level error indicates that the disaggregated-storage verify pass found one or more page IDs
+present in the btree walk but absent from the page log (or vice versa), meaning a page was either
+leaked or discarded prematurely.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

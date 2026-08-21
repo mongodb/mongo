@@ -84,6 +84,10 @@ __wt_wiredtiger_error(int error)
         return (
           "WT_TXN_TOO_LARGE_FOR_CACHE: Transaction dirty content alone exceeds the eviction "
           "updates or dirty trigger");
+    case WT_VERIFY_PAGE_ID_MISMATCH:
+        return (
+          "WT_VERIFY_PAGE_ID_MISMATCH: Verify found a mismatch between the btree and PALI page ID "
+          "lists");
     }
 
     /* Windows strerror doesn't support ENOTSUP. */
