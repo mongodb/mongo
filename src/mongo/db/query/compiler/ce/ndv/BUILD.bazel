@@ -62,6 +62,19 @@ mongo_cc_unit_test(
     ],
 )
 
+# The loader's implementation is compiled into //src/mongo/db:query_exec, mirroring
+# persistent_sample_loader.cpp: a standalone library could not depend on DBDirectClient
+# without creating a dependency cycle with query_exec.
+mongo_cc_library(
+    name = "field_stats_loader",
+    hdrs = [
+        "field_stats_loader.h",
+    ],
+    deps = [
+        ":field_stats",
+    ],
+)
+
 mongo_cc_library(
     name = "hyperloglog",
     srcs = [

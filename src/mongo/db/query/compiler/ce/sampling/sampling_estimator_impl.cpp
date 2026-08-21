@@ -25,6 +25,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/ce/ndv/field_stats_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/math.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
@@ -32,6 +33,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -1161,11 +1163,105 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     return meta;
 }
 
+bool SamplingEstimatorImpl::persistentNDVStatsEnabled() const {
+    if (!_persistentNDVEnabled) {
+        const bool flagEnabled = feature_flags::gFeatureFlagPersistentStats.isEnabled(
+            VersionContext::getDecoration(_opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        // The operation's knob configuration, which reflects any query settings overrides.
+        _persistentNDVEnabled =
+            flagEnabled && QueryKnobConfiguration::get(_opCtx).getEnablePersistentNDVStats();
+    }
+    return *_persistentNDVEnabled;
+}
+
+boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPersistentStats(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+    // TODO SERVER-131766: serve multi-field NDV once composite statistics are persisted.
+    // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
+    // distinct values fall within a range. The persisted sketch counts null and missing separately
+    // ($expr semantics); regular-eq callers accept being off by at most one.
+    if (fields.size() != 1 || bounds.has_value() || !persistentNDVStatsEnabled()) {
+        return boost::none;
+    }
+
+    const std::string path = fields.front().path.fullPath();
+    if (const auto it = _persistedNDVEstimates.find(path); it != _persistedNDVEstimates.end()) {
+        return it->second;
+    }
+
+    const auto estimate = [&]() -> boost::optional<CardinalityEstimate> {
+        const CollectionPtr& collection = _collections.lookupCollection(_nss);
+        if (!collection) {
+            return boost::none;
+        }
+
+        auto swDoc = loadFieldStats(_opCtx, _nss.dbName(), collection->uuid(), {path});
+        if (!swDoc.isOK()) {
+            LOGV2_DEBUG(13176000,
+                        5,
+                        "Found no usable persisted NDV statistics",
+                        logAttrs(_nss),
+                        "path"_attr = path,
+                        "reason"_attr = swDoc.getStatus());
+            return boost::none;
+        }
+
+        // A single-field statistic carries exactly one sketch, holding a non-negative NDV. Any
+        // other shape was written by a version that disagrees with ours, so fall back to the
+        // sample rather than asserting on stored data.
+        const auto& sketches = swDoc.getValue().getNdv().getSketches();
+        const bool usable = sketches.size() == 1 && sketches.front().getNdv() >= 0;
+        if (!usable) {
+            LOGV2_DEBUG(13176002,
+                        5,
+                        "Ignoring unusable persisted NDV statistics document",
+                        logAttrs(_nss),
+                        "path"_attr = path,
+                        "expectedNumSketches"_attr = 1,
+                        "numSketches"_attr = sketches.size(),
+                        "ndv"_attr = sketches.empty()
+                            ? boost::none
+                            : boost::make_optional(sketches.front().getNdv()));
+            return boost::none;
+        }
+
+        const auto ndv = sketches.front().getNdv();
+
+        // EstimationSource::Sampling keeps downstream ranking behavior identical to the
+        // sample-based estimate. TODO SERVER-131761: surface persisted-NDV usage in explain.
+        CardinalityEstimate persistedEstimate{CardinalityType{static_cast<double>(ndv)},
+                                              EstimationSource::Sampling};
+        // The statistics may predate writes; never serve more than the current collection
+        // cardinality (the sample-based path below clamps the same way).
+        if (cost_based_ranker::exactGt(persistedEstimate, _collectionCard)) {
+            persistedEstimate = _collectionCard;
+        }
+        LOGV2_DEBUG(13176001,
+                    5,
+                    "Serving NDV from persisted statistics",
+                    logAttrs(_nss),
+                    "path"_attr = path,
+                    "estimate"_attr = persistedEstimate);
+        return persistedEstimate;
+    }();
+
+    _persistedNDVEstimates.emplace(path, estimate);
+    return estimate;
+}
+
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     const std::vector<FieldPathAndEqSemantics>& fields,
     boost::optional<std::span<const OrderedIntervalList>> bounds) const {
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
 
+    if (auto persisted = tryEstimateNDVFromPersistentStats(fields, bounds)) {
+        return *persisted;
+    }
+
+    // Only the sample-based path below reads the field out of the sample, so this precondition is
+    // checked after the persisted statistics have had their chance to serve the estimate.
     if (!_topLevelSampleFieldNames.empty()) {
         for (const auto& field : fields) {
             tassert(11158505,

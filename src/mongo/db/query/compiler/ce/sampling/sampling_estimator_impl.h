@@ -15,6 +15,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::ce {
 /**
@@ -318,6 +319,12 @@ protected:
     // Lazily computed on the first estimateNDV() call. Counts the number of documents with
     // distinct _id values in the sample to detect duplicates from sampling with replacement.
     mutable boost::optional<size_t> _uniqueDocCount;
+    // Lazily computed on the first estimateNDV() call: whether persisted NDV statistics may be
+    // served (feature flag and knob).
+    mutable boost::optional<bool> _persistentNDVEnabled;
+    // Memoizes persisted-NDV lookups (including misses) per field path, so repeated estimateNDV()
+    // calls during plan enumeration do not repeat the read.
+    mutable StringMap<boost::optional<CardinalityEstimate>> _persistedNDVEstimates;
     // Set to true when tryLoadPersistentSample() successfully loads sample from stats collection.
     bool _wasSamplePersisted = false;
     SamplingCEMethodEnum _persistentSampleMethod;
@@ -325,6 +332,22 @@ protected:
     SamplingCEMethodEnum _samplingStyle;
 
 private:
+    /**
+     * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
+     * eligible: feature flag and knob enabled, a single field and no bounds. Returns boost::none
+     * when ineligible or when no usable statistics exist; the caller then falls back to the
+     * sample-based estimate. Results, including misses, are memoized per field path.
+     */
+    boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const;
+
+    /**
+     * Whether persisted NDV statistics may be served, i.e. featureFlagPersistentStats and the
+     * internalQueryEnablePersistentNDVStats knob are both enabled. Computed once per instance.
+     */
+    bool persistentNDVStatsEnabled() const;
+
     /**
      * Constructs a sampling SBE plan using the random-walk method.
      * The SBE plan consists of a sbe::ScanStage which uses a random cursor to read documents

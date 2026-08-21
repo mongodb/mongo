@@ -75,6 +75,10 @@ public:
      * Does not support estimating NDV over array-valued fields.
      * 'fields' specifies which fields should follow strict, $expr-style equality (null !=
      * missing) vs. regular equality semantics (null == missing).
+     *
+     * Note: when the estimate is served from persisted NDV statistics (single field, no bounds),
+     * the equality semantics are ignored; the persisted sketch counts null and missing separately
+     * ($expr semantics), and regular-eq callers accept being off by at most one.
      */
     virtual CardinalityEstimate estimateNDV(
         const std::vector<FieldPathAndEqSemantics>& fields,
