@@ -287,6 +287,12 @@ public:
         return ++numCurrentOpRan;
     }
 
+    Date_t now() {
+        return MONGO_likely(hasGlobalServiceContext())
+            ? getGlobalServiceContext()->getFastClockSource()->now()
+            : Date_t::now();
+    }
+
     const AsyncClientFactory& getFactory() {
         return checked_cast<NetworkInterfaceTL&>(net()).getClientFactory_forTest();
     }
@@ -764,7 +770,6 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto client = serviceContext->getService()->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
 
-    Timer stopWatch{serviceContext->getTickSource()};
     opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
                              ErrorCodes::ExceededTimeLimit);
 
@@ -785,12 +790,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     auto request = makeTestCommand(requestTimeout, makeEchoCmdObj(), opCtx.get());
 
+    const auto start_time = now();
     auto deferred = runCommand(cb, request);
-    // The time returned in result.elapsed is measured from when the command started, which happens
-    // in runCommand. The delay between setting the deadline on opCtx and starting the command can
-    // be long enough that the assertion about opCtxDeadline fails.
-    auto networkStartCommandDelay = stopWatch.elapsed();
-
     auto result = deferred.get(interruptible());
 
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
@@ -798,8 +799,11 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay + Milliseconds(1), opCtxDeadline);
-    ASSERT_LT(result.elapsed.value(), requestTimeout);
+    // NB: if we experience test flake on the ASSERT_LT/upper bound check, consider deleting
+    // it. Upper bound time checks can never be provably correct in all cases.
+    const auto current_time = now();
+    ASSERT_GTE(current_time, opCtx->getDeadline());
+    ASSERT_LT(current_time, start_time + requestTimeout);
     ASSERT_EQ(result.target, fixture().getServers().front());
 
     // The number of timed-out operations is 1 because of the echo command. The number of succeeded
@@ -818,14 +822,6 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     constexpr auto opCtxDeadline = Milliseconds{1000};
     constexpr auto requestTimeout = Milliseconds{600};
 
-    auto serviceContext = ServiceContext::make();
-    auto client = serviceContext->getService()->makeClient("NetworkClient");
-    auto opCtx = client->makeOperationContext();
-
-    Timer timer{serviceContext->getTickSource()};
-    opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
-                             ErrorCodes::ExceededTimeLimit);
-
     assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint" << "failCommand"
                                               << "mode"
@@ -841,28 +837,26 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
                                                   << "off"));
     });
 
+    auto serviceContext = ServiceContext::make();
+    auto client = serviceContext->getService()->makeClient("NetworkClient");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(now() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+
     auto request = makeTestCommand(
         requestTimeout, makeEchoCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
-    auto createRequestDelay = timer.elapsed();
 
     auto deferred = runCommand(cb, request);
-    // The time returned in result.elapsed is measured from when the command started, which happens
-    // in runCommand. The delay between setting the deadline on opCtx and starting the command can
-    // be long enough that the assertion about opCtxDeadline fails.
-    auto networkStartCommandDelay = timer.elapsed();
-
     auto result = deferred.get(interruptible());
 
     ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
 
     // check that the request timeout uses the smaller of the operation context deadline and
-    // the timeout specified in the request constructor.
-    // The absolute deadline is calculated in the RemoteCommandRequest constructor, while the
-    // request timer starts in `runCommand`. `createRequestDelay` may be slightly too low to capture
-    // this discrepancy, so we add some headroom to the final assertion here.
-    ASSERT_GTE(result.elapsed.value() + createRequestDelay + Milliseconds(1), requestTimeout);
-    ASSERT_LT(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
+    // the deadline calculated in the request constructor.
+    const auto current_time = now();
+    ASSERT_GTE(current_time, request.deadline);
+    ASSERT_LT(current_time, opCtx->getDeadline());
 
     // The number of timed-out operations is 1 because of the echo command. The number of succeeded
     // operations is 1 because of the 'configureFailPoint' command.
@@ -883,6 +877,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExt
 
     auto cb = makeCallbackHandle();
     constexpr auto requestTimeout = Milliseconds{100};
+    const auto expirationTime = now() + failCommandBlockTime;
     auto request = makeTestCommand(
         requestTimeout, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired);
     auto deferred = runCommand(cb, request);
@@ -891,12 +886,11 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExt
     ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
 
-    // The elapsed time should be at least requestTimeout + buffer, minus a small buffer to account
-    // for the time that may pass between calculating the timeout in RCR and starting the timer in
-    // the NITL.
-    ASSERT_GTE(result.elapsed.value(), (requestTimeout + bufferMs) - Milliseconds(10));
-    // And it should not have waited the full failCommand blockTime.
-    ASSERT_LT(result.elapsed.value(), failCommandBlockTime);
+    // The elapsed time should be at least requestTimeout + buffer, and it should
+    // not have waited the full failCommand blockTime.
+    const auto current_time = now();
+    ASSERT_GTE(current_time, request.deadline + bufferMs);
+    ASSERT_LT(request.deadline, expirationTime);
 }
 
 // Test that the "numRequestsTimedOutBeforeSentToRemote" serverStatus metric is incremented when
