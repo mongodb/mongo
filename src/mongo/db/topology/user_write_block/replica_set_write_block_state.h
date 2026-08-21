@@ -101,7 +101,7 @@ public:
      * Returns whether replica set deletions blocking is enabled, disregarding a specific namespace
      * and the state of WriteBlockBypass. Used for serverStatus.
      */
-    [[MONGO_MOD_FILE_PRIVATE]] bool isReplicaSetDeletionsBlockingEnabled_forTest() const;
+    bool isReplicaSetDeletionsBlockingEnabled() const;
 
     /**
      * Reports replica set write blocking counters, specifying one counter per blocking reason.

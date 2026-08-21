@@ -81,8 +81,10 @@ The in-memory state lives in `ReplicaSetWriteBlockState` (`replica_set_write_blo
 a `ServiceContext` decoration. It holds the atomic write-block flag and its reason, a separate
 deletions-blocked flag, a transient index-build-block flag, and counters used for `serverStatus`
 (`replicaSetWritesBlockCounters`, one per reason) and for rejection metrics
-(`replicaSetWritesBlockRejected`, split into inserts/updates/deletes). It exposes the predicates
-that decide whether an operation may proceed: `checkReplicaSetWritesAllowed`,
+(`replicaSetWritesBlockRejected`, split into inserts/updates/deletes). The `serverStatus().repl`
+field `replicaSetWritesBlockAllowDeletions` is always present and reports whether deletions are
+allowed. It is `true` while replica set write blocking is disabled. It exposes the predicates that
+decide whether an operation may proceed: `checkReplicaSetWritesAllowed`,
 `checkReplicaSetDeletionsAllowed`, and the operation-specific gates `checkIfCompactAllowedToStart`,
 `checkIfConvertToCappedAllowedToStart`, `checkIfIncomingMigrationAllowedToStart`,
 `checkIfIncomingReshardingAllowedToStart`, and `checkIfIndexBuildAllowedToStart`. When a check fails

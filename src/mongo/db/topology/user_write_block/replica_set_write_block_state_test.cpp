@@ -152,10 +152,10 @@ TEST_F(ReplicaSetWriteBlockStateTest, DisableDeletionsBlockingClearsIsEnabled) {
 
     auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
     state->enableReplicaSetDeletionsBlocking();
-    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
 
     state->disableReplicaSetDeletionsBlocking();
-    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
 
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");

@@ -235,6 +235,7 @@ public:
             auto reason = UserWritesBlockReasonEnum::kUnspecified;
             auto replicaSetState = ReplicaSetLevelWriteBlockState::kUnknown;
             boost::optional<int> replicaSetReason;
+            bool replicaSetAllowDeletions = true;
             // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
             Lock::GlobalLock lk(
@@ -250,14 +251,15 @@ public:
                     ? UserWriteBlockState::kEnabled
                     : UserWriteBlockState::kDisabled;
                 reason = GlobalUserWriteBlockState::get(opCtx)->getUserWriteBlockingReason(opCtx);
-                replicaSetState =
-                    ReplicaSetWriteBlockState::get(opCtx)->isReplicaSetWriteBlockingEnabled()
+                auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
+                replicaSetState = replicaSetWriteBlockState->isReplicaSetWriteBlockingEnabled()
                     ? ReplicaSetLevelWriteBlockState::kEnabled
                     : ReplicaSetLevelWriteBlockState::kDisabled;
                 if (replicaSetState == ReplicaSetLevelWriteBlockState::kEnabled) {
                     replicaSetReason =
-                        ReplicaSetWriteBlockState::get(opCtx)->getReplicaSetWriteBlockingReason(
-                            opCtx);
+                        replicaSetWriteBlockState->getReplicaSetWriteBlockingReason(opCtx);
+                    replicaSetAllowDeletions =
+                        !replicaSetWriteBlockState->isReplicaSetDeletionsBlockingEnabled();
                 }
             }
             result.append("userWriteBlockMode", state);
@@ -267,6 +269,7 @@ public:
             if (replicaSetReason) {
                 result.append("replicaSetWritesBlockReason", *replicaSetReason);
             }
+            result.append("replicaSetWritesBlockAllowDeletions", replicaSetAllowDeletions);
             ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWritesBlockCounters(result);
             ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWriteBlockRejectionMetrics(
                 result);
