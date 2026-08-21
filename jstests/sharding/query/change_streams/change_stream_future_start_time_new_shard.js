@@ -9,6 +9,9 @@
  *   # Sanitizer variants are too slow and can not add a shard within the given 'kFutureOffsetSecs' timeframe.
  *   incompatible_aubsan,
  *   tsan_incompatible,
+ *   # Continuous config server stepdowns make addShard/moveChunk slow enough to blow past
+ *   # 'kFutureOffsetSecs', causing the "cluster time already past future start time" setup assert.
+ *   does_not_support_stepdowns,
  * ]
  */
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
