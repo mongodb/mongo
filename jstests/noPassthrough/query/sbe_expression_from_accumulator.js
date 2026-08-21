@@ -18,12 +18,17 @@ describe("expressions from accumulators in SBE", function () {
     // When 'featureFlagSbeAccumulatorExpressions' is disabled these expressions stay
     // 'notCompatible', so only the classic/SBE result equivalence is meaningful.
     let sbeLoweringEnabled;
+    // Under "trySbeRestricted" a $project is only pushed down when
+    // 'featureFlagSbeTransformStages' is enabled, so without it the anchored pipeline keeps the
+    // $project in the classic agg layer.
+    let transformPushdownEnabled;
 
     before(function () {
         conn = MongoRunner.runMongod({});
         db = conn.getDB(jsTestName());
         coll = db[jsTestName()];
         sbeLoweringEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeAccumulatorExpressions");
+        transformPushdownEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 
         assert.commandWorked(
             coll.insert([
@@ -99,7 +104,9 @@ describe("expressions from accumulators in SBE", function () {
             "forceClassicEngine",
             options,
         );
-        assertUsesSbe(anchoredPipeline, "trySbeRestricted", options);
+        if (transformPushdownEnabled) {
+            assertUsesSbe(anchoredPipeline, "trySbeRestricted", options);
+        }
         assert.eq(
             runWithFramework(anchoredPipeline, "trySbeRestricted", options),
             anchoredClassicResults,
