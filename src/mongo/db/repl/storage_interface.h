@@ -12,6 +12,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/clean_shutdown_gen.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -89,6 +90,38 @@ public:
      * Increments the current rollback ID. Returns the new value of the rollback ID if successful.
      */
     virtual StatusWith<int> incrementRollbackID(OperationContext* opCtx) = 0;
+
+    /**
+     * Clean shutdown metadata is a history of the clean shutdowns this node has undergone, stored
+     * as one document per clean shutdown in the capped collection local.system.cleanShutdownLog.
+     * Each document records a monotonically increasing identifier and the timestamp of the last
+     * checkpoint the node took before shutting down. Readers use the identifier to tell whether new
+     * shutdowns have been recorded since they last looked.
+     */
+
+    /**
+     * Creates the capped local.system.cleanShutdownLog collection if it does not already exist.
+     *
+     * Called unconditionally on every startup, not just after a clean shutdown, so this is
+     * idempotent rather than returning NamespaceExists the way initializeRollbackID does.
+     */
+    virtual Status initializeCleanShutdownCollection(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns the most recently recorded clean shutdown document, or boost::none if the collection
+     * is present but empty.
+     */
+    virtual StatusWith<boost::optional<CleanShutdownDocument>> getLastCleanShutdownDocument(
+        OperationContext* opCtx) = 0;
+
+    /**
+     * Appends a new document to local.system.cleanShutdownLog recording that this node started up
+     * after a clean shutdown. The new document's _id is one greater than that of the most recent
+     * document, or 0 if there is none.
+     *
+     * 'lastCheckpointTs' is the stable timestamp this node rolled back to on restart.
+     */
+    virtual Status recordCleanShutdown(OperationContext* opCtx, Timestamp lastCheckpointTs) = 0;
 
 
     // Collection creation and population for initial sync.

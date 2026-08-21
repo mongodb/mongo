@@ -80,6 +80,14 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "clean_shutdown_gen",
+    src = "clean_shutdown.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "rollback_gen",
     src = "rollback.idl",
     deps = [
@@ -103,6 +111,7 @@ mongo_cc_library(
         "storage_interface.cpp",
     ],
     deps = [
+        ":clean_shutdown_idl",
         ":optime",
         "//src/mongo/db:service_context",
     ],
@@ -692,6 +701,18 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "clean_shutdown_idl",
+    srcs = [
+        ":clean_shutdown_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:basic_types_serialization",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
     name = "replication_process",
     srcs = [
         "replication_consistency_markers.cpp",
@@ -1009,6 +1030,7 @@ mongo_cc_library(
         "storage_interface_impl.cpp",
     ],
     deps = [
+        ":clean_shutdown_idl",
         ":local_oplog_info",
         ":oplog",
         ":repl_server_parameters",

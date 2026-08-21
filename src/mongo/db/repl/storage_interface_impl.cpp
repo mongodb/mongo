@@ -39,6 +39,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/clean_shutdown_gen.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/oplog.h"
@@ -102,6 +103,15 @@ namespace {
 using UniqueLock = std::unique_lock<std::mutex>;
 
 const auto kIdIndexName = IndexConstants::kIdIndexName;
+
+// Clean shutdowns are rare and each document in this collection is well under 50 bytes, so 1MB
+// should still retain significant history.
+const long long kCleanShutdownCollectionSizeBytes = 1 * 1024 * 1024;
+
+// The _id of the sentinel document that keeps the collection from ever being empty. It sits one
+// below the first real clean shutdown's _id of 0, so readers see it as "no clean shutdown
+// recorded".
+const long long kCleanShutdownSentinelId = -1;
 
 }  // namespace
 
@@ -187,6 +197,98 @@ StatusWith<int> StorageInterfaceImpl::incrementRollbackID(OperationContext* opCt
         return newRBID;
     }
     return status;
+}
+
+Status StorageInterfaceImpl::initializeCleanShutdownCollection(OperationContext* opCtx) {
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = kCleanShutdownCollectionSizeBytes;
+
+    // This runs on every startup, so NamespaceExists is the ordinary case rather than a failure.
+    // Any other error means we do not have a collection to work with, so there is nothing to seed.
+    auto status = createCollection(opCtx, NamespaceString::kCleanShutdownLogNamespace, options);
+    if (!status.isOK() && status != ErrorCodes::NamespaceExists) {
+        return status;
+    }
+
+    // Seed the collection with a sentinel so that it is never both present and empty. That keeps
+    // "has never cleanly shut down" distinct from "does not record clean shutdowns at all": the
+    // former reports the sentinel, the latter has no collection and so reports nothing. The
+    // sentinel's _id is one below that of the first real shutdown, so it reads as exactly the
+    // absence of one and needs no special handling anywhere else.
+    auto lastDoc = getLastCleanShutdownDocument(opCtx);
+    if (!lastDoc.isOK()) {
+        return lastDoc.getStatus();
+    }
+    if (lastDoc.getValue()) {
+        return Status::OK();
+    }
+
+    CleanShutdownDocument sentinel;
+    sentinel.setId(kCleanShutdownSentinelId);
+    sentinel.setCleanShutdownLastCheckpointTimestamp(Timestamp());
+
+    BSONObjBuilder bob;
+    sentinel.serialize(&bob);
+    Timestamp noTimestamp;  // This write is not replicated.
+    return insertDocument(opCtx,
+                          NamespaceString::kCleanShutdownLogNamespace,
+                          TimestampedBSONObj{bob.done(), noTimestamp},
+                          OpTime::kUninitializedTerm);
+}
+
+StatusWith<boost::optional<CleanShutdownDocument>>
+StorageInterfaceImpl::getLastCleanShutdownDocument(OperationContext* opCtx) {
+    try {
+        // Documents are only ever appended, so the last one in natural order is the one with the
+        // highest _id.
+        auto docs = findDocuments(opCtx,
+                                  NamespaceString::kCleanShutdownLogNamespace,
+                                  boost::none,  // Collection scan.
+                                  ScanDirection::kBackward,
+                                  BSONObj(),
+                                  BoundInclusion::kIncludeStartKeyOnly,
+                                  1U);
+        if (!docs.isOK()) {
+            return docs.getStatus();
+        }
+        if (docs.getValue().empty()) {
+            return {boost::none};
+        }
+
+        return boost::make_optional(CleanShutdownDocument::parse(
+            docs.getValue().front(), IDLParserContext("CleanShutdownDocument")));
+    } catch (const DBException&) {
+        return exceptionToStatus();
+    }
+}
+
+Status StorageInterfaceImpl::recordCleanShutdown(OperationContext* opCtx,
+                                                 Timestamp lastCheckpointTs) {
+    auto lastDoc = getLastCleanShutdownDocument(opCtx);
+    if (!lastDoc.isOK()) {
+        return lastDoc.getStatus();
+    }
+
+    CleanShutdownDocument doc;
+    doc.setId(lastDoc.getValue() ? lastDoc.getValue()->getId() + 1 : 0);
+    doc.setCleanShutdownLastCheckpointTimestamp(lastCheckpointTs);
+
+    BSONObjBuilder bob;
+    doc.serialize(&bob);
+    Timestamp noTimestamp;  // This write is not replicated.
+    auto status = insertDocument(opCtx,
+                                 NamespaceString::kCleanShutdownLogNamespace,
+                                 TimestampedBSONObj{bob.done(), noTimestamp},
+                                 OpTime::kUninitializedTerm);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // We wait until durable because a node that restarts must have this document on disk before it
+    // accepts connections again.
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
+    return Status::OK();
 }
 
 StatusWith<std::unique_ptr<CollectionBulkLoader>>

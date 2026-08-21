@@ -45,6 +45,35 @@ StatusWith<int> StorageInterfaceMock::incrementRollbackID(OperationContext* opCt
     return _rbid;
 }
 
+Status StorageInterfaceMock::initializeCleanShutdownCollection(OperationContext* opCtx) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _cleanShutdownCollectionInitialized = true;
+    return Status::OK();
+}
+
+StatusWith<boost::optional<CleanShutdownDocument>>
+StorageInterfaceMock::getLastCleanShutdownDocument(OperationContext* opCtx) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (!_cleanShutdownCollectionInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Clean shutdown collection does not exist");
+    }
+    return _lastCleanShutdownDoc;
+}
+
+Status StorageInterfaceMock::recordCleanShutdown(OperationContext* opCtx,
+                                                 Timestamp lastCheckpointTs) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (!_cleanShutdownCollectionInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Clean shutdown collection does not exist");
+    }
+
+    CleanShutdownDocument doc;
+    doc.setId(_lastCleanShutdownDoc ? _lastCleanShutdownDoc->getId() + 1 : 0);
+    doc.setCleanShutdownLastCheckpointTimestamp(lastCheckpointTs);
+    _lastCleanShutdownDoc = doc;
+    return Status::OK();
+}
+
 void StorageInterfaceMock::setStableTimestamp(ServiceContext* serviceCtx,
                                               Timestamp snapshotName,
                                               bool force) {

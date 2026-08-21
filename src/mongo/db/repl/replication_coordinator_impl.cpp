@@ -521,6 +521,21 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
         fassert(501402, _replicationProcess->incrementRollbackID(opCtx));
     }
 
+    // Record this node's clean shutdowns in a local collection. The collection is created
+    // unconditionally, not just after a clean shutdown, so that its presence identifies a binary
+    // that records them at all.
+    fassert(13224500, _storage->initializeCleanShutdownCollection(opCtx));
+    if (lastShutdownState == StorageEngine::LastShutdownState::kClean) {
+        // The recovery timestamp is the stable timestamp this node rolled back to on restart. A
+        // node with no stable checkpoint records a null timestamp.
+        auto lastCheckpointTs =
+            _storage->getRecoveryTimestamp(getServiceContext()).value_or(Timestamp());
+        LOGV2(13224501,
+              "Recording clean shutdown after startup",
+              "lastCheckpointTimestamp"_attr = lastCheckpointTs);
+        fassert(13224502, _storage->recordCleanShutdown(opCtx, lastCheckpointTs));
+    }
+
     LOGV2_DEBUG(4280503, 1, "Attempting to load local replica set configuration document");
     StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
     if (!cfg.isOK()) {

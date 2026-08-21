@@ -125,6 +125,11 @@ public:
     StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
     StatusWith<int> incrementRollbackID(OperationContext* opCtx) override;
 
+    Status initializeCleanShutdownCollection(OperationContext* opCtx) override;
+    StatusWith<boost::optional<CleanShutdownDocument>> getLastCleanShutdownDocument(
+        OperationContext* opCtx) override;
+    Status recordCleanShutdown(OperationContext* opCtx, Timestamp lastCheckpointTs) override;
+
     StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
         const NamespaceString& nss,
         const CollectionOptions& options,
@@ -464,6 +469,8 @@ private:
     mutable std::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
+    boost::optional<CleanShutdownDocument> _lastCleanShutdownDoc;
+    bool _cleanShutdownCollectionInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();
     Timestamp _initialDataTimestamp = Timestamp::min();
     bool _schemaUpgraded;

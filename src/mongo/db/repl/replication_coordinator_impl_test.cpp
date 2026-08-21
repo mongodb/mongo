@@ -272,6 +272,58 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
+TEST_F(ReplCoordTest, RecordsACleanShutdownDocumentWhenStartingUpAfterACleanShutdown) {
+    init();
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->startup(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+
+    // The first recorded shutdown starts the id sequence at 0, one past the sentinel.
+    auto doc =
+        unittest::assertGet(getStorageInterface()->getLastCleanShutdownDocument(opCtx.get()));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(0LL, doc->getId());
+}
+
+TEST_F(ReplCoordTest, ContinuesTheCleanShutdownIdSequenceFromWhatIsAlreadyRecorded) {
+    init();
+    const auto opCtx = makeOperationContext();
+
+    // This node has already recorded three clean shutdowns, the most recent with _id 2.
+    ASSERT_OK(getStorageInterface()->initializeCleanShutdownCollection(opCtx.get()));
+    ASSERT_OK(getStorageInterface()->recordCleanShutdown(opCtx.get(), Timestamp(1, 1)));
+    ASSERT_OK(getStorageInterface()->recordCleanShutdown(opCtx.get(), Timestamp(2, 1)));
+    ASSERT_OK(getStorageInterface()->recordCleanShutdown(opCtx.get(), Timestamp(3, 1)));
+
+    getReplCoord()->startup(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+
+    // The fourth shutdown continues the sequence from the most recent recorded id rather than
+    // restarting it, so ids never repeat or move backwards.
+    auto doc =
+        unittest::assertGet(getStorageInterface()->getLastCleanShutdownDocument(opCtx.get()));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(3LL, doc->getId());
+}
+
+TEST_F(ReplCoordTest, DoesNotRecordACleanShutdownDocumentAfterAnUncleanShutdown) {
+    init();
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->startup(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
+
+    // Only clean shutdowns are recorded, so the collection holds nothing but the sentinel here.
+    ASSERT_FALSE(
+        unittest::assertGet(getStorageInterface()->getLastCleanShutdownDocument(opCtx.get())));
+}
+
+TEST_F(ReplCoordTest, CreatesTheCleanShutdownCollectionEvenAfterAnUncleanShutdown) {
+    init();
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->startup(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
+
+    // The collection is created on every startup, not just clean ones, so recording a shutdown
+    // afterwards must succeed rather than report a missing collection.
+    ASSERT_OK(getStorageInterface()->recordCleanShutdown(opCtx.get(), Timestamp(1, 1)));
+}
+
 TEST_F(ReplCoordTest, RSNodeHandlesInterruptedAtShutdownDuringStartupRecovery) {
     // Simulate InterruptedAtShutdown thrown during oplog recovery.
     init();
