@@ -9,6 +9,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/storage/damage_vector.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -524,8 +527,15 @@ uint32_t getElementOffset(const BSONObj& object, const BSONElement& elt) {
     // in ptrdiff_t subsumes the size check and avoids signed overflow.
     const auto offset = elt.rawdata() - object.objdata();
     const int elementSize = elt.size();
-    invariant(!elt.eoo() && elementSize > 0 && offset > 0 &&
-              offset + elementSize < object.objsize());
+    if (MONGO_unlikely(elt.eoo() || elementSize <= 0 || offset <= 0 ||
+                       offset + elementSize >= object.objsize())) {
+        LOGV2_FATAL(12987900,
+                    "mutable bson child not bounded by object pointer",
+                    "eoo"_attr = elt.eoo(),
+                    "offset"_attr = offset,
+                    "elementSize"_attr = elementSize,
+                    "objsize"_attr = object.objsize());
+    }
 
     return static_cast<uint32_t>(offset);
 }
@@ -812,8 +822,15 @@ public:
 
         // The first child of an object is always exactly 4 bytes after the start of the object.
         const int64_t childOffset = thisObjectOffset + 4;
-        invariant(childOffset < getObject(rep->objIdx).objsize(),
-                  "mutable bson child begins outside its backing BSONObj");
+        const int32_t objsize = getObject(rep->objIdx).objsize();
+        if (MONGO_unlikely(childOffset >= objsize)) {
+            LOGV2_FATAL(12987901,
+                        "mutable bson child begins outside its backing BSONObj",
+                        "offset"_attr = rep->offset,
+                        "thisObjectOffset"_attr = thisObjectOffset,
+                        "childOffset"_attr = childOffset,
+                        "objsize"_attr = objsize);
+        }
         BSONElement childElt(getObject(rep->objIdx).objdata() + childOffset);
 
         if (!childElt.eoo()) {
@@ -891,8 +908,14 @@ public:
         // pointer outside the buffer.
         const BSONObj& backing = getObject(rep->objIdx);
         const int64_t nextOffset = static_cast<int64_t>(rep->offset) + elt.size();
-        invariant(nextOffset > 0 && nextOffset < backing.objsize(),
-                  "mutable bson right sibling begins outside its backing BSONObj");
+        if (MONGO_unlikely(nextOffset <= 0 || nextOffset >= backing.objsize())) {
+            LOGV2_FATAL(12987902,
+                        "mutable bson right sibling begins outside its backing BSONObj",
+                        "offset"_attr = rep->offset,
+                        "elementSize"_attr = elt.size(),
+                        "nextOffset"_attr = nextOffset,
+                        "objsize"_attr = backing.objsize());
+        }
 
         BSONElement rightElt(backing.objdata() + nextOffset);
 

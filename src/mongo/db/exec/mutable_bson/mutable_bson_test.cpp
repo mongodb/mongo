@@ -3453,7 +3453,9 @@ TEST(SERVER_36024, RegressionCheck) {
     ASSERT_OK(field.setValueInt(1));
 }
 
-DEATH_TEST_REGEX(MutableBsonSerialize, PoisonDocument, "Invariant failure") {
+DEATH_TEST_REGEX(MutableBsonSerialize,
+                 PoisonDocument,
+                 "mutable bson right sibling begins outside its backing BSONObj") {
     // Expect an invariant failure if element size exceeds the parent buffer.
     BSONObj valid = BSON("_id" << "poison" << "events" << BSON_ARRAY(1 << 2) << "trailing" << "x");
 
@@ -3509,6 +3511,49 @@ BSONObj makeObjWithElementEndingAtBufferEnd() {
     return BSONObj(std::move(buf));
 }
 
+BSONObj makeObjWithTerminalElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << 1 << "b"
+                             << "x");
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    const BSONElement a = valid.firstElement();
+    const int bOffset = (a.rawdata() - valid.objdata()) + a.size();
+    const int kStrLenOffset = bOffset + 1 /*type*/ + 2 /*"b\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 1, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
+BSONObj makeObjWithChildrenPastClaimedObjectSize() {
+    BSONObj valid = BSON("a" << BSON("x" << 1));
+
+    auto buf = SharedBuffer::allocate(valid.objsize());
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    constexpr int kChildOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/ + 4 /*subobject objsize*/;
+    DataView(buf.get()).write<LittleEndian<int32_t>>(kChildOffset, 0 /*objsize*/);
+
+    return BSONObj(std::move(buf));
+}
+
+BSONObj makeObjWithTerminalSubobjectElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << BSON("b" << "x"));
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    constexpr int kStrLenOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/ +
+        4 /*subobject objsize*/ + 1 /*type*/ + 2 /*"b\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 2, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
 // Documents the arithmetic above, so a later change to BSON's layout or to the corruption cannot
 // silently stop exercising the intended path.
 TEST(MutableBsonOutOfBounds, ElementEndingAtBufferEndIsAcceptedAtRepCreation) {
@@ -3537,16 +3582,60 @@ TEST(MutableBsonOutOfBounds, WalkToTerminalEooIsStillAllowed) {
     ASSERT_EQ(seen, 2);
 }
 
+TEST(MutableBsonBoundCheckTooLate, ReadPastEndOfObjectGoesUnreported) {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto child = doc.root().findFirstChildNamed("a");
+    ASSERT_TRUE(child.ok());
+}
+
 // Check for the exact message in resolveRightSibling().
-DEATH_TEST_REGEX(MutableBsonOutOfBoundsDeath,
-                 RightSiblingBoundCheckCatchesReadPastEndOfBuffer,
-                 "right sibling begins outside its backing BSONObj") {
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    RightSiblingBoundCheckCatchesReadPastEndOfBuffer,
+    R"("id":12987902,.*"msg":"mutable bson right sibling begins outside its backing BSONObj".*"offset":4,"elementSize":10,"nextOffset":14,"objsize":14)") {
     BSONObj poison = makeObjWithElementEndingAtBufferEnd();
 
     mmb::Document doc(poison);
     auto child = doc.root().leftChild();
     ASSERT_TRUE(child.ok());
     child.rightSibling();
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    GetElementOffsetFatalOnCorruptElement,
+    R"("id":12987900,.*"msg":"mutable bson child not bounded by object pointer".*"eoo":false,"offset":11,"elementSize":10,"objsize":21)") {
+    BSONObj poison = makeObjWithTerminalElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto a = doc.root().findFirstChildNamed("a");
+    ASSERT_TRUE(a.ok());
+    ASSERT_OK(a.setValueInt(2));
+    doc.getObject();
+}
+
+TEST(MutableBsonOutOfBounds, ValidSubobjectChildWalkIsStillAllowed) {
+    mmb::Document doc(BSON("a" << BSON("x" << 1) << "b" << BSONObj()));
+    ASSERT_TRUE(doc.root().findFirstChildNamed("a").leftChild().ok());
+    ASSERT_FALSE(doc.root().findFirstChildNamed("b").leftChild().ok());
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    ChildBoundCheckCatchesElementPastClaimedObjectSize,
+    R"("id":12987901,.*"msg":"mutable bson child begins outside its backing BSONObj".*"offset":4,"thisObjectOffset":7,"childOffset":11,"objsize":11)") {
+    mmb::Document doc(makeObjWithChildrenPastClaimedObjectSize());
+    doc.root().findFirstChildNamed("a").leftChild();
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    RightSiblingBoundCheckCatchesSubobjectElementReadPastEndOfBuffer,
+    R"("id":12987902,.*"msg":"mutable bson right sibling begins outside its backing BSONObj".*"offset":11,"elementSize":11,"nextOffset":22,"objsize":22)") {
+    mmb::Document doc(makeObjWithTerminalSubobjectElementEndingAtBufferEnd());
+    doc.root().findFirstChildNamed("a").leftChild().rightSibling();
 }
 
 // Tests for the bulk copy of runs of unmodified, still-contiguous children in writeChildren().
