@@ -21,8 +21,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 
-#include <cstdint>
-#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -99,7 +97,7 @@ std::unique_ptr<MatchExpression> buildFromMigrateSystemOpFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
 
-    // The filter {fromMigrate:true} allows quickly skip nonrelevant oplog entries
+    // The filter {fromMigrate:true} allows us to quickly skip non-relevant oplog entries.
     auto andMigrateEvents = std::make_unique<AndMatchExpression>();
     andMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(BSON("fromMigrate" << true)), expCtx));
@@ -137,7 +135,6 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
-
     // Match expressions for matching each of the necessary namespace components for the current
     // stream type.
     BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
@@ -184,10 +181,9 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto renameFromEvent =
         backingBsonObjs.emplace_back(BSON("o.renameCollection" << nsMatch.firstElement()));
     auto upgradeDowngradeViewlessTimeseriesEvent = [&]() {
-        const auto& nss = expCtx->getNamespaceString();
-        auto streamType = ChangeStream::getChangeStreamType(nss);
-
         if (streamType == ChangeStreamType::kCollection) {
+            const auto& nss = expCtx->getNamespaceString();
+
             // A single timeseries collection change stream is invalidated when migrating from
             // system.buckets to viewless timeseries collections and back.
             auto filterBSON = nss.isTimeseriesBucketsCollection()
@@ -335,7 +331,6 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
-
     BSONObjBuilder applyOpsBuilder;
     appendBaseTransactionFilter(applyOpsBuilder);
 

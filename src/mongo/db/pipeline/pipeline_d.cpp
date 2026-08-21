@@ -1289,6 +1289,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     bool timeseriesBoundedSortOptimization,
     std::size_t plannerOpts = QueryPlannerParams::DEFAULT,
     boost::optional<TraversalPreference> traversalPreference = boost::none) {
+
+    // If this pipeline is a change stream, then the cursor must use the simple collation, so we
+    // temporarily switch the collator on the ExpressionContext to nullptr for the entire executor
+    // preparation. This must be done before the CanonicalQuery is built, because the oplog $match
+    // filter (which is pushed down into the cursor) is parsed using the ExpressionContext's
+    // collator. Namespace strings and other values matched against oplog entries must always be
+    // compared with the simple collation, regardless of the pipeline's configured collation. Any
+    // user-defined collation applies only to the change events produced downstream, not to the scan
+    // over the oplog. Note that 'collatorStash' restores the original collator when it leaves
+    // scope.
+    const bool isChangeStream =
+        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
+    auto collatorStash = isChangeStream ? expCtx->temporarilyChangeCollator(nullptr) : nullptr;
+
     // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507 & SERVER-84347).
     auto swExecOrCq = tryPrepareDistinctExecutor(expCtx,
                                                  collections,
@@ -1325,16 +1339,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     if (!*shouldProduceEmptyDocs) {
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
-
-    // If this pipeline is a change stream, then the cursor must use the simple collation, so we
-    // temporarily switch the collator on the ExpressionContext to nullptr. We do this here because
-    // by this point, all the necessary pipeline analyses and optimizations have already been
-    // performed. Note that 'collatorStash' restores the original collator when it leaves scope.
-    const bool isChangeStream =
-        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
-    std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
-    auto collatorStash =
-        isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
 
     auto cq = std::move(std::get<1>(execOrCq));
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage = nullptr;

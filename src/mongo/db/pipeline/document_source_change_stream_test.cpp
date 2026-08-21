@@ -14,6 +14,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -366,17 +368,122 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
 
     ASSERT_EQ("^unittest\\.someCollection$",
               DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.someCollection$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.someCollection"),
                       DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ("^someCollection$", DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^someCollection$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "someCollection"),
                       DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ("^unittest\\.\\$cmd$",
               DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.$cmd"),
                       DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+// Builds an insert oplog entry BSON for the given namespace so that we can exercise the oplog match
+// expression's namespace matching directly.
+namespace {
+BSONObj makeInsertOplogEntryBSON(std::string_view ns) {
+    return makeOplogEntry(OpTypeEnum::kInsert,
+                          NamespaceString::createNamespaceString_forTest(boost::none, ns),
+                          BSON("_id" << 0))
+        .getEntry()
+        .toBSON();
+}
+}  // namespace
+
+// The oplog match stage of a single-collection change stream must match the watched collection's
+// namespace exactly (case-sensitively), and must not match a namespace that differs only in case.
+// This must hold regardless of the pipeline's collation.
+TEST_F(ChangeStreamStageTest, OplogMatchNamespaceIsCaseSensitiveWithoutCollation) {
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_sensitive");
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    const auto* matchExpr = oplogMatchStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_sensitive")));
+
+    // An insert into a namespace that only differs in case is not matched.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_sEnSiTiVe")));
+}
+
+// Same as above, but the change stream pipeline runs with a custom, case-insensitive collation
+// (modeled by the "to lower string" mock collator). The oplog namespace matching must remain
+// case-sensitive, because the collation must only apply to the generated change events and not to
+// the scan over the oplog. This is the scenario exercised by jstests/change_streams/collation.js.
+TEST_F(ChangeStreamStageTest, OplogMatchNamespaceIsCaseSensitiveWithCustomCollation) {
+    getExpCtx()->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_insensitive");
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    const auto* matchExpr = oplogMatchStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_insensitive")));
+
+    // An insert into a namespace that only differs in case must not be matched, even though the
+    // case-insensitive collation would otherwise consider the two namespaces equal.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe")));
+
+    // An insert into an entirely different namespace is not matched either.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.some_other_collection")));
+}
+
+// The transaction unwind stage applies a filter to the individual operations extracted from
+// transaction oplog entries. Just like the oplog $match, this filter must match the watched
+// collection's namespace case-sensitively, even when the change stream pipeline runs with a custom,
+// case-insensitive collation. In a sharded cluster the shard parses this filter using the
+// collection's collation, so without stripping the collator the namespace comparison would
+// incorrectly match a namespace that only differs in case. This is the scenario exercised by
+// jstests/change_streams/collation.js in the multi-statement transaction passthrough suites.
+TEST_F(ChangeStreamStageTest, UnwindTransactionNamespaceIsCaseSensitiveWithCustomCollation) {
+    getExpCtx()->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_insensitive");
+
+    auto unwindTransactionStage =
+        getStageFromPipeline<DocumentSourceChangeStreamUnwindTransaction>(pipeline.get());
+    ASSERT_NE(nullptr, unwindTransactionStage);
+
+    const auto* matchExpr = unwindTransactionStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_insensitive")));
+
+    // An insert into a namespace that only differs in case must not be matched, even though the
+    // custom collation would otherwise consider the two namespaces equal.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe")));
+
+    // An insert into an entirely different namespace is not matched either.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.some_other_collection")));
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
@@ -395,7 +502,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
 
     ASSERT_EQ("^unittest\\.system\\.views$",
               DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.system\\.views$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.system.views"),
                       DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
@@ -406,7 +513,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
 
     ASSERT_EQ("^unittest\\.\\$cmd$",
               DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.$cmd"),
                       DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
 }
 
@@ -876,19 +983,19 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
                                             "$or": [
                                                 {
                                                     "o.create": {
-                                                        "$regex": "^change_stream$"
+                                                        "$eq": "change_stream"
                                                     }
                                                 },
                                                 {
                                                     "o.createIndexes": {
-                                                        "$regex": "^change_stream$"
+                                                        "$eq": "change_stream"
                                                     }
                                                 }
                                             ]
                                         },
                                         {
                                             "ns": {
-                                                "$regex": "^unittests\\.\\$cmd$"
+                                                "$eq": "unittests.$cmd"
                                             }
                                         }
                                     ]
@@ -897,7 +1004,7 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
                         },
                         {
                             "o.applyOps.ns": {
-                                "$regex": "^unittests\\.change_stream$"
+                                "$eq": "unittests.change_stream"
                             }
                         },
                         {
@@ -957,13 +1064,13 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
         {
             "$and": [
                 {
-                    "op": {
-                        "$eq": "n"
+                    "o2.endOfTransaction": {
+                        "$eq": "unittests.change_stream"
                     }
                 },
                 {
-                    "o2.endOfTransaction": {
-                        "$regex": "^unittests\\.change_stream$"
+                    "op": {
+                        "$eq": "n"
                     }
                 }
             ]
@@ -1019,19 +1126,19 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                                                     "$or": [
                                                         {
                                                             "o.create": {
-                                                                "$regex": "^change_stream$"
+                                                                "$eq": "change_stream"
                                                             }
                                                         },
                                                         {
                                                             "o.createIndexes": {
-                                                                "$regex": "^change_stream$"
+                                                                "$eq": "change_stream"
                                                             }
                                                         }
                                                     ]
                                                 },
                                                 {
                                                     "ns": {
-                                                        "$regex": "^unittests\\.\\$cmd$"
+                                                        "$eq": "unittests.$cmd"
                                                     }
                                                 }
                                             ]
@@ -1040,7 +1147,7 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                                 },
                                 {
                                     "o.applyOps.ns": {
-                                        "$regex": "^unittests\\.change_stream$"
+                                        "$eq": "unittests.change_stream"
                                     }
                                 },
                                 {
@@ -1100,13 +1207,13 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                 {
                     "$and": [
                         {
-                            "op": {
-                                "$eq": "n"
+                            "o2.endOfTransaction": {
+                                "$eq": "unittests.change_stream"
                             }
                         },
                         {
-                            "o2.endOfTransaction": {
-                                "$regex": "^unittests\\.change_stream$"
+                            "op": {
+                                "$eq": "n"
                             }
                         }
                     ]

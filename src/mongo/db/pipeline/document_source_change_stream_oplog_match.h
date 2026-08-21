@@ -48,6 +48,9 @@ public:
         : DocumentSourceInternalChangeStreamMatch(other, newExpCtx) {
         _clusterTime = other._clusterTime;
         _optimizedEndOfPipeline = other._optimizedEndOfPipeline;
+        // The base class copy constructor re-parses the filter using the pipeline's collator. The
+        // oplog match must always run with the simple collation, so enforce it here.
+        enforceSimpleCollation();
     }
 
     boost::intrusive_ptr<DocumentSource> clone(
@@ -87,6 +90,23 @@ private:
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceInternalChangeStreamMatch(filter, expCtx), _optimizedEndOfPipeline(true) {
         expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+        // The base class constructor parses the filter using the pipeline's collator. The oplog
+        // match must always run with the simple collation, so enforce it here.
+        enforceSimpleCollation();
+    }
+
+    /**
+     * Forces the simple (null) collator onto the oplog match filter expression. Namespace strings
+     * and other values compared against oplog entries must always be matched case-sensitively,
+     * regardless of the pipeline's configured collation. The various paths that build this stage's
+     * filter parse or re-parse the predicate using the ExpressionContext's collator, which would
+     * otherwise propagate a user-defined collation into the namespace equality predicates and
+     * produce incorrect matches. This must be called after every (re)build of the filter.
+     */
+    void enforceSimpleCollation() {
+        if (auto* expr = getMatchExpression()) {
+            expr->setCollator(nullptr);
+        }
     }
 
     // Needed for re-creating the filter during optimization. Note that we do not serialize these

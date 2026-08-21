@@ -114,6 +114,9 @@ DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
       _clusterTime(clusterTime),
       _backingBsonObjs(std::move(backingBsonObjs)) {
     expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    // The oplog match must always run with simple collation, regardless of the pipeline's
+    // configured collation.
+    enforceSimpleCollation();
 }
 
 boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
@@ -218,6 +221,10 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::optimize
 
     // Set the internal DocumentSourceMatch state to the new filter.
     rebuild(filterWithUserPredicates->serialize());
+
+    // 'rebuild()' re-parses the filter using the pipeline's collator. The oplog match must always
+    // run with the simple collation, so enforce it here.
+    enforceSimpleCollation();
 
     // After serializing the predicate, remove all the BSONObjs from _backingBsonObjs.
     _backingBsonObjs.clear();

@@ -230,10 +230,10 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the ns match string. We may optimize this to
-    // exact matches ('$eq') for single collection change streams in the future to improve matching
-    // performance. This is currently not safe because of collations that can affect the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kCollection) {
+        return BSON("" << NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()));
+    }
     return BSON("" << BSONRegEx(getNsRegexForChangeStream(expCtx)));
 }
 
@@ -258,11 +258,12 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the view ns match string. We may optimize this to
-    // exact matches ('$eq') for single database change streams in the future to improve matching
-    // performance. This currently may not be safe because of collations that can affect the
-    // matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kDatabase) {
+        return BSON("" << fmt::format("{}.system.views",
+                                      DatabaseNameUtil::serialize(
+                                          nss.dbName(), expCtx->getSerializationContext())));
+    }
     return BSON("" << BSONRegEx(getViewNsRegexForChangeStream(expCtx)));
 }
 
@@ -284,11 +285,10 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getCollMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the collection match string. We may optimize this
-    // to exact matches ('$eq') for single collection change streams in the future to improve
-    // matching performance. This currently may not be safe because of collations that can affect
-    // the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kCollection) {
+        return BSON("" << nss.coll());
+    }
     return BSON("" << BSONRegEx(getCollRegexForChangeStream(expCtx)));
 }
 
@@ -312,11 +312,11 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the collection-less aggregate ns match string. We
-    // may optimize this to exact matches ('$eq') for single collection and single database change
-    // streams in the future to improve matching performance. This currently may not be safe because
-    // of collations that can affect the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) != ChangeStreamType::kAllDatabases) {
+        return BSON("" << NamespaceStringUtil::serialize(nss.getCommandNS(),
+                                                         SerializationContext::stateDefault()));
+    }
     return BSON("" << BSONRegEx(getCmdNsRegexForChangeStream(expCtx)));
 }
 

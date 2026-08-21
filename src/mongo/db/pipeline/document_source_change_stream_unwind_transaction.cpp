@@ -139,6 +139,14 @@ DocumentSourceChangeStreamUnwindTransaction::DocumentSourceChangeStreamUnwindTra
 void DocumentSourceChangeStreamUnwindTransaction::rebuild(BSONObj filter) {
     _filter = filter.getOwned();
     _expression = MatchExpressionParser::parseAndNormalize(filter, getExpCtx());
+
+    // This filter is applied to individual operations extracted from transaction oplog entries.
+    // Just like the oplog $match, it compares namespace strings and other oplog values that must
+    // always be matched with the simple collation, regardless of the pipeline's configured
+    // collation. The parse above uses the ExpressionContext's collator, which in a sharded cluster
+    // carries the collection's custom collation, so we strip it here to force case-sensitive
+    // matching.
+    _expression->setCollator(nullptr);
 }
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
