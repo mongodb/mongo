@@ -44,6 +44,124 @@ _STAMP_NAME = ".wrapper_hook_uv_stamp"
 # under Windows-native Python (`py_host/dist/python.exe`), which needs
 # `C:\data\mci\0f83\venv` to resolve the same path.
 _CYGDRIVE_RE = re.compile(r"^/cygdrive/([a-zA-Z])(/.*)?$")
+_WINDOWS_BASH_SYSTEM_PREFIXES = ("CYGWIN_NT", "MINGW", "MSYS")
+_BASH_OVERRIDE_ENV = "MONGO_BAZEL_BASH"
+
+
+class MixedPlatformError(RuntimeError):
+    """Raised when native Windows tooling is paired with a POSIX environment."""
+
+
+def _windows_bash_candidates() -> list[str]:
+    """Return likely Bash executables, including native Bash behind WSL on PATH."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str | os.PathLike[str] | None) -> None:
+        if not candidate:
+            return
+        candidate = str(candidate)
+        key = candidate.casefold()
+        if key not in seen:
+            seen.add(key)
+            candidates.append(candidate)
+
+    add(os.environ.get(_BASH_OVERRIDE_ENV))
+    add(shutil.which("bash"))
+    add(shutil.which("bash.exe"))
+
+    # If WSL's bash.exe wins PATH lookup, inspect the other PATH entries too.
+    for path_entry in os.environ.get("PATH", "").split(os.pathsep):
+        if path_entry:
+            bash_path = pathlib.Path(path_entry) / "bash.exe"
+            if bash_path.is_file():
+                add(bash_path)
+
+    git_executable = shutil.which("git.exe") or shutil.which("git")
+    if git_executable:
+        git_path = pathlib.Path(git_executable)
+        if git_path.parent.name.casefold() in {"cmd", "bin"}:
+            git_root = git_path.parent.parent
+            add(git_root / "bin" / "bash.exe")
+            add(git_root / "usr" / "bin" / "bash.exe")
+
+    for root_variable in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        root = os.environ.get(root_variable)
+        if root:
+            git_roots = [pathlib.Path(root) / "Git"]
+            if root_variable == "LOCALAPPDATA":
+                git_roots.append(pathlib.Path(root) / "Programs" / "Git")
+            for git_root in git_roots:
+                add(git_root / "bin" / "bash.exe")
+                add(git_root / "usr" / "bin" / "bash.exe")
+
+    system_drive = os.environ.get("SystemDrive", "C:")
+    for cygwin_root in (
+        pathlib.Path(system_drive) / "cygwin64",
+        pathlib.Path(system_drive) / "cygwin",
+    ):
+        add(cygwin_root / "bin" / "bash.exe")
+
+    return candidates
+
+
+def _check_windows_bash(repo_root: pathlib.Path) -> str:
+    """Find compatible native Bash, skipping WSL, when running Windows Python."""
+    if os.name != "nt":
+        return "bash"
+
+    detected_systems = []
+    wsl_detected = False
+    for bash in _windows_bash_candidates():
+        try:
+            result = subprocess.run(
+                [bash, "-c", "uname -s"],
+                cwd=str(repo_root),
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            continue
+
+        bash_system = result.stdout.strip()
+        normalized_system = bash_system.upper()
+        if result.returncode == 0 and normalized_system.startswith(_WINDOWS_BASH_SYSTEM_PREFIXES):
+            return bash
+        if bash_system:
+            detected_systems.append(f"{bash}: {bash_system}")
+            wsl_detected = wsl_detected or normalized_system.startswith("LINUX")
+
+    detected = ", ".join(detected_systems) or "no usable bash.exe found"
+    if wsl_detected:
+        raise MixedPlatformError(
+            "The Windows Bazel wrapper found WSL Bash but no compatible Git Bash "
+            f"or Cygwin. Detected: {detected}. Install Git Bash/Cygwin or set "
+            f"{_BASH_OVERRIDE_ENV} to a native bash.exe path."
+        )
+    raise MixedPlatformError(
+        "The Windows Bazel wrapper could not find Git Bash or Cygwin. "
+        f"Detected: {detected}. Install Git Bash/Cygwin or set "
+        f"{_BASH_OVERRIDE_ENV} to a native bash.exe path."
+    )
+
+
+def _windows_path_for_bash(path: str) -> str:
+    """Make a native Windows path usable as a command in Git Bash/Cygwin."""
+    return path.replace("\\", "/")
+
+
+def _check_venv_layout(venv_root: pathlib.Path) -> None:
+    """Reject a venv created for the opposite host platform."""
+    if os.name != "nt" or _venv_python(venv_root).exists():
+        return
+
+    posix_python = venv_root / "bin" / "python3"
+    if posix_python.exists():
+        raise MixedPlatformError(
+            f"The venv at {venv_root.resolve()} is a POSIX/WSL venv, but the "
+            "wrapper is running under native Windows Python. Rename or remove "
+            "that venv, then rerun from Git Bash or Cygwin."
+        )
 
 
 def _from_cygwin_path(p):
@@ -200,7 +318,13 @@ def bootstrap_modules(bazel, args):
         setup_python_path()
         return
 
-    if install_modules(bazel, args):
+    try:
+        modules_installed = install_modules(bazel, args)
+    except MixedPlatformError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
+
+    if modules_installed:
         _reexec_current_python()
     else:
         setup_python_path()
@@ -232,6 +356,7 @@ def install_modules(bazel, args):
     fresh venv is scanned), False if no work was needed.
     """
     venv_root = _target_venv()
+    _check_venv_layout(venv_root)
     lock_hash = _uv_lock_hash()
     stamp = venv_root / _STAMP_NAME
 
@@ -251,16 +376,42 @@ def install_modules(bazel, args):
         # bash so this works uniformly on Linux/macOS + Windows (Evergreen
         # Windows hosts have Git Bash / Cygwin on PATH).
         wrapper_debug("no venv found; bootstrapping python3-venv via uv_sync.sh -f")
-        uv_sync_sh = REPO_ROOT / "buildscripts" / "uv_sync.sh"
+        repo_root = REPO_ROOT.resolve()
+        uv_sync_sh = repo_root / "buildscripts" / "uv_sync.sh"
         if not uv_sync_sh.exists():
             # This shouldn't happen inside a mongo repo, but if it does — fall
             # through and let the wrapper's first missing-import fail loudly
             # with a real ImportError.
             return False
-        proc = subprocess.run(["bash", str(uv_sync_sh), "-f"], cwd=str(REPO_ROOT))
+        bash_command = _check_windows_bash(repo_root)
+        # Pass a relative path so native Windows Python never hands a
+        # Windows- or Cygwin-style absolute path to Bash. Bash resolves the
+        # path from the native working directory set above.
+        bootstrap_env = os.environ.copy()
+        # _target_venv() deliberately ignores stale or opposite-platform
+        # VIRTUAL_ENV values. Do the same for uv_sync.sh, whose `-f` mode
+        # otherwise gives an inherited VIRTUAL_ENV precedence over the
+        # workstation python3-venv fallback.
+        bootstrap_env.pop("VIRTUAL_ENV", None)
+        if os.name == "nt":
+            # A native Windows wrapper may be launched while WSL's python3 is
+            # first on PATH. Keep the bootstrap interpreter on the same side
+            # of the platform boundary as the wrapper itself.
+            bootstrap_env["PYTHON3"] = _windows_path_for_bash(sys.executable)
+        proc = subprocess.run(
+            [bash_command, "buildscripts/uv_sync.sh", "-f"],
+            cwd=str(repo_root),
+            env=bootstrap_env,
+        )
         synced = proc.returncode == 0
         venv_root = _target_venv()
         stamp = venv_root / _STAMP_NAME
+        if synced and not _venv_python(venv_root).exists():
+            _check_venv_layout(venv_root)
+            raise MixedPlatformError(
+                f"Bash bootstrap completed, but the expected interpreter was not "
+                f"created at {_venv_python(venv_root)}."
+            )
 
     if not synced:
         print(

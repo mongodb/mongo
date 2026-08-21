@@ -75,6 +75,20 @@ class BootstrapModulesTest(unittest.TestCase):
         self.assertEqual(exec_argv, ["/tmp/repo-python", *argv])
         self.assertEqual(exec_env[install_modules.MODULES_READY_ENV], "1")
 
+    def test_first_phase_exits_for_mixed_platform_bootstrap(self):
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch.object(
+                install_modules,
+                "install_modules",
+                side_effect=install_modules.MixedPlatformError("mixed platform"),
+            ),
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                install_modules.bootstrap_modules("bazel", ["bazel", "build", "//:lint"])
+
+        self.assertEqual(raised.exception.code, 1)
+
 
 class InstallModulesTest(unittest.TestCase):
     def setUp(self):
@@ -88,6 +102,76 @@ class InstallModulesTest(unittest.TestCase):
 
     def _stamp(self) -> pathlib.Path:
         return self.venv / install_modules._STAMP_NAME
+
+    def test_windows_bash_rejects_wsl(self):
+        with (
+            mock.patch.object(install_modules.os, "name", "nt"),
+            mock.patch.object(
+                install_modules,
+                "_windows_bash_candidates",
+                return_value=[r"C:\Windows\System32\bash.exe"],
+            ),
+            mock.patch.object(
+                install_modules.subprocess,
+                "run",
+                return_value=mock.Mock(returncode=0, stdout="Linux\n"),
+            ) as mock_run,
+        ):
+            with self.assertRaisesRegex(install_modules.MixedPlatformError, "WSL"):
+                install_modules._check_windows_bash(self.venv)
+
+        mock_run.assert_called_once_with(
+            [r"C:\Windows\System32\bash.exe", "-c", "uname -s"],
+            cwd=str(self.venv),
+            capture_output=True,
+            text=True,
+        )
+
+    def test_windows_bash_accepts_git_bash(self):
+        with (
+            mock.patch.object(install_modules.os, "name", "nt"),
+            mock.patch.object(
+                install_modules,
+                "_windows_bash_candidates",
+                return_value=[r"C:\Program Files\Git\bin\bash.exe"],
+            ),
+            mock.patch.object(
+                install_modules.subprocess,
+                "run",
+                return_value=mock.Mock(returncode=0, stdout="MINGW64_NT-10.0\n"),
+            ),
+        ):
+            self.assertEqual(
+                install_modules._check_windows_bash(self.venv),
+                r"C:\Program Files\Git\bin\bash.exe",
+            )
+
+    def test_windows_bash_skips_wsl_and_finds_git_bash(self):
+        candidates = [
+            r"C:\Windows\System32\bash.exe",
+            r"C:\Program Files\Git\bin\bash.exe",
+        ]
+        with (
+            mock.patch.object(install_modules.os, "name", "nt"),
+            mock.patch.object(install_modules, "_windows_bash_candidates", return_value=candidates),
+            mock.patch.object(
+                install_modules.subprocess,
+                "run",
+                side_effect=[
+                    mock.Mock(returncode=0, stdout="Linux\n"),
+                    mock.Mock(returncode=0, stdout="MINGW64_NT-10.0\n"),
+                ],
+            ),
+        ):
+            self.assertEqual(install_modules._check_windows_bash(self.venv), candidates[1])
+
+    def test_windows_venv_rejects_posix_layout(self):
+        posix_venv = pathlib.Path(self._tmp.name) / "wsl-venv"
+        (posix_venv / "bin").mkdir(parents=True)
+        (posix_venv / "bin" / "python3").touch()
+        with mock.patch.object(install_modules.os, "name", "nt"):
+            with self.assertRaisesRegex(install_modules.MixedPlatformError, "POSIX/WSL"):
+                install_modules._check_venv_layout(posix_venv)
 
     def test_stamp_match_skips_sync(self):
         self._stamp().write_text(install_modules._uv_lock_hash() + "\n", encoding="utf-8")
@@ -132,21 +216,63 @@ class InstallModulesTest(unittest.TestCase):
 
     def test_missing_venv_bootstraps_via_uv_sync_sh(self):
         os.environ.pop("VIRTUAL_ENV")
+        missing_venv = pathlib.Path(self._tmp.name) / "nope"
+
+        def fake_bootstrap(*_args, **_kwargs):
+            (missing_venv / "bin").mkdir(parents=True, exist_ok=True)
+            (missing_venv / "bin" / "python3").touch()
+            return mock.Mock(returncode=0)
+
         with (
-            mock.patch.object(
-                install_modules, "_target_venv", return_value=pathlib.Path(self._tmp.name) / "nope"
-            ),
+            mock.patch.object(install_modules, "_target_venv", return_value=missing_venv),
             mock.patch.object(
                 install_modules.subprocess,
                 "run",
-                return_value=mock.Mock(returncode=0),
+                side_effect=fake_bootstrap,
             ) as mock_run,
         ):
             self.assertTrue(install_modules.install_modules("bazel", []))
         cmd = mock_run.call_args.args[0]
         self.assertEqual(cmd[0], "bash")
-        self.assertTrue(str(cmd[1]).endswith("uv_sync.sh"))
+        expected_uv_sync_sh = install_modules.REPO_ROOT.resolve() / "buildscripts" / "uv_sync.sh"
+        self.assertEqual(
+            cmd[1], expected_uv_sync_sh.relative_to(install_modules.REPO_ROOT.resolve()).as_posix()
+        )
         self.assertEqual(cmd[2], "-f")
+        self.assertEqual(mock_run.call_args.kwargs["cwd"], str(install_modules.REPO_ROOT.resolve()))
+
+    def test_windows_bootstrap_uses_native_python_and_ignores_stale_venv(self):
+        missing_venv = pathlib.Path(self._tmp.name) / "nope"
+
+        def fake_bootstrap(*_args, **_kwargs):
+            (missing_venv / "Scripts").mkdir(parents=True, exist_ok=True)
+            (missing_venv / "Scripts" / "python.exe").touch()
+            return mock.Mock(returncode=0)
+
+        with (
+            mock.patch.object(install_modules, "_target_venv", return_value=missing_venv),
+            mock.patch.object(install_modules.os, "name", "nt"),
+            mock.patch.object(
+                install_modules,
+                "_check_windows_bash",
+                return_value=r"C:\Program Files\Git\bin\bash.exe",
+            ),
+            mock.patch.object(install_modules.sys, "executable", r"C:\pyhost\python.exe"),
+            mock.patch.object(
+                install_modules.subprocess,
+                "run",
+                side_effect=fake_bootstrap,
+            ) as mock_run,
+        ):
+            self.assertTrue(install_modules.install_modules("bazel", []))
+
+        self.assertEqual(
+            mock_run.call_args.args[0],
+            [r"C:\Program Files\Git\bin\bash.exe", "buildscripts/uv_sync.sh", "-f"],
+        )
+        bootstrap_env = mock_run.call_args.kwargs["env"]
+        self.assertNotIn("VIRTUAL_ENV", bootstrap_env)
+        self.assertEqual(bootstrap_env["PYTHON3"], "C:/pyhost/python.exe")
 
     def test_setup_python_path_appends_target_venv_site_packages(self):
         original = list(sys.path)
