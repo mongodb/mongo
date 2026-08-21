@@ -271,6 +271,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:clock_sources",
     ],
 )
@@ -390,6 +391,7 @@ mongo_cc_unit_test(
     srcs = [
         "backpressure_connection_metrics_test.cpp",
         "hello_metrics_test.cpp",
+        "ingress_handshake_metrics_test.cpp",
         "max_conns_override_test.cpp",
         "message_compressor_manager_test.cpp",
         "message_compressor_registry_test.cpp",

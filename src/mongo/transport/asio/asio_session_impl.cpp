@@ -9,12 +9,10 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
-#include "mongo/db/connection_health_metrics_parameter_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/otel/metrics/metrics_histogram.h"
-#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_filter_hooks.h"
@@ -130,15 +128,6 @@ std::string makeTLVString(const std::vector<ProxiedSupplementaryDataEntry>& tlvD
     return tlvString;
 };
 
-auto& totalIngressTLSConnections =  //
-    *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
-auto& totalIngressTLSHandshakeTimeMillis =  //
-    *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
-otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMillis =
-    otel::metrics::MetricsService::instance().createInt64Histogram(
-        otel::metrics::MetricNames::kIngressTLSHandshakeLatency,
-        "The latency of the TLS handshake when establishing a new ingress connection.",
-        otel::metrics::MetricUnit::kMilliseconds);
 auto& totalMessageSizeErrorsPreAuth =
     *MetricBuilder<Counter64>("network.totalMessageSizeErrorPreAuth");
 auto& totalMessageSizeErrorsPostAuth =
@@ -977,8 +966,9 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
                     asio::ssl::stream_base::server, buffer, UseFuture{});
             }
         };
-        auto startTimer = Timer();
-        return doHandshake().then([this, startTimer = std::move(startTimer)](size_t size) {
+        IngressHandshakeMetrics::get(*this).onTLSHandshakeStarted(
+            getGlobalServiceContext()->getTickSource());
+        return doHandshake().then([this](size_t size) {
             if (_sslSocket->get_sni()) {
                 auto sniName = _sslSocket->get_sni().value();
                 LOGV2_DEBUG(
@@ -986,16 +976,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
             } else {
                 LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
             }
-            const auto handshakeDurationMillis = durationCount<Milliseconds>(startTimer.elapsed());
             IngressHandshakeMetrics::get(*this).onTLSHandshakeCompleted();
-            if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
-                LOGV2(6723804,
-                      "Ingress TLS handshake complete",
-                      "durationMillis"_attr = handshakeDurationMillis);
-            }
-            totalIngressTLSConnections.increment(1);
-            totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
-            ingressTLSHandshakeTimesMillis.record(handshakeDurationMillis);
             auto sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
             if (!sslPeerInfo) {
                 return getSSLManager()

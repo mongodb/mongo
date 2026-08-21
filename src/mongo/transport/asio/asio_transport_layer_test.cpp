@@ -1406,10 +1406,12 @@ TEST_F(AsioTransportLayerTLSHandshakeTest, SuccessfulHandshakes) {
         const otel::metrics::HistogramData histogramData =
             capturer.readInt64Histogram(MetricNames::kIngressTLSHandshakeLatency);
         EXPECT_EQ(histogramData.count, 2);
-        // We can't really control the latency in the test, but 100ms per handshake seems like a
-        // good upper bound for a unit test. If this causes significant flakiness, increase this
-        // value.
-        EXPECT_LE(histogramData.sum, 200);
+        // The recorded values are verified exactly, with a mocked tick source, in
+        // ingress_handshake_metrics_test.cpp. This is only an order-of-magnitude sanity check
+        // that the production call site records a plausible per-handshake duration in
+        // milliseconds (rather than e.g. raw ticks or an absolute timestamp), so it is
+        // intentionally far above any latency reachable on a slow test host.
+        EXPECT_LE(histogramData.sum, 20'000);
     }
 }
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

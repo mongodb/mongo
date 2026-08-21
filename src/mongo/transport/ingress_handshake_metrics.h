@@ -45,8 +45,18 @@ public:
     void onSessionStarted(TickSource* tickSource);
 
     /**
+     * Marks the time when the TLS (SSL) handshake with the client begins. Unlike the other
+     * observations on this class, this one does not require onSessionStarted to have been called:
+     * the TLS handshake latency is measured on its own clock, independently of the session-start
+     * state machine. The tick source must remain valid for at least as long as the last method
+     * call on this instance.
+     */
+    void onTLSHandshakeStarted(TickSource* tickSource);
+
+    /**
      * Marks the time when the TLS (SSL) handshake with the client was completed, if the
-     * connection uses TLS.
+     * connection uses TLS. If onTLSHandshakeStarted was called, reports the TLS handshake
+     * latency metrics.
      */
     void onTLSHandshakeCompleted();
 
@@ -90,6 +100,8 @@ private:
     State _state = State::kWaitingForSessionStart;
     TickSource* _tickSource = nullptr;
     TickSource::Tick _sessionStartedTicks;
+    TickSource* _tlsHandshakeTickSource = nullptr;
+    TickSource::Tick _tlsHandshakeStartedTicks;
     TickSource::Tick _mostRecentHandshakeCommandReceivedTicks;
     TickSource::Tick _mostRecentHandshakeCommandProcessedTicks;
 };

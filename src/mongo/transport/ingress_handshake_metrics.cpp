@@ -7,6 +7,8 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/moving_average_metric.h"
@@ -45,6 +47,16 @@ auto& averageTimeToCompletedHelloMicros =
 auto& averageTimeToCompletedTLSHandshakeMicros =
     *MetricBuilder<MovingAverageMetric>("network.averageTimeToCompletedTLSHandshakeMicros")
          .bind(0.2);
+
+auto& totalIngressTLSConnections =  //
+    *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
+auto& totalIngressTLSHandshakeTimeMillis =  //
+    *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
+otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMillis =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIngressTLSHandshakeLatency,
+        "The latency of the TLS handshake when establishing a new ingress connection.",
+        otel::metrics::MetricUnit::kMilliseconds);
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
@@ -58,10 +70,30 @@ void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
     _state = State::kWaitingForFirstCommand;
 }
 
+void IngressHandshakeMetrics::onTLSHandshakeStarted(TickSource* tickSource) {
+    _tlsHandshakeTickSource = tickSource;
+    _tlsHandshakeStartedTicks = tickSource->getTicks();
+}
+
 void IngressHandshakeMetrics::onTLSHandshakeCompleted() {
+    if (_tlsHandshakeTickSource) {
+        const auto durationMillis =
+            _tlsHandshakeTickSource
+                ->ticksTo<Milliseconds>(_tlsHandshakeTickSource->getTicks() -
+                                        _tlsHandshakeStartedTicks)
+                .count();
+        if (connHealthMetricsLoggingEnabled()) {
+            LOGV2(
+                6723804, "Ingress TLS handshake complete", "durationMillis"_attr = durationMillis);
+        }
+        totalIngressTLSConnections.increment(1);
+        totalIngressTLSHandshakeTimeMillis.increment(durationMillis);
+        ingressTLSHandshakeTimesMillis.record(durationMillis);
+    }
+
     if (_state == State::kWaitingForSessionStart) {
         // We're being called from inside of a unit test that isn't using
-        // `SessionManagerCommon::startSession`. Pretend that we don't exist.
+        // `SessionManagerCommon::startSession`. The session-relative metrics don't apply.
         return;
     }
     invariant(_state == State::kWaitingForFirstCommand);
