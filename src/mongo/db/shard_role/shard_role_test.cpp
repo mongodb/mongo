@@ -2746,6 +2746,88 @@ TEST_F(ShardRoleTest, ReadAcquisitionsChangeReadSourceToLastApplied) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tests for iterateDurableCatalog
+// ---------------------------------------------------------------------------
+
+TEST_F(ShardRoleTest, IterateDurableCatalogOnPrimaryDoesNotChangeReadSource) {
+    // Default fixture state is primary.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    std::vector<NamespaceString> visited;
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(),
+        [&](const NamespaceString& ns, const BSONObj& catalogEntry) { visited.push_back(ns); });
+
+    // The fixture creates nssUnshardedCollection1 and nssShardedCollection1, so the visitor
+    // must have observed at least these two collections.
+    ASSERT(std::find(visited.begin(), visited.end(), nssUnshardedCollection1) != visited.end());
+    ASSERT(std::find(visited.begin(), visited.end(), nssShardedCollection1) != visited.end());
+
+    // On a primary, the read source must remain kNoTimestamp.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+TEST_F(ShardRoleTest, IterateDurableCatalogOnSecondarySetsLastApplied) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Starting state is kNoTimestamp until iterateDurableCatalog adjusts it.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    int visitorCount = 0;
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(),
+        [&](const NamespaceString& ns, const BSONObj& catalogEntry) { ++visitorCount; });
+
+    ASSERT_GT(visitorCount, 0);
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kLastApplied,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+// When a snapshot is already open (recovery unit active), iterateDurableCatalog must not touch
+// the read source. This guards callers that wrap iterateDurableCatalog after an existing
+// acquisition (e.g. CommonMongodProcessInterface::listCatalog when system.views is present).
+TEST_F(ShardRoleTest, IterateDurableCatalogPreservesReadSourceWhenSnapshotAlreadyOpen) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Open a snapshot before any read-source switch can take place. This pins the recovery unit
+    // to its current read source (kNoTimestamp) and marks it active.
+    shard_role_details::getRecoveryUnit(operationContext())->preallocateSnapshot();
+    ASSERT_TRUE(shard_role_details::getRecoveryUnit(operationContext())->isActive());
+    const auto readSourceBefore =
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource();
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(), [&](const NamespaceString& ns, const BSONObj& catalogEntry) {});
+
+    // Read source must be unchanged because the recovery unit was already active.
+    ASSERT_EQUALS(
+        readSourceBefore,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
+                   IterateDurableCatalogTassertsWithoutGlobalISLock,
+                   "Tripwire assertion.*9724500") {
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(), [&](const NamespaceString& ns, const BSONObj& catalogEntry) {});
+}
+
 TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
     const auto nss = nssShardedCollection1;
 

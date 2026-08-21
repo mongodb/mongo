@@ -22,6 +22,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -746,6 +747,23 @@ NamespaceString resolveNssWithoutAcquisitionAtLatest(OperationContext* opCtx,
 [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]]
 boost::optional<NamespaceString> lookupNssWithoutAcquisition(OperationContext* opCtx,
                                                              const UUID& uuid);
+
+/**
+ * Iterates every entry in the durable catalog (_mdb_catalog), calling 'visitor' for each one.
+ *
+ * The caller must hold at least a global IS lock for the duration of the iteration.
+ *
+ * Handles read-source management internally: on secondaries with rc:local the read source is
+ * set to kLastApplied before iterating, ensuring the catalog state returned is consistent with
+ * the replication state. When a storage snapshot is already open (e.g. after a collection
+ * acquisition), the existing read source is preserved.
+ *
+ * Feature-tracking documents written by older versions are skipped automatically.
+ */
+[[MONGO_MOD_PUBLIC]] void iterateDurableCatalog(
+    OperationContext* opCtx,
+    const std::function<void(const NamespaceString& ns, const BSONObj& catalogEntry)>& visitor);
+
 
 }  // namespace shard_role_nocheck
 }  // namespace mongo

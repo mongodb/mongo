@@ -11,6 +11,7 @@
 #include "mongo/client/backoff_with_jitter.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -36,6 +37,8 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/feature_document_util.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -2656,6 +2659,44 @@ NamespaceString shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(Operati
 boost::optional<NamespaceString> shard_role_nocheck::lookupNssWithoutAcquisition(
     OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
+}
+
+void shard_role_nocheck::iterateDurableCatalog(
+    OperationContext* opCtx,
+    const std::function<void(const NamespaceString& ns, const BSONObj& catalogEntry)>& visitor) {
+    tassert(9724500,
+            "iterateDurableCatalog requires at least a global IS lock",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
+    // When no snapshot is open yet, set the read source so that secondaries with rc:local
+    // read at kLastApplied instead of kNoTimestamp.
+    if (!shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        auto readSourceInfo =
+            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(opCtx, boost::none);
+        if (readSourceInfo) {
+            SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
+                opCtx, boost::none, *readSourceInfo);
+        }
+    }
+
+    auto cursor = MDBCatalog::get(opCtx)->getCursor(opCtx);
+    if (!cursor) {
+        return;
+    }
+
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+
+        // For backwards compatibility where older versions have a written feature document.
+        // See SERVER-57125.
+        if (feature_document_util::isFeatureDocument(obj)) {
+            continue;
+        }
+
+        NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj.getStringField("ns")));
+        visitor(ns, obj);
+    }
 }
 
 }  // namespace mongo

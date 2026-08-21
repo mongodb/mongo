@@ -80,7 +80,6 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
-#include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -187,29 +186,14 @@ void listDurableCatalog(OperationContext* opCtx,
                         std::string_view shardName,
                         std::deque<BSONObj>* docs,
                         std::vector<NamespaceStringOrUUID>* systemViewsNamespaces) {
-    auto cursor = MDBCatalog::get(opCtx)->getCursor(opCtx);
-    if (!cursor) {
-        return;
-    }
-
-    while (auto record = cursor->next()) {
-        BSONObj obj = record->data.releaseToBson();
-
-        // For backwards compatibility where older version have a written feature document.
-        // See SERVER-57125.
-        if (feature_document_util::isFeatureDocument(obj)) {
-            continue;
-        }
-
-        NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
-            obj.getStringField("ns")));
-        if (ns.isSystemDotViews()) {
-            systemViewsNamespaces->push_back(ns);
-        }
-
-        docs->push_back(createListCatalogEntryForCollection(
-            VersionContext::getDecoration(opCtx), shardName, ns, obj));
-    }
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+    shard_role_nocheck::iterateDurableCatalog(
+        opCtx, [&](const NamespaceString& ns, const BSONObj& catalogEntry) {
+            if (ns.isSystemDotViews()) {
+                systemViewsNamespaces->push_back(ns);
+            }
+            docs->push_back(createListCatalogEntryForCollection(vCtx, shardName, ns, catalogEntry));
+        });
 }
 
 bool isQEColl(const CollectionAcquisition& acquisition) {
