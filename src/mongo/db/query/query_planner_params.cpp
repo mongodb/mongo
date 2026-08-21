@@ -637,7 +637,8 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
                                        key,
                                        query,
                                        distinctArgs.flipDistinctScanDirection,
-                                       strictDistinctOnly)) {
+                                       strictDistinctOnly,
+                                       canonicalQuery.getDistinct()->unwindsArrays())) {
             indices.push_back(indexEntryFromIndexCatalogEntry(
                 opCtx, collectionPtr, std::move(ice), canonicalQuery));
         }

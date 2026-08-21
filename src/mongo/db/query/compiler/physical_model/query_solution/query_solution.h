@@ -1554,6 +1554,10 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
 
     bool isShardFiltering = false;
     bool isFetching = false;
+
+    // Indicates that the distinct field may be multikey and the scan should proceed as if iterating
+    // over the sorted list of values that would result from unwinding the distinct field.
+    bool unwindsArrays = false;
 };
 
 /**

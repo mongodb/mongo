@@ -291,6 +291,9 @@ void appendStageStructure(const QuerySolutionNode* querySolutionNode,
             bob->appendBool("isShardFiltering", spec->isShardFiltering);
             bob->appendBool("isFetching", spec->isFetching);
         }
+        if (spec->unwindsArrays) {
+            bob->appendBool("unwindsArrays", true);
+        }
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 

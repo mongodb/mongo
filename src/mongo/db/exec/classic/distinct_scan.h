@@ -84,6 +84,9 @@ struct DistinctParams {
     // If we distinct over 'a' the position is 0.
     // If we distinct over 'b' the position is 1.
     int fieldNo{0};
+
+    // See 'DistinctNode::unwindsArrays'.
+    bool unwindsArrays{false};
 };
 
 /**
@@ -136,6 +139,10 @@ private:
     const IndexBounds _bounds;
 
     const size_t _fieldNo = 0;
+
+    // When set, we surface an undefined key in the distinct field as null and make the next
+    // seek skip the null band as well. Only set for unwound multikey scans.
+    const bool _replaceUndefinedWithNull = false;
 
     // The cursor we use to navigate the tree.
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;

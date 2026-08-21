@@ -105,6 +105,10 @@ public:
         return _indexPath;
     }
 
+    bool isStrict() const {
+        return _strict;
+    }
+
     SbeCompatibility sbeCompatibility() const {
         return _sbeCompatibility;
     }

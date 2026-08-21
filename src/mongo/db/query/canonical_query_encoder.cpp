@@ -698,6 +698,7 @@ void encodeKeyForDistinct(const boost::optional<CanonicalDistinct>& distinct,
     }
     encodeUserString(distinct->getKey(), keyBuilder);
     *keyBuilder << distinct->isDistinctScanDirectionFlipped();
+    *keyBuilder << distinct->unwindsArrays();
     if (distinct->getSortRequirement()) {
         const auto& sortPattern = distinct->getSortRequirement().get();
         auto delimiter = "";
