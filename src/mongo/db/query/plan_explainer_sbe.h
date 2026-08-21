@@ -154,6 +154,8 @@ public:
         ExplainOptions::Verbosity verbosity) const final;
     boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
         const override;
+    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
+        const override;
     boost::optional<uint32_t> getJoinPlanCacheKeyHash() const override;
 
 private:
@@ -162,6 +164,7 @@ private:
     // using the same format as we would for the classic engine.
     const std::unique_ptr<PlanStage> _classicRuntimePlannerStage;
     boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> _ceSamplingMetadata;
+    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> _fieldStatsMetadata;
     boost::optional<uint32_t> _joinPlanCacheKeyHash;
     // Do not call getCeSamplingMetadata() on this explainer; it returns boost::none because
     // ceSamplingMetadata is copied into _ceSamplingMetadata above. Callers should use

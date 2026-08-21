@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_options.h"
@@ -65,6 +66,9 @@ struct PlanExplainerData {
     // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
     // Populated on the explain path when CBR used a sampling estimator.
     StringMap<cost_based_ranker::SamplingMetadata> ceSamplingMetadata;
+    // Namespace-keyed persisted NDV statistics emitted under queryPlanner.fieldStatsMetadata.
+    // Only namespaces that served statistics have entries.
+    StringMap<std::vector<ce::PersistedNDVEntry>> fieldStatsMetadata;
     bool fromPlanCache = false;
     // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
     boost::optional<uint32_t> joinPlanCacheKeyHash;
@@ -88,6 +92,12 @@ inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&&
                 "ceSamplingMetadata already has an entry for namespace during merge",
                 !lhs.ceSamplingMetadata.contains(ns));
         lhs.ceSamplingMetadata.emplace(ns, std::move(meta));
+    }
+    for (auto& [ns, entries] : rhs.fieldStatsMetadata) {
+        tassert(13176100,
+                "fieldStatsMetadata already has an entry for namespace during merge",
+                !lhs.fieldStatsMetadata.contains(ns));
+        lhs.fieldStatsMetadata.emplace(ns, std::move(entries));
     }
     // Keep the first set value: the strategy that made the ranking decision owns the field.
     if (!lhs.planRankerReason) {
@@ -363,6 +373,16 @@ public:
      * metadata is available (e.g., CBR was not used, or this is not a classic-engine plan).
      */
     virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
+        const {
+        return boost::none;
+    }
+
+    /**
+     * Returns the per-collection persisted NDV statistics used during planning, to be emitted
+     * under queryPlanner.fieldStatsMetadata in explain output. Returns boost::none if no such
+     * statistics were served.
+     */
+    virtual boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
         const {
         return boost::none;
     }

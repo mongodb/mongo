@@ -740,6 +740,9 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
       _ceSamplingMetadata{maybeExplainData
                               ? boost::make_optional(maybeExplainData->ceSamplingMetadata)
                               : boost::none},
+      _fieldStatsMetadata{maybeExplainData && !maybeExplainData->fieldStatsMetadata.empty()
+                              ? boost::make_optional(maybeExplainData->fieldStatsMetadata)
+                              : boost::none},
       _joinPlanCacheKeyHash{maybeExplainData ? maybeExplainData->joinPlanCacheKeyHash
                                              : boost::none},
       _classicRuntimePlannerExplainer{
@@ -803,6 +806,11 @@ PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
 boost::optional<StringMap<cost_based_ranker::SamplingMetadata>>
 PlanExplainerClassicRuntimePlannerForSBE::getCeSamplingMetadata() const {
     return _ceSamplingMetadata;
+}
+
+boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>>
+PlanExplainerClassicRuntimePlannerForSBE::getFieldStatsMetadata() const {
+    return _fieldStatsMetadata;
 }
 
 boost::optional<uint32_t> PlanExplainerClassicRuntimePlannerForSBE::getJoinPlanCacheKeyHash()

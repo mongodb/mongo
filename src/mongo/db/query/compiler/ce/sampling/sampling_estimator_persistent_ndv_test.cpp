@@ -32,6 +32,8 @@ protected:
     // test can always tell which path produced an estimate.
     static constexpr int kDataNDV = 7;
     static constexpr long long kPersistedNDV = 123;
+    // Fixed creation time so metadata assertions can compare exactly.
+    const Date_t kCreatedAt = Date_t::fromMillisSinceEpoch(42000);
 
     void setUp() override {
         SamplingEstimatorTest::setUp();
@@ -94,7 +96,7 @@ protected:
         doc.setSchemaVersion(kFieldStatsSchemaVersion);
         doc.setCollectionUuid(collUuid);
         doc.setSortedFieldPaths(std::vector<std::string>{path});
-        doc.setCreatedAt(Date_t::now());
+        doc.setCreatedAt(kCreatedAt);
         doc.setNdv(std::move(ndvStats));
         return doc.toBSON();
     }
@@ -170,6 +172,43 @@ protected:
     unittest::ServerParameterGuard _featureFlag{"featureFlagPersistentStats", true};
     unittest::ServerParameterGuard _knob{"internalQueryEnablePersistentNDVStats", true};
 };
+
+TEST_F(PersistentNDVTest, MetadataRecordsServedPaths) {
+    persistNDV(kPersistedNDV);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // Two calls, one metadata entry: memoized re-reads must not duplicate it.
+        estimator.estimateNDV({{.path = "a"}});
+        estimator.estimateNDV({{.path = "a"}});
+
+        const auto meta = estimator.getPersistedNDVMetadata();
+        ASSERT_EQ(meta.size(), 1u);
+        ASSERT_EQ(meta.front().sortedFieldPaths, std::vector<std::string>{"a"});
+        ASSERT_EQ(meta.front().createdAt, kCreatedAt);
+    });
+}
+
+TEST_F(PersistentNDVTest, MetadataIsSortedByFieldPaths) {
+    persistNDV(kPersistedNDV, "a");
+    persistNDV(kPersistedNDV, "b");
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // Request in reverse order; the metadata must come back sorted.
+        estimator.estimateNDV({{.path = "b"}});
+        estimator.estimateNDV({{.path = "a"}});
+
+        const auto meta = estimator.getPersistedNDVMetadata();
+        ASSERT_EQ(meta.size(), 2u);
+        ASSERT_EQ(meta[0].sortedFieldPaths, std::vector<std::string>{"a"});
+        ASSERT_EQ(meta[1].sortedFieldPaths, std::vector<std::string>{"b"});
+    });
+}
+
+TEST_F(PersistentNDVTest, MetadataEmptyWithoutServedEstimates) {
+    // No persisted statistics: the fallback estimate must not record metadata.
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        estimator.estimateNDV({{.path = "a"}});
+        ASSERT_TRUE(estimator.getPersistedNDVMetadata().empty());
+    });
+}
 
 TEST_F(PersistentNDVTest, ServesPersistedNDV) {
     persistNDV(kPersistedNDV);

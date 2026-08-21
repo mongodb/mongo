@@ -808,9 +808,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     if (ctx.explain) {
         PlanExplainerData explainData;
         for (const auto& [nss, estimator] : samplingEstimators) {
-            explainData.ceSamplingMetadata.emplace(
-                NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()),
-                estimator->getSamplingMetadata());
+            const std::string serializedNss =
+                NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext());
+            explainData.ceSamplingMetadata.emplace(serializedNss, estimator->getSamplingMetadata());
+            if (auto ndvMetadata = estimator->getPersistedNDVMetadata(); !ndvMetadata.empty()) {
+                explainData.fieldStatsMetadata.emplace(serializedNss, std::move(ndvMetadata));
+            }
         }
         // Compute the join plan cache key hash for explain regardless of whether the join plan
         // cache is enabled.

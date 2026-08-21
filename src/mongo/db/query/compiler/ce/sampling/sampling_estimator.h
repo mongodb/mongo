@@ -23,6 +23,19 @@ using ProjectionParams = std::variant<NoProjection, TopLevelFieldsProjection>;
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 using SamplingMetadata = mongo::cost_based_ranker::SamplingMetadata;
 
+/**
+ * One persisted NDV statistic (analyze mode "ndv") that served an estimate: the (sorted) field
+ * paths it describes and the statistics document's creation time. Deliberately not part of
+ * SamplingMetadata: NDV statistics are field statistics, unrelated to the sample, even though
+ * the sampling estimator serves both.
+ */
+struct PersistedNDVEntry {
+    std::vector<std::string> sortedFieldPaths;
+    // When 'analyze' built this statistic; one namespace may serve several NDV statistics, each
+    // analyzed at its own time.
+    Date_t createdAt;
+};
+
 class SamplingEstimator {
 public:
     virtual ~SamplingEstimator() {}
@@ -114,6 +127,13 @@ public:
      * Returns metadata about the sample used for cardinality estimation.
      */
     virtual SamplingMetadata getSamplingMetadata() const = 0;
+
+    /**
+     * Returns one entry per persisted NDV statistic (analyze mode "ndv") that served an
+     * estimate, sorted by field paths. Kept apart from getSamplingMetadata(): these are field
+     * statistics, not derived from the sample, even though this estimator serves both.
+     */
+    virtual std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const = 0;
 };
 
 }  // namespace mongo::ce

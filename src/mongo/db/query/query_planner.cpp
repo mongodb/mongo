@@ -1983,10 +1983,15 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
         planRankingResult.maybeExplainData->rejectedPlansWithStages =
             std::move(rejectedSolnWithStages);
         if (samplingEstimator) {
+            const std::string serializedNss = NamespaceStringUtil::serialize(
+                query.nss(), query.getExpCtx()->getSerializationContext());
             planRankingResult.maybeExplainData->ceSamplingMetadata.emplace(
-                NamespaceStringUtil::serialize(query.nss(),
-                                               query.getExpCtx()->getSerializationContext()),
-                samplingEstimator->getSamplingMetadata());
+                serializedNss, samplingEstimator->getSamplingMetadata());
+            if (auto ndvMetadata = samplingEstimator->getPersistedNDVMetadata();
+                !ndvMetadata.empty()) {
+                planRankingResult.maybeExplainData->fieldStatsMetadata.emplace(
+                    serializedNss, std::move(ndvMetadata));
+            }
         }
     }
     return std::move(planRankingResult);

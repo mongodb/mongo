@@ -79,6 +79,14 @@ public:
         return _explainData.ceSamplingMetadata;
     }
 
+    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
+        const override {
+        if (_explainData.fieldStatsMetadata.empty()) {
+            return boost::none;
+        }
+        return _explainData.fieldStatsMetadata;
+    }
+
     boost::optional<PlanRankerReason> getPlanRankerReason() const override {
         return _explainData.planRankerReason;
     }

@@ -1163,6 +1163,17 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     return meta;
 }
 
+std::vector<PersistedNDVEntry> SamplingEstimatorImpl::getPersistedNDVMetadata() const {
+    auto entries = _persistedNDVStatsUsed;
+    // Insertion order follows optimizer traversal; sort for deterministic explain output.
+    // std::vector's operator< compares lexicographically, element by element, so entries order
+    // by their first differing path, with a shorter path list before its extensions.
+    std::sort(entries.begin(), entries.end(), [](auto& a, auto& b) {
+        return a.sortedFieldPaths < b.sortedFieldPaths;
+    });
+    return entries;
+}
+
 bool SamplingEstimatorImpl::persistentNDVStatsEnabled() const {
     if (!_persistentNDVEnabled) {
         const bool flagEnabled = feature_flags::gFeatureFlagPersistentStats.isEnabled(
@@ -1230,7 +1241,8 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
         const auto ndv = sketches.front().getNdv();
 
         // EstimationSource::Sampling keeps downstream ranking behavior identical to the
-        // sample-based estimate. TODO SERVER-131761: surface persisted-NDV usage in explain.
+        // sample-based estimate; explain surfaces the persisted origin via
+        // ceSamplingMetadata.persistedNdv instead.
         CardinalityEstimate persistedEstimate{CardinalityType{static_cast<double>(ndv)},
                                               EstimationSource::Sampling};
         // The statistics may predate writes; never serve more than the current collection
@@ -1238,6 +1250,10 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
         if (cost_based_ranker::exactGt(persistedEstimate, _collectionCard)) {
             persistedEstimate = _collectionCard;
         }
+        // Surfaced in explain as queryPlanner.ceSamplingMetadata.<ns>.persistedNdv. Recorded
+        // only on this non-memoized path, so each path appears once.
+        _persistedNDVStatsUsed.push_back(
+            {std::vector<std::string>{path}, swDoc.getValue().getCreatedAt()});
         LOGV2_DEBUG(13176001,
                     5,
                     "Serving NDV from persisted statistics",

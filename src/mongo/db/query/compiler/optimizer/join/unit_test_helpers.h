@@ -216,6 +216,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::vector<ce::PersistedNDVEntry> getPersistedNDVMetadata() const override {
+        return {};
+    }
+
 private:
     CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;

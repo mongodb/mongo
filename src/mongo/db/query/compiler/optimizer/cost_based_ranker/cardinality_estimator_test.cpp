@@ -1045,6 +1045,9 @@ public:
     ce::SamplingMetadata getSamplingMetadata() const override {
         MONGO_UNREACHABLE;
     }
+    std::vector<ce::PersistedNDVEntry> getPersistedNDVMetadata() const override {
+        return {};
+    }
 };
 
 // Build IndexBounds with a single-point OIL on "a" and 'bIntervalCount' point intervals on "b".
@@ -1464,6 +1467,9 @@ public:
     }
     ce::SamplingMetadata getSamplingMetadata() const override {
         MONGO_UNREACHABLE;
+    }
+    std::vector<ce::PersistedNDVEntry> getPersistedNDVMetadata() const override {
+        return {};
     }
 
 private:

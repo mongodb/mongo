@@ -1,5 +1,10 @@
 // Pins that the field-stats read path's lookup shape (a point _id find with no projection, as
 // issued by loadFieldStats()) is served by the express path.
+//
+// @tags: [
+//   featureFlagPersistentStats,
+//   requires_fcv_91,
+// ]
 import {before, after, describe, it} from "jstests/libs/mochalite.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 

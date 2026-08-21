@@ -175,6 +175,8 @@ public:
      */
     SamplingMetadata getSamplingMetadata() const final;
 
+    std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const final;
+
     /**
      * For each document in a given sample, this helper calculates the number of
      * index keys which satisfy 'bounds', which may be >1 in the case of multi-key
@@ -325,6 +327,9 @@ protected:
     // Memoizes persisted-NDV lookups (including misses) per field path, so repeated estimateNDV()
     // calls during plan enumeration do not repeat the read.
     mutable StringMap<boost::optional<CardinalityEstimate>> _persistedNDVEstimates;
+    // Field paths whose NDV was served from persisted statistics; surfaced in explain via
+    // getSamplingMetadata().
+    mutable std::vector<PersistedNDVEntry> _persistedNDVStatsUsed;
     // Set to true when tryLoadPersistentSample() successfully loads sample from stats collection.
     bool _wasSamplePersisted = false;
     SamplingCEMethodEnum _persistentSampleMethod;
