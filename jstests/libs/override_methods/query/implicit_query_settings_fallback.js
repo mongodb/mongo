@@ -17,9 +17,8 @@ import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_in
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 function containsUnsupportedKeywords(cmdObj) {
-    // Skip queries containing $$NOW or $$CLUSTER_TIME since it evaluates to different values at different times,
-    // making plan comparisons unreliable.
-    const kUnsupportedKeywords = ["$$NOW", "$$CLUSTER_TIME"];
+    // Skip queries containing terms that evaluate to different values at different times.
+    const kUnsupportedKeywords = ["$$NOW", "$$CLUSTER_TIME", "$rand"];
     const serialized = tojson(cmdObj);
     return kUnsupportedKeywords.some((keyword) => serialized.includes(keyword));
 }
