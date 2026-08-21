@@ -201,6 +201,9 @@ FlowControl::FlowControl(repl::ReplicationCoordinator* replCoord)
           std::make_unique<flow_control_details::ReplicationTimestampProvider>(replCoord)),
       _lastTimeSustainerAdvanced(Date_t::now()) {}
 
+FlowControl::FlowControl(std::unique_ptr<TimestampProvider> timestampProvider)
+    : _timestampProvider(std::move(timestampProvider)), _lastTimeSustainerAdvanced(Date_t::now()) {}
+
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
     : FlowControl(service,
                   std::make_unique<flow_control_details::ReplicationTimestampProvider>(replCoord)) {
@@ -340,9 +343,25 @@ int FlowControl::_calculateNewTicketsForLag(const Timestamp& prevSustainerTimest
     invariant(lagMillis >= thresholdLagMillis);
 
     const std::int64_t providerCount = _timestampProvider->getSustainerAppliedCount();
-    const std::int64_t sustainerAppliedCount = providerCount >= 0
-        ? providerCount
-        : _approximateOpsBetween(prevSustainerTimestamp, currSustainerTimestamp);
+    std::int64_t sustainerAppliedCount = providerCount;
+    bool advancingWhileUnanswerable = false;
+    if (providerCount < 0) {
+        // The provider has no count this period; FlowControl computes it itself. The count
+        // is unanswerable when its older endpoint precedes the retained history: -1 (the
+        // neutral fallback below) rather than an approximation that would fabricate 0 or an
+        // undercount there (pinned by ApproximatingOpsFromBelowRetainedHistory). Only a
+        // provider position adopted from below the table (a disagg standby replaying its
+        // checkpoint) fails to resolve — never a plain replica set's own sustainer, whose
+        // history trimming retains.
+        const bool unanswerable = !resolveSampleAtOrBelow(prevSustainerTimestamp);
+        sustainerAppliedCount = unanswerable
+            ? -1
+            : _approximateOpsBetween(prevSustainerTimestamp, currSustainerTimestamp);
+        // Progress we cannot count is still progress: it must not trip the not-moving
+        // warning below.
+        advancingWhileUnanswerable =
+            unanswerable && currSustainerTimestamp > prevSustainerTimestamp;
+    }
     LOGV2_DEBUG(22218,
                 DEBUG_LOG_LEVEL,
                 " PrevApplied: {prevSustainerTimestamp} CurrApplied: {currSustainerTimestamp} "
@@ -350,7 +369,7 @@ int FlowControl::_calculateNewTicketsForLag(const Timestamp& prevSustainerTimest
                 "prevSustainerTimestamp"_attr = prevSustainerTimestamp,
                 "currSustainerTimestamp"_attr = currSustainerTimestamp,
                 "sustainerAppliedCount"_attr = sustainerAppliedCount);
-    if (sustainerAppliedCount > 0) {
+    if (sustainerAppliedCount > 0 || advancingWhileUnanswerable) {
         _lastTimeSustainerAdvanced = Date_t::now();
     } else {
         auto warnThresholdSeconds = gFlowControlWarnThresholdSeconds.load();
@@ -433,8 +452,7 @@ int FlowControl::getNumTickets(Date_t now) {
     const std::int64_t locksUsedLastPeriod = _getLocksUsedLastPeriod();
 
     if (gFlowControlEnabled.load() == false || flowControlUsable == false || locksPerOp < 0.0) {
-        _trimSamples(
-            std::min(lastTargetTime.timestamp, _timestampProvider->getPrevSustainerTimestamp()));
+        _trimSamples(_trimTarget(lastTargetTime.timestamp));
         return kMaxTickets;
     }
 
@@ -523,14 +541,40 @@ int FlowControl::getNumTickets(Date_t now) {
 
     _lastTargetTicketsPermitted.store(ret);
 
-    _trimSamples(
-        std::min(lastTargetTime.timestamp, _timestampProvider->getPrevSustainerTimestamp()));
+    _trimSamples(_trimTarget(lastTargetTime.timestamp));
 
     return ret;
 }
 
-std::int64_t FlowControl::approximateOpsBetween(Timestamp prevTs, Timestamp currTs) {
-    return _approximateOpsBetween(prevTs, currTs);
+Timestamp FlowControl::_trimTarget(Timestamp lastTargetTimestamp) const {
+    // Trim to the oldest position still read: FlowControl's own queries (the target and the
+    // previous sustainer) and the provider's private one (the measurement anchor, when a
+    // measurement is in progress). No ordering among them is assumed — whichever is oldest
+    // this refresh bounds the trim.
+    auto trimTo = std::min(lastTargetTimestamp, _timestampProvider->getPrevSustainerTimestamp());
+    if (const auto anchor = _timestampProvider->measurementAnchor(); !anchor.isNull()) {
+        trimTo = std::min(trimTo, anchor);
+    }
+    return trimTo;
+}
+
+boost::optional<FlowControl::ResolvedSample> FlowControl::resolveSampleAtOrBelow(
+    Timestamp timestamp) const {
+    std::lock_guard<std::mutex> lk(_sampledOpsMutex);
+    if (_sampledOpsApplied.empty() || timestamp.asULL() < std::get<0>(_sampledOpsApplied.front())) {
+        return boost::none;
+    }
+    // First sample strictly above the query, then step back to the newest at-or-below one.
+    // prev(it) cannot fall off the front: the guard above established front.ts <= query, so
+    // the front sample fails upper_bound's strictly-above predicate and it > begin() always.
+    auto it = std::upper_bound(
+        _sampledOpsApplied.begin(),
+        _sampledOpsApplied.end(),
+        timestamp.asULL(),
+        [](std::uint64_t ts, const Sample& sample) { return ts < std::get<0>(sample); });
+    const auto& sample = *std::prev(it);
+    return ResolvedSample{Timestamp(std::get<0>(sample)),
+                          static_cast<std::int64_t>(std::get<1>(sample))};
 }
 
 std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp currTs) {

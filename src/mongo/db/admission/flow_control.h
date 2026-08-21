@@ -22,7 +22,10 @@
 #include <memory>
 #include <mutex>
 #include <tuple>
+#include <utility>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -72,6 +75,12 @@ public:
          * Are the previous and current updates compatible?  For replication,
          * makes sure number of nodes is the same and the median node timestamp (the sustainer)
          * has not gone backwards.
+         *
+         * Contract: false marks the readings as incoherent, and FlowControl responds by
+         * PRESERVING the previous ticket target (and suppressing the sustainer-not-moving
+         * warning) — on a fresh primary that is kMaxTickets, i.e. no throttling. So false
+         * must not be used to signal missing data; a provider with coherent positions but
+         * no count signals that through getSustainerAppliedCount() returning -1 instead.
          */
         virtual bool sustainerAdvanced() const = 0;
 
@@ -90,6 +99,28 @@ public:
          */
         virtual std::int64_t getSustainerAppliedCount() const {
             return -1;
+        }
+
+        /**
+         * The sample-table position where the provider's in-progress measurement started:
+         * the provider's future queries still need the samples from here forward, so
+         * trimming never passes it — including while the provider's positions are absent
+         * from the sustainer getters (e.g. an ignored standby signal, or another signal
+         * being dominant). Null means no measurement in progress (the default): no
+         * constraint on trimming.
+         *
+         * Implementer contract: (1) trimming runs on every flow-control refresh (the
+         * periodic getNumTickets() pass), so report the anchor from the moment the
+         * measurement begins and hold it until the measurement ends — a single null return
+         * in between lets the next trim pass the anchor, and the loss is permanent; (2) the
+         * returned timestamp must be in the
+         * sample table's key domain (the timestamps passed to sample()) — a value from any
+         * other domain makes the trim bound meaningless. Memory stays bounded regardless:
+         * at the sample cap FlowControl loses resolution at the newest sample instead of
+         * growing.
+         */
+        virtual Timestamp measurementAnchor() const {
+            return Timestamp();
         }
     };
 
@@ -111,6 +142,12 @@ public:
      * testing.
      */
     FlowControl(repl::ReplicationCoordinator* replCoord);
+
+    /**
+     * Construct a provider-based flow control object without adding a periodic job runner for
+     * testing.
+     */
+    explicit FlowControl(std::unique_ptr<TimestampProvider> timestampProvider);
 
     static FlowControl* get(ServiceContext* service);
     static FlowControl* get(ServiceContext& service);
@@ -155,11 +192,25 @@ public:
      */
     void disableUntil(Date_t deadline);
 
+    // A resolved sample: its timestamp and the cumulative ops applied since startup at it.
+    struct ResolvedSample {
+        Timestamp timestamp;
+        std::int64_t cumulativeOps = 0;
+    };
+
     /**
-     * Returns an estimate of the number of oplog operations between two timestamps by querying
-     * the internal samples table.
+     * Returns the newest sample at or below `timestamp`, or none if the table is empty or
+     * `timestamp` precedes the oldest sample.
+     *
+     * A position, not a count (contrast _approximateOpsBetween), for callers that measure
+     * rates across SUCCESSIVE queries: anchoring the next query at the returned sample
+     * boundary makes consecutive windows tile exactly — ops between the boundary and the raw
+     * query timestamp are carried into the next window instead of dropped, differencing the
+     * cumulative coordinates counts every op exactly once regardless of sampling granularity,
+     * and "unanswerable" (none) stays distinct from "zero ops". A single count-between-two-
+     * timestamps query can provide none of these across calls.
      */
-    std::int64_t approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+    boost::optional<ResolvedSample> resolveSampleAtOrBelow(Timestamp timestamp) const;
 
     /**
      * Underscore methods are public for testing.
@@ -177,6 +228,8 @@ public:
                                                          std::uint64_t thresholdLagMillis);
 
     [[MONGO_MOD_PRIVATE]] void _trimSamples(Timestamp trimSamplesTo);
+
+    [[MONGO_MOD_PRIVATE]] Timestamp _trimTarget(Timestamp lastTargetTimestamp) const;
 
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
     // observations of the corresponding counter at (roughly) <timestamp>.
