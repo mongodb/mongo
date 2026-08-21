@@ -64,6 +64,12 @@ sh_test(
     data = ["bazel_evergreen_shutils.sh"],
 )
 
+sh_test(
+    name = "prelude_workdir_test",
+    srcs = ["prelude_workdir_test.sh"],
+    data = ["prelude_workdir.sh"],
+)
+
 sh_binary(
     name = "check_idl_compat",
     srcs = ["check_idl_compat.sh"],
