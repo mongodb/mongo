@@ -14,7 +14,7 @@ rst.initiate();
 
 // This testCmd is gated by gFeatureFlagBlender which is enabled on latest version.
 const testCmd = {
-    testCommandFeatureFlaggedOnLatestFCV83: 1,
+    testCommandFeatureFlaggedOnLatestFCV91: 1,
 };
 
 // The testCmd should not be registered when the node is on the last-lts binary.

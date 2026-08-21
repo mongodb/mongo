@@ -50,7 +50,6 @@ selector:
     - jstests/multiVersion/genericSetFCVUsage/collection_validator_feature_compatibility_version.js
     - jstests/multiVersion/genericBinVersion/query-optimization/mql_js_engine_gap_upgrade_downgrade.js
     - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
-    - jstests/multiVersion/genericBinVersion/command_registration_startup_behavior_fcv.js
     - jstests/multiVersion/genericBinVersion/authz_schema_version.js
     - jstests/multiVersion/genericBinVersion/query-integration-search/rank_fusion_upgrade_downgrade.js
     - jstests/multiVersion/genericBinVersion/query-integration-search/score_fusion_upgrade_downgrade.js

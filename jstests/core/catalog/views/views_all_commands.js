@@ -812,7 +812,7 @@ let viewsCommandTests = {
     startTransitionToDedicatedConfigServer: {skip: isUnrelated},
     stopTransitionToDedicatedConfigServer: {skip: isUnrelated},
     sysprofile: {skip: isAnInternalCommand},
-    testCommandFeatureFlaggedOnLatestFCV83: {skip: isAnInternalCommand},
+    testCommandFeatureFlaggedOnLatestFCV91: {skip: isAnInternalCommand},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},

@@ -252,10 +252,10 @@ MONGO_REGISTER_COMMAND(DurableHistoryReplicatedTestCmd).testOnly().forShard();
 
 // TODO SERVER-110189: Make testing this command resilient to releases or update the name of this
 // command.
-class CommandFeatureFlaggedOnLatestFCVTestCmd83 : public BasicCommand {
+class CommandFeatureFlaggedOnLatestFCVTestCmd91 : public BasicCommand {
 public:
-    CommandFeatureFlaggedOnLatestFCVTestCmd83()
-        : BasicCommand("testCommandFeatureFlaggedOnLatestFCV83") {}
+    CommandFeatureFlaggedOnLatestFCVTestCmd91()
+        : BasicCommand("testCommandFeatureFlaggedOnLatestFCV91") {}
 
     bool adminOnly() const override {
         return false;
@@ -288,12 +288,12 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        LOGV2(10044800, "Test-only command 'testCommandFeatureFlaggedOnLatestFCV83' invoked");
+        LOGV2(10044800, "Test-only command 'testCommandFeatureFlaggedOnLatestFCV91' invoked");
         return true;
     }
 };
 
-MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd83)
+MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd91)
     .testOnly()
     .requiresFeatureFlag(feature_flags::gFeatureFlagBlender)
     .forShard();

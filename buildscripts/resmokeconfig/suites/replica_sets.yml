@@ -5,10 +5,7 @@ selector:
     - jstests/replsets/*.js
     - jstests/replsets/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
-  exclude_files:
-    # TODO SERVER-132997: this test covers rollback of the pre-9.0 viewless-timeseries
-    # downgrade oplog entry. That transition is obsolete now that 9.0 is last-LTS.
-    - jstests/replsets/rollback_upgrade_downgrade_viewless_timeseries.js
+  exclude_files: []
 
 executor:
   config:

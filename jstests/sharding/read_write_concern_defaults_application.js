@@ -925,7 +925,7 @@ let testCases = {
     stopTrafficRecording: {skip: "does not accept read or write concern"},
     stopTransitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
     sysprofile: {skip: "internal command"},
-    testCommandFeatureFlaggedOnLatestFCV83: {skip: "internal command"},
+    testCommandFeatureFlaggedOnLatestFCV91: {skip: "internal command"},
     testDeprecation: {skip: "does not accept read or write concern"},
     testDeprecationInVersion2: {skip: "does not accept read or write concern"},
     testInternalTransactions: {skip: "internal command"},

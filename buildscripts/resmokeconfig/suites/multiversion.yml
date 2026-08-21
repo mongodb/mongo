@@ -129,13 +129,6 @@ selector:
     # commandFailed assertions fail.
     - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
 
-    # TODO SERVER-132997: the testCommandFeatureFlaggedOnLatestFCV83 command is gated by
-    # the 8.3 feature flag (gFeatureFlagBlender) and registered based on the binary, not FCV. The test
-    # expects it to be CommandNotFound on the last-lts binary. Now that last-lts is the 9.0 binary,
-    # which already has the command (introduced at 8.3), it is registered at startup and the
-    # CommandNotFound expectation fails.
-    - jstests/multiVersion/genericBinVersion/command_registration_startup_behavior_fcv.js
-
     # TODO SERVER-132957: the test assumes the last-lts binary writes the authSchema document during
     # createUser. That was true of the 8.0 binary, but the 9.0 binary only writes it during FCV
     # downgrade (like latest). Now that last-lts is the 9.0 binary, the upgrade case ("last-lts" ->
