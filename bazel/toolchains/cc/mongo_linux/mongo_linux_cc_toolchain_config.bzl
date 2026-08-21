@@ -1032,6 +1032,18 @@ def _impl(ctx):
         ],
     )
 
+    # If possible with the current linker, mark relocations as read-only.
+    relro_link_flags = ["-Wl,-z,relro"]
+
+    # RHEL 8 arm64 and PPC64LE use 64 KiB pages. Align the end of the PT_GNU_RELRO segment to a
+    # page boundary so the dynamic loader can protect the entire segment. The linkstatic attribute
+    # describes the global build configuration, so dynamic library actions need this flag even
+    # when that configuration is static.
+    common_page_size_link_actions = [
+        ACTION_NAMES.cpp_link_dynamic_library,
+        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+    ] + ([ACTION_NAMES.cpp_link_executable] if not ctx.attr.linkstatic else [])
+
     general_linkflags_feature = feature(
         name = "general_linkflags",
         enabled = ctx.attr.compiler == COMPILERS.CLANG or ctx.attr.compiler == COMPILERS.GCC,
@@ -1048,12 +1060,14 @@ def _impl(ctx):
                     # them.
                     "-Wl,-z,noexecstack",
                     "-Wl,--warn-execstack",
-
-                    # If possible with the current linker, mark relocations as read-only.
-                    "-Wl,-z,relro",
-                ])],
+                ] + relro_link_flags)],
             ),
-        ],
+        ] + ([
+            flag_set(
+                actions = common_page_size_link_actions,
+                flag_groups = [flag_group(flags = ["-Wl,-z,common-page-size=0x10000"])],
+            ),
+        ] if ctx.attr.is_aarch64 or ctx.attr.is_ppc64le else []),
     )
 
     build_id_feature = feature(
