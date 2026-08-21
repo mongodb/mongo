@@ -423,7 +423,16 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             sharding_ddl_util::checkAllowMigrationsOnConfigServer(
                                 opCtx, _collInfo->nsForTargeting);
                         if (_result.is_initialized() && allowMigrations) {
-                            // The command finished and we have the response. Return it.
+                            // The command finished and we have the response. Unblock migrations
+                            // again to ensure that we did so on all shards, then return the
+                            // response.
+                            const auto collUUID = _doc.getCollUUID();
+                            sharding_ddl_util::resumeMigrations(
+                                opCtx,
+                                _collInfo->nsForTargeting,
+                                collUUID,
+                                [&] { return getNewSession(opCtx); },
+                                _doc.getAuthoritativeMetadataAccessLevel());
                             return;
                         } else if (allowMigrations) {
                             // Previous run on a different node completed, but we lost the
@@ -576,18 +585,10 @@ ExecutorFuture<void> CollModCoordinator::_cleanupOnAbort(
                 return;
             }
 
-            bool allowMigrations = sharding_ddl_util::checkAllowMigrationsOnConfigServer(
-                opCtx, _collInfo->nsForTargeting);
-
-            // If we already re-enabled migrations, then we have completed the cleanup and can
-            // return early.
-            if (allowMigrations) {
-                return;
-            }
-
             if (_doc.getPhase() >= Phase::kBlockShards && _isTrackedTimeseriesUpdate()) {
-                // We need the sharding info to know which shards to unblock. Because migrations are
-                // still disabled, the set of shards should be stable.
+                // We need the sharding info to know which shards to unblock. The set of shards may
+                // have changed if we already unblocked migrations, but if that is the case we must
+                // have already released the critical section anyways.
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
                 std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                 if (_shardingInfo->isPrimaryOwningChunks) {
