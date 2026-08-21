@@ -256,6 +256,114 @@ TEST_F(ReshardingUtilTest, FailWhenOverlappingZones) {
     ASSERT_THROWS_CODE(checkForOverlappingZones(zones), DBException, ErrorCodes::BadValue);
 }
 
+/**
+ * Covers selectZonesForParticipantShardsAndChunks, the branch (provenance, requested zones,
+ * forceRedistribution) -> zones used when calculating resharding participant shards and chunks.
+ */
+class ReshardingSelectZonesTest : public ConfigServerTestFixture {
+protected:
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        ShardType shard;
+        shard.setName("a");
+        shard.setHost("a:1234");
+        shard.setTags({kZoneName});
+        setupShards({shard});
+    }
+
+    const std::string kZoneName = "zoneOnShardA";
+    const NamespaceString kSourceNss = NamespaceString::createNamespaceString_forTest("test.foo");
+    const ChunkRange kFullRange{BSON("x" << MINKEY), BSON("x" << MAXKEY)};
+};
+
+TEST_F(ReshardingSelectZonesTest, NoZonesAndNoForceRedistributionReturnsEmpty) {
+    auto zones = resharding::selectZonesForParticipantShardsAndChunks(
+        operationContext(),
+        ReshardingProvenanceEnum::kReshardCollection,
+        boost::none /* requestedZones */,
+        false /* forceRedistribution */,
+        kSourceNss);
+
+    ASSERT_TRUE(zones.empty());
+}
+
+TEST_F(ReshardingSelectZonesTest, RequestedZonesAreReturnedAndValidated) {
+    std::vector<ReshardingZoneType> requestedZones{
+        ReshardingZoneType(kZoneName, kFullRange.getMin(), kFullRange.getMax())};
+
+    auto zones = resharding::selectZonesForParticipantShardsAndChunks(
+        operationContext(),
+        ReshardingProvenanceEnum::kReshardCollection,
+        requestedZones,
+        false /* forceRedistribution */,
+        kSourceNss);
+
+    ASSERT_EQ(1u, zones.size());
+    ASSERT_EQ(kZoneName, zones[0].getZone());
+}
+
+TEST_F(ReshardingSelectZonesTest, ThrowsWhenRequestedZoneDoesNotExist) {
+    std::vector<ReshardingZoneType> requestedZones{
+        ReshardingZoneType("noSuchZone", kFullRange.getMin(), kFullRange.getMax())};
+
+    ASSERT_THROWS_CODE(resharding::selectZonesForParticipantShardsAndChunks(
+                           operationContext(),
+                           ReshardingProvenanceEnum::kReshardCollection,
+                           requestedZones,
+                           false /* forceRedistribution */,
+                           kSourceNss),
+                       DBException,
+                       ErrorCodes::ZoneNotFound);
+}
+
+TEST_F(ReshardingSelectZonesTest, ForceRedistributionWithoutRequestedZonesUsesExistingZones) {
+    TagsType existingTag(kSourceNss, kZoneName, kFullRange);
+    DBDirectClient client(operationContext());
+    client.insert(TagsType::ConfigNS, existingTag.toBSON());
+
+    auto zones = resharding::selectZonesForParticipantShardsAndChunks(
+        operationContext(),
+        ReshardingProvenanceEnum::kReshardCollection,
+        boost::none /* requestedZones */,
+        true /* forceRedistribution */,
+        kSourceNss);
+
+    ASSERT_EQ(1u, zones.size());
+    ASSERT_EQ(kZoneName, zones[0].getZone());
+}
+
+TEST_F(ReshardingSelectZonesTest, UnshardCollectionRejectsRequestedZones) {
+    std::vector<ReshardingZoneType> requestedZones{
+        ReshardingZoneType(kZoneName, kFullRange.getMin(), kFullRange.getMax())};
+
+    ASSERT_THROWS_CODE(resharding::selectZonesForParticipantShardsAndChunks(
+                           operationContext(),
+                           ReshardingProvenanceEnum::kUnshardCollection,
+                           requestedZones,
+                           false /* forceRedistribution */,
+                           kSourceNss),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingSelectZonesTest,
+       UnshardCollectionIgnoresForceRedistributionAndReturnsEmptyEvenWithExistingZones) {
+    // Regression guard: forceRedistribution must not cause existing collection zones to leak
+    // into an unshardCollection operation, whose resulting collection cannot have zones.
+    TagsType existingTag(kSourceNss, kZoneName, kFullRange);
+    DBDirectClient client(operationContext());
+    client.insert(TagsType::ConfigNS, existingTag.toBSON());
+
+    auto zones = resharding::selectZonesForParticipantShardsAndChunks(
+        operationContext(),
+        ReshardingProvenanceEnum::kUnshardCollection,
+        boost::none /* requestedZones */,
+        true /* forceRedistribution */,
+        kSourceNss);
+
+    ASSERT_TRUE(zones.empty());
+}
+
 TEST(SimpleReshardingUtilTest, AssertDonorOplogIdSerialization) {
     // It's a correctness requirement that `ReshardingDonorOplogId.toBSON` serializes as
     // `{clusterTime: <value>, ts: <value>}`, paying particular attention to the ordering of the

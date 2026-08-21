@@ -1226,6 +1226,129 @@ TEST_F(ReshardingCoordinatorPersistenceTest, SourceCleanupBetweenTransitionsSucc
 }
 
 /**
+ * Covers which InitialSplitPolicy calculateParticipantShardsAndChunks picks for a given shard
+ * key shape, zones, and shardDistribution. Uses shardDistribution's with-min/max form.
+ */
+class ReshardingSplitPolicySelectionTest : public ReshardingCoordinatorPersistenceTest {
+protected:
+    // shard0000 is tagged kZone1 and shard0001 is tagged kZone2 by the base fixture's setUp().
+    static inline const std::string kShardOnZone1 = "shard0000";
+    static inline const std::string kShardOnZone2 = "shard0001";
+
+    ReshardingZoneType makeFullRangeZone(const ShardKeyPattern& shardKey,
+                                         const std::string& zoneName) {
+        return ReshardingZoneType(
+            zoneName, shardKey.getKeyPattern().globalMin(), shardKey.getKeyPattern().globalMax());
+    }
+
+    ReshardingCoordinatorDocument makeCoordinatorDocWithShardKey(const BSONObj& shardKeyBSON) {
+        CommonReshardingMetadata meta(
+            _reshardingUUID, _originalNss, UUID::gen(), _tempNss, shardKeyBSON);
+
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        meta.setStartingFCV(fcvSnapshot.getVersion());
+
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(VersionContext{fcvSnapshot});
+        meta.setForwardableOpMetadata(std::move(fom));
+
+        ReshardingCoordinatorDocument doc(CoordinatorStateEnum::kInitializing,
+                                          {DonorShardEntry(ShardId("shard0000"), {})},
+                                          {RecipientShardEntry(ShardId("shard0001"), {})});
+        doc.setCommonReshardingMetadata(meta);
+        return doc;
+    }
+
+    resharding::ParticipantShardsAndChunks runSplitPolicySelection(
+        const ShardKeyPattern& newShardKey,
+        std::vector<ReshardingZoneType> zones,
+        boost::optional<std::vector<ShardKeyRange>> shardDistribution) {
+        auto coordinatorDoc = makeCoordinatorDocWithShardKey(newShardKey.toBSON());
+        // One chunk suffices since zones/shardDistribution below cover the full domain.
+        coordinatorDoc.setNumInitialChunks(1);
+
+        if (!zones.empty()) {
+            coordinatorDoc.setZones(zones);
+        }
+        if (shardDistribution) {
+            coordinatorDoc.setShardDistribution(*shardDistribution);
+        }
+
+        makeAndInsertChunksForDonorShard(
+            _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+        setupSourceCollection(operationContext(), coordinatorDoc);
+        insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc);
+
+        auto externalState = ReshardingCoordinatorExternalStateImpl();
+        return externalState.calculateParticipantShardsAndChunks(
+            operationContext(), coordinatorDoc, zones);
+    }
+
+    std::set<ShardId> recipientShardIds(const resharding::ParticipantShardsAndChunks& result) {
+        std::set<ShardId> shardIds;
+        for (const auto& chunk : result.initialChunks) {
+            shardIds.insert(chunk.getShard());
+        }
+        return shardIds;
+    }
+};
+
+TEST_F(ReshardingSplitPolicySelectionTest,
+       HashedPrefixKeyWithoutPlacementRequestUsesHashedPresplitAcrossAllShards) {
+    // No placement requested: the hashed presplit fast path spreads one chunk per shard.
+    ShardKeyPattern hashedPrefixKey(BSON("newSK" << "hashed"));
+
+    auto result = runSplitPolicySelection(
+        hashedPrefixKey, {} /* zones */, boost::none /* shardDistribution */);
+
+    ASSERT_EQUALS(recipientShardIds(result),
+                  (std::set<ShardId>{ShardId(kShardOnZone1), ShardId(kShardOnZone2)}));
+}
+
+TEST_F(ReshardingSplitPolicySelectionTest,
+       HashedPrefixKeyWithShardDistributionMustNotUseHashedPresplitFastPath) {
+    ShardKeyPattern hashedPrefixKey(BSON("newSK" << "hashed"));
+    ShardKeyRange restrictToZone1Shard{ShardId(kShardOnZone1)};
+    restrictToZone1Shard.setMin(hashedPrefixKey.getKeyPattern().globalMin());
+    restrictToZone1Shard.setMax(hashedPrefixKey.getKeyPattern().globalMax());
+    std::vector<ShardKeyRange> shardDistribution{restrictToZone1Shard};
+
+    auto result = runSplitPolicySelection(hashedPrefixKey, {} /* zones */, shardDistribution);
+
+    ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
+}
+
+TEST_F(ReshardingSplitPolicySelectionTest,
+       HashedPrefixKeyWithZonesAndShardDistributionMustNotUseHashedPresplitFastPath) {
+    // Same as above, but with 'zones' also supplied and agreeing with shardDistribution: confirms
+    // non-empty zones doesn't itself divert to a different branch.
+    ShardKeyPattern hashedPrefixKey(BSON("newSK" << "hashed"));
+    std::vector<ReshardingZoneType> zones{makeFullRangeZone(hashedPrefixKey, kZone1)};
+    ShardKeyRange restrictToZone1Shard{ShardId(kShardOnZone1)};
+    restrictToZone1Shard.setMin(hashedPrefixKey.getKeyPattern().globalMin());
+    restrictToZone1Shard.setMax(hashedPrefixKey.getKeyPattern().globalMax());
+    std::vector<ShardKeyRange> shardDistribution{restrictToZone1Shard};
+
+    auto result = runSplitPolicySelection(hashedPrefixKey, zones, shardDistribution);
+
+    ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
+}
+
+TEST_F(ReshardingSplitPolicySelectionTest, NonHashedPrefixKeyWithShardDistributionHonorsIt) {
+    // Baseline: a range key was never affected by SERVER-133282, so placement should be honored
+    // here too.
+    ShardKeyPattern rangeKey(BSON("newSK" << 1));
+    ShardKeyRange restrictToZone1Shard{ShardId(kShardOnZone1)};
+    restrictToZone1Shard.setMin(rangeKey.getKeyPattern().globalMin());
+    restrictToZone1Shard.setMax(rangeKey.getKeyPattern().globalMax());
+    std::vector<ShardKeyRange> shardDistribution{restrictToZone1Shard};
+
+    auto result = runSplitPolicySelection(rangeKey, {} /* zones */, shardDistribution);
+
+    ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
+}
+
+/**
  * Mirror of ReshardingCoordinatorPersistenceTest, but with the coordinator's reshardingFields
  * writes gated off via featureFlagReshardingInitNoRefresh and
  * featureFlagReshardingNoRefreshApplyingAndBlockingWrites. Verifies that the persistence helpers

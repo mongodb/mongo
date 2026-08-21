@@ -329,6 +329,20 @@ std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext*
                                                                const NamespaceString& sourceNss);
 
 /**
+ * Selects the zones to use when calculating participant shards and chunks for a resharding
+ * operation: 'requestedZones' if the caller supplied any, the source collection's existing zones
+ * if 'forceRedistribution' is set and no zones were supplied, or none otherwise. Throws if zones
+ * were requested for an unshardCollection operation, whose resulting collection cannot have
+ * zones.
+ */
+std::vector<ReshardingZoneType> selectZonesForParticipantShardsAndChunks(
+    OperationContext* opCtx,
+    const boost::optional<ReshardingProvenanceEnum>& provenance,
+    const boost::optional<std::vector<ReshardingZoneType>>& requestedZones,
+    bool forceRedistribution,
+    const NamespaceString& sourceNss);
+
+/**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
  * may be `Timestamp::isNull()` to fetch from the beginning of the oplog.
  */

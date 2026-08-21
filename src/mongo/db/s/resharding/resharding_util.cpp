@@ -270,6 +270,38 @@ std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext*
     return zones;
 }
 
+std::vector<ReshardingZoneType> selectZonesForParticipantShardsAndChunks(
+    OperationContext* opCtx,
+    const boost::optional<ReshardingProvenanceEnum>& provenance,
+    const boost::optional<std::vector<ReshardingZoneType>>& requestedZones,
+    bool forceRedistribution,
+    const NamespaceString& sourceNss) {
+    std::vector<ReshardingZoneType> zones;
+    if (isUnshardCollection(provenance)) {
+        // Since the resulting collection of an unshardCollection operation cannot have zones, we
+        // do not need to account for existing zones in the original collection. Existing zones
+        // from the original collection will be deleted after the unsharding operation commits.
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify zones when unsharding a collection.",
+                !requestedZones);
+    } else if (requestedZones) {
+        zones = *requestedZones;
+
+        ShardingCatalogManager& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
+
+        // This is a best effort check that all of the zones exist. It does not provide any
+        // guarantee that the zones will remain stable during the resharding operation.
+        for (const auto& zone : zones) {
+            shardingCatalogManager.checkZoneExists(opCtx, std::string(zone.getZone()));
+        }
+    } else if (forceRedistribution) {
+        // If zones are not provided by the user for same-key resharding, we should use the
+        // existing zones for this resharding operation.
+        zones = getZonesFromExistingCollection(opCtx, sourceNss);
+    }
+    return zones;
+}
+
 std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,

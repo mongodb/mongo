@@ -1261,36 +1261,12 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         auto opCtx = _makeOperationContext();
         auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
 
-        std::vector<ReshardingZoneType> zones;
-        if (resharding::isUnshardCollection(provenance)) {
-            // Since the resulting collection of an unshardCollection operation cannot have zones,
-            // we do not need to account for existing zones in the original collection. Existing
-            // zones from the original collection will be deleted after the unsharding operation
-            // commits.
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot specify zones when unsharding a collection.",
-                    !_coordinatorDoc.getZones());
-        } else {
-            if (_coordinatorDoc.getZones()) {
-                zones = *_coordinatorDoc.getZones();
-
-                ShardingCatalogManager& shardingCatalogManager =
-                    *ShardingCatalogManager::get(opCtx.get());
-
-                // This is a best effort check that all of the zones exist. It does not provide any
-                // guarantee that the zones will remain stable during the resharding operation.
-                for (const auto& zone : zones) {
-                    shardingCatalogManager.checkZoneExists(opCtx.get(),
-                                                           std::string(zone.getZone()));
-                }
-            } else if (_coordinatorDoc.getForceRedistribution() &&
-                       *_coordinatorDoc.getForceRedistribution()) {
-                // If zones are not provided by the user for same-key resharding, we should use the
-                // existing zones for this resharding operation.
-                zones = resharding::getZonesFromExistingCollection(opCtx.get(),
-                                                                   _coordinatorDoc.getSourceNss());
-            }
-        }
+        auto zones = resharding::selectZonesForParticipantShardsAndChunks(
+            opCtx.get(),
+            provenance,
+            _coordinatorDoc.getZones(),
+            _coordinatorDoc.getForceRedistribution() && *_coordinatorDoc.getForceRedistribution(),
+            _coordinatorDoc.getSourceNss());
 
         auto shardsAndChunks =
             _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
