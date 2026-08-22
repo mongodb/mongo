@@ -10,7 +10,9 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -20,15 +22,23 @@
 
 #include <ostream>
 #include <set>
+#include <span>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
 namespace {
 // This is our default resume token for the representative query shape.
 const auto kDefaultTokenQueryStats = ResumeToken::makeHighWaterMarkToken(Timestamp(), 1);
+
+// Redeclared here to avoid dependency on pipeline library.
+const HashedFieldName kResumeTokenData =
+    FieldNameHasher().hashedFieldName(ResumeToken::kDataFieldName);
+const HashedFieldName kResumeTokenTypeBits =
+    FieldNameHasher().hashedFieldName(ResumeToken::kTypeBitsFieldName);
 }  // namespace
 
 ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
@@ -92,14 +102,14 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
 }
 
 ResumeToken::ResumeToken(const Document& resumeDoc) {
-    auto dataVal = resumeDoc[kDataFieldName];
+    auto dataVal = resumeDoc[kResumeTokenData];
     uassert(40647,
             str::stream()
                 << "Bad resume token: _data of missing or of wrong type. Expected string, got "
                 << resumeDoc.toString(),
             dataVal.getType() == BSONType::string);
     _hexKeyString = dataVal.getString();
-    _typeBits = resumeDoc[kTypeBitsFieldName];
+    _typeBits = resumeDoc[kResumeTokenTypeBits];
     uassert(40648,
             str::stream() << "Bad resume token: _typeBits of wrong type " << resumeDoc.toString(),
             _typeBits.missing() ||

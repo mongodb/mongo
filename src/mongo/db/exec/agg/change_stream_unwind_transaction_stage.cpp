@@ -8,6 +8,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_reordering.h"
+#include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
@@ -18,6 +19,8 @@
 #include <string_view>
 
 namespace mongo {
+using FieldAccessors = change_stream::HashedFieldAccessors;
+
 using namespace std::literals::string_view_literals;
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamUnwindTransactionToStageFn(
@@ -115,21 +118,23 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
     }
 }
 
-
 bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document& doc) {
-    auto op = doc[repl::OplogEntry::kOpTypeFieldName];
+    auto op = doc[FieldAccessors::kOpType];
     auto opType = idl::deserialize<repl::OpTypeEnum>(op.getStringData(),
                                                      IDLParserContext("ChangeStreamEntry.op"));
 
     if (opType != repl::OpTypeEnum::kCommand) {
+        // Hot path.
         return false;
     }
 
-    auto commandVal = doc["o"sv];
+    // Cold path.
+    auto commandVal = doc[FieldAccessors::kObject];
     if (commandVal["applyOps"sv].missing() && commandVal["commitTransaction"sv].missing()) {
         // We should never see an "abortTransaction" command at this point.
         tassert(5543802,
-                str::stream() << "Unexpected op at " << doc["ts"sv].getTimestamp().toString(),
+                str::stream() << "Unexpected op at "
+                              << doc[FieldAccessors::kTimestamp].getTimestamp().toString(),
                 commandVal["abortTransaction"sv].missing());
         return false;
     }
@@ -180,12 +185,12 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
                                                       << input[repl::OpTime::kTermFieldName]));
     _clusterTime = txnOpTime.getTimestamp();
 
-    Value wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
+    Value wallTime = input[FieldAccessors::kWallClockTime];
     DocumentSourceChangeStream::checkValueType(
         wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
     _wallTime = wallTime.getDate();
 
-    auto commandObj = input["o"sv].getDocument();
+    auto commandObj = input[FieldAccessors::kObject].getDocument();
     Value applyOps = commandObj["applyOps"sv];
 
     if (!applyOps.missing()) {
@@ -203,7 +208,8 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         // the transaction, but this entry does not have any updates in it, so we do not include
         // it in the '_txnOplogEntries' stack.
         tassert(5543803,
-                str::stream() << "Unexpected op at " << input["ts"sv].getTimestamp().toString(),
+                str::stream() << "Unexpected op at "
+                              << input[FieldAccessors::kTimestamp].getTimestamp().toString(),
                 !commandObj["commitTransaction"].missing());
 
         if (auto commitTimestamp = commandObj["commitTimestamp"]; !commitTimestamp.missing()) {
@@ -314,7 +320,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::getNextTransactionOp(
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::
     _assertExpectedTransactionEventFormat(const Document& doc) const {
-    Value op = doc["op"sv];
+    Value op = doc[FieldAccessors::kOpType];
     tassert(5543808,
             str::stream() << "Unexpected format for entry within a transaction oplog entry: "
                              "'op' field was type "
@@ -397,7 +403,7 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedName
     const auto dbCmdNs = NamespaceStringUtil::deserialize(boost::none /* tenantId */,
                                                           doc["ns"sv].getStringData(),
                                                           SerializationContext::stateDefault());
-    if (doc["op"sv].getStringData() != "c"sv) {
+    if (doc[FieldAccessors::kOpType].getStringData() != "c"sv) {
         _affectedNamespaces.insert(dbCmdNs);
         return;
     }
@@ -406,7 +412,7 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedName
     // Creating databases, dropping collections, databases or indexes are not supported. Neither are
     // renaming nor collMod operations.
     constexpr std::array<std::string_view, 2> kCollectionField = {"create"sv, "createIndexes"sv};
-    const Document& object = doc["o"sv].getDocument();
+    const Document& object = doc[FieldAccessors::kObject].getDocument();
     for (const auto& fieldName : kCollectionField) {
         const auto field = object[fieldName];
         if (field.getType() == BSONType::string) {

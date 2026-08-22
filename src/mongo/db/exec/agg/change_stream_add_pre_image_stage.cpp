@@ -4,7 +4,9 @@
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -12,6 +14,7 @@
 #include <string_view>
 
 namespace mongo {
+using FieldAccessors = change_stream::HashedFieldAccessors;
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPreImageToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -47,7 +50,7 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     }
 
     // If this is not an update, replace or delete, then just pass along the result.
-    const auto opType = input.getDocument()[DocumentSourceChangeStream::kOperationTypeField];
+    const auto opType = input.getDocument()[FieldAccessors::kOperationType];
     DocumentSourceChangeStream::checkValueType(
         opType, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (auto opTypeValue = opType.getStringData();
@@ -57,8 +60,7 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
         return input;
     }
 
-    auto preImageId =
-        input.getDocument()[DocumentSourceChangeStreamAddPreImage::kPreImageIdFieldName];
+    auto preImageId = input.getDocument()[FieldAccessors::kPreImageId];
     tassert(6091900, "Pre-image id field is missing", !preImageId.missing());
     tassert(5868900,
             "Expected pre-image id field to be a document",
@@ -86,10 +88,14 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
 }
 
 std::string ChangeStreamAddPreImageStage::makePreImageNotFoundErrorMsg(const Document& event) {
-    auto errMsgDoc = Document{{"operationType", event["operationType"]},
-                              {"ns", event["ns"]},
-                              {"clusterTime", event["clusterTime"]},
-                              {"txnNumber", event["txnNumber"]}};
+    auto errMsgDoc = Document{{DocumentSourceChangeStream::kOperationTypeField,
+                               event[DocumentSourceChangeStream::kOperationTypeField]},
+                              {DocumentSourceChangeStream::kNamespaceField,
+                               event[DocumentSourceChangeStream::kNamespaceField]},
+                              {DocumentSourceChangeStream::kClusterTimeField,
+                               event[DocumentSourceChangeStream::kClusterTimeField]},
+                              {DocumentSourceChangeStream::kTxnNumberField,
+                               event[DocumentSourceChangeStream::kTxnNumberField]}};
     return errMsgDoc.toString();
 }
 
@@ -107,7 +113,7 @@ boost::optional<Document> ChangeStreamAddPreImageStage::lookupPreImage(
     }
 
     // Return "preImage" field value from the document.
-    auto preImageField = lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName);
+    auto preImageField = lookedUpDoc->getField(FieldAccessors::kPreImage);
     tassert(
         6148000, "Pre-image document must contain the 'preImage' field", !preImageField.nullish());
     return preImageField.getDocument().getOwned();

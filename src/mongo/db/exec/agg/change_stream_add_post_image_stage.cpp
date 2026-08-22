@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
+#include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
@@ -12,6 +13,8 @@
 #include <string_view>
 
 namespace mongo {
+using FieldAccessors = change_stream::HashedFieldAccessors;
+
 namespace exec::agg {
 using namespace std::literals::string_view_literals;
 
@@ -19,16 +22,23 @@ namespace {
 constexpr auto makePostImageNotFoundErrorMsg =
     &ChangeStreamAddPreImageStage::makePreImageNotFoundErrorMsg;
 
-Value assertFieldHasType(const Document& fullDoc,
-                         std::string_view fieldName,
-                         BSONType expectedType) {
+template <typename T>
+Value assertFieldHasType(const Document& fullDoc, T fieldName, BSONType expectedType) {
     auto val = fullDoc[fieldName];
-    uassert(40578,
-            str::stream() << "failed to look up post image after change: expected \"" << fieldName
-                          << "\" field to have type " << typeName(expectedType)
-                          << ", instead found type " << typeName(val.getType()) << ": "
-                          << val.toString() << ", full object: " << fullDoc.toString(),
-            val.getType() == expectedType);
+    uassert(
+        40578,
+        str::stream() << "failed to look up post image after change: expected \""
+                      << [](T fieldName) -> std::string_view {
+            if constexpr (std::is_same_v<T, HashedFieldName>) {
+                return fieldName.key();
+            } else {
+                return fieldName;
+            }
+        }(fieldName)
+            << "\" field to have type " << typeName(expectedType) << ", instead found type "
+            << typeName(val.getType()) << ": " << val.toString()
+            << ", full object: " << fullDoc.toString(),
+        val.getType() == expectedType);
     return val;
 }
 }  // namespace
@@ -44,8 +54,8 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
     if (!input.isAdvanced()) {
         return input;
     }
-    auto opTypeVal = assertFieldHasType(
-        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
+    auto opTypeVal =
+        assertFieldHasType(input.getDocument(), FieldAccessors::kOperationType, BSONType::string);
     if (opTypeVal.getStringData() != DocumentSourceChangeStream::kUpdateOpType) {
         return input;
     }
