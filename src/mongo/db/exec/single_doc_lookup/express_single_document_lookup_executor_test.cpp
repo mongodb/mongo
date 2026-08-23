@@ -18,6 +18,7 @@
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -86,6 +87,31 @@ protected:
             operationContext(),
             CollectionAcquisitionRequest::fromOpCtx(
                 operationContext(), kTestNss, AcquisitionPrerequisites::OperationType::kWrite),
+            MODE_IX);
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), docs));
+        wuow.commit();
+    }
+
+    void createClusteredCollection(const NamespaceString& nss) {
+        CollectionOptions opts;
+        opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, opts));
+    }
+
+    void createClusteredCollectionWithCaseInsensitiveCollation(const NamespaceString& nss) {
+        CollectionOptions opts;
+        opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        opts.collation = BSON("locale" << "en" << "strength" << 2);
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, opts));
+    }
+
+    void insertInto(const NamespaceString& nss, BSONObj doc) {
+        std::vector<BSONObj> docs{doc};
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), nss, AcquisitionPrerequisites::OperationType::kWrite),
             MODE_IX);
         WriteUnitOfWork wuow{operationContext()};
         ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), docs));
@@ -293,6 +319,83 @@ TEST_F(ExpressLookupTest, IdLookupUsesCollectionDefaultCollation) {
                            boost::none,
                            Document{{"_id", "ABC"sv}},
                            boost::none);
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << "abc"));
+}
+
+// --- Clustered collections ---------------------------------------------------------------------
+//
+// Mirrors sbe_single_document_lookup_executor_test.cpp's clustered-collection coverage
+// (ClusteredScalarIdEngagesSlotBinder / ClusteredCompoundIdEngagesSlotBinder /
+// NonSimpleCollationDeclinesClusteredFastPath): the Express executor independently implements its
+// own clustered path (isClusteredOnId branch in makeExpressExecutor), so it needs its own coverage
+// rather than relying on the SBE executor's.
+
+TEST_F(ExpressLookupTest, ClusteredScalarIdFindsExistingDocument) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "express_clustered");
+    createClusteredCollection(nss);
+    insertInto(nss, BSON("_id" << 1 << "value" << "hello"));
+
+    ExpressSingleDocumentLookupExecutor exec(std::make_unique<OnDemandCollectionAcquirer>(),
+                                             MockLocalLookupEligibility::makeAlwaysLocal());
+    auto result =
+        exec.performLookup(make_intrusive<ExpressionContextForTest>(operationContext(), nss),
+                           nss,
+                           boost::none,
+                           Document{{"_id", 1}},
+                           boost::none);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << 1 << "value" << "hello"));
+}
+
+// Clustered collection with a compound BSON _id, mimicking config.system.preimages's shape
+// (ChangeStreamPreImageId: nsUUID + ts + applyOpsIndex), the same shape exercised by the SBE
+// executor's ClusteredCompoundIdEngagesSlotBinder.
+TEST_F(ExpressLookupTest, ClusteredCompoundIdFindsExistingDocument) {
+    const auto nss =
+        NamespaceString::createNamespaceString_forTest("test", "express_clustered_compound");
+    createClusteredCollection(nss);
+
+    auto uuidA = UUID::gen();
+    auto id1 = BSON("nsUUID" << uuidA.toBSON().firstElement() << "ts" << Timestamp(100, 1)
+                             << "applyOpsIndex" << 0);
+    auto id2 = BSON("nsUUID" << uuidA.toBSON().firstElement() << "ts" << Timestamp(101, 1)
+                             << "applyOpsIndex" << 0);
+    insertInto(nss, BSON("_id" << id1 << "body" << "first"));
+    insertInto(nss, BSON("_id" << id2 << "body" << "second"));
+
+    ExpressSingleDocumentLookupExecutor exec(std::make_unique<OnDemandCollectionAcquirer>(),
+                                             MockLocalLookupEligibility::makeAlwaysLocal());
+    auto expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), nss);
+
+    auto r1 = exec.performLookup(expCtx, nss, boost::none, Document{{"_id", id1}}, boost::none);
+    ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(r1.document->toBson(), BSON("_id" << id1 << "body" << "first"));
+
+    auto r2 = exec.performLookup(expCtx, nss, boost::none, Document{{"_id", id2}}, boost::none);
+    ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(r2.document->toBson(), BSON("_id" << id2 << "body" << "second"));
+}
+
+// Unlike SBE's SlotBinder::make (which declines a clustered collection with a non-simple
+// collation because its RecordId encoding can't apply collation keys), Express's
+// makeExpressExecutorForFindByClusteredId has no such decline branch: it must still return the
+// correct document under a non-simple collation on a clustered collection.
+TEST_F(ExpressLookupTest, ClusteredCollectionWithNonSimpleCollationFindsExistingDocument) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "express_clustered_ci");
+    createClusteredCollectionWithCaseInsensitiveCollation(nss);
+    insertInto(nss, BSON("_id" << "abc"));
+
+    ExpressSingleDocumentLookupExecutor exec(std::make_unique<OnDemandCollectionAcquirer>(),
+                                             MockLocalLookupEligibility::makeAlwaysLocal());
+    auto result =
+        exec.performLookup(make_intrusive<ExpressionContextForTest>(operationContext(), nss),
+                           nss,
+                           boost::none,
+                           Document{{"_id", "ABC"sv}},
+                           boost::none);
+
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
     ASSERT_BSONOBJ_EQ(result.document->toBson(), BSON("_id" << "abc"));
 }

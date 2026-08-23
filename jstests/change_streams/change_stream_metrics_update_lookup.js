@@ -47,67 +47,141 @@ function expectedEngine(isRunningOptimizedUpdateLookup) {
 }
 
 describe("change stream updateLookup single-document-lookup metrics", function () {
-    const testDB = db.getSiblingDB(jsTestName());
-    const testColl = testDB.getCollection("test");
-    let isRunningOptimizedUpdateLookup;
+    function compoundId(seed) {
+        return {nsUUID: UUID(), ts: Timestamp(seed, 1), applyOpsIndex: 0};
+    }
 
-    before(function () {
-        isRunningOptimizedUpdateLookup = FeatureFlagUtil.isEnabled(
-            testDB,
-            "ChangeStreamOptimizedUpdateLookup",
-        );
+    const configs = [
+        {name: "unclustered", collOpts: {}, presentId: "present", goneId: "gone"},
+        {
+            name: "unclustered collation",
+            collOpts: {collation: {locale: "en", strength: 2}},
+            presentId: "present",
+            goneId: "gone",
+        },
+        {
+            name: "clustered scalar _id",
+            collOpts: {clusteredIndex: {key: {_id: 1}, unique: true}},
+            presentId: 1,
+            goneId: 2,
+        },
+        {
+            name: "clustered compound _id",
+            collOpts: {clusteredIndex: {key: {_id: 1}, unique: true}},
+            presentId: compoundId(100),
+            goneId: compoundId(200),
+        },
+        {
+            name: "clustered collation",
+            collOpts: {
+                clusteredIndex: {key: {_id: 1}, unique: true},
+                collation: {locale: "en", strength: 2},
+            },
+            presentId: "present",
+            goneId: "gone",
+        },
+    ];
 
-        assertDropAndRecreateCollection(testDB, testColl.getName());
-    });
+    for (const config of configs) {
+        describe(config.name, function () {
+            const testDB = db.getSiblingDB(jsTestName() + "_" + config.name.replace(/\s+/g, "_"));
+            const testColl = testDB.getCollection("test");
+            const ns = {db: testDB.getName(), coll: testColl.getName()};
+            let isRunningOptimizedUpdateLookup;
 
-    after(function () {
-        assertDropCollection(testDB, testColl.getName());
-    });
+            before(function () {
+                isRunningOptimizedUpdateLookup = FeatureFlagUtil.isEnabled(
+                    testDB,
+                    "ChangeStreamOptimizedUpdateLookup",
+                );
+                assertDropAndRecreateCollection(testDB, testColl.getName(), config.collOpts);
+            });
 
-    beforeEach(function () {
-        assert.commandWorked(testColl.insert([{_id: "present"}, {_id: "gone"}]));
-    });
+            after(function () {
+                assert.commandWorked(testDB.dropDatabase());
+            });
 
-    afterEach(function () {
-        assert.commandWorked(testColl.deleteMany({}));
-    });
+            beforeEach(function () {
+                assert.commandWorked(
+                    testColl.insert([{_id: config.presentId}, {_id: config.goneId}]),
+                );
+            });
 
-    it("records found / notFound into the engine's single-document-lookup cell", function () {
-        const engine = expectedEngine(isRunningOptimizedUpdateLookup);
+            afterEach(function () {
+                assert.commandWorked(testColl.deleteMany({}));
+            });
 
-        const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(testDB, () => {
-            withChangeStreamTest(testDB, (cst) => {
-                const cursor = cst.startWatchingChanges({
-                    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-                    collection: testColl.getName(),
-                });
+            it("records found / notFound into the engine's single-document-lookup cell", function () {
+                const engine = expectedEngine(isRunningOptimizedUpdateLookup);
 
-                // 'present' still exists when the post-image is looked up -> recordFound.
-                assert.commandWorked(testColl.update({_id: "present"}, {$set: {v: 1}}));
+                const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                    testDB,
+                    () => {
+                        withChangeStreamTest(testDB, (cst) => {
+                            const cursor = cst.startWatchingChanges({
+                                pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+                                collection: testColl.getName(),
+                            });
 
-                // 'gone' is deleted before we drain the stream, so its update event's post-image
-                // lookup finds nothing -> recordNotFound.
-                assert.commandWorked(testColl.update({_id: "gone"}, {$set: {v: 1}}));
-                assert.commandWorked(testColl.remove({_id: "gone"}));
+                            // presentId still exists when the post-image is looked up ->
+                            // recordFound.
+                            assert.commandWorked(
+                                testColl.update({_id: config.presentId}, {$set: {v: 1}}),
+                            );
 
-                // Drain all 3 events (2 updates + 1 delete) so the server has completed both
-                // post-image lookups before we read serverStatus.
-                cst.getNextChanges(cursor, 3);
+                            // goneId is deleted before we drain the stream, so its update event's
+                            // post-image lookup finds nothing -> recordNotFound.
+                            assert.commandWorked(
+                                testColl.update({_id: config.goneId}, {$set: {v: 1}}),
+                            );
+                            assert.commandWorked(testColl.remove({_id: config.goneId}));
+
+                            // Assert on the actual event content, not just metric counts.
+                            // cst.assertNextChangesEqualWithDeploymentAwareness also drains all 3
+                            // events (2 updates + 1 delete) so the server has completed both
+                            // post-image lookups before we read serverStatus below.
+                            // Sharded topologies don't guarantee cross-shard event order matches
+                            // client issue order (e.g. a transaction-wrapping passthrough can
+                            // retry one op past a sibling op's commit on StaleConfig), so this
+                            // compares the batch of events as an unordered set there.
+                            cst.assertNextChangesEqualWithDeploymentAwareness({
+                                cursor,
+                                expectedChanges: [
+                                    {
+                                        operationType: "update",
+                                        ns,
+                                        documentKey: {_id: config.presentId},
+                                        fullDocument: {_id: config.presentId, v: 1},
+                                    },
+                                    {
+                                        operationType: "update",
+                                        ns,
+                                        documentKey: {_id: config.goneId},
+                                        fullDocument: null,
+                                    },
+                                    {
+                                        operationType: "delete",
+                                        ns,
+                                        documentKey: {_id: config.goneId},
+                                    },
+                                ],
+                            });
+                        });
+                    },
+                );
+
+                const lookup = delta.changeStreams.updateLookup[engine];
+                assert.eq(lookup.found, 1, {lookup});
+                assert.eq(lookup.notFound, 1, {lookup});
+
+                // Since there are no migrations, the primary executor should always succeed.
+                assert.eq(lookup.notHandled, 0, {lookup});
+
+                // Both lookups (found + notFound) recorded a latency observation.
+                // 'latencyMicros' is a histogram; 'totalCount' is its number of recorded
+                // observations.
+                assert.gt(lookup.latencyMicros.totalCount, 0, {lookup});
             });
         });
-
-        const lookup = delta.changeStreams.updateLookup[engine];
-        assert.eq(lookup.found, 1, {lookup});
-        assert.eq(lookup.notFound, 1, {lookup});
-
-        // Since there are no migration, the primary executor should always succeed.
-        assert.eq(lookup.notHandled, 0, {lookup});
-
-        // Two update events → exactly 2 post-image lookups total.
-        assert.eq(lookup.found + lookup.notFound + lookup.notHandled, 2, {lookup});
-
-        // Both lookups (found + notFound) recorded a latency observation. 'latencyMicros' is a
-        // histogram; 'totalCount' is its number of recorded observations.
-        assert.gt(lookup.latencyMicros.totalCount, 0, {lookup});
-    });
+    }
 });

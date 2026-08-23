@@ -80,6 +80,8 @@ last-continuous:
       ticket: SERVER-131544
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-133661
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
@@ -114,6 +116,8 @@ last-continuous:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-133661
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
@@ -131,6 +135,8 @@ last-lts:
       ticket: SERVER-132414
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-133661
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
@@ -165,6 +171,8 @@ last-lts:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-133661
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js

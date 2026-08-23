@@ -23,6 +23,7 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
@@ -122,18 +123,11 @@ SbeSingleDocumentLookupExecutor::SlotBinder::make(const stage_builder::PlanStage
             return boost::none;
         }
 
-        // A non-simple collation on the clustered key means record_id_helpers::keyForElem below
-        // would encode raw bytes rather than collation keys, producing wrong seek bounds for
-        // string _ids. Decline so the caller falls back, which builds bounds through the
-        // collation-aware path.
-        if (staticData.ccCollator) {
-            return boost::none;
-        }
-
         return SlotBinder{
             .kind = Kind::kClusteredRecordIdPair,
             .slotA = *info.minRecord,
             .slotB = *info.maxRecord,
+            .collator = staticData.ccCollator.get(),
         };
     }
 
@@ -152,8 +146,8 @@ SbeSingleDocumentLookupExecutor::SlotBinder::make(const stage_builder::PlanStage
     const auto& single =
         std::get<stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(info.slots.slots);
 
-    auto keyField = info.index.keyPattern.firstElement().fieldNameStringData();
-    if (keyField != "_id"sv) {
+    // Ensure we are using '_id_' index, as only in this case can we rebind with the right value.
+    if (!IndexDescriptor::isIdIndexPattern(info.index.keyPattern)) {
         return boost::none;
     }
 
@@ -204,9 +198,19 @@ bool SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem
             return true;
         }
         case Kind::kClusteredRecordIdPair: {
-            // record_id_helpers::keyForElem handles both scalar and compound BSON _id (e.g.
-            // ChangeStreamPreImageId). For a point seek the min and max RecordIds are equal.
-            auto rid = record_id_helpers::keyForElem(idElem);
+            // record_id_helpers::keyForElem handles both scalar and compound BSON _id. For a point
+            // seek the min and max RecordIds are equal.
+            //
+            // Mirrors record_id_helpers::keyForDoc's insert-time encoding: when the collection has
+            // a non-simple collation, the on-disk RecordId was built from the collation comparison
+            // key, not the raw value, so the seek key must be transformed the same way to match.
+            BSONElement seekElem = idElem;
+            BSONObjBuilder collationKeyBob;
+            if (collator) {
+                CollationIndexKey::collationAwareIndexKeyAppend(idElem, collator, &collationKeyBob);
+                seekElem = collationKeyBob.done().firstElement();
+            }
+            auto rid = record_id_helpers::keyForElem(seekElem);
             auto [minTag, minVal] = sbe::value::makeCopyRecordId(rid);
             env->resetSlot(slotA, minTag, minVal, /*owned=*/true);
             auto [maxTag, maxVal] = sbe::value::makeCopyRecordId(rid);
@@ -255,6 +259,21 @@ SbeSingleDocumentLookupExecutor::PreparedExecutor::make(OperationContext* opCtx,
         plannerParams.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
         plannerParams.shardKey = coll.getCollectionPtr().getShardKeyPattern().toBSON();
     }
+
+    if (plannerParams.clusteredInfo) {
+        // Clustered collection can perform lookup via a bounded collection scan, without any index.
+        // Don't offer secondary indexes (e.g. an "_id_hashed" index built to support hashed
+        // sharding on this collection) as planning candidates.
+        plannerParams.mainCollectionInfo.indexes.clear();
+    } else {
+        // A non-clustered collection sharded with {_id: "hashed"} carries both the real ascending
+        // "_id_" index and a secondary "_id_hashed" index. Ensure the candidate set to contain only
+        // _id index explicitly.
+        std::erase_if(plannerParams.mainCollectionInfo.indexes, [](const IndexEntry& e) {
+            return !IndexDescriptor::isIdIndexPattern(e.keyPattern);
+        });
+    }
+
     auto solutions = uassertStatusOK(QueryPlanner::plan(*cq, plannerParams));
     if (solutions.empty()) {
         return boost::none;

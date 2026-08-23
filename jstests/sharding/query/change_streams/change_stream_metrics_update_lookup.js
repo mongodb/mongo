@@ -60,6 +60,7 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         const ul = (delta.changeStreams && delta.changeStreams.updateLookup) || {};
         const leaf = (engine, field) => (ul[engine] && ul[engine][field]) || 0;
         return {
+            primaryFound: leaf("express", "found") + leaf("sbe", "found"),
             primaryNotHandled: leaf("express", "notHandled") + leaf("sbe", "notHandled"),
             aggFound: leaf("aggregation", "found"),
             aggNotFound: leaf("aggregation", "notFound"),
@@ -98,11 +99,35 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         {name: "hashed _id", key: {_id: "hashed"}, doc: {_id: 0}, shardKeyFilter: {_id: 0}},
         {name: "range _id", key: {_id: 1}, doc: {_id: 0}, shardKeyFilter: {_id: 0}},
         {name: "range sk", key: {sk: 1}, doc: {_id: 0, sk: 0}, shardKeyFilter: {sk: 0}},
+        {
+            name: "range _id, clustered",
+            key: {_id: 1},
+            doc: {_id: 0},
+            shardKeyFilter: {_id: 0},
+            clustered: true,
+        },
+        {
+            name: "hashed _id, clustered",
+            key: {_id: "hashed"},
+            doc: {_id: 0},
+            shardKeyFilter: {_id: 0},
+            clustered: true,
+        },
     ];
 
-    // Shards 'collName' on 'key' as a single chunk on shard0 and returns the collection.
-    function shardedCollectionOnShard0(collName, key) {
+    // Shards 'collName' on 'key' and returns the collection. Range keys start as a single chunk on
+    // shard0; hashed keys are initially distributed, so callers normalize the document's chunk with
+    // ensureStartsOnShard0(). When 'clustered' is true, create the collection with a clustered _id
+    // index first to exercise the clustered updateLookup path under the same relocation scenarios.
+    function shardedCollectionOnShard0(collName, key, clustered = false) {
         const coll = mongosDB.getCollection(collName);
+        if (clustered) {
+            assert.commandWorked(
+                mongosDB.createCollection(collName, {
+                    clusteredIndex: {key: {_id: 1}, unique: true},
+                }),
+            );
+        }
         const cmd = {shardCollection: coll.getFullName(), key};
         // Hashed sharding otherwise pre-splits into several chunks spread across all shards; pin it
         // to a single chunk so the doc starts on shard0 (range keys already start as one chunk).
@@ -111,6 +136,19 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         }
         assert.commandWorked(mongosDB.adminCommand(cmd));
         return coll;
+    }
+
+    // Hashed shard keys presplit into one chunk per shard, with shard assignment shuffled at
+    // collection-creation time ignoring numInitialChunks entirely. Ensure shard0 is responsible for
+    // data falling under 'shardKeyFilter'.
+    function ensureStartsOnShard0(coll, shardKeyFilter) {
+        assert.commandWorked(
+            mongosDB.adminCommand({
+                moveChunk: coll.getFullName(),
+                find: shardKeyFilter,
+                to: st.shard0.shardName,
+            }),
+        );
     }
 
     // Asserts (retrying, so the donor's asynchronous range deletion / cleanup can finish) that the
@@ -146,8 +184,9 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
     for (const watchMode of Object.values(ChangeStreamWatchMode)) {
         for (const config of shardKeyConfigs) {
             it(`moveChunk relocates the post-image [${watchModeToString(watchMode)}][${config.name}]: primary declines, aggregation finds it`, function () {
-                const coll = shardedCollectionOnShard0("moveChunk", config.key);
+                const coll = shardedCollectionOnShard0("moveChunk", config.key, config.clustered);
                 assert.commandWorked(coll.insert(config.doc));
+                ensureStartsOnShard0(coll, config.shardKeyFilter);
 
                 assertUpdateLookupViaAggregate(
                     {watchMode, coll, expectFound: true},
@@ -180,8 +219,13 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
             });
 
             it(`reshardCollection relocates the post-image [${watchModeToString(watchMode)}][${config.name}]: primary declines, aggregation finds it`, function () {
-                const coll = shardedCollectionOnShard0("reshardCollection", config.key);
+                const coll = shardedCollectionOnShard0(
+                    "reshardCollection",
+                    config.key,
+                    config.clustered,
+                );
                 assert.commandWorked(coll.insert({...config.doc, rk: 0}));
+                ensureStartsOnShard0(coll, config.shardKeyFilter);
 
                 assertUpdateLookupViaAggregate(
                     {watchMode, coll, expectFound: true},
@@ -220,8 +264,13 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
             });
 
             it(`deleted post-image after relocation routes to aggregation.notFound [${watchModeToString(watchMode)}][${config.name}]`, function () {
-                const coll = shardedCollectionOnShard0("deletedPostImage", config.key);
+                const coll = shardedCollectionOnShard0(
+                    "deletedPostImage",
+                    config.key,
+                    config.clustered,
+                );
                 assert.commandWorked(coll.insert(config.doc));
+                ensureStartsOnShard0(coll, config.shardKeyFilter);
 
                 assertUpdateLookupViaAggregate(
                     {watchMode, coll, expectFound: false},
@@ -260,6 +309,43 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                         });
                     },
                 );
+            });
+
+            // Test the successful case of finding the post-image as expected in various configurations.
+            it(`updateLookup resolves the post-image locally without relocation [${watchModeToString(watchMode)}][${config.name}]`, function () {
+                const coll = shardedCollectionOnShard0(
+                    "noRelocation",
+                    config.key,
+                    config.clustered,
+                );
+                assert.commandWorked(coll.insert(config.doc));
+
+                const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                    mongosDB,
+                    () => {
+                        withUpdateLookupStream(watchMode, coll, (cst, cursor) => {
+                            assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
+
+                            cst.assertNextChangesEqual({
+                                cursor,
+                                expectedChanges: [
+                                    {
+                                        operationType: "update",
+                                        ns: {db: mongosDB.getName(), coll: coll.getName()},
+                                        documentKey: config.doc,
+                                        fullDocument: {...config.doc, v: 1},
+                                    },
+                                ],
+                            });
+                        });
+                    },
+                );
+
+                const observed = readUpdateLookupDelta(delta);
+                assert.eq(observed.primaryFound, 1, {observed, delta});
+                assert.eq(observed.primaryNotHandled, 0, {observed, delta});
+                assert.eq(observed.aggFound, 0, {observed, delta});
+                assert.eq(observed.aggNotFound, 0, {observed, delta});
             });
         }
 
