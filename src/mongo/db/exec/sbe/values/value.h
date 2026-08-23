@@ -526,8 +526,7 @@ static_assert(sizeof(TagValueView) <= 16);
 class TagValueOwned {
 public:
     static TagValueOwned fromRaw(std::pair<TypeTags, Value> tv) {
-        auto [t, v] = tv;
-        return TagValueOwned(t, v);
+        return TagValueOwned(tv.first, tv.second);
     }
 
     static TagValueOwned fromRaw(TypeTags t, Value v) {
@@ -619,12 +618,6 @@ public:
 private:
     MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(TypeTags tag, Value value)
         : _tag(tag), _value(value) {}
-
-    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(bool owned, TypeTags tag, Value value)
-        : TagValueOwned(owned ? tag : TypeTags::Nothing, owned ? value : 0) {}
-
-    MONGO_COMPILER_ALWAYS_INLINE TagValueOwned(std::pair<TypeTags, Value> tv)
-        : TagValueOwned(tv.first, tv.second) {}
 
     void release() {
         releaseValue(_tag, _value);
