@@ -295,6 +295,19 @@ function testEof() {
     });
 }
 
+function testTailableCollScan() {
+    // Tailable collscans never reach permanent EOF. exactCE runs plans until EOF, so without
+    // the tailable short-circuit in PlanRanker::rankPlans this explain would hang forever.
+    assert(coll.drop());
+    assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1024}));
+    assert.commandWorked(coll.insert({_id: 1, a: 1}));
+    // The explain used to force costing before SERVER-132813, otherwise there is only one plan and no need to cost.
+    // Use addOption to set just the tailable flag (not awaitData, which would block).
+    assert.commandWorked(
+        coll.explain("executionStats").find({a: 1}).addOption(DBQuery.Option.tailable).finish(),
+    );
+}
+
 function testNodeUnsupportedByCBR() {
     assert(coll.drop());
     assert.commandWorked(coll.insert({}));
@@ -343,6 +356,8 @@ try {
     testEof();
     // Ensure that exactCE succeeds when it encounters a node not yet supported by CBR.
     testNodeUnsupportedByCBR();
+    // Ensure that exactCE does not hang on tailable collscans which never reach EOF.
+    testTailableCollScan();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
