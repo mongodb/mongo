@@ -165,7 +165,9 @@ public:
     }
 
     ~OwnedValueAccessor() override {
-        release();
+        if (_owned) {
+            releaseValue(_tag, _val);
+        }
     }
 
     // Copy and swap idiom for a single copy/move assignment operator.
@@ -248,18 +250,13 @@ public:
 
 private:
     void resetImpl(bool owned, TypeTags tag, Value val) {
-        release();
+        if (_owned) {
+            releaseValue(_tag, _val);
+        }
 
         _tag = tag;
         _val = val;
         _owned = owned;
-    }
-
-    void release() {
-        if (_owned) {
-            releaseValue(_tag, _val);
-            _owned = false;
-        }
     }
 
     bool _owned{false};
@@ -586,7 +583,9 @@ public:
     }
 
     ~BSONObjValueAccessor() override {
-        release();
+        if (_owned) {
+            releaseValue(_tag, _val);
+        }
     }
 
     // Copy and swap idiom for a single copy/move assignment operator.
