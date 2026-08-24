@@ -61,14 +61,6 @@
       # master but remains released on v9.0.)
       - jstests/with_mongot/e2e/search_internal_fields_rejected_by_external_client.js
 
-# Tests that fail only in this family: featureFlagSearchExtension on with
-# featureFlagExtensionsInsideHybridSearch off.
-- name: exclude_hybridSearch_disabled_incompatible
-  value:
-    exclude_files:
-      # TODO SERVER-132516: Re-enable test.
-      - jstests/with_mongot/e2e/search_two_cursor_memory_tracking_disabled.js
-
 - name: extension_flags_hybridSearch_disabled
   value:
     executor:
