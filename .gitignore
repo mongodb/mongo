@@ -59,6 +59,10 @@ iwyu.dat
 /src/mongo/*/*/*Debug*/
 /src/mongo/*/*Release*/
 /src/mongo/*/*/*Release*/
+
+/bazel/hermetic_container/__pycache__/
+/bazel/hermetic_container/dist/
+
 /src/ipch
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
