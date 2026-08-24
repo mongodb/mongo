@@ -267,12 +267,13 @@ Locker::~Locker() {
 }
 
 void Locker::_setClientState(ClientState newState) {
-    auto oldState = _clientState.swap(newState);
+    auto oldState = _clientState.loadRelaxed();
     if (newState == oldState) {
         return;
     }
     globalClientStateCounts.update(oldState, -1);
     globalClientStateCounts.update(newState, 1);
+    _clientState.store(newState);
 }
 
 Locker::ClientStateCounts Locker::getGlobalClientStateCounts() {

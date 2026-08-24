@@ -11,6 +11,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -23,6 +24,8 @@
 
 #include <boost/optional/optional.hpp>
 #include <boost/utility/in_place_factory.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -129,6 +132,8 @@ TEST_F(GlobalLockServerStatusSectionTest, ReportsActiveAndQueuedReaderWriterCoun
 
     auto statusOpCtx = makeOperationContext();
     const auto sectionObj = section->generateSection(statusOpCtx.get(), BSONElement{});
+
+    LOGV2(13393400, "Section object", "section"_attr = sectionObj);
 
     ASSERT_GTE(sectionObj["totalTime"].numberLong(), 0);
 
