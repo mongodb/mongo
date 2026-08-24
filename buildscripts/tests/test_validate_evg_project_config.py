@@ -88,6 +88,39 @@ class TestAuthentication(unittest.TestCase):
         )
 
 
+class TestProjectConfiguration(unittest.TestCase):
+    @mock.patch.object(
+        validate_evg_project_config, "find_evergreen_binary", return_value="evergreen"
+    )
+    @mock.patch.object(validate_evg_project_config.subprocess, "run")
+    def test_nightly_validation_includes_master_config(self, run, _find_evergreen_binary):
+        run.return_value = validate_evg_project_config.subprocess.CompletedProcess(
+            [], 0, stdout="", stderr=""
+        )
+
+        with tempfile.TemporaryDirectory() as temp:
+            auth_config = Path(temp) / "evergreen.yml"
+            auth_config.write_text("{}\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                validate_evg_project_config.main(
+                    evg_project_name=validate_evg_project_config.DEFAULT_EVG_NIGHTLY_PROJECT_NAME,
+                    evg_auth_config=str(auth_config),
+                    quiet=True,
+                )
+
+        self.assertEqual(raised.exception.code, 0)
+        validated_projects = {
+            call.args[0][call.args[0].index("--project") + 1] for call in run.call_args_list
+        }
+        self.assertEqual(
+            validated_projects,
+            {
+                validate_evg_project_config.DEFAULT_EVG_PROJECT_NAME,
+                validate_evg_project_config.DEFAULT_EVG_NIGHTLY_PROJECT_NAME,
+            },
+        )
+
+
 # 'foo' optional comma + whitespace
 
 if __name__ == "__main__":

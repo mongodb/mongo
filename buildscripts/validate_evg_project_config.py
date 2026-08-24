@@ -142,7 +142,10 @@ def main(
             subprocess.run(cmd, capture_output=True, text=True, check=True)
             sys.exit(0)
 
-    if evg_project_name == DEFAULT_EVG_PROJECT_NAME:
+    # The nightly config intentionally includes shared task definitions that are not
+    # selected by any nightly variant. Validate it alongside the master config so
+    # those warnings are only errors when a task is unused in both configurations.
+    if evg_project_name in {DEFAULT_EVG_PROJECT_NAME, DEFAULT_EVG_NIGHTLY_PROJECT_NAME}:
         evg_project_config_map[DEFAULT_EVG_PROJECT_NAME] = DEFAULT_EVG_PROJECT_CONFIG
 
     shared_evg_validate_messages = []
