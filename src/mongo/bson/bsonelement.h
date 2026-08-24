@@ -322,9 +322,6 @@ public:
 
     std::string_view fieldNameStringData() const {
         // if this dassert fails, someone passed bad arguments to the TrustedInit ctor.
-        // TODO SERVER-104907: delete this check once the 'dassert' in TrustedInitTag ctor is
-        // enabled.
-        dassert(bool(eoo()) != bool(fieldNameSize()));
         return std::string_view(fieldName(), _fieldNameSize ? _fieldNameSize - 1 : 0);
     }
 
@@ -878,8 +875,7 @@ public:
      */
     constexpr BSONElement(const char* d, int fieldNameSize, TrustedInitTag)
         : _data(d), _fieldNameSize(fieldNameSize) {
-        // TODO SERVER-104907: enable validation here once all callers have been adjusted/fixed.
-        // dassert((*d == stdx::to_underlying(BSONType::eoo)) != bool(fieldNameSize));
+        dassert((static_cast<BSONType>(*_data) == BSONType::eoo) == (_fieldNameSize == 0));
     }
 
     std::string _asCode() const;
