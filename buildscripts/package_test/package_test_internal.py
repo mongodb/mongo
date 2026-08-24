@@ -47,6 +47,9 @@ test_args = {}  # type: TestArgs
 
 SERVER_PACKAGE_RE = re.compile(r"^mongodb-(?:org|enterprise)(?:-unstable)?(?:-server)?$")
 CRYPT_V1_PACKAGE_RE = re.compile(r"^mongodb-enterprise(?:-unstable)?-crypt-v1$")
+# The ELF interpreter is reported as a DT_NEEDED entry by some Linux toolchains, but it is an
+# architecture-specific runtime component rather than a library dependency of the server binary.
+ARCHITECTURE_LOADER_RE = re.compile(r"^ld-linux-[^.]+\.so\.[0-9.]+$")
 _LOGGING_CONFIGURED = False
 
 SERVER_BINARY_NAMES = ("mongod", "mongos")
@@ -425,13 +428,15 @@ def get_expected_direct_system_libraries(package_platform: str, edition: str) ->
 
 
 def parse_readelf_dependencies(readelf_output: str) -> Set[str]:
-    """Parse the direct shared-library names from readelf's dynamic section."""
+    """Parse direct shared-library names, excluding the architecture-specific ELF interpreter."""
 
     dependencies = set()  # type: Set[str]
     for line in readelf_output.splitlines():
         match = re.search(r"Shared library: \[(?P<name>[^]]+)\]", line)
         if match:
-            dependencies.add(match.group("name"))
+            name = match.group("name")
+            if not ARCHITECTURE_LOADER_RE.match(name):
+                dependencies.add(name)
 
     return dependencies
 

@@ -107,6 +107,15 @@ class PackageTestInternalHelpersTest(unittest.TestCase):
             {"libcurl.so.4", "libc.so.6"}, under_test.parse_readelf_dependencies(readelf_output)
         )
 
+    def test_parses_readelf_direct_dependencies_without_architecture_loader(self):
+        readelf_output = """
+ 0x0000000000000001 (NEEDED)             Shared library: [ld-linux-aarch64.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld-linux-x86-64.so.2]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+"""
+
+        self.assertEqual({"libc.so.6"}, under_test.parse_readelf_dependencies(readelf_output))
+
     def test_parses_ldd_dependencies(self):
         ldd_output = """
 linux-vdso.so.1 (0x0000ffff)
