@@ -219,19 +219,26 @@ SemiFuture<void> NetworkInterfaceMock::setAlarm(const Date_t when, const Cancell
 
     lk.unlock();
 
+    // Resolve the alarm here instead of leaving it for the network thread to clean up. The network
+    // thread only advances when a test drives it, so a thread that cancels an alarm and then waits
+    // on it would block forever if the promise were resolved by runReadyNetworkOperations().
     token.onCancel().unsafeToInlineFuture().getAsync([this, id](Status status) {
         if (!status.isOK()) {
             return;
         }
 
-        std::lock_guard lk(_mutex);
-
+        std::unique_lock lk(_mutex);
         auto it = _alarmsById.find(id);
         if (it == _alarmsById.end()) {
             return;
         }
 
-        _canceledAlarms.insert(id);
+        auto alarm = std::move(it->second->second);
+        _alarms.erase(it->second);
+        _alarmsById.erase(it);
+
+        lk.unlock();
+        alarm.cancel();
     });
 
     return std::move(future).semi();
@@ -694,30 +701,9 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(std::unique_lock<st
         AlarmInfo alarm = std::move(_alarms.begin()->second);
         _alarms.erase(_alarms.begin());
         _alarmsById.erase(alarm.id);
-        auto wasCanceled = _canceledAlarms.erase(alarm.id);
-
-        // If the handle isn't canceled, then run it
-        if (!wasCanceled) {
-            lk.unlock();
-            alarm.promise.emplaceValue();
-            lk.lock();
-        } else {
-            lk.unlock();
-            alarm.cancel();
-            lk.lock();
-        }
-    }
-
-    while (!_canceledAlarms.empty()) {
-        auto id = *_canceledAlarms.begin();
-        _canceledAlarms.erase(_canceledAlarms.begin());
-        auto it = _alarmsById[id];
-        AlarmInfo alarm = std::move(it->second);
-        _alarms.erase(it);
-        _alarmsById.erase(id);
 
         lk.unlock();
-        alarm.cancel();
+        alarm.promise.emplaceValue();
         lk.lock();
     }
 
@@ -762,6 +748,7 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(std::unique_lock<st
             }
         }
     }
+
     invariant(_currentlyRunning == kNetworkThread);
     if (!(_waitingToRunMask & kExecutorThread)) {
         return;

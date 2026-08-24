@@ -533,7 +533,6 @@ private:
     // Sorted map of target to alarms, with the next alarm always first.
     std::multimap<Date_t, AlarmInfo> _alarms;                              // (M)
     stdx::unordered_map<size_t, decltype(_alarms)::iterator> _alarmsById;  // (M)
-    stdx::unordered_set<size_t> _canceledAlarms;                           // (M)
 
     // The connection hook.
     std::unique_ptr<NetworkConnectionHook> _hook;  // (R)
