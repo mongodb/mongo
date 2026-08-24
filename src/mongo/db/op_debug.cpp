@@ -231,9 +231,7 @@ void OpDebug::report(OperationContext* opCtx,
         if (iscommand) {
             const Command* curCommand = curop.getCommand();
             if (curCommand) {
-                mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
-                curCommand->snipForLogging(&cmdToLog);
-                pAttrs->add("command", redact(cmdToLog.getObject()));
+                pAttrs->add("command", redact(snipCommandForLogging(curCommand, query)));
             } else {
                 // Should not happen but we need to handle curCommand == NULL gracefully.
                 // We don't know what the request payload is intended to be, so it might be

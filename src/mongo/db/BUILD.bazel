@@ -603,6 +603,7 @@ mongo_cc_library(
         "//src/mongo/db/topology/user_write_block:replica_set_write_block_state.cpp",
     ],
     deps = [
+        ":commands",
         ":server_base",
         ":server_feature_flags",
         ":sharding_statistics",

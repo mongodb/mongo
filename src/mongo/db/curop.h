@@ -538,6 +538,17 @@ public:
                                            bool truncateOps = false);
 
     /**
+     * Appends a curated subset of this CurOp's state, intended for enriching the lock manager
+     * dump's per-holder "debugInfo" field. Includes the namespace, redacted command,
+     * planCacheShapeHash, planCacheKey, planSummary, seconds running, number of yields, and (if
+     * already collected) storage read bytes.
+     *
+     * If called from a thread other than the one executing the operation associated with this
+     * CurOp, it is necessary to lock the associated Client object before executing this method.
+     */
+    void reportDebugInfo(BSONObjBuilder* builder);
+
+    /**
      * Sets the message for FailPoints used.
      */
     void setFailPointMessage(WithLock, std::string_view message) {

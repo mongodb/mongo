@@ -5,6 +5,7 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"
@@ -60,6 +61,15 @@ std::map<LockerId, BSONObj> getLockerIdToClientMap(ServiceContext* serviceContex
             client->reportState(infoBuilder);
 
             infoBuilder.append("opid", static_cast<int>(clientOpCtx->getOpID()));
+
+            // Enrich the entry with CurOp state so that the lock manager dump is self-contained and
+            // does not require cross-referencing slow-op logs to attribute a lock holder. The
+            // Client is locked above, which is required to read the CurOp from another thread.
+            {
+                BSONObjBuilder debugInfoBuilder(infoBuilder.subobjStart("debugInfo"));
+                CurOp::get(clientOpCtx)->reportDebugInfo(&debugInfoBuilder);
+            }
+
             LockerId lockerId = shard_role_details::getLocker(clientOpCtx)->getId();
             lockToClientMap.insert({lockerId, infoBuilder.obj()});
         }

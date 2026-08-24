@@ -99,6 +99,13 @@ bool prepareForFLERewrite(OperationContext* opCtx,
                           const boost::optional<EncryptionInformation>& encryptionInformation);
 
 /**
+ * Returns a copy of 'cmdObj' with sensitive fields removed for logging, via
+ * 'command->snipForLogging()'. 'command' must be non-null. The returned object still needs to pass
+ * through redact() before being logged.
+ */
+BSONObj snipCommandForLogging(const Command* command, const BSONObj& cmdObj);
+
+/**
  * A simple set of type-erased hooks for pre and post command actions.
  *
  * These hooks will only run on external requests that form CommandInvocations (a.k.a. OP_MSG
