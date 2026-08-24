@@ -493,6 +493,8 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 }),
             );
 
+            st.awaitReplicationOnShards();
+
             {
                 const globalMeta = getGlobalCatalogCollMetadata(ns2);
                 const allGlobalChunks = getAllGlobalCatalogChunks(globalMeta.uuid);
