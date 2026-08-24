@@ -594,6 +594,19 @@ class MongodLauncher(object):
         if "orphanCleanupDelaySecs" not in suite_set_parameters:
             suite_set_parameters["orphanCleanupDelaySecs"] = 1
 
+        # migrationRecipientPITHistoryToPreserveInSecs controls the PIT history window preserved by
+        # chunk migrations in tests. In production, this is controlled directly by the server
+        # parameter minSnapshotHistoryWindowInSeconds.
+        #
+        # If a chunk migration moves a chunk back to one of its original shards after the chunk has
+        # been split, the migration may break point-in-time snapshot access for the portion of the
+        # split chunk left behind. To preserve snapshot accessibility, the migration is rejected when
+        # this condition is detected. The snapshot window preserved by chunk migrations is controlled
+        # by migrationRecipientPITHistoryToPreserveInSecs in tests and by minSnapshotHistoryWindowInSeconds
+        # in production.
+        if "migrationRecipientPITHistoryToPreserveInSecs" not in suite_set_parameters:
+            suite_set_parameters["migrationRecipientPITHistoryToPreserveInSecs"] = 1
+
         # Increase the default config server command timeout to 5 minutes to avoid spurious
         # failures on slow machines.
         if "defaultConfigCommandTimeoutMS" not in suite_set_parameters:
