@@ -196,6 +196,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             hookmgr = wthooks.WiredTigerHookManager()
         WiredTigerTestCase._hookmgr = hookmgr
         WiredTigerTestCase.hook_names = hookmgr.get_hook_names()
+        WiredTigerTestCase.hook_specs = hookmgr.get_hook_specs()
 
         WiredTigerTestCase.setupTestDir(parentTestDir, preserveFiles, removeAtStart, useTimestamp)
         WiredTigerTestCase.setupIO('results.txt', ignoreStdout, printOutput, verbose)

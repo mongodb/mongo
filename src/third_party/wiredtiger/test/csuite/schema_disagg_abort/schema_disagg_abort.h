@@ -45,16 +45,17 @@
 #include "test_util.h"
 
 /* Tunables. */
-#define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
-#define INSERT_ODDS 64  /* generate an insert: 1 in N visits to a published slot */
+
 /*
- * Generate a drop: 1 in N visits to a published slot. It is the dwell in the published state, so it
- * governs how much data a table accumulates before it is dropped - keep it well above INSERT_ODDS
- * or tables are dropped empty and the verifier has nothing to check.
+ * Generator parameters.
  */
-#define DROP_ODDS 48
-#define GEN_APPLY_RATE_FLOOR 30 /* generator: applied values/second, the multi-node worst case */
-#define GEN_LEAD_MIN 64         /* generator: lead floor, so the workers stay fed */
+#define GEN_INSERT_ODDS 64         /* an insert: 1 in N visits to a published slot */
+#define GEN_DROP_ODDS 48           /* a drop: 1 in N visits to a published slot */
+#define GEN_APPLY_RATE_FLOOR 30    /* applied values/second, the multi-node worst case */
+#define GEN_MIN_LEAD 64            /* lead floor, so the workers stay fed */
+#define GEN_STEPDOWN_MIN_EVENTS 64 /* minimum events a lone node emits during stepdown */
+
+#define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
 #define SCHEMA_EPOCH_BOOTSTRAP 1
 #define MAX_NODES 2
 /*
@@ -106,6 +107,17 @@
 
 /* Connection config. */
 #define ENV_CONFIG_DEF "create,statistics=(all),statistics_log=(json,on_close,wait=1)"
+
+/* Timestamp fields accepted by query_ts and set_ts. */
+#define TS_OLDEST 0x01u
+#define TS_STABLE 0x02u
+#define TS_STABLE_SCHEMA_EPOCH 0x04u
+#define TS_STEPDOWN_TIMESTAMP 0x08u
+#define TS_STEPDOWN_SCHEMA_EPOCH 0x10u
+#define TS_LAST_SCHEMA_EPOCH 0x20u
+#define TS_LAST_CHECKPOINT 0x40u
+#define TS_FRONTIER (TS_OLDEST | TS_STABLE | TS_STABLE_SCHEMA_EPOCH)
+#define TS_STEPDOWN (TS_STEPDOWN_TIMESTAMP | TS_STEPDOWN_SCHEMA_EPOCH)
 
 /* Which process this instance of the binary is. */
 typedef enum { ROLE_PARENT = 0, ROLE_NODE } TEST_ROLE;
@@ -279,9 +291,8 @@ typedef struct {
 
 /* main.c */
 void println(const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
-uint64_t query_ts(WT_CONNECTION *conn, const char *name);
-void set_stepdown_ts(WT_CONNECTION *conn, uint64_t ts);
-void set_frontier(WT_CONNECTION *conn, uint64_t ts);
+uint64_t query_ts(WT_CONNECTION *conn, uint8_t bit);
+void set_ts(WT_CONNECTION *conn, uint8_t mask, uint64_t ts);
 void adopted_lsn_publish(uint32_t node_id, uint64_t lsn);
 uint64_t adopted_lsn_read(void);
 
@@ -294,6 +305,7 @@ void parent_main(TEST_CONFIG *cfg, const char *self_path);
  */
 int node_main(TEST_CONFIG *cfg);
 const NODE_ROLE *node_role(bool leads);
+bool node_is_lone(const TEST_CONFIG *cfg);
 void disagg_opts_init(const TEST_CONFIG *cfg);
 bool node_switch_request_consume(void);
 bool workload_active(WORKLOAD_STATE *state, uint32_t stage);

@@ -34,35 +34,6 @@ ckpt_latest(WORKLOAD_STATE *state, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *arg
 
     return (ret != WT_NOTFOUND);
 }
-
-/*
- * ckpt_pick_up --
- *     Pick up the latest complete checkpoint onto this connection. Returns true if a checkpoint was
- *     adopted, false if the page log has no new checkpoint.
- */
-static bool
-ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session)
-{
-    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
-
-    if (!ckpt_latest(state, &ckpt_args))
-        return (false);
-
-    if (ckpt_args.checkpoint_lsn == state->adopted_ckpt_lsn) {
-        free(ckpt_args.checkpoint_metadata.mem);
-        return (false);
-    }
-
-    WT_CONNECTION *conn = session->connection;
-    char meta_config[4096];
-    testutil_snprintf(meta_config, sizeof(meta_config), "disaggregated=(checkpoint_meta=\"%.*s\")",
-      (int)ckpt_args.checkpoint_metadata.size, (const char *)ckpt_args.checkpoint_metadata.data);
-    testutil_check(conn->reconfigure(conn, meta_config));
-    free(ckpt_args.checkpoint_metadata.mem);
-    state->adopted_ckpt_lsn = ckpt_args.checkpoint_lsn;
-    return (true);
-}
-
 /*
  * ckpt_lsn_stat --
  *     Return one of the connection's checkpoint metadata LSN statistics.
@@ -84,25 +55,35 @@ ckpt_lsn_stat(WT_SESSION *session, int stat_key)
 }
 
 /*
- * ckpt_adopt_latest --
- *     Adopt the latest checkpoint before stepping up. A pick-up can be deferred, and stepping up
- *     discards a pending deferral, so wait for the adopted LSN to catch up with the delivered one.
+ * ckpt_pick_up --
+ *     Pick up and adopt the latest complete checkpoint onto this connection. Returns true once a
+ *     new checkpoint is adopted, false if the page log has no new checkpoint.
  */
-void
-ckpt_adopt_latest(WORKLOAD_STATE *state)
+static bool
+ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session)
 {
-    WT_CONNECTION *conn = state->conn;
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
 
-    WT_SESSION *session;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    if (!ckpt_latest(state, &ckpt_args))
+        return (false);
+
+    if (ckpt_args.checkpoint_lsn == state->adopted_ckpt_lsn) {
+        free(ckpt_args.checkpoint_metadata.mem);
+        return (false);
+    }
 
     struct timespec start;
     __wt_epoch(NULL, &start);
-    for (;;) {
-        (void)ckpt_pick_up(state, session);
 
-        const uint64_t delivered =
-          ckpt_lsn_stat(session, WT_STAT_CONN_DISAGG_CHECKPOINT_DELIVERED_LSN);
+    WT_CONNECTION *conn = session->connection;
+    char meta_config[4096];
+    testutil_snprintf(meta_config, sizeof(meta_config), "disaggregated=(checkpoint_meta=\"%.*s\")",
+      (int)ckpt_args.checkpoint_metadata.size, (const char *)ckpt_args.checkpoint_metadata.data);
+    testutil_check(conn->reconfigure(conn, meta_config));
+    free(ckpt_args.checkpoint_metadata.mem);
+
+    const uint64_t delivered = ckpt_lsn_stat(session, WT_STAT_CONN_DISAGG_CHECKPOINT_DELIVERED_LSN);
+    for (;;) {
         const uint64_t adopted = ckpt_lsn_stat(session, WT_STAT_CONN_DISAGG_CHECKPOINT_META_LSN);
         if (adopted >= delivered)
             break;
@@ -117,9 +98,24 @@ ckpt_adopt_latest(WORKLOAD_STATE *state)
         __wt_sleep(0, 10 * WT_THOUSAND);
     }
 
-    testutil_check(session->close(session, NULL));
+    state->adopted_ckpt_lsn = ckpt_args.checkpoint_lsn;
+    return (true);
+}
 
-    println("Node %" PRIu32 ": adopted the latest checkpoint before step-up", state->cfg->node_id);
+/*
+ * ckpt_adopt_latest --
+ *     Adopt the latest checkpoint before stepping up.
+ */
+void
+ckpt_adopt_latest(WORKLOAD_STATE *state)
+{
+    WT_SESSION *session;
+    testutil_check(state->conn->open_session(state->conn, NULL, NULL, &session));
+    const bool adopted = ckpt_pick_up(state, session);
+    testutil_check(session->close(session, NULL));
+    if (adopted)
+        println(
+          "Node %" PRIu32 ": adopted the latest checkpoint before step-up", state->cfg->node_id);
 }
 
 /*
@@ -142,7 +138,7 @@ thread_ckpt_run(void *arg)
     /* The cadence draws from the stream one past the generator's per-worker streams. */
     WT_RAND_STATE *rnd = &state->gen_rnd[state->nth_workers];
     struct timespec last = ckpt.phase_start;
-    uint64_t wait = __wt_random(rnd) % MAX_CKPT_INVL;
+    uint64_t wait = 1 + __wt_random(rnd) % MAX_CKPT_INVL;
 
     while (workload_active(state, STAGE_CKPT)) {
         struct timespec now;
@@ -155,7 +151,7 @@ thread_ckpt_run(void *arg)
         node_role(state->leads)->checkpoint(state, session, &ckpt);
 
         __wt_epoch(NULL, &last);
-        wait = __wt_random(rnd) % MAX_CKPT_INVL;
+        wait = 1 + __wt_random(rnd) % MAX_CKPT_INVL;
     }
 
     testutil_check(session->close(session, NULL));
@@ -205,9 +201,9 @@ thread_ts_run(void *arg)
              */
             const uint64_t frontier = workers_min(state);
             if (frontier != 0) {
-                const uint64_t cur_stable = query_ts(state->conn, "stable_timestamp");
+                const uint64_t cur_stable = query_ts(state->conn, TS_STABLE);
                 if (frontier >= cur_stable)
-                    set_frontier(state->conn, frontier);
+                    set_ts(state->conn, TS_FRONTIER, frontier);
             }
         }
         __wt_atomic_store_bool(&state->ts_busy, false);
@@ -230,7 +226,7 @@ leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
         return;
 
     /* Skip the checkpoint if there is no stable timestamp yet. */
-    const uint64_t stable_ts = query_ts(state->conn, "stable_timestamp");
+    const uint64_t stable_ts = query_ts(state->conn, TS_STABLE);
     if (stable_ts == 0) {
         struct timespec now;
         __wt_epoch(NULL, &now);

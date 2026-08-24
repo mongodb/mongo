@@ -76,28 +76,30 @@ class test_compact06(compact_util):
         # Disable the background compaction server.
         self.turn_off_bg_compact()
 
-        # Background compaction should have skipped the HS file as it is less than 1MB.
-        assert self.get_bg_compaction_files_skipped() == 1
+        # Background compaction should have skipped the HS file as it is less than 1MB. The server
+        # walks the metadata once every full_iteration_wait_time, so it may have skipped the file
+        # more than once before being disabled.
+        files_skipped = self.get_bg_compaction_files_skipped()
+        self.assertGreaterEqual(files_skipped, 1)
 
-        # Enable background and configure it to run once. Don't use the helper function as the
-        # server may go to sleep before we have the time to check it is actually running.
-        self.session.compact(None, 'background=true,run_once=true')
+        # Enable background and configure it to run once.
+        self.turn_on_bg_compact('run_once=true')
 
         # Wait for background compaction to start and skip the HS file again.
-        while self.get_bg_compaction_files_skipped() == 1:
+        while self.get_bg_compaction_files_skipped() == files_skipped:
             time.sleep(1)
 
         # Ensure background compaction stops by itself.
         while self.get_bg_compaction_running():
             time.sleep(1)
 
-        # Background compact should only skip the HS file once.
-        assert self.get_bg_compaction_files_skipped() == 2
+        # A single pass should only skip the HS file once.
+        self.assertEqual(self.get_bg_compaction_files_skipped(), files_skipped + 1)
 
         # Enable the server again but with default options, the HS should be skipped.
         self.turn_on_bg_compact()
 
-        while self.get_bg_compaction_files_skipped() == 2:
+        while self.get_bg_compaction_files_skipped() == files_skipped + 1:
             time.sleep(1)
 
         self.turn_off_bg_compact()

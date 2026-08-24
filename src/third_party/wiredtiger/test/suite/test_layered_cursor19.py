@@ -41,7 +41,7 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
     table_name = test_name
     uri = 'layered:' + table_name
 
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = ',create,statistics=(all),'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
@@ -59,13 +59,13 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
     def get_conn_stat(self, session, stat_id):
         return self.get_stat(stat_id, session=session)
 
-    # Return the number of cursor opens triggered on the follower connection
-    # by running op. The stats cursor is opened and closed outside op, so
-    # its lifetime does not contribute to the delta.
-    def measure_cursor_opens(self, op):
-        before = self.get_conn_stat(self.session_follow, stat.conn.cursor_open_count)
+    # Return the number of times running op made a layered cursor open its stable constituent for
+    # the first time. This counter only moves when stable is actually opened, so an unrelated
+    # cursor opened or closed elsewhere on the connection cannot perturb the delta.
+    def measure_stable_opens(self, op):
+        before = self.get_conn_stat(self.session_follow, stat.conn.layered_curs_open_stable)
         op()
-        after = self.get_conn_stat(self.session_follow, stat.conn.cursor_open_count)
+        after = self.get_conn_stat(self.session_follow, stat.conn.layered_curs_open_stable)
         return after - before
 
     # Write a key on the leader, checkpoint, and have the follower pick it
@@ -97,11 +97,10 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(2))
 
-        delta = self.measure_cursor_opens(do_insert)
-        self.assertEqual(delta, 1,
-            "overwrite=true insert on a follower opened {} cursors, "
-            "expected 1 (ingest only); delta > 1 means the stable cursor "
-            "was opened unnecessarily".format(delta))
+        delta = self.measure_stable_opens(do_insert)
+        self.assertEqual(delta, 0,
+            "overwrite=true insert on a follower opened the stable constituent {} times, "
+            "expected 0 (ingest only)".format(delta))
 
         cursor.close()
 
@@ -129,11 +128,10 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(3))
 
-        delta = self.measure_cursor_opens(do_update)
-        self.assertEqual(delta, 1,
-            "overwrite=true update on a follower opened {} cursors, "
-            "expected 1 (ingest only); delta > 1 means the stable cursor "
-            "was opened unnecessarily".format(delta))
+        delta = self.measure_stable_opens(do_update)
+        self.assertEqual(delta, 0,
+            "overwrite=true update on a follower opened the stable constituent {} times, "
+            "expected 0 (ingest only)".format(delta))
 
         cursor.close()
 
@@ -153,10 +151,10 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(2))
 
-        delta = self.measure_cursor_opens(do_insert)
-        self.assertGreaterEqual(delta, 2,
-            "overwrite=false insert on a follower opened {} cursors, "
-            "expected at least 2 (ingest + stable)".format(delta))
+        delta = self.measure_stable_opens(do_insert)
+        self.assertGreaterEqual(delta, 1,
+            "overwrite=false insert on a follower opened the stable constituent {} times, "
+            "expected at least 1".format(delta))
 
         cursor.close()
 
@@ -177,10 +175,10 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(2))
 
-        delta = self.measure_cursor_opens(do_update)
-        self.assertGreaterEqual(delta, 2,
-            "overwrite=false update on a follower opened {} cursors, "
-            "expected at least 2 (ingest + stable)".format(delta))
+        delta = self.measure_stable_opens(do_update)
+        self.assertGreaterEqual(delta, 1,
+            "overwrite=false update on a follower opened the stable constituent {} times, "
+            "expected at least 1".format(delta))
 
         cursor.close()
 
@@ -208,11 +206,10 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(3))
 
-        delta = self.measure_cursor_opens(do_remove)
-        self.assertEqual(delta, 1,
-            "overwrite=true remove on a follower opened {} cursors, "
-            "expected 1 (ingest only); delta > 1 means the stable cursor "
-            "was opened unnecessarily".format(delta))
+        delta = self.measure_stable_opens(do_remove)
+        self.assertEqual(delta, 0,
+            "overwrite=true remove on a follower opened the stable constituent {} times, "
+            "expected 0 (ingest only)".format(delta))
 
         cursor.close()
 
@@ -263,9 +260,9 @@ class test_layered_cursor19(wttest.WiredTigerTestCase):
             self.session_follow.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(2))
 
-        delta = self.measure_cursor_opens(do_remove)
-        self.assertGreaterEqual(delta, 2,
-            "overwrite=false remove on a follower opened {} cursors, "
-            "expected at least 2 (ingest + stable)".format(delta))
+        delta = self.measure_stable_opens(do_remove)
+        self.assertGreaterEqual(delta, 1,
+            "overwrite=false remove on a follower opened the stable constituent {} times, "
+            "expected at least 1".format(delta))
 
         cursor.close()

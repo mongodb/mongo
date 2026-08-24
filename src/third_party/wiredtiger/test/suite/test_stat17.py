@@ -171,16 +171,18 @@ class test_stat17(wttest.WiredTigerTestCase):
         fast_pages = self._dsrc_stat(stat.dsrc.btree_row_leaf_pages)
         fast_avg   = self._dsrc_stat(stat.dsrc.btree_row_leaf_avg_entries)
 
-        # A handful of concurrent eviction splits between the walk snapshot and
-        # this read is expected; allow the drift to be within 2% of the count
-        # (with a small floor for tiny trees) rather than requiring exact match.
-        max_pages_drift = max(2, exact_pages // 50)
+        # Concurrent eviction splits between the walk snapshot and this read only
+        # ever add pages, so the corrected count is the floor: dropping below it
+        # means the correction was lost. The ceiling only rules out a runaway
+        # counter, so it is deliberately generous.
+        min_pages = exact_pages
+        max_pages = exact_pages + max(10, exact_pages // 4)
         exact_avg = exact_entries // exact_pages
         max_avg_drift = max(1, exact_avg // 50)
 
-        self.assertAlmostEqual(fast_pages, exact_pages, delta=max_pages_drift,
-            msg='fast read after tree-walk correction should be near %d, got %d'
-            % (exact_pages, fast_pages))
+        self.assertTrue(min_pages <= fast_pages <= max_pages,
+            f'fast pages {fast_pages} outside acceptable range '
+            f'({min_pages}-{max_pages}) after tree-walk correction')
         self.assertAlmostEqual(fast_avg, exact_avg, delta=max_avg_drift,
             msg='fast avg after tree-walk correction should be near %d, got %d'
             % (exact_avg, fast_avg))

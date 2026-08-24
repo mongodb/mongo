@@ -79,6 +79,8 @@ Options:\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -r N    | --random-sample N    randomly sort scenarios to be run, then\n\
                                  execute every Nth (2<=N<=1000) scenario.\n\
+          | --skip-report file   if every test that ran was skipped, write the reason\n\
+                                 to file. Used by run_subprocess_function.\n\
   -s N    | --scenario N         use scenario N (N can be symbolic, number, or\n\
                                  list of numbers and ranges in the form 1,3-5,7),\n\
                                  and -1 matches tests with no scenarios.\n\
@@ -342,6 +344,7 @@ if __name__ == '__main__':
     dirarg = None
     scenario = ''
     skipFileForTests = ''
+    skipReportFile = None
     verbose = 1
     args = sys.argv[1:]
     testargs = []
@@ -406,6 +409,12 @@ if __name__ == '__main__':
                     usage()
                     sys.exit(2)
                 hook_names.append(args.pop(0))
+                continue
+            if option == '-skip-report':
+                if len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                skipReportFile = args.pop(0)
                 continue
             if option == '-skip-tests-in-file' or option == 'sf':
                 if len(args) == 0:
@@ -714,6 +723,12 @@ if __name__ == '__main__':
             print(line)
     else:
         result = wttest.runsuite(tests, parallel)
+        # A caller that runs a single function in a subprocess cannot tell a skip from a pass: both
+        # exit zero, and a skipped test removes its home directory on the way out. Leave a note.
+        if skipReportFile != None and result.testsRun > 0 and \
+          len(result.skipped) == result.testsRun:
+            with open(skipReportFile, 'w') as f:
+                f.write(result.skipped[0][1].strip())
         sys.exit(0 if result.wasSuccessful() else 1)
 
     sys.exit(0)

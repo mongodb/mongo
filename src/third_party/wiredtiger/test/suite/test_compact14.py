@@ -51,7 +51,7 @@ class test_compact14(compact_util):
         self.session.checkpoint()
 
         # Enable background compaction.
-        bg_compact_config = 'background=true,free_space_target=1MB'
+        bg_compact_config = 'free_space_target=1MB'
         self.turn_on_bg_compact(bg_compact_config)
 
         while self.get_bg_compaction_files_skipped() == 0:

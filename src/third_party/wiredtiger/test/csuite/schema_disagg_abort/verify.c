@@ -206,7 +206,7 @@ check_data_rows(WT_SESSION *session, const SLOT_STATE states[MAX_POOL_SIZE], uin
 void
 verify_schema_state(WT_CONNECTION *conn, const TEST_CONFIG *cfg)
 {
-    const uint64_t durable_epoch = query_ts(conn, "last_disaggregated_schema_epoch");
+    const uint64_t durable_epoch = query_ts(conn, TS_LAST_SCHEMA_EPOCH);
     println("Schema verify: last_disaggregated_schema_epoch = %" PRIu64, durable_epoch);
     /* Nothing durable means no record is below the cutoff, so there is nothing to check. */
     if (durable_epoch == 0) {
@@ -214,7 +214,7 @@ verify_schema_state(WT_CONNECTION *conn, const TEST_CONFIG *cfg)
         return;
     }
 
-    const uint64_t last_ckpt_ts = query_ts(conn, "last_checkpoint");
+    const uint64_t last_ckpt_ts = query_ts(conn, TS_LAST_CHECKPOINT);
     println("Schema verify: last_checkpoint_timestamp = %" PRIu64, last_ckpt_ts);
 
     WT_SESSION *session;

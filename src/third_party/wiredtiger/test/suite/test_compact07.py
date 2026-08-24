@@ -103,10 +103,8 @@ class test_compact07(compact_util):
         # Enable background compaction with a threshold big enough so it does not process the first
         # table created but only the others with more empty space. We set run_once so we don't
         # conflict with foreground compaction. If the two are running in parallel, stats cannot be
-        # checked properly. Don't use the helper function as the server may go to sleep before we
-        # have the time to check it is actually running.
-        bg_compact_config = f'background=true,free_space_target={(free_space_20 + 1)}MB,run_once=true'
-        self.session.compact(None, bg_compact_config)
+        # checked properly.
+        self.turn_on_bg_compact(f'free_space_target={(free_space_20 + 1)}MB,run_once=true')
 
         # Background compaction should run through every file as listed in the metadata file.
         # Wait until all the eligible files have been compacted.

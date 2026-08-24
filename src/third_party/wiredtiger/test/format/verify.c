@@ -423,6 +423,16 @@ wts_verify(WT_CONNECTION *conn, bool mirror_check)
         return;
     }
 
+    /*
+     * A follower cannot persist layered content, only a leader checkpoint makes it durable. On
+     * reopen after a follower-only run the layered tables restart empty while any non-disaggregated
+     * mirror keeps its locally checkpointed rows, so the mirrors legitimately diverge.
+     */
+    if (g.reopen && g.disagg_storage_config && !g.disagg_leader && !disagg_is_mode_switch()) {
+        WARN("%s", "skipping mirror verify on reopen after a follower-only run");
+        return;
+    }
+
     for (i = 1; i <= ntables; ++i)
         if (tables[i]->mirror && tables[i] != g.base_mirror)
             table_verify_mirror(conn, g.base_mirror, tables[i], NULL, NULL);

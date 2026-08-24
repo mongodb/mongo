@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import signal
 import wttest, wiredtiger
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
@@ -89,8 +90,9 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
 
         subdir = f'SUBPROCESS_crash_point_{self.crash_point}'
         func = f'{self.test_name}.{self.test_name}.subprocess_crash_point_{self.crash_point}'
-        [ignore_result, new_home_dir] = self.run_subprocess_function(
-            subdir, func, silent=True)
+        # Without asserting the crash the test only notices a crash point that never fired
+        # through the recovery message, which the drop scenarios do not need.
+        new_home_dir = self.crash_in_subprocess(subdir, func, signal.SIGABRT)
 
         with self.expectedStdoutPattern('removing incomplete table'):
             self.conn = self.setUpConnectionOpen(new_home_dir)

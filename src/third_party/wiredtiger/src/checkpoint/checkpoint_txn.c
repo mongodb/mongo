@@ -1010,8 +1010,11 @@ __checkpoint_update_disagg_database_size(
      * added during the checkpoint. Negative deltas occur when data is removed reducing the total
      * storage footprint. Undershooting the checkpoint buffer is an accounting bug: diagnostic
      * builds abort, production logs an error and clamps so a wrapped uint64 is not published.
+     *
+     * A drop size is an independent input: a checkpoint that only drops tables has no size delta of
+     * its own, so gating on the delta alone loses the drop.
      */
-    if (!recomputed && session->ckpt.ckpt_size_delta != 0) {
+    if (!recomputed && (session->ckpt.ckpt_size_delta != 0 || drop_size != 0)) {
         uint64_t db;
         int64_t delta;
 
@@ -1020,6 +1023,7 @@ __checkpoint_update_disagg_database_size(
         delta = session->ckpt.ckpt_size_delta - (int64_t)drop_size;
 
         if (delta > 0) {
+            /* FIXME-WT-18423: Handle an overflow in the disaggregated database size accounting. */
             WT_ASSERT(session, UINT64_MAX - db >= (uint64_t)delta);
             __wt_disagg_set_database_size(session, db + (uint64_t)delta);
         } else if (delta < 0) {

@@ -7,7 +7,7 @@
  */
 
 /*
- * The generator stage: the node's command stream - workload, the step-down marker, and the switch
+ * The generator stage: the node's command stream - workload, the step-down event, and the switch
  * event that ends a term - written into the self-pipe. Started only for a phase that produces its
  * own stream: a leader always does, and so does a follower with no peer.
  */
@@ -19,7 +19,7 @@ typedef enum {
     GEN_NORMAL,          /* the term's workload */
     GEN_FLUSH_PUBLISHES, /* one-shot: emit the publishes a term must not end holding */
     GEN_BEGIN_STEPDOWN,  /* one-shot: emit the step-down timestamp */
-    GEN_STEPDOWN,        /* the step-down window: limited workload */
+    GEN_STEPDOWN,        /* the step-down: limited workload */
     GEN_SWITCH,          /* one-shot: emit the switch event that ends the stream */
     GEN_STOP             /* terminal: the phase stopped, or the stream ended */
 } GENERATOR_PHASE;
@@ -83,11 +83,11 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         break;
     case TABLE_PUBLISHED:
         /* Take (more) data, drop the table, or linger. */
-        if (__wt_random(rnd) % INSERT_ODDS == 0) {
+        if (__wt_random(rnd) % GEN_INSERT_ODDS == 0) {
             ev.type = EVENT_INSERT;
             if (stepping_down)
                 *stepdown_insert = true;
-        } else if (__wt_random(rnd) % DROP_ODDS == 0 && (!stepping_down || !*stepdown_insert)) {
+        } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 && (!stepping_down || !*stepdown_insert)) {
             /* Such a drop would wait on a checkpoint the step-down cannot take. */
             ev.type = EVENT_DROP;
             *slot_state = TABLE_DROPPED;
@@ -139,13 +139,13 @@ generator_round(WORKLOAD_STATE *state, uint64_t lead_max, GENERATOR_PHASE phase)
     return (emitted);
 }
 
-/*
- * A leading generator's pacing state: the sentinel poll throttle, and the lead it may build over
- * its workers.
- */
+/* A leading generator's pacing state. */
 typedef struct {
-    struct timespec last_poll;
     uint64_t lead_max; /* events that may be in flight; UINT64_MAX when nothing bounds it */
+    struct timespec last_poll;
+
+    uint64_t stepdown_emitted;      /* events emitted since the step-down started */
+    struct timespec stepdown_start; /* when the step-down event is emitted */
 } GENERATOR_PACING;
 
 /*
@@ -155,11 +155,16 @@ typedef struct {
 static void
 generator_pacing_init(GENERATOR_PACING *pacing, const TEST_CONFIG *cfg)
 {
+    WT_CLEAR(*pacing);
     __wt_epoch(NULL, &pacing->last_poll);
-    /* Bound the lead so a hand-over drains inside one switch period; no switches, no bound. */
+    /*-
+     * How much lead the generator may have over the workers:
+     *   - no roles switching: no limit, the event pipe will be always full,
+     *   - otherwise: throttle the generator, so role switch happens within reasonable time.
+     */
     pacing->lead_max = cfg->switch_interval == 0 ?
       UINT64_MAX :
-      WT_MAX(cfg->switch_interval * GEN_APPLY_RATE_FLOOR, GEN_LEAD_MIN);
+      WT_MAX(cfg->switch_interval * GEN_APPLY_RATE_FLOOR, GEN_MIN_LEAD);
 }
 
 /*
@@ -181,6 +186,8 @@ generator_switch_requested(GENERATOR_PACING *pacing)
 /*
  * generator_flush_publishes --
  *     Emit the pending publish for every slot in an unpublished state, before the role transition.
+ *     FIXME-WT-18272 FIXME-WT-18284: Remove this function once these tickets are resolved.
+ *     Corresponding generator state GEN_FLUSH_PUBLISHES won't be needed anymore, as well.
  */
 static void
 generator_flush_publishes(WORKLOAD_STATE *state)
@@ -205,39 +212,51 @@ generator_flush_publishes(WORKLOAD_STATE *state)
 
 /*
  * generator_stepdown_ended --
- *     Whether the step-down may complete: the peer adopted the step-down checkpoint, or died.
+ *     Whether the step-down may complete: the peer adopted the step-down checkpoint or died, or a
+ *     lone node emitted its share of events.
  */
 static bool
-generator_stepdown_ended(
-  WORKLOAD_STATE *state, GENERATOR_PACING *pacing, const struct timespec *start)
+generator_stepdown_ended(WORKLOAD_STATE *state, GENERATOR_PACING *pacing)
 {
     /* Zero until the reader's step-down work completes. */
     const uint64_t ckpt_lsn = __wt_atomic_load_uint64(&state->stepdown_ckpt_lsn);
+    const bool lone = node_is_lone(state->cfg);
 
-    /* The peer died mid-window: nothing left to wait for, and no next leader to carry it. */
-    if (ckpt_lsn != 0 && !state->cfg->peer_alive)
+    /* A dead peer cannot adopt the checkpoint. */
+    if (ckpt_lsn != 0 && !lone && !state->cfg->peer_alive)
         return (true);
 
     struct timespec now;
     __wt_epoch(NULL, &now);
     if (WT_TIMEDIFF_SEC(now, pacing->last_poll) < 1)
-        return (false);
+        return (false); /* Too early, come back later. */
     pacing->last_poll = now;
 
-    if (ckpt_lsn != 0 && adopted_lsn_read() >= ckpt_lsn)
+    const uint64_t stepdown_events = state->emitted - pacing->stepdown_emitted;
+    /* Lone node exhausted step-down events or peer adopted the checkpoint. */
+    const bool ended = ckpt_lsn != 0 &&
+      (lone ? stepdown_events >= GEN_STEPDOWN_MIN_EVENTS : adopted_lsn_read() >= ckpt_lsn);
+
+    if (ended)
         return (true);
 
-    /* Which side stalled: our own step-down work, or the peer's adoption of it. */
-    if (WT_TIMEDIFF_SEC(now, *start) > MAX_OP_WAIT) {
+    /* Report which part of the step-down stalled. */
+    if (WT_TIMEDIFF_SEC(now, pacing->stepdown_start) > MAX_OP_WAIT) {
         if (ckpt_lsn == 0)
             testutil_die(ETIMEDOUT,
               "Node %" PRIu32 ": the step-down checkpoint did not complete in %d seconds",
               state->cfg->node_id, MAX_OP_WAIT);
-        testutil_die(ETIMEDOUT,
-          "Node %" PRIu32 ": peer did not adopt the step-down checkpoint (lsn %" PRIu64
-          ") in %d seconds",
-          state->cfg->node_id, ckpt_lsn, MAX_OP_WAIT);
+        else if (lone)
+            testutil_die(ETIMEDOUT,
+              "Node %" PRIu32 ": the step-down emitted %" PRIu64 " of %d events in %d seconds",
+              state->cfg->node_id, stepdown_events, GEN_STEPDOWN_MIN_EVENTS, MAX_OP_WAIT);
+        else
+            testutil_die(ETIMEDOUT,
+              "Node %" PRIu32 ": peer did not adopt the step-down checkpoint (lsn %" PRIu64
+              ") in %d seconds",
+              state->cfg->node_id, ckpt_lsn, MAX_OP_WAIT);
     }
+
     return (false);
 }
 
@@ -266,7 +285,6 @@ thread_generator_run(void *arg)
     GENERATOR_PACING pacing;
     generator_pacing_init(&pacing, state->cfg);
 
-    struct timespec start = {0};
     GENERATOR_PHASE phase = GEN_NORMAL;
 
     while (phase != GEN_STOP && workload_active(state, STAGE_GENERATOR)) {
@@ -287,18 +305,23 @@ thread_generator_run(void *arg)
             break;
         case GEN_BEGIN_STEPDOWN:
             /*
-             * Tell the reader to start the step-down work. If the peer exists, then generate a
-             * limited workload until the peer adopts the step-down checkpoint.
+             * Tell the reader to start the step-down work, then generate a limited workload until
+             * the step-down ends.
              */
             generator_transition_emit(state, EVENT_STEPDOWN);
-            __wt_epoch(NULL, &start);
-            phase = state->cfg->peer_alive ? GEN_STEPDOWN : GEN_SWITCH;
+            __wt_epoch(NULL, &pacing.stepdown_start);
+            pacing.stepdown_emitted = state->emitted;
+            phase = GEN_STEPDOWN;
             break;
         case GEN_STEPDOWN:
-            /* Stop adding operations the moment the peer is gone. */
-            progressed =
-              state->cfg->peer_alive && generator_round(state, pacing.lead_max, GEN_STEPDOWN);
-            phase = generator_stepdown_ended(state, &pacing, &start) ? GEN_SWITCH : GEN_STEPDOWN;
+            /* A dead peer cannot carry the operations, so stop adding them. */
+            progressed = (node_is_lone(state->cfg) || state->cfg->peer_alive) &&
+              generator_round(state, pacing.lead_max, GEN_STEPDOWN);
+            if (generator_stepdown_ended(state, &pacing)) {
+                println("Node %" PRIu32 ": step-down emitted %" PRIu64 " events",
+                  state->cfg->node_id, state->emitted - pacing.stepdown_emitted);
+                phase = GEN_SWITCH;
+            }
             break;
         case GEN_SWITCH:
             /* The stream's last event, carrying the counter the next leader continues from. */

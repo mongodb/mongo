@@ -46,6 +46,12 @@ class test_disagg_checkpoint_size07(wttest.WiredTigerTestCase):
     victim_uri = "layered:victim_table"
     victim_base = "victim_table"
 
+    # The shared metadata table. Its own checkpoint size moves with the drop.
+    shared_uri = "file:WiredTigerShared.wt_stable"
+
+    # The fixed overhead every database size carries for the KEK table and shared turtle page.
+    WT_DISAGG_CHECKPOINT_SIZE_BUFFER = 1024 * 1024
+
     value_size = 8000
     num_failed_ckpts = 4
 
@@ -72,24 +78,38 @@ class test_disagg_checkpoint_size07(wttest.WiredTigerTestCase):
             cursor[str(i)] = str(i) + 'x' * self.value_size
         cursor.close()
 
+    def get_checkpoint_size(self, uri):
+        """The size of a file's most recent checkpoint, as the database size counts it."""
+        meta_cursor = self.session.open_cursor('metadata:')
+        meta_cursor.set_key(uri)
+        self.assertEqual(meta_cursor.search(), 0)
+        sizes = re.findall(r',size=(\d+),', meta_cursor.get_value())
+        meta_cursor.close()
+        self.assertGreater(len(sizes), 0, f"no checkpoint size in the metadata for {uri}")
+        return int(sizes[-1])
+
+    def accumulated_stable_size(self):
+        """The database size as the metadata defines it: every stable file's last checkpoint."""
+        total = 0
+        with WiredTigerCursor(self.session, 'metadata:') as cursor:
+            while cursor.next() == 0:
+                uri = cursor.get_key()
+                if not uri.startswith('file:') or not uri.endswith('.wt_stable'):
+                    continue
+                sizes = re.findall(r',size=(\d+),', cursor.get_value())
+                if sizes:
+                    total += int(sizes[-1])
+        return total
+
     def database_size_check(self, context_message=""):
         self.session.checkpoint()
 
-        # Calculate reference value from sum of all the collections
-        accumulated_database_size = 0
-        with WiredTigerCursor(self.session, 'metadata:') as cursor:
-            while cursor.next() == 0:
-                value = cursor.get_value()
-                checkpoints = re.findall(r',checkpoint=([^)]+),', value)
-                if checkpoints:
-                    sizes = re.findall(r',size=(\d+),', checkpoints[0])
-                    if sizes:
-                        accumulated_database_size += int(sizes[-1])
-
+        accumulated_database_size = \
+            self.accumulated_stable_size() + self.WT_DISAGG_CHECKPOINT_SIZE_BUFFER
         database_size = self.get_database_size()
-        self.assertGreaterEqual(database_size, accumulated_database_size,
-            f"database size {database_size} should be greater or equal to "
-            f"accumulated {accumulated_database_size} : {context_message}")
+        self.assertEqual(database_size, accumulated_database_size,
+            f"database size {database_size} should equal the metadata's own total "
+            f"{accumulated_database_size} : {context_message}")
 
     def test_failed_drop_does_not_shrink_database_size(self):
         # Filler table for headroom.
@@ -131,12 +151,21 @@ class test_disagg_checkpoint_size07(wttest.WiredTigerTestCase):
         busy_session.close()
         self.assertTrue(self.exists(self.victim_uri))
 
-        # We should see the drop size for a successful drop
-        with self.expectedStdoutPattern('.*Accumulated drop size.*', maxchars=1000000):
-            self.conn.reconfigure("verbose=[disaggregated_storage:2]")
-            self.session.drop(self.victim_uri, None)
-            self.session.checkpoint()
-            self.conn.reconfigure("verbose=[disaggregated_storage:0]")
+        # A successful drop takes the collection's whole size out of the database size. The same
+        # checkpoint applies the drop's removal to the shared metadata table, whose own checkpoint
+        # size moves as a result; that part of the change does not belong to the collection.
+        victim_size = self.get_checkpoint_size("file:" + self.victim_base + ".wt_stable")
+        shared_before_drop = self.get_checkpoint_size(self.shared_uri)
+        size_before_drop = self.get_database_size()
+        self.session.drop(self.victim_uri, None)
+        self.session.checkpoint()
+        shared_after_drop = self.get_checkpoint_size(self.shared_uri)
+        size_after_drop = self.get_database_size()
+        self.assertEqual(size_before_drop - size_after_drop,
+            victim_size - (shared_after_drop - shared_before_drop),
+            f"a successful drop must remove the collection's size ({victim_size}) from the database "
+            f"size: {size_before_drop} -> {size_after_drop}, shared metadata "
+            f"{shared_before_drop} -> {shared_after_drop}")
 
         self.assertFalse(self.exists(self.victim_uri))
         self.database_size_check("after successful drop")

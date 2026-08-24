@@ -311,6 +311,10 @@ functions:
         echo "startup --output_user_root=${workdir}/bazel-output-root" >> ~/.bazelrc
         echo "BAZELISK_HOME=${workdir}/bazelisk_home" >> ~/.bazeliskrc
 
+        # The perf hosts have no container runtime, so opt out of the mongo hermetic-container
+        # bazel wrapper and build directly on the host.
+        export MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
+
         bazel build --mongo_toolchain_version=v5 --config=opt --build_enterprise=False install-mongod
   "checkout develop": &checkout_develop
     command: shell.exec

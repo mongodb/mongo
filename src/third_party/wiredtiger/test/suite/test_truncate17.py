@@ -111,8 +111,11 @@ class test_truncate17(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        value_a = "aaaaa" * 100
-        value_b = "bbbbb" * 100
+        # Every row gets a distinct value. Variable-length column store run-length encodes
+        # runs of identical values, which packs the whole table into a handful of leaf pages
+        # and leaves the truncate range with no interior page to fast-delete.
+        def value(i):
+            return "{}-{}".format(i, "aaaaa" * 100)
 
         # Pin oldest and stable timestamps to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -122,7 +125,7 @@ class test_truncate17(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(ds.uri)
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
-            cursor[ds.key(i)] = value_a
+            cursor[ds.key(i)] = value(i)
             if i % 487 == 0:
                 self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
                 self.session.begin_transaction()

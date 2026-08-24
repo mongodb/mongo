@@ -74,10 +74,7 @@ class test_compact09(compact_util):
         # Enable background compaction and exclude the two tables. Use run once to be able to
         # track the stats easily.
         exclude_list = f'["{self.uri_prefix}_0.wt", "{self.uri_prefix}_1.wt"]'
-        config = f'background=true,free_space_target=1MB,exclude={exclude_list},run_once=true'
-        # Don't use the helper function as the server may go to sleep before we have the time to
-        # check it is actually running.
-        self.session.compact(None, config)
+        self.turn_on_bg_compact(f'free_space_target=1MB,exclude={exclude_list},run_once=true')
 
         # Background compaction should exclude all files.
         while self.get_bg_compaction_files_excluded() < self.n_tables:
@@ -92,8 +89,7 @@ class test_compact09(compact_util):
 
         # Enable background compaction and exclude only one table.
         exclude_list = f'["{self.uri_prefix}_0.wt"]'
-        config = f'background=true,free_space_target=1MB,exclude={exclude_list},run_once=true'
-        self.session.compact(None, config)
+        self.turn_on_bg_compact(f'free_space_target=1MB,exclude={exclude_list},run_once=true')
 
         # Background compaction should exclude only one file now. Since the stats are cumulative, we
         # need to take into account the previous check.

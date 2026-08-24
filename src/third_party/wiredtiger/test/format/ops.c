@@ -1122,7 +1122,7 @@ ops(void *arg)
     thread_op op;
     uint64_t reset_op, session_op, throttle_delay, truncate_op;
     uint64_t rlog_key, rlog_lane, rlog_read_ts, rlog_replay_ts;
-    uint32_t max_rows, ntries, range, rnd;
+    uint32_t max_rows, ntries, range, rnd, snap_retries;
     u_int i, rlog_table_id, throttle_delay_max;
     int rlog_ret;
     const char *iso_config, *rlog_op_name;
@@ -1165,6 +1165,7 @@ ops(void *arg)
     session = NULL;
     session_op = 0;
     ntries = 0;
+    snap_retries = 0;
 
     /* Set the first operation where we'll reset the session. */
     reset_op = mmrand(&tinfo->extra_rnd, 100, 10 * WT_THOUSAND);
@@ -1543,8 +1544,19 @@ skip_operation:
             ret = snap_repeat_txn(tinfo);
             testutil_assertfmt(
               ret == 0 || ret == WT_ROLLBACK || ret == WT_CACHE_FULL, "operation failed: %d", ret);
-            if (ret == WT_ROLLBACK || ret == WT_CACHE_FULL)
+            if (ret == WT_ROLLBACK || ret == WT_CACHE_FULL) {
+                /*
+                 * A thread can hit WT_ROLLBACK/WT_CACHE_FULL here indefinitely under sustained
+                 * cache pressure, retrying the same repeat-read forever without ever reaching the
+                 * quit check at the top of the loop. Bail out immediately if we're quitting, and
+                 * fail fast rather than spin quietly until the test's own timeout fires.
+                 */
+                if (tinfo->quit)
+                    goto loop_exit;
+                testutil_assert(++snap_retries < WT_THOUSAND);
                 goto rollback;
+            }
+            snap_retries = 0;
         }
 
         /*

@@ -25,7 +25,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import os, signal
+import signal
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from helper_key_provider import KeyProviderBase
 from suite_subprocess import suite_subprocess
@@ -75,26 +75,12 @@ class test_key_provider_disagg02(KeyProviderBase, suite_subprocess):
         self.rotate_key(2)
         self.session.checkpoint(f"debug=(checkpoint_crash_trigger_point={self.crash_point})") # Expected to fail
 
-    def assert_crashed(self, returncode):
-        # WiredTiger kills the process outright on POSIX and aborts on Windows, so the exit status
-        # is platform specific. Where the two are distinguishable, insist on the kill: an abort
-        # means we stopped somewhere we did not ask to.
-        if os.name == 'nt':
-            self.assertNotEqual(returncode, 0)
-        else:
-            self.assertEqual(returncode, -signal.SIGKILL)
-
     def test_key_provider_disagg02(self):
         self.conn.close()
 
-        # Restrict the subprocess to this scenario, otherwise it crashes in the first one and no
-        # other crash point is ever reached.
         subdir = 'SUBPROCESS'
-        [returncode, new_home_dir] = self.run_subprocess_function(subdir,
-            f'{self.test_name}.{self.test_name}.subprocess_func', silent=True,
-            scenario=self.scenario_number)
-
-        self.assert_crashed(returncode)
+        new_home_dir = self.crash_in_subprocess(subdir,
+            f'{self.test_name}.{self.test_name}.subprocess_func', signal.SIGKILL)
 
         # The subprocess wrote to new_home_dir; its turtle reference survived the crash intact.
         self.validate_turtle_page(home=new_home_dir)

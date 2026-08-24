@@ -145,6 +145,9 @@ class WiredTigerHookManager(object):
         self.hooks = []
         self.platform_apis = []
         names_seen = []
+        # The specifications are kept whole as well, so that a subprocess can be started with the
+        # same hooks, arguments included.
+        self.hook_specs = tuple(hooknames)
         for name in hooknames:
             # The hooks are indicated as "somename=arg" or simply "somename".
             # hook_somename.py will be imported, and initialized with the arg.
@@ -233,6 +236,9 @@ class WiredTigerHookManager(object):
 
     def get_hook_names(self):
         return self.hook_names
+
+    def get_hook_specs(self):
+        return self.hook_specs
 
     def get_platform_api(self):
         return MultiPlatformAPI(self.platform_apis)

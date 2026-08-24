@@ -38,15 +38,42 @@ println(const char *fmt, ...)
 }
 
 /*
+ * timestamp_name --
+ *     Return the configuration name for a timestamp bit.
+ */
+static const char *
+timestamp_name(uint8_t bit)
+{
+    switch (bit) {
+    case TS_OLDEST:
+        return ("oldest_timestamp");
+    case TS_STABLE:
+        return ("stable_timestamp");
+    case TS_STABLE_SCHEMA_EPOCH:
+        return ("stable_disaggregated_schema_epoch");
+    case TS_STEPDOWN_TIMESTAMP:
+        return ("step_down_timestamp");
+    case TS_STEPDOWN_SCHEMA_EPOCH:
+        return ("step_down_disaggregated_schema_epoch");
+    case TS_LAST_SCHEMA_EPOCH:
+        return ("last_disaggregated_schema_epoch");
+    case TS_LAST_CHECKPOINT:
+        return ("last_checkpoint");
+    default:
+        testutil_die(EINVAL, "unknown timestamp bit: %#" PRIx8, bit);
+    }
+}
+
+/*
  * query_ts --
  *     Return one of the connection's timestamps as an integer. A timestamp that was never set reads
- *     as zero; an unknown name is a coding error and fails the test.
+ *     as zero.
  */
 uint64_t
-query_ts(WT_CONNECTION *conn, const char *name)
+query_ts(WT_CONNECTION *conn, uint8_t bit)
 {
     char config[64], hex_ts[64];
-    testutil_snprintf(config, sizeof(config), "get=%s", name);
+    testutil_snprintf(config, sizeof(config), "get=%s", timestamp_name(bit));
     testutil_check(conn->query_timestamp(conn, hex_ts, config));
 
     uint64_t ts = 0;
@@ -55,32 +82,22 @@ query_ts(WT_CONNECTION *conn, const char *name)
 }
 
 /*
- * set_stepdown_ts --
- *     Set connection's step-down timestamps.
+ * set_ts --
+ *     Set the selected connection timestamps to given value.
  */
 void
-set_stepdown_ts(WT_CONNECTION *conn, uint64_t ts)
+set_ts(WT_CONNECTION *conn, uint8_t mask, uint64_t ts)
 {
-    char config[128];
-    testutil_snprintf(config, sizeof(config),
-      "step_down_timestamp=%" PRIx64 ",step_down_disaggregated_schema_epoch=%" PRIx64, ts, ts);
-    testutil_check(conn->set_timestamp(conn, config));
-}
+    char config[256];
+    size_t len = 0;
 
-/*
- * set_frontier --
- *     Move the connection's frontier - the oldest and stable timestamps and the stable schema epoch
- *     - to one timestamp. The three always advance together, so everything at or below that
- *     timestamp is committed and published.
- */
-void
-set_frontier(WT_CONNECTION *conn, uint64_t ts)
-{
-    char config[128];
-    testutil_snprintf(config, sizeof(config),
-      "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64
-      ",stable_disaggregated_schema_epoch=%" PRIx64,
-      ts, ts, ts);
+    testutil_assert(mask != 0);
+    for (uint8_t bit = 1; bit != 0; bit = (uint8_t)(bit << 1)) {
+        if ((mask & bit) == 0)
+            continue;
+        testutil_snprintf_len_incr(
+          config + len, sizeof(config) - len, &len, "%s=%" PRIx64 ",", timestamp_name(bit), ts);
+    }
     testutil_check(conn->set_timestamp(conn, config));
 }
 

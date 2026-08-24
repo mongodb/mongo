@@ -64,18 +64,18 @@ class test_layered_checkpoint08(checkpoint_util):
         # Take the sweep baseline after all initial sweeps has been settled. Any future sweeps is
         # exclusively from the test table.
         time.sleep(2)
-        sweep_closes_before = self.get_stat(wiredtiger.stat.conn.dh_sweep_dead_close)
+        sweep_closes_before = self.get_stat(wiredtiger.stat.conn.dh_sweep_expired_close)
 
         session2.close()
 
         # Wait until the sweep has closed any idle handles. With close_scan_interval=1 and
-        # close_idle_time=1, a dead handle is closed within a couple of sweep cycles, so bound the
+        # close_idle_time=1, an idle handle expires within a couple of sweep cycles, so bound the
         # wait to fail fast with a clear error rather than spin until the task timeout if the sweep
         # never makes progress.
-        self.assertStatGreaterSoon(wiredtiger.stat.conn.dh_sweep_dead_close, sweep_closes_before,
+        self.assertStatGreaterSoon(wiredtiger.stat.conn.dh_sweep_expired_close, sweep_closes_before,
             timeout=60, msg='sweep server did not close the idle table handle within 60 seconds')
         self.pr(f"Dhandles closed by sweep: "
-            f"{self.get_stat(wiredtiger.stat.conn.dh_sweep_dead_close) - sweep_closes_before}")
+            f"{self.get_stat(wiredtiger.stat.conn.dh_sweep_expired_close) - sweep_closes_before}")
 
         # Start a checkpoint in a separate thread
         def checkpoint_thread_fn(conn):
