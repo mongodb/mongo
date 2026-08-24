@@ -371,15 +371,13 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
 
 /**
  * Appends the 'rankerChoice' object to 'out', which contains details the ranker that decided the
- * winning plan, the reason for this choice, and the ranker that was requested.
+ * winning plan and the reason for this choice.
  */
 void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
                             const boost::optional<PlanRankerReason> reason,
                             BSONObjBuilder& out) {
     BSONObjBuilder planRankerBob(out.subobjStart("rankerChoice"));
 
-    // TODO SERVER-132230: populate requestedRanker.
-    planRankerBob.append("requestedRanker", "");
     planRankerBob.append("chosenRanker", getPlanSelectionStrategyName(decidingPlanRanker));
     if (decidingPlanRanker == PlanSelectionStrategy::kSinglePlan ||
         decidingPlanRanker == PlanSelectionStrategy::kCachedPlan) {

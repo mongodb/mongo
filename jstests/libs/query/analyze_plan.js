@@ -280,8 +280,6 @@ export function assertChosenRanker(explain, chosenRanker, reason = undefined) {
                 {rankerChoice},
             );
         }
-
-        // TODO SERVER-132230 Assert on the requested ranker.
         return;
     }
 
