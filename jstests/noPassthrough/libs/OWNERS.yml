@@ -24,6 +24,9 @@ filters:
   - "max_conns_override_helpers.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "shard_catalog_expired_history_filtering_utils.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "*sasl*":
     approvers:
       - 10gen/server-security
