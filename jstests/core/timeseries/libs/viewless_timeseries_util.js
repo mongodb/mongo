@@ -322,15 +322,6 @@ export function assertExplainTargetsExpectedTimeseriesNamespace(
         }
 
         if (isTrackedTimeseries(coll)) {
-            if (isFCVlt(db.getMongo(), "8.3")) {
-                // In versions 8.2 findAndModify explain return the main namespace instead of the system.buckets
-                // TODO SERVER-114161 enable the check once the fix have been backported to previous versions
-                jsTest.log(
-                    "Skipping namespace check for findAndModify explain output since FCV is less then 8.3 (BACKPORT-26389)",
-                );
-                return;
-            }
-
             // In sharded clusters for findAndModify over legacy tracked timeseries we convert the namespace on the router and we send the command
             // with translated namespace to the shard,
             // thus we expect explain to report the command targeting system.buckets internal namespace.
