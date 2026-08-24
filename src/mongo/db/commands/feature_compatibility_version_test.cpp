@@ -251,6 +251,24 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringC
         10778001);
 }
 
+TEST_F(FeatureCompatibilityVersionTestFixture, FindFCVDocumentRetriesWriteConflict) {
+    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
+
+    // Inject a conflict into the first storage read. The FCV lookup should retry the collection
+    // scan and return the document successfully.
+    FailPointEnableBlock failPoint(
+        "WTWriteConflictExceptionForReads",
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    const auto initialTimesEntered = failPoint.initialTimesEntered();
+
+    auto fcvDocument =
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
+    EXPECT_EQ(initialTimesEntered + 1, failPoint->waitForTimesEntered(initialTimesEntered + 1));
+    ASSERT_OK(fcvDocument);
+    ASSERT_EQ(FeatureCompatibilityVersionDocument::parse(fcvDocument.getValue()).getVersion(),
+              multiversion::GenericFCV::kLatest);
+}
+
 struct FCVTestParams {
     SetFCVPhaseEnum phase;
     boost::optional<bool> isCleaningServerMetadata;
