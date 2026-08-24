@@ -278,6 +278,10 @@ mongo_cc_library(
     } | {
         "//conditions:default": ["ssl_manager_none.cpp"],
     }),
+    linkopts = select({
+        "//bazel/config:ssl_provider_windows": ["ncrypt.lib"],
+        "//conditions:default": [],
+    }),
     deps = [
         "network",
         "ssl_options",

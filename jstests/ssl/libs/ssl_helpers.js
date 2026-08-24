@@ -1,6 +1,12 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
-import {isDebian, isRHEL8, isUbuntu, isUbuntu2004} from "jstests/libs/os_helpers.js";
+import {
+    isDebian,
+    isRHEL8,
+    isUbuntu,
+    isUbuntu2004,
+    windowsSupportsTLS13
+} from "jstests/libs/os_helpers.js";
 import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to
@@ -12,36 +18,40 @@ TestData.ignoreUnterminatedProcesses = true;
 export var KEYFILE = "jstests/libs/key1";
 
 export var SERVER_CERT = "jstests/libs/server.pem";
+export var TRUSTED_SERVER_CERT = "jstests/libs/trusted-server.pem";
 export var CA_CERT = "jstests/libs/ca.pem";
+export var TRUSTED_CA_CERT = "jstests/libs/trusted-ca.pem";
 export var CLIENT_CERT = "jstests/libs/client.pem";
+export var TRUSTED_CLIENT_CERT = "jstests/libs/trusted-client.pem";
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
+export var TRUSTED_CLUSTER_CERT = "jstests/libs/trusted-cluster-server.pem";
 
 // Note: "tlsAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
 export var disabled = {
-    tlsMode: "disabled"
+    tlsMode: "disabled",
 };
 
 export var allowTLS = {
     tlsMode: "allowTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var preferTLS = {
     tlsMode: "preferTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var requireTLS = {
     tlsMode: "requireTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var dhparamSSL = {
@@ -49,7 +59,7 @@ export var dhparamSSL = {
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
     tlsCAFile: CA_CERT,
-    setParameter: {"opensslDiffieHellmanParameters": DH_PARAM}
+    setParameter: {"opensslDiffieHellmanParameters": DH_PARAM},
 };
 
 // Test if ssl replset  configs work
@@ -77,19 +87,21 @@ export var replShouldFail = function(name, opt1, opt2) {
  * the connections opened between mongos/shards and between the shards themselves.
  */
 export function testShardedLookup(shardingTest) {
-    var st = shardingTest;
+    let st = shardingTest;
     assert(st.adminCommand({enableSharding: "lookupTest"}),
            "error enabling sharding for this configuration");
-    assert(st.adminCommand({shardCollection: "lookupTest.foo", key: {_id: "hashed"}}),
-           "error sharding collection for this configuration");
+    assert(
+        st.adminCommand({shardCollection: "lookupTest.foo", key: {_id: "hashed"}}),
+        "error sharding collection for this configuration",
+    );
 
-    var lookupdb = st.getDB("lookupTest");
+    let lookupdb = st.getDB("lookupTest");
 
     // insert a few docs to ensure there are documents on multiple shards.
-    var fooBulk = lookupdb.foo.initializeUnorderedBulkOp();
-    var barBulk = lookupdb.bar.initializeUnorderedBulkOp();
-    var lookupShouldReturn = [];
-    for (var i = 0; i < 64; i++) {
+    let fooBulk = lookupdb.foo.initializeUnorderedBulkOp();
+    let barBulk = lookupdb.bar.initializeUnorderedBulkOp();
+    let lookupShouldReturn = [];
+    for (let i = 0; i < 64; i++) {
         fooBulk.insert({_id: i});
         barBulk.insert({_id: i});
         lookupShouldReturn.push({_id: i, bar_docs: [{_id: i}]});
@@ -97,11 +109,11 @@ export function testShardedLookup(shardingTest) {
     assert.commandWorked(fooBulk.execute());
     assert.commandWorked(barBulk.execute());
 
-    var docs =
+    let docs =
         lookupdb.foo
             .aggregate([
                 {$sort: {_id: 1}},
-                {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}}
+                {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}},
             ])
             .toArray();
     assert.eq(lookupShouldReturn, docs, "error $lookup failed in this configuration");
@@ -135,16 +147,17 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
             mongos: [options1],
             config: 1,
             shards: [options1, options2],
+            shouldFailInit: !shouldSucceed,
             other: {
                 enableBalancer: true,
                 configOptions: options1,
-                writeConcernMajorityJournalDefault: wcMajorityJournalDefault
+                writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
             },
         });
 
         // Create admin user in case the options include auth
-        st.admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-        st.admin.auth('admin', 'pwd');
+        st.admin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
+        st.admin.auth("admin", "pwd");
 
         authSucceeded = true;
 
@@ -154,21 +167,21 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         testShardedLookup(st);
 
         // Test mongos talking to config servers
-        var r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
+        let r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
-        r = st.adminCommand({movePrimary: 'test', to: st.shard1.shardName});
+        r = st.adminCommand({movePrimary: "test", to: st.shard1.shardName});
         assert.eq(r, true, "error movePrimary failed for this configuration");
 
-        var db1 = st.getDB("test");
+        let db1 = st.getDB("test");
         r = st.adminCommand({shardCollection: "test.col", key: {_id: 1}});
         assert.eq(r, true, "error sharding collection for this configuration");
 
         // Test mongos talking to shards
-        var bigstr = Array(1024 * 1024).join("#");
+        let bigstr = "#".repeat(1024 * 1024);
 
-        var bulk = db1.col.initializeUnorderedBulkOp();
-        for (var i = 0; i < 128; i++) {
+        let bulk = db1.col.initializeUnorderedBulkOp();
+        for (let i = 0; i < 128; i++) {
             bulk.insert({_id: i, string: bigstr});
         }
         assert.commandWorked(bulk.execute());
@@ -178,12 +191,11 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         assert.commandWorked(st.splitFind("test.col", {_id: 0}));
 
         // Test shards talking to each other
-        r = st.getDB('test').adminCommand(
-            {moveChunk: 'test.col', find: {_id: 0}, to: st.shard0.shardName});
+        r = st.getDB("test").adminCommand(
+            {moveChunk: "test.col", find: {_id: 0}, to: st.shard0.shardName});
         assert(r.ok, "error moving chunks: " + tojson(r));
 
         db1.col.remove({});
-
     } catch (e) {
         if (shouldSucceed)
             throw e;
@@ -193,19 +205,19 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
         if (authSucceeded && st.configRS) {
             st.configRS.nodes.forEach((node) => {
-                node.getDB('admin').auth('admin', 'pwd');
+                node.getDB("admin").auth("admin", "pwd");
             });
         }
 
         // This has to be done in order for failure
         // to not prevent future tests from running...
         if (st) {
-            if (st.s.fullOptions.clusterAuthMode === 'x509') {
+            if (st.s.fullOptions.clusterAuthMode === "x509") {
                 // Index consistency check during shutdown needs a privileged user to auth as.
                 const x509User =
-                    'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
-                st.s.getDB('$external')
-                    .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+                    "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
+                st.s.getDB("$external")
+                    .createUser({user: x509User, roles: [{role: "__system", db: "admin"}]});
             }
 
             st.stop();
@@ -215,13 +227,13 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
 
 export function determineSSLProvider() {
     const info = getBuildInfo();
-    const ssl = (info.openssl === undefined) ? '' : info.openssl.running;
+    const ssl = info.openssl === undefined ? "" : info.openssl.running;
     if (/OpenSSL/.test(ssl)) {
-        return 'openssl';
+        return "openssl";
     } else if (/Apple/.test(ssl)) {
-        return 'apple';
+        return "apple";
     } else if (/Windows/.test(ssl)) {
-        return 'windows';
+        return "windows";
     } else {
         return null;
     }
@@ -233,7 +245,7 @@ export function isMacOS(minVersion) {
         // This allows vesions like: 10.15.7-pl2 or other extra data.
         const v = version.match(/^(\d+)\.(\d+)\.(\d+)/);
         assert(v !== null, "Invalid version string '" + version + "'");
-        return (v[1] << 16) | (v[2] << 8) | (v[3]);
+        return (v[1] << 16) | (v[2] << 8) | v[3];
     }
 
     const macOS = getBuildInfo().macOS;
@@ -253,7 +265,7 @@ export function isMacOS(minVersion) {
 }
 
 export function requireSSLProvider(required, fn) {
-    if ((typeof required) === 'string') {
+    if (typeof required === "string") {
         required = [required];
     }
 
@@ -269,26 +281,30 @@ export function requireSSLProvider(required, fn) {
 
 export function detectDefaultTLSProtocol() {
     const conn = MongoRunner.runMongod({
-        tlsMode: 'allowTLS',
+        tlsMode: "allowTLS",
         tlsCertificateKeyFile: SERVER_CERT,
-        tlsDisabledProtocols: 'none',
+        tlsDisabledProtocols: "none",
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
         waitForConnect: true,
-        tlsCAFile: CA_CERT
+        tlsCAFile: CA_CERT,
     });
 
-    assert.eq(0,
-              runMongoProgram('mongo',
-                              '--ssl',
-                              '--port',
-                              conn.port,
-                              '--tlsCertificateKeyFile',
-                              CLIENT_CERT,
-                              '--tlsCAFile',
-                              CA_CERT,
-                              '--eval',
-                              ';'));
+    assert.eq(
+        0,
+        runMongoProgram(
+            "mongo",
+            "--ssl",
+            "--port",
+            conn.port,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--tlsCAFile",
+            CA_CERT,
+            "--eval",
+            ";",
+            ),
+    );
 
     const res = conn.getDB("admin").serverStatus().transportSecurity;
 
@@ -346,12 +362,13 @@ export function isOpenSSL3orGreater() {
 
 export function opensslVersionAsInt() {
     const opensslInfo = getBuildInfo().openssl;
-    if (!opensslInfo) {
-        return null;
+    if (!opensslInfo || !opensslInfo.compiled) {
+        // openssl undefined if apple or windows
+        return undefined;
     }
 
     const matches = opensslInfo.running.match(/OpenSSL\s+(\d+)\.(\d+)\.(\d+)([a-z]?)/);
-    assert.neq(matches, null);
+    assert.neq(matches, null, "cannot parse openSSL version from '" + opensslInfo.running + "'");
 
     let version = (matches[1] << 24) | (matches[2] << 16) | (matches[3] << 8);
 
@@ -360,7 +377,7 @@ export function opensslVersionAsInt() {
 
 export function supportsFIPS() {
     // OpenSSL supports FIPS
-    let expectSupportsFIPS = (determineSSLProvider() == "openssl");
+    let expectSupportsFIPS = determineSSLProvider() == "openssl";
 
     // But OpenSSL supports FIPS only sometimes
     // - Debian does not support FIPS, Fedora 37 does not, Fedora 38 does
@@ -382,5 +399,139 @@ export function copyCertificateFile(a, b) {
         assert.eq(0, runProgram("cmd.exe", "/c", "copy", a, b));
         return;
     }
-    assert.eq(0, runProgram("cp", a, b));
+    assert.eq(0, runProgram("cp", "-f", a, b));
+}
+
+export function clientSupportsTLS1_1() {
+    if (!sslProviderSupportsTLS1_1()) {
+        return false;
+    }
+    const opensslVersion = opensslVersionAsInt();
+    return opensslVersion === undefined ? true : opensslVersion >= 0x100000c;  // 1.0.0l
+}
+
+export function clientSupportsTLS1_2() {
+    const opensslVersion = opensslVersionAsInt();
+    return opensslVersion === undefined ? true : opensslVersion >= 0x1000106;  // 1.0.1f
+}
+
+export function clientSupportsTLS1_3() {
+    // SERVER-121261: support tls 1.3 for apple
+    if (determineSSLProvider() === "apple") {
+        return false;
+    }
+    if (determineSSLProvider() === "windows") {
+        return windowsSupportsTLS13();
+    }
+    const opensslVersion = opensslVersionAsInt();
+    return opensslVersion === undefined ? true : opensslVersion >= 0x1010100;  // 1.1.1
+}
+
+export function runTLSModeTest(conn, mode, clientCert, clientCA, unixDomainSocketPrefix) {
+    const tcpIpUri = `mongodb://localhost:${conn.port}/admin`;
+    switch (mode) {
+        case "disabled": {
+            // Ingress TLS is forbidden on the TCP/IP socket.
+            let exitCode =
+                runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.eq(
+                exitCode,
+                0,
+                `Was not able to connect to ${tcpIpUri} without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.neq(exitCode,
+                       0,
+                       `Was able to connect to ${tcpIpUri} with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        case "allowTLS":
+        case "preferTLS": {
+            // Both TLS and plaintext are permitted on the TCP/IP socket.
+            let exitCode =
+                runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.eq(
+                exitCode,
+                0,
+                `Was not able to connect to ${tcpIpUri} without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.eq(
+                exitCode, 0, `Could not connect to ${tcpIpUri} with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        case "requireTLS": {
+            // Ingress plaintext is forbidden on the TCP/IP socket.
+            let exitCode =
+                runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.neq(exitCode, 0, `Was able to connect without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.eq(exitCode, 0, `Could not connect with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        default:
+            assert(false, "Unrecognized tlsMode option testcase");
+    }
+
+    // Clients always uses plaintext when connecting to the server's unix domain socket regardless
+    // of whether they were configured with TLS or not. Similarly, the server accepts these
+    // plaintext connections over the unix domain sockets regardless of its configured tlsMode.
+    if (!_isWindows()) {
+        const unixPort = `${unixDomainSocketPrefix}/mongodb-${conn.port}.sock`;
+        const unixDomainUri = `mongodb://${encodeURIComponent(unixPort)}`;
+        let exitCode =
+            runMongoProgram("mongo", unixDomainUri, "--eval", "assert.commandWorked(db.hello())");
+        assert.eq(
+            exitCode,
+            0,
+            `Was not able to connect to ${unixDomainUri} without TLS when TLSMode was ${mode}`);
+        exitCode = runMongoProgram(
+            "mongo",
+            unixDomainUri,
+            "--tls",
+            "--tlsCertificateKeyFile",
+            clientCert,
+            "--tlsCAFile",
+            clientCA,
+            "--eval",
+            "assert.commandWorked(db.hello())",
+        );
+        assert.eq(
+            exitCode,
+            0,
+            `Was not able to connect to ${
+                unixDomainUri} with client TLS params when server TLSMode was ${mode}`,
+        );
+    }
 }
