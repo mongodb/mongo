@@ -2756,6 +2756,46 @@ def _podman_command_detail(result: subprocess.CompletedProcess[str]) -> str:
     return (result.stderr or result.stdout or "").strip()
 
 
+def _podman_migration_is_allowed(env: Mapping[str, str]) -> bool:
+    """Allow opting out of automatic `podman system migrate`."""
+    return env.get("MONGO_BAZEL_PODMAN_AUTO_MIGRATE", "1").strip() not in ("0", "false", "False")
+
+
+def _podman_migration_force_is_allowed(env: Mapping[str, str]) -> bool:
+    """Allow forcing migration when Podman cannot enumerate containers."""
+    return env.get("MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE", "0").strip().casefold() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _podman_has_running_containers(
+    podman_argv: Sequence[str],
+    runtime_env: Mapping[str, str],
+) -> tuple[bool | None, str]:
+    """Report whether this user still has usable running containers.
+
+    ``None`` means that Podman could not determine the answer. In particular,
+    a stale pause process can make existing containers unreachable without
+    stopping their workload processes, so a failed listing must not authorize
+    a destructive migration by itself.
+    """
+    result = subprocess.run(
+        [*podman_argv, "ps", "--quiet"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+        env=runtime_env,
+    )
+    if result.returncode != 0:
+        return None, _podman_command_detail(result) or f"exit code {result.returncode}"
+    return bool(result.stdout.strip()), ""
+
+
 def _recover_stale_podman_runtime(
     info_argv: Sequence[str],
     runtime_env: Mapping[str, str],
@@ -2784,10 +2824,67 @@ def _recover_stale_podman_runtime(
                     f"{recheck_detail or f'exit code {recheck.returncode}'}"
                 )
 
+            podman_argv = list(info_argv[:-1])
+            if not _podman_migration_is_allowed(runtime_env):
+                return False, (
+                    "Automatic Podman runtime migration is disabled by "
+                    "MONGO_BAZEL_PODMAN_AUTO_MIGRATE. Run `podman system migrate` manually "
+                    "after verifying that stopping running containers is safe, then retry."
+                )
+
+            has_running_containers, container_check_detail = _podman_has_running_containers(
+                podman_argv, runtime_env
+            )
+            if has_running_containers is None and not _podman_migration_force_is_allowed(
+                runtime_env
+            ):
+                return False, (
+                    "Refusing to run `podman system migrate` because Podman could not "
+                    "determine whether this user has running containers: "
+                    f"{container_check_detail}. Set "
+                    "MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE=1 only when this Podman runtime "
+                    "is isolated and stopping its containers is safe, then retry."
+                )
+
+            if has_running_containers:
+                return False, (
+                    "Refusing to run `podman system migrate` because it stops the containers "
+                    "currently running for this user. Run `podman system migrate` manually "
+                    "after verifying that stopping those containers is safe, then retry."
+                )
+
+            migrate = subprocess.run(
+                [*podman_argv, "system", "migrate"],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+                env=runtime_env,
+            )
+            if migrate.returncode != 0:
+                migrate_detail = _podman_command_detail(migrate)
+                return False, (
+                    "`podman system migrate` failed: "
+                    f"{migrate_detail or f'exit code {migrate.returncode}'}"
+                )
+
+            retry = subprocess.run(
+                info_argv,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+                env=runtime_env,
+            )
+            if retry.returncode == 0:
+                return True, ""
+
+            retry_detail = _podman_command_detail(retry)
             return False, (
-                "Automatic Podman runtime migration is disabled because `podman system migrate` "
-                "stops all running containers belonging to this user. Run `podman system migrate` "
-                "manually after verifying that stopping those containers is safe, then retry."
+                "Podman remained unavailable after `podman system migrate`: "
+                f"{retry_detail or f'exit code {retry.returncode}'}"
             )
     except FileNotFoundError as exc:
         return False, f"Podman recovery command not found: {exc.filename}"
