@@ -13,8 +13,6 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -324,18 +322,26 @@ TEST(ReplicatedFastCountMetricsTest, OplogLagSecsUpdatesOnNewCheckpoint) {
 // advance-checkpoint tests, allowing end-to-end verification that advanceCheckpoint fires
 // the checkpoint scan counters.
 class CheckpointScanMetricsTest : public CatalogTestFixture {
+public:
+    CheckpointScanMetricsTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         opCtx = operationContext();
-        ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), opCtx));
-        ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), opCtx));
+
+        auto stores = test_helpers::createContainerFastCountStores(opCtx);
+        sizeCountStore = std::move(stores.sizeCountStore);
+        timestampStore = std::move(stores.timestampStore);
+
         registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
     }
 
     OperationContext* opCtx;
-    CollectionSizeCountStore sizeCountStore;
-    CollectionSizeCountTimestampStore timestampStore;
+    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
+    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
     OtelMetricsCapturer capturer;
 };
 
@@ -352,7 +358,7 @@ TEST_F(CheckpointScanMetricsTest, ProcessedAndSizeCountFireForUserEntries) {
         test_helpers::makeOplogEntry(
             Timestamp{1, 2}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
@@ -376,9 +382,9 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
             Timestamp{1, 1}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
 
     // Run the first checkpoint so the timestamp store advances to ts{1,1}.
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
-    // Now write an applyOps that only touches the internal fast count collections. This entry
+    // Now write an applyOps that only touches the internal fast count containers. This entry
     // should be counted as skipped, not processed.
     const auto fastCountStoreNss =
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
@@ -396,7 +402,7 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
     }};
     test_helpers::writeToOplog(opCtx, internalEntry);
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
     // The internal applyOps entry must have been skipped (not processed).
     EXPECT_GT(
@@ -416,14 +422,14 @@ TEST_F(CheckpointScanMetricsTest, CheckpointAdvancePopulatesOplogLagSecs) {
         test_helpers::makeOplogEntry(
             Timestamp{500, 1}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
     // applied=1000, checkpoint=500 -> lag=500.
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 500);
 }
 
 TEST_F(CheckpointScanMetricsTest, NoCountersFireWhenOplogIsEmpty) {
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
@@ -441,7 +447,7 @@ TEST_F(CheckpointScanMetricsTest, NoCountersFireWhenOplogIsEmpty) {
 // - One applyOps entry whose inner ops are all on user collections and carry size metadata.
 //   This entry is counted as processed (1) and each inner op increments sizeCount.
 //
-// - One applyOps entry whose inner ops are all on fast-count-internal collections.
+// - One applyOps entry whose inner ops are all on fast-count-internal containers.
 //   Because every inner op is internal, the entire entry is skipped (1).
 //
 // Expected: processed=1, skipped=1, sizeCount=3.
@@ -454,7 +460,7 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
 
     // -- Entry 1: applyOps with 3 user inserts, each carrying size metadata.
-    // operationsOnFastCountCollections() returns false (user ops present), so this entry is
+    // operationsOnFastCountStores() returns false (user ops present), so this entry is
     // counted as processed. extractReplicatedMetadataDeltasForApplyOps sees 3 inner ops with
     // "m.sz", so sizeCount is incremented 3 times.
     const BSONObj userInsert1 = BSON("op" << "i"
@@ -476,8 +482,8 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
             .wallClockTime = Date_t::now(),
         }}});
 
-    // -- Entry 2: applyOps with 2 ops that only touch internal fast-count collections.
-    // operationsOnFastCountCollections() returns true, so the entire entry is skipped.
+    // -- Entry 2: applyOps with 2 ops that only touch internal fast-count containers.
+    // operationsOnFastCountStores() returns true, so the entire entry is skipped.
     const BSONObj internalOp1 =
         BSON("op" << "u"
                   << "ns" << fastCountStoreNss.ns_forTest() << "ui" << UUID::gen() << "o"
@@ -496,7 +502,7 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
             .wallClockTime = Date_t::now(),
         }}});
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
@@ -509,13 +515,10 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
               3);
 }
 
-enum class TimestampStoreMode { kCollection, kContainer };
-
 // Tests that writes through `SizeCountTimestampStore::write` advance `oplog_lag_secs` via the
-// `ReplicatedFastCountOpObserver` hooks — collection writes fire `onInserts`/`onUpdate`, container
-// writes fire `onContainerInsert`/`onContainerUpdate`. Runs both backends from the same bodies.
-class TimestampStoreMetricsTest : public CatalogTestFixture,
-                                  public ::testing::WithParamInterface<TimestampStoreMode> {
+// `ReplicatedFastCountOpObserver` hooks — container writes fire `onContainerInsert`/
+// `onContainerUpdate`.
+class TimestampStoreMetricsTest : public CatalogTestFixture {
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -523,31 +526,10 @@ protected:
         resetOplogLagState_ForTest();
         registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
 
-        if (GetParam() == TimestampStoreMode::kCollection) {
-            ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), opCtx));
-            store = std::make_unique<CollectionSizeCountTimestampStore>();
-            return;
-        }
-
         _ffContainerWrites =
             std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
-        ASSERT_OK(createInternalFastCountContainers(opCtx,
-                                                    NamespaceString::kAdminCommandNamespace,
-                                                    ident::kFastCountMetadataStore,
-                                                    KeyFormat::String,
-                                                    ident::kFastCountMetadataStoreTimestamps,
-                                                    KeyFormat::Long,
-                                                    /*writeToOplog=*/false));
-
-        auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
-        auto recordStore =
-            engine->getRecordStore(opCtx,
-                                   NamespaceString::kAdminCommandNamespace,
-                                   ident::kFastCountMetadataStoreTimestamps,
-                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
-                                   /*uuid=*/boost::none);
-        store = std::make_unique<ContainerSizeCountTimestampStore>(std::move(recordStore));
+        store = test_helpers::createContainerFastCountStores(opCtx).timestampStore;
     }
 
     OperationContext* opCtx;
@@ -558,7 +540,7 @@ private:
     std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 
-TEST_P(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
+TEST_F(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
     // applied=1000, checkpoint=400 -> expect lag=600.
     recordAppliedOpTime(Timestamp(1000, 1));
 
@@ -574,7 +556,7 @@ TEST_P(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 600);
 }
 
-TEST_P(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
+TEST_F(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
     recordAppliedOpTime(Timestamp(1000, 1));
 
     {
@@ -587,7 +569,7 @@ TEST_P(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
 }
 
-TEST_P(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
+TEST_F(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
     recordAppliedOpTime(Timestamp(1000, 1));
 
     {
@@ -607,15 +589,6 @@ TEST_P(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
     }
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 100);
 }
-
-INSTANTIATE_TEST_SUITE_P(,
-                         TimestampStoreMetricsTest,
-                         ::testing::Values(TimestampStoreMode::kCollection,
-                                           TimestampStoreMode::kContainer),
-                         [](const ::testing::TestParamInfo<TimestampStoreMode>& info) {
-                             return info.param == TimestampStoreMode::kCollection ? "Collection"
-                                                                                  : "Container";
-                         });
 
 // Tests for `recordContainerWriteForFastCountTimestamp`, the helper called both by the
 // `ReplicatedFastCountOpObserver` container hooks and by `applyContainerOperations` on the

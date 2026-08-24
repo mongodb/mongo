@@ -5,7 +5,6 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_oplog_tailer.h"
@@ -29,16 +28,22 @@ using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
 
 class SizeCountCheckpointCoordinatorTest : public CatalogTestFixture {
+public:
+    SizeCountCheckpointCoordinatorTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         _opCtx = operationContext();
 
-        ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), _opCtx));
-        ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), _opCtx));
+        auto stores = test_helpers::createContainerFastCountStores(_opCtx);
+        _sizeCountStore = std::move(stores.sizeCountStore);
+        _timestampStore = std::move(stores.timestampStore);
 
         _coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
+            *_sizeCountStore, *_timestampStore, oplogUuid(), Timestamp::min());
     }
 
     UUID oplogUuid() const {
@@ -53,12 +58,12 @@ protected:
 
     boost::optional<Timestamp> readTimestampStore() {
         Lock::GlobalLock lk(_opCtx, MODE_IS);
-        return _timestampStore.read(_opCtx);
+        return _timestampStore->read(_opCtx);
     }
 
     OperationContext* _opCtx = nullptr;
-    CollectionSizeCountStore _sizeCountStore;
-    CollectionSizeCountTimestampStore _timestampStore;
+    std::unique_ptr<ContainerSizeCountStore> _sizeCountStore;
+    std::unique_ptr<ContainerSizeCountTimestampStore> _timestampStore;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
 };
 
@@ -103,7 +108,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
     {
         Lock::GlobalLock writeLock(_opCtx, MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
-        _timestampStore.write(_opCtx, persistedTs);
+        _timestampStore->write(_opCtx, persistedTs);
         wuow.commit();
     }
 
@@ -112,7 +117,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
     writeInsert(persistedTs);
 
     auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
-        _sizeCountStore, _timestampStore, oplogUuid(), persistedTs);
+        *_sizeCountStore, *_timestampStore, oplogUuid(), persistedTs);
     coordinator->flushSync_ForTest(_opCtx);
 
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
@@ -158,7 +163,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {
         auto localCoord = std::make_unique<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
+            *_sizeCountStore, *_timestampStore, oplogUuid(), Timestamp::min());
         localCoord->startup(getServiceContext());
         // Destructor joins the worker threads.
     }
@@ -197,7 +202,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, DestructorDuringFlushCycleInterruptsA
 TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndDestructorNeverDeadlocks) {
     for (int i = 0; i < 50; ++i) {
         auto coordinator = std::make_shared<SizeCountCheckpointCoordinator>(
-            _sizeCountStore, _timestampStore, oplogUuid(), Timestamp::min());
+            *_sizeCountStore, *_timestampStore, oplogUuid(), Timestamp::min());
         coordinator->startup(getServiceContext());
 
         // The flusher thread holds a copy of the shared_ptr to keep the coordinator alive

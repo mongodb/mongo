@@ -9,7 +9,6 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
@@ -36,24 +35,34 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {
+public:
+    ReadAndIncrementSizeCountsTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
 protected:
-    void doReadAndIncrement(CollectionSizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
+    void setUp() override {
+        CatalogTestFixture::setUp();
+
+        store = test_helpers::createContainerFastCountStores(operationContext()).sizeCountStore;
+    }
+
+    void doReadAndIncrement(ContainerSizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
         store.readAndIncrementReplicatedMetadata(operationContext(), deltas);
     }
+
+    std::unique_ptr<ContainerSizeCountStore> store;
 };
 
 TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
-
     const UUID uuid = UUID::gen();
     ReplicatedMetadataDeltas deltas;
     deltas[uuid] =
         ReplicatedMetadataDelta{.metadata = {.sizeCount = {0, 0}}, .state = DDLState::kNone};
 
     // Read before the document exists.
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -62,12 +71,12 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
 
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 0, .count = 0});
 
     // Read after (0,0) document exists.
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -76,13 +85,11 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
 }
 
 TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
@@ -90,7 +97,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
     deltas[uuid] = ReplicatedMetadataDelta{.metadata = {.sizeCount = {.size = -400, .count = -20}},
                                            .state = DDLState::kNone};
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid));
@@ -104,26 +111,24 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
  * document UUIDs ∩ delta UUIDs = {}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid1,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     ReplicatedMetadataDeltas deltas;
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_TRUE(deltas.empty());
 }
@@ -134,20 +139,18 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
  * document UUIDs ∩ delta UUIDs = {uuid1, uuid2}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid1,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
@@ -157,7 +160,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
     deltas[uuid2] =
         ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 10}}, .state = DDLState::kNone};
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -174,20 +177,18 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
  * document UUIDs ∩ delta UUIDs = {uuid1}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid1,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
@@ -195,7 +196,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
     deltas[uuid1] =
         ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -209,13 +210,11 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
  * document UUIDs ∩ delta UUIDs = {uuid1}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid1,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
@@ -226,7 +225,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
     deltas[uuid2] =
         ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 10}}, .state = DDLState::kNone};
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 2);
     ASSERT_TRUE(deltas.contains(uuid1));
@@ -243,20 +242,18 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
  * document UUIDs ∩ delta UUIDs = {}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
-    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
-    CollectionSizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid1,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
     test_helpers::insertSizeCountEntry(
         operationContext(),
-        store,
+        *store,
         uuid2,
         SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
@@ -265,7 +262,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
     deltas[uuid3] =
         ReplicatedMetadataDelta{.metadata = {.sizeCount = {5, 1}}, .state = DDLState::kNone};
 
-    doReadAndIncrement(store, deltas);
+    doReadAndIncrement(*store, deltas);
 
     EXPECT_EQ(deltas.size(), 1);
     ASSERT_TRUE(deltas.contains(uuid3));

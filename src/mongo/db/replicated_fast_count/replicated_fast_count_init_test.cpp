@@ -8,7 +8,6 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
-#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -39,54 +38,6 @@ protected:
     OperationContext* _opCtx;
     ReplicatedFastCountManager* _fastCountManager;
 };
-
-const NamespaceString replicatedFastCountStoreNss =
-    NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-
-const NamespaceString replicatedFastCountStoreTimestampsNss =
-    NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
-TEST_F(ReplicatedFastCountInitTest,
-       setUpReplicatedFastCountCreatesInternalCollectionsAndStartsUpThread) {
-    {
-        auto coll = acquireCollection(
-            _opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                _opCtx, replicatedFastCountStoreNss, AcquisitionPrerequisites::kRead),
-            LockMode::MODE_IS);
-        ASSERT(!coll.exists());
-
-        auto collTimestamps = acquireCollection(
-            _opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                _opCtx, replicatedFastCountStoreTimestampsNss, AcquisitionPrerequisites::kRead),
-            LockMode::MODE_IS);
-        ASSERT(!collTimestamps.exists());
-    }
-
-    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
-
-    setUpReplicatedFastCount(_opCtx);
-
-    {
-        auto coll = acquireCollection(
-            _opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                _opCtx, replicatedFastCountStoreNss, AcquisitionPrerequisites::kRead),
-            LockMode::MODE_IS);
-        ASSERT(coll.exists());
-
-        auto collTimestamps = acquireCollection(
-            _opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                _opCtx, replicatedFastCountStoreTimestampsNss, AcquisitionPrerequisites::kRead),
-            LockMode::MODE_IS);
-        ASSERT(collTimestamps.exists());
-    }
-
-    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
-}
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreIdents) {
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
