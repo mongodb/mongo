@@ -9,9 +9,6 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
- *   # Too slow on TSAN (sanitizer overhead on a multi-shard cluster), causing timeouts.
- *   # TODO SERVER-127099: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  *   tsan_incompatible,
  *   incompatible_aubsan,
  *   requires_fcv_90,
