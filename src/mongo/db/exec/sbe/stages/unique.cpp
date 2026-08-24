@@ -98,9 +98,10 @@ PlanState UniqueStage::getNext() {
         if (inserted) {
             const_cast<value::MaterializedRow&>(*it).makeOwned();
             size_t newSeenSizeBytes = estimateSetSizeBytes(_seen);
-            _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
-                                estimateRowSizeBytes(*it));
-            _dedupReporter.add((newSeenSizeBytes - _prevSeenSizeBytes) + estimateRowSizeBytes(*it));
+            const auto deduplicatedBytes =
+                (newSeenSizeBytes - _prevSeenSizeBytes) + estimateRowSizeBytes(*it);
+            _memoryTracker->add(deduplicatedBytes);
+            _dedupReporter.add(deduplicatedBytes);
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130301,
                     "Exceeded memory limit in record id deduplicator for unique stage",
