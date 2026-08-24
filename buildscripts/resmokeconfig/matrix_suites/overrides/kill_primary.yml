@@ -291,6 +291,11 @@
         # - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
+          shell_options:
+            global_vars:
+              TestData:
+                # TODO SERVER-108424: get rid of runningWithStepdowns once only viewless timeseries are supported
+                runningWithStepdowns: true
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -402,6 +407,11 @@
         # - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
+          shell_options:
+            global_vars:
+              TestData:
+                # TODO SERVER-108424: get rid of runningWithShardStepdowns once only viewless timeseries are supported
+                runningWithShardStepdowns: true
         - class: ValidateCollections
           shell_options:
             global_vars:
