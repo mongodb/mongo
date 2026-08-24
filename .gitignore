@@ -57,6 +57,9 @@ venv
 *.core
 iwyu.dat
 
+/bazel/hermetic_container/__pycache__/
+/bazel/hermetic_container/dist/
+
 /src/ipch
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
