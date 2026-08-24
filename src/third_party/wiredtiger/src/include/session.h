@@ -157,9 +157,10 @@ struct __wt_session_impl {
     WT_RWLOCK *current_rwlock;
     uint8_t current_rwticket;
 
-    WT_ITEM **scratch;     /* Temporary memory for any function */
-    u_int scratch_alloc;   /* Currently allocated */
-    size_t scratch_cached; /* Scratch bytes cached */
+    WT_ITEM **scratch;        /* Temporary memory for any function */
+    u_int scratch_alloc;      /* Currently allocated */
+    size_t scratch_cached;    /* Scratch bytes cached */
+    WT_SPINLOCK scratch_lock; /* Scratch buffer lock */
 #ifdef HAVE_DIAGNOSTIC
 
     /* Enforce the contract that a session is only used by a single thread at a time. */
