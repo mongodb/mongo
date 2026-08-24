@@ -17,7 +17,7 @@ namespace {
 auto& operationsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kQueryCount,  // name
     "Number of queries executed",             // description
-    otel::metrics::MetricUnit::kQueries);     // unit
+    otel::metrics::MetricUnit::kCount);       // unit
 }  // namespace
 ```
 
@@ -33,14 +33,14 @@ team, and a sudden increase in metrics will result in operational costs ballooni
 which is why N&O owns this registry.
 
 When adding a new metric, add a `static constexpr MetricName` entry to the `MetricNames` class in
-`metric_names.h`, grouped under your team name:
+`metric_names.h`, grouped with related metrics:
 
 ```cpp
 class MetricNames {
 public:
-    // Query Team Metrics
-    static constexpr MetricName kQueryCount = {"num_queries"};
-    static constexpr MetricName kQueryLatency = {"query_latency"};
+    // Query Metrics
+    static constexpr MetricName kQueryCount = MetricNameMaker::make("mongodb.query.count");
+    static constexpr MetricName kQueryLatency = MetricNameMaker::make("mongodb.query.latency_millis");
 };
 ```
 
@@ -51,31 +51,39 @@ metric_names.h.
 
 ### Naming Conventions
 
-#### New metrics
+#### Metric Names
 
-Follow
-[OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/semconv/general/naming/):
+All metrics, whether new or migrated from serverStatus, follow the
+[OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/semconv/general/naming/).
+Some notable rules are:
 
-- Use lowercase with dots as separators for namespaces (e.g., `network.connections.active`), and
-  underscores to separate words within namespaces (`slow_queries`)
-- Put every metric within a namespace related to the context of the metric (e.g.,
-  `network.connections.active`, rather than just `connections.active`)
-- Be descriptive but concise, there is no need to restate the units as part of the metric name
+- **Lowercase, dot-separated namespaces** — use dots to separate path segments (e.g.,
+  `mongodb.network.connections.active`) and `snake_case` within each segment (e.g., `slow_queries`).
+- **Always prefer `snake_case` over `camelCase` or hyphens** — all path segments use `snake_case`
+  (`totalTimeMicros` → `total_time_micros`, `block-manager` → `block_manager`, etc.).
+- **No `_total` / `.total` suffix** — Avoid appending `total` to metric names since it may make the
+  meaning of counters confusing.
 
-`mongodb.` will be automatically prepended to all metric names because it is the service name
-provided to OTel.
+Also, metric names should follow these MongoDB specific rules:
 
-#### Migrating existing serverStatus metrics
+- **`mongodb.` prefix** — every metric name gets `mongodb.` at the beginning.
+- **Drop redundant sub-prefixes** — e.g. the second `disk` in
+  `mongodb.hardware.disk.disk_space_free_bytes.`
+- **Provide sufficient context in the metric name for unitless metrics** - Unitless metrics should
+  specify what the number means rather than adding a new unit for it. Such metrics should be created
+  with a `count` unit. Example: we should choose a `docsInserted` metric with `count` unit over a
+  `docs` metric with `numInserted` unit.
 
-Use the same name as the metric in serverStatus, (e.g. `serverStatus.network.bytesIn`) including the
-unit if the metric name includes that already (e.g.
-`serverStatus.metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros`).
+Note that not all metric names currently follow the above guidelines and are in the process of being
+updated (TODO(SERVER-133643)). Any new metric should follow this guidance rather than the precedent
+set by other metric names.
 
-### Available Units
+#### Units
 
 The [`MetricUnit`](metric_unit.h) enum provides standard units.
 
-#### Adding New Units
+Prefer generic unit names over domain-specific ones: the metric name already provides the context,
+so a cursor count should use `MetricUnit::kCount` rather than a `kCursors`-style unit.
 
 If your metric requires a unit not listed above:
 
@@ -86,6 +94,17 @@ If your metric requires a unit not listed above:
 [otel-units]: https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units
 
 Contact the N&O team if you're unsure whether to add a new unit or reuse an existing one.
+
+#### Migrating existing serverStatus metrics
+
+Do **not** simply reuse the serverStatus name. Translate it into the spec above (e.g.
+`serverStatus.metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros` becomes
+`mongodb.network.egress.connection_acquired_to_wire.time_micros`).
+
+#### Avoid renaming released metrics
+
+Once a metric has been released for external consumption and is documented, renaming it breaks
+downstream consumers, dashboards, and alerts. Renames after release should be avoided.
 
 ## Metric Types
 
@@ -105,9 +124,9 @@ typically be run on these metrics.
 
 ```cpp
 auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
-    otel::metrics::MetricNames::kOperationsTotal,
+    otel::metrics::MetricNames::kOperationsCount,
     "Total number of operations performed",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kCount);
 
 counter.add(1);  // Increment by 1
 counter.add(10); // Increment by 10
@@ -132,7 +151,7 @@ distinct from a **Gauge**, which represents an observed point-in-time value (see
 auto& openSessions = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
     otel::metrics::MetricNames::kOpenConnections,
     "Total number of open sessions",
-    otel::metrics::MetricUnit::kConnections);
+    otel::metrics::MetricUnit::kCount);
 
 openSessions.add(1);   // Session started
 openSessions.add(-1);  // Session ended
@@ -170,13 +189,24 @@ information.
 ## Metric Attributes (Labels)
 
 The OpenTelemetry standard supports attaching key-value attributes (also known as labels or tags) to
-metrics, enabling queries like `query_count{database="admin"}`.
+metrics, so a single metric can be sliced by attribute value in the backend it is exported to. For
+example, a `mongodb.query.count` counter with a `mongodb.database` attribute lets you break query
+counts down per database.
 
 **Metric attribute values are required to be known at metric creation time.** This reduces the
 impact of attributes on performance, and helps prevent issues around PII in attributes, which is
 currently disallowed. We may support non-compile-time attributes in the future, please reach out to
 the Networking and Observability team if you'd like this feature prioritized
 ([SERVER-121629](https://jira.mongodb.org/browse/SERVER-121629)).
+
+### Attribute Conventions
+
+- Lowercase.
+- Dot-separated namespacing with `snake_case` within each segment, following the same
+  `{object}.{property}` pattern as metric names.
+- MongoDB-specific attributes use the `mongodb.*` prefix.
+- Singular for single values (`host.name`), plural for arrays (`process.command_args`).
+- No ambiguous abbreviations.
 
 ## Performance Considerations
 
@@ -191,14 +221,14 @@ performance-sensitive code.
 **Use Counters, UpDownCounters, and Gauges** for metrics recorded on every request or in
 latency-critical paths.
 
-### Histograms: Acquires Locks (Avoid in Hot Paths)
+### Histograms: Acquires Locks (Validate Overhead)
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> The underlying OpenTelemetry library acquires locks during histogram `Record()` operations. Avoid
-> using histograms in performance-sensitive code paths where lock contention could impact latency or
-> throughput. [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030) tracks improvements to
-> histogram performance.
+> The underlying OpenTelemetry library acquires locks during histogram `Record()` operations. Ensure
+> that histograms are only used when required and verify their overhead through performance testing. 
+> [SERVER-117030](https://jira.mongodb.org/browse/SERVER-117030) tracks improvements to histogram
+> performance.
 
 **When to use histograms:**
 
@@ -261,7 +291,7 @@ TEST(MyFeatureTest, RecordsMetrics) {
     auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
         otel::metrics::MetricNames::kMyFeatureEvents,
         "Number of events processed",
-        otel::metrics::MetricUnit::kOperations);
+        otel::metrics::MetricUnit::kCount);
     counter.add(5);
 
     // Some variants don't currently include otel (notably Windows and some suse variants) so
@@ -313,7 +343,7 @@ namespace {
 auto& myCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kMyFeatureEvents,
     "Number of events processed",
-    otel::metrics::MetricUnit::kEvents,
+    otel::metrics::MetricUnit::kCount,
     {.serverStatusOptions = otel::metrics::ServerStatusOptions{.dottedPath = "myFeature.eventCount",
                                                                .role = ClusterRole::None}});
 }  // namespace
@@ -368,7 +398,7 @@ exporter can be active at a time.
 Export metrics to local JSONL files by specifying a directory:
 
 ```bash
-mongod --openTelemetryMetricsDirectory=/var/log/mongodb/metrics
+mongod --setParameter openTelemetryMetricsDirectory=/var/log/mongodb/metrics
 ```
 
 Metrics are written to files with the pattern: `mongodb-{pid}-%Y%m%d-%N-metrics.jsonl`, where `%N`
@@ -383,24 +413,24 @@ For example: `mongodb-12345-20251218-0-metrics.jsonl`
 Export metrics to an OpenTelemetry collector or compatible backend via HTTP:
 
 ```bash
-mongod --openTelemetryMetricsHttpEndpoint="http://localhost:4318/v1/metrics"
+mongod --setParameter openTelemetryMetricsHttpEndpoint="http://localhost:4318/v1/metrics"
 ```
 
 The HTTP exporter supports optional gzip compression:
 
 ```bash
-mongod --openTelemetryMetricsHttpEndpoint="http://localhost:4318/v1/metrics" \
-       --openTelemetryMetricsCompression=gzip
+mongod --setParameter openTelemetryMetricsHttpEndpoint="http://localhost:4318/v1/metrics" \
+       --setParameter openTelemetryMetricsCompression=gzip
 ```
 
 ### Export Timing
 
 Control how frequently metrics are exported and the timeout for export operations:
 
-| Parameter                             | Description                       | Default |
-| ------------------------------------- | --------------------------------- | ------- |
-| `--openTelemetryExportIntervalMillis` | Time between consecutive exports  | 1000 ms |
-| `--openTelemetryExportTimeoutMillis`  | Timeout for each export operation | 500 ms  |
+| Parameter                           | Description                       | Default |
+| ----------------------------------- | --------------------------------- | ------- |
+| `openTelemetryExportIntervalMillis` | Time between consecutive exports  | 1000 ms |
+| `openTelemetryExportTimeoutMillis`  | Timeout for each export operation | 500 ms  |
 
 ### Additional Export Methods
 

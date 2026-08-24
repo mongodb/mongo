@@ -89,7 +89,7 @@ public:
 
 /**
  * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to
- * the server, please add an entry to MetricNames grouped under your team name.
+ * the server, please add an entry to MetricNames grouped with related metrics.
  *
  * This ensures that the N&O team has full ownership over new OTel metrics in the server for
  * centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series
