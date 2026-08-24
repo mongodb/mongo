@@ -690,14 +690,12 @@ public:
                 awaitDataState(opCtx).shouldWaitForInserts = true;
             }
 
-            waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitWithPinnedCursorDuringGetMoreBatch,
-                    opCtx,
-                    "waitWithPinnedCursorDuringGetMoreBatch",
-                    []() {}, /*empty function*/
-                    nss);
-            });
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitWithPinnedCursorDuringGetMoreBatch,
+                opCtx,
+                "waitWithPinnedCursorDuringGetMoreBatch",
+                /*whileWaiting=*/nullptr,
+                nss);
 
             const auto shouldSaveCursor = generateBatch(opCtx,
                                                         cursorPin.getCursor(),

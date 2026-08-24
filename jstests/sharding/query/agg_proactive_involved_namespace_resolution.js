@@ -72,10 +72,7 @@ describe("proactive involved-namespace resolution", function () {
     // breaks out of the wait loop after a single iteration (see
     // curop_failpoint_helpers.cpp), so mongos doesn't actually block.
     //
-    // Each kickback bumps the failpoint's `timesEntered` by exactly 2: one hit
-    // from the outer `executeIf` entry and one from the `shouldFail()` check
-    // at the top of the (immediately-broken) wait loop. We divide by 2 to
-    // recover the kickback count.
+    // Each kickback increments the failpoint's `timesEntered` exactly once.
     const countKickbacks = (fn) => {
         const fpName = "hangBeforeRetryingAggregateAfterViewKickback";
         const fp = configureFailPoint(this.st.s, fpName, {sleepFor: 0});
@@ -87,13 +84,7 @@ describe("proactive involved-namespace resolution", function () {
             );
             fp._finalCount = res.count;
         }
-        const entries = fp._finalCount - fp.timesEntered;
-        assert.eq(
-            entries % 2,
-            0,
-            `unexpected failpoint entry count ${entries} (expected multiple of 2)`,
-        );
-        return entries / 2;
+        return fp._finalCount - fp.timesEntered;
     };
 
     it("rejects a cycle between two views safely", () => {

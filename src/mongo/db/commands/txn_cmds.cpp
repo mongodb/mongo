@@ -153,12 +153,13 @@ public:
             // coordinator.
             verifyAuthorizedToAlterPreparedTransaction(opCtx, request().getDbName());
 
-            hangBeforeCommitingTxn.executeIf(
-                [&](const BSONObj& data) {
-                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                        &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
-                },
-                [&](const BSONObj& data) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeCommitingTxn,
+                opCtx,
+                "hangBeforeCommitingTxn",
+                /*whileWaiting=*/nullptr,
+                /*nss=*/{},
+                /*extraPred=*/[&](const BSONObj& data) {
                     // Hang if we don't provide a txnNumber to the fail point. If we do, only hang
                     // if the txnNumber matches the current running txnNumber.
                     if (data.hasField("uuid")) {
