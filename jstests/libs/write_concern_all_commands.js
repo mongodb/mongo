@@ -5953,6 +5953,50 @@ function executeWriteConcernBehaviorTests(conn,
     });
 }
 
+// Commands that override the test's {wtimeout: 1000} with an internal majority write concern
+// (typically 60s per wait, and more than one wait for enableSharding / setFCV). Independently
+// sampling them at the short-command rate can stack enough silent waits to hit Evergreen idle
+// timeout. Timeout handling from SERVER-102770 / SERVER-103553 is not backported below 8.2.
+const kLongInternalWriteConcernCommands = new Set([
+    "create",
+    "dropIndexes",
+    "enableSharding",
+    "setFeatureCompatibilityVersion",
+]);
+
+const kCommandSelectionProbability = 0.25;
+const kMaxLongInternalWriteConcernCommandsPerFile = 1;
+
+// One resmoke test process loads this module once, so the budget is shared across every
+// checkWriteConcernBehaviorForAllCommands() call in the same file.
+let remainingLongInternalWriteConcernCommands = kMaxLongInternalWriteConcernCommandsPerFile;
+
+function selectCommandsToRun(commandsList) {
+    const selectedShort = [];
+    const sampledLong = [];
+    for (const command of commandsList) {
+        if (Math.random() >= kCommandSelectionProbability) {
+            continue;
+        }
+        if (kLongInternalWriteConcernCommands.has(command)) {
+            sampledLong.push(command);
+        } else {
+            selectedShort.push(command);
+        }
+    }
+
+    Random.setRandomSeed();
+    Array.shuffle(sampledLong);
+    const selectedLong = sampledLong.splice(0, remainingLongInternalWriteConcernCommands);
+    remainingLongInternalWriteConcernCommands -= selectedLong.length;
+
+    const selectedCommands = selectedShort.concat(selectedLong);
+    jsTestLog("Running " + selectedCommands.length + "/" + commandsList.length +
+              " commands (short: " + selectedShort.length + ", long: " + tojson(selectedLong) +
+              ", remaining long budget: " + remainingLongInternalWriteConcernCommands + ")");
+    return selectedCommands;
+}
+
 export function checkWriteConcernBehaviorForAllCommands(
     conn, cluster, clusterType, preSetup, shardedCollection, limitToTimeseriesViews = false) {
     jsTestLog("Checking write concern behavior for all commands");
@@ -5960,12 +6004,12 @@ export function checkWriteConcernBehaviorForAllCommands(
         limitToTimeseriesViews ? wcTimeseriesViewsCommandsTests : wcCommandsTests;
     const commandsList = AllCommandsTest.checkCommandCoverage(conn, commandsToTest);
 
-    // Randomly execute commands with 10% probability to reduce test runtime.
-    // This mitigates long internal write concern timeouts (30-60s) that override
-    // test-specified timeouts, as timeout handling improvements from SERVER-102770
-    // and SERVER-103553 are not being backported to versions below 8.2.
-    const selectedCommands = commandsList.filter(() => Math.random() < 0.1);
-    jsTestLog("Running " + selectedCommands.length + "/" + commandsList.length + " commands");
+    // To reduce test runtime and avoid hitting Evergreen's idle timeout, commands are
+    // randomly sampled, and at most one long-internal-write-concern command is kept per
+    // file. This mitigates stacked silent waits from long internal write-concern timeouts
+    // (30-60 seconds) that override test-specified timeouts, since the timeout-handling
+    // improvements from SERVER-102770 and SERVER-103553 are not being backported below 8.2.
+    const selectedCommands = selectCommandsToRun(commandsList);
 
     let coll = conn.getDB(dbName).getCollection(collName);
 
