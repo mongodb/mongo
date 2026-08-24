@@ -86,6 +86,7 @@ selector:
     - jstests/core/shell/bench_test1.js
     - jstests/core_sharding/resharding/*.js
     - jstests/core/query/query_settings/query_settings_size_limits.js
+    - jstests/core/txns/bulk_write_getMore.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js
