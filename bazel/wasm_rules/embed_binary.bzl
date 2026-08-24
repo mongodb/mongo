@@ -8,7 +8,7 @@ Provides CcInfo so dependents can link the .o via deps (recommended) in addition
 to using the output in linkopts/additional_linker_inputs.
 """
 
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 _ASM_TEMPLATE_LINUX = """\
     .section .rodata,"a"
@@ -38,7 +38,7 @@ _{size_sym} = _{end_sym} - _{start_sym}
 """
 
 def _embed_binary_obj_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     input_file = ctx.file.src
     output_file = ctx.outputs.out
     prefix = "_" + ctx.attr.symbol_prefix
@@ -113,7 +113,7 @@ embed_binary_obj = rule(
             doc = "Short name for embedded symbols; produces _<symbol_prefix>_start, _end, _size.",
         ),
         "_cc_toolchain": attr.label(
-            default = "@bazel_tools//tools/cpp:current_cc_toolchain",
+            default = "@rules_cc//cc:current_cc_toolchain",
         ),
         "_macos": attr.label(default = "@platforms//os:macos"),
     },

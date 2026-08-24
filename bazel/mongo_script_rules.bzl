@@ -1,7 +1,7 @@
 """Common mongo-specific bazel build rules intended to be used for buildscripts.
 """
 
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_python//python:py_info.bzl", "PyInfo")
 
 MONGO_TOOLCHAIN_V4_PATH = "/opt/mongodbtoolchain/v4"
@@ -53,7 +53,7 @@ def _py_cxx_test_impl(ctx):
                 )
     python_path_str = ctx.configuration.host_path_separator.join(python_path)
 
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     runfiles = ctx.runfiles(
         files = (
             ctx.files.srcs +

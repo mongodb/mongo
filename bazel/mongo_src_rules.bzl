@@ -13,13 +13,17 @@ load(
     "get_linkopts",
 )
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("//bazel/install_rules:bolt.bzl", "bolt_optimize")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:py_info.bzl", "PyInfo")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_shared_library")
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_shared_library", "rust_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
@@ -774,7 +778,7 @@ def _mongo_cc_binary_and_test(
             exec_properties = exec_properties,
         )
     else:
-        native.cc_test(**args)
+        cc_test(**args)
         extract_debuginfo_test(
             name = name,
             binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
@@ -1258,7 +1262,7 @@ def symlink(name, tags = [], **kwargs):
     )
 
 def strip_deps_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
@@ -1323,7 +1327,7 @@ def mongo_cc_proto_library(
         deps,
         tags = [],
         **kwargs):
-    native.cc_proto_library(
+    cc_proto_library(
         name = name + "_raw",
         deps = deps,
         **kwargs

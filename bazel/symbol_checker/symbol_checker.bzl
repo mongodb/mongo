@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 SymbolInfo = provider(
     fields = {
@@ -66,7 +66,7 @@ def symbol_checker_aspect_impl(target, ctx):
         ]
 
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     nm_bin = cc_toolchain.nm_executable
 
     objs = _collect_cc_objects(cc_info)

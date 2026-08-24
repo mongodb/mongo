@@ -495,7 +495,6 @@ def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str],
             cquery_flags.extend(shlex.split(flag_value))
 
     cquery_flags.append("--//bazel/resmoke:skip_deps_for_cquery")
-    cquery_flags.append("--noincompatible_enable_cc_toolchain_resolution")
     cquery_flags.append("--repo_env=no_c++_toolchain=1")
     cquery_flags.append("--keep_going")
 

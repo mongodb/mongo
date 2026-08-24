@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 
 # This will not currently work under bazel test/run until we have a version of gdb to use in bazel

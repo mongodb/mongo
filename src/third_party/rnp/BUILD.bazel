@@ -4,6 +4,8 @@
 #
 # NOTE: RNP is only supported on Linux platforms with OpenSSL.
 
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 # Platform restriction for all RNP targets (Linux only, exclude AL2 - OpenSSL 1.1.0+ required)

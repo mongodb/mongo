@@ -1,5 +1,5 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
@@ -59,7 +59,7 @@ def _target_platform_os(ctx):
     fail("Unable to determine target operating system from the target platform")
 
 def generate_config_header_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     input = ctx.attr.template.files.to_list()[0].path
     checks = ctx.attr.checks.files.to_list()[0].path
 
@@ -229,7 +229,7 @@ generate_config_header_rule = rule(
             executable = True,
             cfg = "exec",
         ),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_sdkroot": attr.label(default = "//bazel/config:sdkroot"),
         "_windows_cross_host_path": attr.label(default = "//bazel/config:windows_cross_host_path"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),

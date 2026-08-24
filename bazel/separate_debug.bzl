@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 TagInfo = provider(
     doc = "A rule provider to pass around tags that were passed to rules.",
@@ -675,7 +675,7 @@ def wasi_extraction(ctx, cc_toolchain, inputs):
     return provided_info
 
 def extract_debuginfo_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     inputs = depset(transitive = [
         ctx.attr.binary_with_debug.files,
         ctx.attr.cc_shared_library.files if ctx.attr.cc_shared_library != None else depset([]),
@@ -756,7 +756,7 @@ extract_debuginfo = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
@@ -803,7 +803,7 @@ extract_debuginfo_binary = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
@@ -850,7 +850,7 @@ extract_debuginfo_test = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),

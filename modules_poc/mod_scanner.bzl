@@ -1,7 +1,7 @@
 # Based heavily on https://github.com/mongodb-forks/bazel_clang_tidy/blob/master/clang_tidy/clang_tidy.bzl
 # mixed with skylib's run_binary.bzl, and then enhanced to use unused_inputs_list.
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 def _run_mod_scan(
         ctx,  # type: ctx
@@ -9,7 +9,7 @@ def _run_mod_scan(
         compilation_context,  # type: CompilationContext
         infile,
         discriminator):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     tool_inputs, tool_input_mfs = ctx.resolve_tools(tools = [ctx.attr._mod_scanner])
     inputs = depset(
         direct = (
@@ -95,7 +95,7 @@ def _rule_sources(ctx):
     return [src for src in srcs if "src/mongo/" in src.path and "third_party" not in src.path]
 
 def _toolchain_flags(ctx, action_name = ACTION_NAMES.cpp_compile):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
@@ -166,7 +166,7 @@ mod_scanner_aspect = aspect(
     implementation = _mod_scanner_aspect_impl,
     fragments = ["cpp"],
     attrs = {
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
+        "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
         "_mod_scanner": attr.label(
             default = Label(":mod_scanner"),
             cfg = "exec",

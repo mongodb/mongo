@@ -2,6 +2,7 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load(
     "@//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_cc_toolchain_config.bzl",
     "mongo_apple_cross_cc_toolchain_config",

@@ -2,7 +2,7 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
@@ -636,7 +636,7 @@ def resmoke_suite_test(
 
     data_attr = select({
         # Skip user-provided data during cquery — it may include targets that require
-        # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
+        # C++ toolchain resolution, which fails when no_c++_toolchain=1 is set.
         "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
         "//conditions:default": data + cquery_safe_data,
     }) + select({
@@ -765,7 +765,7 @@ def _resmoke_test_impl(ctx):
     # binary. Our launcher is a shell script, so set it explicitly from the resolved
     # cc toolchain. Under coverage, the clang toolchain maps the "gcov" tool to
     # llvm-profdata; llvm-cov is its sibling in the same bin dir.
-    cc_toolchain = find_cpp_toolchain(ctx, mandatory = False)
+    cc_toolchain = find_cc_toolchain(ctx, mandatory = False)
 
     # Note that gcov_executable can be used for either gcov or llvm-profdata
     gcov = cc_toolchain.gcov_executable if cc_toolchain else None
@@ -894,7 +894,7 @@ _resmoke_test = rule(
             doc = "Environment for the test; values support $(location) and make-vars.",
         ),
         # C++ coverage plumbing (see extract_debuginfo_test).
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:optional_current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:optional_current_cc_toolchain"),
         "_lcov_merger": attr.label(
             default = configuration_field(fragment = "coverage", name = "output_generator"),
             executable = True,
@@ -906,7 +906,7 @@ _resmoke_test = rule(
             cfg = config.exec(exec_group = "test"),
         ),
     },
-    toolchains = use_cpp_toolchain(),
+    toolchains = use_cc_toolchain(mandatory = False),
     fragments = ["cpp", "coverage"],
     test = True,
 )

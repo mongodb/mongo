@@ -1,5 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("@//bazel/config:configs.bzl", "sdkroot")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "get_supported_apple_archs")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_llvm_cc_toolchain_config.bzl", "mongo_apple_llvm_cc_toolchain_config")

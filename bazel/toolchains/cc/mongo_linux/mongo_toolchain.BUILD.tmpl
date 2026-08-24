@@ -1,5 +1,6 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 load(

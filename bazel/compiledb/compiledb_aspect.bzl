@@ -1,7 +1,7 @@
 """Aspect-based compile_commands fragment generation."""
 
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 _COMPILEDB_WORKAROUND_FEATURES = [
     "layering_check",
@@ -397,7 +397,7 @@ def _compiledb_aspect_impl(target, ctx):
             OutputGroupInfo(compiledb_report = depset(transitive = [dep_outputs, dep_required_inputs])),
         ]
 
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     original_requested_features, original_unsupported_features = _requested_and_unsupported_features(ctx)
     original_feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -493,7 +493,7 @@ compiledb_aspect = aspect(
     implementation = _compiledb_aspect_impl,
     fragments = ["cpp"],
     attrs = {
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
+        "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
     },
     toolchains = [
         "@bazel_tools//tools/cpp:toolchain_type",

@@ -85,7 +85,7 @@ def _toolchain_download(ctx):
 
     skip_toolchain = ctx.os.environ.get(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE, None)
     if skip_toolchain:
-        generate_noop_toolchain(ctx, substitutions)
+        generate_noop_toolchain(ctx, substitutions, resolvable = True)
         ctx.report_progress("Skipping c++ toolchain download and defining noop toolchain due to {} being defined.".format(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE))
         return None
 

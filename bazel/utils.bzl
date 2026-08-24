@@ -86,13 +86,75 @@ sys.pycache_prefix = os.path.join(tempfile.gettempdir(), "{pycache_dirname}")
 """.format(pycache_dirname = pycache_dirname),
     )
 
-def generate_noop_toolchain(ctx, substitutions):
+# A toolchain that deliberately matches nothing, for os/arch combinations where the
+# mongo toolchain does not exist. It must not resolve, so that the platform's real
+# toolchain wins instead.
+_UNRESOLVABLE_TOOLCHAIN = """
+toolchain(
+    name = "mongo_toolchain",
+    exec_compatible_with = ["@platforms//:incompatible"],
+    target_compatible_with = ["@platforms//:incompatible"],
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+"""
+
+# A toolchain that always matches, backed by the same hollow cc_toolchain. Used only
+# when the toolchain download is deliberately skipped (no_c++_toolchain=1) for
+# analysis-only invocations such as the resmoke target cquery in
+# generate_result_tasks.py.
+_RESOLVABLE_TOOLCHAIN = """
+toolchain(
+    name = "mongo_toolchain",
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+"""
+
+# Minimal cc_toolchain_config_info. Declares no features and no real tools; it exists
+# purely so toolchain resolution and cc_toolchain_alias analysis can succeed.
+_NOOP_CC_TOOLCHAIN_CONFIG_BZL = """\
+\"\"\"Hollow cc toolchain config for the no-op mongo toolchain.\"\"\"
+
+def _impl(ctx):
+    return cc_common.create_cc_toolchain_config_info(
+        ctx = ctx,
+        toolchain_identifier = "mongo_noop_toolchain",
+        host_system_name = "local",
+        target_system_name = "local",
+        target_cpu = "unknown",
+        target_libc = "unknown",
+        compiler = "unknown",
+    )
+
+noop_cc_toolchain_config = rule(
+    implementation = _impl,
+    attrs = {},
+    provides = [CcToolchainConfigInfo],
+)
+"""
+
+def generate_noop_toolchain(ctx, substitutions, resolvable = False):
+    """Generates a mongo toolchain repo with no downloaded payload.
+
+    Args:
+      ctx: the repository rule context.
+      substitutions: unused; accepted so callers can pass the usual substitution dict.
+      resolvable: when True, the stub toolchain carries no platform constraints so it
+        always resolves. Pass True only when the download was skipped on purpose
+        (no_c++_toolchain=1) for an analysis-only invocation. Leave False when the
+        mongo toolchain genuinely does not exist for this os/arch, so that the real
+        platform-specific toolchain (e.g. the apple one) is chosen instead of this stub.
+    """
+
     # BUILD file is required for a no-op.
     # Keep a stub mongo_toolchain target so unconditional register_toolchains()
     # calls don't fail when the toolchain is intentionally skipped/unsupported.
     # Create a stub clang-format script so that targets referencing
     # //:clang_format (e.g. the format_multirun rule) can still build on
     # platforms where the mongo toolchain is unavailable (macOS, etc.).
+    ctx.file("noop_cc_toolchain_config.bzl", _NOOP_CC_TOOLCHAIN_CONFIG_BZL)
+
     ctx.file(
         "clang_format_noop.sh",
         "#!/usr/bin/env bash\n# Stub: mongo toolchain clang-format is not available on this platform.\nexit 0\n",
@@ -103,6 +165,9 @@ def generate_noop_toolchain(ctx, substitutions):
         "BUILD.bazel",
         """
 # {} not supported on this platform
+
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load("//:noop_cc_toolchain_config.bzl", "noop_cc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -131,14 +196,22 @@ filegroup(
     srcs = [],
 )
 
-toolchain(
-    name = "mongo_toolchain",
-    exec_compatible_with = ["@platforms//:incompatible"],
-    target_compatible_with = ["@platforms//:incompatible"],
-    toolchain = "@bazel_tools//tools/cpp:current_cc_toolchain",
-    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+cc_toolchain(
+    name = "cc_mongo_toolchain",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    toolchain_config = ":cc_mongo_toolchain_config",
 )
-""".format(ctx.attr.version),
+
+noop_cc_toolchain_config(
+    name = "cc_mongo_toolchain_config",
+)
+""".format(ctx.attr.version) + (_RESOLVABLE_TOOLCHAIN if resolvable else _UNRESOLVABLE_TOOLCHAIN),
     )
 
 def get_toolchain_subs(ctx):

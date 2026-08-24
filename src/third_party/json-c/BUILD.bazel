@@ -5,6 +5,8 @@
 # Not built on Windows to avoid pulling this (and rnp) into the compiledb graph
 # on Windows, which can cause OOM on run_bazel_compiledb.
 
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 _WINDOWS_INCOMPATIBLE = select({

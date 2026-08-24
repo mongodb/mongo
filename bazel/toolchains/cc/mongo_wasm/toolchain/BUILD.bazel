@@ -1,3 +1,4 @@
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
 
 package(default_visibility = ["//visibility:public"])

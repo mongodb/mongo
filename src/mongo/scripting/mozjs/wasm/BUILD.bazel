@@ -49,7 +49,7 @@ genrule(
         "manual",
         "no-sandbox",
     ],
-    toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
+    toolchains = ["@rules_cc//cc:current_cc_toolchain"],
     tools = [
         "@wasi_sdk//:bin",
     ],

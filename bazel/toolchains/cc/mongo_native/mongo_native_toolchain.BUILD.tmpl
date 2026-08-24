@@ -5,6 +5,7 @@
 # hermetic = False so it uses the system standard library, the system compiler's
 # own resource dir, and the system's own runtime libs.
 
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
 load("@//bazel/toolchains/cc:mongo_custom_features.bzl", "FEATURES_ATTR_NAMES", "get_common_features_attrs")
 load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")

@@ -6,7 +6,7 @@ local sandboxed builds and remote execution work correctly.
 """
 
 load(
-    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "artifact_name_pattern",
     "feature",
     "flag_group",
@@ -14,7 +14,7 @@ load(
     "tool_path",
     "variable_with_value",
 )
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "get_common_features",
