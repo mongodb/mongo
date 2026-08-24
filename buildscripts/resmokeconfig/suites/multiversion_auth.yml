@@ -51,13 +51,6 @@ selector:
     # breaking the ConversionFailure expectations.
     - jstests/multiVersion/genericBinVersion/query-optimization/object_bindata_convert_upgrade_downgrade.js
 
-    # TODO SERVER-131690: this test iterates every supported version below lastLTSFCV and
-    # launches that binary. Now that last-LTS is 9.0, the 8.0 binary newly qualifies but is not
-    # provisioned in the multiversion task ("Unable to start program mongod-8.0: No such file or
-    # directory"). Re-enable once the 8.0 binary is made available to the multiversion suites (this
-    # may be better addressed at the binary-download config level).
-    - jstests/multiVersion/genericBinVersion/skip_level_upgrade.js
-
     # TODO SERVER-133011: the test hardcodes the expected change-event sequence
     # produced by the last-lts binary. Now that last-lts is 9.0, the DDL change-event stream differs
     # from 8.0 (an extra/relocated "create" event), so the expectedEvents sequence no longer matches
@@ -71,13 +64,6 @@ selector:
     # command succeeds, breaking the rejection expectation. Documented for removal once 9.0 is lastLTS
     # (SERVER-123007).
     - jstests/multiVersion/genericSetFCVUsage/replica_set_write_block_upgrade_downgrade.js
-
-    # TODO SERVER-131690: this test launches every entry in allSupportedVersions, including
-    # the static 8.0 binary. Now that last-LTS is 9.0, the 8.0 binary is no longer provisioned in the
-    # multiversion task ("Unable to start program mongod-8.0: No such file or directory"). Same
-    # binary-provisioning root cause as skip_level_upgrade.js; may be better addressed at the
-    # binary-download config level.
-    - jstests/multiVersion/genericSetFCVUsage/fcv_core/major_version_upgrade.js
 
     # TODO SERVER-132996: this test launches every entry in allSupportedVersions, including the
     # static 8.0 binary. Now that last-LTS is 9.0, the 8.0 binary is no longer provisioned in the
@@ -167,11 +153,7 @@ selector:
     # at the downgrade target, so the downgrade succeeds and the assertion fails.
     - jstests/multiVersion/genericBinVersion/query-execution/error_and_log_validation_action.js
 
-    # TODO SERVER-131690: featureFlagReplicationUsageOfPriorityPort is FCV-gated at 8.3.
-    # The test asserts downgrade to last-LTS is forbidden with CannotDowngrade while a priorityPort is
-    # present in the ReplSetConfig. Now that last-LTS is 9.0 (>= 8.3), priority ports are supported at
-    # the downgrade target, so the downgrade is no longer blocked and the CannotDowngrade assertions
-    # fail.
+    # TODO SERVER-126212: now that 9.0 is last-LTS, this test should be removed.
     - jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js
 
     # TODO SERVER-133009: featureFlagPqsQueryKnobs is FCV-gated at 9.0. The test
@@ -191,9 +173,7 @@ selector:
     # succeed, breaking the expected-failure assertions.
     - jstests/multiVersion/genericBinVersion/query-execution-classic/bindata_convert_numeric_view_upgrade_downgrade.js
 
-    # TODO SERVER-131690: featureFlagAssignUUIDToShard is
-    # FCV-gated at 9.0. The test expects shard UUID metadata to be cleared at last-LTS, but last-LTS
-    # is now 9.0 and the feature remains enabled. Re-enable once the test is updated.
+    # TODO SERVER-126212: now that 9.0 is last-LTS, this test should be removed.
     - jstests/multiVersion/genericSetFCVUsage/fcv_upgrade_downgrade_manages_shard_uuids.js
 
     # Skip any tests that run with auth explicitly.

@@ -272,60 +272,6 @@ TEST_F(CommitChunkMigrate, RejectMigrationWhenChangedChunksExceedSizeLimit) {
     ASSERT_EQ(migratedChunk.getVersion(), chunkDoc.getVersion());
 }
 
-TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {
-    GTEST_SKIP()
-        << "Disabled after upgrading kLastLTSFCV to 9.0. Remove/review (TODO: SERVER-131690)";
-
-    const auto originalFCV =
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
-    // (Generic FCV reference): This test intentionally verifies commitChunkMigration behavior
-    // during an FCV transition, with a stable last LTS OFCV to ensure the server FCV being in
-    // transitional state is what rejects the migration.
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
-    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
-    serverGlobalParams.mutableFCV.setVersion(
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    const auto collUUID = UUID::gen();
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(42);
-
-    ShardType shard0;
-    shard0.setName("shard0");
-    shard0.setHost("shard0:12");
-
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("shard1:12");
-
-    setupShards({shard0, shard1});
-
-    ChunkType migratedChunk;
-    const auto version = ChunkVersion({collEpoch, collTimestamp}, {12, 7});
-    migratedChunk.setName(OID::gen());
-    migratedChunk.setCollectionUUID(collUUID);
-    migratedChunk.setVersion(version);
-    migratedChunk.setShard(shard0.getName());
-    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
-    migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
-    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
-
-    setupCollection(kNamespace, kKeyPattern, {migratedChunk});
-
-    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->commitChunkMigration(operationContext(),
-                                                  kNamespace,
-                                                  migratedChunk,
-                                                  migratedChunk.getVersion().epoch(),
-                                                  collTimestamp,
-                                                  ShardId(shard0.getName()),
-                                                  ShardId(shard1.getName())),
-                       DBException,
-                       ErrorCodes::ConflictingOperationInProgress);
-}
-
 TEST_F(CommitChunkMigrate, RetryCommittedMigrationSucceedsDuringFCVTransition) {
     const auto collUUID = UUID::gen();
     const auto collEpoch = OID::gen();
