@@ -2282,6 +2282,9 @@ struct __wt_connection {
      * true\, modify internal algorithms to change skew to force history store eviction to happen
      * more aggressively.  This includes but is not limited to not skewing newest\, not favoring
      * leaf pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction_checkpoint_ts_ordering, if true\, act as if eviction
+     * is being run in parallel to checkpoint.  We should return EBUSY in eviction if we detect any
+     * timestamp ordering issue., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this
      * number of log files.  (Warning: this option can remove log files required for recovery if no
      * checkpoints have yet been done and the number of log files exceeds the configured value.  As
@@ -3045,23 +3048,26 @@ struct __wt_connection {
  * force history store eviction to happen more aggressively.  This includes but is not limited to
  * not skewing newest\, not favoring leaf pages\, and modifying the eviction score mechanism., a
  * boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log
- * removal to retain at least this number of log files.  (Warning: this option can remove log files
- * required for recovery if no checkpoints have yet been done and the number of log files exceeds
- * the configured value.  As WiredTiger cannot detect the difference between a system that has not
- * yet checkpointed and one that will never checkpoint\, it might discard log files before any
- * checkpoint is done.) Ignored if set to 0., an integer between \c 0 and \c 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only provide
- * the exact amount requested.  This will help with spotting memory allocation issues more easily.,
- * a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\,
- * every realloc call will force a new memory allocation by using malloc., a boolean flag; default
- * \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a
- * transaction operation about every Nth operation to simulate a collision., an integer between \c 0
- * and \c 10M; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down
- * checkpoint creation by slowing down internal page processing., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction_checkpoint_ts_ordering,
+ * if true\, act as if eviction is being run in parallel to checkpoint.  We should return EBUSY in
+ * eviction if we detect any timestamp ordering issue., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
+ * of log files.  (Warning: this option can remove log files required for recovery if no checkpoints
+ * have yet been done and the number of log files exceeds the configured value.  As WiredTiger
+ * cannot detect the difference between a system that has not yet checkpointed and one that will
+ * never checkpoint\, it might discard log files before any checkpoint is done.) Ignored if set to
+ * 0., an integer between \c 0 and \c 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * realloc_exact, if true\, reallocation of memory will only provide the exact amount requested.
+ * This will help with spotting memory allocation issues more easily., a boolean flag; default \c
+ * false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\, every realloc call will force a
+ * new memory allocation by using malloc., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
+ * operation about every Nth operation to simulate a collision., an integer between \c 0 and \c 10M;
+ * default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down checkpoint
+ * creation by slowing down internal page processing., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;stress_skiplist, Configure various internal parameters to
  * encourage race conditions and other issues with internal skip lists\, e.g.  using a more dense
  * representation., a boolean flag; default \c false.}

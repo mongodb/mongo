@@ -689,6 +689,7 @@ struct __wt_page {
 #define WT_PAGE_OVFL 5          /* Overflow page */
 #define WT_PAGE_ROW_INT 6       /* Row-store internal page */
 #define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
+#define WT_PAGE_TYPE_COUNT 8    /* First value beyond valid for checks */
     uint8_t type;               /* Page type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

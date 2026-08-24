@@ -29,6 +29,7 @@ __wt_lex_compare_skip
 __wt_log_scan
 __wt_nlpo2
 __wt_nlpo2_round
+__wt_page_type_str
 __wt_print_huffman_code
 __wt_session_breakpoint
 __wt_stat_join_aggregate
