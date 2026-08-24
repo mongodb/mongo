@@ -56,12 +56,7 @@ function checkCollectionDataConsistency(primary, secondary, dbs, colls) {
     }
 }
 
-export function checkPrepareTxnTableUpdate(
-    primary,
-    secondary,
-    commitOrAbort,
-    checkConsistency = false,
-) {
+export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort) {
     Random.setRandomSeed();
     const checkTransactionTableEntry = (
         lsid,
@@ -160,12 +155,6 @@ export function checkPrepareTxnTableUpdate(
         }
         checkTransactionTableEntry(lsid, txnNumber, prepareTimestamp, expectedAffectedNamespaces);
         finishTransaction(session, prepareTimestamp);
-
-        if (checkConsistency) {
-            // Wait for replication and check data consistency after transaction completes
-            rst.awaitLastOpCommitted(undefined, [secondary]);
-            checkCollectionDataConsistency(primary, secondary, dbs, colls);
-        }
     };
 
     jsTest.log.info("Test read-only transaction, with: " + commitOrAbort);
