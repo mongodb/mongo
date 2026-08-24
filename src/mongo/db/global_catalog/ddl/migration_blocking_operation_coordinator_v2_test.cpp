@@ -18,6 +18,7 @@ namespace {
 
 constexpr auto kHangBeforeBlockingMigrations = "hangBeforeBlockingMigrationsV2";
 constexpr auto kHangBeforeAllowingMigrations = "hangBeforeAllowingMigrationsV2";
+constexpr auto kHangBeforeRemovingCoordinatorDocument = "hangBeforeRemovingCoordinatorDocument";
 
 class MigrationBlockingOperationCoordinatorV2Test : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
@@ -311,11 +312,18 @@ TEST_F(MigrationBlockingOperationCoordinatorV2Test,
     stepDown();
     fp->setMode(FailPoint::off);
     ASSERT_NOT_OK(_instance->getCompletionFuture().getNoThrow());
+    // Hold the recovered instance in cleanup so it cannot remove its state document and release
+    // itself from the service before the lookup below.
+    auto cleanupFp = globalFailPointRegistry().find(kHangBeforeRemovingCoordinatorDocument);
+    auto cleanupTimesEntered = cleanupFp->setMode(FailPoint::alwaysOn);
     stepUp(_opCtx);
 
     // Recovery re-drives `_stopBlockingMigrations` from the persisted kStopBlockingMigrations phase
     // through to completion.
     _instance = getExistingInstance();
+    cleanupFp->waitForTimesEntered(cleanupTimesEntered + 1);
+    cleanupFp->setMode(FailPoint::off);
+
     ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
     ASSERT_TRUE(_externalState->migrationsAreAllowed());
     ASSERT_FALSE(stateDocumentExistsOnDisk());
@@ -478,9 +486,16 @@ TEST_F(MigrationBlockingOperationCoordinatorV2Test, RecoversWhenBlockingWithNoOp
 
     stepDown();
     ASSERT_NOT_OK(_instance->getCompletionFuture().getNoThrow());
+    // Hold the recovered instance in cleanup so it cannot remove its state document and release
+    // itself from the service before the lookup below.
+    auto cleanupFp = globalFailPointRegistry().find(kHangBeforeRemovingCoordinatorDocument);
+    auto cleanupTimesEntered = cleanupFp->setMode(FailPoint::alwaysOn);
     stepUp(_opCtx);
 
     _instance = getExistingInstance();
+    cleanupFp->waitForTimesEntered(cleanupTimesEntered + 1);
+    cleanupFp->setMode(FailPoint::off);
+
     ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
     ASSERT_TRUE(_externalState->migrationsAreAllowed());
     ASSERT_FALSE(stateDocumentExistsOnDisk());
