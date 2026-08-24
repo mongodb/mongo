@@ -361,6 +361,19 @@ copy_files_to_directory(
     ],
 )
 
+# This sets up targets for install-gdb and archive-gdb. The archive is a sidecar for
+# pretty-printer tests and is intentionally kept separate from dist-test.
+mongo_install(
+    name = "gdb",
+    testonly = True,
+    srcs = [],
+    package_extract_name = "/",
+    root_files = {
+        "//:gdb_toolchain_folder": "lib",
+    },
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 # This sets up targets for install-dist-test and archive-dist-test
 mongo_install(
     name = "dist-test",
@@ -409,8 +422,12 @@ mongo_install(
         "//src/mongo/db/query:query_pretty_printers_gdb_test.py": "//src/mongo/db/query:query_pretty_printers_gdb_test_program",
     },
     root_files = select({
-        "@platforms//os:linux": {
+        "//bazel/config:install_gdb_enabled_linux": {
             "//:gdb_toolchain_folder": "lib",
+            "//src/mongo/db/extension/test_examples:extension_options_configs": "etc/mongo/extensions",
+            "//x509:generate_main_certificates": "bin/x509",
+        },
+        "//bazel/config:install_gdb_disabled_linux": {
             "//src/mongo/db/extension/test_examples:extension_options_configs": "etc/mongo/extensions",
             "//x509:generate_main_certificates": "bin/x509",
         },

@@ -15,12 +15,68 @@ test_args = @test_args@
 
 
 def resolve_bazel_path(path):
-    candidates = [
-        path,
-        os.path.join(os.getcwd(), "..", path),
-    ]
-    if path.startswith("external/"):
-        candidates.extend(glob.glob(os.path.join(os.getcwd(), "bazel-out", "*", "bin", path)))
+    path_variants = [path]
+    toolchain_marker = "lib/gdb-toolchain/"
+    normalized_path = path.replace(os.sep, "/")
+    if toolchain_marker in normalized_path:
+        toolchain_path = "gdb-toolchain/" + normalized_path.split(toolchain_marker, 1)[1]
+        path_variants.append(toolchain_path)
+
+    local_candidates = []
+    runfiles_candidates = []
+    runfiles_dir = os.environ.get("RUNFILES_DIR")
+    runfiles_manifest = os.environ.get("RUNFILES_MANIFEST_FILE")
+    test_workspace = os.environ.get("TEST_WORKSPACE")
+    for path_variant in path_variants:
+        local_candidates.extend([
+            path_variant,
+            os.path.join(os.getcwd(), path_variant),
+            os.path.join(os.getcwd(), "..", path_variant),
+            os.path.join("bazel-bin", path_variant),
+        ])
+        if path_variant.startswith("external/"):
+            local_candidates.extend(glob.glob(os.path.join(os.getcwd(), "bazel-out", "*", "bin", path_variant)))
+        if runfiles_dir:
+            runfiles_candidates.extend([
+                os.path.join(runfiles_dir, path_variant),
+                os.path.join(runfiles_dir, "_main", path_variant),
+            ])
+            if test_workspace:
+                runfiles_candidates.append(os.path.join(runfiles_dir, test_workspace, path_variant))
+    manifest_candidates = []
+    if runfiles_manifest and os.path.isfile(runfiles_manifest):
+        with open(runfiles_manifest, encoding="utf-8") as manifest:
+            for line in manifest:
+                manifest_path, separator, resolved_path = line.rstrip("\n").partition(" ")
+                if not separator:
+                    continue
+                manifest_path = manifest_path.rstrip("/")
+                for path_variant in path_variants:
+                    path_variant = path_variant.rstrip("/")
+                    suffix = None
+                    if manifest_path == path_variant:
+                        suffix = ""
+                    elif path_variant.startswith(manifest_path + "/"):
+                        suffix = path_variant[len(manifest_path) + 1:]
+                    elif manifest_path.endswith("/" + path_variant):
+                        suffix = ""
+                    else:
+                        path_parts = path_variant.split("/")
+                        for index in range(1, len(path_parts)):
+                            relative_prefix = "/".join(path_parts[:index])
+                            if manifest_path == relative_prefix or manifest_path.endswith("/" + relative_prefix):
+                                suffix = path_variant[len(relative_prefix) + 1:]
+                                break
+                    if suffix is not None:
+                        manifest_candidates.append(
+                            os.path.join(resolved_path, suffix) if suffix else resolved_path
+                        )
+
+    candidates = []
+    if runfiles_dir or runfiles_manifest:
+        candidates.extend(runfiles_candidates)
+        candidates.extend(manifest_candidates)
+    candidates.extend(local_candidates)
 
     for candidate in candidates:
         if os.path.exists(candidate):

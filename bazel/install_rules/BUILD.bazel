@@ -31,10 +31,17 @@ py_test(
     data = ["install_rules.py"],
 )
 
+py_test(
+    name = "pretty_printer_test_launcher_test",
+    srcs = ["pretty_printer_test_launcher_test.py"],
+    data = ["//src/mongo/util:pretty_printer_test_launcher.py.in"],
+)
+
 test_suite(
     name = "install_rules_test",
     tests = [
         ":install_rules_analysis_test",
         ":install_rules_script_test",
+        ":pretty_printer_test_launcher_test",
     ],
 )

@@ -26,6 +26,7 @@ def mongo_pretty_printer_test_impl(ctx):
 
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     gdb = ctx.attr._gdb[DefaultInfo]
+    gdb_toolchain_folder = ctx.attr._gdb_toolchain_folder[DefaultInfo].files
     gdb_files = depset(
         direct = [ctx.file._gdb],
         transitive = [
@@ -69,7 +70,13 @@ def mongo_pretty_printer_test_impl(ctx):
         mnemonic = "MongoPrettyPrinterTestCreation",
     )
 
-    runfiles = ctx.runfiles(files = outputs, transitive_files = gdb_files)
+    # Keep the assembled tree in the test's runfiles. The normal dist-test install does not
+    # include GDB unless explicitly requested, so a directly targeted pretty-printer test must
+    # carry the toolchain it needs itself.
+    runfiles = ctx.runfiles(
+        files = outputs,
+        transitive_files = depset(transitive = [gdb_files, gdb_toolchain_folder]),
+    )
     default_provider = DefaultInfo(
         executable = launcher_output,
         files = depset(outputs),
@@ -106,6 +113,11 @@ mongo_pretty_printer_test = rule(
         "_mongo_toolchain_objcopy": attr.label(
             allow_single_file = True,
             default = "@mongo_toolchain_v5//:llvm_objcopy",
+            cfg = "exec",
+        ),
+        "_gdb_toolchain_folder": attr.label(
+            allow_files = True,
+            default = "//:gdb_toolchain_folder",
             cfg = "exec",
         ),
         "_pretty_printer_creation_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:pretty_printer_test_creator.py"),
