@@ -237,11 +237,12 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
         dumpers = dumper.get_dumpers(None, None)
 
         for artifact in task_info.artifacts:
-            regex = re.search(r"Core Dump (.*?)\.gz", artifact.name)
+            # The upload's display_name ends in a space, so artifact names contain two.
+            regex = re.search(r"Core Dump\s+(.*?)\.gz", artifact.name)
             if not regex:
                 continue
 
-            core_file = regex.group(1)
+            core_file = regex.group(1).strip()
             binary_name, bin_version = dumpers.dbg.get_binary_from_core_dump(core_file)
             dir_to_check = MULTIVERSION_BIN_DIR if bin_version else LOCAL_BIN_DIR
             binary_files = os.listdir(dir_to_check)
