@@ -16,6 +16,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
+#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -30,6 +31,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/ddl/create_indexes_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
@@ -229,6 +231,13 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
         }
 
         // Make noop write to be sure that we are the primary before sending the dropCollection.
+        // This is necessary for correctness in order to avoid the following split-brain scenario:
+        // - A new primary steps up and makes a LOT of progress, installing the sharding metadata on
+        //   the shard.
+        // - The old primary fetches the current set of collections to drop.
+        // - The old primary now drops the collection and we end up without any sharding metadata.
+        // Having this no-op write serves as a barrier since it prevents a shard targeting the new
+        // collections created as a result of setFCV.
         sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
 
         for (const auto& doc : listCollRes.docs) {
@@ -238,14 +247,16 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
             const auto uuid = item.getInfo()->getUuid();
             tassert(
                 10289900, "Expected uuid to be set for shard catalog collection", uuid.has_value());
-            const auto dropCmd = BSON("drop" << item.getName() << "collectionUUID" << *uuid
-                                             << "writeConcern" << BSON("w" << "majority"));
+
+            Drop dropCmd{NamespaceString::makeGlobalConfigCollection(item.getName())};
+            dropCmd.setCollectionUUID(uuid);
+            dropCmd.setWriteConcern(defaultMajorityWriteConcern());
 
             auto dropResponse =
                 shard->runCommand(opCtx,
                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                   DatabaseName::kConfig,
-                                  dropCmd,
+                                  dropCmd.toBSON(),
                                   Shard::RetryPolicy::kIdempotent);
 
             auto status = Shard::CommandResponse::getEffectiveStatus(dropResponse);
@@ -280,6 +291,54 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
             }
         }
     }
+}
+
+void createAuthoritativeShardCatalogChunksOnShards(OperationContext* opCtx) {
+    // No shards should be added until we have forwarded the command to all shards. We use the DDL
+    // lock here to serialize with all of add shard and to avoid deadlocks with the DDL blocking
+    // used by add/remove shard.
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(opCtx,
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    "IndexAuthoritativeShardCatalogMetadata",
+                                                    LockMode::MODE_S);
+
+    const auto opTimeWithShards =
+        Grid::get(opCtx)->catalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kSnapshot);
+
+    const auto chunksIndexes = getChunkCollectionIndexSpecs();
+    std::vector<BSONObj> indexSpecs;
+    for (const auto& index : chunksIndexes) {
+        IndexSpec spec;
+        spec.addKeys(index.keys);
+        spec.unique(index.unique);
+        indexSpecs.emplace_back(spec.toBSON());
+    }
+
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+        if (shardStatus == ErrorCodes::ShardNotFound) {
+            continue;
+        }
+        const auto shard = uassertStatusOK(shardStatus);
+
+        CreateIndexesCommand cmd{NamespaceString::kConfigShardCatalogChunksNamespace};
+        cmd.setIndexes(indexSpecs);
+        cmd.setWriteConcern(defaultMajorityWriteConcern());
+
+        auto response = shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kConfig,
+                                          cmd.toBSON(),
+                                          Shard::RetryPolicy::kIdempotent);
+        auto status = Shard::CommandResponse::getEffectiveStatus(response);
+        uassertStatusOK(status);
+    }
+
+    DBDirectClient client(opCtx);
+    client.createIndexes(NamespaceString::kConfigShardCatalogChunksNamespace,
+                         indexSpecs,
+                         defaultMajorityWriteConcern().toBSON());
 }
 
 // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
@@ -677,9 +736,11 @@ private:
                 requestedVersion, originalVersion) &&
             !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
                  .isUpgradingOrDowngrading()) {
-            // Drop the authoritative shard catalog collections before transitioning to kUpgrading
-            // to ensure we don't start from a state containing leftovers from a previous upgrade.
+            // Drop the authoritative shard catalog collections and recreate the required indexes on
+            // config.shard.catalog.chunks before transitioning to kUpgrading to ensure we don't
+            // start from a state containing leftovers from a previous upgrade.
             dropAuthoritativeShardCatalogCollectionsOnShards(opCtx);
+            createAuthoritativeShardCatalogChunksOnShards(opCtx);
         }
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.

@@ -16,7 +16,7 @@ namespace mongo {
 /**
  * Describes a single index to create: the key pattern and whether it is unique.
  */
-struct IndexSpec_ForCatalog {
+struct [[MONGO_MOD_PUBLIC]] IndexSpec_ForCatalog {
     BSONObj keys;
     bool unique;
 };
