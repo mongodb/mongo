@@ -1044,6 +1044,9 @@ const allTestCases = {
             skip: "executes locally on mongos (not sent to any remote node)",
             conditional: true,
         },
+        updateMetricsFilteringAllowlist: {
+            skip: "executes locally on mongos (not sent to any remote node)",
+        },
         updateRole: {skip: "always targets the config server"},
         updateSearchIndex: {skip: "executes locally on mongos", conditional: true},
         updateUser: {skip: "always targets the config server"},
@@ -1545,6 +1548,7 @@ const allTestCases = {
         transitionToShardedCluster: {skip: "TODO"},
         update: {skip: "TODO"},
         updateESECMKIdentifierList: {skip: "TODO", conditional: true},
+        updateMetricsFilteringAllowlist: {skip: "admin write command"},
         updateRole: {skip: "TODO"},
         updateSearchIndex: {skip: "TODO"},
         updateUser: {skip: "TODO"},

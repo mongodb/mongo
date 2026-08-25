@@ -171,3 +171,6 @@ filters:
   - "list_metrics_filtering_allowlist*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "update_metrics_filtering_allowlist*":
+    approvers:
+      - 10gen/server-networking-and-observability

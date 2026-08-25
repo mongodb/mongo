@@ -410,6 +410,11 @@ const allCommands = {
         isAdminCommand: true,
     },
     update: {command: {update: collName, updates: [{q: {x: 999}, u: {x: 1000}}]}},
+    updateMetricsFilteringAllowlist: {
+        command: {updateMetricsFilteringAllowlist: 1, category: "serverStatus", add: ["test.path"]},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     updateRole: {skip: "no role to update without prior createRole succeeding"},
     updateSearchIndex: {skip: "requires mongot mock setup"},
     updateUser: {skip: "no user to update without prior createUser succeeding"},

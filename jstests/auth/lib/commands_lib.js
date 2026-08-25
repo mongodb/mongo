@@ -7013,6 +7013,20 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "updateMetricsFilteringAllowlist",
+            command: {
+                updateMetricsFilteringAllowlist: 1,
+                category: "serverStatus",
+                add: ["test.path"],
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    privileges: [{resource: {cluster: true}, actions: ["manageMetricsFiltering"]}],
+                },
+            ],
+        },
+        {
             testname: "updateSearchIndex",
             command: {
                 updateSearchIndex: "foo",

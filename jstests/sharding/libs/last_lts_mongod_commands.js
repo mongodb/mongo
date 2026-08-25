@@ -103,4 +103,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrCheckMetadataConsistencySecondaryParticipant",
     "wiredTigerRepair",
     "listMetricsFilteringAllowlist",
+    "updateMetricsFilteringAllowlist",
 ];

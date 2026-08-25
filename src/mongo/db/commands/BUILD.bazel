@@ -435,6 +435,16 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "update_metrics_filtering_allowlist_command_gen",
+    src = "update_metrics_filtering_allowlist_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:metrics_category_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "umc_commands_idl",
     srcs = [
@@ -794,12 +804,14 @@ mongo_cc_library(
         "test_api_version_2_commands.cpp",
         "test_deprecation_command.cpp",
         "traffic_recording_cmds.cpp",
+        "update_metrics_filtering_allowlist_command.cpp",
         "user_management_commands_common.cpp",
         ":connection_status_gen",
         ":generic_servers_gen",
         ":internal_transactions_test_command_gen",
         ":list_metrics_filtering_allowlist_command_gen",
         ":rotate_certificates_gen",
+        ":update_metrics_filtering_allowlist_command_gen",
         "//src/mongo/db/commands/query_cmd:mr_common.cpp",
         "//src/mongo/db/commands/server_status:logical_session_server_status_section.cpp",
     ],

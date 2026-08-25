@@ -1301,6 +1301,40 @@ const allCommands = {
         },
     },
     updateESECMKIdentifierList: {skip: "requires additional setup"},
+    updateMetricsFilteringAllowlist: {
+        setUp: function (mongoS, withDirectConnections) {
+            // No built-in role grants manageMetricsFiltering, so grant it explicitly to the user
+            // in this test. Otherwise, the command would fail with Unauthorized regardless of
+            // whether the user is allowed to issue direct shard operations.
+            assert.commandWorked(
+                withDirectConnections.getDB("admin").runCommand({
+                    createRole: "metricsFilteringAdmin",
+                    privileges: [{resource: {cluster: true}, actions: ["manageMetricsFiltering"]}],
+                    roles: [],
+                }),
+            );
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({grantRolesToUser: "user", roles: ["metricsFilteringAdmin"]}),
+            );
+        },
+        command: {updateMetricsFilteringAllowlist: 1, category: "serverStatus", add: ["test.path"]},
+        isAdminCommand: true,
+        shouldFail: false,
+        teardown: function (mongoS, withDirectConnections) {
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({revokeRolesFromUser: "user", roles: ["metricsFilteringAdmin"]}),
+            );
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({dropRole: "metricsFilteringAdmin"}),
+            );
+        },
+    },
     updateRole: {
         setUp: function (mongoS, withDirectConnections) {
             assert.commandWorked(

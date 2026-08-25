@@ -1826,6 +1826,10 @@ const allCommands = {
         },
     },
     updateESECMKIdentifierList: {skip: "requires additional setup"},
+    updateMetricsFilteringAllowlist: {
+        command: {updateMetricsFilteringAllowlist: 1, category: "serverStatus", add: ["test.path"]},
+        isAdminCommand: true,
+    },
     updateRole: {
         setUp: function (conn) {
             assert.commandWorked(

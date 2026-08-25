@@ -952,6 +952,7 @@ let testCases = {
         useLogs: true,
     },
     updateESECMKIdentifierList: {skip: "does not accept read or write concern"},
+    updateMetricsFilteringAllowlist: {skip: "does not accept read or write concern"},
     updateRole: {
         setUp: function (conn) {
             assert.commandWorked(

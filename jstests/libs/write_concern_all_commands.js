@@ -3310,6 +3310,7 @@ const wcCommandsTests = {
         },
     },
     updateESECMKIdentifierList: {skip: "does not accept write concern"},
+    updateMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     updateRole: {
         targetConfigServer: true,
         noop: {
@@ -4775,6 +4776,7 @@ const wcTimeseriesCommandsTests = {
         },
     },
     updateESECMKIdentifierList: {skip: "does not accept write concern"},
+    updateMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     updateRole: wcCommandsTests["updateRole"],
     updateSearchIndex: {skip: "does not accept write concern"},
     updateUser: wcCommandsTests["updateRole"],
