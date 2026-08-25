@@ -1,3 +1,11 @@
+/**
+ * @tags: [
+ *   # Assumes mongod uses the host distro's SSL stack configuration (e.g. RHEL
+ *   # crypto-policies, system FIPS module); custom builds that link a bundled
+ *   # OpenSSL instead exclude this test via --excludeWithAnyTags.
+ *   assumes_system_ssl_stack
+ * ]
+ */
 // Ensure the server counts the server TLS versions used
 import {
     detectDefaultTLSProtocol,

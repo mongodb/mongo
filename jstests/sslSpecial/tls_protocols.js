@@ -1,5 +1,14 @@
 // Make sure MongoD starts with TLS 1.0 and 1.1 disabled (except w/ old OpenSSL).
 
+/**
+ * @tags: [
+ *   # Assumes mongod uses the host distro's SSL stack configuration: the
+ *   # ssl_helpers.js TLS 1.0/1.1 support probes consult RHEL crypto-policies,
+ *   # which a custom build linking a bundled OpenSSL 3 does not honor. Custom
+ *   # builds exclude this test via --excludeWithAnyTags.
+ *   assumes_system_ssl_stack
+ * ]
+ */
 import {
     CA_CERT,
     CLIENT_CERT,

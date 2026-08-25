@@ -52,6 +52,12 @@ valid_mongocryptd_variants=(
 )
 
 if [ $(find . -name mongocryptd${exe} | wc -l) -ge 1 ]; then
+    # Custom build variants (see etc/evergreen_yml_components/custom_builds/) are
+    # defined in the copybara-private tree; accept them by prefix so that
+    # consumer-specific variant names stay out of this synced file.
+    if [[ "$build_variant" == custom-build-* ]]; then
+        exit 0
+    fi
     echo "Validating that ${build_variant} is a known enterprise task for mongocryptd"
     for valid_mongocryptd_variant in "${valid_mongocryptd_variants[@]}"; do
         if [[ "$build_variant" == "$valid_mongocryptd_variant" ]] || "$build_variant" == "${valid_mongocryptd_variant}-toolchain-v5"; then
