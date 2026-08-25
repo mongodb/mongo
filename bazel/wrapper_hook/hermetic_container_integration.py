@@ -3693,6 +3693,23 @@ def _linux_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
     return output_base.with_name(f"{output_base.name}-mongo-shared-install")
 
 
+def _host_temp_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
+    """Return a host-temp shared install root outside Bazel's output-root hierarchy."""
+    if not output_base.name:
+        raise ValueError("Bazel output base cannot be the filesystem root")
+    return pathlib.Path(tempfile.gettempdir()) / f"{output_base.name}-mongo-shared-install"
+
+
+def _linux_native_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
+    """Return the host-temp shared install root for native Linux actions."""
+    return _host_temp_shared_install_dir(output_base)
+
+
+def _macos_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
+    """Return the host-local shared install root for Darwin actions."""
+    return _host_temp_shared_install_dir(output_base)
+
+
 def _replace_bazel_startup_option(
     args: Sequence[str],
     name: str,
@@ -3743,7 +3760,12 @@ def _write_linux_container_actions_config_unlocked(
     config = _linux_host_container_config(env, machine=machine, repo_root=repo_root)
     output_base = _bazel_output_base(args, env, repo_root=repo_root)
     config["sandbox_base"] = str(_linux_action_sandbox_base(output_base))
-    shared_install_dir = _linux_shared_install_dir(output_base)
+    # Native MongoInstallRule actions publish outside their declared outputs. Use the same
+    # host-temp tree for native actions and for containerized local actions so that the convenience
+    # symlink always points at the artifacts that the build actually installed. The tree is mounted
+    # explicitly into the container below; the wrapper chooses the action strategy at invocation
+    # time.
+    shared_install_dir = _linux_native_shared_install_dir(output_base)
     config["shared_install_dir"] = str(shared_install_dir)
     output_base.mkdir(parents=True, exist_ok=True)
     generation_path = output_base / LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME
@@ -3766,11 +3788,15 @@ def _write_linux_container_actions_config_unlocked(
         generation = generation_path.read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9a-f]{32}", generation):
         raise RuntimeError(f"Invalid Linux action container generation: {generation_path}")
-    if new_generation and shared_install_dir.exists():
-        if shared_install_dir.is_dir() and not shared_install_dir.is_symlink():
-            shutil.rmtree(shared_install_dir)
-        else:
-            shared_install_dir.unlink()
+    if new_generation:
+        for stale_shared_install_dir in (
+            shared_install_dir,
+            _linux_shared_install_dir(output_base),
+        ):
+            if stale_shared_install_dir.is_dir() and not stale_shared_install_dir.is_symlink():
+                shutil.rmtree(stale_shared_install_dir)
+            elif stale_shared_install_dir.exists() or stale_shared_install_dir.is_symlink():
+                stale_shared_install_dir.unlink()
     shared_install_dir.mkdir(parents=True, exist_ok=True)
     config["output_base_generation"] = generation
     prefix = config.get("container_prefix", "mongo_linux_action")
@@ -4135,6 +4161,9 @@ def _macos_cross_host_bazel_test_args(
             "--//bazel/config:idl_use_linux_python=True",
             "--//bazel/config:remote_link=True",
             "--spawn_strategy=local",
+            # MongoInstallRule publishes the shared bazel-bin/install convenience tree, which
+            # is outside the action's declared outputs and cannot be written from a sandbox.
+            "--strategy=MongoInstallRule=local",
             "--strategy=CppCompile=remote",
             "--strategy=CppLink=remote",
             "--strategy=CppArchive=remote",
@@ -4310,6 +4339,8 @@ def _macos_cross_local_container_action_args(
     common_options = [
         "--//bazel/config:macos_cross_local_container_actions=True",
         "--//bazel/config:idl_use_linux_python=True",
+        # The install rule publishes a shared convenience tree outside its declared outputs.
+        "--strategy=MongoInstallRule=local",
         *_macos_cross_local_resource_options(env),
         "--test_strategy=standalone",
         "--strategy=TestRunner=standalone",
@@ -5243,6 +5274,7 @@ def _publish_linux_shared_install_symlink(
     if (
         not target_value
         or bazel_bin_target is None
+        or not bazel_bin_target.is_dir()
         or bazel_bin_target.name != "bin"
         or bazel_bin_target.parent.parent.name != "bazel-out"
     ):
@@ -5261,6 +5293,18 @@ def _publish_linux_shared_install_symlink(
         # This is generated output from the legacy unsandboxed install action.
         shutil.rmtree(link)
     link.symlink_to(shared_install_dir, target_is_directory=True)
+
+
+def _publish_macos_shared_install_symlink(
+    args: Sequence[str],
+    env: Mapping[str, str],
+    repo_root: pathlib.Path = REPO_ROOT,
+) -> None:
+    """Publish bazel-bin/install after Darwin actions use an external shared tree."""
+    _publish_linux_shared_install_symlink(
+        {"shared_install_dir": str(_macos_shared_install_dir(_bazel_output_base(args, env)))},
+        repo_root=repo_root,
+    )
 
 
 def restore_hermetic_container_convenience_symlinks_from_env(
@@ -5368,8 +5412,21 @@ def run_hermetic_container(
     if mode == IntegrationMode.DIRECT:
         direct_args = _bazel_args_with_native_install_strategy(args)
         rc = _run_direct(bazel_real, direct_args)
+        if system == "Darwin" and _bazel_command(args) in {"build", "coverage", "run", "test"}:
+            _publish_macos_shared_install_symlink(args, env)
+        if system == "Linux" and _bazel_command(args) in {"build", "coverage", "run", "test"}:
+            _publish_linux_shared_install_symlink(
+                {
+                    "shared_install_dir": str(
+                        _linux_native_shared_install_dir(_bazel_output_base(args, env))
+                    )
+                }
+            )
         if rc == 0 and system == "Linux" and _bazel_command(args) == "clean":
+            _remove_path(_linux_native_shared_install_dir(_bazel_output_base(args, env)))
             _remove_path(_linux_shared_install_dir(_bazel_output_base(args, env)))
+        if rc == 0 and system == "Darwin" and _bazel_command(args) == "clean":
+            _remove_path(_macos_shared_install_dir(_bazel_output_base(args, env)))
         return rc
 
     args = _bazel_args_with_default_macos_cross_config(args, env=env, system=system)
@@ -5516,7 +5573,9 @@ def run_hermetic_container(
                 return 0
 
             _info("running macOS cross test through host Bazel with local test execution")
-            return _run_direct(bazel_real, host_args)
+            rc = _run_direct(bazel_real, host_args)
+            _publish_macos_shared_install_symlink(host_args, env)
+            return rc
 
         if _macos_cross_local_container_action_requested(args, env, system):
             if env.get("MONGO_HERMETIC_CONTAINER_DRY_RUN") == "1":
@@ -5555,7 +5614,9 @@ def run_hermetic_container(
                 _info("running macOS cross build actions on RBE")
             else:
                 _info("running macOS cross compile/IDL on RBE and link/archive actions locally")
-            return _run_direct(bazel_real, host_args)
+            rc = _run_direct(bazel_real, host_args)
+            _publish_macos_shared_install_symlink(host_args, env)
+            return rc
 
         if _macos_cross_host_run_requested(args, env, system):
             host_run_plan = _macos_cross_host_run_plan(args)
@@ -5577,6 +5638,7 @@ def run_hermetic_container(
             build_result = _run_direct(bazel_real, host_args)
             if build_result:
                 return build_result
+            _publish_macos_shared_install_symlink(host_args, env)
             return _run_macos_cross_host_binary(host_run_plan)
 
         return _run_direct(bazel_real, args)

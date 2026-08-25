@@ -267,7 +267,7 @@ class RunRulesLintTest(unittest.TestCase):
                         [
                             "bazel",
                             "query",
-                            'kind(".* rule", same_pkg_direct_rdeps(//:foo.py))',
+                            'kind(".* rule", same_pkg_direct_rdeps(//:foo.py)) except attr("tags", "manual", kind(".* rule", same_pkg_direct_rdeps(//:foo.py)))',
                             "--output=label",
                         ],
                     )
@@ -481,7 +481,7 @@ class ExistingPythonFilesTest(unittest.TestCase):
                 [
                     "bazel",
                     "query",
-                    'kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py))',
+                    'kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)) except attr("tags", "manual", kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)))',
                     "--output=label",
                 ],
             )

@@ -2036,6 +2036,17 @@ class LinuxHostContainerTest(unittest.TestCase):
             shared_install_dir.mkdir()
             stale_file = shared_install_dir / "stale-binary"
             stale_file.write_text("stale", encoding="utf-8")
+            with mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value=str(pathlib.Path(temp_dir) / "system-temp"),
+            ):
+                native_shared_install_dir = (
+                    hermetic_container_integration._linux_native_shared_install_dir(output_base)
+                )
+            native_shared_install_dir.mkdir(parents=True)
+            native_stale_file = native_shared_install_dir / "stale-binary"
+            native_stale_file.write_text("stale", encoding="utf-8")
 
             with (
                 mock.patch.object(
@@ -2044,6 +2055,11 @@ class LinuxHostContainerTest(unittest.TestCase):
                 mock.patch.object(
                     hermetic_container_integration, "_run_direct", return_value=0
                 ) as run_direct,
+                mock.patch.object(
+                    hermetic_container_integration.tempfile,
+                    "gettempdir",
+                    return_value=str(pathlib.Path(temp_dir) / "system-temp"),
+                ),
             ):
                 rc = hermetic_container_integration.run_hermetic_container(
                     "/usr/bin/bazel",
@@ -2056,6 +2072,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "/usr/bin/bazel", [f"--output_base={output_base}", "clean"]
             )
             self.assertFalse(shared_install_dir.exists())
+            self.assertFalse(native_shared_install_dir.exists())
 
     def test_linux_direct_build_keeps_install_actions_out_of_sandboxes(self):
         with (
@@ -2065,6 +2082,14 @@ class LinuxHostContainerTest(unittest.TestCase):
             mock.patch.object(
                 hermetic_container_integration, "_run_direct", return_value=0
             ) as run_direct,
+            mock.patch.object(
+                hermetic_container_integration, "_publish_linux_shared_install_symlink"
+            ) as publish_shared_install,
+            mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value="/tmp/host-temp",
+            ),
         ):
             rc = hermetic_container_integration.run_hermetic_container(
                 "/usr/bin/bazel",
@@ -2081,6 +2106,9 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "--strategy=MongoInstallRule=local",
                 "install-dist-test",
             ],
+        )
+        publish_shared_install.assert_called_once_with(
+            {"shared_install_dir": "/tmp/host-temp/output-mongo-shared-install"}
         )
 
     def test_reports_background_container_image_digest(self):
@@ -2420,6 +2448,48 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
         )
         self.assertNotIn(output_base, shared_install_dir.parents)
 
+    def test_linux_native_shared_install_dir_is_outside_output_tree(self):
+        output_base = pathlib.Path("/cache/output-base")
+
+        with mock.patch.object(
+            hermetic_container_integration.tempfile,
+            "gettempdir",
+            return_value="/tmp/host-temp",
+        ):
+            shared_install_dir = hermetic_container_integration._linux_native_shared_install_dir(
+                output_base
+            )
+
+        self.assertEqual(
+            pathlib.Path("/tmp/host-temp/output-base-mongo-shared-install"),
+            shared_install_dir,
+        )
+        self.assertNotIn(output_base, shared_install_dir.parents)
+
+    def test_macos_shared_install_symlink_matches_install_script_fallback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            repo_root = root / "repo"
+            repo_root.mkdir()
+            output_base = root / "output-base"
+            bin_dir = output_base / "execroot" / "_main" / "bazel-out" / "k8-opt" / "bin"
+            bin_dir.mkdir(parents=True)
+            (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
+
+            with mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value=str(root / "system-temp"),
+            ):
+                hermetic_container_integration._publish_macos_shared_install_symlink(
+                    [f"--output_base={output_base}", "build"], {}, repo_root=repo_root
+                )
+
+            install_link = repo_root / "bazel-bin" / "install"
+            expected = root / "system-temp" / "output-base-mongo-shared-install" / "k8-opt"
+            self.assertTrue(install_link.is_symlink())
+            self.assertEqual(expected, install_link.resolve())
+
     def test_explicit_output_base_startup_option(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
@@ -2605,12 +2675,17 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root.mkdir()
             output_base = temp / "output_base"
 
-            path, config = hermetic_container_integration._write_linux_container_actions_config(
-                [f"--output_base={output_base}", "build"],
-                env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
-                repo_root=repo_root,
-                machine="x86_64",
-            )
+            with mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value=str(temp / "system-temp"),
+            ):
+                path, config = hermetic_container_integration._write_linux_container_actions_config(
+                    [f"--output_base={output_base}", "build"],
+                    env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
+                    repo_root=repo_root,
+                    machine="x86_64",
+                )
 
             self.assertEqual(
                 path,
@@ -2626,7 +2701,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             )
             self.assertEqual(
                 on_disk["shared_install_dir"],
-                str(output_base.with_name(f"{output_base.name}-mongo-shared-install")),
+                str(temp / "system-temp" / "output_base-mongo-shared-install"),
             )
             self.assertRegex(
                 on_disk["container_name"],
@@ -2664,22 +2739,34 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root = temp / "repo"
             repo_root.mkdir()
             output_base = temp / "output_base"
-            shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
-                output_base
-            )
-            shared_install_dir.mkdir()
-            stale_file = shared_install_dir / "stale-binary"
-            stale_file.write_text("stale", encoding="utf-8")
+            with mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value=str(temp / "system-temp"),
+            ):
+                shared_install_dir = (
+                    hermetic_container_integration._linux_native_shared_install_dir(output_base)
+                )
+                shared_install_dir.mkdir(parents=True)
+                stale_file = shared_install_dir / "stale-binary"
+                stale_file.write_text("stale", encoding="utf-8")
+                legacy_shared_install_dir = (
+                    hermetic_container_integration._linux_shared_install_dir(output_base)
+                )
+                legacy_shared_install_dir.mkdir()
+                legacy_stale_file = legacy_shared_install_dir / "legacy-stale-binary"
+                legacy_stale_file.write_text("stale", encoding="utf-8")
 
-            hermetic_container_integration._write_linux_container_actions_config(
-                [f"--output_base={output_base}", "build"],
-                env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
-                repo_root=repo_root,
-                machine="x86_64",
-            )
+                hermetic_container_integration._write_linux_container_actions_config(
+                    [f"--output_base={output_base}", "build"],
+                    env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
+                    repo_root=repo_root,
+                    machine="x86_64",
+                )
 
             self.assertTrue(shared_install_dir.is_dir())
             self.assertFalse(stale_file.exists())
+            self.assertFalse(legacy_shared_install_dir.exists())
 
     def test_output_base_generation_changes_only_when_output_base_is_replaced(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4287,6 +4374,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertIn("--//bazel/config:idl_use_linux_python=True", args)
         self.assertIn("--//bazel/config:remote_link=True", args)
         self.assertIn("--spawn_strategy=local", args)
+        self.assertIn("--strategy=MongoInstallRule=local", args)
         self.assertIn("--strategy=CppCompile=remote", args)
         self.assertIn("--strategy=CppLink=remote", args)
         self.assertIn("--strategy=IdlcGenerator=remote", args)
@@ -4321,6 +4409,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertIn("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=aarch64", args)
         self.assertIn("--//bazel/config:macos_cross_linux_python_arch=aarch64", args)
         self.assertIn("--//bazel/config:idl_use_linux_python=True", args)
+        self.assertIn("--strategy=MongoInstallRule=local", args)
         self.assertIn("--remote_executor=grpcs://sodalite.cluster.engflow.com", args)
         self.assertIn(
             "--remote_default_exec_properties=container-image=docker://quay.io/mongodb/rbe@sha256:abc123",
@@ -4391,6 +4480,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertIn("--strategy=CppCompile=remote", args)
         self.assertIn("--strategy=IdlcGenerator=remote", args)
         self.assertIn("--//bazel/config:remote_link=True", args)
+        self.assertIn("--strategy=MongoInstallRule=local", args)
         self.assertIn("--strategy=CppLink=remote", args)
         self.assertIn("--strategy=CppArchive=remote", args)
         self.assertIn("--strategy=SolibSymlink=remote", args)
@@ -4447,6 +4537,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertIn("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=aarch64", args)
         self.assertIn("--//bazel/config:macos_cross_linux_python_arch=aarch64", args)
         self.assertIn("--strategy=CppCompile=local", args)
+        self.assertIn("--strategy=MongoInstallRule=local", args)
         self.assertIn("--strategy=CppLink=local", args)
         self.assertIn("--strategy=IdlcGenerator=local", args)
         self.assertIn("--local_resources=cpu=HOST_CPUS", args)
@@ -4468,6 +4559,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             args,
         )
         self.assertIn("--remote_default_exec_properties=Pool=custom-pool", args)
+        self.assertIn("--strategy=MongoInstallRule=local", args)
 
     def test_run_hermetic_container_runs_macos_cross_test_with_host_bazel_without_docker(self):
         containers = {

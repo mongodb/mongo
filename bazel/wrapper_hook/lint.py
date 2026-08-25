@@ -831,7 +831,11 @@ def _get_rules_lint_targets_for_source_labels(
     seen = set()
 
     for source_label in source_labels:
-        query = f'kind(".* rule", same_pkg_direct_rdeps({source_label}))'
+        owner_rules = f'kind(".* rule", same_pkg_direct_rdeps({source_label}))'
+        # Manual targets are often negative analysis fixtures. They intentionally fail during
+        # analysis and must not be pulled into the rules_lint build just because they depend on a
+        # changed source file.
+        query = f'{owner_rules} except attr("tags", "manual", {owner_rules})'
         query_options = _get_bazel_query_options(bazel_options)
         result = subprocess.run(
             [

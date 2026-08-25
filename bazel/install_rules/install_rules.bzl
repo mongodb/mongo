@@ -24,6 +24,32 @@ _WINDOWS_DEBUG_EXTENSIONS = {
     ".pdb": True,
 }
 
+# Windows reserves these DOS device names, even when they appear with a file extension.
+_WINDOWS_RESERVED_BASENAMES = {
+    "AUX": True,
+    "COM1": True,
+    "COM2": True,
+    "COM3": True,
+    "COM4": True,
+    "COM5": True,
+    "COM6": True,
+    "COM7": True,
+    "COM8": True,
+    "COM9": True,
+    "CON": True,
+    "LPT1": True,
+    "LPT2": True,
+    "LPT3": True,
+    "LPT4": True,
+    "LPT5": True,
+    "LPT6": True,
+    "LPT7": True,
+    "LPT8": True,
+    "LPT9": True,
+    "NUL": True,
+    "PRN": True,
+}
+
 _LINUX_DEBUG_EXTENSIONS = {
     ".debug": True,
     ".dwp": True,
@@ -48,6 +74,7 @@ MongoInstallInfo = provider(
         "test_file": "File containing list of installed tests",
         "src_map": "contents of the dep file for use in rules",
         "source_files": "Original source files referenced by transitive install depfiles",
+        "install_owners": "Normalized install destinations and their owning source artifacts",
     },
 )
 
@@ -191,24 +218,144 @@ def is_debug_file(platform_kind, basename):
     else:
         return False
 
-def declare_output(ctx, output, is_directory):
-    """Declare an output as either a file or directory
+def _destination_in_directory(directory, basename):
+    if not directory:
+        return basename
+    return directory + "/" + basename
 
-    Args:
-        ctx: rule ctx
-        output: output file to declare
-        is_directory: determines if the file is a directory
+def _normalize_install_destination(ctx, destination, platform_kind):
+    """Validate and normalize a path relative to an install tree."""
+    if not destination:
+        fail("invalid install destination for %s: path is empty" % ctx.label)
+    if "\\" in destination:
+        fail("invalid install destination for %s: backslashes are not allowed in '%s'" % (ctx.label, destination))
+    if paths.is_absolute(destination) or ":" in destination:
+        fail("invalid install destination for %s: absolute path '%s'" % (ctx.label, destination))
 
-    Returns:
-        File object representing output
+    for component in destination.split("/"):
+        if not component or component == "." or component == "..":
+            fail("invalid install destination for %s: invalid component in '%s'" % (ctx.label, destination))
+        if platform_kind == "windows":
+            if component.endswith(".") or component.endswith(" "):
+                fail("invalid Windows install destination for %s: '%s'" % (ctx.label, destination))
+            if component.split(".")[0].upper() in _WINDOWS_RESERVED_BASENAMES:
+                fail("reserved Windows install destination for %s: '%s'" % (ctx.label, destination))
+
+    normalized = paths.normalize(destination)
+    if normalized == "." or normalized.startswith("../"):
+        fail("invalid install destination for %s: path escapes the install tree: '%s'" % (ctx.label, destination))
+
+    # Install trees and archives move between filesystems. Conservatively reject case-only
+    # aliases even when the current execution filesystem happens to be case-sensitive.
+    return normalized, normalized.lower()
+
+def _record_file_map_output(ctx, file_map, category, source, output):
+    """Record a source-keyed manifest entry without silently losing a second destination."""
+    existing = file_map[category].get(source)
+    if existing != None and existing.path != output.path:
+        fail(
+            "install source '%s' has multiple %s destinations in %s: '%s' and '%s'" % (
+                source,
+                category,
+                ctx.label,
+                existing.short_path,
+                output.short_path,
+            ),
+        )
+    file_map[category][source] = output
+
+def _declare_install_output(
+        ctx,
+        install_dir,
+        destination,
+        source,
+        is_directory,
+        platform_kind,
+        install_owners,
+        owned_descendants):
+    """Declare one uniquely owned artifact in an install tree.
+
+    An identical source/destination/type may arrive through multiple dependency paths. It is
+    represented by one output. Any other exact or ancestor overlap is ambiguous and rejected
+    during analysis, before an install action can race while publishing the convenience tree.
     """
-    if is_directory:
-        return ctx.actions.declare_directory(output)
-    else:
-        return ctx.actions.declare_file(output)
+    normalized, destination_key = _normalize_install_destination(ctx, destination, platform_kind)
+    owner = str(ctx.label)
 
-def sort_file(ctx, file, basename, install_dir, file_map, is_directory, platform_kind):
-    """Determine location a file should be installed to
+    if destination_key in install_owners:
+        existing = install_owners[destination_key]
+        if existing.source == source and existing.is_directory == is_directory:
+            return existing.output
+        fail(
+            ("install destination collision at '%s': %s owns source '%s' (%s), but %s " +
+             "would install source '%s' (%s)") % (
+                normalized,
+                existing.owner,
+                existing.source,
+                "directory" if existing.is_directory else "file",
+                owner,
+                source,
+                "directory" if is_directory else "file",
+            ),
+        )
+
+    if destination_key in owned_descendants:
+        descendant = install_owners[owned_descendants[destination_key]]
+        fail(
+            "install destination prefix collision: '%s' from %s is an ancestor of '%s' from %s" % (
+                normalized,
+                owner,
+                descendant.destination,
+                descendant.owner,
+            ),
+        )
+
+    components = destination_key.split("/")
+    prefix = ""
+    for component in components[:-1]:
+        prefix = component if not prefix else prefix + "/" + component
+        if prefix in install_owners:
+            ancestor = install_owners[prefix]
+            fail(
+                "install destination prefix collision: '%s' from %s is an ancestor of '%s' from %s" % (
+                    ancestor.destination,
+                    ancestor.owner,
+                    normalized,
+                    owner,
+                ),
+            )
+
+    output_path = paths.join(install_dir, normalized)
+    if is_directory:
+        output = ctx.actions.declare_directory(output_path)
+    else:
+        output = ctx.actions.declare_file(output_path)
+
+    install_owners[destination_key] = struct(
+        destination = normalized,
+        is_directory = is_directory,
+        output = output,
+        owner = owner,
+        source = source,
+    )
+    prefix = ""
+    for component in components[:-1]:
+        prefix = component if not prefix else prefix + "/" + component
+        if prefix not in owned_descendants:
+            owned_descendants[prefix] = destination_key
+    return output
+
+def sort_file(
+        ctx,
+        file,
+        basename,
+        install_dir,
+        file_map,
+        is_directory,
+        platform_kind,
+        install_owners,
+        owned_descendants):
+    """Determine location a file should be installed to.
 
     Args:
         ctx: rule ctx
@@ -225,9 +372,8 @@ def sort_file(ctx, file, basename, install_dir, file_map, is_directory, platform
         # the dwp files also contain it. Strip the _with_debug from the name
         install_basename = install_basename.replace("_with_debug.dwp", ".dwp")
 
-    bin_install = install_dir + "/bin/" + install_basename
-
-    lib_install = install_dir + "/lib/" + install_basename
+    bin_install = "bin/" + install_basename
+    lib_install = "lib/" + install_basename
     is_binary = is_binary_file(platform_kind, basename)
     is_debug = is_debug_file(platform_kind, basename)
     is_python = ext == ".py"
@@ -235,16 +381,16 @@ def sort_file(ctx, file, basename, install_dir, file_map, is_directory, platform
     if is_binary or is_python:
         if not is_debug:
             if ctx.attr.debug != "debug":
-                file_map["binaries"][file] = declare_output(ctx, bin_install, is_directory)
+                file_map["binaries"][file] = _declare_install_output(ctx, install_dir, bin_install, file, is_directory, platform_kind, install_owners, owned_descendants)
         elif ctx.attr.debug != "stripped" or ctx.attr.publish_debug_in_stripped:
-            file_map["binaries_debug"][file] = declare_output(ctx, bin_install, is_directory)
+            file_map["binaries_debug"][file] = _declare_install_output(ctx, install_dir, bin_install, file, is_directory, platform_kind, install_owners, owned_descendants)
 
     elif not is_debug:
         if ctx.attr.debug != "debug":
-            file_map["dynamic_libs"][file] = declare_output(ctx, lib_install, is_directory)
+            file_map["dynamic_libs"][file] = _declare_install_output(ctx, install_dir, lib_install, file, is_directory, platform_kind, install_owners, owned_descendants)
 
     elif ctx.attr.debug != "stripped" or ctx.attr.publish_debug_in_stripped:
-        file_map["dynamic_libs_debug"][file] = declare_output(ctx, lib_install, is_directory)
+        file_map["dynamic_libs_debug"][file] = _declare_install_output(ctx, install_dir, lib_install, file, is_directory, platform_kind, install_owners, owned_descendants)
 
 def mongo_install_rule_impl(ctx):
     """Perform install actions
@@ -269,6 +415,8 @@ def mongo_install_rule_impl(ctx):
     test_files = []
     outputs = []
     dwps = []
+    install_owners = {}
+    owned_descendants = {}
     install_dir = ctx.label.name
     platform_kind = _platform_kind(ctx)
     install_script = ctx.attr._install_script.files.to_list()[0]
@@ -278,44 +426,68 @@ def mongo_install_rule_impl(ctx):
         if DebugPackageInfo in input_bin and ctx.attr.create_dwp and ctx.attr.debug != "stripped":
             bin = input_bin[DebugPackageInfo].dwp_file
             dwps.append(bin)
-            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind)
+            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind, install_owners, owned_descendants)
         input_test_binaries = input_bin[TestBinaryInfo].test_binaries.to_list()
         input_files = input_bin.files.to_list()
         test_files.extend(input_test_binaries)
         for bin in input_files:
-            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind)
+            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind, install_owners, owned_descendants)
 
     for input_label, output_folder in ctx.attr.root_files.items():
         label_files = input_label.files.to_list()
         for file in label_files:
-            file_map["root_files"][file.path] = declare_output(ctx, install_dir + "/" + output_folder + "/" + file.basename, file.is_directory)
+            destination = _destination_in_directory(output_folder, file.basename)
+            output = _declare_install_output(ctx, install_dir, destination, file.path, file.is_directory, platform_kind, install_owners, owned_descendants)
+            _record_file_map_output(ctx, file_map, "root_files", file.path, output)
 
     for input_label, output_path in ctx.attr.include_files.items():
-        file = input_label.files.to_list()[0]
-        file_map["include_files"][file.path] = declare_output(ctx, install_dir + "/" + output_path, False)
+        label_files = input_label.files.to_list()
+        if len(label_files) != 1:
+            fail("include_files label %s must produce exactly one file" % input_label.label)
+        file = label_files[0]
+        if file.is_directory:
+            fail("include_files label %s must not produce a directory" % input_label.label)
+        output = _declare_install_output(ctx, install_dir, output_path, file.path, False, platform_kind, install_owners, owned_descendants)
+        _record_file_map_output(ctx, file_map, "include_files", file.path, output)
 
     # sort dependency install files
     for dep in ctx.attr.deps:
         dep_test_binaries = dep[TestBinaryInfo].test_binaries.to_list()
-        dep_default_files = dep[DefaultInfo].files.to_list()
         dep_src_map_file = dep[MongoInstallInfo].src_map.to_list()[0]
         test_files.extend(dep_test_binaries)
 
-        # Create a map of filename to if its a directory, ie. { coolfolder: True, coolfile: False } as the json loses that info
-        file_directory_map = {file_dep.basename: file_dep.is_directory for file_dep in dep_default_files}
+        # The JSON source map intentionally stores paths, so retain directory information from
+        # the original transitive inputs rather than forcing the dependency's install action.
+        file_directory_map = {
+            source.path: source.is_directory
+            for source in dep[MongoInstallInfo].source_files.to_list()
+        }
         src_map = json.decode(dep_src_map_file)
         for key in src_map:
-            if key != "roots":
+            if key not in ["roots", "includes"]:
                 for file in src_map[key]:
+                    if file not in file_directory_map:
+                        fail("install source '%s' from %s is missing from its transitive source files" % (file, dep.label))
                     filename = _basename(file)
 
                     # Due to us creating our binaries using the _with_debug name
                     # the dwp files also contain it. Strip the _with_debug from the name
                     filename = filename.replace("_with_debug.dwp", ".dwp")
-                    sort_file(ctx, file, filename, install_dir, file_map, file_directory_map[filename], platform_kind)
+                    sort_file(ctx, file, filename, install_dir, file_map, file_directory_map[file], platform_kind, install_owners, owned_descendants)
         for file, folder in src_map["roots"].items():
+            if file not in file_directory_map:
+                fail("install source '%s' from %s is missing from its transitive source files" % (file, dep.label))
             filename = _basename(file)
-            file_map["root_files"][file] = declare_output(ctx, install_dir + "/" + folder + "/" + filename, file_directory_map[filename])
+            destination = _destination_in_directory(folder, filename)
+            output = _declare_install_output(ctx, install_dir, destination, file, file_directory_map[file], platform_kind, install_owners, owned_descendants)
+            _record_file_map_output(ctx, file_map, "root_files", file, output)
+        for file, output_path in src_map["includes"].items():
+            if file not in file_directory_map:
+                fail("install source '%s' from %s is missing from its transitive source files" % (file, dep.label))
+            if file_directory_map[file]:
+                fail("transitive include_files source '%s' from %s must not be a directory" % (file, dep.label))
+            output = _declare_install_output(ctx, install_dir, output_path, file, False, platform_kind, install_owners, owned_descendants)
+            _record_file_map_output(ctx, file_map, "include_files", file, output)
 
     # aggregate based on type of installs
     if ctx.attr.debug == "stripped" and not ctx.attr.publish_debug_in_stripped:
@@ -363,19 +535,21 @@ def mongo_install_rule_impl(ctx):
     name = name.replace("/", "_")
     deps_file = ctx.actions.declare_file("install_deps/" + name + "/" + install_dir)
 
+    destination_by_output_path = {
+        owner.output.path: owner.destination
+        for owner in install_owners.values()
+    }
+
     # The roots are in the format { file : folder } so we can add arbitrary files to the install directory
     roots = {} if installed_test_list_file == None else {installed_test_list_file.path: ""}
     for file in root_files:
-        path = file_map["root_files"][file].short_path
-        folder_index_start = path.find(install_dir) + len(install_dir) + 1
-        folder_index_end = path.rfind("/")
-        roots[file] = path[folder_index_start:folder_index_end]
+        output = file_map["root_files"][file]
+        roots[file] = paths.dirname(destination_by_output_path[output.path])
 
     includes = {}
     for file in include_files:
-        path = file_map["include_files"][file].short_path
-        folder_index_start = path.find(install_dir) + len(install_dir) + 1
-        includes[file] = path[folder_index_start:]
+        output = file_map["include_files"][file]
+        includes[file] = destination_by_output_path[output.path]
 
     json_out = struct(
         roots = roots,
@@ -388,28 +562,25 @@ def mongo_install_rule_impl(ctx):
         content = json_out.to_json(),
     )
 
-    # create a mapping of source location to install location
-    pkg_dict = {}
-    flat_map = {}
-
-    for file_type in file_map:
-        flat_map |= file_map[file_type]
-    for file in bins:
-        pkg_dict["bin/" + flat_map[file].basename] = flat_map[file]
-        outputs.append(flat_map[file])
-    for file in libs:
-        pkg_dict["lib/" + flat_map[file].basename] = flat_map[file]
-        outputs.append(flat_map[file])
-    for root_file in root_files:
-        pkg_dict[flat_map[root_file].basename] = flat_map[root_file]
-        outputs.append(flat_map[root_file])
-    for include_file in include_files:
-        pkg_dict[flat_map[include_file].basename] = flat_map[include_file]
-        outputs.append(flat_map[include_file])
     if len(installed_tests) > 0:
-        real_test_list_output_location = ctx.actions.declare_file(install_dir + "/" + installed_test_list_file.basename)
-        pkg_dict[real_test_list_output_location.basename] = real_test_list_output_location
-        outputs.append(real_test_list_output_location)
+        real_test_list_output_location = _declare_install_output(
+            ctx,
+            install_dir,
+            installed_test_list_file.basename,
+            installed_test_list_file.path,
+            False,
+            platform_kind,
+            install_owners,
+            owned_descendants,
+        )
+
+    # A source may intentionally appear at multiple destinations or in multiple categories.
+    # Build the declared outputs and package mapping from destination-keyed ownership so none
+    # of those artifacts is lost through source-keyed flattening.
+    pkg_dict = {}
+    for owner in install_owners.values():
+        pkg_dict[owner.destination] = owner.output
+        outputs.append(owner.output)
 
     # resolve full install dir for python script input
     full_install_dir = ctx.bin_dir.path
@@ -419,7 +590,11 @@ def mongo_install_rule_impl(ctx):
 
     input_deps.append(deps_file)
 
-    source_files = depset(direct = test_files + dwps, transitive = [
+    direct_source_files = test_files + dwps
+    if installed_test_list_file != None:
+        direct_source_files.append(installed_test_list_file)
+
+    source_files = depset(direct = direct_source_files, transitive = [
         f.files
         for f in ctx.attr.srcs
     ] + [
@@ -437,7 +612,7 @@ def mongo_install_rule_impl(ctx):
         ctx.attr._install_script.files,
         python.files,
         source_files,
-    ] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps])
+    ])
 
     if outputs:
         ctx.actions.run(
@@ -448,10 +623,14 @@ def mongo_install_rule_impl(ctx):
                 install_script.path,
                 "--depfile=" + deps_file.path,
                 "--install-dir=" + full_install_dir,
-            ] + ["--depfile=" + str(dep[MongoInstallInfo].deps_files.to_list()[0].path) for dep in ctx.attr.deps],
+            ],
             mnemonic = "MongoInstallRule",
             execution_requirements = {
                 "no-cache": "1",
+                # The install action publishes the shared bazel-bin/install convenience tree,
+                # which is outside this action's declared outputs. It must not be cached or run
+                # remotely. The wrapper selects the appropriate local or container strategy and
+                # provides the writable shared-install root for publication.
                 "no-remote": "1",
             },
         )
@@ -476,6 +655,7 @@ def mongo_install_rule_impl(ctx):
         ),
         MongoInstallInfo(
             deps_files = depset([deps_file], transitive = [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps]),
+            install_owners = install_owners,
             test_file = installed_test_list_file,
             src_map = depset([json_out.to_json()]),
             source_files = source_files,
