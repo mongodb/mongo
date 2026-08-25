@@ -375,16 +375,6 @@ if ! python_works "$python"; then
   fi
 fi
 
-run_bazel_command() {
-  # Legacy `query` cannot evaluate select() branches. Keep the real Bazel
-  # process's output and status while adding a targeted cquery hint on failure.
-  if [[ "$current_bazel_command" == "query" ]]; then
-    "$python" "$REPO_ROOT/bazel/wrapper_hook/query_failure_diagnostic.py" "$bazel_real" "$@"
-  else
-    run_final_bazel "$bazel_real" "$@"
-  fi
-}
-
 autocomplete_query=0
 # bash autocomplete detection
 if [[ $* =~ ^.*--output_base=/tmp/.*-completion-$USER.*$ ]]; then
@@ -460,7 +450,7 @@ if [[ $exit_code != 0 ]]; then
   rm -f "$MONGO_BAZEL_WRAPPER_ARGS"
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
-    run_bazel_command "$@"
+    run_final_bazel "$bazel_real" "$@"
     exit $?
   else
     exit "$exit_code"
@@ -504,7 +494,7 @@ else
     export MONGO_HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS="$hermetic_container_symlink_marker"
   fi
   if [[ ${#new_args[@]} -ne 0 ]]; then
-    run_bazel_command "${new_args[@]}"
+    run_final_bazel "$bazel_real" "${new_args[@]}"
     bazel_exit_code=$?
   fi
   # The post-hook is best effort; its exit status must not replace Bazel's result.

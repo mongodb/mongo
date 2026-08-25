@@ -47,6 +47,15 @@ case "${1:-}" in
     fi
     printf '%s\n' "${@:3}" >"$MONGO_BAZEL_WRAPPER_ARGS"
     ;;
+  */query_failure_diagnostic.py)
+    query_stderr_file="$(mktemp)"
+    shift
+    "$@" 2>"$query_stderr_file"
+    query_exit=$?
+    cat "$query_stderr_file" >&2
+    rm -f "$query_stderr_file"
+    exit "$query_exit"
+    ;;
   */post_bazel_hook.py)
     if [[ -n "${FAKE_POSTHOOK_MARKER:-}" ]]; then
       touch "$FAKE_POSTHOOK_MARKER"
@@ -76,6 +85,12 @@ if [[ -n "${FAKE_PYHOST:-}" && "$*" == *"@py_host//:all"* ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "query" ]]; then
+  printf '\rQUERY_PROGRESS ' >&2
+  printf 'QUERY_RESULT\n'
+  exit 0
+fi
+
 printf '%s\n' "$*" >"$FAKE_BAZEL_MARKER"
 exit "${FAKE_BAZEL_EXIT:-0}"
 EOF
@@ -91,6 +106,34 @@ env \
     PATH="$fake_bin:$PATH" \
     "$repo_root/tools/bazel" version
 grep -qx "version" "$marker"
+
+# Query progress is written to stderr before query results are written to stdout.
+# Keep that ordering intact so a carriage-return progress update cannot erase the
+# result when both streams are connected to the terminal. The old diagnostic
+# wrapper captured stderr and replayed it after stdout, which broke this ordering.
+query_tty_output="$test_root/query-tty-output"
+query_command_args=(
+    env
+    BAZELISK_SKIP_WRAPPER=1
+    BAZEL_REAL="$fake_bin/bazel-real"
+    FAKE_BAZEL_MARKER="$marker"
+    FAKE_PYTHON_VERSION_OK=0
+    MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
+    PATH="$fake_bin:$PATH"
+    "$repo_root/tools/bazel"
+    query
+    //:target
+)
+if [[ "$OSTYPE" == darwin* ]]; then
+    # BSD script takes the transcript file and command as positional arguments.
+    script -q "$query_tty_output" "${query_command_args[@]}" >/dev/null
+else
+    printf -v query_command '%q ' "${query_command_args[@]}"
+    script -qefc "$query_command" "$query_tty_output" >/dev/null
+fi
+query_progress_offset="$(grep -abo 'QUERY_PROGRESS' "$query_tty_output" | cut -d: -f1)"
+query_result_offset="$(grep -abo 'QUERY_RESULT' "$query_tty_output" | cut -d: -f1)"
+[[ "$query_progress_offset" -lt "$query_result_offset" ]]
 
 integration_marker="$test_root/integration-called"
 posthook_marker="$test_root/posthook-called"
