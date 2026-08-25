@@ -24,9 +24,10 @@ let firstPrimaryTerm = res.term;
 jsTestLog("Stepping up node 1 (" + nodes[1] + ").");
 replTest.stepUp(nodes[1]);
 replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY);
-// The election should have happened in a single attempt, so the term of the new primary should
-// be exactly 1 greater than the old primary.
+// The term usually advances by exactly 1, but a stepdown/vote race can spoil the old primary's
+// vote (SERVER-91733), causing stepUp() to retry and consume an extra term. Just assert the term
+// advanced rather than requiring a single round.
 res = assert.commandWorked(nodes[1].adminCommand("replSetGetStatus"));
-assert.eq(firstPrimaryTerm + 1, res.term);
+assert.gt(res.term, firstPrimaryTerm);
 
 replTest.stopSet();
