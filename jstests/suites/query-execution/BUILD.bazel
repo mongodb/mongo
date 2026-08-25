@@ -1541,7 +1541,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",
-        "requires_large_host",
+        "requires_xlarge_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1677,7 +1677,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",  # Timeout of express_pbt.js after 16 minutes
-        "requires_large_host",
+        "requires_xlarge_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -1699,7 +1699,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",  # express_pbt.js times out after 16 minutes
-        "requires_large_host",
+        "requires_xlarge_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
