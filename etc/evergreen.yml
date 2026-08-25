@@ -1391,7 +1391,7 @@ functions:
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \
-                --log=buildlogger                         \
+                ${resmoke_log_option|--log=buildlogger}   \
                 --staggerJobs=on                          \
                 --installDir=${install_dir|dist-test/bin} \
                 --buildId=${build_id}                     \
@@ -1820,91 +1820,104 @@ functions:
         exit $exit_status
 
   "generate compile expansions":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
+    # Custom build hook (no-op unless the variant sets custom_build_version_suffix):
+    # compute MONGO_VERSION_OVERRIDE and apply it before the compile expansions are
+    # generated, so the override is folded into the version expansion. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/set_version_override.sh"
+    - command: expansions.update
+      params:
+        file: src/custom_build_version.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
 
-        # Extract version from .bazelrc.target_mongo_version (e.g., "common --define=MONGO_VERSION=4.4.30").
-        # awk is used instead of grep -oP for portability (macOS grep does not support -P), and the
-        # result is checked explicitly because a pipeline would mask a read or match failure.
-        TARGET_MONGO_VERSION=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
-        if [ -z "$TARGET_MONGO_VERSION" ]; then
-          echo "Unable to extract MONGO_VERSION from .bazelrc.target_mongo_version" >&2
-          exit 1
-        fi
-        MONGO_VERSION="r$TARGET_MONGO_VERSION"
-        # If this is a patch build, we add the patch version id to the version string so we know
-        # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-        fi
-
-        # For commit builds, append the first 8 characters of the git revision to the version string.
-        # cut is used rather than bash substring syntax because Evergreen would consume the ${...}.
-        if [ "${requester}" = "commit" ]; then
-          GIT_REV=$(git rev-parse HEAD)
-          MONGO_VERSION="$MONGO_VERSION-$(echo $GIT_REV | cut -c 1-8)"
-        fi
-
-        # Forcefully override the version for purposes of testing against a different version than
-        # the branch is targeting.
-        #
-        # Artifacts from runs with this enabled still should not be used for a final (non-rc) public
-        # release unless the associated packaging tests have completed successfully.
-        if [ -n "${MONGO_VERSION_OVERRIDE|}" ]; then
-          MONGO_VERSION="${MONGO_VERSION_OVERRIDE|}"
-        fi
-
-        ${activate_virtualenv}
-
-        # shared scons cache testing
-        # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
-        # 'scons_cache_scope' is set on a per variant basis
-        # 'disable_shared_scons_cache' is set on a project level and applies to all variants
-
-        # Shared - if scons_cache_scope is set, then use new shared scons cache settings
-        if [ ! -z ${scons_cache_scope} ]; then
-
-          if [ "${disable_shared_scons_cache}" = "true" ]; then
-
-            echo "SCons Cache disabled. All shared scons settings will be ignored"
-            scons_cache_scope=none
-
-          else
-            scons_cache_scope=${scons_cache_scope}
+          # Extract version from .bazelrc.target_mongo_version (e.g., "common --define=MONGO_VERSION=4.4.30").
+          # awk is used instead of grep -oP for portability (macOS grep does not support -P), and the
+          # result is checked explicitly because a pipeline would mask a read or match failure.
+          TARGET_MONGO_VERSION=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
+          if [ -z "$TARGET_MONGO_VERSION" ]; then
+            echo "Unable to extract MONGO_VERSION from .bazelrc.target_mongo_version" >&2
+            exit 1
+          fi
+          MONGO_VERSION="r$TARGET_MONGO_VERSION"
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
-          if [ "$scons_cache_scope" = "shared" ]; then
-            set +o errexit
-            if [ "Windows_NT" = "$OS" ]; then
-              ./win_mount.sh
+          # For commit builds, append the first 8 characters of the git revision to the version string.
+          # cut is used rather than bash substring syntax because Evergreen would consume the ${...}.
+          if [ "${requester}" = "commit" ]; then
+            GIT_REV=$(git rev-parse HEAD)
+            MONGO_VERSION="$MONGO_VERSION-$(echo $GIT_REV | cut -c 1-8)"
+          fi
+
+          # Forcefully override the version for purposes of testing against a different version than
+          # the branch is targeting.
+          #
+          # Artifacts from runs with this enabled still should not be used for a final (non-rc) public
+          # release unless the associated packaging tests have completed successfully.
+          if [ -n "${MONGO_VERSION_OVERRIDE|}" ]; then
+            MONGO_VERSION="${MONGO_VERSION_OVERRIDE|}"
+          fi
+
+          ${activate_virtualenv}
+
+          # shared scons cache testing
+          # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
+          # 'scons_cache_scope' is set on a per variant basis
+          # 'disable_shared_scons_cache' is set on a project level and applies to all variants
+
+          # Shared - if scons_cache_scope is set, then use new shared scons cache settings
+          if [ ! -z ${scons_cache_scope} ]; then
+
+            if [ "${disable_shared_scons_cache}" = "true" ]; then
+
+              echo "SCons Cache disabled. All shared scons settings will be ignored"
+              scons_cache_scope=none
+
             else
-              mount | grep "\/efs" > /dev/null
-              if [ $? -eq 0 ]; then
-                echo "Shared cache is already mounted"
-              else
-                echo "Shared cache - mounting file system"
-                ${set_sudo}
-                $sudo mount /efs
-              fi
+              scons_cache_scope=${scons_cache_scope}
             fi
-            set -o errexit
+
+            if [ "$scons_cache_scope" = "shared" ]; then
+              set +o errexit
+              if [ "Windows_NT" = "$OS" ]; then
+                ./win_mount.sh
+              else
+                mount | grep "\/efs" > /dev/null
+                if [ $? -eq 0 ]; then
+                  echo "Shared cache is already mounted"
+                else
+                  echo "Shared cache - mounting file system"
+                  ${set_sudo}
+                  $sudo mount /efs
+                fi
+              fi
+              set -o errexit
+            fi
+
+            echo "Shared Cache with setting: ${scons_cache_scope}"
+            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+
+          # Legacy Expansion generation
+          else
+            echo "Using legacy expansion generation"
+            # Proceed with regular expansions generated
+            # This script converts the generated version string into a sanitized version string for
+            # use by scons and uploading artifacts as well as information about for the scons cache.
+            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
           fi
-
-          echo "Shared Cache with setting: ${scons_cache_scope}"
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
-
-        # Legacy Expansion generation
-        else
-          echo "Using legacy expansion generation"
-          # Proceed with regular expansions generated
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-        fi
 
   "apply compile expansions":
     command: expansions.update
@@ -3786,6 +3799,15 @@ tasks:
 - name: compile
   depends_on: []
   commands:
+    # Custom build hook (no-op unless the variant sets custom_build_patch_files):
+    # apply the variant's patch files before compiling. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/apply_patches.sh"
     - func: "scons compile"
       vars:
         targets: >-
@@ -7762,6 +7784,15 @@ tasks:
 
 - name: package
   commands:
+    # Custom build hook (no-op unless the variant sets custom_build_patch_files):
+    # apply the variant's patch files before compiling. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/apply_patches.sh"
     - func: "scons compile"
       vars:
         targets: >-
@@ -8641,6 +8672,87 @@ tasks:
     vars:
       resmoke_args: --suites=mqlrun
 
+# Custom build delivery task. See
+# etc/evergreen_yml_components/custom_builds/README.md for an explanation of the
+# custom build framework and the expansions used here.
+#
+# Custom builds do not define their own compile task: the custom build hooks in
+# the shared "generate compile expansions" function and in the compile/package
+# tasks (MONGO_VERSION_OVERRIDE handling and patch application, gated on the
+# custom_build_* expansions) make the standard compile tasks themselves produce
+# the custom artifacts. All of the standard test tasks depend on compile, whose
+# patched build is what package archives, so the binaries under test are the
+# exact binaries being delivered. The task below only picks up the resulting
+# dist tarball (built and uploaded by the package task), smoke-tests it, and
+# delivers it to the consumer's S3 location.
+- name: custom_build_deliver
+  tags: ["assigned_to_jira_team_devprod_build"]
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set up virtualenv"
+  # prepare_upload.sh needs src_suffix (the branch path component of the delivery
+  # destination), which only exists in the generated compile expansions — generate
+  # and apply them, as the compile tasks do. "generate compile expansions" also
+  # runs the custom build version-override hook, so the expansions reflect
+  # MONGO_VERSION_OVERRIDE.
+  - func: "generate compile expansions"
+  - func: "apply compile expansions"
+  # The package task uploaded the dist tarball to the standard dist location in
+  # mciuploads (build_id is shared by all tasks of this variant's build).
+  - command: s3.get
+    display_name: "fetch custom build dist tarball"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+      local_file: dist-stripped.${ext|tgz}
+      bucket: mciuploads
+  - command: subprocess.exec
+    display_name: "verify custom build dist"
+    type: test
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/verify_dist.sh"
+      - "dist-stripped.${ext|tgz}"
+  # Deliver the tarball to the consumer's location. Patch builds are redirected to a
+  # patch-specific path by prepare_upload.sh so they never overwrite the artifact the
+  # consumer picks up.
+  - command: subprocess.exec
+    display_name: "prepare custom build upload"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/prepare_upload.sh"
+      - "dist-stripped.${ext|tgz}"
+  - command: expansions.update
+    display_name: "apply custom build upload expansions"
+    params:
+      file: custom_build_upload.yml
+  # Uses the aws_key_build/aws_secret_build project variables: the standard
+  # project credentials (aws_key/aws_secret) have no PutObject on
+  # mdb-build-private, which is managed with dedicated uploader credentials
+  # (the same pattern as the release uploads). The object is private; consumers
+  # download it via signed URLs.
+  - command: s3.put
+    display_name: "deliver custom build dist tarball"
+    type: test
+    params:
+      aws_key: ${aws_key_build}
+      aws_secret: ${aws_secret_build}
+      local_file: dist-stripped-custom.${ext|tgz}
+      remote_file: ${custom_build_upload_remote_file}
+      bucket: ${custom_build_upload_bucket}
+      permissions: private
+      visibility: signed
+      content_type: application/tar
+      display_name: Custom Build Dist Tarball
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -8717,6 +8829,19 @@ task_groups:
   - dbtest
   - compile_all
   - package
+
+# Same tasks as compile_all_run_unittests_TG, but with package right after compile:
+# a task group stops running its remaining tasks after a failure, and this order
+# keeps a test failure from blocking the build (and therefore custom_build_deliver).
+# Used by the custom build variants.
+- <<: *compile_task_group_template
+  name: compile_package_run_unittests_TG
+  tasks:
+  - compile
+  - package
+  - unittests
+  - dbtest
+  - compile_all
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
@@ -12439,3 +12564,114 @@ buildvariants:
   tasks:
   - name: sync_repo_with_copybara
     priority: 50
+
+###########################################
+#       Custom build buildvariants        #
+###########################################
+
+# Custom build variants. See etc/evergreen_yml_components/custom_builds/README.md for
+# an explanation of the custom build framework and the expansions used here.
+#
+# The variants below produce the MCAS (Microsoft Defender for Cloud Apps, formerly
+# Adallom) jemalloc builds of 4.4 — community builds that link jemalloc instead of
+# tcmalloc, replacing the one-off hotfix process (previously HELP-95127, where the
+# same change was committed directly on a hotfix branch and artifacts were copied to
+# S3 by hand). Each variant:
+# - applies the mcas-jemalloc-v4.4-*.patch files (the vendored jemalloc-4.3.1, the
+#   SCons allocator wiring, and the bundled fixes MCAS receives) before compiling,
+# - builds with --allocator=jemalloc (the patch adds the jemalloc allocator option
+#   but does not change the "auto" default) and
+#   MONGO_VERSION_OVERRIDE=r4.4.31-mcas-jemalloc via the shared
+#   "generate compile expansions" hook, so every binary carries the custom version,
+# - runs the standard compile/package task group plus a smoke set of test tasks
+#   (the test tasks exercise the exact binaries being delivered),
+# - delivers the dist tarball to s3://mdb-build-private/mcas/version/... via
+#   custom_build_deliver (patch builds are redirected to custom-build-patches/).
+#
+# scons_cache_scope is "none" so jemalloc objects never enter the shared cache used
+# by the stock (tcmalloc) variants.
+
+- name: custom-build-mcas-jemalloc-ubuntu1804
+  display_name: "Custom Build: MCAS jemalloc Ubuntu 18.04 (x86_64)"
+  tags: []
+  cron: "0 4 * * *"
+  run_on:
+  - release-ubuntu1804-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 4.4 version; bump when MCAS picks up a newer 4.4 release.
+    custom_build_base_version: "4.4.31"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off --allocator=jemalloc MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    # logkeeper2.build.10gen.cc (the buildlogger server this branch's resmoke logs
+    # to) is decommissioned, so every test task would fail before running any tests.
+    # Log to the console (the Evergreen task log) instead.
+    resmoke_log_option: --log=console
+    multiversion_platform: ubuntu1804
+    multiversion_edition: targeted
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-ubuntu1804-test
+  - name: compile_package_run_unittests_TG
+    distros:
+    - release-ubuntu1804-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common
+
+- name: custom-build-mcas-jemalloc-amazon2
+  display_name: "Custom Build: MCAS jemalloc Amazon Linux 2 (x86_64)"
+  tags: []
+  cron: "0 4 * * *"
+  run_on:
+  - release-amazon2-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 4.4 version; bump when MCAS picks up a newer 4.4 release.
+    custom_build_base_version: "4.4.31"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v4.4-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-amazon2
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286 --enableEnterpriseTests=off
+    compile_flags: --ssl --allocator=jemalloc MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    # logkeeper2.build.10gen.cc (the buildlogger server this branch's resmoke logs
+    # to) is decommissioned, so every test task would fail before running any tests.
+    # Log to the console (the Evergreen task log) instead.
+    resmoke_log_option: --log=console
+    multiversion_platform: amazon
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: amazon2-build
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-amazon2-test
+  - name: compile_package_run_unittests_TG
+    distros:
+    - release-amazon2-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common

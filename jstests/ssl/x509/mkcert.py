@@ -18,12 +18,16 @@ import OpenSSL
 import re
 import shutil
 
-# pylint: disable=protected-access
-OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
-OpenSSL._util.lib.OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
-OpenSSL._util.lib.OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
-                              b'Sequence of MongoDB Database Roles')
-# pylint: enable=protected-access
+try:
+    # pylint: disable=protected-access
+    # Newer versions of PyOpenSSL hide OBJ_create, but also seem okay without it.
+    OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
+    OpenSSL._util.lib.OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
+    OpenSSL._util.lib.OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
+                                  b'Sequence of MongoDB Database Roles')
+    # pylint: enable=protected-access
+except AttributeError:
+    pass
 
 CONFIGFILE = 'jstests/ssl/x509/certs.yml'
 
