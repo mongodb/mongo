@@ -3096,6 +3096,63 @@ TEST_F(PrepareHeartbeatResponseV1Test, NodeReturnsBadValueWhenAHeartbeatRequestI
     ASSERT_EQUALS("", response.getReplicaSetName());
 }
 
+TEST_F(PrepareHeartbeatResponseV1Test, LastHeartbeatRecvFromPrimaryIsUnsetWhenNoPrimaryIsKnown) {
+    ReplSetHeartbeatArgsV1 args;
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    args.setConfigVersion(initConfigVersion);
+    args.setConfigTerm(initConfigTerm);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+
+    ASSERT_FALSE(getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // Self being primary is not a liveness signal about another node either.
+    getTopoCoord().setPrimaryIndex(0);
+    ASSERT_FALSE(getTopoCoord().getLastHeartbeatRecvFromPrimary());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test, LastHeartbeatRecvFromPrimaryAdvancesOnRequestFromPrimary) {
+    // h2 (member id 20, index 1) is the primary.
+    getTopoCoord().setPrimaryIndex(1);
+    // The primary is known, but it has never sent us a request, so the timestamp is unset rather
+    // than absent.
+    ASSERT_EQUALS(Date_t(), *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // A request from the other secondary does not count.
+    ReplSetHeartbeatArgsV1 fromSecondary;
+    fromSecondary.setSetName("rs0");
+    fromSecondary.setSenderId(30);
+    fromSecondary.setConfigVersion(initConfigVersion);
+    fromSecondary.setConfigTerm(initConfigTerm);
+    prepareHeartbeatResponseV1(fromSecondary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(Date_t(), *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // A request from the primary does.
+    ReplSetHeartbeatArgsV1 fromPrimary;
+    fromPrimary.setSetName("rs0");
+    fromPrimary.setSenderId(20);
+    fromPrimary.setConfigVersion(initConfigVersion);
+    fromPrimary.setConfigTerm(initConfigTerm);
+    const auto firstRecv = now();
+    prepareHeartbeatResponseV1(fromPrimary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(firstRecv, *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // A later request from the primary advances the timestamp.
+    const auto secondRecv = now();
+    ASSERT_GREATER_THAN(secondRecv, firstRecv);
+    prepareHeartbeatResponseV1(fromPrimary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(secondRecv, *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+}
+
 TEST_F(TopoCoordTest, SetConfigVersionToNegativeTwoInHeartbeatResponseWhenNoConfigHasBeenReceived) {
     // set up args and acknowledge sender
     ReplSetHeartbeatArgsV1 args;

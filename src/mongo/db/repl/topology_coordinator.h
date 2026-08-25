@@ -833,6 +833,16 @@ public:
     [[MONGO_MOD_PRIVATE]] int getCurrentPrimaryIndex() const;
 
     /**
+     * Returns the last time we received a heartbeat *request* from the current primary, or
+     * boost::none if there is no known primary other than ourselves. Unlike a heartbeat response,
+     * an inbound request proves the primary is still actively initiating work.
+     *
+     * A returned unset Date_t means we know who the primary is but have never received a request
+     * from it, which callers comparing against 'now' will read as the distant past.
+     */
+    [[MONGO_MOD_PRIVATE]] boost::optional<Date_t> getLastHeartbeatRecvFromPrimary() const;
+
+    /**
      * Transitions to the candidate role if the node is electable.
      */
     [[MONGO_MOD_PRIVATE]] Status becomeCandidateIfElectable(Date_t now,

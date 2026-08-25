@@ -2633,6 +2633,16 @@ int TopologyCoordinator::getCurrentPrimaryIndex() const {
     return _currentPrimaryIndex;
 }
 
+boost::optional<Date_t> TopologyCoordinator::getLastHeartbeatRecvFromPrimary() const {
+    if (_currentPrimaryIndex == -1 || _currentPrimaryIndex == _selfIndex) {
+        return boost::none;
+    }
+    // Unset until the primary sends us its first heartbeat request. Since the sentinel is the
+    // epoch, subtracting it from a wall clock 'now' yields a duration far larger than any election
+    // timeout.
+    return _memberData.at(_currentPrimaryIndex).getLastHeartbeatRecv();
+}
+
 Date_t TopologyCoordinator::getStepDownTime() const {
     return _stepDownUntil;
 }

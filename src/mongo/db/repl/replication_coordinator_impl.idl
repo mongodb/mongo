@@ -25,6 +25,17 @@ server_parameters:
         default: true
         redact: false
 
+    enableStrictPrimaryLivenessCheck:
+        description: <-
+            When enabled, a secondary only postpones its election timeout on a heartbeat response
+            from the primary if it has also recently received a heartbeat request from that primary.
+            This detects a primary that is wedged but whose network stack still replies.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: enableStrictPrimaryLivenessCheck
+        default: true
+        redact: false
+
     shutdownTimeoutMillisForSignaledShutdown:
         description: <-
             The time taken for stepdown and quiesce mode at shutdown in response to SIGTERM.

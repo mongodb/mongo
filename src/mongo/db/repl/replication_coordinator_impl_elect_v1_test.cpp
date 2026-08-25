@@ -1007,6 +1007,12 @@ public:
                                     const OpTime& otherNodesOpTime) {
 
         auto net = getNet();
+
+        // A live primary initiates heartbeats towards us as well as answering ours, and a
+        // secondary only postpones its election timeout if it has seen such a request recently.
+        // Model that here so the mocked primary looks alive in both directions.
+        _receiveHeartbeatRequestFromPrimary(config, primaryHostAndPort);
+
         net->enterNetwork();
 
         // If 'until' is equal to net->now(), process any currently queued requests and return,
@@ -1019,6 +1025,12 @@ public:
                 // Run clock forward to time 'until', or until the time of the next queued request.
                 net->runUntil(until);
                 _respondToHeartbeatsNow(config, primaryHostAndPort, otherNodesOpTime);
+
+                // Keep the primary's inbound heartbeats current as the clock advances, which
+                // requires leaving the network since this goes through the command path.
+                net->exitNetwork();
+                _receiveHeartbeatRequestFromPrimary(config, primaryHostAndPort);
+                net->enterNetwork();
             }
         }
 
@@ -1062,6 +1074,32 @@ private:
      *
      * Intended as a helper function only.
      */
+    /*
+     * Simulates 'primaryHostAndPort' initiating a heartbeat towards us, which is what proves to a
+     * secondary that the primary is still doing work rather than merely answering requests. Does
+     * nothing if that host is not a member of 'config'. Must not be called while in the network.
+     */
+    void _receiveHeartbeatRequestFromPrimary(const ReplSetConfig& config,
+                                             const HostAndPort& primaryHostAndPort) {
+        const MemberConfig* primaryMember = config.findMemberByHostAndPort(primaryHostAndPort);
+        if (!primaryMember) {
+            return;
+        }
+
+        auto replCoord = getReplCoord();
+        ReplSetHeartbeatArgsV1 hbArgs;
+        hbArgs.setSetName(std::string{config.getReplSetName()});
+        hbArgs.setConfigVersion(config.getConfigVersion());
+        hbArgs.setConfigTerm(config.getConfigTerm());
+        hbArgs.setSenderId(primaryMember->getId().getData());
+        hbArgs.setSenderHost(primaryHostAndPort);
+        hbArgs.setTerm(replCoord->getTerm());
+
+        ReplSetHeartbeatResponse hbResp;
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(replCoord->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
+    }
+
     void _respondToHeartbeatsNow(const ReplSetConfig& config,
                                  const HostAndPort& primaryHostAndPort,
                                  const OpTime& otherNodesOpTime) {

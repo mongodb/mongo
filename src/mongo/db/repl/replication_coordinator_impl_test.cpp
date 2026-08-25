@@ -21,6 +21,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
+#include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
@@ -7326,6 +7327,200 @@ TEST_F(ReplCoordTest,
     net->exitNetwork();
 
     ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
+                               replCoord->getElectionTimeout_forTest());
+}
+
+/**
+ * Fixture for the 'enableStrictPrimaryLivenessCheck' tests. Sets up a two-node set in which node1
+ * (self) is SECONDARY and node2 is PRIMARY, and provides helpers to feed heartbeat requests from
+ * and heartbeat responses to the primary.
+ */
+class StrictPrimaryLivenessCheckTest : public ReplCoordTest {
+public:
+    static constexpr int kConfigVersion = 2;
+
+    void setUp() override {
+        ReplCoordTest::setUp();
+        assertStartSuccess(BSON("_id" << "mySet" << "protocolVersion" << 1 << "version"
+                                      << kConfigVersion << "members"
+                                      << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0)
+                                                    << BSON("host" << "node2:12345" << "_id" << 1))
+                                      << "settings"
+                                      << BSON("electionTimeoutMillis"
+                                              << 10000 << "heartbeatIntervalMillis" << 2000)),
+                           HostAndPort("node1", 12345));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    }
+
+    /**
+     * Simulates node2, the primary, initiating a heartbeat to us. This is the signal the strict
+     * check requires.
+     */
+    void receiveHeartbeatRequestFromPrimary() {
+        ReplSetHeartbeatArgsV1 hbArgs;
+        hbArgs.setSetName("mySet");
+        hbArgs.setConfigVersion(kConfigVersion);
+        hbArgs.setConfigTerm(getReplCoord()->getConfig().getConfigTerm());
+        hbArgs.setSenderId(1);
+        hbArgs.setSenderHost(HostAndPort("node2", 12345));
+        hbArgs.setTerm(getReplCoord()->getTerm());
+        ReplSetHeartbeatResponse hbResp;
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
+    }
+
+    /**
+     * Replies to our next outstanding heartbeat request at 'when' as if node2 were a healthy
+     * primary in our term, and runs the network up to that point.
+     */
+    void deliverHeartbeatResponseFromPrimaryAt(Date_t when) {
+        auto net = getNet();
+        net->enterNetwork();
+        // The next heartbeat request may not have been sent yet; let the network run up to 'when'
+        // until it is.
+        while (!net->hasReadyRequests() && net->now() < when) {
+            net->runUntil(when);
+        }
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        ASSERT_EQUALS(HostAndPort("node2", 12345), noi->getRequest().target);
+        ASSERT_EQUALS("replSetHeartbeat",
+                      noi->getRequest().cmdObj.firstElement().fieldNameStringData());
+
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_PRIMARY);
+        hbResp.setTerm(getReplCoord()->getTerm());
+        hbResp.setConfigVersion(kConfigVersion);
+        hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+        hbResp.setWrittenOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+        hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+
+        net->scheduleResponse(noi, when, makeResponseStatus(hbResp.toBSON()));
+        net->runUntil(when);
+        ASSERT_EQUALS(when, net->now());
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+    }
+};
+
+TEST_F(StrictPrimaryLivenessCheckTest, RescheduleElectionTimeoutWhenPrimaryKeepsSendingHeartbeats) {
+    enableStrictPrimaryLivenessCheck.store(true);
+
+    auto replCoord = getReplCoord();
+    const auto electionTimeoutPeriod = replCoord->getConfig().getElectionTimeoutPeriod();
+    const auto startDate = getNet()->now();
+
+    receiveHeartbeatRequestFromPrimary();
+
+    const auto firstResponseAt = startDate + Seconds(4);
+    deliverHeartbeatResponseFromPrimaryAt(firstResponseAt);
+    const auto postponedTimeout = replCoord->getElectionTimeout_forTest();
+    ASSERT_LESS_THAN_OR_EQUALS(firstResponseAt + electionTimeoutPeriod, postponedTimeout);
+
+    // A healthy primary keeps initiating heartbeats, so the response still postpones the election
+    // timeout even though the first request has gone stale.
+    receiveHeartbeatRequestFromPrimary();
+    const auto secondResponseAt = startDate + electionTimeoutPeriod + Seconds(1);
+    deliverHeartbeatResponseFromPrimaryAt(secondResponseAt);
+    ASSERT_LESS_THAN_OR_EQUALS(secondResponseAt + electionTimeoutPeriod,
+                               replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(StrictPrimaryLivenessCheckTest,
+       DoNotRescheduleElectionTimeoutWhenPrimaryHasNotSentAHeartbeatRecently) {
+    enableStrictPrimaryLivenessCheck.store(true);
+
+    auto replCoord = getReplCoord();
+    const auto electionTimeoutPeriod = replCoord->getConfig().getElectionTimeoutPeriod();
+    const auto startDate = getNet()->now();
+
+    // The primary initiates a heartbeat to us, then goes silent.
+    receiveHeartbeatRequestFromPrimary();
+
+    // While that request is still fresh, a heartbeat response from the primary postpones the
+    // election timeout.
+    const auto firstResponseAt = startDate + Seconds(4);
+    deliverHeartbeatResponseFromPrimaryAt(firstResponseAt);
+    const auto postponedTimeout = replCoord->getElectionTimeout_forTest();
+    ASSERT_LESS_THAN_OR_EQUALS(firstResponseAt + electionTimeoutPeriod, postponedTimeout);
+
+    // Once more than an election timeout period has passed since that request, a heartbeat response
+    // from the primary is no longer enough to postpone the election timeout.
+    const auto secondResponseAt = startDate + electionTimeoutPeriod + Seconds(1);
+    deliverHeartbeatResponseFromPrimaryAt(secondResponseAt);
+    ASSERT_EQUALS(postponedTimeout, replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(StrictPrimaryLivenessCheckTest,
+       RescheduleElectionTimeoutOnStaleHeartbeatWhenStrictCheckIsDisabled) {
+    enableStrictPrimaryLivenessCheck.store(false);
+    ON_BLOCK_EXIT([&] { enableStrictPrimaryLivenessCheck.store(true); });
+
+    auto replCoord = getReplCoord();
+    const auto electionTimeoutPeriod = replCoord->getConfig().getElectionTimeoutPeriod();
+    const auto startDate = getNet()->now();
+
+    receiveHeartbeatRequestFromPrimary();
+
+    const auto firstResponseAt = startDate + Seconds(4);
+    deliverHeartbeatResponseFromPrimaryAt(firstResponseAt);
+    ASSERT_LESS_THAN_OR_EQUALS(firstResponseAt + electionTimeoutPeriod,
+                               replCoord->getElectionTimeout_forTest());
+
+    // With the strict check disabled, the stale request from the primary is irrelevant: the
+    // response alone postpones the election timeout.
+    const auto secondResponseAt = startDate + electionTimeoutPeriod + Seconds(1);
+    deliverHeartbeatResponseFromPrimaryAt(secondResponseAt);
+    ASSERT_LESS_THAN_OR_EQUALS(secondResponseAt + electionTimeoutPeriod,
+                               replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(StrictPrimaryLivenessCheckTest,
+       StopReschedulingElectionTimeoutWhenNoHeartbeatFromPrimaryHasEverBeenReceived) {
+    enableStrictPrimaryLivenessCheck.store(true);
+
+    auto replCoord = getReplCoord();
+    const auto electionTimeoutPeriod = replCoord->getConfig().getElectionTimeoutPeriod();
+    const auto startDate = getNet()->now();
+    const auto initialTimeout = replCoord->getElectionTimeout_forTest();
+
+    // We have never received a heartbeat request from the primary, e.g. because we just discovered
+    // it. The response that reveals the primary arrives before we have identified it, so it
+    // postpones the election timeout.
+    const auto firstResponseAt = startDate + Seconds(4);
+    deliverHeartbeatResponseFromPrimaryAt(firstResponseAt);
+    const auto postponedTimeout = replCoord->getElectionTimeout_forTest();
+    ASSERT_GREATER_THAN(postponedTimeout, initialTimeout);
+    ASSERT_LESS_THAN_OR_EQUALS(firstResponseAt + electionTimeoutPeriod, postponedTimeout);
+
+    // Now that we know who the primary is, further responses from a primary that has still never
+    // initiated a heartbeat towards us no longer postpone the election timeout, so the grace
+    // period this node gets on discovery is bounded.
+    const auto secondResponseAt = startDate + electionTimeoutPeriod + Seconds(1);
+    deliverHeartbeatResponseFromPrimaryAt(secondResponseAt);
+    ASSERT_EQUALS(postponedTimeout, replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(StrictPrimaryLivenessCheckTest,
+       RescheduleElectionTimeoutWhenNoHeartbeatFromPrimaryHasEverBeenReceivedAndCheckIsDisabled) {
+    enableStrictPrimaryLivenessCheck.store(false);
+    ON_BLOCK_EXIT([&] { enableStrictPrimaryLivenessCheck.store(true); });
+
+    auto replCoord = getReplCoord();
+    const auto electionTimeoutPeriod = replCoord->getConfig().getElectionTimeoutPeriod();
+    const auto startDate = getNet()->now();
+
+    // The primary has never initiated a heartbeat towards us. With the strict check disabled that
+    // is irrelevant, so every response postpones the election timeout indefinitely.
+    const auto firstResponseAt = startDate + Seconds(4);
+    deliverHeartbeatResponseFromPrimaryAt(firstResponseAt);
+    ASSERT_LESS_THAN_OR_EQUALS(firstResponseAt + electionTimeoutPeriod,
+                               replCoord->getElectionTimeout_forTest());
+
+    const auto secondResponseAt = startDate + electionTimeoutPeriod + Seconds(1);
+    deliverHeartbeatResponseFromPrimaryAt(secondResponseAt);
+    ASSERT_LESS_THAN_OR_EQUALS(secondResponseAt + electionTimeoutPeriod,
                                replCoord->getElectionTimeout_forTest());
 }
 
