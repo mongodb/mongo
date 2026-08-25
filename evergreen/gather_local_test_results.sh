@@ -18,11 +18,7 @@ fi
 
 readonly target_prefix=$(bazel_test_results::label_to_prefix "${test_label}")
 
-readonly bazel_testlogs="${workdir}/src/bazel-testlogs"
-readonly target_outputs="${bazel_testlogs}/${target_prefix}"
-
-if [ ! -d "${target_outputs}" ]; then
-    echo "Error: No bazel test outputs found at ${target_outputs}" >&2
+if ! target_outputs=$(bazel_test_results::resolve_testlogs_dir "${workdir}/src" "${target_prefix}"); then
     echo "The test may have failed to build. Check the logs from the runner task." >&2
     exit 1
 fi

@@ -497,6 +497,10 @@ def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str],
     cquery_flags.append("--//bazel/resmoke:skip_deps_for_cquery")
     cquery_flags.append("--repo_env=no_c++_toolchain=1")
     cquery_flags.append("--keep_going")
+    # Suites with shard_count above Bazel's native cap of 50 get their shard count from a rule
+    # transition, and Bazel omits a target whose own transition changed its configuration from
+    # cquery output. Turning the flag off makes the transition a no-op so the targets are visible.
+    cquery_flags.append("--//bazel/resmoke:support_extended_shard_count=False")
 
     if " " in target_pattern and not target_pattern.startswith("set("):
         target_pattern = f"set({target_pattern})"
@@ -550,15 +554,17 @@ def query_targets(
             candidate_set,
             "--output=starlark",
             "--starlark:expr",
-            'target.label if "IncompatiblePlatformProvider" not in providers(target) else ""',
+            "str(target.label) + "
+            '(" INCOMPATIBLE" if "IncompatiblePlatformProvider" in providers(target) else " OK")',
         ]
     )
     result = subprocess.run(cquery_cmd, capture_output=True, text=True)
-    compatible = {
-        line.strip().removeprefix("@@")
-        for line in result.stdout.strip().split("\n")
-        if line.strip()
-    }
+    compatible = set()
+    for line in result.stdout.splitlines():
+        label, _, verdict = line.strip().rpartition(" ")
+        if verdict == "OK":
+            compatible.add(label.removeprefix("@@").removeprefix("@"))
+
     targets = [c for c in candidates if c in compatible]
     print(f"Variant {variant.name}: Found {len(targets)} targets total", file=sys.stderr)
 

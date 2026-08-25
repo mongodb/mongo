@@ -121,6 +121,15 @@ bool_flag(
     build_setting_default = False,
 )
 
+# Suites with shard_count > 50 exceed the cap Bazel enforces on the native shard_count attribute,
+# so resmoke_suite_test forces their shard count through a rule transition instead. Bazel omits a
+# target whose own transition changed its configuration from cquery output, so any cquery over
+# resmoke test targets must set this to False to see them (see buildscripts/generate_result_tasks.py).
+bool_flag(
+    name = "support_extended_shard_count",
+    build_setting_default = True,
+)
+
 config_setting(
     name = "skip_deps_for_cquery_enabled",
     flag_values = {

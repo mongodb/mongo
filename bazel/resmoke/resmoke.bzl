@@ -323,6 +323,10 @@ _DEFAULT_PYTHON_DATA = [
     "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
 ]
 
+# Bazel fails analysis for a native shard_count above this ("Having more than 50 shards is
+# indicative of poor test organization"). Suites needing more go through the _forced_shards_transition.
+_MAX_NATIVE_SHARD_COUNT = 50
+
 def _resolve_config_root(name, root):
     """Resolves a '//path' config root to a path relative to resmoke's cwd.
 
@@ -699,8 +703,21 @@ def resmoke_suite_test(
         target_compatible_with = target_compatible_with,
     )
 
+    # Bazel caps the native shard_count attribute at 50. Above that, pin the attribute at the cap
+    # and let the rule transition force the real count, so a suite still shards 50 ways if the
+    # transition is disabled (--no//bazel/resmoke:support_extended_shard_count) rather than collapsing to a
+    # single shard.
+    shard_count = kwargs.pop("shard_count", None)
+    forced_shards = 0
+    if shard_count != None and shard_count > _MAX_NATIVE_SHARD_COUNT:
+        forced_shards = shard_count
+        shard_count = _MAX_NATIVE_SHARD_COUNT
+    if shard_count != None:
+        kwargs["shard_count"] = shard_count
+
     _resmoke_test(
         name = name,
+        forced_shards = forced_shards,
         resmoke_bin = ":" + name + "_bin",
         server_deps = server_deps_attr,
         data = data_attr,
@@ -869,9 +886,31 @@ _coverage_dso_transition = transition(
     outputs = ["//command_line_option:features"],
 )
 
+# Bazel rejects a native shard_count above 50. Suites that need more shards than that get their
+# shard count from --test_sharding_strategy instead, set here per target so it applies to this
+# suite alone rather than to every test in the invocation.
+def _forced_shards_transition_impl(settings, attr):
+    if attr.forced_shards == 0:
+        return {}
+    if not settings["//bazel/resmoke:support_extended_shard_count"]:
+        return {}
+    return {"//command_line_option:test_sharding_strategy": "forced=%d" % attr.forced_shards}
+
+_forced_shards_transition = transition(
+    implementation = _forced_shards_transition_impl,
+    inputs = ["//bazel/resmoke:support_extended_shard_count"],
+    outputs = ["//command_line_option:test_sharding_strategy"],
+)
+
 _resmoke_test = rule(
     implementation = _resmoke_test_impl,
+    cfg = _forced_shards_transition,
     attrs = {
+        "forced_shards": attr.int(
+            doc = "Set by the resmoke_suite_test macro when shard_count exceeds the native cap; " +
+                  "forces this many shards via a configuration transition. 0 leaves sharding to " +
+                  "the native shard_count attribute.",
+        ),
         "resmoke_bin": attr.label(
             mandatory = True,
             executable = True,

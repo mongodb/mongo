@@ -58,18 +58,26 @@ def _copy_bins_to_upload(upload_bin_dir: str, upload_lib_dir: str):
     libs = []
     bins = []
     dsyms = []
-    bazel_bin_dir = Path("./bazel-bin/src")
-    for dirpath, _, filenames in os.walk(bazel_bin_dir):
-        if dirpath.endswith(".dSYM"):
-            dsyms.append(Path(dirpath))
-        for f in filenames:
-            file = Path(f)
-            if file.stem.endswith("_with_debug"):
-                continue
-            if file.suffix in [".so", ".so.debug", ".dylib"]:
-                libs.append(Path(os.path.join(dirpath, file)))
-            elif file.suffix in [".debug", ".dwp", ".pdb", ".exe", ""]:
-                bins.append(Path(os.path.join(dirpath, file)))
+    bazel_bin_dirs = [Path("./bazel-bin/src"), *sorted(Path("bazel-out").glob("*/bin/src"))]
+    seen_dirs = set()
+    for bazel_bin_dir in bazel_bin_dirs:
+        if not bazel_bin_dir.is_dir():
+            continue
+        resolved = bazel_bin_dir.resolve()
+        if resolved in seen_dirs:
+            continue
+        seen_dirs.add(resolved)
+        for dirpath, _, filenames in os.walk(bazel_bin_dir):
+            if dirpath.endswith(".dSYM"):
+                dsyms.append(Path(dirpath))
+            for f in filenames:
+                file = Path(f)
+                if file.stem.endswith("_with_debug"):
+                    continue
+                if file.suffix in [".so", ".so.debug", ".dylib"]:
+                    libs.append(Path(os.path.join(dirpath, file)))
+                elif file.suffix in [".debug", ".dwp", ".pdb", ".exe", ""]:
+                    bins.append(Path(os.path.join(dirpath, file)))
 
     for binary_file in bins:
         new_binary_file = upload_bin_dir / binary_file.name
