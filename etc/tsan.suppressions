@@ -27,7 +27,11 @@ race:ZSTD_*
 # internal lock, so the two deadlock and the process wedges with no CPU and no response to
 # SIGABRT. Muting analysis of accesses made from within zstd stops the race being detected at
 # all, so the reporting path never runs.
-called_from_lib:libzstd.so
+#
+# The '$' anchor is load bearing. A called_from_lib pattern that matches two loaded modules is
+# fatal, and the antithesis image has both our bundled lib/libzstd.so and the distro's
+# libzstd.so.1 mapped, so an unanchored 'libzstd.so' aborts every binary at startup (BF-45741).
+called_from_lib:libzstd.so$
 
 # These functions call malloc() down the line while inside a signal handler.
 # Since we've never had problems with any of the allocators we use, and since
