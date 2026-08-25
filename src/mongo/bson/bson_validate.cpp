@@ -86,7 +86,7 @@ constexpr ErrorCodes::Error InvalidBSONColumn = ErrorCodes::InvalidBSONColumn;
 
 class DefaultValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {}
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {}
 
     void checkDuplicateFieldName() {}
 
@@ -99,7 +99,7 @@ public:
 
 class ExtendedValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         // Increments the pointer to the actual element value.
         BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
@@ -195,7 +195,7 @@ public:
         _objFrames.push_back({.type = BSONType::object, .indexCounter = 0});
     }
 
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         // Validate that array indices are monotonically increasing base-10 strings, and field
         // names are UTF8 strings.
         _checkFieldName(ptr);
@@ -405,9 +405,8 @@ public:
         // multiple instances or an EOO.  Only resume with the iterative loop if
         // we have nested objects
         _currElem = _data;
-        const int8_t type = ConstDataView(_data).read<int8_t>();
-        const char* ptr = _validateElem<false>(Cursor{_data + 2, _data + _maxLength}, type);
-        _validator.checkNonConformantElem(_data, 2, type);
+        const char* ptr = _validateElem<false>(Cursor{_data + 2, _data + _maxLength}, *_data);
+        _validator.checkNonConformantElem(_data, 2, *_data);
 
         if (_firstFrameUpdated) {
             // We know that type was kObject/kArray/kCodeWScope
@@ -438,11 +437,7 @@ private:
      * Extra information for each nesting level in the precise validation mode.
      */
     struct PreciseFrameInfo {
-        // Points to the start (type byte) of the element that started this nesting level
-        // (Object, Array, or CodeWScope). An exception to this case is the CodeWScope scope
-        // frame (see _pushCodeWithScope), where nestedElemStart points to the NUL terminator
-        // of the code string.
-        const char* nestedElemStart = nullptr;
+        BSONElement elem;  // _id for top frame, unchecked Object, Array or CodeWScope otherwise.
     };
 
     struct Frame : public std::conditional<precise, PreciseFrameInfo, Empty>::type {
@@ -502,7 +497,8 @@ private:
         _currFrame->end = obj + len;
 
         if constexpr (precise) {
-            _currFrame->nestedElemStart = _currElem;
+            auto nameLen = obj - _currElem - 1;  // exclude type byte
+            _currFrame->elem = BSONElement(_currElem, nameLen, BSONElement::TrustedInitTag{});
         }
         return cursor.ptr;
     }
@@ -515,7 +511,7 @@ private:
         return true;
     }
 
-    const char* _validateSpecial(Cursor cursor, int8_t type) {
+    const char* _validateSpecial(Cursor cursor, uint8_t type) {
         switch (type) {
             case stdx::to_underlying(BSONType::binData): {
                 auto count = cursor.template read<uint32_t>();
@@ -548,7 +544,8 @@ private:
                 cursor.skipString();  // Like String, but...
                 cursor.skip(12);      // ...also skip the 12-byte ObjectId.
                 break;
-            case stdx::to_underlying(BSONType::minKey):
+            case static_cast<uint8_t>(
+                stdx::to_underlying(BSONType::minKey)):  // Need to cast, as MinKey is negative.
             case stdx::to_underlying(BSONType::maxKey):
                 cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
                 break;
@@ -574,21 +571,17 @@ private:
         if constexpr (precise) {
             // When ending the scope of a CodeWScope, pop the extra dummy frame and check its
             // size.
-            if (_currFrame != _frames.begin()) {
-                if (auto nestedElemStart = (_currFrame - 1)->nestedElemStart;
-                    nestedElemStart != nullptr &&
-                    static_cast<BSONType>(ConstDataView(nestedElemStart).read<int8_t>()) ==
-                        BSONType::codeWScope) {
-                    invariant(_popFrame());
-                    uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
-                }
+            if (_currFrame != _frames.begin() &&
+                (_currFrame - 1)->elem.type() == BSONType::codeWScope) {
+                invariant(_popFrame());
+                uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
             }
         }
     }
 
     template <bool nestedFrame>
-    const char* _validateElem(Cursor cursor, int8_t type) {
-        if (MONGO_unlikely(type < 0 || type > stdx::to_underlying(BSONType::jsTypeMax)))
+    const char* _validateElem(Cursor cursor, uint8_t type) {
+        if (MONGO_unlikely(type > stdx::to_underlying(BSONType::jsTypeMax)))
             return _validateSpecial(cursor, type);
 
         auto style = kTypeInfoTable[type];
@@ -621,7 +614,7 @@ private:
             // is safe.
             uassert(InvalidBSON, "BSON size is larger than buffer size", cursor.ptr < cursor.end);
             while (size_t len = cursor.strlen()) {
-                const int8_t type = ConstDataView(cursor.ptr).read<int8_t>();
+                uint8_t type = *cursor.ptr;
                 _currElem = cursor.ptr;
                 // In case _currElem is moved (for instance when the type is CodeWScope).
                 auto elemStart = cursor.ptr;
@@ -633,9 +626,10 @@ private:
                 _validator.checkNonConformantElem(elemStart, len + 1, type);
 
                 if constexpr (precise) {
-                    // See if the _id field was just validated. If so, capture it for error context.
+                    // See if the _id field was just validated. If so, set the global scope
+                    // element.
                     if (_currFrame == _frames.begin() && std::string_view(_currElem + 1) == "_id"sv)
-                        _id = BSONElement(_currElem);  // This is fully validated now.
+                        _currFrame->elem = BSONElement(_currElem);  // This is fully validated now.
                 }
                 dassert(cursor.ptr < cursor.end);
             }
@@ -656,24 +650,15 @@ private:
         str::stream ctx;
         ctx << "in element with field name '";
         if constexpr (precise) {
-            std::for_each(
-                _frames.begin() + 1, _currFrame + (_currFrame != _frames.end()), [&](auto& frame) {
-                    // `nestedElemStart` is the type byte of the Object/Array/CodeWScope that
-                    // opened this frame. Skip when it was never assigned.
-                    // Also skip the CodeWScope *scope* frame (see _pushCodeWithScope), which
-                    // stores the code string's null terminator as a dummy element.
-                    if (frame.nestedElemStart && *frame.nestedElemStart) {
-                        // Field name was validated for null termination before this frame was
-                        // pushed.
-                        ctx << frame.nestedElemStart + 1 << ".";
-                    }
-                });
+            std::for_each(_frames.begin() + 1,
+                          _currFrame + (_currFrame != _frames.end()),
+                          [&](auto& frame) { ctx << frame.elem.fieldName() << "."; });
         }
-        // Also prints "?" for CodeWScope scope frame, see comment above.
-        ctx << (_currElem && *_currElem ? _currElem + 1 : "?") << "'";
+        ctx << (_currElem ? _currElem + 1 : "?") << "'";
 
         if constexpr (precise) {
-            ctx << " in object with " << (_id ? _id.toString() : "unknown _id");
+            auto _id = _frames.begin()->elem;
+            ctx << " in object with " << (_id ? BSONElement(_id).toString() : "unknown _id");
         }
         return str::escape(ctx);
     }
@@ -682,8 +667,7 @@ private:
     const size_t _maxLength;  // The size of the data buffer. The BSON object may be smaller.
     const char* _currElem = nullptr;  // Element to validate: only the name is known to be good.
     typename Frames::iterator _currFrame;  // Frame currently being validated.
-    Frames _frames;   // Has end pointers to check and the containing element for precise mode.
-    BSONElement _id;  // The _id element of the root object. Used in error context string.
+    Frames _frames;  // Has end pointers to check and the containing element for precise mode.
     BSONValidator _validator;
     ValidationVersion _validationVersion;
     bool _insideColumn;
