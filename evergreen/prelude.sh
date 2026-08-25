@@ -26,6 +26,14 @@ if [ -n "$___expansions_error" ]; then
   echo $___expansions_error
   exit 1
 fi
+
+# Custom builds can set the custom_ld_library_path expansion so the produced
+# binaries find their consumer-specific libraries at run time. A no-op unless
+# the expansion is set; see etc/evergreen_yml_components/custom_builds/README.md.
+if [ -n "${custom_ld_library_path:-}" ]; then
+  export LD_LIBRARY_PATH="${custom_ld_library_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
+
 unset expansions_yaml
 unset expansions_default_yaml
 unset script

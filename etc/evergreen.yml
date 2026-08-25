@@ -1169,6 +1169,23 @@ functions:
 
   "generate compile expansions":
     - *f_expansions_write
+    # Custom build hook (no-op unless the variant sets custom_build_version_suffix):
+    # compute MONGO_VERSION_OVERRIDE and apply it before the compile expansions are
+    # generated, so the override is folded into the version expansion. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/set_version_override.sh"
+    - command: expansions.update
+      params:
+        file: src/custom_build_version.yml
+    # compile_expansions_generate.sh reads expansions from the expansions.yml file on
+    # disk (via prelude.sh), not from the agent's in-memory state, so the update above
+    # must be written out before it runs or it will not see MONGO_VERSION_OVERRIDE.
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -1975,6 +1992,15 @@ tasks:
     - name: compile_dist_test
   commands:
     - *f_expansions_write
+    # Custom build hook (no-op unless the variant sets custom_build_patch_files):
+    # apply the variant's patch files before compiling. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/apply_patches.sh"
     - func: "scons compile"
       vars:
         targets: >-
@@ -6180,6 +6206,15 @@ tasks:
     - name: compile_dist_test
   commands:
     - *f_expansions_write
+    # Custom build hook (no-op unless the variant sets custom_build_patch_files):
+    # apply the variant's patch files before compiling. See
+    # etc/evergreen_yml_components/custom_builds/README.md.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/custom_builds/apply_patches.sh"
     - func: "scons compile"
       vars:
         targets: >-
@@ -6935,6 +6970,90 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
+# Custom build delivery task. See
+# etc/evergreen_yml_components/custom_builds/README.md for an explanation of the
+# custom build framework and the expansions used here.
+#
+# Custom builds do not define their own compile task: the custom build hooks in
+# the shared "generate compile expansions" function and in the
+# archive_dist_test/package tasks (MONGO_VERSION_OVERRIDE handling and patch
+# application, gated on the custom_build_* expansions) make the standard compile
+# tasks themselves produce the custom artifacts. All of the standard test tasks
+# depend on archive_dist_test, so the binaries under test are the exact binaries
+# being delivered. The task below only picks up the resulting dist tarball
+# (built and uploaded by the package task), smoke-tests it, and delivers it to
+# the consumer's S3 location.
+- name: custom_build_deliver
+  tags: ["assigned_to_jira_team_devprod_build"]
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - *f_expansions_write
+  # prelude.sh (sourced by the helper scripts) requires the venv.
+  - func: "set up venv"
+  # prepare_upload.sh needs src_suffix (the branch path component of the delivery
+  # destination), which only exists in the generated compile expansions — generate
+  # and apply them, as the compile tasks do. "generate compile expansions" also
+  # runs the custom build version-override hook, so the expansions reflect
+  # MONGO_VERSION_OVERRIDE.
+  - func: "generate compile expansions"
+  - func: "apply compile expansions"
+  # The package task uploaded the dist tarball to the standard dist location in
+  # mciuploads (build_id is shared by all tasks of this variant's build).
+  - command: s3.get
+    display_name: "fetch custom build dist tarball"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+      local_file: dist-stripped.${ext|tgz}
+      bucket: mciuploads
+  - command: subprocess.exec
+    display_name: "verify custom build dist"
+    type: test
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/verify_dist.sh"
+      - "dist-stripped.${ext|tgz}"
+  # Deliver the tarball to the consumer's location. Patch builds are redirected to a
+  # patch-specific path by prepare_upload.sh so they never overwrite the artifact the
+  # consumer picks up.
+  - command: subprocess.exec
+    display_name: "prepare custom build upload"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/prepare_upload.sh"
+      - "dist-stripped.${ext|tgz}"
+  - command: expansions.update
+    display_name: "apply custom build upload expansions"
+    params:
+      file: custom_build_upload.yml
+  - *f_expansions_write
+  # Uses the aws_key_build/aws_secret_build project variables: the standard
+  # project credentials (aws_key/aws_secret) have no PutObject on
+  # mdb-build-private, which is managed with dedicated uploader credentials
+  # (the same pattern as the release uploads). The object is private; consumers
+  # download it via signed URLs.
+  - command: s3.put
+    display_name: "deliver custom build dist tarball"
+    type: test
+    params:
+      aws_key: ${aws_key_build}
+      aws_secret: ${aws_secret_build}
+      local_file: dist-stripped-custom.${ext|tgz}
+      remote_file: ${custom_build_upload_remote_file}
+      bucket: ${custom_build_upload_bucket}
+      permissions: private
+      visibility: signed
+      content_type: application/tar
+      display_name: Custom Build Dist Tarball
 
 #######################################
 #             Task Groups             #
@@ -11527,3 +11646,107 @@ buildvariants:
   tasks:
   - name: sync_repo_with_copybara
     priority: 50
+
+###########################################
+#       Custom build buildvariants        #
+###########################################
+
+# Custom build variants. See etc/evergreen_yml_components/custom_builds/README.md for
+# an explanation of the custom build framework and the expansions used here.
+#
+# The variants below produce the MCAS (Microsoft Defender for Cloud Apps, formerly
+# Adallom) jemalloc builds of 5.0 — community builds that link jemalloc instead of
+# tcmalloc, replacing the one-off hotfix process (previously HELP-73225, where the
+# same change was committed directly on a hotfix branch and artifacts were copied to
+# S3 by hand). Each variant:
+# - applies the mcas-jemalloc-v5.0-{third-party,build,server}.patch files under
+#   etc/evergreen_yml_components/custom_builds/patches/ (the vendored jemalloc,
+#   the SCons allocator wiring, and the bundled fixes MCAS receives) before
+#   compiling,
+# - builds with MONGO_VERSION_OVERRIDE=r5.0.34-mcas-jemalloc via the shared
+#   "generate compile expansions" hook, so every binary carries the custom version,
+# - runs the standard compile/package task group plus a smoke set of test tasks
+#   (the test tasks depend on archive_dist_test, so they exercise the exact
+#   binaries being delivered),
+# - delivers the dist tarball to s3://mdb-build-private/mcas/version/... via
+#   custom_build_deliver (patch builds are redirected to custom-build-patches/).
+#
+# scons_cache_scope is "none" so jemalloc objects never enter the shared cache used
+# by the stock (tcmalloc) variants.
+
+- name: custom-build-mcas-jemalloc-ubuntu1804
+  display_name: "Custom Build: MCAS jemalloc Ubuntu 18.04 (x86_64)"
+  tags: []
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - release-ubuntu1804-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 5.0 version; bump when MCAS picks up a newer 5.0 release.
+    custom_build_base_version: "5.0.34"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    multiversion_platform: ubuntu1804
+    multiversion_edition: targeted
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer --enableEnterpriseTests=off
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-ubuntu1804-test
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common
+
+- name: custom-build-mcas-jemalloc-amazon2
+  display_name: "Custom Build: MCAS jemalloc Amazon Linux 2 (x86_64)"
+  tags: []
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - release-amazon2-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 5.0 version; bump when MCAS picks up a newer 5.0 release.
+    custom_build_base_version: "5.0.34"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v5.0-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-amazon2
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_latch_analyzer --enableEnterpriseTests=off
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    multiversion_platform: amazon2
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: amazon2-latest-large
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-amazon2-test
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - release-amazon2-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common
