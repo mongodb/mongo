@@ -23,6 +23,12 @@ const dbpath = MongoRunner.dataPath + "invalid_utf8_db_name/";
 
 const logIdRegex = (id) => new RegExp(`"id"\\s*:\\s*${id}\\s*,`);
 
+const parseValidationResults = (output) =>
+    output
+        .split("\n")
+        .filter((line) => logIdRegex(9437301).test(line))
+        .map((line) => JSON.parse(line.slice(line.indexOf('{"t"'))).attr.results);
+
 const toHex = (str) =>
     str
         .split("")
@@ -169,13 +175,39 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
                 `${mode} should not terminate startup with an uncaught exception`,
             );
 
+            const validationResults = parseValidationResults(output);
+            const skipResults = validationResults.filter((r) => r.ns === undefined);
+            assert.eq(
+                1,
+                skipResults.length,
+                `${mode} did not report exactly one namespace-less validation result: ${tojson(
+                    validationResults,
+                )}`,
+            );
+            const skipResult = skipResults[0];
+            assert.eq(false, skipResult.valid, `${mode} reported the skipped database as valid`);
+            assert.eq(
+                1,
+                skipResult.errors.length,
+                `${mode} did not report exactly one error for the skipped database`,
+            );
+            assert(
+                /^Database could not be opened, so none of its collections were validated: BadValue/.test(
+                    skipResult.errors[0],
+                ),
+                `${mode} reported an unexpected error for the skipped database: ${skipResult.errors[0]}`,
+            );
+            assert.eq([], skipResult.warnings, `${mode} reported unexpected warnings`);
+
             // Every other database was still validated, and validation reported its own completion
             // rather than being cut short.
-            assert.gte(
-                output.search(/"ns":"validDb\.coll"/),
-                0,
+            const validDbResults = validationResults.filter((r) => r.ns === "validDb.coll");
+            assert.eq(
+                1,
+                validDbResults.length,
                 `${mode} did not validate the database with a valid name`,
             );
+            assert.eq(true, validDbResults[0].valid, `${mode} reported validDb.coll as invalid`);
             if (expectSummary) {
                 assert(
                     logIdRegex(9437304).test(output),

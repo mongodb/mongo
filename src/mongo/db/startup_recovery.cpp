@@ -114,6 +114,15 @@ bool isWriteableStorageEngine() {
     return storageGlobalParams.engine != "devnull";
 }
 
+void logOfflineValidateResults(const ValidateResults& validateResults) {
+    BSONObjBuilder results;
+    validateResults.appendToResultObj(&results, /*debug=*/false);
+    LOGV2_OPTIONS(9437301,
+                  {logv2::LogTruncation::Disabled},
+                  "Offline validation result",
+                  "results"_attr = results.done());
+}
+
 /**
  * Opens a database during startup, attributing failures to the database being opened.
  */
@@ -146,8 +155,19 @@ bool openDbForOfflineValidation(OperationContext* opCtx,
                                 DatabaseHolder* databaseHolder) try {
     openDbDuringStartup(opCtx, dbName, databaseHolder);
     return true;
-} catch (const ExceptionFor<ErrorCodes::BadValue>&) {
-    LOGV2_WARNING(13340101, "Skipping validation of a database that could not be opened");
+} catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+    LOGV2_WARNING(13340101,
+                  "Skipping validation of a database that could not be opened",
+                  logAttrs(dbName),
+                  "databaseNameBytes"_attr = hexblob::encode(dbName.toStringForResourceId()),
+                  "error"_attr = redact(ex));
+
+    // Report the skipped database through the same channel as a validated collection.
+    ValidateResults validateResults;
+    validateResults.addError(str::stream() << "Database could not be opened, so none of its "
+                                              "collections were validated: "
+                                           << ex.toString());
+    logOfflineValidateResults(validateResults);
     return false;
 }
 
@@ -837,12 +857,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
         return e.toStatus();
     }
 
-    BSONObjBuilder results;
-    validateResults.appendToResultObj(&results, /*debug=*/false);
-    LOGV2_OPTIONS(9437301,
-                  {logv2::LogTruncation::Disabled},
-                  "Offline validation result",
-                  "results"_attr = results.done());
+    logOfflineValidateResults(validateResults);
     return validateResults.isValid();
 }
 
