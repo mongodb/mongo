@@ -28,7 +28,9 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/otel/traces/traceparent.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
@@ -341,7 +343,8 @@ namespace {
 
 /**
  * Common implementation for:
- *   object Mongo._runCommandImpl(string dbname, object cmd, int options, object token)
+ *   object Mongo._runCommandImpl(string dbname, object cmd, int options, object token,
+ *                                string traceparent)
  *
  * Extra is for connection-wide metadata to pass with any given runCommand.
  */
@@ -365,6 +368,13 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
     auto arg = ValueWriter(cx, args.get(1)).toBSON();
 
     auto request = makeRequest(database, arg);
+    if (args.length() >= 5 && args.get(4).isString()) {
+        auto traceparent = ValueWriter(cx, args.get(4)).toString();
+        if (!traceparent.empty() && otel::traces::validateW3CTraceparent(traceparent).isOK()) {
+            request.telemetryContext =
+                TelemetryContextSection{OtelContextSection{std::move(traceparent)}};
+        }
+    }
     if (auto tokenArg = args.get(3); tokenArg.isString()) {
         if (auto token = ValueWriter(cx, tokenArg).toString(); !token.empty()) {
             request.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(

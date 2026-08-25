@@ -5,8 +5,8 @@
  * @tags: [requires_otel_build, requires_sharding]
  */
 
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {kSpanExporters} from "jstests/noPassthrough/observability/libs/otel_span_exporters.js";
 import {
     enableFullSampling,
@@ -46,9 +46,11 @@ for (const Exporter of kSpanExporters) {
             const kCommandName = "ping";
             assert.soon(
                 () => {
-                    // The empty $traceCtx is test-only: the shell auto-injects a parent trace
-                    // context, so we pass an empty one to keep mongos the trace entry point.
-                    assert.commandWorked(this.db.runCommand({[kCommandName]: 1, $traceCtx: {}}));
+                    // The shell auto-injects a parent trace context, so skip it to keep mongos the
+                    // trace entry point.
+                    assert.commandWorked(
+                        this.db.runCommand({[kCommandName]: 1}, {skipTelemetryContext: true}),
+                    );
                     return this.exporter
                         .readSpans([this.st.s])
                         .some((span) => isRootSpan(span) && span.name === kCommandName);

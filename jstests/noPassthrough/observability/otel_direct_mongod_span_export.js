@@ -63,10 +63,13 @@ for (const Exporter of kSpanExporters) {
             assert.soon(
                 () => {
                     assert.commandWorked(
-                        this.db.runCommand({
-                            insert: this.coll.getName(),
-                            documents: [{a: 1}],
-                        }),
+                        this.db.runCommand(
+                            {
+                                insert: this.coll.getName(),
+                                documents: [{a: 1}],
+                            },
+                            {skipTelemetryContext: true},
+                        ),
                     );
                     return rootSpansForCommand(this, "insert").length > 0;
                 },
@@ -80,7 +83,10 @@ for (const Exporter of kSpanExporters) {
             assert.soon(
                 () => {
                     assert.commandWorked(
-                        this.db.runCommand({find: this.coll.getName(), filter: {}}),
+                        this.db.runCommand(
+                            {find: this.coll.getName(), filter: {}},
+                            {skipTelemetryContext: true},
+                        ),
                     );
                     return rootSpansForCommand(this, "find").length > 0;
                 },

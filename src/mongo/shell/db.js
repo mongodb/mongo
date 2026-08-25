@@ -224,11 +224,21 @@ DB.prototype._runCommandImpl = function (name, obj, options) {
 };
 
 /**
- * Run a database command.
+ * Run a database command. If `obj` is a command object, command options must be present in the
+ * object. If `obj` is a string (command name), extra may be populated with command options. Other
+ * than command options, extra may contain `skipTelemetryContext` which is used to skip the
+ * automatic injection of a trace context into the command.
  * @this {DB}
  */
 DB.prototype.runCommand = function (obj, extra, queryOptions) {
     "use strict";
+
+    let shellOptions;
+    if (typeof obj === "object" && extra?.skipTelemetryContext !== undefined) {
+        shellOptions = extra;
+        extra = {...extra};
+        delete extra.skipTelemetryContext;
+    }
 
     // Support users who call this function with a string commandName, e.g.
     // db.runCommand("commandName", {arg1: "value", arg2: "value"}).
@@ -237,6 +247,9 @@ DB.prototype.runCommand = function (obj, extra, queryOptions) {
     // if options were passed (i.e. because they were overridden on a collection), use them.
     // Otherwise use getQueryOptions.
     let options = typeof queryOptions !== "undefined" ? queryOptions : this.getQueryOptions();
+    if (shellOptions) {
+        options = {queryOptions: options, ...shellOptions};
+    }
 
     try {
         return this._runCommandImpl(this._name, mergedObj, options);

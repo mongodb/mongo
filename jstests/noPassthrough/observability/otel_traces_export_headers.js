@@ -37,11 +37,11 @@ describe("openTelemetryTracingHttpExportHeaders", function () {
             // A standalone mongod does not sample commands by default, so force-sample ping.
             enableFullSampling(this.mongod, {spanNames: ["ping"]});
 
-            // Generate a few root spans to export. The empty $traceCtx keeps the mongod the trace
+            // Generate a few root spans to export. skipTelemetryContext keeps the mongod the trace
             // entry point (the shell otherwise auto-injects a parent context).
             const db = this.mongod.getDB(jsTestName());
             for (let i = 0; i < 5; i++) {
-                assert.commandWorked(db.runCommand({ping: 1, $traceCtx: {}}));
+                assert.commandWorked(db.runCommand({ping: 1}, {skipTelemetryContext: true}));
             }
         });
 

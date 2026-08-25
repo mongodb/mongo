@@ -208,10 +208,10 @@ testCase("adminCommand is intercepted by proxy's runCommand", () => {
     // Track runCommand calls
     let countCalls = 0;
     const originalRunCommand = conn._runCommandImpl.bind(conn);
-    conn._runCommandImpl = function (dbname, cmd, options, secToken) {
+    conn._runCommandImpl = function (dbname, cmd, options, secToken, traceparent) {
         assert.eq(dbname, "admin");
         countCalls++;
-        return originalRunCommand(dbname, cmd, options, secToken);
+        return originalRunCommand(dbname, cmd, options, secToken, traceparent);
     };
 
     db.adminCommand({ping: 1});
@@ -350,11 +350,11 @@ function overrideRunCommandCountingCallsForCommand(conn, commandName) {
     // Track getMore calls
     let commandCount = 0;
     const originalRunCommand = conn._runCommandImpl.bind(conn);
-    conn._runCommandImpl = function (dbname, cmd, options, secToken) {
+    conn._runCommandImpl = function (dbname, cmd, options, secToken, traceparent) {
         if (cmd[commandName]) {
             commandCount++;
         }
-        return originalRunCommand(dbname, cmd, options, secToken);
+        return originalRunCommand(dbname, cmd, options, secToken, traceparent);
     };
     return {
         count: () => commandCount,
@@ -1302,11 +1302,11 @@ function spyUnderlyingConnectionsRunCommand(multiRouterConn, predicate) {
     const counts = new Array(multiRouterConn._mongoConnections.length).fill(0);
     multiRouterConn._mongoConnections.forEach((conn, idx) => {
         const originalRunCommand = conn._runCommandImpl.bind(conn);
-        conn._runCommandImpl = function (dbname, cmd, options, secToken) {
+        conn._runCommandImpl = function (dbname, cmd, options, secToken, traceparent) {
             if (predicate(dbname, cmd, options)) {
                 counts[idx]++;
             }
-            return originalRunCommand(dbname, cmd, options, secToken);
+            return originalRunCommand(dbname, cmd, options, secToken, traceparent);
         };
     });
     return {
