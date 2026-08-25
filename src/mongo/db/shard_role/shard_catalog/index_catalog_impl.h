@@ -299,12 +299,6 @@ private:
      */
     std::string _getAccessMethodName(const BSONObj& keyPattern) const;
 
-    Status _indexFilteredRecords(OperationContext* opCtx,
-                                 const CollectionPtr& coll,
-                                 const IndexCatalogEntry* index,
-                                 const std::vector<BsonRecord>& bsonRecords,
-                                 int64_t* keysInsertedOut) const;
-
     Status _indexRecords(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const IndexCatalogEntry* index,

@@ -517,19 +517,6 @@ public:
                           ContainerWriteBehavior::kDoNotReplicate) const;
 
     /**
-     * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
-     * Provides a ticket for actually performing the update.
-     */
-    void prepareUpdate(OperationContext* opCtx,
-                       const CollectionPtr& collection,
-                       const IndexCatalogEntry* entry,
-                       const BSONObj& from,
-                       const BSONObj& to,
-                       const RecordId& loc,
-                       const InsertDeleteOptions& options,
-                       UpdateTicket* ticket) const;
-
-    /**
      * Perform a validated update.  The keys for the 'from' object will be removed, and the keys
      * for the object 'to' will be added.  Returns OK if the update succeeded, failure if it did
      * not.  If an update does not succeed, the index will be unmodified, and the keys for
@@ -757,6 +744,20 @@ private:
                       const key_string::Value& keyString,
                       bool dupsAllowed,
                       ContainerWriteBehavior containerWriteBehavior) const;
+
+    /**
+     * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
+     * Provides a ticket for actually performing the update if there is anything to do. Returns
+     * false if no updates are needed.
+     */
+    bool _prepareUpdate(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        const IndexCatalogEntry* entry,
+                        const BSONObj& from,
+                        const BSONObj& to,
+                        const RecordId& loc,
+                        const InsertDeleteOptions& options,
+                        UpdateTicket* ticket) const;
 
     Status _indexKeysOrWriteToSideTable(OperationContext* opCtx,
                                         const CollectionPtr& coll,

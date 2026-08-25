@@ -239,8 +239,12 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
                                            const std::vector<BsonRecord>& bsonRecords,
                                            const InsertDeleteOptions& options,
                                            int64_t* numInserted) {
+    auto filter = entry->getFilterExpression();
     for (const auto& bsonRecord : bsonRecords) {
         invariant(bsonRecord.id != RecordId());
+        if (filter && !exec::matcher::matchesBSON(filter, *bsonRecord.docPtr)) {
+            continue;
+        }
 
         if (!bsonRecord.ts.isNull()) {
             Status status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(bsonRecord.ts);
@@ -293,11 +297,16 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
                                          const InsertDeleteOptions& options,
                                          int64_t* numDeleted,
                                          CheckRecordId checkRecordId) {
-    auto& containerPool = PreallocatedContainerPool::get(opCtx);
+    if (auto filter = entry->getFilterExpression()) {
+        if (!exec::matcher::matchesBSON(filter, obj)) {
+            return;
+        }
+    }
 
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
+    auto& containerPool = PreallocatedContainerPool::get(opCtx);
     auto keys = containerPool.keys();
     getKeys(opCtx,
             coll,
@@ -327,7 +336,9 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                            int64_t* numInserted,
                                            int64_t* numDeleted) {
     UpdateTicket updateTicket;
-    prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
+    if (!_prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket)) {
+        return Status::OK();
+    }
 
     if (entry->indexBuildInterceptor() || !entry->isReady()) {
         bool logIfError = false;
@@ -706,17 +717,23 @@ pair<KeyStringSet, KeyStringSet> SortedDataIndexAccessMethod::setDifference(
     return {{std::move(outLeft)}, {std::move(outRight)}};
 }
 
-void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
-                                                const CollectionPtr& collection,
-                                                const IndexCatalogEntry* entry,
-                                                const BSONObj& from,
-                                                const BSONObj& to,
-                                                const RecordId& record,
-                                                const InsertDeleteOptions& options,
-                                                UpdateTicket* ticket) const {
+bool SortedDataIndexAccessMethod::_prepareUpdate(OperationContext* opCtx,
+                                                 const CollectionPtr& collection,
+                                                 const IndexCatalogEntry* entry,
+                                                 const BSONObj& from,
+                                                 const BSONObj& to,
+                                                 const RecordId& record,
+                                                 const InsertDeleteOptions& options,
+                                                 UpdateTicket* ticket) const {
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     const MatchExpression* indexFilter = entry->getFilterExpression();
-    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, from)) {
+    bool fromMatches = !indexFilter || exec::matcher::matchesBSON(indexFilter, from);
+    bool toMatches = !indexFilter || exec::matcher::matchesBSON(indexFilter, to);
+    if (!fromMatches && !toMatches) {
+        return false;
+    }
+
+    if (fromMatches) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
         const auto getKeysMode = entry->indexBuildInterceptor()
@@ -739,7 +756,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                 record);
     }
 
-    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, to)) {
+    if (toMatches) {
         getKeys(opCtx,
                 collection,
                 entry,
@@ -759,6 +776,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     std::tie(ticket->removed, ticket->added) = setDifference(ticket->oldKeys, ticket->newKeys);
 
     ticket->_isValid = true;
+    return true;
 }
 
 Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
@@ -1744,15 +1762,6 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     Status status = Status::OK();
 
     if (auto interceptor = entry->indexBuildInterceptor()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // See SERVER-28975 and SERVER-39705 for details.
-        if (auto filter = entry->getFilterExpression()) {
-            if (!exec::matcher::matchesBSON(filter, obj)) {
-                return Status::OK();
-            }
-        }
-
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t inserted = 0;
@@ -1800,15 +1809,6 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
     if (auto interceptor = entry->indexBuildInterceptor()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // See SERVER-28975 and SERVER-39705 for details.
-        if (auto filter = entry->getFilterExpression()) {
-            if (!exec::matcher::matchesBSON(filter, obj)) {
-                return;
-            }
-        }
-
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t removed = 0;

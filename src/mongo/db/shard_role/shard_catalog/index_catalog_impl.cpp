@@ -1760,20 +1760,6 @@ const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 // ---------------------------
 
 
-Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
-                                               const CollectionPtr& coll,
-                                               const IndexCatalogEntry* index,
-                                               const std::vector<BsonRecord>& bsonRecords,
-                                               int64_t* keysInsertedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-
-    InsertDeleteOptions options;
-    prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
-
-    return index->accessMethod()->insert(
-        opCtx, pooledBuilder, coll, index, bsonRecords, options, keysInsertedOut);
-}
-
 Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
                                        const CollectionPtr& coll,
                                        const IndexCatalogEntry* index,
@@ -1791,17 +1777,13 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
     if (skip)
         return Status::OK();
 
-    const MatchExpression* filter = index->getFilterExpression();
-    if (!filter)
-        return _indexFilteredRecords(opCtx, coll, index, bsonRecords, keysInsertedOut);
 
-    std::vector<BsonRecord> filteredBsonRecords;
-    for (const auto& bsonRecord : bsonRecords) {
-        if (exec::matcher::matchesBSON(filter, *(bsonRecord.docPtr)))
-            filteredBsonRecords.push_back(bsonRecord);
-    }
+    InsertDeleteOptions options;
+    prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
 
-    return _indexFilteredRecords(opCtx, coll, index, filteredBsonRecords, keysInsertedOut);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+    return index->accessMethod()->insert(
+        opCtx, pooledBuilder, coll, index, bsonRecords, options, keysInsertedOut);
 }
 
 Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
