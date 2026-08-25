@@ -326,10 +326,26 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         return std::make_pair(std::move(metadata), std::move(collectionUUID));
     }();
 
+    // At this point, if this is being called from a MoveRangeCoordinator, no other chunk operations
+    // or DDL operation that blocks migrations can be running concurrently.
+    //
+    // There are no concurrent DDL operations because:
+    //  - we already checked the allowChunkOperations flag, so it must be true at this point.
+    //  - we are running inside a MoveRangeCoordinator. DDL operations cannot successfully call
+    //    setAllowChunkOperations(false) until all MoveRangeCoordinators have been drained.
+    //
+    // There are no concurrent chunk migrations on this shard, and no concurrent split/merge on this
+    // namespace because:
+    //  - we hold an ActiveMigrationsRegistry slot.
+
+    const ChunkRange range(*_args.getMin(), *_args.getMax());
+
+    // First of all, reject retries targeting an old donor to ensure idempotency
+    checkRangeWithinChunk(_opCtx, nss(), collectionMetadata, range);
+
     // Drain the execution/cancellation of any existing range deletion task overlapping with the
     // targeted range (a task issued by a previous migration may still be present when the migration
     // gets interrupted post-commit).
-    const ChunkRange range(*_args.getMin(), *_args.getMax());
     const auto rangeDeletionWaitDeadline = opCtx->fastClockSource().now() +
         Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
     // CollectionShardingRuntime::waitForClean() allows to sync on tasks already registered on the
@@ -360,10 +376,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(1000));
     }
 
-    checkShardKeyPattern(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
-    checkRangeWithinChunk(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkShardKeyPattern(_opCtx, nss(), collectionMetadata, range);
 
     _collectionUUID = collectionUUID;
 
