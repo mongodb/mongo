@@ -220,6 +220,23 @@ test_should_disable_gdb_index_for_all_ci_builds() {
     done
 }
 
+test_remote_unittest_wrapper_is_test_scoped() {
+    local bazelrc="${TEST_SRCDIR}/${TEST_WORKSPACE}/.bazelrc"
+    local common_run_under
+    local test_run_under
+
+    [[ -f "$bazelrc" ]] || fail "the repository .bazelrc should be available to this test"
+
+    common_run_under="$(awk '$1 == "common:remote_unittest" && $2 ~ /^--run_under=/ { print }' "$bazelrc")"
+    test_run_under="$(awk '$1 == "test:remote_unittest" && $2 ~ /^--run_under=/ { print }' "$bazelrc")"
+
+    assert_eq "" "$common_run_under" "the test wrapper should not apply to bazel run"
+    assert_eq \
+        "test:remote_unittest --run_under=//bazel:test_wrapper" \
+        "$test_run_under" \
+        "the test wrapper should still apply to bazel test"
+}
+
 test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
     local tmpdir
     local fake_bazel
@@ -334,6 +351,7 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
 
 test_cache_bazel_output_base_uses_plain_info_once
 test_should_disable_gdb_index_for_all_ci_builds
+test_remote_unittest_wrapper_is_test_scoped
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
 test_retry_bazel_cmd_reuses_healthy_server_after_regular_failure
 test_retry_bazel_cmd_starts_missing_server_with_neutral_message

@@ -61,7 +61,10 @@ sh_binary(
 sh_test(
     name = "bazel_evergreen_shutils_test",
     srcs = ["bazel_evergreen_shutils_test.sh"],
-    data = ["bazel_evergreen_shutils.sh"],
+    data = [
+        "bazel_evergreen_shutils.sh",
+        "//:.bazelrc",
+    ],
 )
 
 sh_test(
