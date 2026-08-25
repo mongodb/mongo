@@ -23,6 +23,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
+#include "mongo/db/shard_role/shard_catalog/metadata_consistency_checks/collection_metadata_checks.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
@@ -2784,6 +2785,94 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     // from check metadata inconsistency.
     const auto inconsistencies = checkConsistency(globalCatalogColl);
     ASSERT_EQ(0, inconsistencies.size());
+}
+
+class checkNoMetadataForNonExistentDatabaseTest : public MetadataConsistencyShardCatalogTest {
+protected:
+    std::vector<MetadataInconsistencyItem> checkNoMetadataForNonExistentDatabase(
+        const stdx::unordered_set<DatabaseName>& dbNamesInGlobalCatalog =
+            stdx::unordered_set<DatabaseName>{},
+        metadata_consistency_util::RSNodeMode rsMode =
+            metadata_consistency_util::RSNodeMode::kPrimary) {
+        return collection_metadata_consistency_checks::checkNoMetadataForNonExistentDatabase(
+            operationContext(), _shardId, rsMode, dbNamesInGlobalCatalog);
+    }
+
+    ChunkType makeChunk(Timestamp timestamp = Timestamp{1, 1}) {
+        auto chunk = generateChunk(
+            _collUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+        chunk.setVersion(ChunkVersion({chunk.getVersion().epoch(), timestamp}, {1, 0}));
+        return chunk;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// Tests for checkNoMetadataForNonExistentDatabase (durable shard catalog)
+// -----------------------------------------------------------------------------------------------
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest,
+       WhenDurableMetadataForNonExistentDb_ThenInconsistency) {
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, _collUuid, _keyPattern));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kCollectionMetadataForNonExistingDatabaseInShardCatalog,
+        inconsistencies);
+}
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest,
+       WhenNoDurableMetadataForNonExistent_ThenNoInconsistency) {
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+// -----------------------------------------------------------------------------------------------
+// Tests for checkNoMetadataForNonExistentDatabase (in-memory CSS)
+// -----------------------------------------------------------------------------------------------
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest,
+       WhenInMemoryTrackedMetadataForNonExistentDb_ThenInconsistency) {
+    setShardCatalogMetadata(_collUuid, _keyPattern, {makeChunk()});
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kCollectionMetadataForNonExistingDatabaseInShardCatalogCache,
+        inconsistencies);
+}
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest,
+       WhenNoInMemoryMetadataForNonExistent_ThenNoInconsistency) {
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest, WhenInMemoryUnowned_ThenNoInconsistency) {
+    setCSRUnowned();
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest, WhenInMemoryUntracked_ThenNoInconsistency) {
+    setCSRAuthoritativeNoRoutingTable();
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase();
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(checkNoMetadataForNonExistentDatabaseTest, WhenCollectionInExistingDb_ThenNoInconsistency) {
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, _collUuid, _keyPattern));
+    setShardCatalogMetadata(_collUuid, _keyPattern, {makeChunk()});
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({_dbName});
+
+    ASSERT_TRUE(inconsistencies.empty());
 }
 
 class MakeInconsistencySeverityTest : public unittest::Test {

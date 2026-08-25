@@ -41,7 +41,12 @@ enums:
             kMissingDatabaseMetadataInShardCatalogCache: "MissingDatabaseMetadataInShardCatalogCache"
             kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
             kMisplacedDatabaseMetadataInShardCatalogCache: "MisplacedDatabaseMetadataInShardCatalogCache"
+            kDatabaseMetadataForNonExistingDatabaseInShardCatalog: "DatabaseMetadataForNonExistingDatabaseInShardCatalog"
+            kDatabaseMetadataForNonExistingDatabaseInShardCatalogCache: "DatabaseMetadataForNonExistingDatabaseInShardCatalogCache"
+            kCollectionMetadataForNonExistingDatabaseInShardCatalog: "CollectionMetadataForNonExistingDatabaseInShardCatalog"
+            kCollectionMetadataForNonExistingDatabaseInShardCatalogCache: "CollectionMetadataForNonExistingDatabaseInShardCatalogCache"
             kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
+            kUnparsableShardCatalogEntry: "UnparsableShardCatalogEntry"
             kInconsistentShardCatalogCollectionMetadata: "InconsistentShardCatalogCollectionMetadata"
             kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
             kLegacyShardCacheCollectionsPresent: "LegacyShardCacheCollectionsPresent"
@@ -78,7 +83,12 @@ enums:
             kMissingDatabaseMetadataInShardCatalogCache: "Found database metadata in the global catalog but not in shard catalog cache"
             kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
             kMisplacedDatabaseMetadataInShardCatalogCache: "Found database metadata in the shard catalog cache of a shard that is not the database's primary shard"
+            kDatabaseMetadataForNonExistingDatabaseInShardCatalog: "Found database metadata in the shard catalog for a database absent from the global catalog"
+            kDatabaseMetadataForNonExistingDatabaseInShardCatalogCache: "Found database metadata in the shard catalog cache for a database absent from the global catalog"
+            kCollectionMetadataForNonExistingDatabaseInShardCatalog: "Found collection metadata in the shard catalog for a database absent from the global catalog"
+            kCollectionMetadataForNonExistingDatabaseInShardCatalogCache: "Found collection metadata in the shard catalog cache for a database absent from the global catalog"
             kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
+            kUnparsableShardCatalogEntry: "Found an unparsable entry in the shard catalog"
             kInconsistentShardCatalogCollectionMetadata: "Found inconsistencies between collection metadata in the global catalog and the shard catalog"
             kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
             kLegacyShardCacheCollectionsPresent: "Found legacy non-authoritative shard catalog cache collections on a shard that is fully upgraded"
@@ -584,6 +594,81 @@ structs:
             options:
                 type: object
                 description: "Collection options not matching the expeced format."
+
+    DatabaseMetadataForNonExistingDatabaseInShardCatalogDetails:
+        description: "Details about durable database metadata for a database absent from the global catalog."
+        strict: false
+        fields:
+            dbName:
+                type: database_name
+                description: "The database name."
+            shardId:
+                type: shard_id
+                description: "The shard where the metadata was found."
+            primary:
+                type: shard_id
+                description: "The primary shard recorded in the metadata."
+            version:
+                type: database_version
+                description: "The database version recorded in the metadata."
+
+    DatabaseMetadataForNonExistingDatabaseInShardCatalogCacheDetails:
+        description: "Details about cached database metadata for a database absent from the global catalog."
+        strict: false
+        fields:
+            dbName:
+                type: database_name
+                description: "The database name."
+            shardId:
+                type: shard_id
+                description: "The shard where the metadata was found."
+            primary:
+                type: shard_id
+                description: "The cached primary shard."
+            version:
+                type: database_version
+                description: "The cached database version."
+
+    CollectionMetadataForNonExistingDatabaseInShardCatalogDetails:
+        description: "Details about durable collection metadata for a database absent from the global catalog."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The collection namespace."
+            shardId:
+                type: shard_id
+                description: "The shard where the metadata was found."
+            collectionTimestamp:
+                type: timestamp
+                description: "The timestamp of the collection metadata recorded in the shard catalog."
+
+    CollectionMetadataForNonExistingDatabaseInShardCatalogCacheDetails:
+        description: "Details about cached collection metadata for a database absent from the global catalog."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The collection namespace."
+            shardId:
+                type: shard_id
+                description: "The shard where the metadata was found."
+            placementVersion:
+                type: shard_version
+                description: "The collection placement version recorded in the cache."
+
+    UnparsableShardCatalogEntryDetails:
+        description: "Details about an unparsable entry found in the shard catalog."
+        strict: false
+        fields:
+            shardId:
+                type: shard_id
+                description: "The shard where the unparsable entry was found."
+            reason:
+                type: string
+                description: "The reason the entry could not be parsed."
 
     Provenance:
         description: "A shardId/HostAndPort combination identifying the exact node that created an inconsistency item"

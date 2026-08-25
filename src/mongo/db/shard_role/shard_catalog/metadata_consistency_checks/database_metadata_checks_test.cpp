@@ -28,7 +28,7 @@ void assertOneInconsistencyFound(const MetadataInconsistencyTypeEnum& type,
     ASSERT_EQ(type, inconsistencies[0].getType());
 }
 
-class DatabaseMetadataChecksTest : public ShardServerTestFixture {
+class DatabaseMetadataChecksTestBase : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
@@ -83,11 +83,13 @@ protected:
     const UUID _dbUuid = UUID::gen();
 };
 
+class CheckDatabaseMetadataConsistencyTest : public DatabaseMetadataChecksTestBase {};
+
 // -----------------------------------------------------------------------------------------------
-// Tests for in-memory DSS metadata checks
+// Tests for checkDatabaseMetadataConsistency (in-memory DSS metadata checks)
 // -----------------------------------------------------------------------------------------------
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasCorrectMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenDbPrimaryHasCorrectMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     insertDurableDatabaseMetadata(dbInGlobalCatalog);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
@@ -95,7 +97,7 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasCorrectMetadata_ThenNoInconsi
     ASSERT_TRUE(checkDatabaseMetadataConsistency(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryIsMissingMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenDbPrimaryIsMissingMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     insertDurableDatabaseMetadata(dbInGlobalCatalog);
     clearInMemoryDatabaseMetadata();
@@ -107,7 +109,7 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryIsMissingMetadata_ThenInconsiste
         inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasIncorrectMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenDbPrimaryHasIncorrectMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     insertDurableDatabaseMetadata(dbInGlobalCatalog);
 
@@ -126,14 +128,14 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasIncorrectMetadata_ThenInconsi
         inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryHasNoMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenNonDbPrimaryHasNoMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     clearInMemoryDatabaseMetadata();
 
     ASSERT_TRUE(checkDatabaseMetadataConsistency(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryHasMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenNonDbPrimaryHasMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
 
@@ -145,10 +147,11 @@ TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryHasMetadata_ThenInconsistency
 }
 
 // -----------------------------------------------------------------------------------------------
-// Tests for durable metadata checks
+// Tests for checkDatabaseMetadataConsistency (durable metadata checks)
 // -----------------------------------------------------------------------------------------------
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasCorrectDurableMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDbPrimaryHasCorrectDurableMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
     insertDurableDatabaseMetadata(dbInGlobalCatalog);
@@ -156,7 +159,8 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasCorrectDurableMetadata_ThenNo
     ASSERT_TRUE(checkDatabaseMetadataConsistency(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryIsMissingDurableMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDbPrimaryIsMissingDurableMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
 
@@ -166,7 +170,8 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryIsMissingDurableMetadata_ThenInc
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasIncorrectDurableMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDbPrimaryHasIncorrectDurableMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
 
@@ -184,14 +189,15 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasIncorrectDurableMetadata_Then
         MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog, inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryIsMissingDurableMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenNonDbPrimaryIsMissingDurableMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     clearInMemoryDatabaseMetadata();
 
     ASSERT_TRUE(checkDatabaseMetadataConsistency(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryHasDurableMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, WhenNonDbPrimaryHasDurableMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     clearInMemoryDatabaseMetadata();
     insertDurableDatabaseMetadata(dbInGlobalCatalog);
@@ -202,7 +208,8 @@ TEST_F(DatabaseMetadataChecksTest, WhenNonDbPrimaryHasDurableMetadata_ThenIncons
         MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasMalformedDurableMetadata_ThenInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDbPrimaryHasMalformedDurableMetadata_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
 
@@ -219,17 +226,19 @@ TEST_F(DatabaseMetadataChecksTest, WhenDbPrimaryHasMalformedDurableMetadata_Then
 }
 
 // -----------------------------------------------------------------------------------------------
-// Tests for non-authoritative in-memory DSS metadata checks
+// Tests for checkDatabaseMetadataConsistency (non-authoritative in-memory DSS metadata checks)
 // -----------------------------------------------------------------------------------------------
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonAuthoritativeDbPrimaryHasNoMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenNonAuthoritativeDbPrimaryHasNoMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
     clearInMemoryDatabaseMetadata();
 
     ASSERT_TRUE(checkDatabaseMetadataConsistencyNonAuthoritative(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest, WhenNonAuthoritativeDbPrimaryHasMetadata_ThenNoInconsistency) {
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenNonAuthoritativeDbPrimaryHasMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
 
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
@@ -239,7 +248,7 @@ TEST_F(DatabaseMetadataChecksTest, WhenNonAuthoritativeDbPrimaryHasMetadata_Then
     ASSERT_TRUE(checkDatabaseMetadataConsistencyNonAuthoritative(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest,
+TEST_F(CheckDatabaseMetadataConsistencyTest,
        WhenNonAuthoritativeNonDbPrimaryHasNoMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     clearInMemoryDatabaseMetadata();
@@ -247,7 +256,7 @@ TEST_F(DatabaseMetadataChecksTest,
     ASSERT_TRUE(checkDatabaseMetadataConsistencyNonAuthoritative(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest,
+TEST_F(CheckDatabaseMetadataConsistencyTest,
        WhenNonAuthoritativeNonDbPrimaryHasStaleMetadata_ThenNoInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     setInMemoryDatabaseMetadata(makeDatabaseMetadata(kShard0, Timestamp{2, 0}));
@@ -255,7 +264,7 @@ TEST_F(DatabaseMetadataChecksTest,
     ASSERT_TRUE(checkDatabaseMetadataConsistencyNonAuthoritative(dbInGlobalCatalog).empty());
 }
 
-TEST_F(DatabaseMetadataChecksTest,
+TEST_F(CheckDatabaseMetadataConsistencyTest,
        WhenNonAuthoritativeNonDbPrimaryClaimsToBePrimary_ThenInconsistency) {
     const auto dbInGlobalCatalog = makeDatabaseMetadata(kShard1);
     setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
@@ -268,7 +277,7 @@ TEST_F(DatabaseMetadataChecksTest,
         inconsistencies);
 }
 
-TEST_F(DatabaseMetadataChecksTest, CheckDatabaseMetadataConsistency_CriticalSection) {
+TEST_F(CheckDatabaseMetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection) {
     // The DSS metadata may be transiently inconsistent while the critical section is active.
     Timestamp dbTimestamp{1, 0};
     DatabaseVersion dbVersion{_dbUuid, dbTimestamp};
@@ -294,6 +303,131 @@ TEST_F(DatabaseMetadataChecksTest, CheckDatabaseMetadataConsistency_CriticalSect
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
     scopedDsr->exitCriticalSectionNoChecks(operationContext());
+}
+
+// -----------------------------------------------------------------------------------------------
+// Tests for checkNoMetadataForNonExistentDatabase (durable shard catalog)
+// -----------------------------------------------------------------------------------------------
+
+class CheckNoMetadataForNonExistentDatabaseTest : public DatabaseMetadataChecksTestBase {
+protected:
+    std::vector<MetadataInconsistencyItem> checkNoMetadataForNonExistentDatabase(
+        const stdx::unordered_set<DatabaseName>& dbNamesInGlobalCatalog =
+            stdx::unordered_set<DatabaseName>{},
+        metadata_consistency_util::RSNodeMode rsMode =
+            metadata_consistency_util::RSNodeMode::kPrimary) {
+        return database_metadata_consistency_checks::checkNoMetadataForNonExistentDatabase(
+            operationContext(), kMyShardName, rsMode, dbNamesInGlobalCatalog);
+    }
+
+    std::vector<MetadataInconsistencyItem> checkNoMetadataForNonExistentDatabaseNonAuthoritative(
+        const stdx::unordered_set<DatabaseName>& dbNamesInGlobalCatalog =
+            stdx::unordered_set<DatabaseName>{}) {
+        unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                             false);
+        return checkNoMetadataForNonExistentDatabase(dbNamesInGlobalCatalog);
+    }
+};
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenDurableMetadataForNonExistentDb_ThenInconsistency) {
+    insertDurableDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({});
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kDatabaseMetadataForNonExistingDatabaseInShardCatalog,
+        inconsistencies);
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenNoDurableMetadataForNonExistent_ThenNoInconsistency) {
+    // Insert metadata for a database that also exists in the global catalog. The check should not
+    // report it as an inconsistency.
+    insertDurableDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({_dbName});
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+// -----------------------------------------------------------------------------------------------
+// Tests for checkNoMetadataForNonExistentDatabase (in-memory DSS)
+// -----------------------------------------------------------------------------------------------
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenInMemoryMetadataForNonExistentDb_ThenInconsistency) {
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({});
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kDatabaseMetadataForNonExistingDatabaseInShardCatalogCache,
+        inconsistencies);
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenNonAuthoritativeAndShardIsNotDbPrimary_ThenNoInconsistency) {
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kShard1));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabaseNonAuthoritative();
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenNonAuthoritativeAndShardIsDbPrimary_ThenInconsistency) {
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabaseNonAuthoritative();
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kDatabaseMetadataForNonExistingDatabaseInShardCatalogCache,
+        inconsistencies);
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest, WhenDelayedSecondary_ThenInMemoryCheckSkipped) {
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase(
+        {}, metadata_consistency_util::RSNodeMode::kDelayedSecondary);
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenCriticalSectionActive_ThenInMemoryCheckSkipped) {
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    {
+        AutoGetDb autoDb(operationContext(), _dbName, MODE_IX);
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
+        scopedDsr->enterCriticalSectionCatchUpPhase(operationContext(), BSON("reason" << "test"));
+        scopedDsr->enterCriticalSectionCommitPhase(operationContext(), BSON("reason" << "test"));
+    }
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({});
+    ASSERT_TRUE(inconsistencies.empty());
+
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
+    scopedDsr->exitCriticalSectionNoChecks(operationContext());
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest,
+       WhenNoInMemoryMetadataForNonExistent_ThenNoInconsistency) {
+    // No in-memory DSS metadata installed.
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({});
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(CheckNoMetadataForNonExistentDatabaseTest, WhenDbExistsInGlobalCatalog_ThenNoInconsistency) {
+    insertDurableDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+    setInMemoryDatabaseMetadata(makeDatabaseMetadata(kMyShardName));
+
+    const auto inconsistencies = checkNoMetadataForNonExistentDatabase({_dbName});
+
+    ASSERT_TRUE(inconsistencies.empty());
 }
 
 }  // namespace

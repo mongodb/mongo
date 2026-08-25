@@ -10,7 +10,9 @@
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_util.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>
@@ -262,6 +264,87 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
 
     // Return the inconsistencies, only if the feature flag enablement state has not changed during
     // the checks.
+    return authoritativeShardsGuard.validateUnchanged() ? inconsistencies
+                                                        : std::vector<MetadataInconsistencyItem>{};
+}
+
+std::vector<MetadataInconsistencyItem> checkNoMetadataForNonExistentDatabase(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    RSNodeMode rsMode,
+    const stdx::unordered_set<DatabaseName>& dbNamesInGlobalCatalog) {
+    metadata_consistency_internal::OptimisticFCVFeatureFlagGuard authoritativeShardsGuard(
+        opCtx, feature_flags::gAuthoritativeShardsCRUD);
+
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    {
+        DBDirectClient client(opCtx);
+        FindCommandRequest findOp{NamespaceString::kConfigShardCatalogDatabasesNamespace};
+        auto cursor = client.find(findOp);
+        tassert(13310801,
+                "Failed to retrieve cursor while reading database metadata from the shard catalog",
+                cursor);
+
+        while (cursor->more()) {
+            const auto dbDoc = cursor->nextSafe().getOwned();
+            DatabaseType dbInShardCatalog;
+            try {
+                dbInShardCatalog = DatabaseType::parse(dbDoc, IDLParserContext("DatabaseType"));
+            } catch (const DBException& ex) {
+                inconsistencies.emplace_back(
+                    makeInconsistency(MetadataInconsistencyTypeEnum::kUnparsableShardCatalogEntry,
+                                      UnparsableShardCatalogEntryDetails{shardId, ex.reason()}));
+                continue;
+            }
+            const auto& dbName = dbInShardCatalog.getDbName();
+            if (!dbNamesInGlobalCatalog.contains(dbName)) {
+                inconsistencies.emplace_back(
+                    makeInconsistency(MetadataInconsistencyTypeEnum::
+                                          kDatabaseMetadataForNonExistingDatabaseInShardCatalog,
+                                      DatabaseMetadataForNonExistingDatabaseInShardCatalogDetails{
+                                          dbName,
+                                          shardId,
+                                          dbInShardCatalog.getPrimary(),
+                                          dbInShardCatalog.getVersion()}));
+            }
+        }
+    }
+
+    // Check the in-memory DSS state.
+    // TODO (SERVER-130947): Also check on delayed secondaries.
+    if (rsMode != RSNodeMode::kDelayedSecondary) {
+        const auto dssDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
+        for (const auto& dbName : dssDatabases) {
+            if (dbName.isInternalDb() || dbNamesInGlobalCatalog.contains(dbName)) {
+                continue;
+            }
+
+            const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+            if (scopedDsr->getCriticalSectionSignal(
+                    ShardingMigrationCriticalSection::Operation::kWrite) ||
+                !scopedDsr->getDbVersion(opCtx)) {
+                continue;
+            }
+
+            if (authoritativeShardsGuard.wasEnabled() ||
+                scopedDsr->getDbPrimaryShard(opCtx) == shardId) {
+                // If authoritative shards is enabled, this is always an inconsistency.
+                // If authoritative shards is not enabled, this is only an inconsistency if the DSS
+                // reports this shard is the dbPrimary.
+                DatabaseMetadataForNonExistingDatabaseInShardCatalogCacheDetails details{
+                    dbName,
+                    shardId,
+                    *scopedDsr->getDbPrimaryShard(opCtx),
+                    *scopedDsr->getDbVersion(opCtx)};
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::
+                        kDatabaseMetadataForNonExistingDatabaseInShardCatalogCache,
+                    std::move(details)));
+            }
+        }
+    }
+
     return authoritativeShardsGuard.validateUnchanged() ? inconsistencies
                                                         : std::vector<MetadataInconsistencyItem>{};
 }

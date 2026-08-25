@@ -38,6 +38,7 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/metadata_consistency_checks/non_existing_database_metadata_checks.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -369,6 +370,18 @@ public:
 
             auto localInconsistencies = metadata_consistency_util::
                 checkShardCatalogCollectionsConsistentWithAuthoritativeness(opCtx);
+
+            // TODO SERVER-133990: We should also check on secondaries.
+            auto nonExistingDatabaseInconsistencies =
+                non_existing_database_metadata_consistency_checks::
+                    checkNonExistingDatabaseMetadataConsistency(
+                        opCtx,
+                        ShardingState::get(opCtx)->shardId(),
+                        metadata_consistency_util::RSNodeMode::kPrimary);
+            localInconsistencies.insert(
+                localInconsistencies.end(),
+                std::make_move_iterator(nonExistingDatabaseInconsistencies.begin()),
+                std::make_move_iterator(nonExistingDatabaseInconsistencies.end()));
 
             return _mergeCursors(opCtx, nss, std::move(cursors), std::move(localInconsistencies));
         }

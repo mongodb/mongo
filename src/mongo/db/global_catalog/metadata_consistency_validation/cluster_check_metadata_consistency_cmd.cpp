@@ -21,8 +21,6 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
-#include "mongo/db/global_catalog/sharding_catalog_client.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -73,26 +71,16 @@ MONGO_FAIL_POINT_DEFINE(hangCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(tripwireCheckMetadataAfterEstablishCursors);
 
 /*
- * Return the set of shards that are primaries for at least one database
+ * Returns the set of shards to target as participants.
  */
-stdx::unordered_set<ShardId> getAllDbPrimaryShards(OperationContext* opCtx) {
-    static const std::vector<BSONObj> rawPipeline{fromjson(R"({
-        $group: {
-            _id: '$primary'
-        }
-    })")};
-    AggregateCommandRequest aggRequest{NamespaceString::kConfigDatabasesNamespace, rawPipeline};
-    auto aggResponse = Grid::get(opCtx)->catalogClient()->runCatalogAggregation(
-        opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});
+stdx::unordered_set<ShardId> getTargetShards(OperationContext* opCtx) {
+    const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    stdx::unordered_set<ShardId> targetShards(allShardIds.begin(), allShardIds.end());
 
-    stdx::unordered_set<ShardId> shardIds;
-    shardIds.reserve(aggResponse.size() + 1);
-    for (auto&& responseEntry : aggResponse) {
-        shardIds.insert(responseEntry.firstElement().str());
-    }
     // The config server is authoritative for config database
-    shardIds.insert(ShardId::kConfigServerId);
-    return shardIds;
+    targetShards.insert(ShardId::kConfigServerId);
+
+    return targetShards;
 }
 
 MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
@@ -160,14 +148,14 @@ public:
             shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
 
-            // Send a request to all shards that are primaries for at least one database
+            // Send a request to all shards.
             const auto shardOpKey = UUID::gen();
             BSONObjBuilder shardRequestBob;
             shardsvrRequest.serialize(&shardRequestBob);
             appendOpKey(shardOpKey, &shardRequestBob);
             auto shardRequestWithOpKey = shardRequestBob.obj();
 
-            for (auto&& shardId : getAllDbPrimaryShards(opCtx)) {
+            for (auto&& shardId : getTargetShards(opCtx)) {
                 requests.emplace_back(std::move(shardId), shardRequestWithOpKey.getOwned());
             }
 
