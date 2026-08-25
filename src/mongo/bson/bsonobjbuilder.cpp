@@ -219,7 +219,7 @@ template <class Derived, class B>
 bool BSONObjBuilderBase<Derived, B>::hasField(std::string_view name) const {
     BSONObjIterator i = iterator();
     while (i.more())
-        if (name == i.next().fieldName())
+        if (name == i.next().fieldNameStringData())
             return true;
     return false;
 }
