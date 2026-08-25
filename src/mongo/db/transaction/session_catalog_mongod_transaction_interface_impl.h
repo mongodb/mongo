@@ -83,8 +83,9 @@ public:
     ScanSessionsCallbackFn makeChildSessionWorkerFnForReap(
         const TxnNumber& parentSessionActiveTxnNumber) override;
 
-    ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
-        std::vector<SessionCatalog::KillToken>* sessionKillTokens,
+    KillSessionsPredicateFn makeKillPredicateForStepUp() override;
+
+    ScanSessionsReadOnlyCallbackFn makeScanFnForStepUp(
         std::vector<OperationSessionInfo>* sessionsToReacquireLocks) override;
 
     ScanSessionsCallbackFn makeSessionWorkerFnForEagerReap(

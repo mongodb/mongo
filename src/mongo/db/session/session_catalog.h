@@ -84,6 +84,8 @@ public:
     using TxnNumberAndProvenance = std::pair<TxnNumber, Provenance>;
 
     using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
+    using ScanSessionsReadOnlyCallbackFn = std::function<void(const ObservableSession&)>;
+    using KillSessionsPredicateFn = std::function<bool(const ObservableSession&)>;
     using OnEagerlyReapedSessionsFn =
         unique_function<void(ServiceContext*, std::vector<LogicalSessionId>)>;
     using MakeSessionWorkerFnForEagerReap =
@@ -124,25 +126,47 @@ public:
                                          Date_t deadline = Date_t::max());
 
     /**
-     * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
-     * each Session which matches the specified 'lsid' or 'matcher'. Does not support reaping.
+     * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn'
+     * to the Session matching the specified 'lsid'. Does not support reaping.
      *
      * NOTE: Since this method runs with the session catalog mutex, the work done by 'workerFn' is
      * not allowed to block, perform I/O or acquire any lock manager locks.
-     * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
-     * SessionCatalog.
      */
     enum class ScanSessionCreateSession { kYes, kNo };
     void scanSession(const LogicalSessionId& lsid,
-                     const ScanSessionsCallbackFn& workerFn,
+                     const ScanSessionsCallbackFn& perSessionScanFn,
                      ScanSessionCreateSession createSession = ScanSessionCreateSession::kNo);
-    void scanSessions(const SessionKiller::Matcher& matcher,
-                      const ScanSessionsCallbackFn& workerFn);
 
     /**
-     * Same as the above but only applies 'workerFn' to parent Sessions.
+     * Iterates through all sessions matching 'matcher' and kills those for which 'shouldKill'
+     * returns true (or all matched sessions if 'shouldKill' is nullptr). If 'perSessionScanFn' is
+     * provided, it is called for each matched session for read-only data collection before the kill
+     * decision. Returns the collected     KillTokens.
+     *
+     * NOTE: Since this method runs with the session catalog mutex, the work done by 'shouldKill'
+     * and 'perSessionScanFn' is not allowed to block, perform I/O or acquire any lock manager
+     * locks.
      */
-    void scanParentSessions(const ScanSessionsCallbackFn& workerFn);
+    std::vector<KillToken> killSessions(
+        const SessionKiller::Matcher& matcher,
+        ErrorCodes::Error reason = ErrorCodes::Interrupted,
+        const KillSessionsPredicateFn& shouldKill = nullptr,
+        const ScanSessionsReadOnlyCallbackFn& perSessionScanFn = nullptr);
+
+    /**
+     * Returns the set of parent session IDs whose last checkout time is before 'threshold'.
+     */
+    LogicalSessionIdSet findExpiredParentSessions(Date_t threshold) const;
+
+    /**
+     * Iterates through all sessions matching 'matcher' and applies 'perSessionScanFn' to each
+     * session for read-only access.
+     *
+     * NOTE: Since this method runs with the session catalog mutex, the work done by
+     * 'perSessionScanFn' is not allowed to block, perform I/O or acquire any lock manager locks.
+     */
+    void scanSessions(const SessionKiller::Matcher& matcher,
+                      const ScanSessionsReadOnlyCallbackFn& perSessionScanFn);
 
     /**
      * Same as the above but applies 'parentSessionWorkerFn' to the Session whose session id is
@@ -374,7 +398,7 @@ class OperationContextSession;
  * RAII type returned by SessionCatalog::checkOutSessionForKill.
  *
  * After calling kill() on an ObservableSession, let that ObservableSession go out
- * of scope and in a context outside of SessionCatalog::scanSessions, call checkOutSessionForKill
+ * of scope and in a context outside of SessionCatalog::killSessions, call checkOutSessionForKill
  * to get an instance of this type. Then, while holding that instance, perform any cleanup
  * you need to perform on a session as part of killing it. More details in the description of
  * ObservableSession::kill, below.
@@ -403,8 +427,8 @@ private:
 using SessionToKill = SessionCatalog::SessionToKill;
 
 /**
- * This type represents access to a transaction session inside of a scanSessions loop.
- * If you have one of these, you're in a scanSessions callback context, and so
+ * This type represents access to a transaction session inside of a SessionCatalog scan.
+ * If you have one of these, you're in a scan callback context, and so
  * have locked the whole catalog and, if the observed session is bound to an operation context,
  * you hold that operation context's client's mutex, as well.
  */

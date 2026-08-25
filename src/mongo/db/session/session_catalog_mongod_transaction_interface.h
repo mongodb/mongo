@@ -46,6 +46,8 @@ namespace mongo {
 class MongoDSessionCatalogTransactionInterface {
 public:
     using ScanSessionsCallbackFn = SessionCatalog::ScanSessionsCallbackFn;
+    using ScanSessionsReadOnlyCallbackFn = SessionCatalog::ScanSessionsReadOnlyCallbackFn;
+    using KillSessionsPredicateFn = SessionCatalog::KillSessionsPredicateFn;
 
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
 
@@ -131,14 +133,16 @@ public:
         const TxnNumber& parentSessionActiveTxnNumber) = 0;
 
     /**
-     * Returns a 'sessionWorkerFn' that can be passed to SessionCatalog::scanSessions() on step-up.
-     *
-     * Returns sessions to kill in output parameter 'sessionKillTokens'.
-     * Also returns a list of prepared transactions in 'sessionsToReacquireLocks' that we will
-     * need to reacquire locks for.
+     * Returns a predicate to determine which sessions should be killed on step-up.
+     * Sessions where the predicate returns true will be killed.
      */
-    virtual ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
-        std::vector<SessionCatalog::KillToken>* sessionKillTokens,
+    virtual KillSessionsPredicateFn makeKillPredicateForStepUp() = 0;
+
+    /**
+     * Returns a read-only scan function for step-up that collects prepared transaction sessions
+     * into 'sessionsToReacquireLocks'.
+     */
+    virtual ScanSessionsReadOnlyCallbackFn makeScanFnForStepUp(
         std::vector<OperationSessionInfo>* sessionsToReacquireLocks) = 0;
 
     /**
