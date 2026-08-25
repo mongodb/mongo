@@ -143,18 +143,11 @@ function handleSessionsCollection(mainConn, priConn, configConn) {
         if (TestData.configShard) {
             extraCollectionWrites += 1;
         }
-        // When shard authoritative collection metadata is enabled, the create coordinator performs
-        // two (or three) retryable writes on the shard, each adding a write to config.transactions:
-        // - _shardsvrCommitCreateCollectionMetadata, to commit the metadata to the shard catalog.
-        // - _shardsvrSetAllowChunkOperations, to enable chunk operations once the critical section
-        //    has been released (the collection is committed with chunk operations disallowed).
-        // - If the shard is a config shard, _configsvrSetAllowChunkOperations also runs for the
-        //   same reason as above.
+        // When shard authoritative collection metadata is enabled, the create coordinator commits
+        // metadata to the shard catalog via a retryable write (_shardsvrCommitCreateCollection
+        // Metadata), adding another write to config.transactions on the shard.
         if (FeatureFlagUtil.isPresentAndEnabled(priConn, "AuthoritativeShardsDDL")) {
-            extraCollectionWrites += 2;
-            if (TestData.configShard) {
-                extraCollectionWrites += 1;
-            }
+            extraCollectionWrites += 1;
         }
     }
     return extraCollectionWrites;
