@@ -56,6 +56,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -600,8 +601,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     const auto optTargetCollType = getShardedCollection(opCtx, toNss);
                     const bool targetIsSharded = (bool)optTargetCollType;
                     _doc.setTargetIsSharded(targetIsSharded);
-                    _doc.setTargetUUID(getCollectionUUID(
-                        opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
                     if (!targetIsSharded) {
                         // (SERVER-67325) Acquire critical section on the target collection in order
@@ -633,8 +632,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                           << "a view already exists with that name: " << toNss);
                         }
 
-                        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
-                                                                                       toNss)) {
+                        const auto collPtr =
+                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                       toNss);
+                        if (collPtr) {
+                            _doc.setTargetUUID(collPtr->uuid());
                             // Release the critical section because the unsharded target collection
                             // already exists, hence no risk of concurrent `createCollection`
                             criticalSection->releaseRecoverableCriticalSection(
@@ -642,7 +644,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 toNss,
                                 criticalSectionReason,
                                 WriteConcerns::kLocalWriteConcern);
+                        } else {
+                            _doc.setTargetUUID(boost::none);
                         }
+                    } else {
+                        _doc.setTargetUUID(optTargetCollType->getUuid());
                     }
 
                     sharding_ddl_util::checkRenamePreconditions(

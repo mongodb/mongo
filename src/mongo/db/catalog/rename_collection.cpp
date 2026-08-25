@@ -70,6 +70,8 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
+MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeButBeforeSourceDrop);
+MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeAndAfterSourceDrop);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
@@ -798,8 +800,21 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return status;
 
     tmpCollectionDropper.dismiss();
-    return dropCollectionForApplyOps(
+
+    uassert(ErrorCodes::BadValue,
+            "Failing rename due to failpoint after rename but before source drop",
+            !failRenameAfterFinalizeButBeforeSourceDrop.shouldFail());
+
+    status = dropCollectionForApplyOps(
         opCtx, source, {}, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    if (!status.isOK())
+        return status;
+
+    uassert(13180500,
+            "Failing rename due to failpoint after rename and after source drop",
+            !failRenameAfterFinalizeAndAfterSourceDrop.shouldFail());
+
+    return status;
 }
 
 }  // namespace

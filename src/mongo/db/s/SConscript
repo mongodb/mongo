@@ -696,6 +696,7 @@ env.CppUnitTest(
         'range_deleter_service_test.cpp',
         'range_deleter_service_test_util.cpp',
         'range_deletion_util_test.cpp',
+        'rename_collection_participant_service_test.cpp',
         'resharding/resharding_agg_test.cpp',
         'resharding/resharding_collection_cloner_test.cpp',
         'resharding/resharding_collection_test.cpp',

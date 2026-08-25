@@ -1042,6 +1042,50 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollect
     _checkOplogEntries(_opObserver->oplogEntries, expectedOplogEntries);
 }
 
+TEST_F(RenameCollectionTest,
+       RenameCollectionAcrossDatabaseRetryAfterRenameSucceedsButBeforeSourceDrop) {
+    RenameCollectionOptions opts;
+    opts.dropTarget = true;
+    _createCollection(_opCtx.get(), _sourceNss);
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, "a_1");
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+    {
+        FailPointEnableBlock failPoint("failRenameAfterFinalizeButBeforeSourceDrop");
+        ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, opts),
+                           AssertionException,
+                           ErrorCodes::BadValue);
+    }
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNssDifferentDb));
+    auto targetUUID = _getCollectionOptions(_opCtx.get(), _targetNssDifferentDb).uuid;
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, opts));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    auto destOptions = _getCollectionOptions(_opCtx.get(), _targetNssDifferentDb);
+    // 7.0 does a re-do of the operation if source and target exists as opposed to newer mongo
+    // versions where we return early.
+    ASSERT_NOT_EQUALS(destOptions.uuid, targetUUID);
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseFailsAfterFinalizeAndSourceDrop) {
+    RenameCollectionOptions opts;
+    opts.dropTarget = true;
+    _createCollection(_opCtx.get(), _sourceNss);
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, "a_1");
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+    {
+        FailPointEnableBlock failPoint("failRenameAfterFinalizeAndAfterSourceDrop");
+        ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, opts),
+                           AssertionException,
+                           13180500);
+    }
+
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNssDifferentDb));
+
+    // Can't attempt a retry here as we don't get any benefit - renameCollection will fail with
+    // source namespace not found
+}
+
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithoutLocks) {
     _createCollection(_opCtx.get(), _sourceNss);
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
