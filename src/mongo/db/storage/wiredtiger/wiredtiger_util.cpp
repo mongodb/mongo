@@ -3,6 +3,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
@@ -20,6 +21,7 @@
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 
 #include <boost/filesystem/directory.hpp>
@@ -416,35 +418,31 @@ void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::
     const int64_t keyCount = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_COUNT);
     const int64_t valueCount = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_COUNT);
     const int64_t maxLeafPage = stat(WT_STAT_DSRC_BTREE_MAXLEAFPAGE);
+#if defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_BUCKETS) && \
+    defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_CEILING)
+    const int64_t histBuckets = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_BUCKETS);
+    const int64_t histCeiling = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_CEILING);
+#else
+    const int64_t histBuckets = 0;
+    const int64_t histCeiling = 0;
+#endif
 
-    // The histogram has one bucket per btree_size_leaf_hist_N statistic. Buckets 0..N-2 are
-    // equal-width slices of [0, leaf page max); the final bucket collects pages at or above the
-    // leaf page max, matching WiredTiger's bucketing. Each element is {maxBytes, count} in bucket
-    // order, where 'maxBytes' is the bucket's exclusive upper bound (null for the open-ended final
-    // bucket).
-    static constexpr int kNumHistBuckets = 9;
-    const int histStatKeys[kNumHistBuckets] = {WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_0,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_1,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_2,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_3,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_4,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_5,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_6,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_7,
-                                               WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_8};
-    const int64_t bucketWidth = maxLeafPage / (kNumHistBuckets - 1);
-
-    BSONArrayBuilder histogram;
-    for (int i = 0; i < kNumHistBuckets; ++i) {
-        BSONObjBuilder bucket(histogram.subobjStart());
-        if (i + 1 < kNumHistBuckets) {
-            bucket.append("maxBytes", static_cast<long long>(bucketWidth * (i + 1)));
-        } else {
-            bucket.appendNull("maxBytes");
-        }
-        bucket.append("count", static_cast<long long>(stat(histStatKeys[i])));
-        bucket.done();
+    const int histStatKeys[WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets] = {
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_0,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_1,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_2,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_3,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_4,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_5,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_6,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_7,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_8};
+    std::array<int64_t, WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets> bucketCounts{};
+    for (int i = 0; i < WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets; ++i) {
+        bucketCounts[i] = stat(histStatKeys[i]);
     }
+    const BSONArray histogram =
+        buildLeafPageSizeHistogram(histBuckets, histCeiling, maxLeafPage, bucketCounts);
 
     LOGV2(12951900,
           "WiredTiger size metrics",
@@ -460,7 +458,32 @@ void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::
           "valueBytes"_attr = valueBytes,
           "keyCount"_attr = keyCount,
           "valueCount"_attr = valueCount,
-          "leafPageSizeHistogram"_attr = histogram.arr());
+          "leafPageSizeHistogram"_attr = histogram);
+}
+
+BSONArray WiredTigerUtil::buildLeafPageSizeHistogram(int64_t publishedBuckets,
+                                                     int64_t publishedCeiling,
+                                                     int64_t maxLeafPage,
+                                                     std::span<const int64_t> bucketCounts) {
+    const int nBuckets =
+        (publishedBuckets > 0 && publishedBuckets <= kLeafPageSizeHistogramMaxBuckets)
+        ? static_cast<int>(publishedBuckets)
+        : kLeafPageSizeHistogramMaxBuckets;
+    const int64_t ceiling = publishedCeiling > 0 ? publishedCeiling : maxLeafPage;
+    const int64_t bucketWidth = nBuckets > 1 ? ceiling / (nBuckets - 1) : 0;
+
+    BSONArrayBuilder histogram;
+    for (int i = 0; i < nBuckets; ++i) {
+        BSONObjBuilder bucket(histogram.subobjStart());
+        if (i + 1 < nBuckets) {
+            bucket.append("maxBytes", static_cast<long long>(bucketWidth * (i + 1)));
+        } else {
+            bucket.append("gteBytes", static_cast<long long>(ceiling));
+        }
+        const int64_t count = i < static_cast<int64_t>(bucketCounts.size()) ? bucketCounts[i] : 0;
+        bucket.append("count", static_cast<long long>(count));
+    }
+    return histogram.arr();
 }
 
 int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {

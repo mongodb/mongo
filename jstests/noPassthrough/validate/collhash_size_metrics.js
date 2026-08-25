@@ -50,6 +50,27 @@ function getSizeMetricAttrsFromRawLog() {
         .map((entry) => entry.attr);
 }
 
+// Histogram ceiling in bytes. Finite buckets use exclusive maxBytes; the last bucket is
+// pages at or above that ceiling (gteBytes).
+function histogramCeiling(hist) {
+    assert.gte(
+        hist.length,
+        2,
+        "histogram must have a finite bucket and an open-ended bucket",
+        hist,
+    );
+    const last = hist[hist.length - 1];
+    const lastFinite = hist[hist.length - 2];
+    assert.eq(undefined, last.maxBytes, "open-ended bucket must not use maxBytes", hist);
+    assert.eq(
+        lastFinite.maxBytes,
+        last.gteBytes,
+        "gteBytes must equal the last finite maxBytes",
+        hist,
+    );
+    return last.gteBytes;
+}
+
 let conn = MongoRunner.runMongod();
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -122,8 +143,16 @@ assert.gte(metrics.length, 2, "expected a line for the collection and at least o
 // Every URI is an on-disk file URI and every histogram sums to the reported leaf-page count.
 for (const m of metrics) {
     assert(m.uri.startsWith("file:") && m.uri.endsWith(".wt"), "URI is not an on-disk file URI", m);
-    assert.eq(9, m.leafPageSizeHistogram.length, "unexpected histogram bucket count", m);
-    const histSum = m.leafPageSizeHistogram.reduce((a, b) => a + b.count, 0);
+    const hist = m.leafPageSizeHistogram;
+    const lastFiniteMax = histogramCeiling(hist);
+    const firstMax = hist[0].maxBytes;
+    assert.eq(
+        firstMax * (hist.length - 1),
+        lastFiniteMax,
+        "finite histogram buckets are not equal-width",
+        m,
+    );
+    const histSum = hist.reduce((a, b) => a + b.count, 0);
     assert.eq(histSum, m.leafPages, "histogram buckets do not sum to the leaf page count", m);
     assert.gte(m.leafPages, 1, "expected at least one leaf page", m);
     // Clean shutdown before validation means every page has an on-disk image.
@@ -142,12 +171,26 @@ assert.gte(cm.internalPages, 1, "expected at least one internal page", cm);
 assert.gt(cm.leafBytes, 0, "expected non-zero leaf bytes", cm);
 assert.gt(cm.valueBytes, 0, "expected non-zero value bytes", cm);
 assert.eq(0, cm.overflowPages, "did not expect overflow pages for small documents", cm);
+const collCeiling = histogramCeiling(cm.leafPageSizeHistogram);
+// 32 KiB is on-disk maxleafpage; 128 KiB is the pre-compression budget once WiredTiger publishes
+// hist_ceiling. Accept either so this test holds across that import.
+assert(
+    collCeiling === 32 * 1024 || collCeiling === 128 * 1024,
+    "collection histogram ceiling is neither 32 KiB nor 128 KiB",
+    {cm, collCeiling},
+);
 
 // At least one index (the _id index) must have produced its own line.
 const indexMetrics = metrics.filter((m) => m.uri.includes("index-"));
 assert.gte(indexMetrics.length, 1, "expected at least one index line", {metrics});
 for (const im of indexMetrics) {
     assert.eq(kNumDocs, im.keyCount, "index key count does not match record count", im);
+    assert.eq(
+        16 * 1024,
+        histogramCeiling(im.leafPageSizeHistogram),
+        "index histogram ceiling is not 16 KiB",
+        im,
+    );
 }
 
 // Size metrics are coupled to collHash: a non-collHash startup validation must not emit the line.

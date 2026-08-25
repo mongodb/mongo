@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
@@ -10,6 +11,7 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <span>
 #include <string_view>
 
@@ -249,6 +251,14 @@ public:
      * included in the log line is the on-disk file backing the b-tree not 'tableUri'.
      */
     static void logStorageSizeStats(WiredTigerSession& session, const std::string& tableUri);
+
+    static constexpr int kLeafPageSizeHistogramMaxBuckets = 9;
+
+    // Zero publishedBuckets/publishedCeiling: 9 buckets, ceiling maxLeafPage.
+    static BSONArray buildLeafPageSizeHistogram(int64_t publishedBuckets,
+                                                int64_t publishedCeiling,
+                                                int64_t maxLeafPage,
+                                                std::span<const int64_t> bucketCounts);
 
     static int64_t getEphemeralIdentSize(WiredTigerSession& session, const std::string& uri);
 

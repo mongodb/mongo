@@ -24,6 +24,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <wiredtiger.h>
 
@@ -1287,6 +1288,62 @@ TEST(SimpleWiredTigerUtilTest, WTMainCacheSizeCalculation) {
     ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0, 0.1), std::floor(0.1 * memSizeMB));
     ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0, tooLargeCachePct),
                   std::floor(0.8 * memSizeMB));
+}
+
+std::vector<BSONElement> leafHistogramBuckets(const BSONArray& hist) {
+    std::vector<BSONElement> buckets;
+    hist.elems(buckets);
+    return buckets;
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramUsesPublishedGeometry) {
+    constexpr int64_t kCeiling = 128 * 1024;
+    constexpr int64_t kOnDiskMax = 32 * 1024;
+    const int64_t counts[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    const BSONArray hist =
+        WiredTigerUtil::buildLeafPageSizeHistogram(9, kCeiling, kOnDiskMax, counts);
+
+    const auto buckets = leafHistogramBuckets(hist);
+    ASSERT_EQUALS(9, buckets.size());
+    const int64_t width = kCeiling / 8;
+    for (int i = 0; i < 8; ++i) {
+        const BSONObj obj = buckets[i].Obj();
+        EXPECT_EQ(width * (i + 1), obj["maxBytes"].numberLong());
+        EXPECT_TRUE(obj["gteBytes"].eoo());
+        EXPECT_EQ(counts[i], obj["count"].numberLong());
+    }
+    const BSONObj last = buckets[8].Obj();
+    EXPECT_TRUE(last["maxBytes"].eoo());
+    EXPECT_EQ(kCeiling, last["gteBytes"].numberLong());
+    EXPECT_EQ(9, last["count"].numberLong());
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramFallsBackWhenPublishedStatsMissing) {
+    // Same inputs logStorageSizeStats uses when the histogram geometry stats are missing at
+    // compile time (#else) or the read returns 0.
+    constexpr int64_t kOnDiskMax = 32 * 1024;
+    const int64_t counts[] = {0, 0, 0, 0, 0, 0, 0, 0, 4};
+    const BSONArray hist = WiredTigerUtil::buildLeafPageSizeHistogram(0, 0, kOnDiskMax, counts);
+
+    const auto buckets = leafHistogramBuckets(hist);
+    ASSERT_EQUALS(WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets, buckets.size());
+    const int64_t width = kOnDiskMax / (WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets - 1);
+    for (int i = 0; i < WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets - 1; ++i) {
+        const BSONObj obj = buckets[i].Obj();
+        EXPECT_EQ(width * (i + 1), obj["maxBytes"].numberLong());
+        EXPECT_EQ(0, obj["count"].numberLong());
+    }
+    const BSONObj last = buckets.back().Obj();
+    EXPECT_EQ(kOnDiskMax, last["gteBytes"].numberLong());
+    EXPECT_EQ(4, last["count"].numberLong());
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramClampsOversizePublishedBucketCount) {
+    constexpr int64_t kCeiling = 128 * 1024;
+    const int64_t counts[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+    const BSONArray hist =
+        WiredTigerUtil::buildLeafPageSizeHistogram(99, kCeiling, 32 * 1024, counts);
+    EXPECT_EQ(WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets, leafHistogramBuckets(hist).size());
 }
 
 DEATH_TEST_F(WiredTigerUtilDeathTest, WTMainCacheSizeInvalidValues, "invariant") {
