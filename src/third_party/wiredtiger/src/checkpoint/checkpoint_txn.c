@@ -1587,53 +1587,60 @@ static int
 __checkpoint_db_debug_crash_points(WT_SESSION_IMPL *session, const char *cfg[])
 {
 
-    WT_CONFIG_ITEM cval;
+    WT_CONFIG_ITEM cval, tval;
     u_int crash_point;
 
-    /* Perform a crash at a relative point in checkpoint. */
     WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_crash_point", &cval));
+    WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_crash_trigger_point", &tval));
     crash_point = (u_int)cval.val;
+
+    /*
+     * Perform a crash at a relative point in checkpoint. The input ranges from 1 to 1000 and
+     * selects proportionally one of the gathered data handles to stop on, or one of the phases that
+     * follow them. The range stops short of CKPT_CRASH_ENUM_MAY_RECOVER, so every point it can
+     * select precedes the checkpoint transaction commit and the checkpoint is never recoverable,
+     * with or without logging. Callers that want a crash the checkpoint can survive name it
+     * instead.
+     */
     if (crash_point > 0) {
-        u_int ckpt_total_crash_points;
-        /*
-         * Calculate total checkpoint crash points. The total checkpoint points required are the
-         * number of data handles that need to be checkpointed.
-         */
-        ckpt_total_crash_points = session->ckpt.handle_next + CKPT_CRASH_PROGRESS_ENUM_END - 1;
+        u_int scaled, total;
+
+        /* Every gathered handle is a crash site, as is each phase below the sentinel. */
+        total = session->ckpt.handle_next + CKPT_CRASH_ENUM_MAY_RECOVER - 1;
 
         /*
-         * Calculate the relative crash point. The input crash_point ranges from
-         * 1 to 1000; convert it to its corresponding crash point position.
+         * Give every site an equal share of the range. Dividing by the width of the range rather
+         * than by its last value keeps the result from running past the last site, which would
+         * never be reached and would survive to the teardown assertion.
          */
-        session->ckpt.crash_point =
-          (((crash_point - 1) * ckpt_total_crash_points) / (WT_THOUSAND - 1)) + 1;
+        scaled = (((crash_point - 1) * total) / WT_THOUSAND) + 1;
 
         /*
-         * If the crash point exceeds the number of handles, crash in the final phase after all
-         * regular tables are checkpointed. Use the crash trigger points to achieve this. Calculate
-         * and set the appropriate trigger point.
+         * Past the handles, what remains indexes the phases that follow them. A checkpoint that
+         * gathered no handles lands there for every input, which is what we want: the per-tree loop
+         * has no crash site to stop on.
          */
-        if (session->ckpt.crash_point > session->ckpt.handle_next)
-            session->ckpt.crash_trigger_point =
-              session->ckpt.crash_point - session->ckpt.handle_next;
+        if (scaled > session->ckpt.handle_next)
+            session->ckpt.crash_trigger_point = scaled - session->ckpt.handle_next;
+        else
+            session->ckpt.crash_point = scaled;
     }
 
     /* Perform a crash at a specific point in checkpoint. */
-    WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_crash_trigger_point", &cval));
-    if (cval.len > 0) {
-        if (WT_CONFIG_LIT_MATCH("before_metadata_sync", cval))
+    if (tval.len > 0) {
+        if (WT_CONFIG_LIT_MATCH("before_metadata_sync", tval))
             session->ckpt.crash_trigger_point = CKPT_CRASH_BEFORE_METADATA_SYNC;
-        else if (WT_CONFIG_LIT_MATCH("before_metadata_update", cval))
-            session->ckpt.crash_trigger_point = CKPT_CRASH_BEFORE_METADATA_UPDATE;
-        else if (WT_CONFIG_LIT_MATCH("before_key_rotation", cval))
-            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION;
-        else if (WT_CONFIG_LIT_MATCH("during_key_rotation", cval))
-            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_DURING_KEY_ROTATION;
-        else if (WT_CONFIG_LIT_MATCH("after_key_rotation", cval))
-            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION;
+        else if (WT_CONFIG_LIT_MATCH("before_checkpoint_commit", tval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_BEFORE_CKPT_COMMIT;
+        else if (WT_CONFIG_LIT_MATCH("before_key_rotation", tval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_KEY_PROVIDER_BEFORE_KEY_ROTATION;
+        else if (WT_CONFIG_LIT_MATCH("during_key_rotation", tval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_KEY_PROVIDER_DURING_KEY_ROTATION;
+        else if (WT_CONFIG_LIT_MATCH("after_key_rotation", tval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_KEY_PROVIDER_AFTER_KEY_ROTATION;
         else
             WT_RET_MSG(session, EINVAL, "Debug checkpoint crash point %.*s is invalid",
-              (int)cval.len, cval.str);
+              (int)tval.len, tval.str);
     }
     return (0);
 }
@@ -1700,15 +1707,6 @@ __checkpoint_log_stage(WT_SESSION_IMPL *session, uint32_t log_flags)
         WT_RET(__wt_log_system_backup_id(session));
         break;
     case WT_TXN_LOG_CKPT_FLUSH:
-        /* FIXME-WT-15069: Remove this if condition as part of this FIXME. This is a temporary
-         * workaround to allow ckpt_crash_before_metadata_sync crash point with logging enabled.
-         * test/model currently expects crash points to result in only non-recoverable checkpoints.
-         * However, from WT perspective, a crash after flushing the logs here is still considered
-         * a valid recoverable checkpoint.
-         */
-        /* Crash before metadata sync if checkpoint crash point is configured. */
-        if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_SYNC)
-            __wt_debug_crash(session);
         WT_RET(__wt_log_flush(session, WT_LOG_FSYNC));
         break;
     case WT_TXN_LOG_CKPT_STOP:
@@ -2093,6 +2091,15 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * either one transaction or all of them together, so panic if we can't actually do that.
      */
     WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_COMMIT);
+
+    /*
+     * Crash with every data file durable but the checkpoint transaction still open. Because
+     * __wt_debug_crash only kills the process, a crash taken any later would leave recoverability
+     * up to whether the log server happened to have written the commit records yet.
+     */
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_CKPT_COMMIT)
+        __wt_debug_crash(session);
+
     if ((ret = __wti_checkpoint_parallel_commit(session)) != 0)
         WT_ERR_PANIC(session, ret, "Checkpoint worker transaction commit failed");
     if ((ret = __wt_txn_commit(session, NULL)) != 0)
@@ -2100,10 +2107,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Clear the checkpoint flag, as it governs the checkpoint transaction above. */
     F_CLR(session, WT_SESSION_CHECKPOINT);
-
-    /* Crash before updating the metadata if checkpoint crash point is configured. */
-    if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_UPDATE)
-        __wt_debug_crash(session);
 
     /*
      * Flush all the logs that are generated during the checkpoint. It is possible that checkpoint
@@ -2113,7 +2116,11 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     WT_ERR(__checkpoint_log_stage(session, WT_TXN_LOG_CKPT_FLUSH));
 
-    /* Crash before metadata sync if checkpoint crash point is configured. */
+    /*
+     * Crash with the metadata still stale but the checkpoint transaction committed and its log
+     * records fsynced above. With logging enabled recovery replays them and the checkpoint takes
+     * effect; without logging nothing survives the stale turtle file and it is lost.
+     */
     if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_SYNC)
         __wt_debug_crash(session);
 
@@ -2300,7 +2307,7 @@ __checkpoint_db_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 {
-    WT_CONFIG_ITEM cval;
+    WT_CONFIG_ITEM cval, tval;
     WT_DECL_RET;
     uint32_t orig_flags;
     bool checkpoint_cleanup, flush, flush_sync;
@@ -2336,6 +2343,18 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 
     WT_ERR(__wt_config_gets(session, cfg, "debug.checkpoint_cleanup", &cval));
     checkpoint_cleanup = cval.val;
+
+    /*
+     * The two crash point settings select points on opposite sides of the checkpoint transaction
+     * commit, so they disagree about whether the checkpoint survives rather than refining each
+     * other. Reject the combination here, before the transaction starts: an error returned once it
+     * is running is escalated to a panic under disaggregated storage.
+     */
+    WT_ERR(__wt_config_gets(session, cfg, "debug.checkpoint_crash_point", &cval));
+    WT_ERR(__wt_config_gets(session, cfg, "debug.checkpoint_crash_trigger_point", &tval));
+    if (cval.val > 0 && tval.len > 0)
+        WT_ERR_MSG(session, EINVAL,
+          "checkpoint_crash_point and checkpoint_crash_trigger_point are mutually exclusive");
 
     /*
      * If this checkpoint includes a flush_tier then this call also must wait for any earlier

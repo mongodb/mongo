@@ -375,11 +375,6 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
      */
     entry->deferred = deferred;
 
-    /* Cannot fail past this point. */
-    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-    TAILQ_INSERT_TAIL(&conn->disaggregated_storage.shared_metadata_qh, entry, q);
-    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Scheduled copying disaggregated metadata for table \"%s\" (stable URI \"%s\") with %s "
       "operation to shared "
@@ -393,6 +388,11 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
       entry->table_value == NULL ? "<none>" : entry->table_value);
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  stable: %s",
       entry->stable_value == NULL ? "<none>" : entry->stable_value);
+
+    /* Cannot fail past this point. */
+    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+    TAILQ_INSERT_TAIL(&conn->disaggregated_storage.shared_metadata_qh, entry, q);
+    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
     /* No need to free the entry structure here as it has been added to the queue. */
     entry = NULL;

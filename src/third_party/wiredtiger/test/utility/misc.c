@@ -443,7 +443,7 @@ testutil_timeout_wait(uint32_t timeout_seconds, pid_t pid)
     }
     testutil_assert_errno(kill(pid, SIGKILL) == 0);
     testutil_assert_errno(waitpid(pid, &status, 0) != -1);
-    testutil_die(EINVAL, "child process %d killed, timed out after " PRIu32 " seconds\n", (int)pid,
+    testutil_die(EINVAL, "child process %d killed, timed out after %" PRIu32 " seconds\n", (int)pid,
       timeout_seconds);
 }
 

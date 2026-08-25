@@ -1165,14 +1165,14 @@ static const uint8_t confchk_WT_SESSION_begin_transaction_jump[WT_CONFIG_JUMP_TA
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
   1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 6, 7, 7, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
+const char __WT_CONFIG_CHOICE_before_checkpoint_commit[] = "before_checkpoint_commit";
 const char __WT_CONFIG_CHOICE_before_metadata_sync[] = "before_metadata_sync";
-const char __WT_CONFIG_CHOICE_before_metadata_update[] = "before_metadata_update";
 const char __WT_CONFIG_CHOICE_before_key_rotation[] = "before_key_rotation";
 const char __WT_CONFIG_CHOICE_during_key_rotation[] = "during_key_rotation";
 const char __WT_CONFIG_CHOICE_after_key_rotation[] = "after_key_rotation";
 
 static const char *confchk_checkpoint_crash_trigger_point_choices[] = {
-  __WT_CONFIG_CHOICE_before_metadata_sync, __WT_CONFIG_CHOICE_before_metadata_update,
+  __WT_CONFIG_CHOICE_before_checkpoint_commit, __WT_CONFIG_CHOICE_before_metadata_sync,
   __WT_CONFIG_CHOICE_before_key_rotation, __WT_CONFIG_CHOICE_during_key_rotation,
   __WT_CONFIG_CHOICE_after_key_rotation, NULL};
 
@@ -1182,8 +1182,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_checkpoint_debug_subconfigs[] = 
   {"checkpoint_crash_point", "int", NULL, "min=0,max=1000", NULL, 0, NULL,
     WT_CONFIG_COMPILED_TYPE_INT, 188, 0, 1000, NULL},
   {"checkpoint_crash_trigger_point", "string", NULL,
-    "choices=[\"before_metadata_sync\","
-    "\"before_metadata_update\",\"before_key_rotation\","
+    "choices=[\"before_checkpoint_commit\","
+    "\"before_metadata_sync\",\"before_key_rotation\","
     "\"during_key_rotation\",\"after_key_rotation\"]",
     NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 189, INT64_MIN, INT64_MAX,
     confchk_checkpoint_crash_trigger_point_choices},

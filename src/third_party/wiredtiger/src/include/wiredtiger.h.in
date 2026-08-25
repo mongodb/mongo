@@ -1953,12 +1953,15 @@ struct __wt_session {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_cleanup, if true\, checkpoint cleanup thread is
      * triggered to perform the checkpoint cleanup., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_crash_point, A value between 1 and 1000 will
-     * trigger a controlled crash during the checkpoint process.  Lower values will trigger crashes
-     * in the initial phase of checkpoint\, while higher values will result in crashes in the final
-     * phase of the checkpoint process., an integer between \c 0 and \c 1000; default \c 0.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;database_size_fix, if true\, recompute the disaggregated
-     * database size from the sum of all the collections' latest checkpoint sizes\, instead of
-     * applying the incremental delta., a boolean flag; default \c false.}
+     * trigger a controlled crash during the checkpoint\, selecting proportionally which tree to
+     * stop on or\, at the top of the range\, the phase that follows them.  Every point it can
+     * select precedes the checkpoint transaction commit\, so the checkpoint is never recoverable;
+     * use \c checkpoint_crash_trigger_point to crash where the checkpoint can survive.  Cannot be
+     * combined with \c checkpoint_crash_trigger_point., an integer between \c 0 and \c 1000;
+     * default \c 0.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;database_size_fix, if true\, recompute the
+     * disaggregated database size from the sum of all the collections' latest checkpoint sizes\,
+     * instead of applying the incremental delta., a boolean flag; default \c false.}
      * @config{ ),,}
      * @config{drop, specify a list of checkpoints to drop.  The list may additionally contain one
      * of the following keys: \c "from=all" to drop all checkpoints\, \c "from=<checkpoint>" to drop

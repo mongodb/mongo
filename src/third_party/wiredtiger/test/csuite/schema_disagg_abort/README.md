@@ -69,7 +69,7 @@ Threads are created for each leader or follower phase.
 | generator | 1 for a leader or lone node | Advance the slot state machines and emit workload and role-transition events. |
 | reader | 1 | Read the self-pipe or peer pipe, demultiplex events and drain work at transition markers. |
 | worker | `-T N` | Apply events, relay leader events, append records and report completed timestamps. |
-| timestamp | 1 | Advance oldest, stable and stable-schema timestamps to the workers' completed frontier. |
+| timestamp | 1 | Advance oldest, stable and stable-schema timestamps to the completed frontier. |
 | checkpoint | 1 | Write leader checkpoints to PALite or adopt the latest checkpoint as follower. |
 
 Shutdown is ordered generator, reader, workers, checkpoint, timestamp. The last two remain available

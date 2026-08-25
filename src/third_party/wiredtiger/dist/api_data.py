@@ -2192,15 +2192,17 @@ methods = {
             if true, checkpoint cleanup thread is triggered to perform the checkpoint cleanup''',
             type='boolean'),
         Config('checkpoint_crash_point', '0', r'''
-            A value between 1 and 1000 will trigger a controlled crash during the
-            checkpoint process. Lower values will trigger crashes in the initial phase of
-            checkpoint, while higher values will result in crashes in the final phase of the
-            checkpoint process''', type='int', min='0', max='1000'),
+            A value between 1 and 1000 will trigger a controlled crash during the checkpoint,
+            selecting proportionally which tree to stop on or, at the top of the range, the phase
+            that follows them. Every point it can select precedes the checkpoint transaction
+            commit, so the checkpoint is never recoverable; use \c checkpoint_crash_trigger_point
+            to crash where the checkpoint can survive. Cannot be combined with
+            \c checkpoint_crash_trigger_point''', type='int', min='0', max='1000'),
         Config('checkpoint_crash_trigger_point', '', r'''
-            enable code that performs a crash during checkpoint process with a goal of uncovering
-            race conditions at unexpected times. This option is intended for use with internal
-            testing of WiredTiger.''', undoc=True,
-            choices=['before_metadata_sync', 'before_metadata_update',
+            enable code that performs a crash during the checkpoint process with a goal of
+            uncovering race conditions at unexpected times. This option is intended for use with
+            internal testing of WiredTiger.''', undoc=True,
+            choices=['before_checkpoint_commit', 'before_metadata_sync',
                 'before_key_rotation', 'during_key_rotation', 'after_key_rotation']),
         Config('database_size_fix', 'false', r'''
             if true, recompute the disaggregated database size from the sum of all the collections'

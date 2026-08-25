@@ -42,6 +42,9 @@ type python3 > /dev/null 2>&1 || {
     exit 1
 }
 
+# We require clang-format which may not be installed.
+check_clang_format
+
 echo 'dist/s_all run started...'
 
 export WT_FAST=""

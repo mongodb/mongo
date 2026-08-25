@@ -55,6 +55,12 @@
 #define GEN_MIN_LEAD 64            /* lead floor, so the workers stay fed */
 #define GEN_STEPDOWN_MIN_EVENTS 64 /* minimum events a lone node emits during stepdown */
 
+/*
+ * Frontier window to track completed timestamps across workers. Must be large enough to accommodate
+ * all in-flight timestamps.
+ */
+#define FRONTIER_WINDOW 0x10000u
+
 #define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
 #define SCHEMA_EPOCH_BOOTSTRAP 1
 #define MAX_NODES 2
@@ -245,16 +251,18 @@ typedef struct {
 
     /* Single monotonic timestamp for schema epochs AND commit timestamps. */
     uint64_t current_ts;
+    uint64_t frontier_ts; /* every timestamp at or below it is applied; atomic access */
+    /* Circular buffer for completed timestamps of all workers; atomic access. */
+    uint8_t completed_ts[FRONTIER_WINDOW];
     uint64_t emitted; /* generator: how many events have been emitted */
     uint64_t applied; /* worker: how many events have been applied; atomic access */
     uint32_t nth_workers;
 
     /* Per-worker-thread state; the reader fills the queue, the slot model is the generator's. */
     struct {
-        wt_thread_t thr;       /* this worker's handle */
-        EVENT_QUEUE evq;       /* this worker's inbound events */
-        bool busy;             /* the worker is mid-apply; atomic access */
-        uint64_t completed_ts; /* the latest published or committed timestamp; atomic access */
+        wt_thread_t thr; /* this worker's handle */
+        EVENT_QUEUE evq; /* this worker's inbound events */
+        bool busy;       /* the worker is mid-apply; atomic access */
         /* Table state is carried across leader-follower transitions. */
         TABLE_STATE table_state[MAX_POOL_SIZE];
         /* Advanced by every create under -q, so a slot's table name is never reused. */
@@ -316,6 +324,7 @@ void workload_counter_advance(WORKLOAD_STATE *state, uint64_t v);
 void evq_enqueue(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev);
 bool evq_dequeue(WORKLOAD_STATE *state, uint32_t thread_index, SCHEMA_EVENT *ev);
 bool evq_is_empty(WORKLOAD_STATE *state, uint32_t thread_index);
+uint64_t evq_depth(WORKLOAD_STATE *state, uint32_t thread_index);
 void evq_drain_barrier(WORKLOAD_STATE *state);
 
 /* event_pipe.c: the event framing every pipe shares. */

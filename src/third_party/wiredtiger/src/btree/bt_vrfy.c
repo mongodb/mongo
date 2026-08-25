@@ -456,20 +456,22 @@ __verify_one_checkpoint(
     /* Account for the root page in the accumulated total block size. */
     WT_ERR(__verify_disagg_accumulate_size(session, vs, ckpt->raw.data, ckpt->raw.size));
 
+    if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
+        __wt_verbose_warning(session, WT_VERB_VERIFY,
+          "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64, ckpt->size,
+          vs->total_block_size);
 #ifdef HAVE_DIAGNOSTIC
-    /* Validate the size of the btree. */
-    if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size)
         /*
-         * FIXME-WT-18038: We are seeing mismatches due to nuanced reconciliation issues, where
-         * bytes_total increments happen before the reconciliation panic boundary, leaving us in an
-         * inconsistent state if reconciliation fails after the increment but before completion.
-         * Only fail in diagnostic builds for now; enable this branch in production builds once this
-         * is resolved.
+         * FIXME-WT-18038: Mismatches can arise from the reconciliation panic boundary: bytes_total
+         * increments happen before the boundary, so a reconciliation that fails after the increment
+         * but before completion leaves the counter inconsistent. Fail in diagnostic builds so the
+         * drift is caught during testing; production builds only warn.
          */
         WT_ERR_MSG(session, WT_ERROR,
           "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64, ckpt->size,
           vs->total_block_size);
 #endif
+    }
 
     /*
      * The checkpoints are in time-order, so the last one in the list is the most recent. If this is

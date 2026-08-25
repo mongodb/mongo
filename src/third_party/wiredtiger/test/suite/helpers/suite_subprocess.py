@@ -42,6 +42,11 @@ class suite_subprocess:
     """
     maxbytes = 1 * 1024 ** 3
 
+    # The signal __wt_debug_crash raises, for callers to hand to assert_crashed. Windows has no
+    # SIGKILL: __wt_debug_crash aborts there instead, and assert_crashed does not compare the
+    # signal on that platform, so the fallback describes the abort without ever being used.
+    debug_crash_signal = getattr(signal, 'SIGKILL', signal.SIGABRT)
+
     def has_error_in_file(self, filename):
         """
         Return whether the file contains 'ERROR'.

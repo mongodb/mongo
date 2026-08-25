@@ -83,6 +83,19 @@ worker_record_open(const WORKLOAD_STATE *state, uint32_t thread_index)
 }
 
 /*
+ * schema_op_stall_report --
+ *     Report the frontier state a stalled schema operation is waiting on.
+ */
+static void
+schema_op_stall_report(WORKLOAD_STATE *state)
+{
+    println("Node %" PRIu32 ": stable %" PRIu64 ", frontier %" PRIu64, state->cfg->node_id,
+      query_ts(state->conn, TS_STABLE), __wt_atomic_load_uint64(&state->frontier_ts));
+    for (uint32_t t = 0; t < state->nth_workers; t++)
+        println("  worker %" PRIu32 ": %" PRIu64 " events queued", t, evq_depth(state, t));
+}
+
+/*
  * schema_op_execute --
  *     Execute one schema operation: create or drop the test's tables, on either role.
  */
@@ -112,6 +125,7 @@ schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT
             int err, sub_err;
             const char *err_msg;
             session->get_last_error(session, &err, &sub_err, &err_msg);
+            schema_op_stall_report(state);
             testutil_die(ETIMEDOUT, "node%" PRIu32 " %s %s %s: EBUSY for %d seconds: %s",
               state->cfg->node_id, state->leads ? "leader" : "follower",
               is_create ? "CREATE" : "DROP", ev->uri, MAX_OP_WAIT, err_msg);
@@ -177,15 +191,21 @@ insert_data(
 
 /*
  * worker_complete --
- *     Mark one timestamp fully completed by a worker: adopt it - only a consuming phase needs that,
- *     a generating one allocated it already - and publish the thread's completed frontier.
+ *     Mark one timestamp fully completed by a worker: adopt it and mark it in the completion
+ *     window.
  */
 static void
-worker_complete(WORKLOAD_STATE *state, uint32_t thread_index, uint64_t value)
+worker_complete(WORKLOAD_STATE *state, uint64_t value)
 {
     workload_counter_advance(state, value);
     (void)__wt_atomic_add_uint64(&state->applied, 1);
-    __wt_atomic_store_uint64(&state->workers[thread_index].completed_ts, value);
+
+    /* One writer per timestamp, so the mark needs no read-modify-write. */
+    const uint64_t frontier_ts = __wt_atomic_load_uint64(&state->frontier_ts);
+    testutil_assertfmt(value > frontier_ts && value - frontier_ts < FRONTIER_WINDOW,
+      "completed timestamp %" PRIu64 " outside the window above the frontier %" PRIu64, value,
+      frontier_ts);
+    __wt_atomic_store_uint8(&state->completed_ts[value % FRONTIER_WINDOW], 1);
 }
 
 /*
@@ -215,7 +235,7 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, const
         if (relay)
             (void)pipe_relay_event(state->cfg, ev);
         record_event_line(ctx->record_fp, ev);
-        worker_complete(state, thread_index, ev->event_ts);
+        worker_complete(state, ev->event_ts);
         break;
     case EVENT_CREATE:
     case EVENT_DROP:
@@ -231,7 +251,7 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, const
             (void)pipe_relay_event(state->cfg, ev);
         record_event_line(ctx->record_fp, ev);
         schema_op_publish(ctx->session, ev->uri, ev->event_ts);
-        worker_complete(state, thread_index, ev->event_ts);
+        worker_complete(state, ev->event_ts);
         break;
     case EVENT_NONE:
     case EVENT_STEPDOWN:

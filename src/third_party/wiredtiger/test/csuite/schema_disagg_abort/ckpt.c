@@ -72,6 +72,12 @@ ckpt_pick_up(WORKLOAD_STATE *state, WT_SESSION *session)
         return (false);
     }
 
+    /* Never adopt a checkpoint the node has not caught up with. */
+    if (__wt_atomic_load_uint64(&state->current_ts) < ckpt_args.checkpoint_timestamp) {
+        free(ckpt_args.checkpoint_metadata.mem);
+        return (false);
+    }
+
     struct timespec start;
     __wt_epoch(NULL, &start);
 
@@ -159,23 +165,23 @@ thread_ckpt_run(void *arg)
 }
 
 /*
- * workers_min --
- *     Return the minimum completed timestamp across all worker threads: the frontier with no
- *     unfinished publish or commit at or below it. Returns 0 if any worker has not yet completed an
- *     operation this phase.
+ * frontier_advance --
+ *     Advance the frontier over the timestamps the workers completed: the frontier with no
+ *     unfinished publish or commit at or below it. Only the timestamp thread may call it.
  */
 static uint64_t
-workers_min(WORKLOAD_STATE *state)
+frontier_advance(WORKLOAD_STATE *state)
 {
-    uint64_t min_val = UINT64_MAX;
-    for (uint32_t i = 0; i < state->nth_workers; i++) {
-        const uint64_t val = __wt_atomic_load_uint64(&state->workers[i].completed_ts);
-        if (val == 0)
-            return (0);
-        if (val < min_val)
-            min_val = val;
+    uint64_t frontier_ts = __wt_atomic_load_uint64(&state->frontier_ts);
+
+    while (__wt_atomic_load_uint8(&state->completed_ts[(frontier_ts + 1) % FRONTIER_WINDOW]) != 0) {
+        /* Consume the mark for this timestamp. */
+        __wt_atomic_store_uint8(&state->completed_ts[(frontier_ts + 1) % FRONTIER_WINDOW], 0);
+        ++frontier_ts;
     }
-    return (min_val);
+    __wt_atomic_store_uint64(&state->frontier_ts, frontier_ts);
+
+    return (frontier_ts);
 }
 
 /*
@@ -189,6 +195,9 @@ thread_ts_run(void *arg)
     WORKLOAD_STATE *state = arg;
 
     while (workload_active(state, STAGE_TS)) {
+        /* Frontier of the fully complete operations across all workers. */
+        const uint64_t frontier_ts = frontier_advance(state);
+
         /*
          * Setting timestamps is a critical section: the stable frontier must not advance while a
          * step-down is in progress.
@@ -199,12 +208,9 @@ thread_ts_run(void *arg)
              * The single frontier serves both schema and data operations: everything at or below it
              * is published and committed.
              */
-            const uint64_t frontier = workers_min(state);
-            if (frontier != 0) {
-                const uint64_t cur_stable = query_ts(state->conn, TS_STABLE);
-                if (frontier >= cur_stable)
-                    set_ts(state->conn, TS_FRONTIER, frontier);
-            }
+            const uint64_t stable_ts = query_ts(state->conn, TS_STABLE);
+            if (frontier_ts >= stable_ts)
+                set_ts(state->conn, TS_FRONTIER, frontier_ts);
         }
         __wt_atomic_store_bool(&state->ts_busy, false);
 

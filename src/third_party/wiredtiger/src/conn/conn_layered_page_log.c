@@ -591,7 +591,7 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
-    if (session->ckpt.crash_trigger_point == KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION)
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_KEY_PROVIDER_BEFORE_KEY_ROTATION)
         __wt_debug_crash(session);
 
     if (push_mode) {
@@ -633,7 +633,7 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     /* Write the encryption key data to disaggregated storage. */
     ret = __disagg_put_crypt_key(session, WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID, &crypt.keys, &lsn);
 
-    if (session->ckpt.crash_trigger_point == KEY_PROVIDER_CRASH_DURING_KEY_ROTATION)
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_KEY_PROVIDER_DURING_KEY_ROTATION)
         __wt_debug_crash(session);
 
     /* Callback to update key provider on the result of new encryption key data. */
@@ -657,7 +657,7 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     if (push_mode && ret == 0)
         __disagg_prune_pending_crypt_keys(session, ckpt_timestamp);
 
-    if (session->ckpt.crash_trigger_point == KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION)
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_KEY_PROVIDER_AFTER_KEY_ROTATION)
         __wt_debug_crash(session);
 done:
 err:

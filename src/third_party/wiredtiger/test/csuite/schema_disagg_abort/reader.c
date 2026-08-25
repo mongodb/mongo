@@ -15,18 +15,17 @@
 #include "schema_disagg_abort.h"
 
 /*
- * workers_timestamps_assert --
- *     Assert that no worker completed an event above the given timestamp.
+ * frontier_assert --
+ *     Assert the frontier has not passed a drained stream's final timestamp: nothing above it was
+ *     delivered, so nothing above it can be complete.
  */
 static void
-workers_timestamps_assert(WORKLOAD_STATE *state, uint64_t timestamp)
+frontier_assert(WORKLOAD_STATE *state, uint64_t timestamp)
 {
-    for (uint32_t t = 0; t < state->nth_workers; t++) {
-        const uint64_t completed = __wt_atomic_load_uint64(&state->workers[t].completed_ts);
-        testutil_assertfmt(completed <= timestamp,
-          "step-down: worker %" PRIu32 " completed %" PRIu64 " above the marker's %" PRIu64, t,
-          completed, timestamp);
-    }
+    const uint64_t frontier_ts = __wt_atomic_load_uint64(&state->frontier_ts);
+
+    testutil_assertfmt(frontier_ts <= timestamp,
+      "step-down: the frontier %" PRIu64 " passed the marker's %" PRIu64, frontier_ts, timestamp);
 }
 
 /*
@@ -104,7 +103,7 @@ thread_reader_run(void *arg)
              * step-down timestamp.
              */
             evq_drain_barrier(state);
-            workers_timestamps_assert(state, ev.event_ts);
+            frontier_assert(state, ev.event_ts);
             reader_step_down(state, ev.event_ts);
             break;
         case EVENT_SWITCH:
