@@ -26,7 +26,7 @@ struct SpecialArgRecord {
 };
 
 // clang-format off
-static constexpr std::array<SpecialArgRecord, 35> specials{{
+static constexpr auto specials = std::to_array<SpecialArgRecord>({
     //                                       /-isGenericArgument
     //                                       |  /-isGenericReply
     //                                       |  |  /-stripFromRequest
@@ -64,8 +64,7 @@ static constexpr std::array<SpecialArgRecord, 35> specials{{
     {"maxTimeMSOpOnly"sv,                   1, 0, 1, 0},
     {"$configTime"sv,                       1, 1, 1, 1},
     {"ok"sv,                                0, 1, 0, 0},
-    {"$topologyTime"sv,                     1, 1, 1, 1},
-    {"$traceCtx"sv,                         1, 0, 0, 0}}};
+    {"$topologyTime"sv,                     1, 1, 1, 1}});
 // clang-format on
 
 TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {

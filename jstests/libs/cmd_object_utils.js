@@ -22,7 +22,6 @@ export const kGenericArgFieldNames = [
     "$oplogQueryData",
     "$queryOptions",
     "$replData",
-    "$traceCtx",
     "databaseVersion",
     "help",
     "shardVersion",
