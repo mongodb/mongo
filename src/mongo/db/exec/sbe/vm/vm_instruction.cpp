@@ -1383,8 +1383,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto date = getMaybeOwnedFromStack(0);
 
         auto [owned, tag, val] =
-            dateTrunc(date.tag(), date.value(), unit, binSize, timezone, startOfWeek)
-                .releaseToRaw();
+            dateTrunc(date.view(), unit, binSize, timezone, startOfWeek).releaseToRaw();
 
         topStack(owned, tag, val);
     }

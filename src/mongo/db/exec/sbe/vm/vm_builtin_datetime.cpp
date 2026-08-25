@@ -176,19 +176,18 @@ value::TagValueMaybeOwned ByteCode::builtinDateFromStringNoThrow(ArityType arity
     }
 }
 
-value::TagValueMaybeOwned ByteCode::dateTrunc(value::TypeTags dateTag,
-                                              value::Value dateValue,
+value::TagValueMaybeOwned ByteCode::dateTrunc(value::TagValueView date,
                                               TimeUnit unit,
                                               int64_t binSize,
                                               TimeZone timezone,
                                               DayOfWeek startOfWeek) {
     // Get date.
-    if (!coercibleToDate(dateTag)) {
+    if (!coercibleToDate(date.tag)) {
         return value::TagValueMaybeOwned::nothing();
     }
-    auto date = getDate({dateTag, dateValue});
+    auto dateValue = getDate(date);
 
-    auto truncatedDate = truncateDate(date, unit, binSize, timezone, startOfWeek);
+    auto truncatedDate = truncateDate(dateValue, unit, binSize, timezone, startOfWeek);
     return value::TagValueMaybeOwned::date(truncatedDate.toMillisSinceEpoch());
 }
 
@@ -633,7 +632,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateTrunc(ArityType arity) {
     // Get date.
     auto dateView = viewFromStack(1);
 
-    return dateTrunc(dateView.tag, dateView.value, unit, binSize, timezone, startOfWeek);
+    return dateTrunc(dateView, unit, binSize, timezone, startOfWeek);
 }
 
 

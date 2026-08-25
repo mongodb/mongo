@@ -621,8 +621,7 @@ private:
     value::TagValueMaybeOwned genericISOWeek(value::TagValueView date, value::TagValueView tz);
     value::TagValueMaybeOwned genericNewKeyString(ArityType arity,
                                                   CollatorInterface* collator = nullptr);
-    value::TagValueMaybeOwned dateTrunc(value::TypeTags dateTag,
-                                        value::Value dateValue,
+    value::TagValueMaybeOwned dateTrunc(value::TagValueView date,
                                         TimeUnit unit,
                                         int64_t binSize,
                                         TimeZone timezone,
@@ -886,7 +885,7 @@ private:
      */
     value::TagValueMaybeOwned builtinCollArrayToSet(ArityType arity);
 
-    static MultiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
+    static MultiAccState getMultiAccState(value::TagValueView state);
 
     value::TagValueMaybeOwned builtinAggFirstNNeedsMoreInput(ArityType arity);
     value::TagValueMaybeOwned builtinAggFirstN(ArityType arity);
@@ -974,10 +973,7 @@ private:
     value::TagValueMaybeOwned builtinAggRemovableConcatArraysRemove(ArityType arity);
     value::TagValueMaybeOwned builtinAggRemovableConcatArraysFinalize(ArityType arity);
     template <int quantity>
-    void aggRemovableStdDevImpl(value::TypeTags stateTag,
-                                value::Value stateVal,
-                                value::TypeTags inputTag,
-                                value::Value inputVal);
+    void aggRemovableStdDevImpl(value::TagValueView state, value::TagValueView input);
     value::TagValueMaybeOwned builtinAggRemovableStdDevAdd(ArityType arity);
     value::TagValueMaybeOwned builtinAggRemovableStdDevRemove(ArityType arity);
     value::TagValueMaybeOwned builtinAggRemovableStdDevFinalize(ArityType arity, bool isSamp);
@@ -1424,12 +1420,9 @@ public:
 
 protected:
     template <TopBottomSense Sense>
-    static int32_t compare(value::TypeTags leftElemTag,
-                           value::Value leftElemVal,
-                           value::TypeTags rightElemTag,
-                           value::Value rightElemVal) {
+    static int32_t compare(value::TagValueView leftElem, value::TagValueView rightElem) {
         auto [cmpTag, cmpVal] =
-            value::compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal);
+            value::compareValue(leftElem.tag, leftElem.value, rightElem.tag, rightElem.value);
 
         if (cmpTag == value::TypeTags::NumberInt32) {
             int32_t cmp = value::bitcastTo<int32_t>(cmpVal);

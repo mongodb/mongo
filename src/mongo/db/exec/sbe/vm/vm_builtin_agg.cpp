@@ -355,7 +355,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstN(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     aggFirstN(state, array, maxSize, memUsage, memLimit, moveOwnedFromStack(1));
 
@@ -373,9 +373,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstNMerge(ArityType arity) {
           mergeMaxSize,
           mergeMemUsage,
           mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.tag(), mergeStateTagVal.value());
+          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
     auto [state, array, accStartIdx, accMaxSize, accMemUsage, accMemLimit, accIsGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
     uassert(7548604,
             "Two arrays to merge should have the same MaxSize component",
             accMaxSize == mergeMaxSize);
@@ -449,7 +449,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastN(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     auto fieldTagVal = moveOwnedFromStack(1);
     aggLastN(state, array, startIdx, maxSize, memUsage, memLimit, std::move(fieldTagVal));
@@ -468,9 +468,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastNMerge(ArityType arity) {
           mergeMaxSize,
           mergeMemUsage,
           mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.tag(), mergeStateTagVal.value());
+          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
     uassert(7548703,
             "Two arrays to merge should have the same MaxSize component",
             maxSize == mergeMaxSize);
@@ -499,7 +499,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastNFinalize(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
     auto [state, arr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
     if (startIdx == 0) {
         if (isGroupAccum) {
             auto out = state->swapAt(0, value::TypeTags::Null, 0);
@@ -602,10 +602,8 @@ protected:
 
         if (_sense == TopBottomSense::kTop) {
             for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto keyView = _bytecode->viewFromStack(_keysStartOffset + i);
-                auto itemTagVal = itemArray->getAt(i);
                 int32_t cmp = compare<TopBottomSense::kTop>(
-                    keyView.tag, keyView.value, itemTagVal.tag, itemTagVal.value);
+                    _bytecode->viewFromStack(_keysStartOffset + i), itemArray->getAt(i));
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
@@ -613,10 +611,8 @@ protected:
             }
         } else {
             for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto keyView = _bytecode->viewFromStack(_keysStartOffset + i);
-                auto itemTagVal = itemArray->getAt(i);
                 int32_t cmp = compare<TopBottomSense::kBottom>(
-                    keyView.tag, keyView.value, itemTagVal.tag, itemTagVal.value);
+                    _bytecode->viewFromStack(_keysStartOffset + i), itemArray->getAt(i));
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
@@ -670,7 +666,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNImpl(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     size_t numKeys = 1;
     bool keyIsDecomposed = false;
@@ -748,9 +744,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNMerge(ArityType arity) {
           mergeMaxSize,
           mergeMemUsage,
           mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.tag(), mergeStateTagVal.value());
+          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
     tassert(5807008,
             "Two arrays to merge should have the same MaxSize component",
             maxSize == mergeMaxSize);
@@ -783,7 +779,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNFinalize(ArityType arity
 
     auto stateTagVal = moveOwnedFromStack(0);
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     auto outputArrayTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto outputArray = value::getArrayView(outputArrayTagVal.value());
@@ -928,7 +924,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxN(ArityType arity) {
     }
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     CollatorInterface* collator = nullptr;
     if (arity == 3) {
@@ -960,9 +956,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxNMerge(ArityType arity) {
           mergeMaxSize,
           mergeMemUsage,
           mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.tag(), mergeStateTagVal.value());
+          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
     uassert(7548801,
             "Two arrays to merge should have the same MaxSize component",
             maxSize == mergeMaxSize);
@@ -999,7 +995,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxNFinalize(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.tag(), stateTagVal.value());
+        getMultiAccState(stateTagVal.view());
 
     CollatorInterface* collator = nullptr;
     if (arity == 2) {
@@ -1946,10 +1942,7 @@ std::tuple<value::Array*, value::Array*, value::Array*, value::Array*, int64_t> 
     return {state, sumX, sumY, cXY, count};
 }
 
-value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
-                                                   value::Value xVal,
-                                                   value::TypeTags yTag,
-                                                   value::Value yVal) {
+value::TagValueMaybeOwned covarianceCheckNonFinite(value::TagValueView x, value::TagValueView y) {
     int nanCnt = 0;
     int posCnt = 0;
     int negCnt = 0;
@@ -1976,8 +1969,8 @@ value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
             }
         }
     };
-    checkValue(xTag, xVal);
-    checkValue(yTag, yVal);
+    checkValue(x.tag, x.value);
+    checkValue(y.tag, y.value);
 
     if (nanCnt == 0 && posCnt == 0 && negCnt == 0) {
         return value::TagValueMaybeOwned::nothing();
@@ -2070,8 +2063,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceAdd(ArityType arity) {
     auto [state, sumXState, sumYState, cXYState, count] =
         covarianceState(stateTagVal.tag(), stateTagVal.value());
 
-    auto nonFiniteTagVal =
-        covarianceCheckNonFinite(xTagVal.tag(), xTagVal.value(), yTagVal.tag(), yTagVal.value());
+    auto nonFiniteTagVal = covarianceCheckNonFinite(xTagVal.view(), yTagVal.view());
     if (nonFiniteTagVal.tag() != value::TypeTags::Nothing) {
         aggRemovableSumImpl<1>(cXYState, nonFiniteTagVal.tag(), nonFiniteTagVal.value());
         return stateTagVal;
@@ -2217,8 +2209,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceRemove(ArityType arity) 
     auto [state, sumXState, sumYState, cXYState, count] =
         covarianceState(stateTagVal.tag(), stateTagVal.value());
 
-    auto nonFiniteTagVal =
-        covarianceCheckNonFinite(xTagVal.tag(), xTagVal.value(), yTagVal.tag(), yTagVal.value());
+    auto nonFiniteTagVal = covarianceCheckNonFinite(xTagVal.view(), yTagVal.view());
     if (nonFiniteTagVal.tag() != value::TypeTags::Nothing) {
         aggRemovableSumImpl<-1>(cXYState, nonFiniteTagVal.tag(), nonFiniteTagVal.value());
         return stateTagVal;
@@ -2553,38 +2544,36 @@ void updateRemovableStdDevState(value::Array* state, int64_t count, int64_t nonF
 }  // namespace
 
 template <int quantity>
-void ByteCode::aggRemovableStdDevImpl(value::TypeTags stateTag,
-                                      value::Value stateVal,
-                                      value::TypeTags inputTag,
-                                      value::Value inputVal) {
+void ByteCode::aggRemovableStdDevImpl(value::TagValueView state, value::TagValueView input) {
     static_assert(quantity == 1 || quantity == -1);
-    auto [state, sumState, m2State, count, nonFiniteCount] =
-        removableStdDevState(stateTag, stateVal);
-    if (!value::isNumber(inputTag)) {
+    auto [stateArray, sumState, m2State, count, nonFiniteCount] =
+        removableStdDevState(state.tag, state.value);
+    if (!value::isNumber(input.tag)) {
         return;
     }
-    if ((inputTag == value::TypeTags::NumberDouble &&
-         !std::isfinite(value::bitcastTo<double>(inputVal))) ||
-        (inputTag == value::TypeTags::NumberDecimal &&
-         !value::bitcastTo<Decimal128>(inputVal).isFinite())) {
+    if ((input.tag == value::TypeTags::NumberDouble &&
+         !std::isfinite(value::bitcastTo<double>(input.value))) ||
+        (input.tag == value::TypeTags::NumberDecimal &&
+         !value::bitcastTo<Decimal128>(input.value).isFinite())) {
         nonFiniteCount += quantity;
-        updateRemovableStdDevState(state, count, nonFiniteCount);
+        updateRemovableStdDevState(stateArray, count, nonFiniteCount);
         return;
     }
 
     if (count == 0) {
         // Assuming we are adding value if count == 0.
-        aggDoubleDoubleSumImpl(sumState, inputTag, inputVal);
-        updateRemovableStdDevState(state, ++count, nonFiniteCount);
+        aggDoubleDoubleSumImpl(sumState, input.tag, input.value);
+        updateRemovableStdDevState(stateArray, ++count, nonFiniteCount);
         return;
     } else if (count + quantity == 0) {
         genericResetDoubleDoubleSumState(sumState);
         genericResetDoubleDoubleSumState(m2State);
-        updateRemovableStdDevState(state, 0, 0);
+        updateRemovableStdDevState(stateArray, 0, 0);
         return;
     }
 
-    auto inputDouble = value::bitcastTo<double>(value::coerceToDouble(inputTag, inputVal).second);
+    auto inputDouble =
+        value::bitcastTo<double>(value::coerceToDouble(input.tag, input.value).second);
     auto sumTagVal = aggDoubleDoubleSumFinalizeImpl(sumState);
     double x = count * inputDouble -
         value::bitcastTo<double>(value::coerceToDouble(sumTagVal.tag(), sumTagVal.value()).second);
@@ -2596,7 +2585,7 @@ void ByteCode::aggRemovableStdDevImpl(value::TypeTags stateTag,
         m2State,
         value::TypeTags::NumberDouble,
         value::bitcastFrom<double>(x * x * quantity / (count * (count - quantity))));
-    updateRemovableStdDevState(state, count, nonFiniteCount);
+    updateRemovableStdDevState(stateArray, count, nonFiniteCount);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevAdd(ArityType arity) {
@@ -2618,7 +2607,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevAdd(ArityType arity
                              value::bitcastFrom<int64_t>(0));  // kNonFiniteCount
     }
 
-    aggRemovableStdDevImpl<1>(stateTagVal.tag(), stateTagVal.value(), input.tag, input.value);
+    aggRemovableStdDevImpl<1>(stateTagVal.view(), input);
 
     return stateTagVal;
 }
@@ -2627,7 +2616,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevRemove(ArityType ar
     auto stateTagVal = moveOwnedFromStack(0);
     auto input = viewFromStack(1);
 
-    aggRemovableStdDevImpl<-1>(stateTagVal.tag(), stateTagVal.value(), input.tag, input.value);
+    aggRemovableStdDevImpl<-1>(stateTagVal.view(), input);
 
     return stateTagVal;
 }

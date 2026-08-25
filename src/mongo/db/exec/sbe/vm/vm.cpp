@@ -684,53 +684,52 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
     return accumulatorStateTagVal;
 }
 
-ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
-                                                   value::Value stateVal) {
+ByteCode::MultiAccState ByteCode::getMultiAccState(value::TagValueView state) {
     uassert(
-        7548600, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
-    auto state = value::getArrayView(stateVal);
+        7548600, "The accumulator state should be an array", state.tag == value::TypeTags::Array);
+    auto stateArray = value::getArrayView(state.value);
 
     uassert(7548601,
             "The accumulator state should have correct number of elements",
-            state->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
+            stateArray->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
 
-    auto arrayTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    auto arrayTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
     uassert(7548602,
             "Internal array component is not of correct type",
             arrayTagVal.tag == value::TypeTags::Array);
     auto array = value::getArrayView(arrayTagVal.value);
 
-    auto startIndexTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
+    auto startIndexTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
     uassert(7548700,
             "Index component be a 64-bit integer",
             startIndexTagVal.tag == value::TypeTags::NumberInt64);
     int64_t startIndex = value::bitcastTo<int64_t>(startIndexTagVal.value);
 
-    auto maxSizeTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    auto maxSizeTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
     uassert(7548603,
             "MaxSize component should be a 64-bit integer",
             maxSizeTagVal.tag == value::TypeTags::NumberInt64);
     int64_t maxSize = value::bitcastTo<int64_t>(maxSizeTagVal.value);
 
-    auto memUsageTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
+    auto memUsageTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
     uassert(7548612,
             "MemUsage component should be a 32-bit integer",
             memUsageTagVal.tag == value::TypeTags::NumberInt32);
     int32_t memUsage = value::bitcastTo<int32_t>(memUsageTagVal.value);
 
-    auto memLimitTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
+    auto memLimitTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
     uassert(7548613,
             "MemLimit component should be a 32-bit integer",
             memLimitTagVal.tag == value::TypeTags::NumberInt32);
     auto memLimit = value::bitcastTo<int32_t>(memLimitTagVal.value);
 
-    auto isGroupAccumTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
+    auto isGroupAccumTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
     uassert(8070611,
             "IsGroupAccum component should be a boolean",
             isGroupAccumTagVal.tag == value::TypeTags::Boolean);
     auto isGroupAccum = value::bitcastTo<bool>(isGroupAccumTagVal.value);
 
-    return {state, array, startIndex, maxSize, memUsage, memLimit, isGroupAccum};
+    return {stateArray, array, startIndex, maxSize, memUsage, memLimit, isGroupAccum};
 }
 
 int32_t updateAndCheckMemUsage(

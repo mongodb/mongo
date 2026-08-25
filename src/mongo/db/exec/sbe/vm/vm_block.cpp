@@ -1066,7 +1066,7 @@ value::TagValueOwned ByteCode::blockNativeAggTopBottomNImpl(value::TagValueOwned
             valBlockView.tag == value::TypeTags::valueBlock);
     auto* valBlock = value::getValueBlock(valBlockView.value);
 
-    MultiAccState stateTuple = getMultiAccState(state.tag(), state.value());
+    MultiAccState stateTuple = getMultiAccState(state.view());
     auto [stateArray, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
     tassert(11093700, "maxSize must be greater than zero", maxSize > 0);
 
@@ -1199,10 +1199,8 @@ public:
 
         if (_sense == TopBottomSense::kTop) {
             for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto [keyTag, keyVal] = _keys[i][_blockIndex];
-                auto itemTagVal = itemArray->getAt(i);
                 int32_t cmp =
-                    compare<TopBottomSense::kTop>(keyTag, keyVal, itemTagVal.tag, itemTagVal.value);
+                    compare<TopBottomSense::kTop>(_keys[i][_blockIndex], itemArray->getAt(i));
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
@@ -1210,10 +1208,8 @@ public:
             }
         } else {
             for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto [keyTag, keyVal] = _keys[i][_blockIndex];
-                auto itemTagVal = itemArray->getAt(i);
-                int32_t cmp = compare<TopBottomSense::kBottom>(
-                    keyTag, keyVal, itemTagVal.tag, itemTagVal.value);
+                int32_t cmp =
+                    compare<TopBottomSense::kBottom>(_keys[i][_blockIndex], itemArray->getAt(i));
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
@@ -1307,7 +1303,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggTopBottomNImpl(ArityType arit
     }
 
     auto [stateArray, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(state.tag(), state.value());
+        getMultiAccState(state.view());
     tassert(11093703, "maxSize must be greater than zero", maxSize > 0);
 
     value::DeblockedTagVals bitset = bitsetBlock->extract();
