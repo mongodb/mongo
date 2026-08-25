@@ -7,6 +7,8 @@
  * query_intensive_pbt,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
+ * # TODO(SERVER-131815): Delete this tag when issue is fixed
+ * does_not_support_transactions,
  * # Tests a rewrite that was added in v9.0.
  * requires_fcv_90,
  * # Time series collections do not support indexing array values in measurement fields.
