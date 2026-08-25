@@ -1282,6 +1282,26 @@ functions:
 
   "scons compile":
   - *get_version_expansions
+  # Custom build hook (see etc/evergreen_yml_components/custom_builds/README.md):
+  # set_version_override.sh computes MONGO_VERSION_OVERRIDE from the variant's
+  # custom_build_version_suffix and regenerates the version expansions locally
+  # (writing an empty override file when unset, so the expansions.update below
+  # changes nothing). It lives in this shared function — not in
+  # archive_dist_test — so EVERY compile task of a custom build (package,
+  # archive_dist_test_debug, the dbtest compiles, ...) builds with the custom
+  # version; otherwise their binaries silently carry the standard patch/commit
+  # version.
+  - command: subprocess.exec
+    display_name: "set custom build version override (if configured)"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/set_version_override.sh"
+  - command: expansions.update
+    display_name: "apply custom build version override"
+    params:
+      file: src/custom_build_version.yml
   - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
@@ -2400,6 +2420,19 @@ tasks:
   depends_on:
   - name: compile_dist_test
   commands:
+  # Custom build hook (see etc/evergreen_yml_components/custom_builds/README.md).
+  # No-op on variants that do not configure a custom build: apply_patches.sh exits
+  # immediately when custom_build_patch_files is unset. The MONGO_VERSION_OVERRIDE
+  # hook lives in the shared "scons compile" function, so every compile task of a
+  # custom build (this one, package, the debug and dbtest compiles, ...) applies it
+  # from its own workdir.
+  - command: subprocess.exec
+    display_name: "apply custom build patches (if configured)"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/apply_patches.sh"
   - func: "scons compile"
     vars:
       targets: >-
@@ -6926,6 +6959,16 @@ tasks:
   - name: compile_dist_test
   commands:
   - *f_expansions_write
+  # No-op unless the variant sets custom_build_patch_files (see
+  # etc/evergreen_yml_components/custom_builds/README.md). Custom builds use this to
+  # patch the tree (including the packager scripts) before packaging.
+  - command: subprocess.exec
+    display_name: "apply custom build patches (if configured)"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/apply_patches.sh"
   - func: "scons compile"
     vars:
       targets: >-

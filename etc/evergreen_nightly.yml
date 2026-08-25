@@ -6,6 +6,8 @@ include:
 - filename: etc/evergreen_yml_components/tasks/release_tasks.yml
 - filename: etc/evergreen_yml_components/variants/atlas.yml
 - filename: etc/evergreen_yml_components/variants/misc_release.yml
+- filename: etc/evergreen_yml_components/custom_builds/tasks.yml
+- filename: etc/evergreen_yml_components/custom_builds/variants.yml
 ### Comment out when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/ibm.yml
 ### Uncomment when using this file for a LTS release branch. ###

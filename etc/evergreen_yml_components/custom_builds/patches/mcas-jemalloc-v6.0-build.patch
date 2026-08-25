@@ -1,0 +1,71 @@
+diff --git a/SConstruct b/SConstruct
+index dbe1391c7d9..36154177fec 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -338,7 +338,7 @@ add_option('sanitize-coverage',
+ )
+ 
+ add_option('allocator',
+-    choices=["auto", "system", "tcmalloc", "tcmalloc-experimental"],
++    choices=["auto", "system", "tcmalloc", "tcmalloc-experimental", "jemalloc"],
+     default=build_profile.allocator,
+     help='allocator to use (use "auto" for best choice for current platform)',
+     type='choice',
+@@ -1599,8 +1599,9 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
+ if get_option('allocator') == "auto":
+     # using an allocator besides system on android would require either fixing or disabling
+     # gperftools on android
+-    if env.TargetOSIs('windows') or \
+-       env.TargetOSIs('linux') and not env.TargetOSIs('android'):
++    if env.TargetOSIs('linux') and not env.TargetOSIs('android'):
++        env['MONGO_ALLOCATOR'] = "jemalloc"
++    elif env.TargetOSIs('windows'):
+         env['MONGO_ALLOCATOR'] = "tcmalloc"
+     else:
+         env['MONGO_ALLOCATOR'] = "system"
+@@ -4437,7 +4438,7 @@ def doConfigure(myenv):
+     if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
+         if use_system_version_of_library('tcmalloc'):
+             conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
+-    elif myenv['MONGO_ALLOCATOR'] in ['system', 'tcmalloc-experimental']:
++    elif myenv['MONGO_ALLOCATOR'] in ['system', 'tcmalloc-experimental', 'jemalloc']:
+         pass
+     else:
+         myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
+diff --git a/src/mongo/util/SConscript b/src/mongo/util/SConscript
+index 429b0dfcb42..644ecd372b9 100644
+--- a/src/mongo/util/SConscript
++++ b/src/mongo/util/SConscript
+@@ -370,6 +370,32 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
+         ],
+     )
+ 
++if env['MONGO_ALLOCATOR'] == 'jemalloc':
++    tcmspEnv = env.Clone()
++    tcmspEnv.Append(
++        CPPPATH=['#/src/third_party/jemalloc/dist/include'],
++        CCFLAGS=['-Wno-ignored-attributes'])
++    tcmspEnv.Library(
++        target='jemalloc_set_parameter',
++        source=[
++            'jemalloc_server_status_section.cpp',
++            'jemalloc_set_parameter.cpp',
++        ],
++        LIBDEPS=[
++            '$BUILD_DIR/mongo/db/commands/server_status',
++            '$BUILD_DIR/mongo/idl/server_parameter',
++            '$BUILD_DIR/mongo/transport/service_executor',
++            'processinfo',
++        ],
++        LIBDEPS_DEPENDENTS=[
++            '$BUILD_DIR/mongo/db/mongod_initializers',
++            '$BUILD_DIR/mongo/s/mongos_initializers',
++        ],
++        LIBDEPS_TAGS=[
++            'lint-allow-nonprivate-on-deps-dependents',
++        ],
++    )
++
+ env.Library(
+     target='winutil',
+     source=[

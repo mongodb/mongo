@@ -32,11 +32,12 @@ if [[ "${requester}" == "commit" ]]; then
 fi
 
 # Forcefully override the version for purposes of testing against a different version than the
-# branch is targeting.
+# branch is targeting (used by custom builds, see
+# etc/evergreen_yml_components/custom_builds/README.md).
 #
 # Artifacts from runs with this enabled still should not be used for a final (non-rc) public release
-# unless the associated `test_packages` task has completed successfully.
-if [[ -n "${MONGO_VERSION_OVERRIDE}" ]]; then
+# unless the associated packaging tests have completed successfully.
+if [ -n "${MONGO_VERSION_OVERRIDE:-}" ]; then
   MONGO_VERSION="${MONGO_VERSION_OVERRIDE}"
 fi
 

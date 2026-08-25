@@ -1,0 +1,79 @@
+# Custom build tasks. See etc/evergreen_yml_components/custom_builds/README.md for an
+# explanation of the custom build framework and the expansions used here.
+#
+# Custom builds do not define their own compile task: the custom build hooks in the
+# shared "scons compile" function and in the archive_dist_test/package tasks (patch
+# application and MONGO_VERSION_OVERRIDE handling, gated on the custom_build_*
+# expansions) make the standard compile tasks themselves produce the custom
+# artifacts. All of the standard test tasks depend on archive_dist_test, so the
+# binaries under test are the exact binaries being delivered. The task below only
+# picks up the resulting dist tarball (built and uploaded by the package task),
+# smoke-tests it, and delivers it to the consumer's S3 location.
+
+tasks:
+- name: custom_build_deliver
+  tags: ["assigned_to_jira_team_devprod_build"]
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  # prelude.sh (sourced by the helper scripts) requires the venv.
+  - func: "set up venv"
+  # prepare_upload.sh needs src_suffix (the branch path component of the delivery
+  # destination), which only exists in the generated version expansions — apply
+  # them before writing the task environment, as the release delivery tasks do.
+  - func: "get and apply version expansions"
+  - func: "f_expansions_write"
+  # The package task uploaded the dist tarball to the standard dist location in
+  # mciuploads (build_id is shared by all tasks of this variant's build).
+  - command: s3.get
+    display_name: "fetch custom build dist tarball"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+      local_file: dist-stripped.${ext|tgz}
+      bucket: mciuploads
+  - command: subprocess.exec
+    display_name: "verify custom build dist"
+    type: test
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/verify_dist.sh"
+      - "dist-stripped.${ext|tgz}"
+  # Deliver the tarball to the consumer's location. Patch builds are redirected to a
+  # patch-specific path by prepare_upload.sh so they never overwrite the artifact the
+  # consumer picks up.
+  - command: subprocess.exec
+    display_name: "prepare custom build upload"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/custom_builds/prepare_upload.sh"
+      - "dist-stripped.${ext|tgz}"
+  - command: expansions.update
+    display_name: "apply custom build upload expansions"
+    params:
+      file: custom_build_upload.yml
+  # Uses the aws_key_build/aws_secret_build project variables: the standard
+  # project credentials (aws_key/aws_secret) have no PutObject on
+  # mdb-build-private, which is managed with dedicated uploader credentials
+  # (the same pattern as the release uploads). The object is private; consumers
+  # download it via signed URLs.
+  - command: s3.put
+    display_name: "deliver custom build dist tarball"
+    type: test
+    params:
+      aws_key: ${aws_key_build}
+      aws_secret: ${aws_secret_build}
+      local_file: dist-stripped-custom.${ext|tgz}
+      remote_file: ${custom_build_upload_remote_file}
+      bucket: ${custom_build_upload_bucket}
+      permissions: private
+      visibility: signed
+      content_type: application/tar
+      display_name: Custom Build Dist Tarball

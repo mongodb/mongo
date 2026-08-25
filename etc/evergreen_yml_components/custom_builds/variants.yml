@@ -1,0 +1,99 @@
+# Custom build variants. See etc/evergreen_yml_components/custom_builds/README.md for
+# an explanation of the custom build framework and the expansions used here.
+#
+# The variants below produce the MCAS (Microsoft Defender for Cloud Apps, formerly
+# Adallom) jemalloc builds of 6.0 — community builds that link jemalloc instead of
+# tcmalloc, replacing the one-off hotfix process (previously SERVER-117900, where the
+# same change was committed directly on a hotfix branch and artifacts were copied to
+# S3 by hand). Each variant:
+# - applies the patches/mcas-jemalloc-v6.0-{third-party,build,server}.patch files
+#   (the vendored jemalloc, the SCons allocator wiring, and the bundled fixes
+#   MCAS receives) before compiling,
+# - builds with MONGO_VERSION_OVERRIDE=r6.0.29-mcas-jemalloc via the shared
+#   "scons compile" hook, so every binary carries the custom version,
+# - runs the standard compile/package task group plus a smoke set of test tasks
+#   (the test tasks depend on archive_dist_test, so they exercise the exact
+#   binaries being delivered),
+# - delivers the dist tarball to s3://mdb-build-private/mcas/version/... via
+#   custom_build_deliver (patch builds are redirected to custom-build-patches/).
+#
+# scons_cache_scope is "none" so jemalloc objects never enter the shared cache used
+# by the stock (tcmalloc) variants.
+
+buildvariants:
+- name: custom-build-mcas-jemalloc-ubuntu1804
+  display_name: "Custom Build: MCAS jemalloc Ubuntu 18.04 (x86_64)"
+  tags: []
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - release-ubuntu1804-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 6.0 version; bump when MCAS picks up a newer 6.0 release.
+    custom_build_base_version: "6.0.29"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-ubuntu1804
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    multiversion_platform: ubuntu1804
+    multiversion_edition: targeted
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer --enableEnterpriseTests=off
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-ubuntu1804-test
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - release-ubuntu1804-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common
+
+- name: custom-build-mcas-jemalloc-amazon2
+  display_name: "Custom Build: MCAS jemalloc Amazon Linux 2 (x86_64)"
+  tags: []
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - release-amazon2-test
+  expansions:
+    custom_build_version_suffix: mcas-jemalloc
+    # Latest released 6.0 version; bump when MCAS picks up a newer 6.0 release.
+    custom_build_base_version: "6.0.29"
+    custom_build_patch_files: etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-third-party.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-build.patch etc/evergreen_yml_components/custom_builds/patches/mcas-jemalloc-v6.0-server.patch
+    custom_build_upload_bucket: mdb-build-private
+    custom_build_upload_path_prefix: mcas/version
+    custom_build_verify_allocator: jemalloc
+    push_arch: x86_64-amazon2
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_latch_analyzer --enableEnterpriseTests=off
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    multiversion_platform: amazon2
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: none
+    large_distro_name: amazon2-latest-large
+  tasks:
+  - name: custom_build_deliver
+    distros:
+    - release-amazon2-test
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - release-amazon2-build
+  # Smoke set: this branch has no .development_critical/.release_critical selectors;
+  # aggregation + jscore broadly exercise the jemalloc-linked binaries.
+  - name: aggregation
+  - name: .jscore .common
