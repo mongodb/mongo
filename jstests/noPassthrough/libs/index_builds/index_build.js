@@ -735,6 +735,14 @@ export var IndexBuildTest = class {
     }
 };
 
+/**
+ * The resumable index build tests scan the restarted node's in-memory log for specific log IDs
+ * emitted while the build resumes. The log only retains the most recent `ramLogMaxLines` lines, so
+ * the lines the test is looking for can be evicted before it gets to them. Thus, we set
+ * `ramLogMaxLines` to a high value.
+ */
+const kRamLogMaxLines = 4096;
+
 export const ResumableIndexBuildTest = class {
     /**
      * Returns a version of the given array that has been flattened into one dimension.
@@ -1080,14 +1088,18 @@ export const ResumableIndexBuildTest = class {
 
         if (runBeforeStartup) runBeforeStartup();
 
-        const setParameter = {logComponentVerbosity: tojson({index: 1, storage: 1})};
+        const setParameter = {
+            logComponentVerbosity: tojson({index: 1, storage: 1}),
+            ramLogMaxLines: kRamLogMaxLines,
+        };
         if (failPointAfterStartup) {
             Object.extend(setParameter, {
                 ["failpoint." + failPointAfterStartup]: tojson({mode: "alwaysOn"}),
             });
         }
-        const defaultOptions = {noCleanData: true, setParameter: setParameter};
-        upg.start(conn, Object.assign(defaultOptions, options || {}));
+        const startOptions = Object.assign({noCleanData: true}, options || {});
+        startOptions.setParameter = Object.assign(setParameter, startOptions.setParameter || {});
+        upg.start(conn, startOptions);
         reconnect(conn);
         upg.waitForState(conn, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
@@ -1443,7 +1455,10 @@ export const ResumableIndexBuildTest = class {
         rst.stop(resumeNode);
         assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput(".*")));
 
-        rst.start(resumeNode, {noCleanData: true});
+        rst.start(resumeNode, {
+            noCleanData: true,
+            setParameter: {ramLogMaxLines: kRamLogMaxLines},
+        });
         reconnect(resumeNode);
         rst.waitForState(resumeNode, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
         otherNodeFp.off();
@@ -1572,7 +1587,11 @@ export const ResumableIndexBuildTest = class {
         );
 
         jsTest.log.info(`restarting ${hostType} (${nodeToCrash.host})`);
-        rst.start(nodeToCrash, {noCleanData: true}, /*restart*/ true);
+        rst.start(
+            nodeToCrash,
+            {noCleanData: true, setParameter: {ramLogMaxLines: kRamLogMaxLines}},
+            /*restart*/ true,
+        );
         reconnect(nodeToCrash);
 
         // Ensure that we resume or restart the index build as expected after node crash/restart.
@@ -1798,7 +1817,10 @@ export const ResumableIndexBuildTest = class {
 
         const checkLogIdAfterRestart = function (primary, id) {
             rst.stop(primary);
-            rst.start(primary, {noCleanData: true});
+            rst.start(primary, {
+                noCleanData: true,
+                setParameter: {ramLogMaxLines: kRamLogMaxLines},
+            });
             checkLog.containsJson(primary, id);
         };
 
@@ -1900,7 +1922,10 @@ export const ResumableIndexBuildTest = class {
 
         // Interrupting the resumed index build should make it restart from the beginning on next
         // server startup.
-        rst.start(primary, {noCleanData: true});
+        rst.start(primary, {
+            noCleanData: true,
+            setParameter: {ramLogMaxLines: kRamLogMaxLines},
+        });
         checkLog.containsJson(primary, 20660, {buildUUID: equalsBuildUUID});
 
         // Ensure that the index build was completed after it was restarted.
