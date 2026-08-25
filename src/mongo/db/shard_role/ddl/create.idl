@@ -198,6 +198,7 @@ commands:
                       action_type:
                           [remove, update, collStats, indexStats, planCacheRead]
                 - privilege: # Can be triggered by aggregation ($joinPlanCacheStats)
+                      agg_stage: joinPlanCacheStats
                       resource_pattern: database
                       action_type: planCacheRead
         reply_type: CreateCommandReply
