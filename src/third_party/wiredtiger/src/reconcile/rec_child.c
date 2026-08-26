@@ -199,6 +199,7 @@ __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
 {
     WT_DECL_RET;
     WT_PAGE_MODIFY *mod;
+    bool skipped_write;
 
     /* We may acquire a hazard pointer our caller must release. */
     cmsp->hazard = false;
@@ -308,10 +309,15 @@ __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
 
             /*
              * The child is potentially modified if the page's modify structure has been created. If
-             * the modify structure exists and the page has been reconciled, set that state.
+             * the modify structure exists and the page has been reconciled, set that state. A
+             * reconciliation that skipped the write is the exception: it leaves a result behind
+             * without replacing the on-disk image, so the child must still be evaluated as it was
+             * before instantiation.
              */
             mod = ref->page->modify;
-            if (mod != NULL && mod->rec_result != 0) {
+            skipped_write = mod != NULL && mod->rec_result == WT_PM_REC_REPLACE &&
+              mod->mod_replace.block_cookie == NULL;
+            if (mod != NULL && mod->rec_result != 0 && !skipped_write) {
                 cmsp->state = WTI_CHILD_MODIFIED;
                 goto done;
             }

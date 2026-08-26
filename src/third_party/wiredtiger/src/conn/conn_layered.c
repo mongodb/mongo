@@ -11,27 +11,141 @@
 static void __disagg_shared_metadata_queue_clear(WT_SESSION_IMPL *session);
 
 /*
+ * __layered_file_config_from_ingest --
+ *     Build a file configuration from the ingest constituent's metadata. Exclude the file ID and
+ *     checkpoint state because the stable constituent gets its own.
+ */
+static int
+__layered_file_config_from_ingest(
+  WT_SESSION_IMPL *session, const char *layered_cfg, char **file_cfgp)
+{
+    WT_DECL_RET;
+    char *ingest_meta = NULL;
+    *file_cfgp = NULL;
+
+    /* Determine the ingest URI. */
+    WT_DECL_ITEM(ingest_uri);
+    WT_ERR(__wt_scr_alloc(session, 0, &ingest_uri));
+
+    WT_CONFIG_ITEM cval;
+    WT_ERR(__wt_config_getones(session, layered_cfg, "ingest", &cval));
+    WT_ERR(__wt_buf_fmt(session, ingest_uri, "%.*s", (int)cval.len, cval.str));
+
+    /* Read the metadata for that ingest URI. */
+    WT_ERR(__wt_metadata_search(session, ingest_uri->data, &ingest_meta));
+
+    /* Use ingest metadata values where available and file configuration defaults otherwise. */
+    const char *cfg[3];
+    cfg[0] = WT_CONFIG_BASE(session, file_config);
+    cfg[1] = ingest_meta;
+    cfg[2] = NULL;
+    WT_ERR(__wt_config_collapse(session, cfg, file_cfgp));
+
+err:
+    __wt_free(session, ingest_meta);
+    __wt_scr_free(session, &ingest_uri);
+    return (ret);
+}
+
+/*
+ * __layered_stable_page_log_config --
+ *     Build the page log portion of the stable constituent's configuration.
+ */
+static int
+__layered_stable_page_log_config(
+  WT_SESSION_IMPL *session, const char *layered_cfg, char **page_log_cfgp)
+{
+    WT_DECL_RET;
+    *page_log_cfgp = NULL;
+
+    WT_DECL_ITEM(buf);
+    WT_ERR(__wt_scr_alloc(session, 0, &buf));
+
+    /*
+     * Read the page_log field from the layered metadata, if present.
+     *
+     * FIXME-WT-18475: page_log can be absent because table-level disaggregated settings replace
+     * connection-level settings. Remove the WT_NOTFOUND handling when this absence is resolved.
+     */
+    WT_CONFIG_ITEM cval;
+    WT_ERR_NOTFOUND_OK(
+      __wt_config_getones(session, layered_cfg, "disaggregated.page_log", &cval), true);
+
+    if (ret != 0 || cval.len == 0) {
+        /* Fall back to the connection's page log. */
+        const char *conn_page_log = S2C(session)->disaggregated_storage.page_log;
+        cval.str = conn_page_log == NULL ? "" : conn_page_log;
+        cval.len = strlen(cval.str);
+    }
+
+    /* Format the selected page log for the final configuration. */
+    WT_ERR(__wt_buf_fmt(session, buf, "disaggregated=(page_log=%.*s)", (int)cval.len, cval.str));
+    WT_ERR(__wt_strndup(session, buf->data, buf->size, page_log_cfgp));
+
+err:
+    __wt_scr_free(session, &buf);
+    return (ret);
+}
+
+/*
+ * __layered_stable_config_from_ingest --
+ *     Build the stable constituent's configuration by adding stable-specific settings to the file
+ *     configuration derived from the ingest constituent.
+ */
+static int
+__layered_stable_config_from_ingest(
+  WT_SESSION_IMPL *session, const char *layered_cfg, const char **stable_cfgp)
+{
+    WT_DECL_RET;
+    char *ingest_file_cfg = NULL, *page_log_cfg = NULL;
+    *stable_cfgp = NULL;
+
+    WT_ERR(__layered_file_config_from_ingest(session, layered_cfg, &ingest_file_cfg));
+    WT_ERR(__layered_stable_page_log_config(session, layered_cfg, &page_log_cfg));
+
+    /*
+     * Apply the stable constituent's settings. Merge nested fields so setting page_log preserves
+     * sibling settings such as storage_tier.
+     */
+    const char *cfg[4];
+    cfg[0] = ingest_file_cfg;
+    cfg[1] = "block_manager=disagg,in_memory=false,log=(enabled=false)";
+    cfg[2] = page_log_cfg;
+    cfg[3] = NULL;
+    WT_ERR(__wt_config_merge(session, cfg, NULL, stable_cfgp));
+
+err:
+    __wt_free(session, ingest_file_cfg);
+    __wt_free(session, page_log_cfg);
+    return (ret);
+}
+
+/*
  * __layered_create_missing_stable_table --
- *     Create a missing stable table from an existing layered table configuration.
+ *     Create a missing stable table, using the caller-provided configuration or deriving one from
+ *     the ingest constituent.
  */
 static int
 __layered_create_missing_stable_table(
-  WT_SESSION_IMPL *session, const char *uri, const char *layered_cfg)
+  WT_SESSION_IMPL *session, const char *uri, const char *layered_cfg, const char *stable_create_cfg)
 {
     WT_DECL_RET;
-    const char *constituent_cfg;
-    const char *stable_cfg[4] = {WT_CONFIG_BASE(session, table_meta), layered_cfg, NULL, NULL};
+    const char *config, *derived_config = NULL;
 
-    constituent_cfg = NULL;
+    config = stable_create_cfg;
 
-    /* Disable logging on the stable table so we have timestamps. */
-    stable_cfg[2] = "log=(enabled=false)";
+    /*
+     * Step-up without schema epochs clears the queue that carries stable_create_cfg. Derive the
+     * configuration from ingest metadata instead.
+     */
+    if (config == NULL) {
+        WT_RET(__layered_stable_config_from_ingest(session, layered_cfg, &derived_config));
+        config = derived_config; /* config now points to locally allocated memory. */
+    }
 
-    WT_ERR(__wt_config_merge(session, stable_cfg, NULL, &constituent_cfg));
-    WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_create(session, uri, constituent_cfg));
+    WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_create(session, uri, config));
+    __wt_free(session, derived_config);
 
-err:
-    __wt_free(session, constituent_cfg);
     return (ret);
 }
 
@@ -87,7 +201,7 @@ __layered_create_missing_stable_tables_legacy(WT_SESSION_IMPL *session)
          */
         if (ret == WT_NOTFOUND) {
             WT_ERR_MSG_CHK(session,
-              __layered_create_missing_stable_table(session, stable_uri, layered_cfg),
+              __layered_create_missing_stable_table(session, stable_uri, layered_cfg, NULL),
               "Failed to create missing stable table \"%s\" from \"%s\"", stable_uri, layered_cfg);
 
             /*
@@ -96,7 +210,7 @@ __layered_create_missing_stable_tables_legacy(WT_SESSION_IMPL *session)
              */
             WT_ERR(__wt_disagg_enqueue_metadata_operation(session, stable_uri,
               layered_uri + strlen("layered:"), WT_SHARED_METADATA_CREATE,
-              WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL));
+              WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL, NULL));
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Created missing stable table \"%s\" from \"%s\"", stable_uri, layered_uri);
         }
@@ -201,7 +315,8 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
 
         /* The table hasn't been dropped, so create it. */
         WT_ERR_MSG_CHK(session,
-          __layered_create_missing_stable_table(session, entry->stable_uri, entry->layered_value),
+          __layered_create_missing_stable_table(
+            session, entry->stable_uri, entry->layered_value, entry->stable_create_config),
           "Failed to create missing stable table \"%s\" with schema epoch %" PRIu64
           " from layered config \"%s\"",
           entry->stable_uri, entry->schema_epoch, entry->layered_value);
@@ -266,6 +381,7 @@ __disagg_shared_metadata_queue_free(WT_SESSION_IMPL *session, WT_DISAGG_METADATA
     __wt_free(session, (*entry)->layered_value);
     __wt_free(session, (*entry)->stable_value);
     __wt_free(session, (*entry)->table_value);
+    __wt_free(session, (*entry)->stable_create_config);
     __wt_free(session, *entry);
     *entry = NULL;
 }
@@ -321,12 +437,14 @@ err:
  * __wt_disagg_enqueue_metadata_operation --
  *     Enqueue a metadata operation for a given URI into the shared metadata table to be done at the
  *     next checkpoint. A caller that has already removed the local metadata passes the stable
- *     table's configuration in stable_value, since it can no longer be read from local metadata.
+ *     table's configuration in stable_value, since it can no longer be read from local metadata. A
+ *     caller creating a table passes the stable table's create configuration in
+ *     stable_create_config, so that step-up can recreate a missing stable constituent.
  */
 int
 __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *stable_uri,
   const char *table_name, WT_SHARED_METADATA_OP metadata_op, wt_timestamp_t schema_epoch,
-  bool deferred, const char *stable_value)
+  bool deferred, const char *stable_value, const char *stable_create_config)
 {
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
@@ -363,6 +481,8 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
         WT_ERR(__wt_strdup(session, stable_value, &entry->stable_value));
     else
         WT_ERR(__disagg_save_metadata(session, cursor, "", stable_uri, &entry->stable_value));
+    if (stable_create_config != NULL)
+        WT_ERR(__wt_strdup(session, stable_create_config, &entry->stable_create_config));
 
     /*
      * Schema operations (create, drop) start deferred: at the start of each checkpoint, while the
@@ -388,6 +508,8 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
       entry->table_value == NULL ? "<none>" : entry->table_value);
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  stable: %s",
       entry->stable_value == NULL ? "<none>" : entry->stable_value);
+    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  stable create config: %s",
+      entry->stable_create_config == NULL ? "<none>" : entry->stable_create_config);
 
     /* Cannot fail past this point. */
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);

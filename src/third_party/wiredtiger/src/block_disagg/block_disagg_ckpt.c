@@ -203,8 +203,8 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
          * they capture the checkpoint state of the stable table that was just checkpointed.
          */
         WT_SAVE_DHANDLE(session,
-          ret = __wt_disagg_enqueue_metadata_operation(
-            session, stable_uri, table_name, WT_SHARED_METADATA_UPDATE, schema_epoch, false, NULL));
+          ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, table_name,
+            WT_SHARED_METADATA_UPDATE, schema_epoch, false, NULL, NULL));
         WT_ERR(ret);
     }
 

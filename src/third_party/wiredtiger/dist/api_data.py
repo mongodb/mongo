@@ -2008,6 +2008,10 @@ methods = {
         Display the contents of in-memory pages as they are verified, using the application's
         message handler, intended for debugging''',
         type='boolean'),
+    Config('fix_btree_size', 'false', r'''
+        When set to true, verify overwrites the checkpoint metadata size with the size derived from
+        walking the tree if they differ''',
+        type='boolean'),
     Config('read_corrupt', 'false', r'''
         A mode that allows verify to continue reading after encountering a checksum error. It
         will skip past the corrupt block and continue with the verification process''',

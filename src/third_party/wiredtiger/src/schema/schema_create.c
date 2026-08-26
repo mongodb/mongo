@@ -1112,7 +1112,7 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
             WT_ERR(__wt_scr_alloc(session, 0, &tmp));
             WT_ERR(__wt_buf_fmt(session, tmp, "file:%s.wt_stable", tablename));
             WT_ERR(__wt_disagg_enqueue_metadata_operation(session, tmp->data, tablename,
-              WT_SHARED_METADATA_CREATE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL));
+              WT_SHARED_METADATA_CREATE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL, NULL));
         }
 
 err:
@@ -1203,6 +1203,10 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
       session, tmp, "ingest=\"%s\",stable=\"%s\",log=(enabled=false)", ingest_uri, stable_uri));
     layered_cfg[3] = tmp->data;
 
+    /*
+     * FIXME-WT-18475: the table-level disaggregated category replaces the connection-level
+     * category, so storage_tier removes page_log from the layered metadata.
+     */
     WT_ERR(__wt_config_collapse(session, layered_cfg, &tablecfg));
     WT_ERR(__wt_metadata_insert(session, uri, tablecfg));
 
@@ -1221,6 +1225,13 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     WT_ERR(__wt_schema_create(session, ingest_uri, constituent_cfg));
     __wt_free(session, constituent_cfg);
 
+    /* Build the stable constituent configuration for a later step-up. */
+    stable_cfg[1] = disagg_config->data;
+
+    /* Disable logging on the stable table to ensure we have timestamps. */
+    stable_cfg[3] = "log=(enabled=false)";
+    WT_ERR(__wt_config_merge(session, stable_cfg, NULL, &constituent_cfg));
+
     /*
      * Once the step-down timestamp is set, all writes go to the ingest constituent, so a stable
      * constituent would stay empty. Create the table in the follower shape instead, and the next
@@ -1231,13 +1242,7 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     step_down_ts = __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp);
     if (__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         if (step_down_ts == WT_TS_NONE) {
-            stable_cfg[1] = disagg_config->data;
-
-            /* Disable logging on the stable table to ensure we have timestamps. */
-            stable_cfg[3] = "log=(enabled=false)";
-            WT_ERR(__wt_config_merge(session, stable_cfg, NULL, &constituent_cfg));
             WT_ERR(__wt_schema_create(session, stable_uri, constituent_cfg));
-            __wt_free(session, constituent_cfg);
         } else {
             WT_STAT_CONN_INCR(session, disagg_step_down_window_creates);
             __wt_verbose_info(session, WT_VERB_LAYERED,
@@ -1253,7 +1258,7 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
      * of a table creation, it would result in doing extra work.
      */
     WT_ERR(__wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
-      WT_SHARED_METADATA_CREATE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL));
+      WT_SHARED_METADATA_CREATE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL, constituent_cfg));
 
 err:
     __wt_scr_free(session, &disagg_config);

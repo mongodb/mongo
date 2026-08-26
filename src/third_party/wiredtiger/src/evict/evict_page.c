@@ -784,6 +784,12 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             WT_ASSERT(session,
               ref->page->disagg_info == NULL || closing ||
                 __wt_materialization_check(session, ref->page->disagg_info->rec_lsn_max));
+            /*
+             * An instantiated page cannot reach here: a skipped write over unwritten changes leaves
+             * the page dirty, and eviction reconciles dirty pages, clearing the flag. WT_REF_DISK
+             * with live page-delete information would resurrect the truncated page.
+             */
+            WT_ASSERT(session, !mod->instantiated);
             __wt_page_modify_clear(session, ref->page);
             __wt_ref_out(session, ref);
             WT_REF_SET_STATE(ref, WT_REF_DISK);

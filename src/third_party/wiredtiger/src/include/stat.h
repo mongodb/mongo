@@ -584,6 +584,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_pages_already_in_urgent_queue;
     int64_t cache_eviction_blocked_prefetched;
     int64_t eviction_root_pages_skipped;
+    int64_t eviction_server_skip_trees_read_only;
     int64_t eviction_server_skip_history_store_pages_with_updates_during_checkpoint;
     int64_t eviction_server_skip_dirty_pages_during_checkpoint;
     int64_t eviction_server_skip_disagg_trees_checkpointed;
@@ -602,7 +603,6 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_trees_too_many_active_walks;
     int64_t eviction_server_skip_checkpointing_trees;
     int64_t eviction_server_skip_trees_stick_in_cache;
-    int64_t eviction_server_skip_trees_read_only;
     int64_t eviction_server_skip_trees_eviction_disabled;
     int64_t eviction_server_skip_trees_not_useful_before;
     int64_t eviction_server_slept;

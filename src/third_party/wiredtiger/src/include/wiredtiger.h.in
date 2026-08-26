@@ -1607,6 +1607,9 @@ struct __wt_session {
      * @config{dump_tree_shape, Display the btree shapes as they are verified\, using the
      * application's message handler\, intended for debugging; requires optional support from the
      * block manager., a boolean flag; default \c false.}
+     * @config{fix_btree_size, When set to true\, verify overwrites the checkpoint metadata size
+     * with the size derived from walking the tree if they differ., a boolean flag; default \c
+     * false.}
      * @config{read_corrupt, A mode that allows verify to continue reading after encountering a
      * checksum error.  It will skip past the corrupt block and continue with the verification
      * process., a boolean flag; default \c false.}
@@ -6870,76 +6873,76 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: eviction server skipped the root pages */
 #define	WT_STAT_CONN_EVICTION_ROOT_PAGES_SKIPPED	1157
 /*!
+ * cache: eviction server skips checkpointed stable btrees on followers
+ * when not looking for clean pages
+ */
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_READ_ONLY	1158
+/*!
  * cache: eviction server skips clean history store pages with updates
  * when a precise checkpoint is in progress
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_HISTORY_STORE_PAGES_WITH_UPDATES_DURING_CHECKPOINT	1158
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_HISTORY_STORE_PAGES_WITH_UPDATES_DURING_CHECKPOINT	1159
 /*! cache: eviction server skips dirty pages during a running checkpoint */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_DIRTY_PAGES_DURING_CHECKPOINT	1159
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_DIRTY_PAGES_DURING_CHECKPOINT	1160
 /*!
  * cache: eviction server skips disaggregated trees already visited by
  * the ongoing checkpoint
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_DISAGG_TREES_CHECKPOINTED	1160
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_DISAGG_TREES_CHECKPOINTED	1161
 /*! cache: eviction server skips ingest btrees in disagg */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_INGEST_TREES	1161
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_INGEST_TREES	1162
 /*! cache: eviction server skips internal pages as it has an active child */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_INTL_PAGE_WITH_ACTIVE_CHILD	1162
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_INTL_PAGE_WITH_ACTIVE_CHILD	1163
 /*! cache: eviction server skips metadata pages with history */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_METATDATA_WITH_HISTORY	1163
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_METATDATA_WITH_HISTORY	1164
 /*!
  * cache: eviction server skips pages on an outdated disaggregated read-
  * only btree that a reader still has open
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_STALE_DISAGG_PAGES	1164
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_STALE_DISAGG_PAGES	1165
 /*!
  * cache: eviction server skips pages that are written with transactions
  * greater than the checkpoint timestamp
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_CHECKPOINT_TIMESTAMP	1165
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_CHECKPOINT_TIMESTAMP	1166
 /*!
  * cache: eviction server skips pages that are written with transactions
  * greater than the last running
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_LAST_RUNNING	1166
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_LAST_RUNNING	1167
 /*!
  * cache: eviction server skips pages that are written with transactions
  * greater than the prune timestamp
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_PRUNE_TIMESTAMP	1167
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_PRUNE_TIMESTAMP	1168
 /*!
  * cache: eviction server skips pages that have been reconciled
  * previously at the same prune timestamp
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_PRUNE_TIMESTAMP_NOT_MOVE	1168
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_PRUNE_TIMESTAMP_NOT_MOVE	1169
 /*!
  * cache: eviction server skips pages that previously failed eviction and
  * likely will again
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_RETRY	1169
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_PAGES_RETRY	1170
 /*! cache: eviction server skips pages that we do not want to evict */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_UNWANTED_PAGES	1170
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_UNWANTED_PAGES	1171
 /*! cache: eviction server skips stable btrees in disagg */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_STABLE_TREES	1171
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_STABLE_TREES	1172
 /*! cache: eviction server skips tree that we do not want to evict */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_UNWANTED_TREE	1172
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_UNWANTED_TREE	1173
 /*!
  * cache: eviction server skips trees because there are too many active
  * walks
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_TOO_MANY_ACTIVE_WALKS	1173
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_TOO_MANY_ACTIVE_WALKS	1174
 /*! cache: eviction server skips trees that are being checkpointed */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_CHECKPOINTING_TREES	1174
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_CHECKPOINTING_TREES	1175
 /*!
  * cache: eviction server skips trees that are configured to stick in
  * cache
  */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_STICK_IN_CACHE	1175
-/*!
- * cache: eviction server skips trees that are read-only if it is not
- * looking for clean pages
- */
-#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_READ_ONLY	1176
+#define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_STICK_IN_CACHE	1176
 /*! cache: eviction server skips trees that disable eviction */
 #define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_EVICTION_DISABLED	1177
 /*! cache: eviction server skips trees that were not useful before */

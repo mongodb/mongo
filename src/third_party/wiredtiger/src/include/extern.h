@@ -601,7 +601,8 @@ extern int __wt_disagg_config_get_role(WT_SESSION_IMPL *session, const char **cf
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *stable_uri,
   const char *table_name, WT_SHARED_METADATA_OP metadata_op, wt_timestamp_t schema_epoch,
-  bool deferred, const char *stable_value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool deferred, const char *stable_value, const char *stable_create_config)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_disagg_get_database_size(WT_SESSION_IMPL *session, uint64_t *sizep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_disagg_parse_meta(WT_SESSION_IMPL *session, const WT_ITEM *meta_buf,

@@ -282,7 +282,7 @@ __drop_layered(
      */
     WT_SAVE_DHANDLE(session,
       ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
-        WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL));
+        WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL, NULL));
     WT_ERR(ret);
 
 err:

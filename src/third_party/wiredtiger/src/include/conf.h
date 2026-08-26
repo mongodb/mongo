@@ -178,7 +178,7 @@ WT_CONF_API_DECLARE(WT_SESSION, reconfigure, 3, 9);
 WT_CONF_API_DECLARE(WT_SESSION, rollback_transaction, 1, 2);
 WT_CONF_API_DECLARE(WT_SESSION, salvage, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, timestamp_transaction, 1, 5);
-WT_CONF_API_DECLARE(WT_SESSION, verify, 1, 13);
+WT_CONF_API_DECLARE(WT_SESSION, verify, 1, 14);
 WT_CONF_API_DECLARE(colgroup, meta, 2, 12);
 WT_CONF_API_DECLARE(file, config, 6, 60);
 WT_CONF_API_DECLARE(file, meta, 7, 70);

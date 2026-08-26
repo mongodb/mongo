@@ -37,6 +37,11 @@ typedef struct {
     bool read_corrupt;
     bool skip_per_key_hs;
 
+    /* When set, overwrite the checkpoint metadata size with the derived size on mismatch. */
+    bool fix_btree_size;
+    /* Set when any checkpoint's size has been corrected, so the metadata is written back. */
+    bool size_fixed;
+
     /* History store cursor for the per-key checks. */
     WT_CURSOR *hs_cursor;
 
@@ -106,6 +111,16 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 
     WT_RET(__wt_config_gets(session, cfg, "skip_per_key_hs", &cval));
     vs->skip_per_key_hs = cval.val != 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "fix_btree_size", &cval));
+    vs->fix_btree_size = cval.val != 0;
+    if (vs->fix_btree_size) {
+        if (F_ISSET(S2C(session), WT_CONN_READONLY))
+            WT_RET_MSG(session, ENOTSUP, "fix_btree_size requires a writable connection");
+        if (!__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
+            WT_RET_MSG(
+              session, ENOTSUP, "fix_btree_size requires a disaggregated leader connection");
+    }
 
     WT_RET(__wt_config_gets(session, cfg, "stable_timestamp", &cval));
     vs->stable_timestamp = WT_TS_NONE; /* Ignored unless a value has been set */
@@ -457,20 +472,30 @@ __verify_one_checkpoint(
     WT_ERR(__verify_disagg_accumulate_size(session, vs, ckpt->raw.data, ckpt->raw.size));
 
     if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
-        __wt_verbose_warning(session, WT_VERB_VERIFY,
-          "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64, ckpt->size,
-          vs->total_block_size);
+
+        if (vs->fix_btree_size) {
+            __wt_verbose_notice(session, WT_VERB_VERIFY,
+              "checkpoint %s: size mismatch detected, correcting checkpoint size from "
+              "%" PRIu64 " to %" PRIu64,
+              ckpt->name, ckpt->size, vs->total_block_size);
+            ckpt->size = vs->total_block_size;
+            vs->size_fixed = true;
+        } else {
+            __wt_verbose_warning(session, WT_VERB_VERIFY,
+              "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
+              ckpt->size, vs->total_block_size);
 #ifdef HAVE_DIAGNOSTIC
-        /*
-         * FIXME-WT-18038: Mismatches can arise from the reconciliation panic boundary: bytes_total
-         * increments happen before the boundary, so a reconciliation that fails after the increment
-         * but before completion leaves the counter inconsistent. Fail in diagnostic builds so the
-         * drift is caught during testing; production builds only warn.
-         */
-        WT_ERR_MSG(session, WT_ERROR,
-          "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64, ckpt->size,
-          vs->total_block_size);
+            /*
+             * FIXME-WT-18038: Mismatches can arise from the reconciliation panic boundary:
+             * bytes_total increments happen before the boundary, so a reconciliation that fails
+             * after the increment but before completion leaves the counter inconsistent. Fail in
+             * diagnostic builds so the drift is caught during testing; production builds only warn.
+             */
+            WT_ERR_MSG(session, WT_ERROR,
+              "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
+              ckpt->size, vs->total_block_size);
 #endif
+        }
     }
 
     /*
@@ -635,6 +660,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         if (vs->dump_layout)
             WT_ERR(__dump_layout(session, vs));
     }
+
+    /*
+     * If any checkpoint's size was corrected, write the updated checkpoint list back to the
+     * metadata.
+     */
+    if (vs->size_fixed)
+        WT_ERR(__wt_meta_ckptlist_set(session, session->dhandle, ckptbase, NULL));
 
 done:
 err:
