@@ -14,6 +14,7 @@
  * ]
  */
 
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
@@ -70,41 +71,68 @@ st.s
     ])
     .toArray();
 
-const lsid = {id: UUID()};
-const txnNumber = NumberLong(1);
 const mongosDB = st.s.getDB(dbName);
 
+// A shard that sub-routes inside a transaction cannot refresh stale routing info, because that
+// needs locks it may not take mid-transaction; it aborts the transaction with
+// ShardCannotRefreshDueToLocksHeld, a TransientTransactionError. Both transactions below are
+// therefore wrapped in withRetryOnTransientTxnError, which reruns the whole transaction on a
+// transient error. This test uses a fresh session for each attempt, so no explicit cleanup is needed.
 jsTest.log(
-    "Step 1: insert {_id: 'X'} into local (shard0); mongos has shard0 in its participant map but has not contacted shard1.",
+    "Steps 1-3: insert into local (shard0), $lookup so shard0 sub-routes to shard1 as a brand-new participant, then commit.",
 );
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: localColl,
-        documents: [{_id: "X", key: "K"}],
-        lsid: lsid,
-        txnNumber: txnNumber,
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }),
-);
+let aggRes;
+withRetryOnTransientTxnError(() => {
+    const lsid = {id: UUID()};
+    const txnNumber = NumberLong(1);
 
-jsTest.log(
-    "Step 2: aggregate with $lookup: shard0 sub-routes to shard1 (a brand-new participant); mongos records its term on first observation.",
-);
-const aggRes = assert.commandWorked(
-    mongosDB.runCommand({
-        aggregate: localColl,
-        pipeline: [
-            {$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}},
-        ],
-        cursor: {},
-        lsid: lsid,
-        txnNumber: txnNumber,
-        stmtId: NumberInt(1),
-        autocommit: false,
-    }),
-);
+    // mongos has shard0 in its participant map but has not contacted shard1 yet.
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: localColl,
+            documents: [{_id: "X", key: "K"}],
+            lsid: lsid,
+            txnNumber: txnNumber,
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+
+    // shard1 is a brand-new participant here, so mongos records its term on first observation.
+    aggRes = assert.commandWorked(
+        mongosDB.runCommand({
+            aggregate: localColl,
+            pipeline: [
+                {
+                    $lookup: {
+                        from: foreignColl,
+                        localField: "key",
+                        foreignField: "_id",
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
+            lsid: lsid,
+            txnNumber: txnNumber,
+            stmtId: NumberInt(1),
+            autocommit: false,
+        }),
+    );
+
+    // Commit must succeed: no participant primary changed, so the sub-router join is legitimate.
+    const commitRes = assert.commandWorked(
+        st.s.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
+    );
+    jsTest.log.info("commit response", {commitRes});
+});
+
 jsTest.log.info("aggregate succeeded", {firstBatch: aggRes.cursor.firstBatch});
 // local holds the pre-populated {_id:1} plus the in-txn {_id:"X"} insert, so the snapshot-read
 // aggregate returns both, each with the foreign document joined in.
@@ -113,19 +141,6 @@ for (const doc of aggRes.cursor.firstBatch) {
     assert.eq("K", doc.key);
     assert.eq(1, doc.joined.length, "expected the $lookup to find a match on shard1");
 }
-
-jsTest.log(
-    "Step 3: commit must succeed: no participant primary changed, so the brand-new sub-router join is legitimate.",
-);
-const commitRes = assert.commandWorked(
-    st.s.adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: txnNumber,
-        autocommit: false,
-    }),
-);
-jsTest.log.info("commit response", {commitRes});
 
 jsTest.log("Step 4: verify both inserts persisted.");
 const localDocs = st.s.getDB(dbName)[localColl].find({_id: "X"}).toArray();
@@ -141,40 +156,50 @@ checkLog.containsJson(st.s, 12812800, {shardId: st.shard1.shardName});
 jsTest.log(
     "Step 6: drive a second transaction; the participant primaries are unchanged, so it also commits.",
 );
-const lsid2 = {id: UUID()};
-const txnNumber2 = NumberLong(1);
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: localColl,
-        documents: [{_id: "X2", key: "K"}],
-        lsid: lsid2,
-        txnNumber: txnNumber2,
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }),
-);
-assert.commandWorked(
-    mongosDB.runCommand({
-        aggregate: localColl,
-        pipeline: [
-            {$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}},
-        ],
-        cursor: {},
-        lsid: lsid2,
-        txnNumber: txnNumber2,
-        stmtId: NumberInt(1),
-        autocommit: false,
-    }),
-);
-assert.commandWorked(
-    st.s.adminCommand({
-        commitTransaction: 1,
-        lsid: lsid2,
-        txnNumber: txnNumber2,
-        autocommit: false,
-    }),
-);
+withRetryOnTransientTxnError(() => {
+    const lsid2 = {id: UUID()};
+    const txnNumber2 = NumberLong(1);
+
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: localColl,
+            documents: [{_id: "X2", key: "K"}],
+            lsid: lsid2,
+            txnNumber: txnNumber2,
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        mongosDB.runCommand({
+            aggregate: localColl,
+            pipeline: [
+                {
+                    $lookup: {
+                        from: foreignColl,
+                        localField: "key",
+                        foreignField: "_id",
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
+            lsid: lsid2,
+            txnNumber: txnNumber2,
+            stmtId: NumberInt(1),
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid2,
+            txnNumber: txnNumber2,
+            autocommit: false,
+        }),
+    );
+});
 
 const localDocs2 = st.s.getDB(dbName)[localColl].find({_id: "X2"}).toArray();
 assert.eq(1, localDocs2.length, "X2 must be present in local on shard0 after the 2nd commit");
