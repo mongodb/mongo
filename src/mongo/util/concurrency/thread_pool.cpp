@@ -104,6 +104,11 @@ public:
         return _joinedThreadsCount.loadRelaxed();
     }
 
+    bool hasUnjoinedRetiredThreads_forTest() const {
+        std::unique_lock lk(_mutex);
+        return !_retiredThreads.empty();
+    }
+
 private:
     /**
      * Representation of the stage of life of a thread pool.
@@ -699,6 +704,10 @@ void ThreadPool::setMaxThreads(size_t maxThreads) {
 
 uint64_t ThreadPool::joinedThreadsCount_forTest() const {
     return _impl->joinedThreadsCount_forTest();
+}
+
+bool ThreadPool::hasUnjoinedRetiredThreads_forTest() const {
+    return _impl->hasUnjoinedRetiredThreads_forTest();
 }
 
 }  // namespace mongo

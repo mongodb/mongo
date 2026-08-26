@@ -14,11 +14,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
 
 #include <cstddef>
 #include <functional>
@@ -96,16 +96,6 @@ protected:
         return *_pool;
     }
 
-    void waitForReapTo(ThreadPool& pool, size_t upperBound) {
-        Timer reapTimer;
-        while (pool.getStats().numThreads > upperBound) {
-            Microseconds elapsed{reapTimer.micros()};
-            ASSERT_LT(elapsed, Seconds{5})
-                << fmt::format("Failed to reap excess threads after {}", elapsed);
-            sleepFor(Milliseconds{50});
-        }
-    }
-
     auto blockingWorkCallback(boost::optional<int> taskNumber = {}) {
         return [&, taskNumber](auto status) {
             ASSERT_OK(status) << (taskNumber ? std::to_string(*taskNumber) : std::string{});
@@ -123,7 +113,74 @@ protected:
         return _retiredNow - _retiredStart;
     }
 
+    /** Default timeout. This is not a perf test, so use loose bounds. */
+    static constexpr Milliseconds defaultTimeout() {
+        return Seconds(30);
+    }
+
+    void pollForMinActiveThreads(const ThreadPool& pool,
+                                 const ThreadPool::Options& options,
+                                 Milliseconds timeoutMs = defaultTimeout()) const {
+        ASSERT_LT(options.maxIdleThreadAge, timeoutMs);
+        SCOPED_TRACE("waiting for min active threads");
+
+        _pollUntil([&] { return pool.getStats().numThreads == options.minThreads; },
+                   Milliseconds{1},
+                   timeoutMs);
+    }
+
+    void pollForRetiredThreadJoins(const ThreadPool& pool,
+                                   const ThreadPool::Options& options,
+                                   Milliseconds timeoutMs = defaultTimeout()) const {
+
+        ASSERT_LT(options.maxIdleThreadAge, timeoutMs);
+        SCOPED_TRACE("waiting for retired thread joins");
+        _pollUntil(
+            [&] { return !pool.hasUnjoinedRetiredThreads_forTest(); }, Milliseconds{1}, timeoutMs);
+    }
+
+    ThreadPool::Stats pollForNoPendingTasks(const ThreadPool& pool,
+                                            Milliseconds timeoutMs = defaultTimeout()) const {
+        SCOPED_TRACE("waiting for no pending tasks");
+        ThreadPool::Stats stats{};
+        _pollUntil(
+            [&] {
+                stats = pool.getStats();
+                return stats.numPendingTasks == 0;
+            },
+            Milliseconds{10},
+            timeoutMs);
+        return stats;
+    }
+
+    void pollForThreads(const ThreadPool& pool, Milliseconds timeoutMs = defaultTimeout()) const {
+        SCOPED_TRACE("waiting for threads");
+        _pollUntil([&] { return pool.getStats().numThreads != 0; }, Milliseconds{50}, timeoutMs);
+    }
+
 private:
+    /**
+     * Poll for `condition` to be true at rate of `interval` with timeout `timeout`.
+     *
+     * Checks the condition before the timeout. This means it's possible for the condition to be
+     * true after the timeout, which would pass. This is sufficient for test purposes.
+     */
+    void _pollUntil(unique_function<bool()> condition,
+                    Milliseconds interval,
+                    Milliseconds timeout) const {
+        ASSERT_LT(interval, timeout);
+
+        Date_t now = Date_t::now();
+        const Date_t deadline = now + timeout;
+        while (!condition() && now < deadline) {
+            sleepFor(interval);
+            now = Date_t::now();
+        }
+
+        ASSERT_LT(now, deadline) << fmt::format("Timeout exceeded ({}ms) waiting for condition",
+                                                timeout);
+    }
+
     boost::optional<ThreadPool> _pool;
     BlockingWorkControl _blockingWorkControl;
 
@@ -153,7 +210,7 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     }
 
     blockingWorkControl().unblock();
-    waitForReapTo(pool, 0);
+    pollForMinActiveThreads(pool, options);
 
     blockingWorkControl().block();
     // This one additional task will start on the one available thread.
@@ -167,7 +224,7 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     }
 
     blockingWorkControl().unblock();
-    waitForReapTo(pool, 0);
+    pollForMinActiveThreads(pool, options);
     {
         auto stats = pool.getStats();
         ASSERT_EQ(stats.numThreads, 0);
@@ -188,7 +245,7 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
         pool.schedule(blockingWorkCallback(i));
     ASSERT_EQ(blockingWorkControl().pauseUntilWorkStartedCountAtLeast(options.maxThreads),
               options.maxThreads);
-    sleepFor(Milliseconds(100));
+    sleepFor(options.maxIdleThreadAge);
     {
         auto stats = pool.getStats();
         ASSERT_EQ(stats.numThreads, options.maxThreads);
@@ -199,7 +256,7 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
     blockingWorkControl().unblock();
     blockingWorkControl().pauseUntilWorkStartedCountAtLeast(options.maxThreads + extra);
     ASSERT_EQ(pool.getStats().numPendingTasks, 0);
-    waitForReapTo(pool, options.minThreads);
+    pollForMinActiveThreads(pool, options);
 }
 
 DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
@@ -223,9 +280,7 @@ DEATH_TEST_REGEX_F(
 TEST_F(ThreadPoolTest, LivePoolCleanedByDestructor) {
     auto& pool = makePool({});
     pool.startup();
-    while (pool.getStats().numThreads == 0) {
-        sleepFor(Milliseconds{50});
-    }
+    pollForThreads(pool);
     // Destructor should reap leftover threads.
 }
 
@@ -265,10 +320,7 @@ DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
             t.join();
         }
     };
-    ThreadPool::Stats stats;
-    while ((stats = pool.getStats()).numPendingTasks != 0) {
-        sleepFor(Milliseconds{10});
-    }
+    const ThreadPool::Stats stats = pollForNoPendingTasks(pool);
     // Accounts for cleanup and regular worker thread.
     ASSERT_EQ(stats.numThreads, 2);
     ASSERT_EQ(stats.numIdleThreads, 0);
@@ -304,7 +356,7 @@ TEST_F(ThreadPoolTest, JoinAllRetiredThreads) {
     unittest::Barrier barrier(options.maxThreads + 1);
 
     auto& pool = makePool(options);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -314,9 +366,7 @@ TEST_F(ThreadPoolTest, JoinAllRetiredThreads) {
     pool.startup();
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
+    pollForMinActiveThreads(pool, options);
 
     pool.shutdown();
     pool.join();
@@ -371,7 +421,7 @@ TEST_F(ThreadPoolTest, ModifyMinThreads) {
     unittest::Barrier barrier(options.maxThreads + 1);
 
     auto& pool = makePool(options);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -381,19 +431,17 @@ TEST_F(ThreadPoolTest, ModifyMinThreads) {
     pool.startup();
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
+    pollForMinActiveThreads(pool, options);
     ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
-    sleepFor(Milliseconds{100});
+
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - options.minThreads);
 
     // Modify to lower value
     // barrier was reset when counter reached 0
     const size_t newMinThreads = 2;
     pool.setMinThreads(newMinThreads);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -401,19 +449,18 @@ TEST_F(ThreadPoolTest, ModifyMinThreads) {
     }
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > newMinThreads) {
-        sleepFor(Microseconds{1});
-    }
+    options.minThreads = newMinThreads;
+    pollForMinActiveThreads(pool, options);
 
     ASSERT_EQ(pool.getStats().numIdleThreads, newMinThreads);
-    sleepFor(Milliseconds{100});
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - newMinThreads);
 
     // modify to higher value
     // barrier was reset when counter reached 0
-    const size_t higherMinThreads = 6;
-    pool.setMinThreads(higherMinThreads);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    options.minThreads = 6;
+    pool.setMinThreads(options.minThreads);
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -421,13 +468,11 @@ TEST_F(ThreadPoolTest, ModifyMinThreads) {
     }
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > higherMinThreads) {
-        sleepFor(Microseconds{1});
-    }
+    pollForMinActiveThreads(pool, options);
 
-    ASSERT_EQ(pool.getStats().numIdleThreads, higherMinThreads);
-    sleepFor(Milliseconds{100});
-    ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - higherMinThreads);
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    pollForRetiredThreadJoins(pool, options);
+    ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - options.minThreads);
     pool.shutdown();
     pool.join();
 }
@@ -443,7 +488,7 @@ TEST_F(ThreadPoolTest, DecreaseMaxThreadsAndDoLessWork) {
     pool.startup();
 
     unittest::Barrier barrier(options.maxThreads + 1);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -455,8 +500,8 @@ TEST_F(ThreadPoolTest, DecreaseMaxThreadsAndDoLessWork) {
     ASSERT_EQ(updateRetiredCount(pool), 0);
 
     // Modify maxThreads to a lower value;
-    const size_t lowerMaxThreads = 4;
-    pool.setMaxThreads(lowerMaxThreads);
+    options.maxThreads = 4;
+    pool.setMaxThreads(options.maxThreads);
     unittest::Barrier barrier2(2);
     // Schedule only one task
     pool.schedule([&](auto status) {
@@ -465,11 +510,13 @@ TEST_F(ThreadPoolTest, DecreaseMaxThreadsAndDoLessWork) {
     });
 
     barrier2.countDownAndWait();
-    // Cleaning up the retired threads happens after task execution, so wait briefly for this to
-    // complete.
-    sleepFor(Milliseconds{100});
+
+    // Cleaning up the retired threads happens after task execution, so wait for this to complete
+    ASSERT_EQ(options.maxThreads, options.minThreads);
+    // max threads == min threads, so no need to wait for threads to idle
+    pollForRetiredThreadJoins(pool, options);
     // Four threads should have retired due to lowering max from 8 to 4.
-    ASSERT_EQ(updateRetiredCount(pool), originalMaxThreads - lowerMaxThreads);
+    ASSERT_EQ(updateRetiredCount(pool), originalMaxThreads - options.maxThreads);
     pool.shutdown();
     pool.join();
 }
@@ -482,7 +529,7 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     unittest::Barrier barrier(options.maxThreads + 1);
 
     auto& pool = makePool(options);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -492,12 +539,10 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     pool.startup();
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
+    pollForMinActiveThreads(pool, options);
     ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
-    sleepFor(Milliseconds{100});
+
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - options.minThreads);
 
     // Modify to higher value
@@ -505,7 +550,7 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     pool.setMaxThreads(newMaxThreads);
     // create new barrier to reflect new number of threads
     unittest::Barrier barrier2(newMaxThreads + 1);
-    for (auto i = size_t{0}; i < newMaxThreads; ++i) {
+    for (size_t i = 0; i < newMaxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier2.countDownAndWait();
@@ -513,12 +558,10 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     }
     barrier2.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
+    pollForMinActiveThreads(pool, options);
     ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
-    sleepFor(Milliseconds{100});
+
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), newMaxThreads - options.minThreads);
 
     // modify to lower value
@@ -526,7 +569,7 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     pool.setMaxThreads(lowerMaxThreads);
     // create new barrier to reflect new number of threads
     unittest::Barrier barrier3(lowerMaxThreads + 1);
-    for (auto i = size_t{0}; i < lowerMaxThreads; ++i) {
+    for (size_t i = 0; i < lowerMaxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier3.countDownAndWait();
@@ -534,12 +577,10 @@ TEST_F(ThreadPoolTest, ModifyMaxThreads) {
     }
     barrier3.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
+    pollForMinActiveThreads(pool, options);
     ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
-    sleepFor(Milliseconds{100});
+
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), lowerMaxThreads - options.minThreads);
     pool.shutdown();
     pool.join();
@@ -552,7 +593,7 @@ TEST_F(ThreadPoolTest, ModifyMaxAndMinThreads) {
     options.maxIdleThreadAge = Milliseconds(100);
     unittest::Barrier barrier(options.maxThreads + 1);
     auto& pool = makePool(options);
-    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier.countDownAndWait();
@@ -562,21 +603,18 @@ TEST_F(ThreadPoolTest, ModifyMaxAndMinThreads) {
     pool.startup();
     barrier.countDownAndWait();
 
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
+    pollForMinActiveThreads(pool, options);
     ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
-    sleepFor(Milliseconds{100});
 
+    pollForRetiredThreadJoins(pool, options);
     ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - options.minThreads);
-    const size_t newMaxThreads = 12;
-    const size_t newMinThreads = 2;
-    pool.setMaxThreads(newMaxThreads);
-    pool.setMinThreads(newMinThreads);
+    options.maxThreads = 12;
+    options.minThreads = 2;
+    pool.setMaxThreads(options.maxThreads);
+    pool.setMinThreads(options.minThreads);
     // create new barrier to reflect new number of threads
-    unittest::Barrier barrier2(newMaxThreads + 1);
-    for (auto i = size_t{0}; i < newMaxThreads; ++i) {
+    unittest::Barrier barrier2(options.maxThreads + 1);
+    for (size_t i = 0; i < options.maxThreads; ++i) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
             barrier2.countDownAndWait();
@@ -584,13 +622,11 @@ TEST_F(ThreadPoolTest, ModifyMaxAndMinThreads) {
     }
     barrier2.countDownAndWait();
 
-    while (pool.getStats().numThreads > newMinThreads) {
-        sleepFor(Microseconds{1});
-    }
+    pollForMinActiveThreads(pool, options);
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
 
-    ASSERT_EQ(pool.getStats().numIdleThreads, newMinThreads);
-    sleepFor(Milliseconds{100});
-    ASSERT_EQ(updateRetiredCount(pool), newMaxThreads - newMinThreads);
+    pollForRetiredThreadJoins(pool, options);
+    ASSERT_EQ(updateRetiredCount(pool), options.maxThreads - options.minThreads);
     pool.shutdown();
     pool.join();
 }

@@ -144,6 +144,8 @@ public:
 
     uint64_t joinedThreadsCount_forTest() const;
 
+    bool hasUnjoinedRetiredThreads_forTest() const;
+
 private:
     class Impl;
     std::unique_ptr<Impl> _impl;
