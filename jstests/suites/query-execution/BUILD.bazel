@@ -40,7 +40,7 @@ resmoke_suite_test(
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "ci-release-critical",
         "common",
@@ -92,7 +92,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_one_shard_sharded_collections",
     config = "//buildscripts/resmokeconfig:suites/aggregation_one_shard_sharded_collections.yml",
-    shard_count = 5,
+    shard_count = 8,
     tags = [
         "aggregation",
         "ci-default",
@@ -110,7 +110,7 @@ resmoke_suite_test(
     name = "aggregation_secondary_reads",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_secondary_reads.yml",
-    shard_count = 6,
+    shard_count = 9,
     tags = [
         "aggregation",
         "ci-default",
@@ -125,7 +125,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_sharded_collections_causally_consistent_passthrough",
     config = "//buildscripts/resmokeconfig:suites/aggregation_sharded_collections_causally_consistent_passthrough.yml",
-    shard_count = 7,
+    shard_count = 10,
     tags = [
         "aggregation",
         "ci-default",
@@ -142,7 +142,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams",
     config = "//buildscripts/resmokeconfig:suites/change_streams.yml",
-    shard_count = 4,
+    shard_count = 5,
     tags = [
         "change_streams",
         "ci-default",
@@ -157,7 +157,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_mongos_sessions_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough.yml",
-    shard_count = 5,
+    shard_count = 8,
     tags = [
         "change_streams",
         "ci-default",
@@ -176,7 +176,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_mongos_sessions_passthrough_v1",
     config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough_v1.yml",
-    shard_count = 5,
+    shard_count = 9,
     tags = [
         "change_streams",
         "ci-default",
@@ -195,7 +195,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_multi_stmt_txn_mongos_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -210,7 +210,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_multi_stmt_txn_mongos_passthrough_v1",
     config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough_v1.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -253,7 +253,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_multi_stmt_txn_sharded_collections_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -268,7 +268,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_multi_stmt_txn_sharded_collections_passthrough_v1",
     config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough_v1.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -328,7 +328,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough.yml",
-    shard_count = 4,
+    shard_count = 5,
     tags = [
         "change_streams",
         "ci-default",
@@ -343,7 +343,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_passthrough_v1",
     config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough_v1.yml",
-    shard_count = 3,
+    shard_count = 5,
     tags = [
         "change_streams",
         "ci-default",
@@ -358,7 +358,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_db_passthrough",
     config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough.yml",
-    shard_count = 4,
+    shard_count = 5,
     tags = [
         "change_streams",
         "ci-default",
@@ -373,7 +373,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_db_passthrough_v1",
     config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough_v1.yml",
-    shard_count = 3,
+    shard_count = 5,
     tags = [
         "change_streams",
         "ci-default",
@@ -388,7 +388,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "clustered_collection_passthrough",
     config = "//buildscripts/resmokeconfig:suites/clustered_collection_passthrough.yml",
-    shard_count = 10,
+    shard_count = 17,
     tags = [
         "ci-default",
         "clustered_collections",
@@ -402,7 +402,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "sharding_change_streams_v1",
     config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v1.yml",
-    shard_count = 6,
+    shard_count = 9,
     tags = [
         "change_streams",
         "ci-default",
@@ -418,7 +418,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "sharding_change_streams_ignore_removed_shards",
     config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_ignore_removed_shards.yml",
-    shard_count = 5,
+    shard_count = 7,
     tags = [
         "change_streams",
         "ci-default",
@@ -434,7 +434,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_mongos_pqs_hints",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_mongos_pqs_hints.yml",
-    shard_count = 5,
+    shard_count = 7,
     tags = ["ci-default"],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -469,7 +469,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_sharded_collections_pqs_hints",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_pqs_hints.yml",
-    shard_count = 6,
+    shard_count = 8,
     tags = ["ci-default"],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -503,7 +503,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_secondary_reads_sharded_collections_v1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_secondary_reads_sharded_collections_v1.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -520,7 +520,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_batch_size_1_embedded_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_embedded_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -556,7 +556,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_batch_size_1_embedded_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_embedded_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -574,7 +574,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_batch_size_1_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -592,7 +592,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_batch_size_1_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -610,7 +610,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -628,7 +628,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -646,7 +646,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -664,7 +664,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -682,7 +682,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -700,7 +700,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -718,7 +718,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -736,7 +736,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_db.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -754,7 +754,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -772,7 +772,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -790,7 +790,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_embedded_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -808,7 +808,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_embedded_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -826,7 +826,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_embedded_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -844,6 +844,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_irs_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_irs_watch_cluster.yml",
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -862,7 +863,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_irs_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_irs_watch_db.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -935,7 +936,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_watch_cluster",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_watch_cluster.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -953,7 +954,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_watch_db",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_watch_db.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -970,7 +971,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_secondary_reads_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_passthrough.yml",
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "change_streams",
         "ci-default",
@@ -986,7 +987,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_secondary_reads_sharded_collections",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1002,7 +1003,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_secondary_reads_sharded_collections_v1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections_v1.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1018,7 +1019,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_sharded_collections_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_sharded_collections_passthrough.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -1033,7 +1034,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_db_secondary_reads_sharded_collections",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1049,7 +1050,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_db_secondary_reads_sharded_collections_v1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections_v1.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1065,7 +1066,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_db_sharded_collections_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_sharded_collections_passthrough.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -1153,7 +1154,7 @@ resmoke_suite_test(
     name = "aggregation_mongos_passthrough",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_mongos_passthrough.yml",
-    shard_count = 6,
+    shard_count = 7,
     tags = [
         "aggregation",
         "ci-default",
@@ -1168,7 +1169,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_mongos_pqs_fallback",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_mongos_pqs_fallback.yml",
     shard_count = 50,
     tags = [
@@ -1248,7 +1249,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -1266,7 +1267,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_bg_mutator_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1284,7 +1285,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_irs_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_irs_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 3,
     tags = [
         "change_streams",
         "ci-default",
@@ -1303,7 +1304,7 @@ resmoke_suite_test(
     name = "change_streams_sharding_fsm_watch_collection",
     size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_watch_collection.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -1320,7 +1321,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_secondary_reads_passthrough_v1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_passthrough_v1.yml",
-    shard_count = 6,
+    shard_count = 8,
     tags = [
         "change_streams",
         "ci-default",
@@ -1336,7 +1337,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_whole_cluster_sharded_collections_passthrough_v1",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_sharded_collections_passthrough_v1.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",
@@ -1365,8 +1366,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "replica_sets_jscore_pqs_hints",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_pqs_hints.yml",
-    shard_count = 12,
+    shard_count = 16,
     tags = [
         "ci-default",
     ],
@@ -1603,6 +1605,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_sharded_collections_passthrough_qemp_ifr_batch1",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_passthrough_qemp_ifr_batch1.yml",
     shard_count = 20,
     tags = [
@@ -1623,7 +1626,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_replication_high_yielding",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_replication_high_yielding.yml",
     shard_count = 23,
     tags = [
@@ -1649,7 +1652,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_sharded_collections_pqs_fallback",
-    size = "large",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_pqs_fallback.yml",
     shard_count = 50,
     tags = [
@@ -1740,7 +1743,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "change_streams_sharding_fsm_batch_size_1_watch_collection",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_collection.yml",
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "change_streams",
         "ci-default",

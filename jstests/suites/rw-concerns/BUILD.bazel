@@ -19,7 +19,7 @@ resmoke_suite_test(
     name = "cwrwc_passthrough",
     config = "//buildscripts/resmokeconfig:suites/cwrwc_passthrough.yml",
     data = CORE_DATA + ["//jstests/fle2/libs:all_subpackage_javascript_files"],
-    shard_count = 6,
+    shard_count = 8,
     tags = [
         "ci-release-critical",
         "large",
@@ -43,7 +43,7 @@ resmoke_suite_test(
         "//src/mongo/db/modules/enterprise/jstests/fle/lib:all_subpackage_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/libs:all_subpackage_javascript_files",
     ],
-    shard_count = 9,
+    shard_count = 13,
     tags = [
         "ci-release-critical",
         "read_write_concern",
@@ -65,7 +65,7 @@ resmoke_suite_test(
     data = CORE_DATA + [
         "//jstests/fle2/libs:all_subpackage_javascript_files",
     ],
-    shard_count = 12,
+    shard_count = 17,
     tags = [
         "ci-release-critical",
         "large",
@@ -89,7 +89,7 @@ resmoke_suite_test(
         "//src/mongo/db/modules/enterprise/jstests/fle/lib:all_subpackage_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/libs:all_subpackage_javascript_files",
     ],
-    shard_count = 8,
+    shard_count = 12,
     tags = [
         "ci-release-critical",
         "read_write_concern",

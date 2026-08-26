@@ -19,7 +19,7 @@ resmoke_suite_test(
     name = "timeseries_crud_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/timeseries_crud_jscore_passthrough.yml",
     data = CORE_DATA,
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "ci-release-critical",
         "timeseries_crud",

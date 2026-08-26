@@ -39,7 +39,7 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 14,
+    shard_count = 16,
     tags = [
         "ci-release-critical",
         "jscore",
@@ -66,7 +66,7 @@ resmoke_suite_test(
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:proxy_protocol_server",
     ] + SHARDING_DATA,
-    shard_count = 50,
+    shard_count = 100,
     tags = [
         "ci-release-critical",
         "common",
@@ -95,7 +95,7 @@ resmoke_suite_test(
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:proxy_protocol_server",
     ] + SHARDING_DATA,
-    shard_count = 50,
+    shard_count = 75,
     tags = [
         "ci-release-critical",
         "common",
@@ -130,6 +130,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
@@ -137,7 +138,7 @@ resmoke_suite_test(
         "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 17,
+    shard_count = 26,
     tags = [
         "ci-release-critical",
         "common",
@@ -193,7 +194,7 @@ resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_jscore_passthrough",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_jscore_passthrough.yml",
-    shard_count = 10,
+    shard_count = 11,
     tags = [
         "ci-default",
         "common",
@@ -211,7 +212,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough.yml",
-    shard_count = 7,
+    shard_count = 10,
     tags = [
         "ci-default",
         "multi_shard",
@@ -226,7 +227,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough.yml",
-    shard_count = 6,
+    shard_count = 9,
     tags = [
         "ci-default",
         "incompatible_debug_mode",
@@ -242,7 +243,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_stmt_txn_jscore_passthrough_with_migration",
     config = "//buildscripts/resmokeconfig:suites/multi_stmt_txn_jscore_passthrough_with_migration.yml",
-    shard_count = 8,
+    shard_count = 13,
     tags = [
         "ci-default",
         "multi_stmt",
@@ -257,7 +258,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_passthrough.yml",
-    shard_count = 10,
+    shard_count = 14,
     tags = [
         "ci-default",
         "retry",
@@ -271,7 +272,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_stepdown_passthrough",
     config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_stepdown_passthrough.yml",
-    shard_count = 3,
+    shard_count = 4,
     tags = [
         "ci-default",
         "retry",
@@ -336,6 +337,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "config_fuzzer_sharding_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
@@ -618,7 +620,7 @@ resmoke_suite_test(
         resmoke_args = [
             "--runNoFeatureFlagTests",
         ],
-        shard_count = 50,
+        shard_count = 140,
         tags = [
             "ci-default",
             "default",
@@ -696,7 +698,7 @@ resmoke_suite_test(
     name = "resharding_timeseries_fuzzer",
     srcs = [":resharding_timeseries_fuzzer_tests"],
     config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
-    shard_count = 10,
+    shard_count = 11,
     tags = [
         "ci-default",
         "feature_flag_guarded",
