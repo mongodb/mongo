@@ -1128,7 +1128,6 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     // coverity[missing_lock]
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
-        inPotentialAbortScenario(_recipientCtx.getState()) ||
         _changeStreamsMonitorCompleted.getFuture().isReady()) {
         return ExecutorFuture(**executor);
     }
