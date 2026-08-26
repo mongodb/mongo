@@ -911,6 +911,7 @@ mongo_cc_library(
         "list_databases_for_all_tenants_command",
         "test_commands_enabled",
         "//src/mongo:base",
+        "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/db:api_parameters",

@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/db/auth/action_type.h"
@@ -101,12 +102,17 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
 // through the IndexBuildsCoordinator.
 MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
-
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
+
+// This failpoint makes createIndexes fail with NamespaceNotFound.
+MONGO_FAIL_POINT_DEFINE(createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild);
 
 constexpr auto kCommandName = "createIndexes"sv;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"sv;
 constexpr auto kIndexAlreadyExists = "index already exists"sv;
+
+// How many times createIndexes retries after a NamespaceNotFound.
+constexpr size_t kMaxNamespaceNotFoundRetryAttempts = 10;
 
 /**
  * Appends 'message' to the 'note' component of the response.
@@ -691,6 +697,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
     bool shouldContinueInBackground = false;
     try {
+        if (MONGO_unlikely(
+                createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild.shouldFail())) {
+            uasserted(ErrorCodes::NamespaceNotFound,
+                      "createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild failpoint");
+        }
+
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
             opCtx, cmd.getDbName(), *collectionUUID, indexes, buildUUID, indexBuildOptions));
 
@@ -797,17 +809,15 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
         LOGV2(20447, "Index build: completed", "buildUUID"_attr = buildUUID);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        // If the collection is dropped after the initial checks in this function (before the
-        // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
-        // the task running the index build) may return NamespaceNotFound. This is not
-        // considered an error and the command should return success.
-        LOGV2(20448,
-              "Index build: failed because collection dropped",
+        // A concurrent drop or move can invalidate the collection after its UUID is resolved.
+        // Propagate NamespaceNotFound so the outer loop can retry the command.
+        LOGV2(13282200,
+              "Index build: lost UUID resolution; retrying createIndexes",
               "buildUUID"_attr = buildUUID,
               logAttrs(ns),
               "collectionUUID"_attr = *collectionUUID,
               "exception"_attr = ex);
-        return reply;
+        throw;
     } catch (DBException& ex) {
         if (shouldContinueInBackground) {
             LOGV2(4760400,
@@ -923,6 +933,8 @@ public:
             // specs, then we will wait for the build(s) to finish before trying again unless we are
             // in a multi-document transaction.
             bool shouldLogMessageOnAlreadyBuildingError = true;
+            auto remainingNamespaceNotFoundRetryAttempts = kMaxNamespaceNotFoundRetryAttempts;
+            BackoffWithJitter namespaceNotFoundBackoff{Milliseconds{1}, Milliseconds{10}};
             while (true) {
                 boost::optional<ResolvedIndexBuildRequest> resolvedRequest;
                 try {
@@ -981,6 +993,53 @@ public:
                     // in-progress build and starting to listen for completion. It is good enough,
                     // however: we can only wait longer than needed, not less.
                     IndexBuildsCoordinator::get(opCtx)->waitUntilAnIndexBuildFinishes(opCtx);
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // NamespaceNotFound can mean the collection is truly gone, or just not yet
+                    // published by its still-committing creator. The latter is retried for free
+                    // below, since it's guaranteed to resolve; only the former spends the budget.
+                    bool isCommitPending = false;
+                    if (resolvedRequest && resolvedRequest->collectionUUID) {
+                        try {
+                            CollectionCatalog::latest(opCtx)
+                                ->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+                                    opCtx, ns().dbName(), *resolvedRequest->collectionUUID);
+                        } catch (const ExceptionFor<ErrorCodes::CommitPendingNamespaceOrUUID>&) {
+                            isCommitPending = true;
+                        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        }
+                    }
+
+                    if (!isCommitPending) {
+                        if (remainingNamespaceNotFoundRetryAttempts == 0) {
+                            LOGV2(13282201,
+                                  "Index build: exhausted retry attempts after repeated "
+                                  "NamespaceNotFound",
+                                  logAttrs(ns()),
+                                  "attempts"_attr = kMaxNamespaceNotFoundRetryAttempts);
+                            uasserted(ErrorCodes::ConflictingOperationInProgress,
+                                      str::stream()
+                                          << "createIndexes on " << ns().toStringForErrorMsg()
+                                          << " conflicted with another operation after "
+                                          << kMaxNamespaceNotFoundRetryAttempts << " retries");
+                        }
+                        --remainingNamespaceNotFoundRetryAttempts;
+                    }
+
+                    // Retry from the beginning to recheck collection and sharding state. A direct
+                    // request may recreate a dropped collection; a routed request may surface a
+                    // sharding error.
+
+                    // This command releases the DDL scope once the coordinator has accepted the
+                    // build, so it may be gone by now. Re-establish it for the retry.
+                    if (!scopedReplicaSetDDL) {
+                        scopedReplicaSetDDL.emplace(opCtx, std::vector<NamespaceString>{ns()});
+                    }
+                    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+                    // The collection may not have become visible yet to the code path that raised
+                    // NamespaceNotFound.
+                    namespaceNotFoundBackoff.incrementAttemptCount();
+                    opCtx->sleepFor(namespaceNotFoundBackoff.getBackoffDelay());
                 } catch (const DBException&) {
                     // Set last op on error to provide the client with a specific optime to read the
                     // state of the server when the createIndexes command failed.
