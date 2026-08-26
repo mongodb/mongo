@@ -294,9 +294,11 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             return _translateTimeseriesNss(executor, token);
         })
         .then([this, anchor = shared_from_this()] {
-            std::lock_guard<std::mutex> lg(_mutex);
-            if (!_constructionCompletionPromise.getFuture().isReady()) {
-                _constructionCompletionPromise.emplaceValue();
+            {
+                std::lock_guard<std::mutex> lg(_mutex);
+                if (!_constructionCompletionPromise.getFuture().isReady()) {
+                    _constructionCompletionPromise.emplaceValue();
+                }
             }
 
             hangBeforeRunningCoordinatorInstance.pauseWhileSet();
@@ -401,6 +403,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                 .withBackoffBetweenIterations(kExponentialBackoff)
                 .on(**executor, CancellationToken::uncancelable());
         })
+        .thenRunOn(_service->getInstanceCleanupExecutor())
         .onCompletion([this, executor, token, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
