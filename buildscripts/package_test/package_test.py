@@ -31,8 +31,10 @@ from buildscripts.package_test.package_test_commands import (
 )
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
+    ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH,
     RELEASE_BINARY_NAMES,
     combine_execution_log_validation_summaries,
+    extract_file_from_tar_by_basename,
     fetch_release_binary_provenance_from_tasks,
     fetch_release_execution_log_from_tasks,
     fetch_task_artifact_to_file,
@@ -58,7 +60,6 @@ formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
 handler.setFormatter(formatter)
 root.addHandler(handler)
 
-ARCHIVE_DIST_TEST_BUILD_COMMAND_PATH = ".bazel_build_invocation"
 ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH = ".bazel_release_execution_log.binpb.zst"
 DEFAULT_RELEASE_BINARY_ARCHIVE_PATH = Path("mongo-binaries.tgz")
 
@@ -176,7 +177,7 @@ def create_release_binary_provenance_from_archive_dist_test(
         archive_task, "Artifacts", download_dir / "archive_dist_test_artifacts.tgz"
     )
     build_command_path = extract_file_from_tar_by_basename(
-        artifacts_path, ARCHIVE_DIST_TEST_BUILD_COMMAND_PATH, download_dir
+        artifacts_path, ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH, download_dir
     )
     binary_archive_path = fetch_task_artifact_to_file(
         archive_task, "Binaries", download_dir / "archive_dist_test_binaries"
@@ -305,34 +306,6 @@ def fetch_release_execution_log_from_archive_artifacts(
     return extract_file_from_tar_by_basename(
         artifacts_path, ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH, output_dir
     )
-
-
-def extract_file_from_tar_by_basename(
-    artifacts_path: Path, artifact_basename: str, output_dir: Path
-) -> Path:
-    """Extract a file from a tar archive by basename."""
-
-    output_path = output_dir / artifact_basename
-    with tarfile.open(artifacts_path, "r:*") as artifacts:
-        for member in artifacts.getmembers():
-            if not member.isfile():
-                continue
-            if Path(member.name).name != artifact_basename:
-                continue
-
-            extracted = artifacts.extractfile(member)
-            if extracted is None:
-                continue
-
-            try:
-                with output_path.open("wb") as output:
-                    while chunk := extracted.read(1024 * 1024):
-                        output.write(chunk)
-            finally:
-                extracted.close()
-            return output_path
-
-    raise RuntimeError(f"Could not find {artifact_basename} in {artifacts_path}")
 
 
 def should_validate_package_build_provenance() -> bool:

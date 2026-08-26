@@ -88,6 +88,28 @@ bazel_evergreen_shutils::should_disable_gdb_index() {
     return 0
 }
 
+# Return the invocation file used to create release binary provenance for a task. The ordinary
+# invocation file is still written for every Bazel compile, but provenance must retain the command
+# from the task's primary build instead of whichever compile ran last.
+bazel_evergreen_shutils::get_provenance_build_invocation_file() {
+    local task_name_to_check="${1:-}"
+    local project_to_check="${2:-}"
+
+    case "${task_name_to_check}" in
+    archive_dist_test)
+        echo ".bazel_provenance_build_invocation"
+        ;;
+    package)
+        if [[ "${project_to_check}" == mongo-release* ]]; then
+            echo ".bazel_provenance_build_invocation"
+        fi
+        ;;
+    crypt_create_lib)
+        echo ".bazel_crypt_build_invocation"
+        ;;
+    esac
+}
+
 # Requires: evergreen_remote_exec, task_name (for tests), bazel_args vars optionally.
 bazel_evergreen_shutils::compute_local_arg() {
     local mode="${1:-build}" # build|test|run

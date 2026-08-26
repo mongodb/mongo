@@ -68,6 +68,30 @@ def compact_log_with_spawns(*spawns: tuple[str, bool]) -> bytes:
 
 
 class PackageTestProvenanceTest(unittest.TestCase):
+    def test_archive_provenance_extracts_dedicated_invocation(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            archive_path = temp_path / "artifacts.tgz"
+            normal_invocation = temp_path / ".bazel_build_invocation"
+            provenance_invocation = temp_path / ".bazel_provenance_build_invocation"
+            normal_invocation.write_text("normal invocation")
+            provenance_invocation.write_text("provenance invocation")
+
+            with tarfile.open(archive_path, "w:gz") as archive:
+                archive.add(normal_invocation, "src/.bazel_build_invocation")
+                archive.add(
+                    provenance_invocation,
+                    "src/.bazel_provenance_build_invocation",
+                )
+
+            extracted = under_test.extract_file_from_tar_by_basename(
+                archive_path,
+                under_test.ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH,
+                temp_path,
+            )
+
+            self.assertEqual("provenance invocation", extracted.read_text())
+
     def test_release_branch_projects_are_detected(self) -> None:
         for project in (
             "mongodb-mongo-v9.0",

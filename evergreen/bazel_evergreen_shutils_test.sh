@@ -237,6 +237,29 @@ test_remote_unittest_wrapper_is_test_scoped() {
         "the test wrapper should still apply to bazel test"
 }
 
+test_provenance_build_invocation_file_selection() {
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file archive_dist_test mongodb-mongo-v8.3-staging)" \
+        "archive_dist_test should create the provenance invocation file"
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongo-release)" \
+        "release package should create the provenance invocation file"
+    assert_eq \
+        "" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongodb-mongo-v8.3-staging)" \
+        "non-server-release package should not create the provenance invocation file"
+    assert_eq \
+        ".bazel_crypt_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file crypt_create_lib mongo-release)" \
+        "crypt_create_lib should create its dedicated invocation file"
+    assert_eq \
+        "" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file unit_tests mongo-release)" \
+        "unrelated tasks should not create a provenance invocation file"
+}
+
 test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
     local tmpdir
     local fake_bazel
@@ -352,6 +375,7 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
 test_cache_bazel_output_base_uses_plain_info_once
 test_should_disable_gdb_index_for_all_ci_builds
 test_remote_unittest_wrapper_is_test_scoped
+test_provenance_build_invocation_file_selection
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
 test_retry_bazel_cmd_reuses_healthy_server_after_regular_failure
 test_retry_bazel_cmd_starts_missing_server_with_neutral_message
