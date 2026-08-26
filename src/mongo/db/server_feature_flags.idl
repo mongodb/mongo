@@ -359,8 +359,7 @@ feature_flags:
     featureFlagBatchedContainerWrites:
         description: "When enabled, allows a batched container write format to support compact oplog entries."
         cpp_varname: gFeatureFlagBatchedContainerWrites
-        default: true
-        version: 9.1
+        default: false
         fcv_gated: true
     featureFlagServerStatusMetricsFiltering:
         description: "Enable metrics filtering for the serverStatus command."
