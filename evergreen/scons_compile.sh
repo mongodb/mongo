@@ -6,6 +6,13 @@ cd src
 set -o errexit
 set -o verbose
 
+# Builds that must link against an OpenSSL installed outside the toolchain (for
+# example custom builds) can set the mongo_openssl_root expansion to the installation
+# prefix; SConstruct then prepends its include/lib directories to the search paths.
+if [[ -n "${mongo_openssl_root:-}" ]]; then
+  export MONGO_OPENSSL_ROOT="${mongo_openssl_root}"
+fi
+
 rm -rf ${install_directory}
 
 # By default, limit link jobs to one quarter of our overall -j

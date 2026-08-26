@@ -27,6 +27,8 @@ include:
 - filename: etc/evergreen_yml_components/variants/coverity.yml
 - filename: etc/evergreen_yml_components/tasks/release_tasks.yml
 - filename: etc/evergreen_yml_components/tasks/security_tasks.yml
+- filename: etc/evergreen_yml_components/custom_builds/tasks.yml
+- filename: etc/evergreen_yml_components/custom_builds/variants.yml
 - filename: etc/evergreen_yml_components/variants/misc/misc.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/release/release.yml

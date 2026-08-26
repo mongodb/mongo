@@ -3342,6 +3342,22 @@ def doConfigure(myenv):
     global ssl_provider
     global http_client
 
+    # Builds that must link against an OpenSSL installed outside the toolchain (for
+    # example custom builds, see etc/evergreen_yml_components/custom_builds/README.md)
+    # can set MONGO_OPENSSL_ROOT in the environment to the installation prefix. The
+    # prefix's include and lib directories are prepended to the search paths so both
+    # these configure checks and the real compile/link pick it up.
+    mongo_openssl_root = os.environ.get("MONGO_OPENSSL_ROOT", "")
+    if mongo_openssl_root:
+        print(f"MONGO_OPENSSL_ROOT set, prepending {mongo_openssl_root} to search paths")
+        myenv.PrependUnique(
+            CPPPATH=[os.path.join(mongo_openssl_root, "include")],
+            LIBPATH=[
+                os.path.join(mongo_openssl_root, "lib64"),
+                os.path.join(mongo_openssl_root, "lib"),
+            ],
+        )
+
     # Check that the compilers work.
     #
     # TODO: Currently, we have some flags already injected. Eventually, this should test the
@@ -6093,6 +6109,18 @@ elif env['PLATFORM'] == 'darwin':
         ],
         RPATH=['$PREFIX_LIBDIR_RPATH_GENERATOR'],
     )
+
+# Builds that link against an OpenSSL outside the toolchain via MONGO_OPENSSL_ROOT
+# (see doConfigure) get an $ORIGIN-relative RUNPATH so binaries that ship the OpenSSL
+# runtime libraries next to them (a lib directory beside their bin directory,
+# bundled by evergreen/custom_builds/bundle_openssl3_runtime.sh) resolve them with no
+# LD_LIBRARY_PATH. The directory simply doesn't exist in the plain dist tarball,
+# where the loader falls through to the consumer-provided OpenSSL.
+if os.environ.get("MONGO_OPENSSL_ROOT", "") and env['PLATFORM'] == 'posix':
+    env.AppendUnique(RPATH=[
+        f"$RPATH_ESCAPED_DOLLAR_ORIGIN/../lib",
+        f"$RPATH_ESCAPED_DOLLAR_ORIGIN/../lib64",
+    ])
 
 env.Default(env.Alias("install-default"))
 
