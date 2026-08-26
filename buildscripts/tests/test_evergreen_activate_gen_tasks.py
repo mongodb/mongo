@@ -286,6 +286,18 @@ class TestEvgExpansions(unittest.TestCase):
         self.assertIn("task_name", str(err.exception))
         self.assertIn("evergreen_api_key", str(err.exception))
 
+    def test_upper_cased_names_are_read(self):
+        """Python upper-cases every key of os.environ on Windows."""
+        expansions = under_test.EvgExpansions.from_environ(
+            {name.upper(): value for name, value in ENV.items()}
+        )
+
+        self.assertEqual(expansions.build_id, ENV["build_id"])
+        self.assertEqual(expansions.version_id, ENV["version_id"])
+        self.assertEqual(expansions.task_name, ENV["task_name"])
+        self.assertEqual(expansions.api_user, ENV["evergreen_api_user"])
+        self.assertEqual(expansions.api_key, ENV["evergreen_api_key"])
+
     def test_api_server_defaults_but_can_be_overridden(self):
         self.assertEqual(
             under_test.EvgExpansions.from_environ(ENV).api_server, under_test.DEFAULT_API_SERVER
