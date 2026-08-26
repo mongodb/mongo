@@ -14,6 +14,7 @@
  * ]
  */
 
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -47,64 +48,90 @@ st.s
     [localColl].aggregate([{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}])
     .toArray();
 
-const lsid = {id: UUID()};
-const txnNumber = NumberLong(1);
 const mongosDB = st.s.getDB(dbName);
 
-jsTest.log("Step 1: insert {_id: 'X'} into local (shard0).");
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: localColl,
-        documents: [{_id: "X", key: "Y"}],
+// A shard that sub-routes inside a transaction cannot refresh stale routing info, because that
+// needs locks it may not take mid-transaction, and mid-transaction none of the automatic retries
+// apply (see SERVER-58021); it aborts the transaction with ShardCannotRefreshDueToLocksHeld
+// instead. That abort carries the same TransientTransactionError label as the abort this test is
+// looking for, so the only response singled out below is the NoSuchTransaction the term check
+// produces. Anything else is raised by assert.commandWorked() and handed to
+// withRetryOnTransientTxnError, which restarts the whole scenario on a transient error and
+// rethrows a genuine failure. Each attempt uses a fresh session, so there is nothing to clean up
+// between them.
+let aggRes;
+let attemptLsid;
+let attemptTxnNumber;
+withRetryOnTransientTxnError(() => {
+    attemptLsid = {id: UUID()};
+    attemptTxnNumber = NumberLong(1);
+    const lsid = attemptLsid;
+    const txnNumber = attemptTxnNumber;
+
+    jsTest.log("Step 1: insert {_id: 'X'} into local (shard0).");
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: localColl,
+            documents: [{_id: "X", key: "Y"}],
+            lsid: lsid,
+            txnNumber: txnNumber,
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+
+    jsTest.log("Step 2: insert {_id: 'Y'} into foreign (shard1).");
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: foreignColl,
+            documents: [{_id: "Y", value: "should-be-lost-without-fix"}],
+            lsid: lsid,
+            txnNumber: txnNumber,
+            stmtId: NumberInt(1),
+            autocommit: false,
+        }),
+    );
+
+    jsTest.log(
+        "Step 3: step up a different node on shard1; the in-progress participant and its pending write are discarded.",
+    );
+    const oldPrimary = st.rs1.getPrimary();
+    const electionTarget = st.rs1.getSecondaries()[0];
+    st.rs1.stepUp(electionTarget);
+    st.rs1.awaitNodesAgreeOnPrimary();
+    const newPrimary = st.rs1.getPrimary();
+    jsTest.log.info("shard1 primary changed", {
+        oldPrimary: oldPrimary.host,
+        newPrimary: newPrimary.host,
+    });
+    assert.neq(oldPrimary.host, newPrimary.host, "stepUp did not change the primary");
+
+    // Settle routing state on the new primary with a non-transactional read before re-entering
+    // the txn; otherwise the in-txn aggregate hits a retriable routing error from inside a
+    // snapshot-read.
+    st.s.getDB(dbName)[foreignColl].find().toArray();
+
+    jsTest.log(
+        "Step 4: aggregate with $lookup: shard0 sub-routes to shard1's new primary, and the router detects the term bump.",
+    );
+    const res = mongosDB.runCommand({
+        aggregate: localColl,
+        pipeline: [{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}],
+        cursor: {},
         lsid: lsid,
         txnNumber: txnNumber,
-        stmtId: NumberInt(0),
-        startTransaction: true,
+        stmtId: NumberInt(2),
         autocommit: false,
-    }),
-);
-
-jsTest.log("Step 2: insert {_id: 'Y'} into foreign (shard1).");
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: foreignColl,
-        documents: [{_id: "Y", value: "should-be-lost-without-fix"}],
-        lsid: lsid,
-        txnNumber: txnNumber,
-        stmtId: NumberInt(1),
-        autocommit: false,
-    }),
-);
-
-jsTest.log(
-    "Step 3: step up a different node on shard1; the in-progress participant and its pending write are discarded.",
-);
-const oldPrimary = st.rs1.getPrimary();
-const electionTarget = st.rs1.getSecondaries()[0];
-st.rs1.stepUp(electionTarget);
-st.rs1.awaitNodesAgreeOnPrimary();
-const newPrimary = st.rs1.getPrimary();
-jsTest.log.info("shard1 primary changed", {
-    oldPrimary: oldPrimary.host,
-    newPrimary: newPrimary.host,
-});
-assert.neq(oldPrimary.host, newPrimary.host, "stepUp did not change the primary");
-
-// Settle routing state on the new primary with a non-transactional read before re-entering the
-// txn; otherwise the in-txn aggregate hits a retriable routing error from inside a snapshot-read.
-st.s.getDB(dbName)[foreignColl].find().toArray();
-
-jsTest.log(
-    "Step 4: aggregate with $lookup: shard0 sub-routes to shard1's new primary, and the router detects the term bump.",
-);
-const aggRes = mongosDB.runCommand({
-    aggregate: localColl,
-    pipeline: [{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}],
-    cursor: {},
-    lsid: lsid,
-    txnNumber: txnNumber,
-    stmtId: NumberInt(2),
-    autocommit: false,
+    });
+    // A NoSuchTransaction here is the result under test, so keep it; any other failure means this
+    // attempt proved nothing, and raising it lets the helper decide whether to restart the
+    // scenario or fail the test.
+    if (!res.ok && res.code !== ErrorCodes.NoSuchTransaction) {
+        jsTest.log.info("attempt did not reach the term check", {res});
+        assert.commandWorked(res);
+    }
+    aggRes = res;
 });
 
 jsTest.log(
@@ -129,8 +156,8 @@ if (!aggRes.ok) {
     // instead. Either way, a partial commit is unacceptable.
     const commitRes = st.s.adminCommand({
         commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: txnNumber,
+        lsid: attemptLsid,
+        txnNumber: attemptTxnNumber,
         autocommit: false,
     });
     jsTest.log.info("commitTransaction returned", {commitRes});
@@ -152,50 +179,64 @@ const foreignIds = foreignDocs.map((d) => d._id);
 assert(!localIds.includes("X"), "X should NOT be present in local on shard0 because the transaction aborted");
 assert(!foreignIds.includes("Y"), "Y should NOT be present in foreign on shard1 because the transaction aborted");
 
-jsTest.log(
-    "Step 7: re-run the whole transaction (what a driver does on TransientTransactionError); both writes must now land.",
-);
-const retryTxnNumber = NumberLong(2);
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: localColl,
-        documents: [{_id: "X", key: "Y"}],
-        lsid: lsid,
-        txnNumber: retryTxnNumber,
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }),
-);
-assert.commandWorked(
-    mongosDB.runCommand({
-        insert: foreignColl,
-        documents: [{_id: "Y", value: "durable-after-retry"}],
-        lsid: lsid,
-        txnNumber: retryTxnNumber,
-        stmtId: NumberInt(1),
-        autocommit: false,
-    }),
-);
-assert.commandWorked(
-    mongosDB.runCommand({
-        aggregate: localColl,
-        pipeline: [{$lookup: {from: foreignColl, localField: "key", foreignField: "_id", as: "joined"}}],
-        cursor: {},
-        lsid: lsid,
-        txnNumber: retryTxnNumber,
-        stmtId: NumberInt(2),
-        autocommit: false,
-    }),
-);
-assert.commandWorked(
-    st.s.adminCommand({
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: retryTxnNumber,
-        autocommit: false,
-    }),
-);
+jsTest.log("Step 7: retry the whole transaction after a TransientTransactionError; both writes must now land.");
+// This one only has to succeed, so the standard helper applies: it retries the whole transaction
+// after a TransientTransactionError. Each attempt uses a fresh session for test isolation, so
+// there is no explicit cleanup between attempts.
+withRetryOnTransientTxnError(() => {
+    const retryLsid = {id: UUID()};
+    const retryTxnNumber = NumberLong(1);
+
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: localColl,
+            documents: [{_id: "X", key: "Y"}],
+            lsid: retryLsid,
+            txnNumber: retryTxnNumber,
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        mongosDB.runCommand({
+            insert: foreignColl,
+            documents: [{_id: "Y", value: "durable-after-retry"}],
+            lsid: retryLsid,
+            txnNumber: retryTxnNumber,
+            stmtId: NumberInt(1),
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        mongosDB.runCommand({
+            aggregate: localColl,
+            pipeline: [
+                {
+                    $lookup: {
+                        from: foreignColl,
+                        localField: "key",
+                        foreignField: "_id",
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
+            lsid: retryLsid,
+            txnNumber: retryTxnNumber,
+            stmtId: NumberInt(2),
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({
+            commitTransaction: 1,
+            lsid: retryLsid,
+            txnNumber: retryTxnNumber,
+            autocommit: false,
+        }),
+    );
+});
 
 assert.eq(
     1,
