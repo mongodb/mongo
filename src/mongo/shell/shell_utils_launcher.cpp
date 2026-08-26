@@ -517,7 +517,7 @@ int getSignal(const BSONObj& a) {
 }
 
 BSONObj getStopMongodOpts(const BSONObj& a) {
-    if (a.nFields() == 3) {
+    if (a.nFields() >= 3) {
         BSONObjIterator i(a);
         i.next();
         i.next();
@@ -559,13 +559,14 @@ BSONObj StopMongoProgram(const BSONObj& a, void* data) {
     return BSON("" << (double)code);
 }
 
+/** stopMongoProgramByPid(pid[, signal[, opts[, waitPid]]]) */
 BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
     int nFields = a.nFields();
-    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 3);
+    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 4);
     uassert(
         ErrorCodes::BadValue, "stopMongoProgramByPid needs a number", a.firstElement().isNumber());
     ProcessId pid = ProcessId::fromNative(int(a.firstElement().number()));
-    int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a));
+    int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a), getWaitPid(a));
     LOGV2_INFO(22822, "shell: Stopped mongo program with pid", "pid"_attr = pid);
     return BSON("" << (double)code);
 }
