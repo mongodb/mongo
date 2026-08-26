@@ -169,20 +169,31 @@ bazel_evergreen_shutils::maybe_release_flag() {
 # --- Timeouts --------------------------------------------------------------
 
 # Timeout helper: returns a "timeout <secs>" prefix or empty string.
+#
+# Arguments:
+#   $1: "on" when remote execution is enabled
+#   $2: Bazel command name (only "build" receives the local fallback timeout)
 # Prints a one-time warning to stderr if a timeout was requested but no
 # timeout binary is available. Supports macOS 'gtimeout' if installed.
 # SIGQUIT triggers Bazel/Bazelisk diagnostics but does not reliably stop the
 # full process tree, so follow it with a short kill-after window.
 bazel_evergreen_shutils::timeout_prefix() {
-    local fallback_remote="${1:-}" # "on" = use 3600s default for remote builds
-    local need_timeout=""          # "explicit" | "fallback" | ""
+    local fallback_remote="${1:-}" # "on" = use the remote-build fallback
+    local bazel_command="${2:-}"
+    local need_timeout="" # "explicit" | "fallback"
     local timeout_bin=""
     local timeout_kill_after_seconds="${BAZEL_EVG_TIMEOUT_KILL_AFTER_SECONDS:-15}"
+    local fallback_timeout_seconds=7200 # Local builds get two hours per attempt.
+    local fallback_timeout_label="local-build"
 
     # Do we want a timeout?
     if [[ -n "${build_timeout_seconds:-}" ]]; then
         need_timeout="explicit"
     elif [[ "$fallback_remote" == "on" ]]; then
+        need_timeout="fallback"
+        fallback_timeout_seconds=3600
+        fallback_timeout_label="remote-build"
+    elif [[ "$bazel_command" == "build" ]]; then
         need_timeout="fallback"
     fi
 
@@ -199,7 +210,7 @@ bazel_evergreen_shutils::timeout_prefix() {
             if [[ "$need_timeout" == "explicit" ]]; then
                 echo "[warn] 'timeout' not found; requested ${build_timeout_seconds}s timeout will be ignored." >&2
             else
-                echo "[warn] 'timeout' not found; remote-build fallback timeout (3600s) will be ignored." >&2
+                echo "[warn] 'timeout' not found; ${fallback_timeout_label} fallback timeout (${fallback_timeout_seconds}s) will be ignored." >&2
             fi
             # Helpful hint for macOS users
             if bazel_evergreen_shutils::is_macos; then
@@ -216,7 +227,7 @@ bazel_evergreen_shutils::timeout_prefix() {
         if [[ "$need_timeout" == "explicit" ]]; then
             echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s ${build_timeout_seconds}"
         elif [[ "$need_timeout" == "fallback" ]]; then
-            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s 3600"
+            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s ${fallback_timeout_seconds}"
         else
             echo ""
         fi
@@ -637,7 +648,7 @@ bazel_evergreen_shutils::write_last_engflow_link() {
 #   $3: bazel binary
 #   $4..: full bazel subcommand + args (e.g. "build --verbose_failures ...")
 # Special handling:
-#   - exit 124/137 -> timeout
+#   - exit 124/137 -> timeout; only build commands retry after a timeout
 #   - server death (pid missing) -> restart, then retry
 # Returns with global RET set.
 bazel_evergreen_shutils::retry_bazel_cmd() {
@@ -646,7 +657,8 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     local BAZEL_BINARY="$1"
     shift
 
-    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}")"
+    local bazel_command="${1:-}"
+    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}" "$bazel_command")"
     local timeout_duration=""
     if [[ -n "$timeout_str" ]]; then
         timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
@@ -762,6 +774,9 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             fi
             bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
             bazel_evergreen_shutils::terminate_bazel_servers || true
+            if [[ "$bazel_command" != "build" ]]; then
+                break
+            fi
         elif ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
             if $has_next_attempt; then
                 echo "[retry ${i}] Bazel server exited unexpectedly (possibly OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
