@@ -751,7 +751,7 @@ class TypeErasedAttributeStorage {
 public:
     using const_iterator = const detail::NamedAttribute*;
 
-    TypeErasedAttributeStorage() : _size(0) {}
+    TypeErasedAttributeStorage() : _data(nullptr), _size(0) {}
 
     template <typename... Args>
     TypeErasedAttributeStorage(const detail::AttributeStorage<Args...>& store)
@@ -772,13 +772,15 @@ public:
         return _data;
     }
     const_iterator end() const {
-        return _data + _size;
+        // Guard against forming _data + _size when _data is null (as in a default-constructed
+        // instance), which would be undefined pointer arithmetic even when _size is 0.
+        return _data ? _data + _size : _data;
     }
 
     // Applies a function to every stored named attribute in order they are captured
     template <typename Func>
     void apply(Func&& f) const {
-        std::for_each(_data, _data + _size, [&](const auto& attr) {
+        std::for_each(begin(), end(), [&](const auto& attr) {
             visit([&](auto&& val) { f(attr.name, val); }, attr.value);
         });
     }

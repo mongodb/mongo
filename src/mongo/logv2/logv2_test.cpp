@@ -522,6 +522,17 @@ TEST_F(LogV2Test, Basic) {
     ASSERT_EQUALS(lines->back(), fmt::to_string(buffer));
 }
 
+TEST_F(LogV2Test, DefaultConstructedAttributeStorage) {
+    // A default-constructed TypeErasedAttributeStorage must have a well-defined (empty) range so
+    // that begin()/end() and apply() do not read an indeterminate _data pointer.
+    TypeErasedAttributeStorage attrs;
+    ASSERT(attrs.empty());
+    ASSERT_EQUALS(attrs.size(), 0u);
+    ASSERT(attrs.begin() == nullptr);
+    ASSERT(attrs.begin() == attrs.end());
+    attrs.apply([](std::string_view, auto&&) { FAIL("empty storage should not invoke callback"); });
+}
+
 TEST_F(LogV2Test, MismatchAttrInLogging) {
     auto lines = makeLineCapture(PlainFormatter());
     if (!kDebugBuild) {
