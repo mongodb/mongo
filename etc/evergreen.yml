@@ -203,11 +203,11 @@ patch_aliases:
     variant_tags: ["required", "mongot_e2e"]
     task: ".*"
   - alias: codecoverage
-    description: "Run tests and report code coverage"
+    description: "Run the code coverage tasks"
     variant: ".*-coverage"
     task: ".*"
   - alias: unittestcoverage
-    description: "Run unit tests and report code coverage"
+    description: "Run the unittest code coverage task only (skips any integration tests)"
     variant: ".*-coverage"
     task: "^(unit_test_group.*|bazel_coverage)$"
   - alias: cluster_scalability
