@@ -4,7 +4,10 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 
 #include <string_view>
 
@@ -67,6 +70,30 @@ protected:
         } else {
             stats.registerCommitted(chunkOperationMetricType());
         }
+    }
+
+    /**
+     * Checks whether the critical section is acquired for the coordinator's namespace, throwing
+     * StaleConfig in case it is taken.
+     * TODO (SERVER-133735): remove this function.
+     */
+    void _checkCriticalSection() {
+        if (getDoc().getGenericPhase() != CoordinatorGenericPhase::kUnset) {
+            return;
+        }
+        auto opCtxHolder = this->makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+
+        const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss());
+
+        uassert(StaleConfigInfo(
+                    nss(),
+                    ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
+                    boost::none /* wantedVersion */,
+                    ShardingState::get(opCtx)->shardId()),
+                str::stream() << "The critical section for " << nss().toStringForErrorMsg()
+                              << " is taken",
+                !scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
     }
 
     /**

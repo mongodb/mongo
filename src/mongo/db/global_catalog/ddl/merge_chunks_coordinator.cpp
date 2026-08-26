@@ -266,6 +266,7 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
     };
 
     return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] { _checkCriticalSection(); })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
             [this, anchor = shared_from_this()](auto* opCtx) {
@@ -401,6 +402,12 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
             }
 
             const auto phase = _doc.getPhase();
+
+            // If the phase is unset, there's no persisted document, so there is nothing to cleanup.
+            if (phase == Phase::kUnset) {
+                uassertStatusOK(status);
+                MONGO_UNREACHABLE_TASSERT(13380601);
+            }
 
             // Before the kGlobalCatalogCommit phase the merge has not been committed anywhere, so
             // a non-retryable error is safe to abort on. Persist an abort reason so the critical
