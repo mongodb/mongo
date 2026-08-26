@@ -559,3 +559,16 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    reshardingCollectionSizeEstimationTimeoutMS:
+        description: >-
+            The maximum amount of time the collection size estimation aggregation is allowed to
+            run for when deciding whether resharding document validation should be performed.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gReshardingCollectionSizeEstimationTimeoutMS
+        default:
+            expr: 5 * 1000
+        validator:
+            gt: 0
+        redact: false

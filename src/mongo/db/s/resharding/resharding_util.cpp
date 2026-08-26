@@ -85,14 +85,20 @@ boost::optional<long long> estimateCollectionSizeBytes(OperationContext* opCtx,
                                     << BSON("$sum" << "$storageStats.size")))};
     AggregateCommandRequest aggRequest(nss, pipeline);
 
+    // The caller holds the FCV region while this runs, so the aggregation must be bounded. See
+    // SERVER-133988.
+    const auto deadline = opCtx->fastClockSource().now() +
+        Milliseconds{gReshardingCollectionSizeEstimationTimeoutMS.load()};
     BSONObjBuilder resultBuilder;
     try {
-        uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
-                                                       ClusterAggregate::Namespaces{nss, nss},
-                                                       aggRequest,
-                                                       PrivilegeVector(),
-                                                       boost::none,
-                                                       &resultBuilder));
+        opCtx->runWithDeadline(deadline, ErrorCodes::MaxTimeMSExpired, [&] {
+            uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
+                                                           ClusterAggregate::Namespaces{nss, nss},
+                                                           aggRequest,
+                                                           PrivilegeVector(),
+                                                           boost::none,
+                                                           &resultBuilder));
+        });
         BSONObj result = resultBuilder.obj();
         auto resultArr = result["cursor"]["firstBatch"].Array();
         if (resultArr.empty()) {
