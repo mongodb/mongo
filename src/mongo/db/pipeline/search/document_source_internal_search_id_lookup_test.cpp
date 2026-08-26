@@ -333,9 +333,14 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsSbeWhe
     auto executor =
         exec::agg::buildIdLookupExecutor(expCtx, catalogResourceHandle, boost::none /* view */);
 
-    // Flag on + no view: the SBE point-read executor. It runs local and, on a sharded acquisition,
-    // drops orphans via the SHARDING_FILTER it puts above the scan -- no fallback needed.
-    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(executor.get()));
+    // Flag on + no view: SBE with local-read fallback for _ids SBE declines (kNotHandled).
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        executor.get());
+    ASSERT_TRUE(chain);
+    ASSERT_TRUE(
+        dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(chain->primary_forTest()));
+    ASSERT_TRUE(dynamic_cast<const exec::agg::InternalSearchIdLookUpLocalReadExecutor*>(
+        chain->fallback_forTest()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
@@ -365,8 +370,13 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, StageHoldsSbeExecutorWhenFlagOn) {
 
     auto* stage = dynamic_cast<exec::agg::InternalSearchIdLookUpStage*>(idLookupStage.get());
     ASSERT_TRUE(stage);
-    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(
-        stage->getLookupExecutor_forTest()));
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        stage->getLookupExecutor_forTest());
+    ASSERT_TRUE(chain);
+    ASSERT_TRUE(
+        dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(chain->primary_forTest()));
+    ASSERT_TRUE(dynamic_cast<const exec::agg::InternalSearchIdLookUpLocalReadExecutor*>(
+        chain->fallback_forTest()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
@@ -403,6 +413,28 @@ DEATH_TEST_F(InternalSearchIdLookupWithCatalogDeathTest,
     exec::agg::MockStage::setSource_forTest(stage, mockLocalStage.get());
 
     stage->getNext();  // Expected to tassert: the executor declined an _id lookup.
+
+    // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
+}
+
+// SBE SlotBinder cannot encode object _ids; without a fallback enrich() tripwires 13006201
+// (AF-20648). Local-read must resolve the document instead.
+TEST_F(InternalSearchIdLookupWithCatalogTest, OptimizedPathFallsBackForObjectIdWhenFlagOn) {
+    unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
+    std::vector<BSONObj> docs{fromjson("{_id: {a: 1}, color: 'red'}")};
+    insertDocuments(kTestNss, docs);
+    expCtx->setUUID(collectionUUID());
+
+    auto [idLookup, idLookupStage, collections] = createIdLookup();
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{fromjson("{_id: {a: 1}}")}}, expCtx);
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
+
+    auto next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), Document{fromjson("{_id: {a: 1}, color: 'red'}")});
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
@@ -959,9 +991,9 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocumentsExp
     assertFiltersOrphans(/*optimizedEnabled=*/true);
 }
 
-// On a sharded collection with the flag on, the stage builds the same SBE point-read executor as
-// for an unsharded collection -- there's no sharded-ness branch on our layer. This test pins that
-// executor choice.
+// On a sharded collection with the flag on, the stage builds the same SBE + local-read fallback
+// chain as for an unsharded collection -- there's no sharded-ness branch on our layer. This test
+// pins that executor choice.
 TEST_F(InternalSearchIdLookupOrphanFilteringTest,
        StageHoldsSbeExecutorForShardedCollectionWhenFlagOn) {
     unittest::ServerParameterGuard flag{"featureFlagSearchOptimizedIdLookup", true};
@@ -974,8 +1006,13 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest,
 
     auto* stage = dynamic_cast<exec::agg::InternalSearchIdLookUpStage*>(idLookupStage.get());
     ASSERT_TRUE(stage);
-    ASSERT_TRUE(dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(
-        stage->getLookupExecutor_forTest()));
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        stage->getLookupExecutor_forTest());
+    ASSERT_TRUE(chain);
+    ASSERT_TRUE(
+        dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(chain->primary_forTest()));
+    ASSERT_TRUE(dynamic_cast<const exec::agg::InternalSearchIdLookUpLocalReadExecutor*>(
+        chain->fallback_forTest()));
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
