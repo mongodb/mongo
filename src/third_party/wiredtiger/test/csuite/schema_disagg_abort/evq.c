@@ -64,7 +64,7 @@ evq_empty(EVENT_QUEUE *q)
 void
 evq_enqueue(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
 {
-    testutil_assert(ev->thread_id < state->nth_workers);
+    testutil_assert(ev->thread_id < state->worker_count);
 
     EVENT_QUEUE *q = &state->workers[ev->thread_id].evq;
     while (!evq_push(q, ev) && workload_active(state, STAGE_WORKERS))
@@ -115,7 +115,7 @@ evq_depth(WORKLOAD_STATE *state, uint32_t thread_index)
 void
 evq_drain_barrier(WORKLOAD_STATE *state)
 {
-    for (uint32_t t = 0; t < state->nth_workers; t++)
+    for (uint32_t t = 0; t < state->worker_count; t++)
         while (
           (!evq_empty(&state->workers[t].evq) || __wt_atomic_load_bool(&state->workers[t].busy)) &&
           workload_active(state, STAGE_WORKERS))

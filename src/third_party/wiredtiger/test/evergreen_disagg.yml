@@ -828,6 +828,31 @@ tasks:
           # taking leadership.
           schema_args: -r f -s 30
 
+  # Legacy schema mode: no schema epochs and no publish, single node only.
+  - name: schema-disagg-abort-legacy-crash-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # The only legacy shape that asserts drop absence: a step-up resurrects the drops a
+          # node applied while following.
+          schema_args: -e -r l -k 150
+
+  - name: schema-disagg-abort-legacy-switch-test-disagg-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    depends_on:
+        - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -e -r l -s 30
+
   # FIXME-WT-18403: Remove these tasks once all the known create/drop/create issues are gone.
   - name: schema-disagg-abort-unique-crash-test-disagg-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]

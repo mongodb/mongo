@@ -1176,10 +1176,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
              * prune timestamp, do not attempt reconciliation again. Repeating the reconciliation
              * without the prune timestamp advancing will yield no progress in garbage collection.
              */
-            wt_timestamp_t prune_timestamp =
-              __wt_atomic_load_uint64_acquire(&btree->prune_timestamp);
-            if (prune_timestamp != WT_TS_NONE &&
-              page->modify->rec_prune_timestamp >= prune_timestamp) {
+            if (__wti_evict_prune_ts_unmoved(session, page)) {
                 WT_STAT_CONN_INCR(session, cache_eviction_blocked_prune_timestamp);
                 return (__wt_set_return(session, EBUSY));
             }

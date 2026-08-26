@@ -4392,9 +4392,9 @@ tasks:
             ${PREPARE_TEST_ENV}
 
             if [ ${is_patch|false} = true ]; then
-              test/evergreen/code_coverage/coverage-report-per-test.sh true ${num_jobs|1}
+              test/evergreen/code_coverage/coverage-report-per-test.sh true ${num_jobs|1} "${branch_name}"
             else
-              test/evergreen/code_coverage/coverage-report-per-test.sh false ${num_jobs|1}
+              test/evergreen/code_coverage/coverage-report-per-test.sh false ${num_jobs|1} "${branch_name}"
             fi
       - func: "code coverage publish report"
 
@@ -4496,9 +4496,9 @@ tasks:
             pr_args+="--code_change_report_url $code_change_report_url "
 
             if [ ${is_patch|false} = true ]; then
-              ./test/evergreen/coverage-report.sh true ${python_binary|python3} ${github_commit} "$pr_args"
+              ./test/evergreen/coverage-report.sh true "${python_binary|python3}" "${github_commit}" "${branch_name}" "$pr_args"
             else
-              ./test/evergreen/coverage-report.sh false ${python_binary|python3} ${github_commit} "$pr_args"
+              ./test/evergreen/coverage-report.sh false "${python_binary|python3}" "${github_commit}" "${branch_name}" "$pr_args"
             fi
 
       - func: "code coverage publish report"

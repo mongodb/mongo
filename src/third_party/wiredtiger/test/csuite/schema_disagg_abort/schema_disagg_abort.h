@@ -7,37 +7,18 @@
  */
 
 /*
- * Disaggregated schema epoch crash recovery test.
+ * Disaggregated schema crash recovery test: one or two nodes create, populate and drop tables over
+ * a shared page log while the parent switches their roles, kills them or stops them cleanly. Each
+ * node is then recovered from shared storage and verified against per-operation record files. See
+ * README.md for the architecture, the generator's slot model and what verification asserts.
  *
- * The test binary runs in one of two roles, each in its own process:
- *
- *   parent - orchestrator and verifier. Spawns one or two symmetric nodes per the -r topology,
- *            then drives a timeline: role switches every -s seconds, SIGKILLs at the -k times,
- *            and a graceful stop at the -t timeout. Afterwards it reopens the surviving state
- *            and verifies it against the record files.
- *   node   - a database node that leads or follows, described below.
- *
- * Events are the single currency, and both node roles run the identical pipeline: a source writes
- * events to a pipe, the reader demuxes them to per-thread queues, and the workers execute them. A
- * leader's source is its own generator thread writing the full stream (the workload and the switch
- * event that ends a term) to a self-pipe; a follower's source is the peer's relay. The only role
- * difference in the pipeline is that a leader relays every applied event to the peer. A follower
- * with no event source (no peer, or the peer died) simply idles in role.
- *
- * Checkpoints are deliberately not part of the stream: a checkpoint thread paces them on its own,
- * producing them while leading and adopting the latest one while following. That independence is
- * what lets a checkpoint land anywhere between an operation and its publish, and what keeps
- * checkpoints coming while a worker sits blocked waiting for one.
- *
- * Nodes switch roles on the switch event: the leader's generator emits it when the parent drops the
- * switch-request sentinel, and the hand-over relays it to the peer; a lone follower's generator
- * consumes the sentinel and reports the hand-over directly. Nodes stop gracefully when the parent
- * drops the stop sentinel.
- *
- * The children are started by re-spawning this binary with internal options, so no state is
- * inherited by forking: everything a node needs travels through the command line. The two nodes
- * are connected by a pair of pipes, one per direction; a node writes to its out-pipe while
- * leading and reads from its in-pipe while following.
+ * Main parts:
+ *   - the parent: orchestrates and verifies;
+ *   - a node: leads or follows;
+ *   - events: generator writes them to a pipe, the reader demuxes them to
+ *     per-worker queues, the workers apply them;
+ *   - checkpoints are in their own thread, independent of the workers;
+ *   - role changes and the graceful stop are driven by sentinel files the parent drops;
  */
 
 #pragma once
@@ -52,7 +33,7 @@
 #define GEN_INSERT_ODDS 64         /* an insert: 1 in N visits to a published slot */
 #define GEN_DROP_ODDS 48           /* a drop: 1 in N visits to a published slot */
 #define GEN_APPLY_RATE_FLOOR 30    /* applied values/second, the multi-node worst case */
-#define GEN_MIN_LEAD 64            /* lead floor, so the workers stay fed */
+#define GEN_LEAD_PER_THREAD 32     /* in-flight events per worker, so the workers stay fed */
 #define GEN_STEPDOWN_MIN_EVENTS 64 /* minimum events a lone node emits during stepdown */
 
 /*
@@ -62,7 +43,7 @@
 #define FRONTIER_WINDOW 0x10000u
 
 #define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
-#define SCHEMA_EPOCH_BOOTSTRAP 1
+#define TS_BOOTSTRAP 1  /* the timestamp sequence starts here, on either mode */
 #define MAX_NODES 2
 /*
  * In-node: a retried op gives up, before the parent stops waiting. A blocked drop waits for the
@@ -70,12 +51,12 @@
  */
 #define MAX_OP_WAIT 30
 #define MAX_POOL_SIZE 64
-#define MAX_TH 12
 #define MAX_TIME 40
+#define MIN_TIME 10
 #define MAX_WAIT 60 /* parent: a child starting, stopping, or posting a sentinel */
 #define MIN_POOL_SIZE 2
+#define MAX_TH 12
 #define MIN_TH 2
-#define MIN_TIME 10
 
 /* Directory layout under the test home. */
 #define NODE_HOME_FMT "WT_NODE%" PRIu32
@@ -124,6 +105,8 @@
 #define TS_LAST_CHECKPOINT 0x40u
 #define TS_FRONTIER (TS_OLDEST | TS_STABLE | TS_STABLE_SCHEMA_EPOCH)
 #define TS_STEPDOWN (TS_STEPDOWN_TIMESTAMP | TS_STEPDOWN_SCHEMA_EPOCH)
+/* The epoch bits set_ts drops when epochs are off; setting either one leaves legacy mode. */
+#define TS_SCHEMA_EPOCHS (TS_STABLE_SCHEMA_EPOCH | TS_STEPDOWN_SCHEMA_EPOCH)
 
 /* Which process this instance of the binary is. */
 typedef enum { ROLE_PARENT = 0, ROLE_NODE } TEST_ROLE;
@@ -149,8 +132,9 @@ typedef struct {
     uint32_t thread_id;
     /*
      * The timestamp whose completion this event represents: a publish epoch, an insert's commit
-     * timestamp (which the rows also hold), or a term's final timestamp. CREATE/DROP carry none - a
-     * schema operation completes with its publish.
+     * timestamp (which the rows also hold), a legacy schema operation's timestamp, or a term's
+     * final timestamp. CREATE/DROP carry none when schema epochs are in use - a schema operation
+     * then completes with its publish.
      */
     uint64_t event_ts;
     uint32_t key_min;
@@ -182,10 +166,11 @@ typedef struct {
     bool peer_alive;    /* this node has a live peer; cleared on pipe EOF/EPIPE */
     char home[PATH_MAX];
     char page_log_home[PATH_MAX];
-    uint32_t nth;
+    uint32_t thread_count;
     uint32_t pool_size;
     /* FIXME-WT-18403: Remove -q once all the known create/drop/create issues are gone. */
     bool unique_tables;               /* -q: never reuse a table name */
+    bool epoch_less;                  /* -e: legacy schema operations without epochs or publish */
     uint32_t total_time;              /* -t: graceful stop after this many seconds */
     uint32_t switch_interval;         /* -s: switch roles every N seconds; 0: never */
     uint32_t kill_time[KILL_TARGETS]; /* -k [l|f]N: SIGKILL the target at N; 0: never */
@@ -249,26 +234,29 @@ typedef struct {
     uint64_t stepdown_ckpt_lsn; /* the step-down checkpoint, once taken */
     bool ts_busy;               /* the timestamp thread is mid-advance; atomic access */
 
-    /* Single monotonic timestamp for schema epochs AND commit timestamps. */
+    /* Single monotonic value for schema operations and commit timestamps. */
     uint64_t current_ts;
     uint64_t frontier_ts; /* every timestamp at or below it is applied; atomic access */
     /* Circular buffer for completed timestamps of all workers; atomic access. */
     uint8_t completed_ts[FRONTIER_WINDOW];
-    uint64_t emitted; /* generator: how many events have been emitted */
-    uint64_t applied; /* worker: how many events have been applied; atomic access */
-    uint32_t nth_workers;
+    uint64_t emitted;      /* generator: how many events have been emitted */
+    uint64_t applied;      /* worker: how many events have been applied; atomic access */
+    uint32_t worker_count; /* how many workers are in use this phase */
 
     /* Per-worker-thread state; the reader fills the queue, the slot model is the generator's. */
     struct {
         wt_thread_t thr; /* this worker's handle */
         EVENT_QUEUE evq; /* this worker's inbound events */
         bool busy;       /* the worker is mid-apply; atomic access */
-        /* Table state is carried across leader-follower transitions. */
-        TABLE_STATE table_state[MAX_POOL_SIZE];
-        /* Advanced by every create under -q, so a slot's table name is never reused. */
-        uint32_t slot_gen[MAX_POOL_SIZE];
-        /* Slot took an insert while stepping down; not droppable until the step-down completes. */
-        bool stepdown_insert[MAX_POOL_SIZE];
+        struct {
+            /* Table state is carried across leader-follower transitions. */
+            TABLE_STATE state;
+            /* Advanced by every create under -q, so a slot's table name is never reused. */
+            uint32_t gen;
+            /* Slot took an insert while stepping down; not droppable until the step-down completes.
+             */
+            bool stepdown_insert;
+        } table[MAX_POOL_SIZE];
     } workers[MAX_TH];
 
     /* The single-threaded stages, indexed by stage: generator, reader, checkpoint, timestamp. */
@@ -300,7 +288,7 @@ typedef struct {
 /* main.c */
 void println(const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
 uint64_t query_ts(WT_CONNECTION *conn, uint8_t bit);
-void set_ts(WT_CONNECTION *conn, uint8_t mask, uint64_t ts);
+void set_ts(const TEST_CONFIG *cfg, WT_CONNECTION *conn, uint8_t mask, uint64_t ts);
 void adopted_lsn_publish(uint32_t node_id, uint64_t lsn);
 uint64_t adopted_lsn_read(void);
 

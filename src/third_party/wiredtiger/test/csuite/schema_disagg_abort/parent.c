@@ -79,10 +79,10 @@ spawn_node(const TEST_CONFIG *cfg, const char *self_path, uint32_t node_id, bool
     static const char *const node_names[SUBPROC_SLOTS] = {"node0", "node1"};
     testutil_assert(node_id < SUBPROC_SLOTS);
 
-    char id_arg[16], nth_arg[16], pool_arg[16], rfd_arg[16], switch_arg[16], wfd_arg[16],
+    char id_arg[16], thr_count_arg[16], pool_arg[16], rfd_arg[16], switch_arg[16], wfd_arg[16],
       seed_arg[80];
     testutil_snprintf(id_arg, sizeof(id_arg), "%" PRIu32, node_id);
-    testutil_snprintf(nth_arg, sizeof(nth_arg), "%" PRIu32, cfg->nth);
+    testutil_snprintf(thr_count_arg, sizeof(thr_count_arg), "%" PRIu32, cfg->thread_count);
     testutil_snprintf(pool_arg, sizeof(pool_arg), "%" PRIu32, cfg->pool_size);
     testutil_snprintf(rfd_arg, sizeof(rfd_arg), "%d", read_fd);
     testutil_snprintf(switch_arg, sizeof(switch_arg), "%" PRIu32, cfg->switch_interval);
@@ -106,9 +106,11 @@ spawn_node(const TEST_CONFIG *cfg, const char *self_path, uint32_t node_id, bool
         argv[n++] = cfg->opts->build_dir;
     }
     argv[n++] = "-T";
-    argv[n++] = nth_arg;
+    argv[n++] = thr_count_arg;
     argv[n++] = "-u";
     argv[n++] = pool_arg;
+    if (cfg->epoch_less)
+        argv[n++] = "-e";
     if (cfg->unique_tables)
         argv[n++] = "-q";
     /* The node bounds how far its generator runs ahead so a hand-over drains inside a period. */

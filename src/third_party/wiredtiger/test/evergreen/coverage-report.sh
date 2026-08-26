@@ -4,9 +4,9 @@ set -o errexit
 set -o verbose
 
 # Check if correct number of arguments are given, pr_args can be an empty string for patch builds.
-if [[ $# -lt 3 || $# -gt 5 ]]; then
+if [[ $# -lt 4 || $# -gt 5 ]]; then
     echo "Error: invalid number of arguments."
-    echo "Usage: coverage-report.sh \${is_patch} \${python_binary} \${github_commit} \${pr_args}"
+    echo "Usage: coverage-report.sh \${is_patch} \${python_binary} \${github_commit} \${base_branch} \${pr_args}"
     echo "Current args: $@"
     exit 1
 fi
@@ -14,7 +14,8 @@ fi
 is_patch=$1
 python_binary=$2
 github_commit=$3
-pr_args=$4
+base_branch=$4
+pr_args=$5
 
 echo "coverage-report.sh"
 echo "==========================="
@@ -22,7 +23,19 @@ echo "Current args:"
 echo ". is_patch            =  $is_patch"
 echo ". python_binary       =  $python_binary"
 echo ". github_commit       =  $github_commit"
+echo ". base_branch         =  $base_branch"
 echo ". pr_args             =  $pr_args"
+
+# Prefer origin/<branch>: Evergreen clones often have only the remote-tracking ref.
+if git rev-parse --verify --quiet "origin/${base_branch}" >/dev/null; then
+    base_ref="origin/${base_branch}"
+elif git rev-parse --verify --quiet "${base_branch}" >/dev/null; then
+    base_ref="${base_branch}"
+else
+    echo "Error: base branch '${base_branch}' not found as origin/${base_branch} or ${base_branch}"
+    exit 1
+fi
+echo ". base_ref            =  $base_ref"
 
 virtualenv -p $python_binary venv
 source venv/bin/activate
@@ -33,7 +46,7 @@ EXTRA_CODE_CHANGE_PARAMETERS=''
 if [[ $is_patch == true ]]; then
     echo "This is a patch build"
     # Obtain the diff for the changes in this patch, excluding newly added 0-length files.
-    python3 test/evergreen/code_change_report/git_diff_tool.py -g . -d coverage_report/diff.txt -v
+    python3 test/evergreen/code_change_report/git_diff_tool.py -g . -d coverage_report/diff.txt -v --base_branch "${base_branch}"
     EXTRA_CODE_CHANGE_PARAMETERS='-d coverage_report/diff.txt'
     # Generate an HTML friendly version of the diff for
     sed 's/$/<br>/' coverage_report/diff.txt > coverage_report/diff.html
@@ -60,8 +73,8 @@ cd ..
 git worktree add --detach wiredtiger_previous "${github_commit}"
 cd wiredtiger_previous
 if [[ $is_patch == true ]]; then
-# Checkout the point at which this patch/branch diverged from develop
-git checkout `python3 dist/common_functions.py last_commit_from_dev`
+# Checkout the point at which this patch/branch diverged from the project branch
+git checkout "$(git merge-base -- "${base_ref}" HEAD)"
 else
 # Checkout the previous commit
 git checkout HEAD~

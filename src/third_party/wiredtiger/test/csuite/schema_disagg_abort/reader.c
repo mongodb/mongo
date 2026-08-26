@@ -42,8 +42,12 @@ reader_step_down(WORKLOAD_STATE *state, uint64_t ts)
     while (__wt_atomic_load_bool(&state->ts_busy))
         __wt_sleep(0, WT_THOUSAND);
 
-    set_ts(conn, TS_STEPDOWN, ts);
-    set_ts(conn, TS_FRONTIER, ts);
+    /*
+     * FIXME-WT-18314: Reject step down timestamp without the epoch. The `-e` mode with role
+     * switches becomes illegal.
+     */
+    set_ts(state->cfg, conn, TS_STEPDOWN, ts);
+    set_ts(state->cfg, conn, TS_FRONTIER, ts);
 
     WT_SESSION *session;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));

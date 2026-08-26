@@ -43,10 +43,10 @@ generator_emit(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
  *     state's valid moves at random. Reports whether an event was emitted; taking no move is valid,
  *     and lingering widens the window a checkpoint can land in.
  *
- * One gate keeps every move safe to execute: an insert only after its table's create published, so
- *     its commit exceeds the create's epoch. A published table with data that no checkpoint covers
- *     yet is left droppable on purpose - the drop retries in EBUSY until the checkpoint thread's
- *     next checkpoint clears it.
+ * One gate keeps every move safe to execute: an insert only after its table's create completes, so
+ *     its commit exceeds the create's publish epoch or legacy operation timestamp. A table with
+ *     data that no checkpoint covers yet is left droppable on purpose - the drop retries in EBUSY
+ *     until the checkpoint thread's next checkpoint clears it.
  */
 static bool
 generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
@@ -54,20 +54,21 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
     const bool stepping_down = phase == GEN_STEPDOWN;
     WT_RAND_STATE *rnd = &state->gen_rnd[t];
     const uint32_t slot = __wt_random(rnd) % state->cfg->pool_size;
-    TABLE_STATE *slot_state = &state->workers[t].table_state[slot];
+    TABLE_STATE *slot_state = &state->workers[t].table[slot].state;
     /* Set while stepping down; such a slot cannot be dropped until the term ends. */
-    bool *stepdown_insert = &state->workers[t].stepdown_insert[slot];
+    bool *stepdown_insert = &state->workers[t].table[slot].stepdown_insert;
 
     SCHEMA_EVENT ev = {0}; /* EVENT_NONE until a move is taken */
     switch (*slot_state) {
     case TABLE_NONE:
-        /* The only move: a fresh table; its publish is a later event of its own. */
+        /* A legacy create is complete immediately; epoch mode publishes it in a later event. */
         ev.type = EVENT_CREATE;
-        *slot_state = TABLE_CREATED;
+        *slot_state = state->cfg->epoch_less ? TABLE_PUBLISHED : TABLE_CREATED;
         if (state->cfg->unique_tables)
-            ++state->workers[t].slot_gen[slot];
+            ++state->workers[t].table[slot].gen;
         break;
     case TABLE_CREATED:
+        testutil_assert(!state->cfg->epoch_less);
         switch (__wt_random(rnd) % 3) {
         case 0: /* publish the create */
             ev.type = EVENT_PUBLISH_CREATE;
@@ -90,10 +91,11 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 && (!stepping_down || !*stepdown_insert)) {
             /* Such a drop would wait on a checkpoint the step-down cannot take. */
             ev.type = EVENT_DROP;
-            *slot_state = TABLE_DROPPED;
+            *slot_state = state->cfg->epoch_less ? TABLE_NONE : TABLE_DROPPED;
         }
         break;
     case TABLE_DROPPED:
+        testutil_assert(!state->cfg->epoch_less);
         /* Publish the drop, which frees the slot, or linger in the window. */
         if (__wt_random(rnd) % 2 == 0) {
             ev.type = EVENT_PUBLISH_DROP;
@@ -106,13 +108,15 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
 
     ev.thread_id = t;
     testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot,
-      state->workers[t].slot_gen[slot]);
+      state->workers[t].table[slot].gen);
     if (ev.type == EVENT_INSERT) {
         ev.key_min = DATA_KEY_MIN;
         ev.key_max = DATA_KEY_MAX;
     }
-    /* This event needs a timestamp. */
-    if (ev.type == EVENT_INSERT || ev.type == EVENT_PUBLISH_CREATE || ev.type == EVENT_PUBLISH_DROP)
+    /* Only an epoch-mode schema operation defers its timestamp to its publish event. */
+    const bool deferred_ts =
+      !state->cfg->epoch_less && (ev.type == EVENT_CREATE || ev.type == EVENT_DROP);
+    if (!deferred_ts)
         ev.event_ts = __wt_atomic_add_uint64(&state->current_ts, 1);
 
     generator_emit(state, &ev);
@@ -133,7 +137,7 @@ generator_round(WORKLOAD_STATE *state, uint64_t lead_max, GENERATOR_PHASE phase)
 
     bool emitted = false;
 
-    for (uint32_t t = 0; t < state->nth_workers && workload_active(state, STAGE_GENERATOR); t++)
+    for (uint32_t t = 0; t < state->worker_count && workload_active(state, STAGE_GENERATOR); t++)
         if (generator_op(state, t, phase))
             emitted = true;
     return (emitted);
@@ -141,7 +145,7 @@ generator_round(WORKLOAD_STATE *state, uint64_t lead_max, GENERATOR_PHASE phase)
 
 /* A leading generator's pacing state. */
 typedef struct {
-    uint64_t lead_max; /* events that may be in flight; UINT64_MAX when nothing bounds it */
+    uint64_t lead_max; /* events that may be in flight */
     struct timespec last_poll;
 
     uint64_t stepdown_emitted;      /* events emitted since the step-down started */
@@ -157,14 +161,13 @@ generator_pacing_init(GENERATOR_PACING *pacing, const TEST_CONFIG *cfg)
 {
     WT_CLEAR(*pacing);
     __wt_epoch(NULL, &pacing->last_poll);
-    /*-
-     * How much lead the generator may have over the workers:
-     *   - no roles switching: no limit, the event pipe will be always full,
-     *   - otherwise: throttle the generator, so role switch happens within reasonable time.
+    /*
+     * How much lead the generator may have over the workers: enough to keep every worker fed, and
+     * enough that a role switch, which drains what is queued first, completes in reasonable time.
+     * Bounding it also keeps a graceful stop prompt, since the stop drains the same queues.
      */
-    pacing->lead_max = cfg->switch_interval == 0 ?
-      UINT64_MAX :
-      WT_MAX(cfg->switch_interval * GEN_APPLY_RATE_FLOOR, GEN_MIN_LEAD);
+    pacing->lead_max = WT_MAX((uint64_t)cfg->thread_count * GEN_LEAD_PER_THREAD,
+      (uint64_t)cfg->switch_interval * GEN_APPLY_RATE_FLOOR);
 }
 
 /*
@@ -192,9 +195,12 @@ generator_switch_requested(GENERATOR_PACING *pacing)
 static void
 generator_flush_publishes(WORKLOAD_STATE *state)
 {
-    for (uint32_t t = 0; t < state->nth_workers; t++)
+    if (state->cfg->epoch_less)
+        return;
+
+    for (uint32_t t = 0; t < state->worker_count; t++)
         for (uint32_t slot = 0; slot < state->cfg->pool_size; slot++) {
-            TABLE_STATE *slot_state = &state->workers[t].table_state[slot];
+            TABLE_STATE *slot_state = &state->workers[t].table[slot].state;
             if (*slot_state != TABLE_CREATED && *slot_state != TABLE_DROPPED)
                 continue;
 
@@ -203,7 +209,7 @@ generator_flush_publishes(WORKLOAD_STATE *state)
             ev.thread_id = t;
             ev.event_ts = __wt_atomic_add_uint64(&state->current_ts, 1);
             testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t,
-              slot, state->workers[t].slot_gen[slot]);
+              slot, state->workers[t].table[slot].gen);
 
             *slot_state = *slot_state == TABLE_CREATED ? TABLE_PUBLISHED : TABLE_NONE;
             generator_emit(state, &ev);

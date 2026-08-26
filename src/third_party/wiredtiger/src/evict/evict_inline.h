@@ -1072,3 +1072,16 @@ __evict_page_updates_candidate(WT_PAGE *page)
      */
     return (page->modify->bytes_updates != 0);
 }
+
+/*
+ * __wti_evict_prune_ts_unmoved --
+ *     Return whether the prune timestamp has not advanced since the page's last reconciliation.
+ */
+static WT_INLINE bool
+__wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    wt_timestamp_t prune_timestamp;
+
+    prune_timestamp = __wt_atomic_load_uint64_acquire(&S2BT(session)->prune_timestamp);
+    return (prune_timestamp != WT_TS_NONE && page->modify->rec_prune_timestamp >= prune_timestamp);
+}

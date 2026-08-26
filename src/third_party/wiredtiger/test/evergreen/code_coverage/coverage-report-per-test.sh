@@ -5,13 +5,14 @@ set -o verbose
 echo "=== Starting Code Coverage Per Test script ==="
 
 # Copy command line parameters into local variables
-if test "$#" -ne 2; then
-    echo "Two command line parameters (is_patch and num_jobs) are required"
+if test "$#" -ne 3; then
+    echo "Three command line parameters (is_patch, num_jobs, and base_branch) are required"
     exit 1
 fi
 is_patch=$1
 num_jobs=$2
-echo "is_patch = ${is_patch}, and num_jobs = ${num_jobs}"
+base_branch=$3
+echo "is_patch = ${is_patch}, num_jobs = ${num_jobs}, base_branch = ${base_branch}"
 
 test/evergreen/find_cmake.sh
 
@@ -52,7 +53,7 @@ rm -Rf build*copy*
 if [ "${is_patch}" = true ]; then
   echo "This is a patch build, so generate a diff and a report on reached functions"
   # Obtain the diff for the changes in this patch, excluding newly added 0-length files.
-  python3 test/evergreen/code_change_report/git_diff_tool.py -g . -d coverage_report/diff.txt -v
+  python3 test/evergreen/code_change_report/git_diff_tool.py -g . -d coverage_report/diff.txt -v --base_branch "${base_branch}"
   # Generate an HTML friendly version of the diff for
   sed 's/$/<br>/' coverage_report/diff.txt > coverage_report/diff.html
   # Logging for debugging

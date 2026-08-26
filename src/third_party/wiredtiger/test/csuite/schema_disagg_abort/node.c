@@ -191,7 +191,7 @@ node_transition_done(const TEST_CONFIG *cfg, WORKLOAD_STATE *state, bool complet
 
 /*
  * node_stage_stopped --
- *     Whether every thread of a stage has been joined. STAGE_WORKERS is nth_workers threads wide,
+ *     Whether every thread of a stage has been joined. STAGE_WORKERS is worker_count threads wide,
  *     the other stages are one thread each, and STAGE_NONE is no thread at all.
  */
 bool
@@ -200,7 +200,7 @@ node_stage_stopped(WORKLOAD_STATE *state, uint32_t stage)
     if (stage != STAGE_WORKERS)
         return (!state->aux_thr[stage].created);
 
-    for (uint32_t i = 0; i < state->nth_workers; i++)
+    for (uint32_t i = 0; i < state->worker_count; i++)
         if (state->workers[i].thr.created)
             return (false);
     return (true);
@@ -244,9 +244,9 @@ static void
 workload_start(WORKLOAD_STATE *state, bool as_leader)
 {
     TEST_CONFIG *cfg = state->cfg;
-    testutil_assert(cfg->nth <= MAX_TH);
+    testutil_assert(cfg->thread_count <= MAX_TH);
 
-    state->nth_workers = cfg->nth;
+    state->worker_count = cfg->thread_count;
     state->leads = as_leader;
     /* A leader feeds itself; so does a follower with no peer. Snapshot it: peer_alive can flip. */
     state->generates = as_leader || !cfg->peer_alive;
@@ -259,17 +259,19 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->frontier_ts = state->current_ts;
     memset(state->completed_ts, 0, sizeof(state->completed_ts));
 
-    /* Reset workers' state. Note: tables' state survives role transitioning. */
-    for (uint32_t i = 0; i < cfg->nth; i++) {
+    /* Reset workers' state. */
+    for (uint32_t i = 0; i < cfg->thread_count; i++) {
         state->workers[i].busy = false;
         state->workers[i].evq.head = state->workers[i].evq.tail = 0;
-        memset(state->workers[i].stepdown_insert, 0, sizeof(state->workers[i].stepdown_insert));
+        for (uint32_t j = 0; j < cfg->pool_size; j++)
+            state->workers[i].table[j].stepdown_insert = false;
+        /* State and slot generation survive role transitioning. */
     }
 
     /* Re-seed the phase's worker and auxiliary streams. */
-    for (uint32_t i = 0; i <= cfg->nth; i++)
+    for (uint32_t i = 0; i <= cfg->thread_count; i++)
         testutil_random_from_random(
-          &state->gen_rnd[i], i < cfg->nth ? &cfg->opts->data_rnd : &cfg->opts->extra_rnd);
+          &state->gen_rnd[i], i < cfg->thread_count ? &cfg->opts->data_rnd : &cfg->opts->extra_rnd);
 
     node_aux_start(state, STAGE_TS, thread_ts_run);
     node_workers_start(state);
@@ -340,7 +342,7 @@ node_step_up(WORKLOAD_STATE *state, uint64_t final_ts)
 
     /* Restore the timestamps on the new leader's connection. */
     if (final_ts != 0)
-        set_ts(state->conn, TS_FRONTIER, final_ts);
+        set_ts(state->cfg, state->conn, TS_FRONTIER, final_ts);
 }
 
 /*
@@ -428,13 +430,9 @@ node_main(TEST_CONFIG *cfg)
 
     const NODE_ROLE *role = node_role(cfg->start_leader);
     node_open(state, role->name);
-    /*
-     * Enter the epoch world before the workload can publish anything, on either role: a follower
-     * publishes the operations it applies too. Timestamps start at the same point, so the first
-     * event's epoch is above the stable one.
-     */
-    workload_seed_counter(state, SCHEMA_EPOCH_BOOTSTRAP);
-    set_ts(state->conn, TS_FRONTIER, SCHEMA_EPOCH_BOOTSTRAP);
+    /* Seed the timestamp sequence; epoch mode also enters the schema epoch world at this value. */
+    workload_seed_counter(state, TS_BOOTSTRAP);
+    set_ts(cfg, state->conn, TS_FRONTIER, TS_BOOTSTRAP);
     println("Node %" PRIu32 ": starting as %s", cfg->node_id, role->name);
 
     return (node_run(cfg, state, role));

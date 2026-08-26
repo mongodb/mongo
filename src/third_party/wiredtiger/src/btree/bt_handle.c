@@ -479,39 +479,6 @@ __wt_btree_config_encryptor(
 }
 
 /*
- * __btree_setup_page_log --
- *     Configure a WT_BTREE page log.
- */
-static int
-__btree_setup_page_log(WT_SESSION_IMPL *session, WT_BTREE *btree)
-{
-    WT_CONFIG_ITEM page_log_item;
-    WT_DECL_RET;
-    WT_NAMED_PAGE_LOG *npage_log;
-    const char **cfg;
-
-    cfg = btree->dhandle->cfg;
-
-    /* Setup any configured page log on the data handle */
-    ret = __wt_config_gets(session, cfg, "disaggregated.page_log", &page_log_item);
-    WT_RET_NOTFOUND_OK(ret);
-    if (ret == WT_NOTFOUND || page_log_item.len == 0) {
-        npage_log = S2C(session)->disaggregated_storage.npage_log;
-        if (npage_log != NULL)
-            btree->page_log = npage_log->page_log;
-        return (0);
-    }
-
-    WT_RET(__wt_schema_open_page_log(session, &page_log_item, &npage_log));
-    if (npage_log == NULL)
-        return (0);
-
-    btree->page_log = npage_log->page_log;
-
-    return (0);
-}
-
-/*
  * __btree_conf --
  *     Configure a WT_BTREE structure.
  */
@@ -638,7 +605,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
                   "a live stable table cannot be opened on a follower");
             }
 
-            WT_RET(__btree_setup_page_log(session, btree));
+            WT_RET(
+              __wt_schema_page_log_from_config(session, btree->dhandle->cfg, &btree->page_log));
 
             /* A page log service and a storage source cannot both be enabled. */
             WT_ASSERT(session, btree->page_log == NULL || btree->bstorage == NULL);

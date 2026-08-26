@@ -9,7 +9,7 @@
 /*
  * The worker stage: N threads applying what the reader queued, exactly as the source stream fixed
  * each event, so both roles execute an identical history. Writes the verifier's record files, and
- * reports each completed operation as the thread's frontier mark.
+ * marks each completed operation in the shared frontier window.
  */
 
 #include "schema_disagg_abort.h"
@@ -40,19 +40,20 @@ record_event_line(FILE *fp, const SCHEMA_EVENT *ev)
     int ret = 0;
 
     switch (ev->type) {
+    case EVENT_CREATE:
+    case EVENT_DROP:
     case EVENT_PUBLISH_CREATE:
     case EVENT_PUBLISH_DROP:
-        /* A schema operation is recorded when its publish fixes the epoch, not when it ran. */
+        /* Epoch mode records at publish; legacy mode records before executing the operation. */
         ret = fprintf(fp, "%s %" PRIu64 " %s\n",
-          ev->type == EVENT_PUBLISH_CREATE ? "CREATE" : "DROP", ev->event_ts, ev->uri);
+          ev->type == EVENT_CREATE || ev->type == EVENT_PUBLISH_CREATE ? "CREATE" : "DROP",
+          ev->event_ts, ev->uri);
         break;
     case EVENT_INSERT:
         ret = fprintf(fp, "INSERT %" PRIu64 " %" PRIu32 " %" PRIu32 " %s\n", ev->event_ts,
           ev->key_min, ev->key_max, ev->uri);
         break;
     case EVENT_NONE:
-    case EVENT_CREATE:
-    case EVENT_DROP:
     case EVENT_STEPDOWN:
     case EVENT_SWITCH:
         testutil_assertfmt(false, "Unexpected record event type: %d", ev->type);
@@ -91,7 +92,7 @@ schema_op_stall_report(WORKLOAD_STATE *state)
 {
     println("Node %" PRIu32 ": stable %" PRIu64 ", frontier %" PRIu64, state->cfg->node_id,
       query_ts(state->conn, TS_STABLE), __wt_atomic_load_uint64(&state->frontier_ts));
-    for (uint32_t t = 0; t < state->nth_workers; t++)
+    for (uint32_t t = 0; t < state->worker_count; t++)
         println("  worker %" PRIu32 ": %" PRIu64 " events queued", t, evq_depth(state, t));
 }
 
@@ -211,14 +212,8 @@ worker_complete(WORKLOAD_STATE *state, uint64_t value)
 /*
  * apply_event --
  *     Apply one event on this node, identically for both roles and exactly as the source stream
- *     fixed it: execute it, record it, relay it to the peer when leading, and mark its value
- *     completed. A schema operation carries no timestamp - its epoch, record and completion belong
- *     to its later publish event.
- *
- * The order within an event is load-bearing (README invariant 1): relay before record, so a record
- *     on disk implies the peer holds the event; record before publish, so no checkpoint can make an
- *     unrecorded epoch durable; relay before the completion store, so the stable frontier only ever
- *     covers already-relayed events.
+ *     fixed it. In epoch mode a schema operation's timestamp, record and completion belong to its
+ *     later publish event; in legacy mode they belong to the operation itself.
  */
 static void
 apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, const SCHEMA_EVENT *ev)
@@ -239,14 +234,22 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, const
         break;
     case EVENT_CREATE:
     case EVENT_DROP:
+        /* A legacy checkpoint can make the operation durable as soon as it executes. */
+        if (state->cfg->epoch_less)
+            record_event_line(ctx->record_fp, ev);
         schema_op_execute(state, ctx->session, ev);
         if (relay)
             (void)pipe_relay_event(state->cfg, ev);
-        /* No timestamp: count it applied, but the completion belongs to the publish. */
-        (void)__wt_atomic_add_uint64(&state->applied, 1);
+        if (state->cfg->epoch_less)
+            worker_complete(state, ev->event_ts);
+        else
+            /* No timestamp: count it applied, but the completion belongs to the publish. */
+            (void)__wt_atomic_add_uint64(&state->applied, 1);
         break;
     case EVENT_PUBLISH_CREATE:
     case EVENT_PUBLISH_DROP:
+        /* Legacy mode should not see these events. */
+        testutil_assert(!state->cfg->epoch_less);
         if (relay)
             (void)pipe_relay_event(state->cfg, ev);
         record_event_line(ctx->record_fp, ev);
@@ -316,7 +319,7 @@ node_workers_start(WORKLOAD_STATE *state)
     /* One argument per worker, alive for as long as its thread; the handles live in the state. */
     static THREAD_ARG worker_arg[MAX_TH];
 
-    for (uint32_t i = 0; i < state->nth_workers; i++) {
+    for (uint32_t i = 0; i < state->worker_count; i++) {
         worker_arg[i].state = state;
         worker_arg[i].thread_index = i;
         testutil_check(
@@ -337,6 +340,6 @@ node_workers_stop(WORKLOAD_STATE *state)
 
     /* Stop the current stage. */
     __wt_atomic_store_uint32(&state->stop_stage, STAGE_WORKERS);
-    for (uint32_t i = 0; i < state->nth_workers; i++)
+    for (uint32_t i = 0; i < state->worker_count; i++)
         testutil_check(__wt_thread_join(NULL, &state->workers[i].thr));
 }

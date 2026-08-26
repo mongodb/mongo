@@ -415,6 +415,34 @@ __wt_schema_open_page_log(
 }
 
 /*
+ * __wt_schema_page_log_from_config --
+ *     Return the page log named by a table's configuration, or the connection's page log if the
+ *     table does not name one.
+ */
+int
+__wt_schema_page_log_from_config(
+  WT_SESSION_IMPL *session, const char *cfg[], WT_PAGE_LOG **page_logp)
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    WT_NAMED_PAGE_LOG *npage_log;
+
+    *page_logp = NULL;
+
+    ret = __wt_config_gets(session, cfg, "disaggregated.page_log", &cval);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret == WT_NOTFOUND || cval.len == 0)
+        npage_log = S2C(session)->disaggregated_storage.npage_log;
+    else
+        WT_RET(__wt_schema_open_page_log(session, &cval, &npage_log));
+
+    if (npage_log != NULL)
+        *page_logp = npage_log->page_log;
+
+    return (0);
+}
+
+/*
  * __wt_schema_open_storage_source --
  *     Return a storage source if configured. This doesn't really belong here, but it's shared
  *     between btree and tiered handle configuration, so I could not think of somewhere better.

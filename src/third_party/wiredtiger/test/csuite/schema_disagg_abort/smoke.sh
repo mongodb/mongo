@@ -42,6 +42,12 @@ $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -t 10 -T 2 -h WT_TEST.schema_disa
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -t 10 -T 4 -h WT_TEST.schema_disagg_abort.l4
 $TEST_WRAPPER "$test_bin" -b "$build_dir" -r l -t 10 -T 2 -u 4 -h WT_TEST.schema_disagg_abort.u4
 
+# Legacy schema mode: only single node is supported.
+$TEST_WRAPPER "$test_bin" -b "$build_dir" -e -r l -t 10 -T 2 -h WT_TEST.schema_disagg_abort.el
+$TEST_WRAPPER "$test_bin" -b "$build_dir" -e -r l -k 8 -t 10 -T 2 -h WT_TEST.schema_disagg_abort.ek
+$TEST_WRAPPER "$test_bin" -b "$build_dir" -e -r l -s 5 -k 12 -t 20 -T 2 \
+    -h WT_TEST.schema_disagg_abort.elsk
+
 # A lone follower generates its own workload and never checkpoints, so nothing becomes durable; the
 # second run then steps up over the operations it accumulated, the way a fresh node bootstraps its
 # own tables before taking leadership.
