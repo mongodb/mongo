@@ -71,24 +71,27 @@ class GreeterServiceImpl final : public Greeter::Service {
 };
 
 TEST(GRPCCore, HelloWorld) {
-    constexpr auto kServerAddress = "localhost:50051";
-
     GreeterServiceImpl service;
     grpc::EnableDefaultHealthCheckService(true);
 
+    int selectedPort = 0;
     grpc::ServerBuilder builder;
-    builder.AddListeningPort(kServerAddress, grpc::InsecureServerCredentials());
+    builder.AddListeningPort("localhost:0", grpc::InsecureServerCredentials(), &selectedPort);
     builder.RegisterService(&service);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    ASSERT(server) << "gRPC server failed to start";
+    ASSERT_GT(selectedPort, 0);
+
+    const auto serverAddress = fmt::format("localhost:{}", selectedPort);
 
     stdx::thread serverThread([&] {
-        LOGV2(7516101, "Server is listening for connections", "address"_attr = kServerAddress);
+        LOGV2(7516101, "Server is listening for connections", "address"_attr = serverAddress);
         server->Wait();
     });
 
     auto pf = makePromiseFuture<std::tuple<grpc::Status, std::string>>();
     stdx::thread clientThread(
-        [&] { pf.promise.setWith([&] { return runClient(kServerAddress); }); });
+        [&] { pf.promise.setWith([&] { return runClient(serverAddress); }); });
     const auto& [grpcStatus, response] = pf.future.get();
     ASSERT_EQ(grpcStatus.error_code(), grpc::StatusCode::OK);
     ASSERT_EQ(response, "Hello world");
