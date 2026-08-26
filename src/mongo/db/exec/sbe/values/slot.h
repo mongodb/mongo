@@ -529,23 +529,6 @@ using FrameIdGenerator = IdGenerator<FrameId>;
 using SpoolIdGenerator = IdGenerator<SpoolId>;
 
 /**
- * Given an unordered slot 'map', calls 'callback' for each slot/value pair in order of ascending
- * slot id.
- */
-template <typename T, typename C>
-void orderedSlotMapTraverse(const SlotMap<T>& map, C callback) {
-    std::set<SlotId> slots;
-    for (auto&& elem : map) {
-        slots.insert(elem.first);
-    }
-
-    for (auto slot : slots) {
-        callback(slot, map.at(slot));
-    }
-}
-
-
-/**
  * Accessor for a slot which can own the value held by that slot and provides optimized BSONObj
  * access.
  */
