@@ -2886,9 +2886,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
     unsigned long long beforeTransactionStart =
         ServerTransactionsMetrics::get(opCtx())->getTotalStarted();
     unsigned long long beforeStartedInternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalInternalStarted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalStartedInternal();
     unsigned long long beforeStartedExternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalExternalStarted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalStartedExternal();
 
     auto sessionCheckout = checkOutSession();
 
@@ -2899,9 +2899,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
 
     // The test fixture's client has no transport session, so the transaction is classified as
     // server-initiated and only the internal counter moves.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalStarted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStartedInternal(),
               beforeStartedInternal + 1U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalStarted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStartedExternal(),
               beforeStartedExternal);
 }
 
@@ -2924,9 +2924,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
     unsigned long long beforeCommitCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalCommitted();
     unsigned long long beforeCommittedInternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalInternalCommitted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommittedInternal();
     unsigned long long beforeCommittedExternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalExternalCommitted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommittedExternal();
 
     txnParticipant.commitUnpreparedTransaction(opCtx());
 
@@ -2935,9 +2935,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
 
     // The test fixture's client has no transport session, so the transaction was classified as
     // server-initiated when it started and must be counted out of the same bucket on commit.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalCommitted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommittedInternal(),
               beforeCommittedInternal + 1U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalCommitted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommittedExternal(),
               beforeCommittedExternal);
 }
 
@@ -2967,9 +2967,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
     unsigned long long beforeAbortCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
     unsigned long long beforeAbortedInternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalInternalAborted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalAbortedInternal();
     unsigned long long beforeAbortedExternal =
-        ServerTransactionsMetrics::get(opCtx())->getTotalExternalAborted();
+        ServerTransactionsMetrics::get(opCtx())->getTotalAbortedExternal();
 
     txnParticipant.abortTransaction(opCtx());
 
@@ -2978,9 +2978,9 @@ TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
 
     // The test fixture's client has no transport session, so the transaction was classified as
     // server-initiated when it started and must be counted out of the same bucket on abort.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalInternalAborted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAbortedInternal(),
               beforeAbortedInternal + 1U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalExternalAborted(),
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAbortedExternal(),
               beforeAbortedExternal);
 }
 

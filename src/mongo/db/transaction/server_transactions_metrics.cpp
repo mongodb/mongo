@@ -72,11 +72,11 @@ unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
     return _totalStartedInternal.loadRelaxed() + _totalStartedExternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalInternalStarted() const {
+unsigned long long ServerTransactionsMetrics::getTotalStartedInternal() const {
     return _totalStartedInternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalExternalStarted() const {
+unsigned long long ServerTransactionsMetrics::getTotalStartedExternal() const {
     return _totalStartedExternal.loadRelaxed();
 }
 
@@ -88,11 +88,11 @@ unsigned long long ServerTransactionsMetrics::getTotalAborted() const {
     return _totalAbortedInternal.loadRelaxed() + _totalAbortedExternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalInternalAborted() const {
+unsigned long long ServerTransactionsMetrics::getTotalAbortedInternal() const {
     return _totalAbortedInternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalExternalAborted() const {
+unsigned long long ServerTransactionsMetrics::getTotalAbortedExternal() const {
     return _totalAbortedExternal.loadRelaxed();
 }
 
@@ -104,11 +104,11 @@ unsigned long long ServerTransactionsMetrics::getTotalCommitted() const {
     return _totalCommittedInternal.loadRelaxed() + _totalCommittedExternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalInternalCommitted() const {
+unsigned long long ServerTransactionsMetrics::getTotalCommittedInternal() const {
     return _totalCommittedInternal.loadRelaxed();
 }
 
-unsigned long long ServerTransactionsMetrics::getTotalExternalCommitted() const {
+unsigned long long ServerTransactionsMetrics::getTotalCommittedExternal() const {
     return _totalCommittedExternal.loadRelaxed();
 }
 

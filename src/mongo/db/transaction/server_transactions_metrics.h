@@ -44,18 +44,18 @@ public:
     void incrementCurrentOpen();
 
     unsigned long long getTotalStarted() const;
-    unsigned long long getTotalInternalStarted() const;
-    unsigned long long getTotalExternalStarted() const;
+    unsigned long long getTotalStartedInternal() const;
+    unsigned long long getTotalStartedExternal() const;
     void incrementTotalStarted(bool isServerInitiated);
 
     unsigned long long getTotalAborted() const;
-    unsigned long long getTotalInternalAborted() const;
-    unsigned long long getTotalExternalAborted() const;
+    unsigned long long getTotalAbortedInternal() const;
+    unsigned long long getTotalAbortedExternal() const;
     void incrementTotalAborted(bool isServerInitiated);
 
     unsigned long long getTotalCommitted() const;
-    unsigned long long getTotalInternalCommitted() const;
-    unsigned long long getTotalExternalCommitted() const;
+    unsigned long long getTotalCommittedInternal() const;
+    unsigned long long getTotalCommittedExternal() const;
     void incrementTotalCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPrepared() const;
