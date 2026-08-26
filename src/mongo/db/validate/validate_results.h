@@ -183,6 +183,13 @@ public:
         _collectionHash = std::move(collectionHash);
     }
 
+    boost::optional<uint64_t> getXxh3CollectionHash() const {
+        return _xxh3CollectionHash;
+    }
+    void setXxh3CollectionHash(uint64_t xxh3CollectionHash) {
+        _xxh3CollectionHash = xxh3CollectionHash;
+    }
+
     const boost::optional<SHA256Block>& getMetadataHash() const {
         return _metadataHash;
     }
@@ -361,6 +368,7 @@ private:
 
     // Hashes computed for extended validate.
     boost::optional<SHA256Block> _collectionHash;
+    boost::optional<uint64_t> _xxh3CollectionHash;
     boost::optional<SHA256Block> _metadataHash;
     boost::optional<stdx::unordered_map<std::string, std::pair<std::string, int>>> _partialHashes;
     boost::optional<stdx::unordered_map<std::string, std::vector<BSONObj>>> _revealedIds;

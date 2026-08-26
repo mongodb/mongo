@@ -17,10 +17,14 @@
 namespace mongo {
 namespace repl {
 
-int64_t computeDocValidationHash(const BSONObj& doc) {
+int64_t computeDocValidationHash(ConstDataRange doc) {
     // XXH3 is a non-cryptographic hash, so this value is only used to guard against replication
     // bugs and storage corruption.
-    return static_cast<int64_t>(XXH3_64bits(doc.objdata(), doc.objsize()));
+    return static_cast<int64_t>(XXH3_64bits(doc.data(), doc.length()));
+}
+
+int64_t computeDocValidationHash(const BSONObj& doc) {
+    return computeDocValidationHash(ConstDataRange(doc.objdata(), doc.objsize()));
 }
 
 int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& postImage) {

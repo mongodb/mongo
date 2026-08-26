@@ -21,6 +21,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/rss/persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
@@ -877,11 +880,19 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
     results.validateResults.setNumInvalidDocuments(0);
     results.validateResults.setNumNonCompliantDocuments(0);
 
+    const bool computeXxh3Hash = _validateState->isCollHashValidation() &&
+        rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseContinuousInternodeValidation();
+
     if (opts.beginRecordId.isNull()) {
         // The record store is empty if the first RecordId isn't initialized. Stand in an empty
         // hash, which is the correct collection hash for an empty collection.
         if (_validateState->isCollHashValidation()) {
             results.validateResults.setCollectionHash(SHA256Block::computeHash({}));
+        }
+        if (computeXxh3Hash) {
+            results.validateResults.setXxh3CollectionHash(0);
         }
         return results;
     }
@@ -896,6 +907,15 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         // zeroed out.
         SHA256Block accumulatedBlock;
         accumulatedBlock.xorInline(accumulatedBlock);
+
+        // Accumulates the same records' XXH3 hashes, XORed together the same way the replicated
+        // collection validation hash folds in its per-document hashes. Zero is both the XOR
+        // identity and the value that hash carries for an empty collection.
+        uint64_t accumulatedXxh3 = 0;
+
+        // Set when a record that failed validation was folded into the hashes, which then cover
+        // that record's raw bytes rather than a document.
+        bool hashedCorruptRecord = false;
         bool revealHashedIds = _validateState->getRevealHashedIds().has_value();
         stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds;
         if (revealHashedIds) {
@@ -941,9 +961,16 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             results.validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
 
             if (_validateState->isCollHashValidation()) {
-                SHA256Block block = SHA256Block::computeHash(
-                    {ConstDataRange(record->data.data(), record->data.size())});
+                const ConstDataRange recordRange(record->data.data(), record->data.size());
+                SHA256Block block = SHA256Block::computeHash({recordRange});
                 accumulatedBlock.xorInline(block);
+                if (computeXxh3Hash) {
+                    accumulatedXxh3 ^=
+                        static_cast<uint64_t>(repl::computeDocValidationHash(recordRange));
+                }
+
+                hashedCorruptRecord |=
+                    !validateRecordStatus.isOK() || validatedSize != dataSize || !validDocument;
                 if (revealHashedIds) {
                     const auto idField = record->data.toBson()["_id"];
                     auto idBlock = SHA256Block::computeHash(
@@ -1186,6 +1213,16 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
 
         if (_validateState->isCollHashValidation()) {
             results.validateResults.setCollectionHash(accumulatedBlock);
+            if (computeXxh3Hash) {
+                results.validateResults.setXxh3CollectionHash(accumulatedXxh3);
+            }
+            if (hashedCorruptRecord) {
+                LOGV2_WARNING(13374600,
+                              "Collection hashes cover records that failed validation, so they "
+                              "hash those records' raw bytes rather than the documents they are "
+                              "meant to hold",
+                              logAttrs(_validateState->nss()));
+            }
             if (revealHashedIds) {
                 results.validateResults.setRevealedIds(std::move(revealedIds));
             }

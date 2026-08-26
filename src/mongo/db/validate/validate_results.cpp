@@ -156,6 +156,10 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         resultObj->append("all", _collectionHash->toHexString());
     }
 
+    if (_xxh3CollectionHash.has_value()) {
+        resultObj->append("xxh3All", static_cast<long long>(_xxh3CollectionHash.value()));
+    }
+
     if (_metadataHash.has_value()) {
         resultObj->append("metadata", _metadataHash->toHexString());
     }
@@ -300,13 +304,19 @@ void ValidateResults::merge(const ValidateResults& other) {
 
     tmp._recordTimestamps.insert(other._recordTimestamps.begin(), other._recordTimestamps.end());
 
-    // The collection and partial hashes are order-independent XORs of per-record SHA256 blocks and
-    // must be combined at the SHA256Block level before being stringified, so merge() only adopts a
-    // value when this result doesn't already have one.
+    // The collection and partial hashes are order-independent XORs of per-record hashes and must be
+    // combined at the hash level before being stringified, so merge() only adopts a value when this
+    // result doesn't already have one.
     if (!tmp._collectionHash) {
         tmp._collectionHash = other._collectionHash;
     } else if (other._collectionHash) {
         tmp._collectionHash->xorInline(*other._collectionHash);
+    }
+
+    if (!tmp._xxh3CollectionHash) {
+        tmp._xxh3CollectionHash = other._xxh3CollectionHash;
+    } else if (other._xxh3CollectionHash) {
+        tmp._xxh3CollectionHash = (*tmp._xxh3CollectionHash) ^ (*other._xxh3CollectionHash);
     }
 
     if (!tmp._metadataHash) {

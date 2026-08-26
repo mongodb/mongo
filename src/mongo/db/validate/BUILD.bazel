@@ -99,6 +99,9 @@ mongo_cc_library(
         "//src/mongo/db/index:multikey_paths",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
+        "//src/mongo/db/rss:persistence_provider",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
@@ -130,6 +133,8 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":collection_validation",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:sorted_data_interface_test_assert",
     ],

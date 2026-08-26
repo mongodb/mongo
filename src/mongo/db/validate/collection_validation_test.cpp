@@ -16,9 +16,11 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -1525,6 +1527,160 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationFixedBucketingInc
         _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1}, {_validateMode});
     ASSERT(results[0].getErrors().count(
         std::string{collection_validation::kTimeseriesFixedBucketingInconsistencyReason}));
+}
+
+/**
+ * Records the per-document validation hashes the way disaggregated storage does, which is what
+ * makes validate accumulate an XXH3 collection hash.
+ */
+class ContinuousInternodeValidationProvider : public rss::AttachedPersistenceProvider {
+public:
+    bool shouldUseContinuousInternodeValidation() const override {
+        return true;
+    }
+};
+
+class CollectionValidationXxh3Test : public CollectionValidationTest {
+protected:
+    CollectionValidationXxh3Test()
+        : CollectionValidationTest(Options{}.setPersistenceProvider(
+              std::make_unique<ContinuousInternodeValidationProvider>())) {}
+
+    ValidateResults collectionHashValidate(const NamespaceString& nss = kNss) {
+        ValidateResults results;
+        EXPECT_EQ(ErrorCodes::OK,
+                  collection_validation::validate(
+                      operationContext(),
+                      nss,
+                      collection_validation::ValidationOptions{
+                          collection_validation::ValidateMode::kCollectionHash,
+                          collection_validation::RepairMode::kNone,
+                          /*logDiagnostics=*/false},
+                      &results));
+        return results;
+    }
+
+    // XORs the per-document validation hashes the same way the replicated collection validation
+    // hash accumulates them.
+    static uint64_t expectedXxh3(const std::vector<BSONObj>& docs) {
+        uint64_t hash = 0;
+        for (const auto& doc : docs) {
+            hash ^= static_cast<uint64_t>(repl::computeDocValidationHash(doc));
+        }
+        return hash;
+    }
+
+    void insertDocs(const std::vector<BSONObj>& docs, const NamespaceString& nss = kNss) {
+        const AutoGetCollection coll(operationContext(), nss, MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), *coll, docs));
+        wuow.commit();
+    }
+
+    // Stands in for the same collection on a second node, so the two hashes can be compared the
+    // way continuous internode validation compares them across a replica set.
+    const NamespaceString& secondNss() {
+        static const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.t2");
+        return nss;
+    }
+
+    void createSecondCollection(const std::vector<BSONObj>& docs) {
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), secondNss(), CollectionOptions{}));
+        insertDocs(docs, secondNss());
+    }
+};
+
+TEST_F(CollectionValidationXxh3Test, EmptyCollectionHashesToZero) {
+    const auto results = collectionHashValidate();
+    ASSERT_TRUE(results.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*results.getXxh3CollectionHash(), 0U);
+}
+
+TEST_F(CollectionValidationXxh3Test, HashIsTheXorOfThePerDocumentHashes) {
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)};
+    insertDocs(docs);
+
+    const auto results = collectionHashValidate();
+    ASSERT_TRUE(results.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*results.getXxh3CollectionHash(), expectedXxh3(docs));
+}
+
+TEST_F(CollectionValidationXxh3Test, SameContentsInAnyOrderHashTheSame) {
+    insertDocs({BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    createSecondCollection({BSON("_id" << 3), BSON("_id" << 1), BSON("_id" << 2)});
+
+    const auto first = collectionHashValidate();
+    const auto second = collectionHashValidate(secondNss());
+    ASSERT_TRUE(first.getXxh3CollectionHash().has_value());
+    ASSERT_TRUE(second.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*first.getXxh3CollectionHash(), *second.getXxh3CollectionHash());
+}
+
+TEST_F(CollectionValidationXxh3Test, DifferingContentsHashDifferently) {
+    insertDocs({BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    createSecondCollection({BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 4)});
+
+    const auto first = collectionHashValidate();
+    const auto second = collectionHashValidate(secondNss());
+    ASSERT_TRUE(first.getXxh3CollectionHash().has_value());
+    ASSERT_TRUE(second.getXxh3CollectionHash().has_value());
+    EXPECT_NE(*first.getXxh3CollectionHash(), *second.getXxh3CollectionHash());
+}
+
+TEST_F(CollectionValidationXxh3Test, MissingDocumentHashesDifferently) {
+    insertDocs({BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    createSecondCollection({BSON("_id" << 1), BSON("_id" << 2)});
+
+    const auto first = collectionHashValidate();
+    const auto second = collectionHashValidate(secondNss());
+    ASSERT_TRUE(first.getXxh3CollectionHash().has_value());
+    ASSERT_TRUE(second.getXxh3CollectionHash().has_value());
+    EXPECT_NE(*first.getXxh3CollectionHash(), *second.getXxh3CollectionHash());
+}
+
+TEST_F(CollectionValidationXxh3Test, RecordThatIsNotValidBSONIsStillHashed) {
+    const auto doc = BSON("_id" << 1);
+    insertDocs({doc});
+    ASSERT_EQ(1, setUpInvalidData(operationContext()));
+
+    const auto results = collectionHashValidate();
+    EXPECT_FALSE(results.isValid());
+    ASSERT_TRUE(results.getXxh3CollectionHash().has_value());
+
+    // The corrupt record contributes its raw bytes, which is what the accompanying warning is
+    // about.
+    const auto invalidBson = "\0\0\0\0\0"sv;
+    EXPECT_EQ(*results.getXxh3CollectionHash(),
+              static_cast<uint64_t>(repl::computeDocValidationHash(doc)) ^
+                  static_cast<uint64_t>(repl::computeDocValidationHash(
+                      ConstDataRange(invalidBson.data(), invalidBson.size()))));
+}
+
+TEST_F(CollectionValidationTest, NoXxh3HashWithoutContinuousInternodeValidation) {
+    {
+        const AutoGetCollection coll(operationContext(), kNss, MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), *coll, BSON("_id" << 1)));
+        wuow.commit();
+    }
+
+    ValidateResults results;
+    EXPECT_EQ(
+        ErrorCodes::OK,
+        collection_validation::validate(operationContext(),
+                                        kNss,
+                                        collection_validation::ValidationOptions{
+                                            collection_validation::ValidateMode::kCollectionHash,
+                                            collection_validation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false},
+                                        &results));
+
+    // The default attached storage provider does not record the per-document validation hashes,
+    // so there is nothing for this hash to be compared against.
+    ASSERT_TRUE(results.getCollectionHash().has_value());
+    EXPECT_FALSE(results.getXxh3CollectionHash().has_value());
 }
 
 }  // namespace

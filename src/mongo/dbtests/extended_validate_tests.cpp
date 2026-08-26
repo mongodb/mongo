@@ -157,6 +157,9 @@ public:
             ASSERT_NE(results1.getCollectionHash(), results2.getCollectionHash());
         }
 
+        EXPECT_FALSE(results1.getXxh3CollectionHash().has_value());
+        EXPECT_FALSE(results2.getXxh3CollectionHash().has_value());
+
         dumpOnErrorGuard.dismiss();
     }
 

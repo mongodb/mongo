@@ -325,6 +325,73 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
     EXPECT_EQ(ab.getIndexResultsMap().at("idx2").getKeysTraversed(), 9);
 }
 
+TEST(ValidateResultsTest, MergeCombinesXxh3CollectionHashWithXor) {
+    const auto uuid = UUID::gen();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    auto make = [&](boost::optional<uint64_t> hash) {
+        ValidateResults vr;
+        vr.setUUID(uuid);
+        vr.setNamespaceString(nss);
+        if (hash) {
+            vr.setXxh3CollectionHash(*hash);
+        }
+        return vr;
+    };
+
+    // Two ranges of the same collection combine into the XOR of their hashes, in either order.
+    ValidateResults ab = make(0x1234);
+    ab.merge(make(0x00ff));
+    ValidateResults ba = make(0x00ff);
+    ba.merge(make(0x1234));
+    ASSERT_TRUE(ab.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*ab.getXxh3CollectionHash(), uint64_t{0x1234 ^ 0x00ff});
+    EXPECT_TRUE(ab.getXxh3CollectionHash() == ba.getXxh3CollectionHash());
+
+    // A result that never got far enough to compute a hash adopts the other one's.
+    ValidateResults adopted = make(boost::none);
+    adopted.merge(make(0x1234));
+    ASSERT_TRUE(adopted.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*adopted.getXxh3CollectionHash(), uint64_t{0x1234});
+
+    ValidateResults kept = make(0x1234);
+    kept.merge(make(boost::none));
+    ASSERT_TRUE(kept.getXxh3CollectionHash().has_value());
+    EXPECT_EQ(*kept.getXxh3CollectionHash(), uint64_t{0x1234});
+
+    ValidateResults neither = make(boost::none);
+    neither.merge(make(boost::none));
+    EXPECT_FALSE(neither.getXxh3CollectionHash().has_value());
+}
+
+TEST(ValidateResultsTest, Xxh3CollectionHashIsReportedAsALong) {
+    ValidateResults vr;
+    // Small enough to fit in an int, which is where a narrowing append would change the type.
+    vr.setXxh3CollectionHash(0);
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const BSONObj obj = bob.obj();
+    const auto elem = obj.getField("xxh3All");
+    EXPECT_EQ(elem.type(), BSONType::numberLong);
+    EXPECT_EQ(elem.Long(), 0);
+}
+
+TEST(ValidateResultsTest, Xxh3CollectionHashKeepsItsBitsWhenReported) {
+    ValidateResults vr;
+    // BSON has no unsigned 64-bit type, so a hash with the high bit set is reported as a negative
+    // long long carrying the same bits, which is how the replicated collection hash stores it too.
+    const uint64_t hash = 0xffff'ffff'ffff'fffeULL;
+    vr.setXxh3CollectionHash(hash);
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const BSONObj obj = bob.obj();
+    const auto elem = obj.getField("xxh3All");
+    EXPECT_EQ(elem.type(), BSONType::numberLong);
+    EXPECT_EQ(static_cast<uint64_t>(elem.Long()), hash);
+}
+
 TEST(ValidateResultsTest, MergeThrowsAndIsAtomicOnSpecMismatch) {
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");

@@ -175,6 +175,7 @@ mongo_cc_binary(
         "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
         "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replication_consistency_markers_impl",

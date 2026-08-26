@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -14,8 +16,15 @@ namespace repl {
 /**
  * Computes a per-document hash to be stored on the oplog entry for continuous internode
  * validation.
+ *
+ * Public so that offline validation can compute the same hash over a collection's documents.
  */
-int64_t computeDocValidationHash(const BSONObj& doc);
+[[MONGO_MOD_PUBLIC]] int64_t computeDocValidationHash(const BSONObj& doc);
+
+/**
+ * Computes the same hash over a document that is already held as a range of bytes.
+ */
+[[MONGO_MOD_PUBLIC]] int64_t computeDocValidationHash(ConstDataRange doc);
 
 /**
  * Computes the validation hash for an update. The pre-image and post-image are hashed independently
