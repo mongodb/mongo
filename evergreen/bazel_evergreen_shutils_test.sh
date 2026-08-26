@@ -94,6 +94,13 @@ case "$*" in
             printf '%s\n' "$FAKE_BAZEL_SERVER_PID" >"$FAKE_BAZEL_PIDFILE"
         fi
         ;;
+    cquery*)
+        [[ "$*" == *"--build_tag_filters=resmoke_config"* ]] || {
+            echo "resmoke config cquery must filter by tag: $*" >&2
+            exit 96
+        }
+        printf '%s\n' "//buildscripts/resmokeconfig:fake_config bazel-out/fake/config.yml"
+        ;;
     "shutdown")
         if [[ -n "${FAKE_BAZEL_PIDFILE:-}" ]]; then
             rm -f "$FAKE_BAZEL_PIDFILE"
@@ -235,6 +242,30 @@ test_remote_unittest_wrapper_is_test_scoped() {
         "test:remote_unittest --run_under=//bazel:test_wrapper" \
         "$test_run_under" \
         "the test wrapper should still apply to bazel test"
+}
+
+test_query_resmoke_configs_filters_target_universe() {
+    local tmpdir
+    local fake_bazel
+    local output_file
+
+    tmpdir="$(new_tmpdir)"
+    export FAKE_BAZEL_LOG="${tmpdir}/invocations.log"
+    export FAKE_BAZEL_OUTPUT_BASE="${tmpdir}/output-base"
+    export FAKE_BAZEL_COMMAND_LOG="${tmpdir}/command.log"
+    : >"$FAKE_BAZEL_LOG"
+    : >"$FAKE_BAZEL_COMMAND_LOG"
+    fake_bazel="$(make_fake_bazel "$tmpdir")"
+    output_file="${tmpdir}/resmoke_suite_configs.yml"
+
+    bazel_evergreen_shutils::query_resmoke_configs "$fake_bazel" "" "$output_file"
+
+    assert_contains "$(<"$FAKE_BAZEL_LOG")" "--build_tag_filters=resmoke_config" \
+        "resmoke config discovery should filter cquery's target universe"
+    assert_eq \
+        "//buildscripts/resmokeconfig:fake_config bazel-out/fake/config.yml" \
+        "$(<"$output_file")" \
+        "resmoke config discovery should preserve cquery output"
 }
 
 test_provenance_build_invocation_file_selection() {
@@ -453,6 +484,7 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
 test_cache_bazel_output_base_uses_plain_info_once
 test_should_disable_gdb_index_for_all_ci_builds
 test_remote_unittest_wrapper_is_test_scoped
+test_query_resmoke_configs_filters_target_universe
 test_provenance_build_invocation_file_selection
 test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts

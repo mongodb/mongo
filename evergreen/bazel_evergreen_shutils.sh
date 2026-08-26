@@ -828,7 +828,10 @@ bazel_evergreen_shutils::query_resmoke_configs() {
     local FLAGS="$2"
     local OUTPUT_FILE="$3"
 
-    ${BAZEL_BINARY} cquery ${FLAGS} 'kind(resmoke_config, //...)' \
+    # Restrict cquery's target universe before analysis. Without this filter, cquery analyzes
+    # every target matched by //..., including manual analysis-test fixtures whose expected
+    # analysis failures are not caught by their wrapper tests.
+    ${BAZEL_BINARY} cquery ${FLAGS} --build_tag_filters=resmoke_config 'kind(resmoke_config, //...)' \
         --output=starlark \
         --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()]) if target.files.to_list() else ""' \
         >"${OUTPUT_FILE}"
