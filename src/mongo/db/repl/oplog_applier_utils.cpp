@@ -177,18 +177,23 @@ void getContainerKeyHash(OperationContext* opCtx,
 }
 
 /**
- * Returns a copy of 'op' whose 'o' field holds 'oField'.
+ * Returns a copy of baseObject with an OplogEntry::kObjectFieldName appended.
+ *
+ * The baseObject must not have an existing OplogEntry::kObjectFieldName.
  *
  * Note that the rebuilt 'o' is appended last rather than in its original position, so the field
  * order of the result differs from that of a natural oplog entry.
  */
-OplogEntry withObject(const OplogEntry& op, const BSONObj& oField) {
-    BSONObjBuilder builder;
-    for (auto&& elem : op.getEntry().getRaw()) {
-        if (elem.fieldNameStringData() != OplogEntry::kObjectFieldName) {
-            builder.append(elem);
-        }
-    }
+OplogEntry withObject(const BSONObj& baseObject, const BSONObj& oField) {
+    dassert(!baseObject.hasField(OplogEntry::kObjectFieldName), baseObject.toString());
+    // The fixed per-element overhead of an appended BSON field: one type byte ahead of the field
+    // name and one NUL byte terminating it. baseObject.objsize() already accounts for the object's
+    // 4-byte length header and trailing EOO byte, both of which carry over to the result.
+    static constexpr int kElementOverheadBytes = 2;
+    BSONObjBuilder builder(baseObject.objsize() + kElementOverheadBytes +
+                           static_cast<int>(OplogEntry::kObjectFieldName.size()) +
+                           oField.objsize());
+    builder.appendElements(baseObject);
     builder.append(OplogEntry::kObjectFieldName, oField);
     return OplogEntry(builder.obj());
 }
@@ -320,7 +325,12 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
         return false;
     }
 
-    const BSONObj& o = op.getObject();
+    const BSONObj o = op.getObject();
+
+    // Create an owned copy and strip the object field, this will serve as a template to create
+    // "unrolled" batched oplog.
+    const BSONObj rawWithoutO = op.getRaw().removeField(OplogEntry::kObjectFieldName);
+
     switch (op.getOpType()) {
         case OpTypeEnum::kContainerInsert: {
             const auto insertO = ContainerInsertOplogEntryO::parse(
@@ -337,7 +347,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
                     reserveAdditional(expanded, values.size());
                     for (size_t i = 0; i < values.size(); ++i) {
                         expanded.emplace_back(
-                            withObject(op,
+                            withObject(rawWithoutO,
                                        makeSingleContainerInsertO(
                                            ContainerKey(baseKey + static_cast<int64_t>(i)),
                                            ContainerVal(values[i]))));
@@ -351,7 +361,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
                 reserveAdditional(expanded, keys.size());
                 for (size_t i = 0; i < keys.size(); ++i) {
                     expanded.emplace_back(
-                        withObject(op,
+                        withObject(rawWithoutO,
                                    makeSingleContainerInsertO(ContainerKey(keys[i]),
                                                               ContainerVal(values[i]))));
                 }
@@ -363,8 +373,8 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
             const auto& keys = key.getArrayKey();
             reserveAdditional(expanded, keys.size());
             for (auto&& singleKey : keys) {
-                expanded.emplace_back(
-                    withObject(op, makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
+                expanded.emplace_back(withObject(
+                    rawWithoutO, makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
             }
             return true;
         }
@@ -376,7 +386,7 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
             for (auto&& singleKey : keys) {
                 ContainerDeleteOplogEntryO singleO;
                 singleO.setKey(ContainerKey(singleKey));
-                expanded.emplace_back(withObject(op, singleO.toBSON()));
+                expanded.emplace_back(withObject(rawWithoutO, singleO.toBSON()));
             }
             return true;
         }
