@@ -727,6 +727,13 @@ class DataConsistencyChecker {
         //  nindexes, except on nodes with buildIndexes: false
         //  ns
         sourceCollections.forEach((collName) => {
+            // dbHash can report a legacy buckets namespace during an FCV transition, but collStats
+            // rejects direct access to it. Run collStats on the corresponding timeseries namespace.
+            const timeseriesBucketsPrefix = "system.buckets.";
+            if (collName.startsWith(timeseriesBucketsPrefix)) {
+                collName = collName.substring(timeseriesBucketsPrefix.length);
+            }
+
             const sourceCollStats = sourceNode.getDB(dbName).runCommand({collStats: collName});
             const syncingCollStats = syncingNode.getDB(dbName).runCommand({collStats: collName});
 
