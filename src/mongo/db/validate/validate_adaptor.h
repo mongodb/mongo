@@ -146,10 +146,9 @@ public:
     };
 
     /**
-     * The accumulated output of traversing one slice of the record store. Every field is
+     * The accumulated output of traversing one range of the record store. Every field is
      * self-contained so that results for disjoint slices can be combined via
-     * ValidateResults::merge() and KeyStringIndexConsistency::merge() (SERVER-128593) once the
-     * traversal is parallelized in SERVER-127596.
+     * ValidateResults::merge() and KeyStringIndexConsistency::merge()
      *
      * 'status' carries any exception thrown mid-traversal. The results accumulated up to that point
      * are still returned so that the caller can report partial progress before rethrowing.

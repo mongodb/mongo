@@ -21,7 +21,7 @@ std::vector<RecordId> _computeSlicePivots(const RecordId& firstRecordId,
         return pivots;
     }
 
-    // TODO(SERVER-127596): String-formatted RecordIds, used by clustered collections, have no
+    // TODO(SERVER-134015): String-formatted RecordIds, used by clustered collections, have no
     // arithmetic to stride over, so they traverse as a single slice for now. Interpolating over the
     // key bytes would restore parallelism for clustered and timeseries collections.
     if (!firstRecordId.isLong() || !lastRecordId.isLong()) {
