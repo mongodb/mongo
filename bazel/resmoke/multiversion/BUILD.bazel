@@ -43,6 +43,11 @@ multiversion_setup(
 )
 
 multiversion_setup(
+    name = "8.0",
+    version = "8.0",
+)
+
+multiversion_setup(
     name = "8.0.16",
     version = "8.0.16",
 )

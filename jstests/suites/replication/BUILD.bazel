@@ -1227,6 +1227,7 @@ resmoke_suite_test(
         "//bazel/resmoke/multiversion:last-lts",
         "//bazel/resmoke/multiversion:8.0.16",
         "//bazel/resmoke/multiversion:7.0",
+        "//bazel/resmoke/multiversion:8.0",
     ],
     shard_count = 9,
     tags = [
