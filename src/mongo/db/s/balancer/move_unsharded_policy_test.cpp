@@ -172,5 +172,84 @@ TEST_F(MoveUnshardedPolicyTest, DontMigrateAnyCollectionIfReshardingMinimumDurat
     ASSERT_EQ(0, migrateInfoVector.size());
 }
 
+TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfOneAlwaysSkipsWhenShardedCollections) {
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
+
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    // A threshold of 1.0 means the balancer should always skip moveCollection in favor of a chunk
+    // migration whenever there are sharded collections that can be balanced.
+    FailPointEnableBlock fp("balancerShouldReturnRandomMigrations",
+                            BSON("skipMoveCollectionThreshold" << 1.0));
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up an unsplittable collection that could be moved.
+    setUpUnsplittableCollection(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable"),
+        kShardId0);
+
+    // Set up a sharded collection so there is something to balance via chunk migrations.
+    const auto shardedNss =
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_sharded");
+    const auto shardedUUID = UUID::gen();
+    const ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
+    setUpCollection(shardedNss, shardedUUID, version);
+
+    // Run several rounds to be confident the skip is deterministic and not random luck.
+    for (int i = 0; i < 20; ++i) {
+        auto availableShards = getAllShardIds(operationContext());
+        const auto& migrateInfoVector =
+            _unshardedPolicy.selectCollectionsToMove(operationContext(),
+                                                     getShardStats(operationContext()),
+                                                     &availableShards,
+                                                     true /*onlyTrackedCollections*/);
+        ASSERT_EQ(0, migrateInfoVector.size());
+    }
+}
+
+TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfZeroNeverSkips) {
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
+
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    // A threshold of 0.0 means the balancer should never skip moveCollection, even when there are
+    // sharded collections that could be balanced.
+    FailPointEnableBlock fp("balancerShouldReturnRandomMigrations",
+                            BSON("skipMoveCollectionThreshold" << 0.0));
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up an unsplittable collection that should always be moved.
+    const auto unsplittableColl = setUpUnsplittableCollection(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable"),
+        kShardId0);
+
+    // Set up a sharded collection to ensure it is the threshold, not the absence of sharded
+    // collections, that drives the behavior.
+    const auto shardedNss =
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_sharded");
+    const auto shardedUUID = UUID::gen();
+    const ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
+    setUpCollection(shardedNss, shardedUUID, version);
+
+    auto availableShards = getAllShardIds(operationContext());
+    const auto& migrateInfoVector =
+        _unshardedPolicy.selectCollectionsToMove(operationContext(),
+                                                 getShardStats(operationContext()),
+                                                 &availableShards,
+                                                 true /*onlyTrackedCollections*/);
+    ASSERT_EQ(1, migrateInfoVector.size());
+    ASSERT_EQ(unsplittableColl.getUuid(), migrateInfoVector[0].uuid);
+}
+
 }  // namespace
 }  // namespace mongo

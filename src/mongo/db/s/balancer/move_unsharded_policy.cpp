@@ -386,6 +386,13 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
+        // Probability of skipping a moveCollection in favor of a chunk migration when there are
+        // sharded collections that could be balanced.
+        double skipMoveCollectionThreshold = 0.6;
+        if (auto elem = sfp.getData()["skipMoveCollectionThreshold"]; elem.isNumber()) {
+            skipMoveCollectionThreshold = elem.numberDouble();
+        }
+
         // Don't issue moveCollection if reshardingMinimumOperationDuration is greater than 5
         // seconds to prevent tests from taking too long.
         if (resharding::gReshardingMinimumOperationDurationMillis.load() > 5000) {
@@ -427,7 +434,7 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
         auto drainingShardIter = std::find_if(
             allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
         bool isDraining = drainingShardIter != allShards.end();
-        if (opCtx->getClient()->getPrng().trueWithProbability(0.6) &&
+        if (opCtx->getClient()->getPrng().trueWithProbability(skipMoveCollectionThreshold) &&
             clusterHasShardedCollections(opCtx, isDraining)) {
             return result;
         }
