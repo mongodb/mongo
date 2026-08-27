@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from bisect import bisect_left, bisect_right
 from typing import Callable, NamedTuple, Optional
@@ -14,13 +15,18 @@ from pydantic import BaseModel, Field
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.multiversion.previous_release_tag import (
     find_previous_release_tag,
-    list_release_tags,
 )
 
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
 RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+(?:-.+)?$")
-# Same, but final (GA) only: `r8.0.29`, not `r8.0.28-rc0` or `r8.0.13-s8-0`.
+# Same, but final (GA) only: `r8.0.29`, not `r8.0.30-rc0` or `r8.0.13-s8-0`.
 FINAL_RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+$")
+
+# Set by evergreen/multiversion_selection.sh for the general last-patch suites, which
+# must upgrade from a released version. Unset means the permissive behaviour the
+# disagg/DSC suites rely on: they test against Atlas release candidates, which are never
+# final releases.
+LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR = "MULTIVERSION_LAST_PATCH_EXCLUDE_PRERELEASE"
 LOGGER = structlog.getLogger(__name__)
 
 
@@ -191,27 +197,24 @@ class MultiversionService:
         mongo_version: MongoVersion,
         mongo_releases: MongoReleases,
         last_patch_resolver: Optional[Callable[[str], Optional[str]]] = None,
-        release_tag_lister: Optional[Callable[[str], list[str]]] = None,
     ) -> None:
         """
         Initialize the service.
 
         :param mongo_version: Contents of the Mongo Version file.
         :param mongo_releases: Contents of the Mongo Releases file.
-        :param last_patch_resolver: Callable taking a tag glob pattern and
-          returning the last patch release tag, or None. Defaults to
-          ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake
-          to avoid invoking git.
-        :param release_tag_lister: Callable taking a tag glob and returning the matching
-          tags. Defaults to reading them from the repository. Tests can inject a fake to
+        :param last_patch_resolver: Callable taking a tag glob pattern and a
+          ``exclude_prerelease`` flag, returning the last patch release tag or None. Defaults to
+          ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake to
           avoid invoking git.
         """
         self.mongo_version = mongo_version
         self.mongo_releases = mongo_releases
         self.last_patch_resolver = last_patch_resolver or (
-            lambda tag_pattern: find_previous_release_tag("HEAD", tag_pattern=tag_pattern)
+            lambda tag_pattern, exclude_prerelease=False: find_previous_release_tag(
+                "HEAD", tag_pattern=tag_pattern, exclude_prerelease=exclude_prerelease
+            )
         )
-        self.release_tag_lister = release_tag_lister or list_release_tags
         self._last_patch_cache: object = _UNRESOLVED
         self._version_constants: Optional[VersionConstantValues] = None
 
@@ -252,11 +255,15 @@ class MultiversionService:
         )
 
     def get_last_patch_version(self) -> Optional[str]:
-        """Get the last patch version (e.g. '8.3.1' or '8.3.1-rc1010').
+        """Get the version to use for last-patch testing (e.g. '8.0.29').
 
-        Resolved lazily on first call by walking git tags, then memoized for
-        the lifetime of the service. Returns ``None`` if no matching tag
-        exists or the resolver fails (e.g. no git, malformed tag).
+        This is the newest *published* release of the current series, bounded by
+        the newest release tag reachable from HEAD so that a build is never
+        tested against a release newer than itself.
+
+        Resolved lazily on first call, then memoized for the lifetime of the
+        service. Returns ``None`` when the series has nothing to upgrade from --
+        which callers treat as "skip last-patch testing".
         """
         # Cached `None` is a valid resolved value, so we use a sentinel to
         # distinguish it from "not computed yet".
@@ -277,56 +284,88 @@ class MultiversionService:
         latest = self.mongo_version.get_version()
         return f"r{latest.major}.{latest.minor}.*"
 
-    def _resolve_last_patch(self) -> Optional[str]:
+    def _resolve_last_patch_tag(self, exclude_prerelease: bool) -> Optional[str]:
+        """Return the newest release tag of this series before HEAD, without its 'r'.
+
+        `find_previous_release_tag` never returns a tag at or descending from HEAD, so
+        the result is always an earlier release -- the build under test can never be
+        compared against itself. That is also what makes a freshly cut branch skip: on a
+        v9.0 whose HEAD is still `r9.0.0`, the tag is not *before* HEAD, so nothing
+        resolves. Once commits land past it, `r9.0.0` becomes the version to test
+        against, which is exactly right: HEAD is the code that will become 9.0.1.
+        """
         tag_pattern = self._current_series_tag_pattern()
         try:
-            last_patch_tag = self.last_patch_resolver(tag_pattern)
+            last_patch_tag = self.last_patch_resolver(
+                tag_pattern, exclude_prerelease=exclude_prerelease
+            )
         except Exception as exc:
             LOGGER.info("Failed to resolve last patch tag", tag_pattern=tag_pattern, error=exc)
             return None
         if not last_patch_tag:
-            return None
-        if not RELEASE_TAG_RE.match(last_patch_tag):
+            # No release tag of this series precedes HEAD. Either the series has never
+            # released (master, whose only in-series tag is an alpha) or the branch was
+            # just cut and HEAD is still the release tag itself. Skip rather than fail:
+            # last-lts and last-continuous share the same selection task and must not be
+            # taken down with it.
             LOGGER.info(
-                "Unrecognized format for last patch tag", tag=last_patch_tag, pattern=tag_pattern
+                "No release tag of this series precedes HEAD; skipping last-patch",
+                tag_pattern=tag_pattern,
+                exclude_prerelease=exclude_prerelease,
+            )
+            return None
+        expected = FINAL_RELEASE_TAG_RE if exclude_prerelease else RELEASE_TAG_RE
+        if not expected.match(last_patch_tag):
+            LOGGER.info(
+                "Unrecognized format for last patch tag",
+                tag=last_patch_tag,
+                pattern=tag_pattern,
+                exclude_prerelease=exclude_prerelease,
             )
             return None
         return last_patch_tag[1:]
 
-    def has_released_patch_version(self) -> bool:
-        """Return whether this release series has ever shipped a final (GA) release.
+    def _resolve_last_patch(self) -> Optional[str]:
+        """Resolve the version to hand to db-contrib-tool for last-patch.
 
-        Used to decide whether to offer LAST_PATCH at all: last-patch means upgrading
-        from the previous patch release of the same series, so it is meaningless before
-        the series releases -- every `r9.0.*` tag is an alpha or rc until 9.0.1 ships.
+        The newest *final* release tag of this series before HEAD, unless the caller
+        opted into the permissive behaviour the disagg/DSC suites need (see
+        :data:`LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR`). Those deliberately test against Atlas
+        release candidates, so restricting them to GA tags would leave them nothing.
 
-        This answers only "has the series released?", not "is this build downloadable":
-        a tag can exist with no published binary (r8.0.27, r8.3.5), which
-        db-contrib-tool already handles by stepping down to the newest reachable
-        candidate.
+        Restricting the general suites to final tags does two things. It keeps master
+        out, since `r9.1.0-alpha0` is not a release anyone runs. And once a release
+        candidate for the *next* patch is cut, it stops that rc -- which is nearer HEAD
+        than the last actual release -- from being preferred over it.
 
-        Ambiguity returns True, since silently dropping coverage is worse than a
-        download failure.
+        The resolved tag may not be published yet; that is deliberate. db-contrib-tool
+        resolves it to that commit's Evergreen build, and steps down through published
+        releases at or below it when that build is missing. Determining publication here
+        would mean a second implementation of that policy on the other side of one
+        interface.
         """
-        tag_pattern = self._current_series_tag_pattern()
-        try:
-            tags = self.release_tag_lister(tag_pattern)
-        except Exception as exc:
-            LOGGER.warning("Could not list release tags", tag_pattern=tag_pattern, error=str(exc))
-            return True
+        return self._resolve_last_patch_tag(exclude_prerelease=self._exclude_prerelease())
 
-        if not tags:
-            LOGGER.warning("No release tags found; assuming released", tag_pattern=tag_pattern)
-            return True
+    def _exclude_prerelease(self) -> bool:
+        """Return whether last-patch must resolve to a final (GA) release tag.
 
-        if not any(FINAL_RELEASE_TAG_RE.match(tag) for tag in tags):
-            LOGGER.info(
-                "Series has no final release yet; skipping last-patch",
-                tag_pattern=tag_pattern,
-                tags_seen=len(tags),
-            )
-            return False
-        return True
+        Off by default, which is the permissive behaviour the disagg/DSC suites rely on.
+        The general suites opt in from evergreen/multiversion_selection.sh, because
+        db-contrib-tool builds the `multiversion-config` command line itself and cannot
+        be told to pass a flag.
+        """
+        return bool(os.environ.get(LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR, "").strip())
+
+    def has_released_patch_version(self) -> bool:
+        """Return whether there is a last-patch version to offer as a default peer.
+
+        Deliberately strict and independent of the environment: this decides whether
+        LAST_PATCH joins `last_versions` for every suite that declares it, and it runs
+        during task generation, where the general suites' opt-in is not set. A variant
+        that wants last-patch on a series with no GA release overrides `last_versions`
+        directly, which is how the disagg suites run on a pre-release series.
+        """
+        return self._resolve_last_patch_tag(exclude_prerelease=True) is not None
 
     def get_binary_name_for_version(self, version: str, base_name: str) -> str:
         """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.

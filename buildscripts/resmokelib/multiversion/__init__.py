@@ -23,10 +23,11 @@ class MultiversionConfig(BaseModel):
       mode.
     * last_lts_fcv: LTS version that should be tested against.
     * last_continuous_fcv: Continuous version that should be tested against.
-    * last_patch_version: Last patch release version (e.g. '8.3.1' or '8.3.1-rc1010'),
-      derived from git tag history. Omitted when not resolvable.
-    * last_patch_fcv: FCV derived from the last patch release (e.g. '8.3').
-      Omitted when not resolvable.
+    * last_patch_version: Newest published release of the current series, bounded by the
+      newest release tag reachable from HEAD (e.g. '8.0.29'). Omitted when the series has
+      nothing to upgrade from.
+    * last_patch_fcv: FCV derived from the last patch release (e.g. '8.0').
+      Omitted when the series has nothing to upgrade from.
     """
 
     last_versions: list[str]
@@ -72,11 +73,12 @@ class MultiversionConfigSubcommand(Subcommand):
             multiversion_service.get_last_patch_version() if include_last_patch else None
         )
         last_patch_fcv = multiversion_service.get_last_patch_fcv() if include_last_patch else None
-        # Offer last-patch by default only where the series has actually released, so a
-        # new series turns it on by itself with no config change. A variant can still opt
-        # in via the `last_versions` expansion, which replaces this list rather than
-        # extending it -- that is how the disagg suites test against Atlas DSC release
-        # candidates, which are not GA releases.
+        # Offer last-patch by default only where the series has a published release to
+        # upgrade from, so a new series turns it on by itself with no config change and
+        # master stays a no-op. A variant can still opt in via the `last_versions`
+        # expansion, which replaces this list rather than extending it -- that is how the
+        # disagg suites test against Atlas DSC release candidates, which are never
+        # published releases.
         last_versions = multiversion_service.get_last_versions()
         if multiversion_service.has_released_patch_version():
             last_versions.append(config.MultiversionOptions.LAST_PATCH)

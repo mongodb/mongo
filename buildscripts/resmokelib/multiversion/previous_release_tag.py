@@ -21,6 +21,8 @@ always the *previous* tag, never one that points at the target itself.
 
 from __future__ import annotations
 
+import os
+import re
 from typing import Optional
 
 import structlog
@@ -29,6 +31,11 @@ from git import Commit, Repo
 LOGGER = structlog.getLogger(__name__)
 
 DEFAULT_TAG_PATTERN = "r*.*.*"
+
+# A final (GA) release tag: `r8.0.29`, not `r8.0.30-rc0`, `r9.0.0-alpha0` or `r8.0.13-s8-0`.
+# `tag_pattern` is a git glob and cannot express "no suffix", so pre-releases are filtered
+# out after listing rather than by the pattern.
+FINAL_RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+$")
 
 
 def _list_candidate_tags(repo: Repo, pattern: str) -> list[str]:
@@ -46,18 +53,12 @@ def _list_candidate_tags(repo: Repo, pattern: str) -> list[str]:
     return [line for line in stdout.splitlines() if line]
 
 
-def list_release_tags(
-    pattern: str = DEFAULT_TAG_PATTERN, *, repo_root: Optional[str] = None
-) -> list[str]:
-    """List tags matching ``pattern``, newest first."""
-    return _list_candidate_tags(Repo(repo_root), pattern)
-
-
 def find_previous_release_tag(
     target_commit_ref: str = "HEAD",
     *,
     repo_root: Optional[str] = None,
     tag_pattern: str = DEFAULT_TAG_PATTERN,
+    exclude_prerelease: bool = False,
 ) -> Optional[str]:
     """Return the previous release tag relative to ``target_commit_ref``.
 
@@ -68,17 +69,34 @@ def find_previous_release_tag(
     ``git tag -l``). Use it to narrow the search to a major or major.minor
     series, e.g. ``r9.*.*`` or ``r9.0.*``. Defaults to ``r*.*.*``.
 
+    ``exclude_prerelease`` restricts candidates to final (GA) tags, dropping release
+    candidates, alphas and special builds. This is what keeps a series that has
+    never released -- master, whose only in-series tag is an alpha -- from
+    resolving anything, and stops a newer release candidate from being preferred
+    over the last actual release once one is cut.
+
     Returns ``None`` only when no tags matching ``tag_pattern`` exist in the
     repository. Invalid targets / repository issues are surfaced via the
     underlying GitPython exception types (for example
     :class:`git.exc.GitCommandError`, :class:`gitdb.exc.BadName`,
     :class:`git.exc.InvalidGitRepositoryError`, :class:`git.exc.NoSuchPathError`).
     """
+    if repo_root is None:
+        # GitPython's repo discovery does not honor GIT_DIR: when GIT_DIR is set
+        # (e.g. by a Bazel action running from an output directory with no .git
+        # ancestor) but GIT_WORK_TREE is not, it raises InvalidGitRepositoryError
+        # even though the plain git CLI resolves GIT_DIR fine. GIT_WORK_TREE points
+        # at the working tree root, which GitPython resolves on its own -- including
+        # following the .git file of a linked worktree -- so prefer it when present.
+        repo_root = os.environ.get("GIT_WORK_TREE")
     repo = Repo(repo_root)
     target_commit = repo.commit(target_commit_ref)
     LOGGER.debug("target commit is valid", target_commit=target_commit)
     tags = _list_candidate_tags(repo, tag_pattern)
     LOGGER.debug("listed candidate tags", count=len(tags), pattern=tag_pattern)
+    if exclude_prerelease:
+        tags = [tag for tag in tags if FINAL_RELEASE_TAG_RE.match(tag)]
+        LOGGER.debug("filtered to final release tags", count=len(tags))
     if not tags:
         return None
 

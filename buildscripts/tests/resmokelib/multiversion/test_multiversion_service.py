@@ -1,7 +1,8 @@
 """Unit tests for multiversion_service.py."""
 
+import os
 import unittest
-from unittest import TestCase
+from unittest import TestCase, mock
 
 from packaging.version import Version
 
@@ -161,8 +162,10 @@ class TestCalculateFcvConstants(TestCase):
 
 
 class TestLastPatchOnMultiversionService(TestCase):
-    def _make_service(self, resolver):
-        mongo_version = under_test.MongoVersion(mongo_version="6.0")
+    # Resolution is git-only: the newest release tag of the current series before HEAD.
+    # Tests inject the tag resolver so git is never invoked.
+
+    def _make_service(self, resolver, mongo_version="6.0.5", exclude_prerelease=False):
         mongo_releases = under_test.MongoReleases(
             **{
                 "featureCompatibilityVersions": ["5.0", "6.0", "100.0"],
@@ -170,141 +173,161 @@ class TestLastPatchOnMultiversionService(TestCase):
                 "eolVersions": [],
             }
         )
+        patcher = mock.patch.dict(
+            os.environ,
+            {under_test.LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR: "1" if exclude_prerelease else ""},
+            clear=False,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         return under_test.MultiversionService(
-            mongo_version=mongo_version,
+            mongo_version=under_test.MongoVersion(mongo_version=mongo_version),
             mongo_releases=mongo_releases,
             last_patch_resolver=resolver,
         )
 
-    def test_resolver_returning_tag_populates_fields(self):
-        service = self._make_service(lambda _pattern: "r8.3.1-rc1010")
-        self.assertEqual(service.get_last_patch_version(), "8.3.1-rc1010")
-        self.assertEqual(service.get_last_patch_fcv(), "8.3")
+    @staticmethod
+    def _resolver(tag, capture=None):
+        def resolve(tag_pattern, exclude_prerelease=False):
+            if capture is not None:
+                capture.append((tag_pattern, exclude_prerelease))
+            return tag
 
-    def test_resolver_returning_plain_release_tag(self):
-        service = self._make_service(lambda _pattern: "r8.3.1")
-        self.assertEqual(service.get_last_patch_version(), "8.3.1")
-        self.assertEqual(service.get_last_patch_fcv(), "8.3")
+        return resolve
+
+    # --- general suites: final-only ------------------------------------------------
+
+    def test_exclude_prerelease_resolves_a_final_tag(self):
+        service = self._make_service(self._resolver("r6.0.4"), exclude_prerelease=True)
+        self.assertEqual(service.get_last_patch_version(), "6.0.4")
+        self.assertEqual(service.get_last_patch_fcv(), "6.0")
+
+    def test_exclude_prerelease_skips_when_nothing_precedes_head(self):
+        # master's case: the only in-series tag is an alpha, so the filtered walk
+        # returns nothing. Also a freshly cut branch whose HEAD is still the tag.
+        service = self._make_service(self._resolver(None), exclude_prerelease=True)
+        self.assertIsNone(service.get_last_patch_version())
+
+    def test_exclude_prerelease_rejects_a_prerelease_the_resolver_still_returned(self):
+        service = self._make_service(self._resolver("r6.0.5-rc1"), exclude_prerelease=True)
+        self.assertIsNone(service.get_last_patch_version())
+
+    def test_exclude_prerelease_passes_the_flag_to_the_resolver(self):
+        captured = []
+        self._make_service(
+            self._resolver("r6.0.4", captured), exclude_prerelease=True
+        ).get_last_patch_version()
+        self.assertEqual(captured, [("r6.0.*", True)])
+
+    def test_first_release_of_a_series_is_valid_once_head_moves_past_it(self):
+        # v9.0's case: target is 9.0.0 and r9.0.0 precedes HEAD, so 9.0.0 is exactly
+        # what HEAD -- the code that will become 9.0.1 -- should upgrade from.
+        service = self._make_service(
+            self._resolver("r6.0.0"), mongo_version="6.0.0", exclude_prerelease=True
+        )
+        self.assertEqual(service.get_last_patch_version(), "6.0.0")
+
+    # --- disagg: permissive (default) -----------------------------------------------
+
+    def test_permissive_accepts_a_prerelease_tag(self):
+        service = self._make_service(self._resolver("r6.0.5-rc1010"))
+        self.assertEqual(service.get_last_patch_version(), "6.0.5-rc1010")
+        self.assertEqual(service.get_last_patch_fcv(), "6.0")
+
+    def test_permissive_passes_the_flag_to_the_resolver(self):
+        captured = []
+        self._make_service(self._resolver("r6.0.4", captured)).get_last_patch_version()
+        self.assertEqual(captured, [("r6.0.*", False)])
+
+    def test_permissive_works_on_a_series_with_no_final_release(self):
+        service = self._make_service(self._resolver("r6.0.0-rc4"), mongo_version="6.0.0")
+        self.assertEqual(service.get_last_patch_version(), "6.0.0-rc4")
+
+    # --- shared shape / failure handling --------------------------------------------
 
     def test_resolver_returning_none_leaves_fields_none(self):
-        service = self._make_service(lambda _pattern: None)
+        service = self._make_service(self._resolver(None))
         self.assertIsNone(service.get_last_patch_version())
         self.assertIsNone(service.get_last_patch_fcv())
 
     def test_resolver_returning_unparseable_tag_falls_back_to_none(self):
-        service = self._make_service(lambda _pattern: "v8.3.1")
-        self.assertIsNone(service.get_last_patch_version())
-
-    def test_resolver_returning_alpha_tag(self):
-        # The 'alpha' label is preserved verbatim.
-        service = self._make_service(lambda _pattern: "r10.0.0-alpha0")
-        self.assertEqual(service.get_last_patch_version(), "10.0.0-alpha0")
-
-    def test_resolver_returning_two_digit_minor(self):
-        service = self._make_service(lambda _pattern: "r8.12.0")
-        self.assertEqual(service.get_last_patch_version(), "8.12.0")
+        self.assertIsNone(self._make_service(self._resolver("v6.0.4")).get_last_patch_version())
 
     def test_resolver_returning_tag_missing_patch_component(self):
-        service = self._make_service(lambda _pattern: "r8.3")
-        self.assertIsNone(service.get_last_patch_version())
+        self.assertIsNone(self._make_service(self._resolver("r6.0")).get_last_patch_version())
 
     def test_resolver_returning_invalid_tag(self):
-        service = self._make_service(lambda _pattern: "rfoo")
-        self.assertIsNone(service.get_last_patch_version())
+        self.assertIsNone(self._make_service(self._resolver("rfoo")).get_last_patch_version())
 
     def test_resolver_raising_falls_back_to_none(self):
-        def resolver(_pattern):
+        def resolver(_tag_pattern, exclude_prerelease=False):
             raise RuntimeError("git is unhappy")
 
         service = self._make_service(resolver)
         self.assertIsNone(service.get_last_patch_version())
         self.assertIsNone(service.get_last_patch_fcv())
 
-    def test_resolver_receives_pattern_bounded_by_latest(self):
-        captured = []
-
-        def resolver(tag_pattern):
-            captured.append(tag_pattern)
-            return None
-
-        self._make_service(resolver).get_last_patch_version()
-        self.assertEqual(captured, ["r6.0.*"])
-
     def test_get_version_constants_does_not_invoke_resolver(self):
-        def resolver(_pattern):
+        def resolver(_tag_pattern, exclude_prerelease=False):
             raise AssertionError("resolver should not be called from get_version_constants")
 
-        # If get_version_constants() touched the resolver this would raise.
         self._make_service(resolver).get_version_constants()
 
     def test_get_version_constants_caches_result(self):
-        service = self._make_service(lambda _pattern: None)
+        service = self._make_service(self._resolver(None))
         self.assertIs(service.get_version_constants(), service.get_version_constants())
 
     def test_get_binary_name_for_last_lts(self):
-        service = self._make_service(lambda _pattern: None)
+        service = self._make_service(self._resolver(None))
         self.assertEqual(
             service.get_binary_name_for_version(MultiversionOptions.LAST_LTS, "mongod"),
             "mongod-5.0",
         )
 
     def test_get_binary_name_for_last_continuous(self):
-        service = self._make_service(lambda _pattern: None)
+        service = self._make_service(self._resolver(None))
         self.assertEqual(
             service.get_binary_name_for_version(MultiversionOptions.LAST_CONTINUOUS, "mongos"),
             "mongos-5.0",
         )
 
     def test_get_binary_name_for_last_patch(self):
-        service = self._make_service(lambda _pattern: "r8.3.1")
+        service = self._make_service(self._resolver("r6.0.4"), exclude_prerelease=True)
         self.assertEqual(
             service.get_binary_name_for_version(MultiversionOptions.LAST_PATCH, "mongod"),
-            "mongod-8.3",
+            "mongod-6.0",
         )
 
     def test_get_binary_name_for_unknown_option_raises(self):
-        service = self._make_service(lambda _pattern: None)
+        service = self._make_service(self._resolver(None))
         with self.assertRaises(ValueError):
             service.get_binary_name_for_version("not_a_real_option", "mongod")
 
     def test_resolver_called_at_most_once_across_repeated_calls(self):
-        calls = []
-
-        def resolver(tag_pattern):
-            calls.append(tag_pattern)
-            return "r8.3.1"
-
-        service = self._make_service(resolver)
+        captured = []
+        service = self._make_service(self._resolver("r6.0.4", captured))
         for _ in range(3):
             service.get_last_patch_version()
             service.get_last_patch_fcv()
-        self.assertEqual(calls, ["r6.0.*"])
+        self.assertEqual(captured, [("r6.0.*", False)])
 
     def test_resolver_called_at_most_once_when_result_is_none(self):
-        # Cached `None` must not be re-resolved -- the sentinel distinguishes
-        # "not computed yet" from "computed, no tag".
-        calls = []
-
-        def resolver(tag_pattern):
-            calls.append(tag_pattern)
-            return None
-
-        service = self._make_service(resolver)
+        captured = []
+        service = self._make_service(self._resolver(None, captured))
         for _ in range(3):
             service.get_last_patch_version()
             service.get_last_patch_fcv()
-        self.assertEqual(calls, ["r6.0.*"])
+        self.assertEqual(captured, [("r6.0.*", False)])
 
 
 class TestHasReleasedPatchVersion(TestCase):
-    # Decides whether LAST_PATCH is offered by default. Skipping is only correct on
-    # positive evidence that the series has not released; anything ambiguous must fall
-    # through to True so the problem surfaces downstream instead of silently dropping
-    # coverage.
+    # Decides whether LAST_PATCH joins `last_versions` for every suite that declares it.
+    # Always strict and environment-independent: it runs during task generation, where
+    # the general suites' opt-in is not set.
 
-    def _make_service(self, lister):
+    def _make_service(self, resolver, mongo_version="9.0.1"):
         return under_test.MultiversionService(
-            mongo_version=under_test.MongoVersion(mongo_version="9.0"),
+            mongo_version=under_test.MongoVersion(mongo_version=mongo_version),
             mongo_releases=under_test.MongoReleases(
                 **{
                     "featureCompatibilityVersions": ["8.0", "9.0", "100.0"],
@@ -312,44 +335,41 @@ class TestHasReleasedPatchVersion(TestCase):
                     "eolVersions": [],
                 }
             ),
-            release_tag_lister=lister,
+            last_patch_resolver=resolver,
         )
 
-    def test_series_with_a_ga_release(self):
-        service = self._make_service(lambda _p: ["r9.0.1", "r9.0.1-rc0", "r9.0.0"])
-        self.assertTrue(service.has_released_patch_version())
+    @staticmethod
+    def _resolver(tag, capture=None):
+        def resolve(tag_pattern, exclude_prerelease=False):
+            if capture is not None:
+                capture.append((tag_pattern, exclude_prerelease))
+            return tag
 
-    def test_series_with_only_prereleases(self):
-        # The v9.0 case today: tags exist, none of them final.
-        service = self._make_service(lambda _p: ["r9.0.0-rc1018", "r9.0.0-rc0", "r9.0.0-alpha2"])
-        self.assertFalse(service.has_released_patch_version())
+        return resolve
 
-    def test_special_build_tags_are_not_ga(self):
-        # e.g. r8.0.13-s8-0 -- a special build, not a patch release.
-        service = self._make_service(lambda _p: ["r9.0.0-s8-0", "r9.0.0-rc0"])
-        self.assertFalse(service.has_released_patch_version())
+    def test_offered_when_a_final_tag_precedes_head(self):
+        self.assertTrue(self._make_service(self._resolver("r9.0.0")).has_released_patch_version())
 
-    def test_no_tags_at_all_is_treated_as_ambiguous(self):
-        # Not a real branch state: even a brand-new series has alphas. More likely the
-        # shallow clone did not restore tags, so do not skip on it.
-        service = self._make_service(lambda _p: [])
-        self.assertTrue(service.has_released_patch_version())
+    def test_not_offered_when_nothing_precedes_head(self):
+        self.assertFalse(self._make_service(self._resolver(None)).has_released_patch_version())
 
-    def test_lister_failure_is_treated_as_ambiguous(self):
-        def lister(_p):
-            raise RuntimeError("git is unhappy")
+    def test_prerelease_tag_does_not_count(self):
+        self.assertFalse(
+            self._make_service(self._resolver("r9.0.1-rc0")).has_released_patch_version()
+        )
 
-        self.assertTrue(self._make_service(lister).has_released_patch_version())
-
-    def test_lister_receives_pattern_for_current_series(self):
+    def test_always_asks_for_final_tags_regardless_of_environment(self):
         captured = []
+        with mock.patch.dict(
+            os.environ, {under_test.LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR: ""}, clear=False
+        ):
+            self._make_service(self._resolver("r9.0.0", captured)).has_released_patch_version()
+        self.assertEqual(captured, [("r9.0.*", True)])
 
-        def lister(pattern):
-            captured.append(pattern)
-            return ["r9.0.1"]
-
-        self._make_service(lister).has_released_patch_version()
-        self.assertEqual(captured, ["r9.0.*"])
+    def test_offered_for_the_first_release_of_a_series(self):
+        # target 9.0.0 with r9.0.0 preceding HEAD: valid, HEAD becomes 9.0.1.
+        service = self._make_service(self._resolver("r9.0.0"), mongo_version="9.0.0")
+        self.assertTrue(service.has_released_patch_version())
 
 
 class TestGetOldVersions(TestCase):
