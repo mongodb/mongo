@@ -37,12 +37,6 @@ namespace mongo::timeseries::bucket_catalog::internal {
 using BucketDocumentValidator =
     std::function<std::pair<Collection::DocumentValidationResult, Status>(const BSONObj&)>;
 
-enum class [[MONGO_MOD_PARENT_PRIVATE]] StageInsertBatchResult {
-    Success,
-    RolloverNeeded,
-    NoMeasurementsStaged,
-};
-
 /**
  * Mode enum to control whether the bucket retrieval methods will return buckets that have a state
  * that conflicts with insertion.
@@ -402,40 +396,21 @@ void closeArchivedBucket(BucketCatalog& catalog,
                          ExecutionStatsController& stats);
 
 /**
- * Inserts measurements into the provided eligible bucket. On success of all measurements being
- * inserted into the provided bucket, returns true. Otherwise, returns false.
- * Also increments `currentPosition` to one past the index of the last measurement inserted.
+ * Inserts measurements into the provided eligible bucket. Returns the WriteBatch used for
+ * insertions, which becomes the caller's responsibility to commit or abort. This will be null if no
+ * measurements were actually inserted. Increments `currentPosition` to one past the index of the
+ * last measurement inserted.
  */
 [[MONGO_MOD_PARENT_PRIVATE]]
-StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                                          OperationId opId,
-                                                          const StringDataComparator* comparator,
-                                                          BatchedInsertContext& batch,
-                                                          Stripe& stripe,
-                                                          WithLock stripeLock,
-                                                          uint64_t storageCacheSizeBytes,
-                                                          Bucket& eligibleBucket,
-                                                          size_t& currentPosition,
-                                                          std::shared_ptr<WriteBatch>& writeBatch);
-
-/**
- * Given an already-selected 'bucket', inserts the measurement in 'batchedInsertTuple' to the bucket
- * if possible.
- * Returns true if successfully inserted.
- * Returns false if 'bucket' needs to be rolled over. Marks its 'rolloverReason' accordingly.
- */
-bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
-                                          Stripe& stripe,
-                                          WithLock stripeLock,
-                                          const BatchedInsertTuple& batchedInsertTuple,
-                                          OperationId opId,
-                                          const TimeseriesOptions& timeseriesOptions,
-                                          const StripeNumber& stripeNumber,
-                                          uint64_t storageCacheSizeBytes,
-                                          const StringDataComparator* comparator,
-                                          Bucket& bucket,
-                                          ExecutionStatsController& stats,
-                                          std::shared_ptr<WriteBatch>& writeBatch);
+std::shared_ptr<WriteBatch> stageInsertBatchIntoEligibleBucket(
+    BucketCatalog& catalog,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    BatchedInsertContext& batch,
+    WithLock stripeLock,
+    uint64_t storageCacheSizeBytes,
+    Bucket& eligibleBucket,
+    size_t& currentPosition);
 
 /**
  * Given a bucket 'bucket', a measurement 'doc', and the 'writeBatch', updates the 'writeBatch'

@@ -11,7 +11,6 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
@@ -21,7 +20,6 @@
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -35,7 +33,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
@@ -339,61 +336,65 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     auto options = batchedInsertCtx.options;
     auto& stats = batchedInsertCtx.stats;
     auto collator = _getCollator(nss);
-    Bucket& bucket = [&]() -> Bucket& {
-        auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
-        auto bucketOpenedDueToMetadata = true;
-        if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
-                                                               stripe,
-                                                               WithLock::withoutLock(),
-                                                               doc,
-                                                               bucketKey,
-                                                               measurementTimestamp,
-                                                               options,
-                                                               collator,
-                                                               _storageCacheSizeBytes,
-                                                               allowQueryBasedReopening,
-                                                               stats,
-                                                               bucketOpenedDueToMetadata)) {
-            return *eligibleBucket;
+    for (int retries = 0; retries < 2; ++retries) {
+        Bucket& bucket = [&]() -> Bucket& {
+            auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+            auto bucketOpenedDueToMetadata = true;
+            if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
+                                                                   stripe,
+                                                                   WithLock::withoutLock(),
+                                                                   doc,
+                                                                   bucketKey,
+                                                                   measurementTimestamp,
+                                                                   options,
+                                                                   collator,
+                                                                   _storageCacheSizeBytes,
+                                                                   allowQueryBasedReopening,
+                                                                   stats,
+                                                                   bucketOpenedDueToMetadata)) {
+                return *eligibleBucket;
+            }
+
+            // Roll over buckets to preemptively update the stats.
+            findAndRolloverOpenBuckets(catalog,
+                                       stripe,
+                                       WithLock::withoutLock(),
+                                       bucketKey,
+                                       measurementTimestamp,
+                                       Seconds(*options.getBucketMaxSpanSeconds()),
+                                       allowQueryBasedReopening,
+                                       bucketOpenedDueToMetadata);
+
+            return internal::allocateBucket(catalog,
+                                            stripe,
+                                            WithLock::withoutLock(),
+                                            bucketKey,
+                                            options,
+                                            measurementTimestamp,
+                                            collator,
+                                            stats);
+        }();
+
+        auto opId = opCtx->getOpID();
+        size_t currentPosition = 0;
+        auto writeBatch =
+            bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
+                                                                         opId,
+                                                                         collator,
+                                                                         batchedInsertCtx,
+                                                                         WithLock::withoutLock(),
+                                                                         _storageCacheSizeBytes,
+                                                                         bucket,
+                                                                         currentPosition);
+        if (writeBatch) {
+            ASSERT_EQ(currentPosition, 1);
+            return writeBatch;
         }
-
-        // Roll over buckets to preemptively update the stats.
-        findAndRolloverOpenBuckets(catalog,
-                                   stripe,
-                                   WithLock::withoutLock(),
-                                   bucketKey,
-                                   measurementTimestamp,
-                                   Seconds(*options.getBucketMaxSpanSeconds()),
-                                   allowQueryBasedReopening,
-                                   bucketOpenedDueToMetadata);
-
-        return internal::allocateBucket(catalog,
-                                        stripe,
-                                        WithLock::withoutLock(),
-                                        bucketKey,
-                                        options,
-                                        measurementTimestamp,
-                                        collator,
-                                        stats);
-    }();
-
-    auto opId = opCtx->getOpID();
-    size_t currentPosition = 0;
-    std::shared_ptr<bucket_catalog::WriteBatch> writeBatch =
-        activeBatch(catalog.trackingContexts, bucket, opId, batchedInsertCtx.stripeNumber, stats);
-    EXPECT_EQ(bucket_catalog::internal::StageInsertBatchResult::Success,
-              bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
-                                                                           opId,
-                                                                           collator,
-                                                                           batchedInsertCtx,
-                                                                           stripe,
-                                                                           WithLock::withoutLock(),
-                                                                           _storageCacheSizeBytes,
-                                                                           bucket,
-                                                                           currentPosition,
-                                                                           writeBatch));
-
-    return writeBatch;
+    }
+    // The second insert attempt must always succeed as it'll be on a fresh bucket. If that fails as
+    // well, we'd loop forever.
+    GTEST_FAIL();
+    return nullptr;
 }
 
 void BucketCatalogTest::_testMeasurementSchema(
@@ -1040,23 +1041,21 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
             bucketToInsertInto->rolloverReason = RolloverReason::kNone;
         }
         size_t prevNumMeasurements = bucketToInsertInto->numMeasurements;
-        auto newWriteBatch = activeBatch(_bucketCatalog->trackingContexts,
-                                         *bucketToInsertInto,
-                                         _opCtx->getOpID(),
-                                         curBatch.stripeNumber,
-                                         curBatch.stats);
         size_t prevCurPosition = curPosition;
-        auto successfulInsertion =
+        auto newWriteBatch =
             internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
                                                          _opCtx->getOpID(),
                                                          bucketsColl->getDefaultCollator(),
                                                          curBatch,
-                                                         stripe,
                                                          stripeLock,
                                                          _storageCacheSizeBytes,
                                                          *bucketToInsertInto,
-                                                         curPosition,
-                                                         newWriteBatch);
+                                                         curPosition);
+        if (prevCurPosition < curPosition) {
+            EXPECT_TRUE(newWriteBatch);
+        } else {
+            EXPECT_FALSE(newWriteBatch);
+        }
         EXPECT_EQ((bucketToInsertInto->numMeasurements - prevNumMeasurements),
                   numMeasurementsInWriteBatch[i]);
         curPositionFromNumMeasurementsInBatch += numMeasurementsInWriteBatch[i];
@@ -1073,13 +1072,6 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                            stripeLock,
                            *bucketToInsertInto,
                            RolloverReason::kSchemaChange);
-        if (i == (numMeasurementsInWriteBatch.size() - 1)) {
-            EXPECT_EQ(successfulInsertion,
-                      bucket_catalog::internal::StageInsertBatchResult::Success);
-        } else {
-            EXPECT_NE(successfulInsertion,
-                      bucket_catalog::internal::StageInsertBatchResult::Success);
-        }
     }
 }
 
@@ -5991,6 +5983,45 @@ TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsNonNegative) {
     // Reset all stats.
     collStats.numActiveBuckets.swap(0);
     globalStats.numActiveBuckets.swap(0);
+}
+
+TEST_F(BucketCatalogTest, StagingRecheckRolloverDoesNotLeakBatch) {
+    const Date_t time = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto committedBatch =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << time << _metaField << _metaValue));
+    _commit(_ns1, committedBatch, 0);
+
+    std::shared_ptr<bucket_catalog::WriteBatch> secondBatch;
+    {
+        FailPointEnableBlock forceRecheckRollover("timeseriesForceStagingRecheckRollover");
+        secondBatch = _insertOneWithoutReopening(
+            _opCtx,
+            *_bucketCatalog,
+            _ns1,
+            _uuid1,
+            BSON(_timeField << time + Seconds(1) << _metaField << _metaValue));
+    }
+
+    // The measurement lands in a new bucket after the forced rollover.
+    EXPECT_NE(secondBatch->bucketId, committedBatch->bucketId);
+
+    // The second measurement must not have registered a write batch in the original bucket
+    for (auto& stripe : _bucketCatalog->stripes) {
+        const Bucket* bucket = internal::findBucket(_bucketCatalog->bucketStateRegistry,
+                                                    *stripe,
+                                                    WithLock::withoutLock(),
+                                                    committedBatch->bucketId,
+                                                    internal::IgnoreBucketState::kYes);
+        if (bucket) {
+            EXPECT_EQ(0, bucket->batches.count(_opCtx->getOpID()));
+        }
+    }
+
+    _commit(_ns1, secondBatch, 0);
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

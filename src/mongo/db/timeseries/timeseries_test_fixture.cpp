@@ -475,23 +475,16 @@ void TimeseriesTestFixture::_stageInsertOneBatchIntoEligibleBucketHelper(
     size_t currentPosition = 0;
     auto& stripe = *_bucketCatalog->stripes[batch.stripeNumber];
     std::lock_guard stripeLock{stripe.mutex};
-    auto writeBatch = activeBatch(_bucketCatalog->trackingContexts,
-                                  *bucket,
-                                  _opCtx->getOpID(),
-                                  batch.stripeNumber,
-                                  batch.stats);
-    auto successfulInsertion = bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(
+    auto writeBatch = bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(
         *_bucketCatalog,
         _opCtx->getOpID(),
         bucketsColl->getDefaultCollator(),
         batch,
-        stripe,
         stripeLock,
         _storageCacheSizeBytes,
         *bucket,
-        currentPosition,
-        writeBatch);
-    ASSERT_EQ(successfulInsertion, bucket_catalog::internal::StageInsertBatchResult::Success);
+        currentPosition);
+    ASSERT(writeBatch);
     ASSERT_EQ(currentPosition, batch.measurementsTimesAndIndices.size());
 }
 

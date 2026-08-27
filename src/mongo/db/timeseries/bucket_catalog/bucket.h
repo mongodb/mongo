@@ -190,7 +190,6 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts&,
 std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
                                         OperationId opId,
-                                        std::uint8_t stripe,
                                         ExecutionStatsController& stats);
 
 }  // namespace mongo::timeseries::bucket_catalog

@@ -1135,9 +1135,8 @@ TimeseriesWriteBatches stageInsertBatch(
     std::unique_lock<std::mutex> stripeLock{stripe.mutex};
     TimeseriesWriteBatches writeBatches;
     size_t currentPosition = 0;
-    bool needsAnotherBucket = true;
 
-    while (needsAnotherBucket) {
+    while (currentPosition < batch.measurementsTimesAndIndices.size()) {
         bool bucketOpenedDueToMetadata = true;
         auto [measurement, measurementTimestamp, _] =
             batch.measurementsTimesAndIndices[currentPosition];
@@ -1157,37 +1156,30 @@ TimeseriesWriteBatches stageInsertBatch(
                                                  batch.stats,
                                                  bucketOpenedDueToMetadata);
 
-        // getEligibleBucket guarantees that we will successfully insert at least one measurement
-        // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without
-        // rolling it over, which allows us to unconditionally initialize the writeBatch.
-        std::shared_ptr<WriteBatch> writeBatch = activeBatch(
-            bucketCatalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
-        writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
-        internal::StageInsertBatchResult result =
-            internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
-                                                         opId,
-                                                         comparator,
-                                                         batch,
-                                                         stripe,
-                                                         stripeLock,
-                                                         storageCacheSizeBytes,
-                                                         eligibleBucket,
-                                                         currentPosition,
-                                                         writeBatch);
+        auto writeBatch = internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
+                                                                       opId,
+                                                                       comparator,
+                                                                       batch,
+                                                                       stripeLock,
+                                                                       storageCacheSizeBytes,
+                                                                       eligibleBucket,
+                                                                       currentPosition);
 
-        /**
-         * Though rare, it is possible that the bucket provided by getEligibleBucket
-         * is not considered to be eligible when re-checking for rollover inside
-         * stageInsertBatchIntoEligibleBucket. For example, there is a global
-         * statistic, numActiveBuckets, that is not protected by the stripe lock
-         * and can be independently updated between the two checks. To avoid a
-         * crash, the write path will ignore an ineligible bucket and try again.
-         */
-        if (result != internal::StageInsertBatchResult::NoMeasurementsStaged) {
-            writeBatches.emplace_back(writeBatch);
+        if (writeBatch) {
+            writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
+            writeBatches.push_back(writeBatch);
+        } else {
+            /**
+             * Though rare, it is possible that the bucket provided by getEligibleBucket is not
+             * considered to be eligible when re-checking for rollover inside
+             * stageInsertBatchIntoEligibleBucket. For example, there is a global statistic,
+             * numActiveBuckets, that is not protected by the stripe lock and can be independently
+             * updated between the two checks. To avoid a crash, the write path will ignore an
+             * ineligible bucket and try again. If this happened, the previous bucket must have a
+             * rollover reason set or we'd just loop forever trying to insert into it.
+             */
+            invariant(eligibleBucket.rolloverReason != RolloverReason::kNone);
         }
-
-        needsAnotherBucket = (result != internal::StageInsertBatchResult::Success);
     }
 
     invariant(currentPosition == batch.measurementsTimesAndIndices.size());

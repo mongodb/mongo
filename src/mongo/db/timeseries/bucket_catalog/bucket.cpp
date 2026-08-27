@@ -144,7 +144,6 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
 std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
                                         OperationId opId,
-                                        std::uint8_t stripe,
                                         ExecutionStatsController& stats) {
     auto it = bucket.batches.find(opId);
     if (it == bucket.batches.end()) {
