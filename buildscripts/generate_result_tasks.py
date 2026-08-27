@@ -319,9 +319,6 @@ def get_assignment_tag(target: str) -> Optional[str]:
     # Format is like "assigned_to_jira_team_devprod_build".
     # See also docs/evergreen-testing/yaml_configuration/task_ownership_tags.md
 
-    # Route failures to devprod test infrastructure as RBE is rolled out. TODO SERVER-126116.
-    return "assigned_to_jira_team_devprod_test_infrastructure"
-
     assignment_tags = resolve_assignment_tags()
     tags = set()
     for codeowner in get_codeowners(target):
@@ -337,7 +334,7 @@ def get_assignment_tag(target: str) -> Optional[str]:
 
 def get_codeowners(target: str) -> list[str]:
     package = target.split(":", 1)[0]
-    return resolve_codeowners().get(package)
+    return resolve_codeowners().get(package, [])
 
 
 @cache
@@ -459,9 +456,7 @@ def _build_tag_query(tags: list[str], target_pattern: str, local_exec: bool = Fa
         # lookahead prevents matching tag prefixes). The macro expands to the custom
         # _resmoke_test rule, and the ci-*/exclusion tags this query filters on are
         # only ever applied to resmoke suites, so no other rule kind is relevant.
-        return (
-            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', " f"kind('_resmoke_test', {target_pattern}))"
-        )
+        return f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('_resmoke_test', {target_pattern}))"
 
     if len(positive_tags) == 1:
         inclusion = tagged(positive_tags[0])

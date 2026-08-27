@@ -8,6 +8,9 @@ from buildscripts import generate_result_tasks as g
 
 INCOMPATIBLE = "incompatible_with_bazel_remote_test"
 
+FAKE_CODEOWNERS = {"//jstests/suites/security": ["10gen/server-security"]}
+FAKE_ASSIGNMENT_TAGS = {"10gen/server-security": "assigned_to_jira_team_server_security"}
+
 
 class TestBuildTagQuery(unittest.TestCase):
     def test_rbe_excludes_incompatible(self):
@@ -71,7 +74,21 @@ class TestExpandEvergreenVariables(unittest.TestCase):
         self.assertEqual(local, "--test_tag_filters=ci-default,incompatible_with_bazel_remote_test")
 
 
-class TestMakeResultsTask(unittest.TestCase):
+class FakeOwnershipMixin:
+    """Stubs out the ownership lookups, which otherwise shell out to `bazel run`."""
+
+    def setUp(self):
+        super().setUp()
+        for name, value in (
+            ("resolve_codeowners", FAKE_CODEOWNERS),
+            ("resolve_assignment_tags", FAKE_ASSIGNMENT_TAGS),
+        ):
+            patcher = mock.patch.object(g, name, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+
+class TestMakeResultsTask(FakeOwnershipMixin, unittest.TestCase):
     @staticmethod
     def _exec_vars(task):
         for cmd in task["commands"]:
@@ -97,7 +114,7 @@ class TestMakeResultsTask(unittest.TestCase):
         self.assertEqual(g.LOCAL_INCOMPATIBLE_FILTER, ",incompatible_with_bazel_remote_test")
 
 
-class TestMakeLocalResultsTask(unittest.TestCase):
+class TestMakeLocalResultsTask(FakeOwnershipMixin, unittest.TestCase):
     @staticmethod
     def _funcs(task):
         return [c.get("func") for c in task["commands"]]
@@ -107,6 +124,7 @@ class TestMakeLocalResultsTask(unittest.TestCase):
         return [c.get("func") or c.get("command") for c in task["commands"]]
 
     def setUp(self):
+        super().setUp()
         self.task = g.make_local_results_task("//jstests/suites/security:auth")
 
     def test_named_after_target_and_tagged_local(self):
