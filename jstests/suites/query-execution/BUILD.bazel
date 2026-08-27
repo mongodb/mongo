@@ -2026,10 +2026,12 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "no_passthrough_qemp_ifr_no_nlm_transform",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_qemp_ifr_no_nlm_transform.yml",
+    data = NO_PASSTHROUGH_DATA,
     shard_count = 40,
     tags = [
         "ci-default",
         "incompatible_with_bazel_remote_test",
+        "requires_xlarge_host",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -2047,6 +2049,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "no_passthrough_with_mongod_qemp_ifr_no_nlm_transform",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_with_mongod_qemp_ifr_no_nlm_transform.yml",
+    data = [
+        "//jstests/auth:test_only_commands_list.js",
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
     shard_count = 10,
     tags = [
         "ci-default",
