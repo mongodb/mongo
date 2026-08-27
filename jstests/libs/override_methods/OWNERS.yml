@@ -20,6 +20,9 @@ filters:
   - "implicitly_retry_on_shard_transition_errors.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "implicitly_retry_on_csrs_transition_errors.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "validate_collections_on_shutdown.js":
     approvers:
       - 10gen/server-validate

@@ -132,6 +132,7 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        await import('jstests/libs/override_methods/implicitly_retry_on_csrs_transition_errors.js');
         globalThis.db = connect(TestData.connectionString);
         await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
