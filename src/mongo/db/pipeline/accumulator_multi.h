@@ -225,7 +225,6 @@ private:
     // constructor as we add/remove values.
     std::vector<std::pair<Value, int64_t>> _ring;
     size_t _ringHead = 0;
-    size_t _ringCount = 0;
     Sense _variant;
 };
 

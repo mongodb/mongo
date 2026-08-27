@@ -328,7 +328,7 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 }
 
 void AccumulatorFirstLastN::_processValue(const Value& val) {
-    if (_ringCount == static_cast<size_t>(*_n)) {
+    if (_ring.size() == static_cast<size_t>(*_n)) {
         if (_variant == Sense::kFirst) {
             // Once _ring contains 'n' elements and this is $firstN, we don't need to call process
             // anymore. Return before copying 'val' since it is discarded here.
@@ -347,7 +347,6 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
         const int64_t newSize = valToProcess.getApproximateSize();
         _memUsageTracker.add(newSize);
         _ring.push_back({std::move(valToProcess), newSize});
-        ++_ringCount;
     }
 
     checkMemUsage();
@@ -388,14 +387,14 @@ void AccumulatorFirstLastN::reset() {
     _ring.shrink_to_fit();
     _memUsageTracker.set(sizeof(*this));
     _ringHead = 0;
-    _ringCount = 0;
 }
 
 Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
     std::vector<Value> result;
-    result.reserve(_ringCount);
-    for (size_t i = 0; i < _ringCount; ++i) {
-        result.emplace_back(_ring[(_ringHead + i) % _ring.size()].first);
+    size_t const n = _ring.size();
+    result.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        result.emplace_back(_ring[(_ringHead + i) % n].first);
     }
     return Value{std::move(result)};
 }
