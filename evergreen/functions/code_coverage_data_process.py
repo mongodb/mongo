@@ -3,6 +3,7 @@ import os
 import platform
 import subprocess
 import sys
+import tarfile
 
 from buildscripts.util.expansions import get_expansion
 
@@ -19,6 +20,101 @@ def get_bazel_coverage_report_file() -> str:
         bazel_output_location, "_coverage", "_coverage_report.dat"
     )
     return bazel_coverage_report_location
+
+
+BAZEL_COVERAGE_SUMMARY_FILE = "bazel-coverage-summary.txt"
+BAZEL_COVERAGE_REPORT_FILE = "bazel-coverage-report.tar.gz"
+BAZEL_COVERAGE_REPORT_MEMBER = "bazel-coverage-report.lcov"
+
+
+def _archive_coverage_report(report_path: str, archive_path: str) -> None:
+    """Compress the raw lcov report into the working directory for upload.
+
+    The report lives under bazel's output path, which s3.put can't reach, and a full-repo
+    tracefile is large but highly compressible, so it is archived rather than copied.
+
+    A tarball rather than a bare .gz specifically so the artifact opens by double-click on
+    macOS: Archive Utility rejects a plain gzip stream with "Error 79 - Inappropriate file
+    type or format", but handles tar.gz natively. The tar wrapper costs ~3% at the same
+    compression level, and this artifact exists to be downloaded and read by a human.
+    """
+    with tarfile.open(archive_path, "w:gz", compresslevel=9) as tar:
+        tar.add(report_path, arcname=BAZEL_COVERAGE_REPORT_MEMBER)
+    print(
+        f"[coverage-summary] archived raw lcov report to {archive_path} "
+        f"({os.path.getsize(report_path)} -> {os.path.getsize(archive_path)} bytes)"
+    )
+
+
+def _parse_lcov_line_coverage(report_path: str) -> dict[str, dict[int, int]]:
+    """Parse an lcov tracefile into {source_file: {line_number: hit_count}}.
+
+    A single source file can appear in more than one record when reports are merged, so hit
+    counts are accumulated per line rather than overwritten. Only DA: (line) records are read;
+    branch and function records are ignored.
+    """
+    per_file: dict[str, dict[int, int]] = {}
+    current: dict[int, int] | None = None
+    with open(report_path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("SF:"):
+                current = per_file.setdefault(line[3:].strip(), {})
+            elif line.startswith("end_of_record"):
+                current = None
+            elif line.startswith("DA:") and current is not None:
+                # DA:<line>,<hits>[,<checksum>]
+                fields = line[3:].strip().split(",")
+                try:
+                    line_no = int(fields[0])
+                    hits = int(fields[1])
+                except (IndexError, ValueError):
+                    continue
+                current[line_no] = current.get(line_no, 0) + hits
+    return per_file
+
+
+def _write_coverage_summary(report_path: str, summary_path: str) -> None:
+    """Log summary coverage stats and write a per-file breakdown for upload as an artifact."""
+
+    per_file = _parse_lcov_line_coverage(report_path)
+
+    def covered_of(lines: dict[int, int]) -> int:
+        return sum(1 for hits in lines.values() if hits > 0)
+
+    total_executable = sum(len(lines) for lines in per_file.values())
+    total_covered = sum(covered_of(lines) for lines in per_file.values())
+
+    def percent(covered: int, executable: int) -> float:
+        return 100.0 * covered / executable if executable else 0.0
+
+    print(
+        f"[coverage-summary] files={len(per_file)} executable_lines={total_executable} "
+        f"covered_lines={total_covered} "
+        f"coverage={percent(total_covered, total_executable):.0f}% "
+        f"report={report_path} ({os.path.getsize(report_path)} bytes)"
+    )
+
+    with open(summary_path, "w", encoding="utf-8") as out:
+        out.write(f"Coverage report: {report_path}\n")
+        out.write(
+            f"Files: {len(per_file)}  Executable lines: {total_executable}  "
+            f"Covered lines: {total_covered}  "
+            f"Coverage: {percent(total_covered, total_executable):.0f}%\n\n"
+        )
+        out.write(f"{'Lines':>8} {'Exec':>8} {'Uncovered':>10} {'Cover':>8}  File\n")
+        for path, lines in sorted(per_file.items()):
+            executable = len(lines)
+            covered = covered_of(lines)
+            out.write(
+                f"{executable:>8} {covered:>8} {executable - covered:>10} "
+                f"{percent(covered, executable):>7.0f}%  {path}\n"
+            )
+        out.write(
+            f"\n{total_executable:>8} {total_covered:>8} "
+            f"{total_executable - total_covered:>10} "
+            f"{percent(total_covered, total_executable):>7.0f}%  TOTAL\n"
+        )
+    print(f"[coverage-summary] wrote per-file breakdown to {summary_path}")
 
 
 def main():
@@ -48,6 +144,8 @@ def main():
     bazel_coverage_report_location = get_bazel_coverage_report_file()
     if os.path.exists(bazel_coverage_report_location):
         print("Found bazel coverage report.")
+        _write_coverage_summary(bazel_coverage_report_location, BAZEL_COVERAGE_SUMMARY_FILE)
+        _archive_coverage_report(bazel_coverage_report_location, BAZEL_COVERAGE_REPORT_FILE)
         # no gcda files are generated from bazel coverage so we can exit early here
         return 0
 
