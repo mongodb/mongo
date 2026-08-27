@@ -768,24 +768,6 @@ class DataConsistencyChecker {
             const syncingCollStats = syncingNode.getDB(dbName).runCommand({collStats: collName});
 
             if (sourceCollStats.ok !== 1 || syncingCollStats.ok !== 1) {
-                const sourceHasCode491 =
-                    sourceCollStats.code ===
-                    ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace;
-                const syncingHasCode491 =
-                    syncingCollStats.code ===
-                    ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace;
-                if (
-                    collName.startsWith("system.buckets.") &&
-                    ((sourceHasCode491 && syncingCollStats.ok === 1) ||
-                        (syncingHasCode491 && sourceCollStats.ok === 1) ||
-                        (sourceHasCode491 && syncingHasCode491))
-                ) {
-                    const error = new Error(
-                        `collStats failed with code 491 for ${dbName}.${collName}`,
-                    );
-                    error.code = ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace;
-                    throw error;
-                }
                 sourceCollInfos.print(collectionPrinted, collName);
                 syncingCollInfos.print(collectionPrinted, collName);
 
