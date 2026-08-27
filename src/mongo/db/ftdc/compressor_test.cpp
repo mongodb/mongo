@@ -445,6 +445,74 @@ TEST_F(FTDCCompressorTest, TestFull) {
     }
 }
 
+// RLE of zeros that fits strictly inside one metric (zeroesCount < sampleCount - j).
+// TestFull also covers long in-metric zero runs.
+TEST_F(FTDCCompressorTest, TestRLEZeroRunFitsInMetric) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 1));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 2));
+    ASSERT_HAS_SPACE(st);
+    // Three zeros on "a", then a non-zero so the run does not reach the end of the metric.
+    st = c.addSample(BSON("a" << 20 << "b" << 3));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 4));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 5));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 30 << "b" << 6));
+    ASSERT_HAS_SPACE(st);
+}
+
+// Zero run that fills exactly the remaining samples of a metric; the next metric starts non-zero.
+TEST_F(FTDCCompressorTest, TestRLEZeroRunExactRemainingSamples) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 1));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 2));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 3));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 4));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 5));
+    ASSERT_HAS_SPACE(st);
+}
+
+// Identical non-zero samples: every delta is zero, so one RLE run covers every metric.
+TEST_F(FTDCCompressorTest, TestRLEAllMetricsUnchanged) {
+    TestTie c;
+
+    BSONObj doc = BSON("a" << 7 << "b" << 11 << "c" << 13);
+    auto st = c.addSample(doc);
+    ASSERT_HAS_SPACE(st);
+    for (int i = 0; i < 20; ++i) {
+        st = c.addSample(doc);
+        ASSERT_HAS_SPACE(st);
+    }
+}
+
+// Trailing zeros of one metric concatenated with leading zeros of the next, so the decoder
+// must carry zeroesCount across the metric boundary (zeroesCount > sampleCount - j).
+TEST_F(FTDCCompressorTest, TestRLEZeroRunSpansMetrics) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 8));
+    ASSERT_HAS_SPACE(st);
+}
+
 template <typename T>
 BSONObj generateSample(std::random_device& rd, T generator, size_t count) {
     BSONObjBuilder builder;

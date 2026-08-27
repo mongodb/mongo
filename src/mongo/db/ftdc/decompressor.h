@@ -9,6 +9,7 @@
 #include "mongo/db/ftdc/block_compressor.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace mongo {
@@ -22,6 +23,9 @@ class FTDCDecompressor {
 
 public:
     FTDCDecompressor() = default;
+
+    static constexpr std::uint64_t kMaxTotalSamples = 1ull << 25;    // 256MiB of 8-byte samples
+    static constexpr std::uint64_t kMaxDeltaFileSize = 10ull << 20;  // 10MiB
 
     /**
      * Inflates a compressed chunk of metrics into a vector of owned BSON documents.
