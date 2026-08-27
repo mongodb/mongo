@@ -25,6 +25,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <utility>
 #include <vector>
 
@@ -162,9 +163,14 @@ public:
                           ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
     /**
-     * Returns the total number of entries currently cached on the session catalog.
+     * Returns the total number of entries currently cached on the session catalog. Takes no
+     * partition mutex, so it is safe to call from diagnostic paths such as FTDC during a scan.
      */
     size_t size() const;
+
+    size_t numPartitions_forTest() const {
+        return _partitions.size();
+    }
 
     /**
      * Registers two callbacks: one to run when sessions are "eagerly" reaped from the catalog, ie
@@ -208,8 +214,8 @@ private:
         // opCtx that starts a new client txnNumber checks this logical session back in.
         TxnNumber lastClientTxnNumberStarted = kUninitializedTxnNumber;
 
-        // Signaled when the state becomes available. Uses the transaction table's mutex to protect
-        // the state transitions.
+        // Signaled when the state becomes available. Uses the owning catalog partition's mutex to
+        // protect the state transitions.
         stdx::condition_variable availableCondVar;
 
         // Pointer to the OperationContext for the operation running on this logical session, or
@@ -226,6 +232,59 @@ private:
         int killsRequested{0};
     };
     using SessionRuntimeInfoMap = LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>>;
+
+    /**
+     * A shard of the session catalog. Each partition owns the sessions whose parent lsid hashes to
+     * it; the partition's mutex protects its map, the runtime state of the sessions it owns, and
+     * serves as the mutex for their 'availableCondVar' waits. Parent and child sessions share the
+     * lsid 'id' component, so a whole session family always lives in a single partition.
+     *
+     * Aligned so that no two partitions share a cache line: ObservableMutex writes its counters on
+     * every lock, including uncontended ones.
+     */
+    class alignas(std::hardware_destructive_interference_size) Partition {
+    public:
+        /**
+         * Locks the partition and is the only way to reach its session map. Instantiate through
+         * the Locked or ConstLocked aliases.
+         */
+        template <typename P>
+        class LockedImpl {
+        public:
+            explicit LockedImpl(P& partition) : _lock(partition._mutex), _partition(&partition) {}
+
+            auto& sessions() const {
+                return _partition->_sessions;
+            }
+
+            auto& lock() {
+                return _lock;
+            }
+
+            explicit(false) operator WithLock() const {
+                return WithLock(_lock);
+            }
+
+        private:
+            std::unique_lock<ObservableMutex<std::mutex>> _lock;
+            P* _partition;
+        };
+        using Locked = LockedImpl<Partition>;
+        using ConstLocked = LockedImpl<const Partition>;
+
+        const ObservableMutex<std::mutex>& mutex() const {
+            return _mutex;
+        }
+
+    private:
+        mutable ObservableMutex<std::mutex> _mutex;
+        SessionRuntimeInfoMap _sessions;
+    };
+
+    /**
+     * Locks and returns the partition owning 'lsid'.
+     */
+    Partition::Locked _lockPartition(const LogicalSessionId& lsid);
 
     /**
      * Returns a callback with the default logic used to decide if a session may be reaped early.
@@ -248,16 +307,18 @@ private:
     ScopedCheckedOutSession _checkOutSession(OperationContext* opCtx);
 
     /**
-     * Returns the session runtime info for 'lsid' from the '_sessions' map. The returned pointer
-     * is guaranteed to be linked on the map for as long as the mutex is held.
+     * Returns the session runtime info for 'lsid', or nullptr. The returned pointer stays linked
+     * on the map for as long as the partition stays locked.
      */
-    SessionRuntimeInfo* _getSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
+    SessionRuntimeInfo* _getSessionRuntimeInfo(const Partition::Locked& partition,
+                                               const LogicalSessionId& lsid);
 
     /**
-     * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The
-     * returned pointer is guaranteed to be linked on the map for as long as the mutex is held.
+     * Creates or returns the session runtime info for 'lsid'. The returned pointer stays linked on
+     * the map for as long as the partition stays locked.
      */
-    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
+    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(const Partition::Locked& partition,
+                                                       const LogicalSessionId& lsid);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again. Will free
@@ -279,11 +340,12 @@ private:
     MakeSessionWorkerFnForEagerReap _makeSessionWorkerFnForEagerReap =
         _defaultMakeSessionWorkerFnForEagerReap;
 
-    // Protects the state below
-    mutable ObservableMutex<std::mutex> _mutex;
+    // Owns the Session objects for all current Sessions, sharded by parent lsid. Sized at
+    // construction from 'sessionCatalogPartitions' and never resized.
+    std::vector<Partition> _partitions;
 
-    // Owns the Session objects for all current Sessions.
-    SessionRuntimeInfoMap _sessions;
+    // Number of entries across all partitions, so that size() takes no partition mutex.
+    Atomic<long long> _numParentSessions{0};
 
     Atomic<bool> _disallowNewTransactions{false};
 };
@@ -403,8 +465,8 @@ using SessionToKill = SessionCatalog::SessionToKill;
 /**
  * This type represents access to a transaction session inside of a SessionCatalog scan.
  * If you have one of these, you're in a scan callback context, and so
- * have locked the whole catalog and, if the observed session is bound to an operation context,
- * you hold that operation context's client's mutex, as well.
+ * have locked the catalog partition owning the observed session and, if the observed session is
+ * bound to an operation context, you hold that operation context's client's mutex, as well.
  */
 class [[MONGO_MOD_PUBLIC]] ObservableSession {
 public:
