@@ -892,6 +892,10 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
 
     clientHandle = std::move(retrievedClient);
 
+    networkInterfaceDelayCommandsAfterAcquireConn.execute(
+        [](const BSONObj& data) { sleepmillis(data["delayMs"].safeNumberLong()); });
+    networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
+
     if (interface->_svcCtx && requestToSend.deadline != RemoteCommandRequest::kNoDeadline &&
         WireSpec::getWireSpec(interface->_svcCtx).isInternalClient()) {
         auto now = interface->now();
@@ -925,8 +929,6 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
                         "target"_attr = request.target);
         }
     }
-
-    networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
 
     LOGV2_DEBUG(4646300,
                 2,
