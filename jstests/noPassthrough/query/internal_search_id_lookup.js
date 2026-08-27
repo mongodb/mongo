@@ -2,10 +2,11 @@
  * Test the basic operation of a `$_internalSearchIdLookup` aggregation stage.
  *
  * `$_internalSearchIdLookup` resolves `_id`s through one of two executors depending on the
- * `featureFlagSearchOptimizedIdLookup` IFR flag: the Express fast path (flag on) or the classic
- * local-read path (flag off). Because the flag is toggleable at runtime, we run the suite once per
- * state so the waterfall exercises both executors.
+ * `featureFlagSearchOptimizedIdLookup` IFR flag: SBE with local-read fallback (flag on) or
+ * local-read alone (flag off). Because the flag is toggleable at runtime, we run the suite once
+ * per state so the waterfall exercises both executors.
  */
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 const collName = "internal_search_id_lookup";
@@ -136,6 +137,70 @@ for (const optimizedIdLookup of [false, true]) {
                     }),
                     11140100,
                 );
+            });
+
+            it("looks up mixed scalar and non-scalar `_id`s", function () {
+                const mixedCollName = collName + "_mixed";
+                const oid = ObjectId("507f1f77bcf86cd799439011");
+                const date = ISODate("2020-01-02T03:04:05Z");
+                const mixedDocs = [
+                    {_id: 42, x: "number"},
+                    {_id: "str", x: "string"},
+                    {_id: oid, x: "oid"},
+                    {_id: date, x: "date"},
+                    {_id: true, x: "bool"},
+                    {_id: BinData(0, "AQID"), x: "bindata"},
+                    {_id: NumberLong(99), x: "long"},
+                    {_id: NumberDecimal("1.5"), x: "decimal"},
+                    {_id: Timestamp(1, 1), x: "timestamp"},
+                    {_id: UUID("81fd5473-1747-4c9d-8743-f10642b3bb99"), x: "uuid"},
+                    {_id: {a: 1, b: 2}, x: "object"},
+                    {_id: {nested: {x: 1}}, x: "nested"},
+                ];
+                const mixedColl = this.db[mixedCollName];
+                mixedColl.drop();
+                assert.writeOK(mixedColl.insert(mixedDocs));
+
+                // Each source document is looked up by its own `_id`. When the optimized path is
+                // on, scalars use SBE and object `_id`s fall back to local-read (SERVER-134017).
+                assertArrayEq({
+                    actual: idLookupAgg(this.internalDB, mixedCollName, [
+                        {$match: {}},
+                        {$_internalSearchIdLookup: {}},
+                    ]).toArray(),
+                    expected: mixedDocs,
+                });
+            });
+
+            it("drops a missing object `_id` without tripwiring", function () {
+                const missingCollName = collName + "_missing_object";
+                const missingColl = this.db[missingCollName];
+                missingColl.drop();
+                assert.writeOK(
+                    missingColl.insert([
+                        {_id: 0, x: "scalar"},
+                        {_id: {a: 1}, x: "present"},
+                        {_id: "probe0", lookupId: 0},
+                        {_id: "probeMissing", lookupId: {missing: 1}},
+                        {_id: "probePresent", lookupId: {a: 1}},
+                    ]),
+                );
+
+                assertArrayEq({
+                    actual: idLookupAgg(this.internalDB, missingCollName, [
+                        {
+                            $match: {
+                                _id: {$in: ["probe0", "probeMissing", "probePresent"]},
+                            },
+                        },
+                        {$project: {_id: "$lookupId"}},
+                        {$_internalSearchIdLookup: {}},
+                    ]).toArray(),
+                    expected: [
+                        {_id: 0, x: "scalar"},
+                        {_id: {a: 1}, x: "present"},
+                    ],
+                });
             });
         },
     );
