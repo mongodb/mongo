@@ -176,9 +176,12 @@ protected:
 TEST_F(PersistentNDVTest, MetadataRecordsServedPaths) {
     persistNDV(kPersistedNDV);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 0u);
+
         // Two calls, one metadata entry: memoized re-reads must not duplicate it.
         estimator.estimateNDV({{.path = "a"}});
         estimator.estimateNDV({{.path = "a"}});
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 1u);
 
         const auto meta = estimator.getPersistedNDVMetadata();
         ASSERT_EQ(meta.size(), 1u);

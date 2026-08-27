@@ -134,6 +134,15 @@ public:
      * statistics, not derived from the sample, even though this estimator serves both.
      */
     virtual std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const = 0;
+
+    /**
+     * Returns the number of distinct persisted NDV statistics (analyze mode "ndv") this estimator
+     * has served so far. Repeated NDV requests for the same field path are memoized and counted
+     * once. Cheaper than getPersistedNDVMetadata() when only the count is needed.
+     */
+    virtual size_t getNumPersistedNDVStatsUsed() const {
+        return 0;
+    }
 };
 
 }  // namespace mongo::ce

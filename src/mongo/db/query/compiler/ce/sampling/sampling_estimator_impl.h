@@ -177,6 +177,10 @@ public:
 
     std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const final;
 
+    size_t getNumPersistedNDVStatsUsed() const final {
+        return _persistedNDVStatsUsed.size();
+    }
+
     /**
      * For each document in a given sample, this helper calculates the number of
      * index keys which satisfy 'bounds', which may be >1 in the case of multi-key

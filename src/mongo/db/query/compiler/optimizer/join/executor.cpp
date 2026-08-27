@@ -573,8 +573,20 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     od.joinOptimizationMetrics.emplace();
     auto& metrics = *od.joinOptimizationMetrics;
 
-    // Record serverStatus metrics on every exit path, including the ones that throw.
-    ON_BLOCK_EXIT([&] { recordJoinOptimizationMetrics(metrics); });
+    // The sampling estimators are created only after a join plan cache miss further down; the
+    // recording guard needs them in scope to tally the persisted NDV statistics they served.
+    SamplingEstimatorMap samplingEstimators;
+
+    ON_BLOCK_EXIT([&] {
+        // Record serverStatus metrics on every exit path, including the ones that throw.
+        if (auto& pe = metrics.planEnumerationMetrics) {
+            for (const auto& [nss, samplingEstimator] : samplingEstimators) {
+                pe->numPersistentNDVStatsUsed +=
+                    static_cast<int>(samplingEstimator->getNumPersistedNDVStatsUsed());
+            }
+        }
+        recordJoinOptimizationMetrics(metrics);
+    });
 
     // Try to build JoinGraph.
     const auto& config = pipeline.getContext()->getQueryKnobConfiguration();
@@ -656,7 +668,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     auto& peMetrics = *metrics.planEnumerationMetrics;
 
     // Acquire the samples that CE (both here and in CBR below) will consult.
-    SamplingEstimatorMap samplingEstimators = makeSamplingEstimators(
+    samplingEstimators = makeSamplingEstimators(
         mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx(), peMetrics);
 
     // Select access plans for each table in the join.

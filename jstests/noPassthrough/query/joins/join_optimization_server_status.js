@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   featureFlagPersistentStats,
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  *   requires_capped,
  * ]
@@ -11,6 +11,7 @@
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {dropSamplesColl} from "jstests/libs/query/persistent_samples_utils.js";
+import {getPersistentNDVMetrics} from "jstests/libs/query/planning_metrics_utils.js";
 
 describe("join optimization serverStatus metrics", function () {
     const kCounters = [
@@ -22,6 +23,7 @@ describe("join optimization serverStatus metrics", function () {
         "numFinalPlanNestedLoopJoins",
         "numSamplingCalls",
         "numPersistentSamplesUsed",
+        "numPersistentNDVStatsUsed",
         "numSuffixSourcesPushedToSbe",
         "numResidualClassicSources",
     ];
@@ -95,6 +97,9 @@ describe("join optimization serverStatus metrics", function () {
                 // Required for join optimization to load a persisted sample rather than always
                 // sampling on the fly.
                 featureFlagPersistentStats: true,
+                // Lets the persisted NDV cases below serve statistics; with none persisted this
+                // only makes the other cases count lookup misses, which they do not assert on.
+                internalQueryEnablePersistentNDVStats: true,
             },
         });
         assert.neq(null, this.conn, "mongod was unable to start up");
@@ -155,6 +160,41 @@ describe("join optimization serverStatus metrics", function () {
 
     after(function () {
         MongoRunner.stopMongod(this.conn);
+    });
+
+    // Helpers for the persisted NDV statistics cases below. Each case joins against its own
+    // products collection, so statistics persisted by one case cannot leak into another; the
+    // join key ("sku", matched by orders.b) is deliberately non-unique, since the optimizer
+    // skips estimateNDV() entirely for unique join keys.
+    before(function () {
+        this.createProducts = (suffix) => {
+            const products = this.db["products_" + suffix];
+            assert.commandWorked(
+                products.insertMany(Array.from({length: 10}, (_, i) => ({_id: i, sku: i % 5}))),
+            );
+            // A dummy index provides the path arrayness info the join optimizer requires.
+            assert.commandWorked(products.createIndex({dummy: 1, sku: 1}));
+            return products;
+        };
+
+        this.persistentNdvMetrics = () => getPersistentNDVMetrics(this.db);
+
+        this.runNdvJoinQuery = (products) => {
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: products.getName(),
+                        localField: "b",
+                        foreignField: "sku",
+                        as: "product",
+                    },
+                },
+                {$unwind: "$product"},
+            ];
+            assert.commandWorked(
+                this.db.runCommand({aggregate: this.orders.getName(), pipeline, cursor: {}}),
+            );
+        };
     });
 
     it("registers all metrics at startup", function () {
@@ -529,5 +569,65 @@ describe("join optimization serverStatus metrics", function () {
             "suffix sources pushed to SBE",
             attr,
         );
+    });
+
+    it("counts a persistentNdv miss when no statistics are persisted", function () {
+        const products = this.createProducts("miss");
+
+        const before = this.persistentNdvMetrics();
+        this.runNdvJoinQuery(products);
+        const after = this.persistentNdvMetrics();
+
+        assert.eq(after.misses, before.misses + 1, "expected one miss", {before, after});
+        assert.eq(after.hits, before.hits, "expected no hit", {before, after});
+    });
+
+    it("counts a persistentNdv hit and numPersistentNDVStatsUsed when statistics serve", function () {
+        const products = this.createProducts("hit");
+        assert.commandWorked(
+            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: "sku"}),
+        );
+
+        const before = this.persistentNdvMetrics();
+        const joinOptBefore = this.metrics();
+        this.runNdvJoinQuery(products);
+        const after = this.persistentNdvMetrics();
+        const joinOptAfter = this.metrics();
+
+        assert.eq(after.hits, before.hits + 1, "expected one hit", {before, after});
+        assert.eq(after.misses, before.misses, "expected no miss", {before, after});
+        // The same use aggregates into this section's counter as well.
+        assert.eq(
+            counterDelta(joinOptBefore, joinOptAfter, "numPersistentNDVStatsUsed"),
+            1,
+            "expected one persisted NDV statistic counted",
+            {joinOptBefore, joinOptAfter},
+        );
+    });
+
+    it("counts neither hit nor miss when persisted NDV consumption is disabled", function () {
+        const products = this.createProducts("disabled");
+        assert.commandWorked(
+            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: "sku"}),
+        );
+
+        assert.commandWorked(
+            this.db.adminCommand({setParameter: 1, internalQueryEnablePersistentNDVStats: false}),
+        );
+        try {
+            const before = this.persistentNdvMetrics();
+            this.runNdvJoinQuery(products);
+            const after = this.persistentNdvMetrics();
+
+            assert.eq(after.hits, before.hits, "expected no hit", {before, after});
+            assert.eq(after.misses, before.misses, "expected no miss", {before, after});
+        } finally {
+            assert.commandWorked(
+                this.db.adminCommand({
+                    setParameter: 1,
+                    internalQueryEnablePersistentNDVStats: true,
+                }),
+            );
+        }
     });
 });

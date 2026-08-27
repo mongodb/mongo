@@ -1077,6 +1077,12 @@ namespace {
 auto& persistentSampleHits = *MetricBuilder<Counter64>{"query.sampling.persistentSample.hits"};
 auto& persistentSampleMisses = *MetricBuilder<Counter64>{"query.sampling.persistentSample.misses"};
 
+// Hit = served an NDV from persisted field statistics. Miss = fell back to the sample-based
+// estimate although persisted NDV statistics were enabled and requested. Counted once per
+// estimator and field path; memoized re-reads within one estimator do not count again.
+auto& persistentNDVHits = *MetricBuilder<Counter64>{"query.sampling.persistentNdv.hits"};
+auto& persistentNDVMisses = *MetricBuilder<Counter64>{"query.sampling.persistentNdv.misses"};
+
 // Latency of attempting to load a persistent sample
 auto& persistentSampleLoadMicros =
     *MetricBuilder<DurationCounter64<Microseconds>>{"query.sampling.persistentSample.loadMicros"};
@@ -1263,6 +1269,7 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
         return persistedEstimate;
     }();
 
+    (estimate ? persistentNDVHits : persistentNDVMisses).incrementRelaxed();
     _persistedNDVEstimates.emplace(path, estimate);
     return estimate;
 }

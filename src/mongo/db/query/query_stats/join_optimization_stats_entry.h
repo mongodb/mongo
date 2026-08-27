@@ -59,6 +59,7 @@ public:
                 AggregatedMetric<int64_t>(pe->numSamplingCalls),
                 AggregatedMetric<int64_t>(pe->numPersistentSamplesUsed),
                 AggregatedMetric<int64_t>(pe->numUniqueIndexesUsedForNDV),
+                AggregatedMetric<int64_t>(pe->numPersistentNDVStatsUsed),
                 AggregatedMetric<int64_t>(pe->samplingTimeMicros),
                 AggregatedMetric<int64_t>(pe->cbrPlanningTimeMicros),
                 AggregatedMetric<int64_t>(pe->planEnumerationTimeMicros),
@@ -126,6 +127,7 @@ public:
         AggregatedMetric<int64_t> numSamplingCalls;
         AggregatedMetric<int64_t> numPersistentSamplesUsed;
         AggregatedMetric<int64_t> numUniqueIndexesUsedForNDV;
+        AggregatedMetric<int64_t> numPersistentNDVStatsUsed;
         AggregatedMetric<int64_t> samplingTimeMicros;
         AggregatedMetric<int64_t> cbrPlanningTimeMicros;
         AggregatedMetric<int64_t> planEnumerationTimeMicros;

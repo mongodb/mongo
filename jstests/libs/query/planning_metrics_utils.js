@@ -70,6 +70,10 @@ export function getPersistentSampleMetrics(db) {
     return db.serverStatus().metrics.query.sampling.persistentSample;
 }
 
+export function getPersistentNDVMetrics(db) {
+    return db.serverStatus().metrics.query.sampling.persistentNdv;
+}
+
 export function getAnalyzeCommandMetrics(db) {
     return db.serverStatus().metrics.commands.analyze;
 }

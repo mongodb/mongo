@@ -99,6 +99,8 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
                                                                   "numPersistentSamplesUsed");
         planEnumerationMetrics->numUniqueIndexesUsedForNDV.appendTo(metricsEntryBuilder,
                                                                     "numUniqueIndexesUsedForNDV");
+        planEnumerationMetrics->numPersistentNDVStatsUsed.appendTo(metricsEntryBuilder,
+                                                                   "numPersistentNDVStatsUsed");
         planEnumerationMetrics->samplingTimeMicros.appendTo(metricsEntryBuilder,
                                                             "samplingTimeMicros");
         planEnumerationMetrics->cbrPlanningTimeMicros.appendTo(metricsEntryBuilder,
@@ -157,6 +159,8 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
                 other.numPersistentSamplesUsed);
             planEnumerationMetrics->numUniqueIndexesUsedForNDV.combine(
                 other.numUniqueIndexesUsedForNDV);
+            planEnumerationMetrics->numPersistentNDVStatsUsed.combine(
+                other.numPersistentNDVStatsUsed);
             planEnumerationMetrics->samplingTimeMicros.combine(other.samplingTimeMicros);
             planEnumerationMetrics->cbrPlanningTimeMicros.combine(other.cbrPlanningTimeMicros);
             planEnumerationMetrics->planEnumerationTimeMicros.combine(

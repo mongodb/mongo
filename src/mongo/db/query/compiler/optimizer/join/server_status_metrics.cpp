@@ -29,6 +29,7 @@ void recordJoinOptimizationMetrics(const OpDebug::JoinOptimizationMetrics& metri
         joinOptMetrics.numFinalPlanNestedLoopJoins.increment(pe->numFinalPlanNestedLoopJoins);
         joinOptMetrics.numSamplingCalls.increment(pe->numSamplingCalls);
         joinOptMetrics.numPersistentSamplesUsed.increment(pe->numPersistentSamplesUsed);
+        joinOptMetrics.numPersistentNDVStatsUsed.increment(pe->numPersistentNDVStatsUsed);
         joinOptMetrics.numPlansEnumerated.increment(pe->numPlansEnumerated);
         joinOptMetrics.numMemoizedNodes.increment(pe->numMemoizedNodes);
         joinOptMetrics.numJoinNodesRejectedByCost.increment(pe->numJoinNodesRejectedByCost);

@@ -294,6 +294,7 @@ this shape never enumerated a plan.
 | `cbrPlanningTimeMicros`              | counter (micros) | Time spent generating single-table access plans in CBR.                                     |
 | `planEnumerationTimeMicros`          | counter (micros) | Time spent enumerating plans and picking a winner.                                          |
 | `ceTimeMicros`                       | counter (micros) | Time spent evaluating cardinality estimates for join optimization, separate from CE in CBR. |
+| `numPersistentNDVStatsUsed`          | counter          | Number of persisted NDV statistics (analyze mode "ndv") that served join planning.          |
 
 ##### Fallback Reasons
 

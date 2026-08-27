@@ -10,13 +10,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fixed_string.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/time_support.h"
 
 #include <chrono>
 #include <cmath>
 #include <compare>
 #include <limits>
-#include <string>
 #include <string_view>
 
 #include <boost/functional/hash.hpp>

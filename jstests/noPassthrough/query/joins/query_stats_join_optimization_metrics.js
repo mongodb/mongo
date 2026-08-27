@@ -112,6 +112,8 @@ const kPerEnumerationExpectedMetrics = {
     // Only 'customers' has a persisted sample to reuse.
     numPersistentSamplesUsed: 1,
     numUniqueIndexesUsedForNDV: 0,
+    // internalQueryEnablePersistentNDVStats defaults to off, so no persisted NDV is consulted.
+    numPersistentNDVStatsUsed: 0,
 };
 
 // Timers recorded only on the enumeration path, i.e. only on a join plan cache miss. Like the
@@ -341,6 +343,37 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
     const joinMetrics = stats[0].metrics.supplementalMetrics.JoinOptimization;
     assert(joinMetrics);
     // Recreating the indexes invalidated the join plan cache, so this run enumerates again.
+    assertJoinMetrics(joinMetrics, 1, 1);
+}
+
+{
+    // Validate that we count join edges served from persisted NDV statistics (analyze mode
+    // "ndv"). The unique index from the previous block still covers the 'a' edge, so only the
+    // 'b' edge requests an NDV estimate; persist statistics for both of its sides so the
+    // request is served regardless of which side the optimizer picks as the "primary key".
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryEnablePersistentNDVStats: true}),
+    );
+    assert.commandWorked(db.runCommand({analyze: orders.getName(), mode: "ndv", key: "b"}));
+    assert.commandWorked(db.runCommand({analyze: items.getName(), mode: "ndv", key: "b"}));
+
+    // Clearing the store also drops the analyze commands' own recorded shapes: their internal
+    // pipeline contains an internal-only accumulator whose shape fails re-parsing on $queryStats
+    // reads and would otherwise fail the reads below.
+    resetQueryStatsStore(conn, "10MB");
+
+    kPerEnumerationExpectedMetrics.numPersistentNDVStatsUsed = 1;
+
+    // TODO SERVER-134077: the single large batch is load-bearing. Supplemental query stats
+    // metrics are only recorded when the initial batch exhausts the cursor; with the default
+    // batch size the JoinOptimization section would be missing entirely.
+    assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+
+    const stats = getQueryStats(conn, {collName: orders.getName()});
+    assert.eq(1, stats.length, tojson(stats));
+
+    const joinMetrics = stats[0].metrics.supplementalMetrics.JoinOptimization;
+    assert(joinMetrics);
     assertJoinMetrics(joinMetrics, 1, 1);
 }
 
