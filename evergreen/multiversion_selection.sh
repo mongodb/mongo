@@ -29,11 +29,32 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
     last_continuous_arg=""
 fi
 
-# Optionally include the last-patch version (e.g. on the disagg variant). The release feed source
-# used to resolve it is controlled independently via the DB_CONTRIB_TOOL_RELEASE_FEED_SOURCE env
-# variable (db-contrib-tool's --releaseFeedSource option), injected by the evergreen function.
+# Include the last-patch version when this branch has last-patch coverage. Two ways in:
+#
+#  - multiversion_include_last_patch, a per-variant opt-in used by the disagg suites, which
+#    resolve last-patch from the private atlas feed rather than from published releases. Those
+#    deliberately test against release candidates, so they must NOT set the final-only policy
+#    below -- restricting them to GA tags would leave them with nothing to resolve.
+#
+#  - resmoke reporting last_patch as a default peer, which is true exactly when the branch's
+#    series has already shipped a release.
+#
+# Both checks sit inside the `if` so that `set -o errexit` cannot abort the whole selection
+# step: failing to answer the question means "no last-patch", never a lost
+# last-lts/last-continuous download.
 last_patch_arg=""
 if [[ -n "${multiversion_include_last_patch}" ]]; then
+    last_patch_arg="last-patch"
+elif $python buildscripts/resmoke.py multiversion-config \
+    --config-file-output multiversion-config.yml &&
+    $python -c "
+import sys, yaml
+
+with open('multiversion-config.yml') as handle:
+    config = yaml.safe_load(handle) or {}
+sys.exit(0 if 'last_patch' in (config.get('last_versions') or []) else 1)
+"; then
+    export MULTIVERSION_LAST_PATCH_FINAL_ONLY=1
     last_patch_arg="last-patch"
 fi
 

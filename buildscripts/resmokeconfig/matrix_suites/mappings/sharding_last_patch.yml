@@ -1,0 +1,6 @@
+base_suite: sharding
+overrides:
+  - "multiversion.sharding_multiversion_selector"
+  - "multiversion.sharding_multiversion_testdata_last_patch"
+excludes:
+  - "multiversion.sharding_multiversion_fixture_last_patch"
