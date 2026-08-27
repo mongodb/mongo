@@ -793,10 +793,36 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                                                                  << "objId" << rehydratedObjId));
                 }
                 HealthLogInterface::get(opCtx)->log(*logEntry);
+
+                // It is important that data InvalidBSON is skipped so that BSONObj methods are not
+                // called on structurally invalid BSON.
+                if (status.code() != ErrorCodes::NonConformantBSON) {
+                    continue;
+                }
             }
         }
 
-        BSONObj currentObj = record.toBson();
+        BSONObj currentObj;
+        try {
+            // TODO(SERVER-133724): Ensure data is validated before calling `toBson`, or avoid
+            // using BSONObj.
+            currentObj = record.toBson();
+        } catch (const ExceptionFor<ErrorCodes::BSONInternalError>& ex) {
+            const auto msg = "Document is not well-formed BSON";
+            const auto status = Status(ex.code(), msg);
+            std::unique_ptr<HealthLogEntry> logEntry = dbCheckErrorHealthLogEntry(
+                _secondaryIndexCheckParameters,
+                collPtr->ns(),
+                collPtr->uuid(),
+                msg,
+                ScopeEnum::Document,
+                OplogEntriesEnum::Batch,
+                status,
+                BSON("recordID" << currentRecordId.toString() << "objId" << rehydratedObjId));
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            continue;
+        }
+
         if (!currentObj.hasField("_id")) {
             return Status(ErrorCodes::NoSuchKey,
                           "Document with record ID " + currentRecordId.toString() + " missing _id");

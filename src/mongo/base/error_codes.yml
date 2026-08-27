@@ -1347,5 +1347,10 @@ error_codes:
 
   - {code: 524, name: CommitPendingNamespaceOrUUID, categories: [InternalOnly]}
 
+  # Used for defensive BSON checks, and should only be used inside BSONObj and BSONElement.
+  # Detection of invalid BSON at other layers should use other error codes, such as
+  # ErrorCodes::InvalidBSON or ErrorCodes::NonConformantBSON.
+  - {code: 525, name: BSONInternalError, categories: [CloseConnectionError]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

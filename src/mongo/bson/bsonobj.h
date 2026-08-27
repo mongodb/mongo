@@ -54,50 +54,52 @@ class ExtendedRelaxedV200Generator;
 class LegacyStrictGenerator;
 
 /**
-   C++ representation of a "BSON" object -- that is, an extended JSON-style
-   object in a binary representation.
-
-   See bsonspec.org.
-
-   A `BSONObj` may be passed cheaply by value, similarly to a `std::shared_ptr`.
-
-   An atomic refcount is kept in a heap-allocated struct, adjacent to its data.
-   It is safe to copy, destroy, or otherwise access a `BSONObj` object,
-   regardless of whether that object shares ownership of its data with other
-   `BSONObj` objects that might be accessed by other threads.
-
-   While access to the data pointed to by a `BSONObj` is thread-safe, the
-   `BSONObj` itself is unsynchronized. Multiple threads must not mutate
-   the same `BSONObj` object. For example, changing what a `BSONObj`
-   variable points to (via swap or assignment) would be unsafe.
-
- BSON object format:
-
- code
- <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
-
- totalSize includes itself.
-
- Data:
- Bool:      <byte>
- EOO:       nothing follows
- Undefined: nothing follows
- OID:       an OID object
- NumberDouble: <double>
- NumberInt: <int32>
- NumberDecimal: <dec128>
- String:    <unsigned32 strsizewithnull><cstring>
- Date:      <8bytes>
- Regex:     <cstring regex><cstring options>
- Object:    a nested object, leading with its entire size, which terminates with EOO.
- Array:     same as object
- DBRef:     <strlen> <cstring ns> <oid>
- DBRef:     a database reference: basically a collection name plus an Object ID
- BinData:   <int len> <byte subtype> <byte[len] data>
- Code:      a function (not a closure): same format as String.
- Symbol:    a language symbol (say a python symbol).  same format as String.
- Code With Scope: <total size><String><Object>
- \endcode
+ * C++ representation of a "BSON" object -- that is, an extended JSON-style
+ * object in a binary representation.
+ *
+ * See bsonspec.org.
+ *
+ * A `BSONObj` may be passed cheaply by value, similarly to a `std::shared_ptr`.
+ *
+ * An atomic refcount is kept in a heap-allocated struct, adjacent to its data.
+ * It is safe to copy, destroy, or otherwise access a `BSONObj` object,
+ * regardless of whether that object shares ownership of its data with other
+ * `BSONObj` objects that might be accessed by other threads.
+ *
+ * While access to the data pointed to by a `BSONObj` is thread-safe, the
+ * `BSONObj` itself is unsynchronized. Multiple threads must not mutate
+ * the same `BSONObj` object. For example, changing what a `BSONObj`
+ * variable points to (via swap or assignment) would be unsafe.
+ *
+ * It is required that construction of a BSONObj is performed on data that
+ * represents structurally valid BSON. Failure to do so will trigger defensive
+ * checks that throw ErrorCodes::BSONInternalError.
+ *
+ * BSON object format:
+ *
+ *   <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
+ *
+ *   totalSize includes itself.
+ *
+ *   Data:
+ *   Bool:      <byte>
+ *   EOO:       nothing follows
+ *   Undefined: nothing follows
+ *   OID:       an OID object
+ *   NumberDouble: <double>
+ *   NumberInt: <int32>
+ *   NumberDecimal: <dec128>
+ *   String:    <unsigned32 strsizewithnull><cstring>
+ *   Date:      <8bytes>
+ *   Regex:     <cstring regex><cstring options>
+ *   Object:    a nested object, leading with its entire size, which terminates with EOO.
+ *   Array:     same as object
+ *   DBRef:     <strlen> <cstring ns> <oid>
+ *   DBRef:     a database reference: basically a collection name plus an Object ID
+ *   BinData:   <int len> <byte subtype> <byte[len] data>
+ *   Code:      a function (not a closure): same format as String.
+ *   Symbol:    a language symbol (say a python symbol).  same format as String.
+ *   Code With Scope: <total size><String><Object>
  */
 class BSONObj {
 public:
@@ -138,16 +140,23 @@ public:
 
     /**
      * Construct a BSONObj from data in the proper format.
-     *  Use this constructor when something else owns bsonData's buffer
+     *  Use this constructor when something else owns bsonData's buffer.
      */
-    template <typename Traits = DefaultSizeTrait>
-    explicit BSONObj(const char* bsonData, Traits t = Traits{}) {
-        init<Traits>(bsonData);
+    explicit BSONObj(const char* bsonData) : BSONObj(bsonData, DefaultSizeTrait{}) {}
+
+    template <typename Traits>
+    BSONObj(const char* bsonData, Traits) : _objdata(bsonData) {
+        // TODO(SERVER-133681): Remove size traits and move the run time size check out.
+        if (!isValid<Traits>())
+            _assertInvalid(Traits::MaxSize);
+        _validateEoo();
     }
 
     explicit BSONObj(ConstSharedBuffer ownedBuffer)
         : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata()),
-          _ownedBuffer(std::move(ownedBuffer)) {}
+          _ownedBuffer(std::move(ownedBuffer)) {
+        _validateEoo();
+    }
 
     /**
      * Move construct a BSONObj
@@ -226,6 +235,7 @@ public:
     BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
         _ownedBuffer = std::move(buffer);
+        _validateEoo();
         return *this;
     }
     BSONObj& shareOwnershipWith(const BSONObj& other) & {
@@ -703,14 +713,15 @@ private:
 
     void _assertInvalid(int maxSize) const;
 
-    template <typename Traits = DefaultSizeTrait>
-    void init(const char* data) {
-        _objdata = data;
-        if (!isValid<Traits>())
-            _assertInvalid(Traits::MaxSize);
-    }
-
     void _validateUnownedSize(int size) const;
+
+    void _validateEoo() const {
+        // Casting mimics type extraction in BSONElement::type().
+        tassert(ErrorCodes::BSONInternalError,
+                "BSONObj does not end with EOO",
+                static_cast<BSONType>(static_cast<signed char>(_objdata[objsize() - 1])) ==
+                    BSONType::eoo);
+    }
 
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;

@@ -198,13 +198,12 @@ TEST(BSONValidate, Fuzz) {
                 }
             }
         }
-        BSONObj fuzzed(buffer.data());
 
         // There is no assert here because there is no other BSON validator oracle
         // to compare outputs against (BSONObj::valid() is a wrapper for validateBSON()).
         // Thus, the reason for this test is to ensure that validateBSON() doesn't trip
         // any ASAN or UBSAN check when fed fuzzed input.
-        validateBSON(fuzzed).isOK();
+        validateBSON(buffer.data(), buffer.size()).isOK();
     }
 }
 

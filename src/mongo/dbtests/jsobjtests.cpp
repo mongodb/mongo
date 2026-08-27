@@ -786,46 +786,53 @@ class Base {
 public:
     virtual ~Base() {}
     void run() {
-        ASSERT(validateBSON(valid()).isOK());
-        ASSERT(!validateBSON(invalid()).isOK());
+        auto validBuffer = valid();
+        auto invalidBuffer = invalid();
+        ASSERT(validateBSON(validBuffer.get(), validBuffer.capacity()).isOK());
+        ASSERT(!validateBSON(invalidBuffer.get(), invalidBuffer.capacity()).isOK());
     }
 
 protected:
-    virtual BSONObj valid() const {
-        return BSONObj();
+    virtual ConstSharedBuffer valid() const {
+        return BSONObj().getOwned().sharedBuffer();
     }
-    virtual BSONObj invalid() const {
-        return BSONObj();
+    virtual ConstSharedBuffer invalid() const {
+        return BSONObj().getOwned().sharedBuffer();
     }
-    static char get(const BSONObj& o, int i) {
-        return o.objdata()[i];
+    static char get(const ConstSharedBuffer& buf, int i) {
+        return buf.get()[i];
     }
-    static void set(BSONObj& o, int i, char c) {
-        const_cast<char*>(o.objdata())[i] = c;
+    static void set(ConstSharedBuffer& buf, int i, char c) {
+        const_cast<char*>(buf.get())[i] = c;
+    }
+    static ConstSharedBuffer bufferFromJson(std::string_view json) {
+        return fromjson(json).sharedBuffer();
+    }
+    static int bsonSize(const ConstSharedBuffer& buf) {
+        return ConstDataView(buf.get()).read<LittleEndian<int>>();
     }
 };
 
 class BadType : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":1}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":1}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         set(ret, 4, 50);
         return ret;
     }
 };
 
 class EooBeforeEnd : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":1}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":1}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         // (first byte of size)++
         set(ret, 0, get(ret, 0) + 1);
-        // re-read size for BSONObj::details
-        return ret.copy();
+        return ret;
     }
 };
 
@@ -834,183 +841,182 @@ public:
     void run() {
         BSONObjBuilder b;
         b.appendNull("a");
-        BSONObj o = b.done();
+        auto o = b.obj().sharedBuffer();
         set(o, 4, stdx::to_underlying(mongo::BSONType::undefined));
-        ASSERT(validateBSON(o).isOK());
+        ASSERT(validateBSON(o.get(), o.capacity()).isOK());
     }
 };
 
 class TotalSizeTooSmall : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":1}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":1}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         // (first byte of size)--
         set(ret, 0, get(ret, 0) - 1);
-        // re-read size for BSONObj::details
-        return ret.copy();
+        return ret;
     }
 };
 
 class EooMissing : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":1}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":1}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
-        set(ret, ret.objsize() - 1, (char)0xff);
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
+        set(ret, bsonSize(ret) - 1, (char)0xff);
         // (first byte of size)--
         set(ret, 0, get(ret, 0) - 1);
-        // re-read size for BSONObj::details
-        return ret.copy();
+        return ret;
     }
 };
 
 class WrongStringSize : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":\"b\"}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
-        auto val = ret.firstElement().valueStringData();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
+        BSONObj obj(ret);
+        auto val = obj.firstElement().valueStringData();
         ASSERT_EQUALS(val, "b"sv);
         auto d = const_cast<char*>(val.data());
         ASSERT_EQUALS(d[1], 0);
         d[1] = 1;
-        return ret.copy();
+        return ret;
     }
 };
 
 class ZeroStringSize : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":\"b\"}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         set(ret, 7, 0);
         return ret;
     }
 };
 
 class NegativeStringSize : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":\"b\"}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         set(ret, 10, -100);
         return ret;
     }
 };
 
 class WrongSubobjectSize : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":{\"b\":1}}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":{\"b\":1}}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         set(ret, 0, get(ret, 0) + 1);
         set(ret, 7, get(ret, 7) + 1);
-        return ret.copy();
+        return ret;
     }
 };
 
 class WrongDbrefNsSize : public Base {
-    BSONObj valid() const override {
-        return fromjson("{ \"a\": Dbref( \"b\", \"ffffffffffffffffffffffff\" ) }");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{ \"a\": Dbref( \"b\", \"ffffffffffffffffffffffff\" ) }");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         set(ret, 0, get(ret, 0) + 1);
         set(ret, 7, get(ret, 7) + 1);
-        return ret.copy();
+        return ret;
     };
 };
 
 class NoFieldNameEnd : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":1}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":1}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
-        memset(const_cast<char*>(ret.objdata()) + 5, 0xff, ret.objsize() - 5);
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
+        memset(const_cast<char*>(ret.get()) + 5, 0xff, bsonSize(ret) - 5);
         return ret;
     }
 };
 
 class BadRegex : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":/c/i}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":/c/i}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
-        memset(const_cast<char*>(ret.objdata()) + 7, 0xff, ret.objsize() - 7);
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
+        memset(const_cast<char*>(ret.get()) + 7, 0xff, bsonSize(ret) - 7);
         return ret;
     }
 };
 
 class BadRegexOptions : public Base {
-    BSONObj valid() const override {
-        return fromjson("{\"a\":/c/i}");
+    ConstSharedBuffer valid() const override {
+        return bufferFromJson("{\"a\":/c/i}");
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
-        memset(const_cast<char*>(ret.objdata()) + 9, 0xff, ret.objsize() - 9);
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
+        memset(const_cast<char*>(ret.get()) + 9, 0xff, bsonSize(ret) - 9);
         return ret;
     }
 };
 
 class CodeWScopeBase : public Base {
-    BSONObj valid() const override {
+    ConstSharedBuffer valid() const override {
         BSONObjBuilder b;
         BSONObjBuilder scope;
         scope.append("a", "b");
         b.appendCodeWScope("c", "d", scope.done());
-        return b.obj();
+        return b.obj().sharedBuffer();
     }
-    BSONObj invalid() const override {
-        BSONObj ret = valid();
+    ConstSharedBuffer invalid() const override {
+        auto ret = valid();
         modify(ret);
         return ret;
     }
 
 protected:
-    virtual void modify(BSONObj& o) const = 0;
+    virtual void modify(ConstSharedBuffer& o) const = 0;
 };
 
 class CodeWScopeSmallSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 7, 7);
     }
 };
 
 class CodeWScopeZeroStrSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 11, 0);
     }
 };
 
 class CodeWScopeSmallStrSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 11, 1);
     }
 };
 
 class CodeWScopeNoSizeForObj : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 7, 13);
     }
 };
 
 class CodeWScopeSmallObjSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 17, 1);
     }
 };
 
 class CodeWScopeBadObject : public CodeWScopeBase {
-    void modify(BSONObj& o) const override {
+    void modify(ConstSharedBuffer& o) const override {
         set(o, 21, stdx::to_underlying(BSONType::jsTypeMax) + 1);
     }
 };
@@ -1020,8 +1026,7 @@ public:
     NoSize(BSONType type) : type_(type) {}
     void run() {
         const char data[] = {0x07, 0x00, 0x00, 0x00, char(type_), 'a', 0x00};
-        BSONObj o(data);
-        ASSERT(!validateBSON(o).isOK());
+        ASSERT(!validateBSON(data, sizeof(data)).isOK());
     }
 
 private:
