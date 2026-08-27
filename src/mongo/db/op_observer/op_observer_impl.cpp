@@ -760,13 +760,23 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
               str::stream() << "recordIds' size: " << recordIds.size()
                             << ", is non-empty but not equal to count: " << count);
 
+    // Compute the per-document validation hashes before reserving any oplog slot below. A slot
+    // reserved by an uncommitted write holds back the oplog visibility point, so work done between
+    // the reservation and wuow.commit() delays oplog visibility for all concurrent writers.
+    const bool useValidationHash =
+        repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+    std::vector<int64_t> docHashes;
+    if (useValidationHash) {
+        docHashes.reserve(count);
+        for (size_t i = 0; i < count; i++) {
+            docHashes.push_back(repl::computeDocValidationHash(begin[i].doc));
+        }
+    }
+
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
     AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kLogOp);
 
     WriteUnitOfWork wuow(opCtx);
-
-    const bool useValidationHash =
-        repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
 
     std::vector<repl::OpTime> opTimes(count);
     std::vector<Timestamp> timestamps(count);
@@ -800,7 +810,11 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         if (isReplicatedFastCountEnabled(opCtx)) {
             replicatedSizeDelta = insertedDoc.objsize();
         }
-        setSizeMetadataIfNeeded(oplogEntry, replicatedSizeDelta, insertedDoc, useValidationHash);
+        boost::optional<int64_t> docHash;
+        if (useValidationHash) {
+            docHash = docHashes[i];
+        }
+        setSizeMetadata(oplogEntry, replicatedSizeDelta, docHash);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));

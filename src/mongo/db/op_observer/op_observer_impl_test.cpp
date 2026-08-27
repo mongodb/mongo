@@ -481,6 +481,36 @@ protected:
         return getSizeMetadataFromOplogEntry(entry);
     }
 
+    // Inserts all of 'docs' in a single batch and returns the size metadata of the oplog entry
+    // generated for each one, in insertion order.
+    std::vector<boost::optional<SingleOpSizeMetadata>> insertManyAndGetSizeMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const std::vector<BSONObj>& docs,
+        std::vector<RecordId> recordIds) {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        std::vector<InsertStatement> inserts;
+        for (const auto& doc : docs) {
+            inserts.emplace_back(doc);
+        }
+        opObserver().onInserts(opCtx,
+                               *autoColl,
+                               inserts.begin(),
+                               inserts.end(),
+                               recordIds,
+                               /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                               /*defaultFromMigrate=*/false);
+        wuow.commit();
+
+        std::vector<boost::optional<SingleOpSizeMetadata>> sizeMetadata;
+        for (const auto& entryBSON : getNOplogEntries(opCtx, docs.size())) {
+            sizeMetadata.push_back(
+                getSizeMetadataFromOplogEntry(assertGet(OplogEntry::parse(entryBSON))));
+        }
+        return sizeMetadata;
+    }
+
     boost::optional<SingleOpSizeMetadata> updateAndGetSizeMetadata(
         OperationContext* opCtx,
         const NamespaceString& ns,
@@ -1888,6 +1918,24 @@ TEST_F(OpObserverTest, CheckHashExistsOnInsertWithFlagAndRecordId) {
     ASSERT(sizeMetadata->getH());
     EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashMatchesItsOwnDocumentOnMultiDocumentInsert) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const std::vector<BSONObj> docs = {BSON("_id" << 0 << "data" << "x"),
+                                       BSON("_id" << 1 << "data" << "yy"),
+                                       BSON("_id" << 2 << "data" << "zzz")};
+    const auto sizeMetadata =
+        insertManyAndGetSizeMetadata(opCtx, nss, docs, {RecordId(1), RecordId(2), RecordId(3)});
+    ASSERT_EQ(sizeMetadata.size(), docs.size());
+    for (size_t i = 0; i < docs.size(); i++) {
+        ASSERT(sizeMetadata[i]) << "no size metadata for document " << i;
+        ASSERT(sizeMetadata[i]->getH()) << "no hash for document " << i;
+        EXPECT_EQ(*sizeMetadata[i]->getH(), repl::computeDocValidationHash(docs[i]));
+    }
 }
 
 TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithoutRecordId) {
