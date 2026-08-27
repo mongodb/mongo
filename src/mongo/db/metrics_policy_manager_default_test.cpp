@@ -49,7 +49,10 @@ INSTANTIATE_TEST_SUITE_P(AllCategories,
                          testing::Values(MetricsCategoryEnum::kServerStatus,
                                          MetricsCategoryEnum::kReplSetGetStatus,
                                          MetricsCategoryEnum::kCollStats,
-                                         MetricsCategoryEnum::kDbStats),
+                                         MetricsCategoryEnum::kDbStats,
+                                         MetricsCategoryEnum::kBuildInfo,
+                                         MetricsCategoryEnum::kHostInfo,
+                                         MetricsCategoryEnum::kGetCmdLineOpts),
                          [](const testing::TestParamInfo<MetricsCategoryEnum>& info) {
                              return std::string{idlSerialize(info.param)};
                          });
