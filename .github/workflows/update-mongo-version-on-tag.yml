@@ -14,3 +14,6 @@ jobs:
     # intentionally points to @master so every branch always runs the
     # latest implementation with no per-branch backporting required.
     uses: 10gen/mongo/.github/workflows/_update-mongo-version-impl.yml@master
+    secrets:
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      SERVER_RELEASE_APP_PRIVATE_KEY: ${{ secrets.SERVER_RELEASE_APP_PRIVATE_KEY }}
