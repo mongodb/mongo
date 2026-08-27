@@ -340,6 +340,11 @@ def _resolve_config_root(name, root):
               "path written as '//path/to/tests/*/'.") % (name, root))
     return root[len("//"):]
 
+_DEDICATED_SUITE_SKIP_SETTING = {
+    "last-continuous": "//bazel/resmoke/multiversion:last_continuous_redundant",
+    "last-patch": "//bazel/resmoke/multiversion:last_patch_unavailable",
+}
+
 def _dep_target_name(dep):
     """Extract the target name from a label string, e.g. '//pkg:name' → 'name'."""
     if ":" in dep:
@@ -396,10 +401,11 @@ def resmoke_suite_test(
             as a single test case (e.g. query_tester_server_test).
         tags: Bazel tags.
         target_compatible_with: Compatibility constraints forwarded to py_test.
-            Suites whose multiversion_deps consist solely of last-continuous
-            automatically gain an additional incompatibility with
-            @platforms//:incompatible when
-            //bazel/resmoke/multiversion:last_continuous_redundant is True.
+            Suites whose multiversion_deps consist solely of last-continuous or
+            solely of last-patch automatically gain an additional
+            incompatibility with @platforms//:incompatible when, respectively,
+            //bazel/resmoke/multiversion:last_continuous_redundant or
+            //bazel/resmoke/multiversion:last_patch_unavailable is True.
         timeout: Bazel test timeout.
         exec_properties: Execution properties for remote execution.
         multiversion_deps: List of multiversion_setup targets whose output
@@ -627,14 +633,18 @@ def resmoke_suite_test(
     # targets nothing depends on.
     cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags + seed_target_data + [":" + tss_test_list]
 
-    # If this suite's only multiversion dep is last-continuous, it is a
-    # dedicated last-continuous suite.  Mark it incompatible when
-    # last-continuous resolves to the same version as last-lts so that
-    # `bazel test //...` skips it rather than running redundant tests.
+    # A suite with a single multiversion dep is dedicated to that peer, so it can
+    # be skipped outright when the peer is not worth (or not possible) to test
+    # against: last-continuous resolving to the same version as last-lts would
+    # duplicate the last-lts suite exactly, and last-patch on a series with no GA
+    # release has no binaries to download at all.  Mark those incompatible so
+    # `bazel test //...` skips them instead of running redundant tests or failing
+    # in db-contrib-tool.  Suites with more than one peer still have work to do
+    # for the other peers, so they are left alone.
     dep_names = [_dep_target_name(d) for d in multiversion_deps]
-    if dep_names == ["last-continuous"]:
+    if len(dep_names) == 1 and dep_names[0] in _DEDICATED_SUITE_SKIP_SETTING:
         target_compatible_with = target_compatible_with + select({
-            "//bazel/resmoke/multiversion:last_continuous_redundant": ["@platforms//:incompatible"],
+            _DEDICATED_SUITE_SKIP_SETTING[dep_names[0]]: ["@platforms//:incompatible"],
             "//conditions:default": [],
         })
 

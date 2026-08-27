@@ -83,6 +83,48 @@
               # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
               enableOTELTracing: false
 
+- name: replica_fixture_last_patch_new_new_old
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: new_new_old
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
+- name: replica_fixture_last_patch_new_old_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: new_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
+- name: replica_fixture_last_patch_old_new_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: old_new_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
 - name: sharded_fixture_last_lts_new_old_old_new
   value:
     executor:

@@ -540,7 +540,7 @@
     },
     "//bazel/resmoke/multiversion:version_compat.bzl%multiversion_compat": {
       "general": {
-        "bzlTransitiveDigest": "ht8HY1acr6ZvwIAjHvG+wAELB172czx5SAXMCxtJwHI=",
+        "bzlTransitiveDigest": "6TQyCZFSrgdwUsdGrYco2MxZavdco7vs4uXpvjzGcZ8=",
         "usagesDigest": "R4mZQP/JOBtMnHjng8+GXEO6lqaVIOlZ0dRztz3X5ZM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

@@ -154,3 +154,6 @@ filters:
   - "with_mongot_extension*":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "multiversion_sanity_check*":
+    approvers:
+      - 10gen/server-jstest-infra

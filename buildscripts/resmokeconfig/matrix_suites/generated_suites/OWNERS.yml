@@ -91,6 +91,15 @@ filters:
   - "/multiversion_sanity_check_last_lts_old_new_new.yml":
     approvers:
       - 10gen/server-jstest-infra
+  - "/multiversion_sanity_check_last_patch_new_new_old.yml":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "/multiversion_sanity_check_last_patch_new_old_new.yml":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "/multiversion_sanity_check_last_patch_old_new_new.yml":
+    approvers:
+      - 10gen/server-jstest-infra
   - "/no_passthrough_qemp_ifr_batch1.yml":
     approvers:
       - 10gen/query-execution

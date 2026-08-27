@@ -59,6 +59,11 @@ def add_multiversion_exclude_tags(args):
             tag_field = "requires_fcv_tag_lts"
         elif version == "last-continuous":
             tag_field = "requires_fcv_tag_continuous"
+        elif version == "last-patch":
+            # A last-patch binary is in the same series as the version under test, so
+            # its FCV matches and the default tag set applies. This mirrors
+            # mongo-task-generator's get_fcv_tags_for_patch().
+            tag_field = "requires_fcv_tag"
         else:
             continue
         tags_str = config.get(tag_field, "")

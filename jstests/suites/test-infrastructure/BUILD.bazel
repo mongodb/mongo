@@ -41,6 +41,9 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
         "multiversion_sanity_check_last_lts_new_new_old": "last-lts",
         "multiversion_sanity_check_last_lts_new_old_new": "last-lts",
         "multiversion_sanity_check_last_lts_old_new_new": "last-lts",
+        "multiversion_sanity_check_last_patch_new_new_old": "last-patch",
+        "multiversion_sanity_check_last_patch_new_old_new": "last-patch",
+        "multiversion_sanity_check_last_patch_old_new_new": "last-patch",
     }.items()
 ]
 

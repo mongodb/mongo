@@ -174,7 +174,7 @@ _multiversion_exclude_tags = rule(
     attrs = {
         "old_bin_version": attr.string(
             mandatory = True,
-            values = ["last_lts", "last_continuous"],
+            values = ["last_lts", "last_continuous", "last_patch"],
         ),
         "multiversion_setup": attr.label(
             mandatory = True,
@@ -198,6 +198,7 @@ _multiversion_exclude_tags = rule(
 _VERSION_TO_OLD_BIN_VERSION = {
     "last-continuous": "last_continuous",
     "last-lts": "last_lts",
+    "last-patch": "last_patch",
 }
 
 def multiversion_setup(name, version, **kwargs):
@@ -210,10 +211,11 @@ def multiversion_setup(name, version, **kwargs):
         bazel test //my:suite \\
             --//bazel/resmoke/multiversion:last-continuous-pin=<evg-version-id>
 
-    For last-continuous and last-lts, a <name>_exclude_tags companion is created
-    by running 'resmoke.py generate-multiversion-exclude-tags'.  For other versions
-    an empty no-op tag file is produced.  These are passed into resmoke_suite_test
-    via --tagFile when the multiversion_setup target appears in multiversion_deps.
+    For last-continuous, last-lts and last-patch, a <name>_exclude_tags companion
+    is created by running 'resmoke.py generate-multiversion-exclude-tags'.  For
+    other versions an empty no-op tag file is produced.  These are passed into
+    resmoke_suite_test via --tagFile when the multiversion_setup target appears in
+    multiversion_deps.
     """
 
     string_flag(

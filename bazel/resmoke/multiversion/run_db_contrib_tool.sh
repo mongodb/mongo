@@ -18,9 +18,15 @@ log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 
 # Point git at the real repository so tag lookups (needed for patch versions
-# like 8.0.16) work when db-contrib-tool runs from a Bazel output directory
-# that has no .git ancestor.
-export GIT_DIR="$(dirname "$(readlink -f "$root/MODULE.bazel")")/.git"
+# like 8.0.16 and for the last-patch alias) work when db-contrib-tool runs from
+# a Bazel output directory that has no .git ancestor. GIT_WORK_TREE is required
+# alongside GIT_DIR: the plain git CLI resolves GIT_DIR alone fine, but
+# GitPython -- used by resmoke's last-patch tag resolution -- raises
+# InvalidGitRepositoryError without GIT_WORK_TREE, since it does not honor a
+# GIT_DIR pointing at a linked worktree's .git file the same way.
+mongo_root="$(dirname "$(readlink -f "$root/MODULE.bazel")")"
+export GIT_DIR="$mongo_root/.git"
+export GIT_WORK_TREE="$mongo_root"
 
 # cd into the per-invocation output dir so that db-contrib-tool's temporary
 # 'multiversion-config.yml' is isolated from parallel invocations.  The output

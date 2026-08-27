@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("@multiversion_compat_settings//:settings.bzl", "LAST_CONTINUOUS_IS_LAST_LTS")
+load("@multiversion_compat_settings//:settings.bzl", "LAST_CONTINUOUS_IS_LAST_LTS", "LAST_PATCH_HAS_GA_RELEASE")
 load("//bazel/resmoke/multiversion:multiversion.bzl", "multiversion_setup")
 
 # Visibility is restricted to tests because multiversion_setup downloads
@@ -27,6 +27,33 @@ config_setting(
     name = "last_continuous_redundant",
     flag_values = {
         "//bazel/resmoke/multiversion:last_continuous_is_last_lts": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
+# True when a GA release of the current series precedes HEAD, i.e. when
+# last-patch has something to resolve to.  False on master (whose only in-series
+# tag is an alpha) and on a freshly cut branch still sitting on its release tag;
+# there, db-contrib-tool finds no binaries and the :last-patch target fails, so
+# dedicated last-patch suites are marked incompatible instead.
+#
+# The default is computed from the repository's git tags by the
+# multiversion_compat module extension, using the same strict GA-only predicate
+# as MultiversionService.has_released_patch_version().  Suites that deliberately
+# test against a pre-release peer -- the disagg suites, which run against Atlas
+# release candidates -- are the one case this is too strict for; on a series with
+# only rc tags they can be re-enabled with:
+#   bazel test ... --//bazel/resmoke/multiversion:last_patch_has_ga_release=True
+bool_flag(
+    name = "last_patch_has_ga_release",
+    build_setting_default = LAST_PATCH_HAS_GA_RELEASE,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "last_patch_unavailable",
+    flag_values = {
+        "//bazel/resmoke/multiversion:last_patch_has_ga_release": "False",
     },
     visibility = ["//visibility:public"],
 )
@@ -62,12 +89,21 @@ multiversion_setup(
     version = "last-lts",
 )
 
+# Which version this resolves to is decided by resmoke from the branch's release
+# tags (MultiversionService.get_last_patch_version()), not here.  Whether there
+# is anything to resolve at all is answered by :last_patch_has_ga_release above,
+# which keeps dedicated last-patch suites -- and therefore this target -- out of
+# `bazel test //...` on a series that has never released.
+#
+# The constraint here is what keeps a wildcard build (`bazel build //...`, which
+# unlike `bazel test` does not stop at test targets) from trying to fetch
+# binaries that do not exist; the *_exclude_tags companion depends on this target
+# and so inherits the incompatibility.
 multiversion_setup(
     name = "last-patch",
-    target_compatible_with = select(
-        {
-            "//conditions:default": ["@platforms//:incompatible"],  # last-patch download requires additional configuration, SERVER-131473
-        },
-    ),
+    target_compatible_with = select({
+        ":last_patch_unavailable": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     version = "last-patch",
 )
