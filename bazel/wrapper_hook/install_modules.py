@@ -47,6 +47,17 @@ _CYGDRIVE_RE = re.compile(r"^/cygdrive/([a-zA-Z])(/.*)?$")
 _WINDOWS_BASH_SYSTEM_PREFIXES = ("CYGWIN_NT", "MINGW", "MSYS")
 _BASH_OVERRIDE_ENV = "MONGO_BAZEL_BASH"
 
+# The hermetic Python toolchain repo, as materialized under the output base by
+# `@py_host//:all`. tools/bazel and tools/bazel.bat locate the wrapper
+# interpreter the same way; keep the three in sync.
+_PY_HOST_REPO_DIR = "_main~setup_mongo_python_toolchains~py_host"
+# tools/bazel.bat copies the py_host dist here when it can't run the
+# interpreter in place (Windows file locking), so the copy is hermetic too.
+_WINDOWS_WRAPPER_PYTHON_PARTS = (".tmp", "bazel", "wrapper-python")
+# Minimum interpreter version the repo's Python code requires; mirrors the
+# `python_works` check in tools/bazel.
+_MIN_PYTHON_VERSION = (3, 13)
+
 
 class MixedPlatformError(RuntimeError):
     """Raised when native Windows tooling is paired with a POSIX environment."""
@@ -198,6 +209,96 @@ def _target_venv():
     return REPO_ROOT / "python3-venv"
 
 
+def _py_host_interpreter_relpath() -> pathlib.Path:
+    """Interpreter path within the py_host repo's `dist` tree. The Windows
+    CPython distribution puts python.exe at the root of the dist; the POSIX
+    ones use the usual `bin/` prefix.
+    """
+    if os.name == "nt":
+        return pathlib.Path("dist", "python.exe")
+    return pathlib.Path("dist", "bin", "python3")
+
+
+def _is_hermetic_python(candidate) -> bool:
+    """True if `candidate` is an interpreter from the hermetic toolchain —
+    either in the py_host repo tree under the output base, or the copy of
+    that tree tools/bazel.bat stages under `.tmp/bazel/wrapper-python`.
+    """
+    if not candidate:
+        return False
+    parts = pathlib.PurePath(candidate).parts
+    if _PY_HOST_REPO_DIR in parts:
+        return True
+    n = len(_WINDOWS_WRAPPER_PYTHON_PARTS)
+    return any(parts[i : i + n] == _WINDOWS_WRAPPER_PYTHON_PARTS for i in range(len(parts)))
+
+
+def _python_works(candidate) -> bool:
+    """Mirror of tools/bazel's `python_works`: an executable interpreter new
+    enough to run this repo's Python.
+    """
+    candidate = pathlib.Path(candidate)
+    if not candidate.is_file() or not os.access(candidate, os.X_OK):
+        return False
+    try:
+        proc = subprocess.run(
+            [
+                str(candidate),
+                "-c",
+                "import sys; raise SystemExit(0 if sys.version_info >= "
+                f"{_MIN_PYTHON_VERSION} else 1)",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return proc.returncode == 0
+
+
+def _hermetic_python():
+    """Path to the hermetic toolchain interpreter, or None if it isn't
+    materialized under this repo's output base yet.
+
+    The venv the wrapper hook bootstraps is created by
+    `<interpreter> -m venv`, so it inherits whichever interpreter we hand
+    `uv_sync.sh`. Using the Bazel-managed Python keeps that venv on the same
+    hermetic CPython the rest of the build uses, instead of whatever
+    `python3` happens to be first on PATH.
+
+    Two sources, cheapest first:
+      1. The running interpreter, when the wrapper was itself launched from
+         the toolchain (the normal path — tools/bazel and tools/bazel.bat
+         both prefer it). No probing needed.
+      2. The py_host tree reached through Bazel's convenience symlink
+         (or the `.compiledb` one, for compiledb-only output bases).
+    """
+    if _is_hermetic_python(sys.executable):
+        return pathlib.Path(sys.executable)
+
+    repo_root = REPO_ROOT.resolve()
+    symlinks = [
+        repo_root / f"bazel-{repo_root.name}",
+        repo_root / ".compiledb" / f"compiledb-{repo_root.name}",
+    ]
+    for symlink in symlinks:
+        if not symlink.exists():
+            continue
+        # <output_base>/execroot/_main/../../external/<py_host>/dist/...
+        candidate = (
+            symlink.resolve().parent.parent
+            / "external"
+            / _PY_HOST_REPO_DIR
+            / _py_host_interpreter_relpath()
+        )
+        if _python_works(candidate):
+            wrapper_debug(f"using hermetic python for bootstrap: {candidate}")
+            return candidate
+
+    wrapper_debug("hermetic python toolchain not found; bootstrapping without it")
+    return None
+
+
 def _venv_python(venv_root):
     if os.name == "nt":
         return venv_root / "Scripts" / "python.exe"
@@ -340,7 +441,7 @@ def install_modules(bazel, args):
     venv exists at all (fresh host), `buildscripts/uv_sync.sh -f` bootstraps
     `python3-venv` from scratch (creating the venv, installing pinned uv
     into it, and running a full `--all-groups` sync, which includes this
-    group).
+    group) using the hermetic toolchain interpreter.
 
     Notably, we do NOT try to materialize wheels via
     `bazel build @pypi//:<pkg>`. That path used to be here (matching the
@@ -393,11 +494,23 @@ def install_modules(bazel, args):
         # otherwise gives an inherited VIRTUAL_ENV precedence over the
         # workstation python3-venv fallback.
         bootstrap_env.pop("VIRTUAL_ENV", None)
-        if os.name == "nt":
-            # A native Windows wrapper may be launched while WSL's python3 is
-            # first on PATH. Keep the bootstrap interpreter on the same side
-            # of the platform boundary as the wrapper itself.
-            bootstrap_env["PYTHON3"] = _windows_path_for_bash(sys.executable)
+        # uv_sync.sh creates python3-venv with `$PYTHON3 -m venv`. Pin that to
+        # the hermetic toolchain interpreter so the wrapper's venv matches the
+        # Python the build uses, rather than an arbitrary system python3 that
+        # may be the wrong version or missing ensurepip.
+        bootstrap_python = _hermetic_python()
+        if bootstrap_python is None and os.name == "nt":
+            # No py_host tree yet. A native Windows wrapper may be launched
+            # while WSL's python3 is first on PATH, so fall back to the
+            # running interpreter to keep the bootstrap on the same side of
+            # the platform boundary as the wrapper itself.
+            bootstrap_python = pathlib.Path(sys.executable)
+        if bootstrap_python is not None:
+            bootstrap_env["PYTHON3"] = (
+                _windows_path_for_bash(str(bootstrap_python))
+                if os.name == "nt"
+                else str(bootstrap_python)
+            )
         proc = subprocess.run(
             [bash_command, "buildscripts/uv_sync.sh", "-f"],
             cwd=str(repo_root),

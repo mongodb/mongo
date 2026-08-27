@@ -223,8 +223,11 @@ class InstallModulesTest(unittest.TestCase):
             (missing_venv / "bin" / "python3").touch()
             return mock.Mock(returncode=0)
 
+        hermetic = pathlib.Path(self._tmp.name) / "py_host" / "dist" / "bin" / "python3"
+
         with (
             mock.patch.object(install_modules, "_target_venv", return_value=missing_venv),
+            mock.patch.object(install_modules, "_hermetic_python", return_value=hermetic),
             mock.patch.object(
                 install_modules.subprocess,
                 "run",
@@ -232,6 +235,7 @@ class InstallModulesTest(unittest.TestCase):
             ) as mock_run,
         ):
             self.assertTrue(install_modules.install_modules("bazel", []))
+        self.assertEqual(mock_run.call_args.kwargs["env"]["PYTHON3"], str(hermetic))
         cmd = mock_run.call_args.args[0]
         self.assertEqual(cmd[0], "bash")
         expected_uv_sync_sh = install_modules.REPO_ROOT.resolve() / "buildscripts" / "uv_sync.sh"
@@ -258,6 +262,9 @@ class InstallModulesTest(unittest.TestCase):
                 return_value=r"C:\Program Files\Git\bin\bash.exe",
             ),
             mock.patch.object(install_modules.sys, "executable", r"C:\pyhost\python.exe"),
+            # No py_host tree materialized yet: the wrapper's own interpreter
+            # is the fallback.
+            mock.patch.object(install_modules, "_hermetic_python", return_value=None),
             mock.patch.object(
                 install_modules.subprocess,
                 "run",
@@ -281,6 +288,77 @@ class InstallModulesTest(unittest.TestCase):
             self.assertIn(str(self.site_packages), sys.path)
         finally:
             sys.path[:] = original
+
+
+class HermeticPythonTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        # resolve(): on macOS the temp dir is under a /private symlink, which
+        # _hermetic_python() collapses when it resolves the bazel symlink.
+        self.tmp = pathlib.Path(self._tmp.name).resolve()
+
+    def test_running_interpreter_in_py_host_is_used_directly(self):
+        exe = (
+            self.tmp
+            / "output_base"
+            / "external"
+            / install_modules._PY_HOST_REPO_DIR
+            / "dist"
+            / "bin"
+            / "python3"
+        )
+        with mock.patch.object(install_modules.sys, "executable", str(exe)):
+            # No filesystem probing at all: we're already running it.
+            self.assertEqual(install_modules._hermetic_python(), pathlib.Path(str(exe)))
+
+    def test_windows_wrapper_python_copy_counts_as_hermetic(self):
+        self.assertTrue(
+            install_modules._is_hermetic_python(r"C:\repo\.tmp\bazel\wrapper-python\python.exe")
+            if os.name == "nt"
+            else install_modules._is_hermetic_python("/repo/.tmp/bazel/wrapper-python/python3")
+        )
+
+    def test_system_interpreter_is_not_hermetic(self):
+        self.assertFalse(install_modules._is_hermetic_python("/usr/bin/python3"))
+        self.assertFalse(install_modules._is_hermetic_python(""))
+
+    def _make_py_host(self, output_base: pathlib.Path) -> pathlib.Path:
+        interpreter = (
+            output_base
+            / "external"
+            / install_modules._PY_HOST_REPO_DIR
+            / install_modules._py_host_interpreter_relpath()
+        )
+        interpreter.parent.mkdir(parents=True)
+        interpreter.touch()
+        interpreter.chmod(0o755)
+        return interpreter
+
+    def test_resolved_through_bazel_convenience_symlink(self):
+        repo_root = self.tmp / "mongo"
+        repo_root.mkdir()
+        output_base = self.tmp / "output_base"
+        execroot = output_base / "execroot" / "_main"
+        execroot.mkdir(parents=True)
+        interpreter = self._make_py_host(output_base)
+        (repo_root / f"bazel-{repo_root.name}").symlink_to(execroot)
+
+        with (
+            mock.patch.object(install_modules.sys, "executable", "/usr/bin/python3"),
+            mock.patch.object(install_modules, "REPO_ROOT", repo_root),
+            mock.patch.object(install_modules, "_python_works", return_value=True),
+        ):
+            self.assertEqual(install_modules._hermetic_python(), interpreter)
+
+    def test_none_when_py_host_missing_or_too_old(self):
+        repo_root = self.tmp / "mongo"
+        repo_root.mkdir()
+        with (
+            mock.patch.object(install_modules.sys, "executable", "/usr/bin/python3"),
+            mock.patch.object(install_modules, "REPO_ROOT", repo_root),
+        ):
+            self.assertIsNone(install_modules._hermetic_python())
 
 
 if __name__ == "__main__":
