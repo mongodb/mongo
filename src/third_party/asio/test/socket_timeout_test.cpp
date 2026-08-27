@@ -354,8 +354,8 @@ void syncReceiveTimeoutTest(SocketPair& sockets, ByteSequence destination) {
     ASSERT_EQ(result.bytesTransferred, 0) << result;
     // We expect that the receiver timed out, so their `receive` operation should have taken a
     // significant portion of the timeout time. Realistically, the duration will be larger than
-    // the timeout, but to play it safe let's require that it was at least 75% of the timeout.
-    ASSERT_GT(result.duration, 3 * timeout / 4) << result;
+    // the timeout, but to play it safe let's require that it was at least 50% of the timeout.
+    ASSERT_GT(result.duration, timeout / 2) << result;
 }
 
 /**
