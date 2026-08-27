@@ -32,7 +32,7 @@ notifications:
         - "<@U0WM3PSMV>" # mira.carey@mongodb.com - SVP
         - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
         - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
-        - "<@U067K23N0RL>" # thomas.chang@mongodb.com - VP
+        - "<@U0VB7SB7D>" # bernie@mongodb.com - VP
         - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
         - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
       message_footer: |
@@ -96,27 +96,13 @@ groups:
   #######################################################################
 
   # Core Server Team VP orgs as described on https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
-  - name: "Clusters & Integrations"
-    teams:
-      - "Catalog and Routing"
-      - "Cluster Scalability"
-      - "Networking & Observability"
-      - "Server Programmability"
-      - "Server Security"
-      - "Workload Resilience"
-    slack_tags:
-      - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
-      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
-      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
-      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
-  - name: "Durable Transactions & Availability"
+  - name: "Durability and Availability"
     thresholds:
       hot: 50
       cold: 25
     teams:
-      - "RSSD"
+      - "Workload Resilience"
       - "Replication"
-      - "Storage Execution"
       - "Storage Engines"
       - "Storage Engines - Server Integration"
       - "Storage Engines - Foundations"
@@ -130,18 +116,32 @@ groups:
       - "Backup - DS"
     slack_tags:
       - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
-      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
-  - name: "Query"
+      - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
+      - "<@UDWBB4ZQV>" # xiang.gao@mongodb.com - Director
+  - name: "Online Transaction Processing"
     teams:
+      - "Storage Execution"
       - "Query Execution"
       - "Query Optimization"
-      - "Query Integration"
+      - "Catalog and Routing"
     slack_tags:
-      - "<@U067K23N0RL>" # thomas.chang@mongodb.com - VP
+      - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
       - "<@U0B71RRMBN1>" # andrey.gorelov@mongodb.com - Director
+      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+  - name: "Database Architecture and Interfaces"
+    teams:
+      - "Query Integration"
+      - "Networking & Observability"
+      - "Server Programmability"
+      - "Server Security"
+    slack_tags:
+      - "<@U0VB7SB7D>" # bernie@mongodb.com - VP
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
   - name: "Developer Productivity"
     teams:
       - "DevProd AXIS"
@@ -169,41 +169,15 @@ teams:
 
   # Core Server Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
 
-  # Clusters & Integrations teams
-  - name: "Catalog and Routing"
-    slack_tags:
-      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
-  - name: "Cluster Scalability"
-    slack_tags:
-      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
-  - name: "Networking & Observability"
-    slack_tags:
-      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
-  - name: "Server Programmability"
-    slack_tags:
-      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
-      - "<@U0AMLD1C9J7>" # gabriel.spil@mongodb.com - Lead
-  - name: "Server Security"
-    slack_tags:
-      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
-      - "<@U02HWKGMAQL>" # adam.rayner@mongodb.com - Lead
+  # Durability and Availability teams
   - name: "Workload Resilience"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
-
-  # Durable Transactions & Availability teams
-  - name: "RSSD"
-    slack_tags:
-      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
-      - "<@U08102DKT3M>" # austin.miller@mongodb.com - Lead
+      - "<@UCAV3DERW>" # jason.chan@mongodb.com
   - name: "Replication"
     slack_tags:
-      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<!subteam^S0AK685U9TK>" # @rss-repl-triage - Leads + triagers
-  - name: "Storage Execution"
-    slack_tags:
-      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
-      - "<!subteam^S02P8DH4XNH>" # @leads-storage-execution - Leads
   - name: "Storage Engines"
     slack_tags:
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
@@ -271,7 +245,14 @@ teams:
       hot: 1
       cold: 3
 
-  # Query teams
+  # Online Transaction Processing teams
+  - name: "Storage Execution"
+    slack_tags:
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+      - "<!subteam^S02P8DH4XNH>" # @leads-storage-execution - Leads
+  - name: "Catalog and Routing"
+    slack_tags:
+      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
   - name: "Query Execution"
     slack_tags:
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
@@ -280,6 +261,8 @@ teams:
     slack_tags:
       - "<@U0B71RRMBN1>" # andrey.gorelov@mongodb.com - Director
       - "<!subteam^S08K9JHA36C>" # @leads-query-optimization
+
+  # Database Architecture and Interfaces teams
   - name: "Query Integration"
     slack_tags:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
@@ -287,6 +270,18 @@ teams:
     thresholds:
       hot: 3
       cold: 5
+  - name: "Networking & Observability"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U02H776RRH8>" # didier.nadeau@mongodb.com
+  - name: "Server Programmability"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U0AMLD1C9J7>" # gabriel.spil@mongodb.com - Lead
+  - name: "Server Security"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U02HWKGMAQL>" # adam.rayner@mongodb.com - Lead
 
   # Release Quality teams
   - name: "Build Baron"
