@@ -226,8 +226,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
 
     uint64_t currentEngineEpoch = _engineEpoch.load();
     uint64_t currentRtsEpoch = _rtsEpoch.load();
-    if (isShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch ||
-        session->_getRtsEpoch() != currentRtsEpoch) {
+    if (isCleanShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch) {
         invariant(session->_getEngineEpoch() <= currentEngineEpoch);
         // There is a race condition with clean shutdown, where the storage engine is ripped
         // from underneath OperationContexts, which are not "active" (i.e., do not have any
@@ -238,9 +237,10 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
         return;
     }
 
-    if (session->_getRtsEpoch() != currentRtsEpoch) {
-        // When the session is stale due to rollback to stable, we skip caching and return early.
-        // The session and cursor will be closed by the session wrapper.
+    if (isShuttingDown() || session->_getRtsEpoch() != currentRtsEpoch) {
+        // The session is stale due to a rollback to stable, which leaves the WT_CONNECTION intact.
+        // Skip caching and return early: the session and its cursors must still be closed, which
+        // the session wrapper does, or WiredTiger keeps holding the data handles of their tables.
         invariant(session->_getRtsEpoch() <= currentRtsEpoch);
         return;
     }

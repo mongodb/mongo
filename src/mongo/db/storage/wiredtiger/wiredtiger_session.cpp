@@ -153,8 +153,10 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::strin
     WiredTigerConnection::BlockShutdown blockShutdown(_connection);
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
-    // cursor from an earlier epoch.
-    if (_connection->isShuttingDown() || _getEngineEpoch() < _connection->_engineEpoch.load()) {
+    // cursor from an earlier epoch. A rollback to stable leaves the WT_CONNECTION intact, so the
+    // cursor must still be closed below in that case.
+    if (_connection->isCleanShuttingDown() ||
+        _getEngineEpoch() < _connection->_engineEpoch.load()) {
         return;
     }
 
@@ -191,8 +193,10 @@ void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
     WiredTigerConnection::BlockShutdown blockShutdown(_connection);
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
-    // cursor from an earlier epoch.
-    if (_connection->isShuttingDown() || _getEngineEpoch() < _connection->_engineEpoch.load()) {
+    // cursor from an earlier epoch. A rollback to stable leaves the WT_CONNECTION intact, so the
+    // cursor must still be closed below in that case.
+    if (_connection->isCleanShuttingDown() ||
+        _getEngineEpoch() < _connection->_engineEpoch.load()) {
         return;
     }
 

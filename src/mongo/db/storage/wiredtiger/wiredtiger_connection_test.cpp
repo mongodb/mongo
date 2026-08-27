@@ -144,6 +144,43 @@ TEST(WiredTigerConnectionTest, ReleaseSessionAfterShutdown) {
     ASSERT_EQ(connection->getIdleSessionsCount(), 0);
 }
 
+// Test that a session made stale by a rollback to stable is closed when it is released, rather than
+// abandoned as it is during a clean shutdown. A rollback to stable leaves the WT_CONNECTION intact,
+// so an abandoned session keeps its cached cursors, and therefore the data handles of their tables,
+// open for the lifetime of the process.
+TEST(WiredTigerConnectionTest, ReleaseSessionAfterRollbackToStableClosesItsCursors) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+    const std::string uri = "table:rollback_to_stable";
+
+    {
+        WiredTigerManagedSession session = connection->getUninterruptibleSession();
+        ASSERT_OK(
+            wtRCToStatus(session->create(uri.c_str(), "key_format=q,value_format=u"), *session));
+    }
+
+    {
+        WiredTigerManagedSession session = connection->getUninterruptibleSession();
+
+        // Leave a cursor on the table in the session's cursor cache. It stays open, so WiredTiger
+        // holds the table's data handle until the session itself is closed.
+        session->releaseCursor(WiredTigerUtil::genTableId(), session->getNewCursor(uri), "");
+        ASSERT_EQ(session->cachedCursors(), 1);
+
+        connection->shuttingDown(WiredTigerConnection::ShutdownReason::kRollbackToStable);
+        connection->restart();
+    }
+
+    // The session's rollback to stable epoch was stale, so it was not returned to the cache.
+    ASSERT_EQ(connection->getIdleSessionsCount(), 0);
+
+    // Nothing holds the table's data handle any more, so the table can be dropped. Do not wait for
+    // locks, so that a leaked cursor fails the drop with EBUSY instead of hanging the test.
+    WiredTigerManagedSession session = connection->getUninterruptibleSession();
+    ASSERT_OK(wtRCToStatus(session->drop(uri.c_str(), "checkpoint_wait=false,lock_wait=false"),
+                           *session));
+}
+
 // Test that, if a recovery unit reconfigures its session, the session will have its configuration
 // reset to default values before it is released to the session cache where it can be used by
 // another recovery unit.
