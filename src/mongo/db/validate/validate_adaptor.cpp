@@ -11,6 +11,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -542,6 +543,8 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
         _progress.finished();
     });
 
+    HashContext hashCtx;
+
     // Because the progress meter is intended as an approximation, it's sufficient to get the number
     // of records when we begin traversing, even if this number may deviate from the final number.
     const auto& coll = _validateState->getCollection();
@@ -589,17 +592,16 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
         BSONObj recordBson = record->data.toBson();
         auto idField = recordBson["_id"];
 
-        auto idBlock =
-            SHA256Block::computeHash({ConstDataRange(idField.value(), idField.valuesize())});
-        auto deeperHash = getPartialHashBucketKey(idBlock.toHexString());
-        if (deeperHash) {
-            auto docHash = SHA256Block::computeHash(
-                {ConstDataRange(record->data.data(), record->data.size())});
-            if (!idHashToDocHash.count(*deeperHash)) {
-                idHashToDocHash.emplace(*deeperHash, std::make_pair(docHash, 1));
-            } else {
-                idHashToDocHash.at(*deeperHash).first.xorInline(docHash);
-                idHashToDocHash.at(*deeperHash).second++;
+        const auto idBlock = SHA256Block::computeHashWithCtx(
+            &hashCtx, {ConstDataRange(idField.value(), idField.valuesize())});
+        if (auto deeperHash = getPartialHashBucketKey(idBlock.toHexString())) {
+            auto docHash = SHA256Block::computeHashWithCtx(
+                &hashCtx, {ConstDataRange(record->data.data(), record->data.size())});
+            const auto [it, inserted] =
+                idHashToDocHash.try_emplace(std::move(*deeperHash), docHash, 1);
+            if (!inserted) {
+                it->second.first.xorInline(docHash);
+                ++it->second.second;
             }
         }
     }
@@ -905,6 +907,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         // zeroed out.
         SHA256Block accumulatedBlock;
         accumulatedBlock.xorInline(accumulatedBlock);
+        HashContext hashCtx;
 
         // Accumulates the same records' XXH3 hashes, XORed together the same way the replicated
         // collection validation hash folds in its per-document hashes. Zero is both the XOR
@@ -960,7 +963,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
 
             if (_validateState->isCollHashValidation()) {
                 const ConstDataRange recordRange(record->data.data(), record->data.size());
-                SHA256Block block = SHA256Block::computeHash({recordRange});
+                const SHA256Block block = SHA256Block::computeHashWithCtx(&hashCtx, {recordRange});
                 accumulatedBlock.xorInline(block);
                 if (computeXxh3Hash) {
                     accumulatedXxh3 ^=
@@ -971,10 +974,11 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                     !validateRecordStatus.isOK() || validatedSize != dataSize || !validDocument;
                 if (revealHashedIds) {
                     const auto idField = record->data.toBson()["_id"];
-                    auto idBlock = SHA256Block::computeHash(
-                        {ConstDataRange(idField.value(), idField.valuesize())});
+                    const auto idBlock = SHA256Block::computeHashWithCtx(
+                        &hashCtx, {ConstDataRange(idField.value(), idField.valuesize())});
+                    const auto idBlockHexStr = idBlock.toHexString();
                     for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
-                        if (idBlock.toHexString().starts_with(hashPrefix)) {
+                        if (idBlockHexStr.starts_with(hashPrefix)) {
                             revealedIds[hashPrefix].push_back(idField.wrap());
                         }
                     }
