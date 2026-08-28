@@ -1689,6 +1689,116 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
         shard_role_details::getLocker(operationContext())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
+namespace {
+using Intent = rss::consensus::IntentRegistry::Intent;
+
+size_t declaredIntents(ServiceContext* svcCtx, Intent intent) {
+    return rss::consensus::IntentRegistry::get(svcCtx)
+        .getTotalIntentsDeclared()[static_cast<size_t>(intent)];
+}
+}  // namespace
+
+TEST_F(ShardRoleTest, YieldReleasesWriteIntentAndRestoreReacquiresIt) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                               },
+                                               MODE_IX);
+
+    const auto intentsAfterAcquire = declaredIntents(getServiceContext(), Intent::Write);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    // No locks are held while yielded, so no intent should be declared either.
+    const bool lockedWhileYielded =
+        shard_role_details::getLocker(operationContext())->isDbLockedForMode(nss.dbName(), MODE_IX);
+    const auto intentsWhileYielded = declaredIntents(getServiceContext(), Intent::Write);
+
+    restoreTransactionResourcesToOperationContext(operationContext(),
+                                                  std::move(yieldedTransactionResources));
+
+    ASSERT_EQ(1, intentsAfterAcquire);
+    ASSERT_FALSE(lockedWhileYielded);
+    ASSERT_EQ(0, intentsWhileYielded);
+
+    ASSERT_TRUE(shard_role_details::getLocker(operationContext())
+                    ->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_EQ(1, declaredIntents(getServiceContext(), Intent::Write));
+}
+
+TEST_F(ShardRoleTest, YieldReleasesReadIntentAndRestoreReacquiresIt) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               },
+                                               MODE_IS);
+
+    const auto intentsAfterAcquire = declaredIntents(getServiceContext(), Intent::Read);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    const auto intentsWhileYielded = declaredIntents(getServiceContext(), Intent::Read);
+
+    restoreTransactionResourcesToOperationContext(operationContext(),
+                                                  std::move(yieldedTransactionResources));
+
+    ASSERT_EQ(1, intentsAfterAcquire);
+    ASSERT_EQ(0, intentsWhileYielded);
+    ASSERT_EQ(1, declaredIntents(getServiceContext(), Intent::Read));
+}
+
+TEST_F(ShardRoleTest, StepdownWhileYieldedDrainsAndRestoreFailsForWrite) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                               },
+                                               MODE_IX);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    // The drain completes without needing to kill the yielded operation since no intent is held.
+    auto stepdownClient = getServiceContext()->getService()->makeClient("StepdownClient");
+    auto stepdownOpCtx = stepdownClient->makeOperationContext();
+    auto stepdownGuard =
+        rss::consensus::IntentRegistry::get(getServiceContext())
+            .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown,
+                                       stepdownOpCtx.get(),
+                                       nullptr,
+                                       10 /* timeout_sec */)
+            .get();
+
+    // If the yield is resumed during the state transition it should fail due to not being able to
+    // declare the intent.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
 TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
     const auto nss = nssUnshardedCollection1;
 

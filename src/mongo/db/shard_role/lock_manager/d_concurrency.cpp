@@ -172,6 +172,21 @@ void Lock::GlobalLock::_declareIntent(
     }
 }
 
+boost::optional<rss::consensus::IntentRegistry::Intent> Lock::GlobalLock::releaseIntent() {
+    if (!_guard) {
+        return boost::none;
+    }
+    auto intent = _guard->intent();
+    // Destroying the guard deregisters the intent.
+    _guard = boost::none;
+    return intent;
+}
+
+void Lock::GlobalLock::reacquireIntent(rss::consensus::IntentRegistry::Intent intent) {
+    invariant(!_guard);
+    _guard.emplace(intent, _opCtx);
+}
+
 Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     : _opCtx(otherLock._opCtx),
       _result(otherLock._result),

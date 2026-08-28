@@ -882,6 +882,35 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
+Lock::GlobalLock* getIntentOwningGlobalLock(TransactionResources& transactionResources) {
+    // Every acquisition points at that same global lock, so consulting the first one suffices.
+    // 'globalLock' is only set for lock-free acquisitions; otherwise it is held by 'dbLock'.
+    auto globalLockFor = [](shard_role_details::AcquiredBase& acquisition) {
+        return acquisition.dbLock ? acquisition.dbLock->getGlobalLock()
+                                  : acquisition.globalLock.get();
+    };
+    if (!transactionResources.acquiredCollections.empty()) {
+        return globalLockFor(transactionResources.acquiredCollections.front());
+    }
+    if (!transactionResources.acquiredViews.empty()) {
+        return globalLockFor(transactionResources.acquiredViews.front());
+    }
+    return nullptr;
+}
+
+void yieldLocksAndIntents(OperationContext* opCtx, TransactionResources& transactionResources) {
+    Locker::LockSnapshot lockSnapshot;
+    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
+
+    boost::optional<rss::consensus::IntentRegistry::Intent> yieldedIntent;
+    if (auto* globalLock = getIntentOwningGlobalLock(transactionResources)) {
+        yieldedIntent = globalLock->releaseIntent();
+    }
+
+    transactionResources.yielded.emplace(
+        TransactionResources::YieldedStateHolder{std::move(lockSnapshot), yieldedIntent});
+}
+
 StashedTransactionResources buildStashedTransactionResourcesAndDetachFromOpCtx(
     OperationContext* opCtx) {
     auto& transactionResources = TransactionResources::get(opCtx);
@@ -1990,10 +2019,7 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     // Stash the locker state, only if we have any active acquisition. Don't do it when we don't, as
     // it is illegal to call saveLockStateAndUnlock without actually holding any locks.
     if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
-        Locker::LockSnapshot lockSnapshot;
-        shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-        transactionResources.yielded.emplace(
-            TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+        yieldLocksAndIntents(opCtx, transactionResources);
     }
 
     auto originalState = std::exchange(transactionResources.state,
@@ -2029,6 +2055,17 @@ void restoreTransactionResourcesToOperationContext(
         // Reacquire locks. External yields do not have a lock snapshot so we only restore for
         // internal yields.
         if (auto ptr = transactionResources.yielded.get_ptr()) {
+            // Re-declare the intent released on yield before reacquiring the locks, mirroring the
+            // acquisition order. This throws if the intent is no longer compatible with the
+            // replication state - for instance a Write intent after a stepdown - which correctly
+            // prevents the operation from resuming. 'yielded' is left intact in that case, so the
+            // operation stays in a consistent yielded state.
+            if (ptr->yieldedIntent) {
+                auto* globalLock = getIntentOwningGlobalLock(transactionResources);
+                tassert(13407001, "Missing global lock for a yielded intent", globalLock);
+                globalLock->reacquireIntent(*ptr->yieldedIntent);
+            }
+
             shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, ptr->yieldedLocker);
             transactionResources.yielded.reset();
         }
@@ -2233,11 +2270,8 @@ void restoreTransactionResourcesToOperationContext(
                     // means holding the session checked in while we wait, which can lead to
                     // deadlocks. Also retryable writes will safely be retried by a higher layer in
                     // case of StaleConfig.
-                    Locker::LockSnapshot lockSnapshot;
                     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                    transactionResources.yielded.emplace(
-                        TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                    yieldLocksAndIntents(opCtx, transactionResources);
                     // Wait for the critical section to finish.
                     refresh_util::waitForCriticalSectionToComplete(opCtx,
                                                                    *ex->getCriticalSectionSignal())
@@ -2260,11 +2294,8 @@ void restoreTransactionResourcesToOperationContext(
                     PlanYieldPolicy::throwCollectionDroppedError(extraInfo->collectionUUID());
                 }
             } catch (const StorageUnavailableException& ex) {
-                Locker::LockSnapshot lockSnapshot;
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                transactionResources.yielded.emplace(
-                    TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                yieldLocksAndIntents(opCtx, transactionResources);
 
                 logAndRecordWriteConflictAndBackoff(opCtx,
                                                     attempts,
@@ -2286,11 +2317,8 @@ void restoreTransactionResourcesToOperationContext(
                     throw;
                 }
                 // Release locks
-                Locker::LockSnapshot lockSnapshot;
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                transactionResources.yielded.emplace(
-                    TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                yieldLocksAndIntents(opCtx, transactionResources);
                 const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
                 const auto refreshStatus = Grid::get(opCtx)
                                                ->catalogCache()
