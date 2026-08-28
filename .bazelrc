@@ -510,14 +510,6 @@ coverage --fission=no
 coverage --build_runfile_links
 coverage --legacy_external_runfiles
 coverage --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]
-# Record the compilation directory as "." in the LLVM coverage mapping. Without this, locally
-# executed compiles bake the absolute exec root into the mapping, the collector emits lcov with
-# absolute SF: paths, and CoverageOutputGenerator discards every record -- it logs
-# "WARNING: There was no coverage found." and writes a 0-byte combined report while the tests
-# still pass. Remote compiles happen to produce relative paths already, which is why this only
-# ever showed up in Evergreen (see .bazelrc.evergreen, which disables remote execution).
-coverage --copt=-fcoverage-compilation-dir=.
-
 # This is set in .bazelrc.evergreen:
 # coverage --config=no-remote-exec
 
