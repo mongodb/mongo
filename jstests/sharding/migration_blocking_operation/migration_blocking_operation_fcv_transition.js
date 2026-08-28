@@ -13,6 +13,10 @@
  *
  * @tags: [
  *   requires_fcv_90,
+ *   # This test drives the cluster FCV between lastLTSFCV and latestFCV. Those constants come from
+ *   # the shell's binary and are not consistent across nodes in a multiversion cluster, so there is
+ *   # no FCV the whole cluster agrees on for this test to transition to.
+ *   multiversion_incompatible,
  * ]
  */
 
