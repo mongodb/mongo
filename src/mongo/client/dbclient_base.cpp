@@ -187,7 +187,8 @@ void appendMetadata(OperationContext* opCtx,
     const bool isLocalConnection = connectionType == ConnectionString::ConnectionType::kLocal;
     if (targetAcceptsTelemetrySection && !isLocalConnection && opCtx) {
         auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx);
-        request.telemetryContext = otel::traces::toWireType(holder.getTelemetryContext().get());
+        request.telemetryContext =
+            otel::traces::TelemetryContextSerializer::toSection(holder.getTelemetryContext().get());
     }
 }
 }  // namespace

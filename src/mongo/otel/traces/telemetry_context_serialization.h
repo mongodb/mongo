@@ -27,14 +27,8 @@ public:
     static std::shared_ptr<TelemetryContext> fromSection(
         const boost::optional<mongo::TelemetryContextSection>& section);
     static boost::optional<mongo::TelemetryContextSection> toSection(
-        const std::shared_ptr<TelemetryContext>& context);
+        const TelemetryContext* context);
 };
-
-/**
- * Converts a TelemetryContext to the wire-format type for use in OpMsg's telemetry section.
- * Returns boost::none if ctx is null or if no active span is present in ctx.
- */
-boost::optional<TelemetryContextSection> toWireType(const TelemetryContext* ctx);
 
 #else
 
@@ -55,14 +49,10 @@ public:
         return std::make_shared<TelemetryContext>();
     }
     static boost::optional<mongo::TelemetryContextSection> toSection(
-        const std::shared_ptr<TelemetryContext>& context) {
+        const TelemetryContext* context) {
         return boost::none;
     }
 };
-
-inline boost::optional<::mongo::TelemetryContextSection> toWireType(const TelemetryContext*) {
-    return boost::none;
-}
 
 #endif
 

@@ -79,7 +79,7 @@ boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySecti
         maxWireVersion == std::numeric_limits<int>::max()) {
         return boost::none;
     }
-    return otel::traces::toWireType(request.telemetryContext.get());
+    return otel::traces::TelemetryContextSerializer::toSection(request.telemetryContext.get());
 }
 
 otel::traces::Span AsyncDBClient::startEgressSpan(
