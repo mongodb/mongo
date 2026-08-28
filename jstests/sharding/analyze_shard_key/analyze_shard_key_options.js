@@ -2,6 +2,7 @@
  * Tests that the analyzeShardKey command supports analyzing the characteristics of the shard
  * key and/or the read and write distribution.
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
@@ -23,6 +24,9 @@ function runTest(conn) {
     }
     assert.commandWorked(coll.insert(docs, {writeConcern}));
     assert.commandWorked(coll.createIndex({x: 1}));
+    if (!FixtureHelpers.isStandalone(db)) {
+        FixtureHelpers.awaitReplication(db);
+    }
 
     const res0 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {x: 1}}));
     AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res0);
