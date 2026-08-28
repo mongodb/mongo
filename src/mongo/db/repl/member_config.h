@@ -224,11 +224,6 @@ public:
     bool hasTags() const;
 
     /**
-     * Gets the raw user-specified "tags" subdocument, or boost::none if unset.
-     */
-    using MemberConfigBase::getTags;
-
-    /**
      * Gets a begin iterator over the tags for this member.
      */
     TagIterator tagsBegin() const {
