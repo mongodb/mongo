@@ -13,6 +13,7 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/drop_database.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -75,6 +76,7 @@ public:
                 // For the authoritative shards use the replay protection
                 auto newClient = getGlobalServiceContext()->getService()->makeClient(
                     "ShardsvrDropDatabaseParticipant");
+                auto opMetadata = ForwardableOperationMetadata(opCtx);
 
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(
@@ -82,6 +84,7 @@ public:
                     opCtx->getCancellationToken(),
                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
                 cancelableOperationContext->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                opMetadata.setOn(cancelableOperationContext.get());
 
                 _handleDropDatabase(cancelableOperationContext.get(), dbName, fromMigrate);
             } else {

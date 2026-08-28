@@ -682,7 +682,7 @@ assert.soon = function (func, msg, timeout, interval = 200, {runHangAnalyzer = t
 
         const diff = new Date().getTime() - start.getTime();
         if (diff > timeout) {
-            msg = _buildAssertionMessage(msg);
+            msg = formatErrorMsg(_buildAssertionMessage(msg), attr);
             if (runHangAnalyzer) {
                 msg =
                     msg +
@@ -797,7 +797,7 @@ assert.retry = function (
         }
     }
     // Used up all attempts
-    msg = _buildAssertionMessage(msg);
+    msg = formatErrorMsg(_buildAssertionMessage(msg), attr);
     if (runHangAnalyzer) {
         msg =
             msg +
@@ -918,7 +918,8 @@ assert.time = function (f, msg, timeout = 30_000 /*ms*/, {runHangAnalyzer = true
     }
 
     const msgPrefix = "assert.time failed";
-    msg = _buildAssertionMessage(msg);
+    const assertionAttr = {timeMS: diff, timeoutMS: timeout, function: f, diff, ...attr};
+    msg = formatErrorMsg(_buildAssertionMessage(msg), assertionAttr);
     if (runHangAnalyzer) {
         msg =
             msg +
@@ -929,7 +930,7 @@ assert.time = function (f, msg, timeout = 30_000 /*ms*/, {runHangAnalyzer = true
         print(msg + " Running hang analyzer from assert.time.");
         MongoRunner.runHangAnalyzer();
     }
-    _doassert(msg, msgPrefix, {timeMS: diff, timeoutMS: timeout, function: f, diff, ...attr});
+    _doassert(msg, msgPrefix, assertionAttr);
 };
 
 /**
