@@ -39,6 +39,7 @@ const kRetryableErrors = [
     // TODO SERVER-85145: Stop ignoring transient errors that might occur with concurrent shard
     // removals.
     {code: ErrorCodes.HostUnreachable},
+    {code: ErrorCodes.ConnectionClosedByPeer},
     {code: ErrorCodes.ShutdownInProgress},
     {code: ErrorCodes.ShardNotFound},
     {code: ErrorCodes.AddOrRemoveShardInProgress},
