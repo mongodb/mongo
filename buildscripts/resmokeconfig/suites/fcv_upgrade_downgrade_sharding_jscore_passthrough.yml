@@ -86,6 +86,13 @@ selector:
     # which is not the case if featureFlagPQSBackfill is on.
     - jstests/core/query/query_settings/query_settings_size_limits.js
 
+    # This test sends a maximum-size batch update. During FCV upgrade/downgrade,
+    # auth-shard metadata work clears and recovers unsharded collection filtering metadata, which
+    # can cause the batch to return NoProgressMade.
+    # TODO (SERVER-98118): Remove this exclusion once FCV upgrade/downgrade does not clear unsharded
+    # collection filtering metadata.
+    - jstests/core/query/batch_write/batch_write_command_update.js
+
     # This test expects a large bulk insert to succeed, which is not guaranteed due to the auth
     # shards FCV upgrade/downgrade.
     # TODO (SERVER-98118): Remove this exclusion once FCV upgrade/downgrade does not clear unsharded
