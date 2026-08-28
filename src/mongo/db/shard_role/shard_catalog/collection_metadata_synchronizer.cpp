@@ -48,7 +48,7 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
     }
 
     boost::optional<ExpiredHistoryFilter> expiredFilter;
-    if (feature_flags::gShardCatalogExpiredHistoryCleanup.isEnabled()) {
+    if (feature_flags::gShardCatalogExpiredHistoryFiltering.isEnabled()) {
         const auto oldestTimestamp =
             opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
         expiredFilter = ExpiredHistoryFilter{ShardingState::get(opCtx)->shardId(), oldestTimestamp};

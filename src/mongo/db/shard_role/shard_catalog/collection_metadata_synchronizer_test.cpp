@@ -270,7 +270,7 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerCanRecoverFromDisk) {
 }
 
 TEST_F(MetadataSynchronizerFixture, RecoverySkipsExpiredHistoricalChunksWhenFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryCleanup",
+    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
                                                true};
     OperationContext* opCtx = operationContext();
     const auto chunks = seedMixedHistoryCollection(opCtx);

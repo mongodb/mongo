@@ -24,7 +24,7 @@ export const kRetentionWindowSecs = 600;
 // run with the filter disabled and the default windows in one of the two suites.
 export function startFilteringShardingTest(extraSetParameters = {}) {
     const setParameter = {
-        featureFlagShardCatalogExpiredHistoryCleanup: true,
+        featureFlagShardCatalogExpiredHistoryFiltering: true,
         minSnapshotHistoryWindowInSeconds: kRetentionWindowSecs,
         ...extraSetParameters,
     };

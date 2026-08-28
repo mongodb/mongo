@@ -98,12 +98,9 @@ feature_flags:
         version: 9.0
         fcv_gated: true
         enable_on_transitional_fcv_UNSAFE: true
-    featureFlagShardCatalogExpiredHistoryCleanup:
-        description:
-            "Feature flag to enable the handling of expired historical chunk ownership metadata in
-            the shard-local catalog: skipping documents unreachable by point-in-time reads during
-            filtering metadata recovery, and reaping them in the background."
-        cpp_varname: feature_flags::gShardCatalogExpiredHistoryCleanup
+    featureFlagShardCatalogExpiredHistoryFiltering:
+        description: "Feature flag to enable filtering out expired unreachable chunk ownership metadata during shard catalog metadata recovery."
+        cpp_varname: feature_flags::gShardCatalogExpiredHistoryFiltering
         default: false
         fcv_gated: false
     featureFlagTerminateSecondaryReadsUponRangeDeletion:
