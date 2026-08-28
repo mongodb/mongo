@@ -37,6 +37,8 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -92,6 +94,9 @@ public:
         ASSERT_OK(createCollection(opCtx.get(), createCommandForTest("admin.collForRename")));
         ASSERT_OK(createCollection(opCtx.get(), createCommandForTest("local.coll")));
         ASSERT_OK(createCollection(opCtx.get(), createCommandForTest("config.coll")));
+        ASSERT_OK(createCollection(
+            opCtx.get(),
+            CreateCommand(NamespaceString::kReplicaSetWritesCriticalSectionsNamespace)));
     }
 
 protected:
@@ -188,6 +193,30 @@ protected:
             MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
+        wuow.commit();
+    }
+
+    void updateReplicaSetWriteBlockCriticalSection(OperationContext* opCtx, bool allowDeletions) {
+        const auto nss = NamespaceString::kReplicaSetWritesCriticalSectionsNamespace;
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        ASSERT(autoColl) << "Collection " << nss.toStringForErrorMsg() << " doesn't exist";
+
+        ReplicaSetWriteBlockingCriticalSectionDocument doc(
+            UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace);
+        doc.setEnabled(true);
+        doc.setAllowDeletions(allowDeletions);
+        doc.setReplicaSetWritesBlockReason(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+        const auto updatedDoc = doc.toBSON();
+        const auto criteria = updatedDoc["_id"].wrap();
+        CollectionUpdateArgs updateArgs{criteria};
+        updateArgs.criteria = criteria;
+        updateArgs.update = BSON("$set" << BSON("allowDeletions" << allowDeletions));
+        updateArgs.updatedDoc = updatedDoc;
+
+        WriteUnitOfWork wuow(opCtx);
+        ReplicaSetWriteBlockOpObserver opObserver;
+        OplogUpdateEntryArgs oplogUpdateArgs(&updateArgs, *autoColl);
+        opObserver.onUpdate(opCtx, oplogUpdateArgs);
         wuow.commit();
     }
 
@@ -316,6 +345,48 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
               true /* useDirectClient */,
               false /* fromMigrate */,
               true /* shouldSucceed */);
+}
+
+TEST_F(ReplicaSetWriteBlockOpObserverTest,
+       UpdatingAllowDeletionsChangesOnlyDeletionBlockingAndDoesNotReenableWrites) {
+    auto opCtx = cc().makeOperationContext();
+    auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        rsBlock->disableReplicaSetWriteBlocking();
+        rsBlock->disableReplicaSetDeletionsBlocking();
+    }
+
+    // An update that disallows deletions leaves writes blocking active while enabling deletion
+    // blocking.
+    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), false /* allowDeletions */);
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(rsBlock->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    BSONObjBuilder beforeBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(beforeBuilder);
+    const auto before =
+        beforeBuilder.obj()
+            .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+            .safeNumberLong();
+
+    // An allowDeletions-only update must leave write blocking active while allowing deletions.
+    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), true /* allowDeletions */);
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
+        ASSERT_FALSE(rsBlock->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    BSONObjBuilder afterBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(afterBuilder);
+    const auto after = afterBuilder.obj()
+                           .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+                           .safeNumberLong();
+    ASSERT_EQ(after, before + 1);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEnabledNoBypass) {

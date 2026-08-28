@@ -104,6 +104,12 @@ public:
     bool isReplicaSetDeletionsBlockingEnabled() const;
 
     /**
+     * Increments the per-reason enable counter without changing whether write blocking is active.
+     * Used when an active block's allowDeletions policy changes.
+     */
+    void incrementReplicaSetWritesBlockCounter(ReplicaSetWritesBlockReasonEnum reason);
+
+    /**
      * Reports replica set write blocking counters, specifying one counter per blocking reason.
      */
     void appendReplicaSetWritesBlockCounters(BSONObjBuilder& bob) const;

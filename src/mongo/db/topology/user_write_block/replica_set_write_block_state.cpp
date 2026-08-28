@@ -33,9 +33,17 @@ ReplicaSetWriteBlockState* ReplicaSetWriteBlockState::get(OperationContext* opCt
 
 void ReplicaSetWriteBlockState::enableReplicaSetWriteBlocking(
     ReplicaSetWritesBlockReasonEnum reason) {
-    _writeBlockInfo.store(WriteBlockInfo{.blocked = true, .reason = reason});
+    const auto previousInfo =
+        _writeBlockInfo.swap(WriteBlockInfo{.blocked = true, .reason = reason});
+    if (!previousInfo.blocked) {
+        _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
+        LOGV2(12097000, "Blocking replica set writes", "reason"_attr = idl::serialize(reason));
+    }
+}
+
+void ReplicaSetWriteBlockState::incrementReplicaSetWritesBlockCounter(
+    ReplicaSetWritesBlockReasonEnum reason) {
     _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
-    LOGV2(12097000, "Blocking replica set writes", "reason"_attr = idl::serialize(reason));
 }
 
 void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
@@ -44,9 +52,6 @@ void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
         LOGV2(12097001,
               "Unblocking replica set writes",
               "reason"_attr = idl::serialize(previousInfo.reason));
-    } else {
-        LOGV2(12097003,
-              "disableReplicaSetWriteBlocking called but replica set writes were not blocked");
     }
 }
 

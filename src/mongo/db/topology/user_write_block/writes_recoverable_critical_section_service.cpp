@@ -92,6 +92,20 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
+void setAllowDeletionsDocumentField(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    bool allowDeletions) {
+    PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> store(
+        NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+    store.update(
+        opCtx,
+        BSON(ReplicaSetWriteBlockingCriticalSectionDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+        BSON("$set" << BSON(ReplicaSetWriteBlockingCriticalSectionDocument::kAllowDeletionsFieldName
+                            << allowDeletions)),
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+}
+
 template <typename DocType, typename CheckExistingFn, typename BuildNewDocFn>
 void acquireCriticalSection(OperationContext* opCtx,
                             const NamespaceString& collectionNss,
@@ -500,15 +514,22 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
     // state into memory.
     PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> replicaSetWritesStore(
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+    auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
     replicaSetWritesStore.forEach(
-        opCtx, BSONObj{}, [&opCtx](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
+        opCtx, BSONObj{}, [&](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             invariant(doc.getNss().isEmpty());
+
             if (doc.getEnabled()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetWriteBlocking(
+                replicaSetWriteBlockState->enableReplicaSetWriteBlocking(
                     doc.getReplicaSetWritesBlockReason());
+            } else {
+                replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
             }
-            if (!doc.getAllowDeletions()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetDeletionsBlocking();
+
+            if (doc.getAllowDeletions()) {
+                replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
+            } else {
+                replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
             }
             return true;
         });
@@ -584,6 +605,63 @@ void UserWritesRecoverableCriticalSectionService::
         opCtx->getServiceContext()->getStorageEngine()->pauseOrResumeAutoCompactForWriteBlock(
             opCtx, true /* pause */);
     }
+}
+
+bool UserWritesRecoverableCriticalSectionService::updateAllowDeletionsForActiveReplicaSetWriteBlock(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool allowDeletions,
+    ReplicaSetWritesBlockReasonEnum reason) {
+    LOGV2_DEBUG(12096706,
+                3,
+                "Updating allowDeletions for replica set writes recoverable critical section",
+                logAttrs(nss),
+                "allowDeletions"_attr = allowDeletions,
+                "reason"_attr = reasonText(reason));
+
+    invariant(nss == kBlockReplicaSetWritesNamespace);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    {
+        // In-flight deletes that started under allowDeletions:true may still complete, while
+        // new deletes are rejected once the OpObserver commits the updated policy.
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+        const auto bsonObj = findRecoverableCriticalSectionDoc(
+            opCtx, NamespaceString::kReplicaSetWritesCriticalSectionsNamespace, nss);
+        if (bsonObj.isEmpty()) {
+            return false;
+        }
+
+        const auto collCSDoc = ReplicaSetWriteBlockingCriticalSectionDocument::parse(
+            bsonObj, IDLParserContext("UpdateReplicaSetWritesCS"));
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot update replica set writes critical section when it is "
+                                 "not enabled",
+                collCSDoc.getEnabled());
+        uassert(
+            ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot update replica set writes critical section with a different "
+                             "reason. reason: "
+                          << reasonText(reason) << ", current: "
+                          << reasonText(collCSDoc.getReplicaSetWritesBlockReason()),
+            collCSDoc.getReplicaSetWritesBlockReason() == reason);
+
+        if (collCSDoc.getAllowDeletions() == allowDeletions) {
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            return true;
+        }
+
+        setAllowDeletionsDocumentField(opCtx, nss, allowDeletions);
+    }
+
+    LOGV2_DEBUG(13365900,
+                2,
+                "Updated allowDeletions for replica set writes recoverable critical section",
+                logAttrs(nss),
+                "allowDeletions"_attr = allowDeletions,
+                "reason"_attr = reasonText(reason));
+    return true;
 }
 
 void UserWritesRecoverableCriticalSectionService::

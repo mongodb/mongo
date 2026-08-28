@@ -24,6 +24,7 @@ import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
 
 describe("Test blockReplicaSetWrites command on replica set level", function () {
     before(function () {
@@ -183,6 +184,83 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
     });
 
+    it("Test that allowDeletions can be updated while replica set write blocking is active", function () {
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const docBeforeUpdate =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        const blockCounterBeforeUpdate =
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace;
+
+        // Update the active block to allow deletions without releasing it.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const docAfterUpdateToTrue =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        assert.eq(
+            docBeforeUpdate._id,
+            docAfterUpdateToTrue._id,
+            "Expected the existing critical section to update",
+        );
+        assert.eq(true, docAfterUpdateToTrue.enabled, "Expected write blocking to remain enabled");
+        assert.eq(true, docAfterUpdateToTrue.allowDeletions, "Expected allowDeletions to update");
+        assert.eq(
+            docBeforeUpdate.replicaSetWritesBlockReason,
+            docAfterUpdateToTrue.replicaSetWritesBlockReason,
+            "Expected the write-block reason to remain unchanged",
+        );
+        assert.eq(
+            blockCounterBeforeUpdate + 1,
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace,
+            "Updating allowDeletions must increment the block counter",
+        );
+
+        // Update the active block back to disallow deletions, then repeat the same value as a no-op.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        const docAfterUpdateBackToFalse =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        assert.eq(
+            docBeforeUpdate._id,
+            docAfterUpdateBackToFalse._id,
+            "Expected the existing critical section to update",
+        );
+        assert.eq(
+            true,
+            docAfterUpdateBackToFalse.enabled,
+            "Expected write blocking to remain enabled",
+        );
+        assert.eq(
+            false,
+            docAfterUpdateBackToFalse.allowDeletions,
+            "Expected allowDeletions to update back to false",
+        );
+        assert.eq(
+            blockCounterBeforeUpdate + 2,
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace,
+            "Each allowDeletions change must increment the enable counter; identical repeats must not",
+        );
+    });
+
     it("Test CUD operations are blocked/allowed when replica set write block is enabled/disabled", function () {
         const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
 
@@ -331,11 +409,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
         assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
 
-        // Disable write block and and re-enable with allowDeletions: true to check that user deletes are allowed.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
+        // Update the active block with allowDeletions: true to check that user deletes are allowed.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
@@ -407,11 +481,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
                 "TTL should not have reaped the document while deletions are blocked",
             );
 
-            // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
-            disableReplicaSetWriteBlock(
-                this.replicaSetPrimaryAdminDB,
-                "InsufficientDiskSpace" /* reason */,
-            );
+            // Update the active block with allowDeletions: true — TTL should now reap the document.
             enableReplicaSetWriteBlock(
                 this.replicaSetPrimaryAdminDB,
                 true /* allowDeletions */,
@@ -589,13 +659,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             ErrorCodes.ReplicaSetWritesBlocked,
         );
 
-        // Disable write block.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-
-        // Check that with allowDeletions:true, compact is permitted.
+        // Update the active block with allowDeletions:true; compact is then permitted.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
@@ -645,13 +709,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             return true;
         }, "Timed out waiting to disable autoCompact");
 
-        // Disable write block.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-
-        // Check that with allowDeletions:true, auto-compact is permitted.
+        // Update the active block with allowDeletions:true; auto-compact is then permitted.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
@@ -849,6 +907,50 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             null,
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
             "Expected index to exist after write blocking is disabled",
+        );
+    });
+
+    it("Test changing allowDeletions does not abort an in-progress index build", function () {
+        const testColl = this.replicaSetPrimaryAdminDB.getCollection(this.adminTestCollName);
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // A non-empty admin collection bypasses write blocking but uses the normal index-build path.
+        enableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, true, "InsufficientDiskSpace");
+        assert.commandWorked(this.replicaSetPrimary.adminCommand({clearLog: "global"}));
+
+        const hangFp = configureFailPoint(
+            this.replicaSetPrimary,
+            "hangAfterInitializingIndexBuild",
+        );
+        const awaitIndexBuild = startParallelShell(() => {
+            assert.commandWorked(
+                db.getSiblingDB("admin").getCollection("testDB_adminTestColl").createIndex({a: 1}),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        try {
+            hangFp.wait();
+
+            // Retuning the deletion policy must not run the initial-enable index-build abort path.
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+
+            assert(
+                !checkLog.checkContainsOnceJson(this.replicaSetPrimary, 6511600, {}),
+                "Retuning allowDeletions must not invoke abortIndexBuildsForWriteBlocking",
+            );
+        } finally {
+            hangFp.off();
+            awaitIndexBuild();
+        }
+
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected the in-progress index build to complete after the policy update",
         );
     });
 

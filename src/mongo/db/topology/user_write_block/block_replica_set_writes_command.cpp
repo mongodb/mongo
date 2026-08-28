@@ -93,23 +93,35 @@ public:
                         str::stream() << "'allowDeletions' is required when enabling "
                                       << Request::kCommandName,
                         request().getAllowDeletions().has_value());
-                // Prevent new index builds from starting.
-                auto writeBlockState = ReplicaSetWriteBlockState::get(opCtx);
-                writeBlockState->enableUserIndexBuildBlocking();
-                // Temporarily block new index builds during setup. Once the critical section
-                // is committed the op observer takes over enforcement, so this is always reset.
-                ScopeGuard guard([&]() { writeBlockState->disableUserIndexBuildBlocking(); });
-                // Abort and wait for any ongoing index builds to finish.
-                IndexBuildsCoordinator::get(opCtx)->abortIndexBuildsForWriteBlocking(opCtx);
-
-                // Enable write blocking
-                UserWritesRecoverableCriticalSectionService::get(opCtx)
-                    ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+                auto* criticalSectionService =
+                    UserWritesRecoverableCriticalSectionService::get(opCtx);
+                // If a block is already active, update allowDeletions eventually.
+                const auto activeBlock =
+                    criticalSectionService->updateAllowDeletionsForActiveReplicaSetWriteBlock(
                         opCtx,
                         UserWritesRecoverableCriticalSectionService::
                             kBlockReplicaSetWritesNamespace,
                         *request().getAllowDeletions(),
                         request().getReason());
+                if (!activeBlock) {
+                    // Prevent new index builds from starting.
+                    auto writeBlockState = ReplicaSetWriteBlockState::get(opCtx);
+                    writeBlockState->enableUserIndexBuildBlocking();
+                    // Temporarily block new index builds during setup. Once the critical section
+                    // is committed the op observer takes over enforcement, so this is always reset.
+                    ScopeGuard guard([&]() { writeBlockState->disableUserIndexBuildBlocking(); });
+                    // Abort and wait for any ongoing index builds to finish.
+                    IndexBuildsCoordinator::get(opCtx)->abortIndexBuildsForWriteBlocking(opCtx);
+
+                    // Enable write blocking with the requested allowDeletions.
+                    criticalSectionService
+                        ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+                            opCtx,
+                            UserWritesRecoverableCriticalSectionService::
+                                kBlockReplicaSetWritesNamespace,
+                            *request().getAllowDeletions(),
+                            request().getReason());
+                }
             } else {
                 // Disable write blocking.
                 uassert(ErrorCodes::InvalidOptions,

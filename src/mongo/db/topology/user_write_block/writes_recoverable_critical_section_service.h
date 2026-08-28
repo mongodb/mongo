@@ -139,6 +139,17 @@ public:
         ReplicaSetWritesBlockReasonEnum reason);
 
     /**
+     * If the replica set writes critical section is already active, updates only its
+     * 'allowDeletions' option. The existing reason must match. Returns false if the critical
+     * section has not been acquired. Repeating the current 'allowDeletions' value is a no-op.
+     * Each allowDeletions change increments replicaSetWritesBlockCounters for the reason.
+     */
+    bool updateAllowDeletionsForActiveReplicaSetWriteBlock(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           bool allowDeletions,
+                                                           ReplicaSetWritesBlockReasonEnum reason);
+
+    /**
      * Releases the prevent writes critical section, allowing replica set writes again.
      */
     void releaseRecoverableCriticalSectionBlockingReplicaSetWrites(

@@ -20,7 +20,8 @@ structs:
             allowDeletions:
                 description:
                     "If true, allow deletions. If false, disables. Required when enabling the
-                    block (enabled: true) and disallowed when disabling it (enabled: false)."
+                    block (enabled: true) and disallowed when disabling it (enabled: false). An
+                    enabled request with the same reason may update this setting on an active block."
                 type: bool
                 optional: true
             reason:
