@@ -37,6 +37,20 @@ namespace mongo {
 
 class ObservableSession;
 
+namespace session_catalog_detail {
+/**
+ * The partition which the calling thread currently holds through a 'Locked', or null. Thread-
+ * private, so no atomic is needed: the only thread whose read must be correct is the one which
+ * wrote it. Partitions are never locked two-at-a-time (every scan scopes its 'Locked' inside the
+ * per-partition loop), so a single slot suffices; the saved previous value in 'LockedImpl' keeps
+ * the answer honest if that ever changes.
+ */
+inline const void*& heldPartition() {
+    thread_local const void* held = nullptr;
+    return held;
+}
+}  // namespace session_catalog_detail
+
 /**
  * Keeps track of the transaction runtime state for every active transaction session on this
  * instance.
@@ -69,12 +83,56 @@ public:
     class ScopedCheckedOutSession;
     class SessionToKill;
 
-    struct KillToken {
-        KillToken(LogicalSessionId lsid) : lsidToKill(std::move(lsid)) {}
-        KillToken(KillToken&&) = default;
-        KillToken& operator=(KillToken&&) = default;
+    /**
+     * RAII handle for an outstanding kill request on 'lsidToKill'. However the token goes away -
+     * consumed, moved from, or destroyed - the kill is returned to the catalog exactly once.
+     *
+     * NOTE: returning a kill locks the session's partition, so a token must not be destroyed while
+     * that partition is held. Tokens are only ever handed out with it released.
+     */
+    class KillToken {
+    public:
+        KillToken(KillToken&& other) noexcept
+            : _lsidToKill(std::move(other._lsidToKill)),
+              _catalog(std::exchange(other._catalog, nullptr)) {}
 
-        LogicalSessionId lsidToKill;
+        KillToken& operator=(KillToken&& other) noexcept {
+            if (this != &other) {
+                _returnIfArmed();
+                _lsidToKill = std::move(other._lsidToKill);
+                _catalog = std::exchange(other._catalog, nullptr);
+            }
+            return *this;
+        }
+
+        KillToken(const KillToken&) = delete;
+        KillToken& operator=(const KillToken&) = delete;
+
+        ~KillToken() {
+            _returnIfArmed();
+        }
+
+        const LogicalSessionId& lsidToKill() const {
+            return _lsidToKill;
+        }
+
+    private:
+        // Only 'ObservableSession::kill' may issue a token: one fabricated elsewhere would
+        // return a kill which was never requested.
+        friend class ObservableSession;
+        friend class SessionCatalog;
+
+        KillToken(SessionCatalog* catalog, LogicalSessionId lsid)
+            : _lsidToKill(std::move(lsid)), _catalog(catalog) {}
+
+        void _returnIfArmed();
+
+        // The session whose kill this returns. Only ever set together with '_catalog', so the two
+        // cannot get out of step.
+        LogicalSessionId _lsidToKill;
+
+        // Null once the kill has been returned or the token has been moved from.
+        SessionCatalog* _catalog;
     };
 
     SessionCatalog();
@@ -163,10 +221,29 @@ public:
                           ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
     /**
+     * Kills the session with 'lsid' if 'shouldKill' returns true for it, and returns the resulting
+     * token. Returns none if the session is not in the catalog or 'shouldKill' declines it.
+     *
+     * 'shouldKill' runs with the session's partition locked, so the same restrictions as
+     * 'scanSession' apply to it: no blocking, no I/O and no lock manager locks. The token is only
+     * handed back once that partition has been released, so that returning the kill cannot deadlock
+     * against it.
+     */
+    boost::optional<KillToken> killSessionIf(const LogicalSessionId& lsid,
+                                             const KillSessionsPredicateFn& shouldKill,
+                                             ErrorCodes::Error reason = ErrorCodes::Interrupted);
+
+    /**
      * Returns the total number of entries currently cached on the session catalog. Takes no
      * partition mutex, so it is safe to call from diagnostic paths such as FTDC during a scan.
      */
     size_t size() const;
+
+    /**
+     * Returns the number of sessions with a kill which has been requested but neither consumed by
+     * 'checkOutSessionForKill' nor returned.
+     */
+    size_t numSessionsWithOutstandingKills() const;
 
     size_t numPartitions_forTest() const {
         return _partitions.size();
@@ -197,12 +274,22 @@ private:
      * time.
      */
     struct SessionRuntimeInfo {
-        SessionRuntimeInfo(LogicalSessionId lsid) : parentSession(std::move(lsid)) {
+        SessionRuntimeInfo(SessionCatalog* catalog, LogicalSessionId lsid)
+            : catalog(catalog), parentSession(std::move(lsid)) {
             // Can only create a SessionRuntimeInfo with a parent transaction session id.
             invariant(isParentSessionId(parentSession.getSessionId()));
         }
 
         Session* getSession(WithLock, const LogicalSessionId& lsid);
+
+        /**
+         * Retires one outstanding kill and wakes up anybody waiting to check the session out. The
+         * only place 'killsRequested' is decremented.
+         */
+        void returnKill(WithLock);
+
+        // The catalog owning this session. Never changes and is never null.
+        SessionCatalog* const catalog;
 
         // Must only be accessed by the OperationContext which currently has this logical session
         // checked out.
@@ -251,7 +338,16 @@ private:
         template <typename P>
         class LockedImpl {
         public:
-            explicit LockedImpl(P& partition) : _lock(partition._mutex), _partition(&partition) {}
+            explicit LockedImpl(P& partition) : _lock(partition._mutex), _partition(&partition) {
+                _prevHeld = std::exchange(session_catalog_detail::heldPartition(), &partition);
+            }
+
+            ~LockedImpl() {
+                session_catalog_detail::heldPartition() = _prevHeld;
+            }
+
+            LockedImpl(LockedImpl&&) = delete;
+            LockedImpl& operator=(LockedImpl&&) = delete;
 
             auto& sessions() const {
                 return _partition->_sessions;
@@ -268,12 +364,22 @@ private:
         private:
             std::unique_lock<ObservableMutex<std::mutex>> _lock;
             P* _partition;
+            const void* _prevHeld;
         };
         using Locked = LockedImpl<Partition>;
         using ConstLocked = LockedImpl<const Partition>;
 
         const ObservableMutex<std::mutex>& mutex() const {
             return _mutex;
+        }
+
+        /**
+         * Whether this partition is locked by the calling thread. Only ever used to catch a lock
+         * which is about to be taken recursively, so a stale 'false' just means the check is
+         * skipped.
+         */
+        bool isLockedByCurrentThread() const {
+            return session_catalog_detail::heldPartition() == static_cast<const void*>(this);
         }
 
     private:
@@ -321,6 +427,18 @@ private:
                                                        const LogicalSessionId& lsid);
 
     /**
+     * Retires the kill 'killToken' holds and disarms it, so it cannot be returned again. The
+     * overload taking a lock is for callers which already hold the session's partition.
+     */
+    void _returnKill(WithLock, SessionRuntimeInfo* sri, KillToken& killToken);
+    void _returnKill(KillToken& killToken);
+
+    /**
+     * Returns the partition owning 'lsid', without locking it.
+     */
+    Partition& _partitionFor(const LogicalSessionId& lsid);
+
+    /**
      * Makes a session, previously checked out through 'checkoutSession', available again. Will free
      * any retryable sessions with txnNumbers before clientTxnNumberStarted if it is set.
      */
@@ -348,6 +466,10 @@ private:
     Atomic<long long> _numParentSessions{0};
 
     Atomic<bool> _disallowNewTransactions{false};
+
+    // Number of sessions whose 'killsRequested' is above zero, so that it can be reported without
+    // locking any partition.
+    Atomic<int> _numSessionsWithOutstandingKills{0};
 };
 
 /**
@@ -362,7 +484,7 @@ public:
                             boost::optional<SessionCatalog::KillToken> killToken)
         : _catalog(catalog), _sri(sri), _session(session), _killToken(std::move(killToken)) {
         if (_killToken) {
-            invariant(session->getSessionId() == _killToken->lsidToKill);
+            invariant(session->getSessionId() == _killToken->lsidToKill());
         }
     }
 
@@ -506,21 +628,6 @@ public:
         return _sri->lastCheckout;
     }
 
-    /**
-     * Increments the number of "killers" for the logical session that this transaction session
-     * corresponds to and returns a 'kill token' to to be passed later on to
-     * 'checkOutSessionForKill' method of the SessionCatalog in order to permit the caller to
-     * execute any kill cleanup tasks. This token is later used to decrement the number of
-     * "killers".
-     *
-     * Marking session as killed is an internal property only that will cause any further calls to
-     * 'checkOutSession' to block until 'checkOutSessionForKill' is called the same number of times
-     * as 'kill' was called and the returned scoped object destroyed.
-     *
-     * If the first killer finds the session checked-out, this method will also interrupt the
-     * operation context which has it checked-out.
-     */
-    SessionCatalog::KillToken kill(ErrorCodes::Error reason = ErrorCodes::Interrupted) const;
 
     /**
      * To be used with 'scanSessionsForReap' to indicate to the SessionCatalog that, from the user
@@ -558,6 +665,15 @@ public:
 
 private:
     friend class SessionCatalog;
+
+    /**
+     * Marks the session as killed, interrupting whichever operation has it checked out, and returns
+     * a token for 'checkOutSessionForKill'. Check-outs block until every token is gone.
+     *
+     * Private because it runs with the partition locked while returning a kill locks it again, so
+     * only the catalog, which hands tokens out after unlocking, may call it. See 'killSessionIf'.
+     */
+    SessionCatalog::KillToken kill(ErrorCodes::Error reason = ErrorCodes::Interrupted) const;
 
     static ClientLock _lockClientForSession(WithLock, SessionCatalog::SessionRuntimeInfo* sri) {
         if (const auto opCtx = sri->checkoutOpCtx) {

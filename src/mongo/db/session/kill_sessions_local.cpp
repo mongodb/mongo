@@ -70,6 +70,9 @@ void killSessionsAction(
     sessionKillTokens = catalog->killSessions(matcher, reason, filterFn);
 
     for (auto& sessionKillToken : sessionKillTokens) {
+        // Kept separately because the token is handed off to 'checkOutSessionForKill' below.
+        const auto lsidToKill = sessionKillToken.lsidToKill();
+
         Date_t checkoutStartTime = Date_t::now();
         try {
             auto session = catalog->checkOutSessionForKill(
@@ -100,12 +103,12 @@ void killSessionsAction(
             // then we crash the node and dump info on the session.
             LOGV2(11790801,
                   "Exceeded time limit while checking out session",
-                  "lsidToKill"_attr = sessionKillToken.lsidToKill,
+                  "lsidToKill"_attr = lsidToKill,
                   "duration"_attr = Date_t::now() - checkoutStartTime);
             if (reason == ErrorCodes::InterruptedDueToReplStateChange) {
                 LOGV2_FATAL(11790802,
                             "Failed to check out session for kill",
-                            "lsidToKill"_attr = sessionKillToken.lsidToKill);
+                            "lsidToKill"_attr = lsidToKill);
             }
             // Failed to check out the session for kill, continue with the next sessionKillToken.
             if (numTimeOuts)

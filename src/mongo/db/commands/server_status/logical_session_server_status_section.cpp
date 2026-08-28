@@ -32,6 +32,8 @@ public:
         BSONObjBuilder statsBuilder(logicalSessionCache ? logicalSessionCache->getStats().toBSON()
                                                         : BSONObj());
         statsBuilder.append("sessionCatalogSize", int32_t(sessionCatalog->size()));
+        statsBuilder.append("sessionsWithOutstandingKills",
+                            int32_t(sessionCatalog->numSessionsWithOutstandingKills()));
 
         return statsBuilder.obj();
     }

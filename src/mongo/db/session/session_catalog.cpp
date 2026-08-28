@@ -117,13 +117,54 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
     return &sessionTransactionTable;
 }
 
+void SessionCatalog::KillToken::_returnIfArmed() {
+    if (_catalog) {
+        _catalog->_returnKill(*this);
+    }
+}
+
+void SessionCatalog::_returnKill(WithLock lk, SessionRuntimeInfo* sri, KillToken& killToken) {
+    invariant(killToken._catalog == this);
+
+    sri->returnKill(lk);
+    killToken._catalog = nullptr;
+}
+
+void SessionCatalog::_returnKill(KillToken& killToken) {
+    const auto& lsid = killToken.lsidToKill();
+    auto& partitionToLock = _partitionFor(lsid);
+
+    // Returning a kill locks the session's partition, so a token destroyed by a thread which
+    // already holds it would wait on itself forever. Report that as a leaked kill instead of
+    // hanging. This misses a holder which is waiting on 'availableCondVar', since that releases the
+    // mutex without dropping its 'Locked'.
+    invariant(!partitionToLock.isLockedByCurrentThread(),
+              "Session kill token destroyed while its own partition is held, which would deadlock. "
+              "A token must be moved out of a scan callback rather than dropped in it.");
+
+    Partition::Locked partition(partitionToLock);
+
+    // A session with an outstanding kill cannot be reaped, see
+    // 'ObservableSession::_shouldBeReaped'.
+    auto sri = _getSessionRuntimeInfo(partition, lsid);
+    invariant(sri, "Session with an outstanding kill disappeared from the catalog");
+
+    LOGV2_DEBUG(11840100,
+                2,
+                "Returning an unconsumed session kill token",
+                "lsid"_attr = lsid,
+                "killsRequested"_attr = sri->killsRequested);
+
+    _returnKill(partition, sri, killToken);
+}
+
 SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
     boost::optional<KillToken> killToken,
     Date_t deadline) {
     if (killToken) {
-        dassert(killToken->lsidToKill == lsid);
+        dassert(killToken->lsidToKill() == lsid);
     } else {
         dassert(opCtx->getLogicalSessionId() == lsid);
     }
@@ -148,17 +189,31 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
         hangAfterIncrementingNumWaitingToCheckOut.pauseWhileSet(opCtx);
         partition.lock().lock();
     }
-    const auto ok = opCtx->waitForConditionOrInterruptUntil(
-        sri->availableCondVar,
-        partition.lock(),
-        deadline,
-        [&partition, &sri, &session, forKill = killToken.has_value()]() {
-            ObservableSession osession(partition, sri, session);
-            return osession._isAvailableForCheckOut(forKill);
-        });
+    // '~KillToken' would return the kill anyway; doing it here reuses the held partition lock.
+    const auto returnKill = [&] {
+        if (killToken) {
+            _returnKill(partition, sri, *killToken);
+        }
+    };
 
-    if (!ok && killToken) {
-        --sri->killsRequested;
+    const auto ok = [&] {
+        try {
+            return opCtx->waitForConditionOrInterruptUntil(
+                sri->availableCondVar,
+                partition.lock(),
+                deadline,
+                [&partition, &sri, &session, forKill = killToken.has_value()]() {
+                    ObservableSession osession(partition, sri, session);
+                    return osession._isAvailableForCheckOut(forKill);
+                });
+        } catch (const DBException&) {
+            returnKill();
+            throw;
+        }
+    }();
+
+    if (!ok) {
+        returnKill();
     }
     iassert(opCtx->getTimeoutError(), "operation exceeded time limit", ok);
 
@@ -188,7 +243,7 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
     invariant(!operationSessionDecoration(opCtx));
     invariant(!opCtx->getTxnNumber());
 
-    auto lsid = killToken.lsidToKill;
+    auto lsid = killToken.lsidToKill();
     return SessionToKill(_checkOutSessionInner(opCtx, lsid, std::move(killToken), deadline));
 }
 
@@ -345,6 +400,31 @@ LogicalSessionIdSet SessionCatalog::scanSessionsForReap(
     }
 }
 
+boost::optional<SessionCatalog::KillToken> SessionCatalog::killSessionIf(
+    const LogicalSessionId& lsid,
+    const KillSessionsPredicateFn& shouldKill,
+    ErrorCodes::Error reason) {
+    // Declared out here so that the token outlives the partition lock below: returning a kill needs
+    // that same partition.
+    boost::optional<KillToken> killToken;
+
+    {
+        auto partition = _lockPartition(lsid);
+
+        if (auto sri = _getSessionRuntimeInfo(partition, lsid)) {
+            auto session = sri->getSession(partition, lsid);
+            invariant(session);
+
+            ObservableSession osession(partition, sri, session);
+            if (shouldKill(osession)) {
+                killToken.emplace(osession.kill(reason));
+            }
+        }
+    }
+
+    return killToken;
+}
+
 SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid,
                                                       ErrorCodes::Error reason) {
     auto partition = _lockPartition(lsid);
@@ -360,6 +440,18 @@ size_t SessionCatalog::size() const {
     return static_cast<size_t>(_numParentSessions.load());
 }
 
+size_t SessionCatalog::numSessionsWithOutstandingKills() const {
+    return static_cast<size_t>(_numSessionsWithOutstandingKills.load());
+}
+
+void SessionCatalog::SessionRuntimeInfo::returnKill(WithLock) {
+    invariant(killsRequested > 0);
+    if (--killsRequested == 0) {
+        catalog->_numSessionsWithOutstandingKills.fetchAndSubtract(1);
+    }
+    availableCondVar.notify_all();
+}
+
 void SessionCatalog::setDisallowNewTransactions() {
     _disallowNewTransactions.store(true);
 }
@@ -368,10 +460,14 @@ bool SessionCatalog::getDisallowNewTransactions() {
     return _disallowNewTransactions.load();
 }
 
-SessionCatalog::Partition::Locked SessionCatalog::_lockPartition(const LogicalSessionId& lsid) {
+SessionCatalog::Partition& SessionCatalog::_partitionFor(const LogicalSessionId& lsid) {
     // Hash only the 'id' component, which parent and child sessions share, so a whole session
     // family maps to one partition without materializing the parent lsid.
-    return Partition::Locked(_partitions[UUID::Hash{}(lsid.getId()) % _partitions.size()]);
+    return _partitions[UUID::Hash{}(lsid.getId()) % _partitions.size()];
+}
+
+SessionCatalog::Partition::Locked SessionCatalog::_lockPartition(const LogicalSessionId& lsid) {
+    return Partition::Locked(_partitionFor(lsid));
 }
 
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
@@ -401,8 +497,8 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeIn
 
     const auto& parentLsid = isParentSessionId(lsid) ? lsid : *getParentSessionId(lsid);
     // The parent entry may already exist, so only count an insertion that took place.
-    auto [sriIt, inserted] =
-        partition.sessions().emplace(parentLsid, std::make_unique<SessionRuntimeInfo>(parentLsid));
+    auto [sriIt, inserted] = partition.sessions().emplace(
+        parentLsid, std::make_unique<SessionRuntimeInfo>(this, parentLsid));
     if (inserted) {
         _numParentSessions.fetchAndAdd(1);
     }
@@ -439,7 +535,7 @@ void SessionCatalog::_releaseSession(
         invariant(sriIt->second.get() == sri);
         invariant(sri->checkoutOpCtx);
         if (killToken) {
-            dassert(killToken->lsidToKill == session->getSessionId());
+            dassert(killToken->lsidToKill() == session->getSessionId());
         }
 
         service = sri->checkoutOpCtx->getServiceContext();
@@ -448,8 +544,7 @@ void SessionCatalog::_releaseSession(
         sri->availableCondVar.notify_all();
 
         if (killToken) {
-            invariant(sri->killsRequested > 0);
-            --sri->killsRequested;
+            _returnKill(partition, sri, *killToken);
         }
 
         if (clientTxnNumberStarted.has_value()) {
@@ -520,13 +615,16 @@ Session* SessionCatalog::SessionRuntimeInfo::getSession(WithLock, const LogicalS
 SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) const {
     const bool firstKiller = (0 == _sri->killsRequested);
     ++_sri->killsRequested;
+    if (firstKiller) {
+        _sri->catalog->_numSessionsWithOutstandingKills.fetchAndAdd(1);
+    }
 
     if (firstKiller && hasCurrentOperation()) {
         const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
         serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
     }
 
-    return SessionCatalog::KillToken(getSessionId());
+    return SessionCatalog::KillToken(_sri->catalog, getSessionId());
 }
 
 void ObservableSession::markForReap(ReapMode reapMode) {
