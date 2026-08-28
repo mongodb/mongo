@@ -1314,11 +1314,9 @@ struct __wt_ref {
      * all of the update structures.)
      *
      * After instantiation, the page_del structure is kept until the instantiated page is next
-     * reconciled and a new image is written. This is because in some cases reconciliation of the
-     * parent internal page may need to write out a reference to the pre-instantiated on-disk page,
-     * at which point the page_del information is needed to build the correct reference. (A
-     * reconciliation that skips the write, possible in disaggregated storage, leaves the on-disk
-     * state unchanged, so the page_del structure is kept across it.)
+     * reconciled. This is because in some cases reconciliation of the parent internal page may need
+     * to write out a reference to the pre-instantiated on-disk page, at which point the page_del
+     * information is needed to build the correct reference.
      *
      * If the ref is in WT_REF_DELETED state, all actions besides checking whether page_del is NULL
      * require that the WT_REF be locked. There are two reasons for this: first, the page might be

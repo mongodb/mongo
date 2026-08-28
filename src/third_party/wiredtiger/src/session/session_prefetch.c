@@ -14,13 +14,18 @@
  *     internal sessions, internal pages, tiered tables, special btree handles, an overwhelmed
  *     prefetch queue, and sessions that have not yet read enough pages from disk to justify it.
  *     Internal pages are excluded because identifying which leaf pages to preload from an internal
- *     page traversal is non-trivial.
+ *     page traversal is non-trivial. A session that has declared a scan skips the two checks that
+ *     only exist to guess at what it has already stated.
  */
 bool
 __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    bool scan;
+
     if (!F_ISSET(session, WT_SESSION_PREFETCH_ENABLED))
         return (false);
+
+    scan = session->pf.scan_hint;
 
     WT_STAT_CONN_INCR(session, prefetch_attempts);
 
@@ -34,7 +39,7 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
     }
 
-    if (F_ISSET(session, WT_SESSION_INTERNAL)) {
+    if (F_ISSET(session, WT_SESSION_INTERNAL) && !scan) {
         WT_STAT_CONN_INCR(session, prefetch_skipped_internal_session);
         return (false);
     }
@@ -53,7 +58,7 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (session->pf.prefetch_disk_read_count == 1)
         WT_STAT_CONN_INCR(session, prefetch_disk_one);
 
-    if (session->pf.prefetch_disk_read_count < 2) {
+    if (session->pf.prefetch_disk_read_count < 2 && !scan) {
         WT_STAT_CONN_INCR(session, prefetch_skipped_disk_read_count);
         return (false);
     }

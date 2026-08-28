@@ -241,8 +241,8 @@ leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
     /* The timestamp thread owns the frontier; just checkpoint. */
     testutil_check(session->checkpoint(session, "use_timestamp=true"));
 
-    println(
-      "Node %" PRIu32 ": checkpoint %" PRIu32 " complete", state->cfg->node_id, ++ckpt->produced);
+    println("Node %" PRIu32 ": checkpoint %" PRIu32 " complete; stable timestamp = %" PRIu64,
+      state->cfg->node_id, ++ckpt->produced, stable_ts);
 
     /* A stable frontier implies every worker completed an operation this phase. */
     if (ckpt->produced == 1u)

@@ -37,13 +37,45 @@ __wti_conn_prefetch_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __prefetch_thread_chk --
- *     Check to decide if the pre-fetch thread should continue running.
+ * __prefetch_server_running --
+ *     Check whether the pre-fetch server threads are running.
  */
 static bool
-__prefetch_thread_chk(WT_SESSION_IMPL *session)
+__prefetch_server_running(WT_SESSION_IMPL *session)
 {
     return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_PREFETCH));
+}
+
+/*
+ * __wti_prefetch_scan_begin --
+ *     Declare that the session is about to traverse a btree end to end, so pre-fetch does not have
+ *     to infer it from the session's recent reads.
+ */
+void
+__wti_prefetch_scan_begin(WT_SESSION_IMPL *session, WT_PREFETCH_SCAN *scan)
+{
+    scan->prefetch_set = scan->scan_hint_set = false;
+
+    if (!__prefetch_server_running(session))
+        return;
+
+    scan->prefetch_set = !F_ISSET(session, WT_SESSION_PREFETCH_ENABLED);
+    scan->scan_hint_set = !session->pf.scan_hint;
+    F_SET(session, WT_SESSION_PREFETCH_ENABLED);
+    session->pf.scan_hint = true;
+}
+
+/*
+ * __wti_prefetch_scan_end --
+ *     End a declared scan.
+ */
+void
+__wti_prefetch_scan_end(WT_SESSION_IMPL *session, WT_PREFETCH_SCAN *scan)
+{
+    if (scan->scan_hint_set)
+        session->pf.scan_hint = false;
+    if (scan->prefetch_set)
+        F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
 }
 
 /*
@@ -178,7 +210,7 @@ __wti_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_ERR(__wt_thread_group_create(session, &conn->prefetch.threads, "prefetch-server",
-      WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __prefetch_thread_chk,
+      WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __prefetch_server_running,
       __prefetch_thread_run, NULL));
     return (0);
 

@@ -113,11 +113,6 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         ev.key_min = DATA_KEY_MIN;
         ev.key_max = DATA_KEY_MAX;
     }
-    /* Only an epoch-mode schema operation defers its timestamp to its publish event. */
-    const bool deferred_ts =
-      !state->cfg->epoch_less && (ev.type == EVENT_CREATE || ev.type == EVENT_DROP);
-    if (!deferred_ts)
-        ev.event_ts = __wt_atomic_add_uint64(&state->current_ts, 1);
 
     generator_emit(state, &ev);
     return (true);
@@ -207,7 +202,6 @@ generator_flush_publishes(WORKLOAD_STATE *state)
             SCHEMA_EVENT ev = {0};
             ev.type = *slot_state == TABLE_CREATED ? EVENT_PUBLISH_CREATE : EVENT_PUBLISH_DROP;
             ev.thread_id = t;
-            ev.event_ts = __wt_atomic_add_uint64(&state->current_ts, 1);
             testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t,
               slot, state->workers[t].table[slot].gen);
 
@@ -268,14 +262,13 @@ generator_stepdown_ended(WORKLOAD_STATE *state, GENERATOR_PACING *pacing)
 
 /*
  * generator_transition_emit --
- *     Emit a transition event (stepdown or switch) stamped with the current counter.
+ *     Emit a transition event (stepdown or switch).
  */
 static void
 generator_transition_emit(WORKLOAD_STATE *state, EVENT_TYPE type)
 {
     SCHEMA_EVENT ev = {0};
     ev.type = type;
-    ev.event_ts = __wt_atomic_load_uint64(&state->current_ts);
     generator_emit(state, &ev);
 }
 
@@ -311,8 +304,7 @@ thread_generator_run(void *arg)
             break;
         case GEN_BEGIN_STEPDOWN:
             /*
-             * Tell the reader to start the step-down work, then generate a limited workload until
-             * the step-down ends.
+             * Start the step-down work, then generate a limited workload until the step-down ends.
              */
             generator_transition_emit(state, EVENT_STEPDOWN);
             __wt_epoch(NULL, &pacing.stepdown_start);
@@ -330,7 +322,7 @@ thread_generator_run(void *arg)
             }
             break;
         case GEN_SWITCH:
-            /* The stream's last event, carrying the counter the next leader continues from. */
+            /* The stream's last event. */
             generator_transition_emit(state, EVENT_SWITCH);
             phase = GEN_STOP;
             break;

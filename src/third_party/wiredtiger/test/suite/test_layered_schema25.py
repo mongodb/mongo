@@ -114,6 +114,39 @@ class test_layered_schema25(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.create_idle_tables()
         self.sweep_idle_handles()
 
+    def drop_empty_table_and_wait_for_sweep(self, publish_epoch, covering_epoch=None):
+        """Create an empty table at the given publish epoch, optionally advance the stable epoch
+        to cover it, then drop it and wait for the sweep server to remove the stable constituent
+        handle."""
+        session = self.conn.open_session('')
+        session.create(self.uri, self.table_config)
+        self.publish(self.uri, publish_epoch, session=session)
+        if covering_epoch is not None:
+            self.set_stable_epoch(covering_epoch)
+
+        # The empty table drops cleanly even though no checkpoint has covered it yet. Close the
+        # session so no cached handle reference pins the dropped table.
+        session.drop(self.uri)
+        session.close()
+
+        # The stable constituent handle must eventually disappear.
+        stable_file = f'file:{self.test_name}.wt_stable'
+        deadline = time.time() + self.sweep_timeout
+        while stable_file in self.open_handles():
+            self.assertLess(time.time(), deadline,
+                'sweep server did not remove the dropped table in time')
+            time.sleep(0.5)
+
+    def test_sweep_removes_dropped_uncheckpointed_table(self):
+        # An empty table dropped before any checkpoint covers it must not pin its handle: the
+        # drop closes it and the sweep server then removes it. Exercise both publish states,
+        # above the stable epoch (awaiting publication) and below it (published, uncheckpointed).
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(5)
+        self.drop_empty_table_and_wait_for_sweep(publish_epoch=10)
+        self.drop_empty_table_and_wait_for_sweep(publish_epoch=15, covering_epoch=20)
+
     def test_sweep_keeps_table_awaiting_publication(self):
         # The table outlived the sweep, so its committed data is still protected.
         self.setup_swept_connection()

@@ -283,11 +283,6 @@ page->modify->instantiated) and discards the \c page_del structure, as once a
 reconciliation result exists it can be used to reconcile the parent.
 (This is true whether or not it includes the tombstones from instantiation, i.e., whether
 the truncation was committed.)
-The exception is a reconciliation that skips the write, which is possible in
-disaggregated storage.
-Nothing is written, so the parent still refers to the pre-instantiation image and may still
-describe it with a fast-truncate proxy cell; the flag and the \c page_del structure are kept
-so that the parent can write that cell out again.
 
 Note that "unresolved" includes "prepared".
 While we cannot write out a prepared truncation in the parent page's address cells, in

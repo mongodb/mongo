@@ -99,6 +99,16 @@ __clayered_value_in_tombstone_namespace(const WT_ITEM *value, bool encode)
 }
 
 /*
+ * __wt_clayered_value_in_tombstone_namespace --
+ *     Namespace boundary test for callers outside the layered cursor.
+ */
+bool
+__wt_clayered_value_in_tombstone_namespace(const WT_ITEM *value, bool encode)
+{
+    return (__clayered_value_in_tombstone_namespace(value, encode));
+}
+
+/*
  * __clayered_deleted_encode --
  *     Encode values that are in the encoded name space.
  */
@@ -170,7 +180,8 @@ __wt_clayered_ingest_to_stable_value(WT_SESSION_IMPL *session, WT_ITEM *value)
 {
     size_t size_before;
 
-    WT_ASSERT(session, !__wt_clayered_deleted(value));
+    WT_ASSERT_ALWAYS(
+      session, !__wt_clayered_deleted(value), "a tombstone must never be drained as a value");
 
     if (__clayered_stable_tombstone_encoding(S2C(session)))
         return;
@@ -3706,46 +3717,44 @@ __clayered_modify_stable(WTI_CLAYERED_OP *op, WT_MODIFY *entries, int nentries)
     WT_SESSION_IMPL *session = CUR2S(clayered);
     WT_CURSOR *cursor = &clayered->iface;
     WT_CURSOR *c_stable = op->stable;
-    bool need_full_update = false;
+    bool found, need_full_update;
     WT_DECL_RET;
     WT_DECL_ITEM(buf);
 
+    /*
+     * The search only fetches the base value for the namespace checks below. A missing key is left
+     * to the raw modify, whose write-path search distinguishes a key that does not exist from one
+     * this transaction cannot modify (WT_NOTFOUND versus WT_ROLLBACK).
+     */
     c_stable->set_key(c_stable, &cursor->key);
-    /* It's valid to build the modify on an empty value. */
     WT_ERR_NOTFOUND_OK(c_stable->search(c_stable), true);
+    found = ret == 0;
 
-    if (ret == 0 && __clayered_stable_tombstone_encoding(S2C(session)) &&
-      __clayered_value_in_tombstone_namespace(&c_stable->value, false /* decode */)) {
-        /*
-         * A delete-encoded value alters the original value and cannot serve as the base value for a
-         * modify; perform a full update instead. This only arises while stable tombstone encoding
-         * is enabled; with it off the stored value is the raw value and a plain modify applies
-         * directly.
-         */
-        __clayered_deleted_decode(session, &c_stable->value, true);
-        WT_ERR(__wt_modify_apply_api(c_stable, entries, nentries));
-        need_full_update = true;
-    } else {
-        WT_ERR(c_stable->modify(c_stable, entries, nentries));
-        /*
-         * A plain modify stores its result unescaped. While stable tombstone encoding is on, a
-         * result that moved into the tombstone namespace must be re-escaped with a full update so
-         * it decodes back unchanged; with encoding off the raw result is the stored form.
-         */
-        need_full_update = __clayered_stable_tombstone_encoding(S2C(session)) &&
-          __clayered_value_in_tombstone_namespace(&c_stable->value, true /* encode */);
-    }
+    /*
+     * While stable tombstone encoding is on, a base or a result in the tombstone namespace cannot
+     * go through a raw modify: a delete-encoded base alters the value the modify applies to, and a
+     * raw modify stores its result unescaped. Both take the encoded full-update path instead. With
+     * encoding off the stored value is the raw value and a plain modify applies directly.
+     */
+    need_full_update = found && __clayered_stable_tombstone_encoding(S2C(session)) &&
+      (__clayered_value_in_tombstone_namespace(&c_stable->value, false /* decode */) ||
+        __wt_modify_result_may_be_in_tombstone_namespace(
+          session, c_stable->value_format, &c_stable->value, entries, nentries));
 
     if (need_full_update) {
-        /*
-         * FIXME-WT-18216: If an error occurs before the full update completes, the intermediate
-         * unescaped update remains in the transaction's update chain. The transaction cannot
-         * commit, but subsequent operations can still observe the raw value before rollback.
-         */
+        __clayered_deleted_decode(session, &c_stable->value, true);
+        WT_ERR(__wt_modify_apply_api(c_stable, entries, nentries));
         WT_ERR(__clayered_deleted_encode(session, &c_stable->value, true, &c_stable->value, &buf));
         __wt_clayered_stable_value_stat(session, c_stable->value.data, c_stable->value.size);
         F_SET(c_stable, WT_CURSTD_VALUE_EXT);
         WT_ERR(c_stable->update(c_stable));
+    } else {
+        WT_ERR(c_stable->modify(c_stable, entries, nentries));
+        /* With encoding on, a stored modify never reconstructs into the tombstone namespace. */
+        WT_ASSERT_ALWAYS(session,
+          !__clayered_stable_tombstone_encoding(S2C(session)) ||
+            !__clayered_value_in_tombstone_namespace(&c_stable->value, true /* encode */),
+          "a raw stable modify stored an unescaped tombstone-namespace value");
     }
 
     clayered->current_cursor = c_stable;
@@ -3790,6 +3799,19 @@ __clayered_modify_try_ingest(
         return (0);
     }
 
+    /*
+     * A raw modify stores its result unescaped. Divert a result that may land in the tombstone
+     * namespace to the encoded full-update path before storing anything: a committed raw modify
+     * would leave an unescaped namespace version on the chain for the ingest-to-stable drain to
+     * misread as escaped.
+     */
+    if (__wt_modify_result_may_be_in_tombstone_namespace(
+          session, c_ingest->value_format, &c_ingest->value, entries, nentries)) {
+        WT_RET(__wt_modify_apply_api(c_ingest, entries, nentries));
+        *need_full_updatep = true;
+        return (0);
+    }
+
     WT_RET_NOTFOUND_OK(ret = c_ingest->modify(c_ingest, entries, nentries));
 
     /*
@@ -3807,12 +3829,10 @@ __clayered_modify_try_ingest(
         return (0);
     }
 
-    /*
-     * A plain modify stores its result unescaped. If the modify moved the value into the tombstone
-     * namespace, re-escape it with a full update so it decodes back unchanged.
-     */
-    *need_full_updatep =
-      __clayered_value_in_tombstone_namespace(&c_ingest->value, true /* encode */);
+    /* The raw modify path never produces a tombstone-namespace value. */
+    WT_ASSERT_ALWAYS(session,
+      !__clayered_value_in_tombstone_namespace(&c_ingest->value, true /* encode */),
+      "a raw ingest modify stored an unescaped tombstone-namespace value");
     return (0);
 }
 
@@ -3860,11 +3880,6 @@ __clayered_modify_ingest(WTI_CLAYERED_OP *op, WT_MODIFY *entries, int nentries)
     }
 
     if (need_full_update) {
-        /*
-         * FIXME-WT-18216: If an error occurs before the full update completes, the intermediate
-         * unescaped update remains in the transaction's update chain. The transaction cannot
-         * commit, but subsequent operations can still observe the raw value before rollback.
-         */
         WT_ERR(__clayered_deleted_encode(session, &c_ingest->value, false, &c_ingest->value, &buf));
         F_SET(c_ingest, WT_CURSTD_VALUE_EXT);
         WT_ERR(c_ingest->update(c_ingest));

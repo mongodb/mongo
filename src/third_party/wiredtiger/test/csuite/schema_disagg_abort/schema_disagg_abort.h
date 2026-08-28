@@ -123,6 +123,7 @@ typedef enum {
     EVENT_INSERT,
     EVENT_PUBLISH_CREATE,
     EVENT_PUBLISH_DROP,
+    EVENT_PENDING,
     EVENT_STEPDOWN,
     EVENT_SWITCH
 } EVENT_TYPE;
@@ -130,11 +131,11 @@ typedef enum {
 typedef struct {
     EVENT_TYPE type;
     uint32_t thread_id;
-    /*
-     * The timestamp whose completion this event represents: a publish epoch, an insert's commit
-     * timestamp (which the rows also hold), a legacy schema operation's timestamp, or a term's
-     * final timestamp. CREATE/DROP carry none when schema epochs are in use - a schema operation
-     * then completes with its publish.
+    /*-
+     * The completion timestamp for this event:
+     *   - a publish epoch,
+     *   - an insert's commit timestamp,
+     *   - a legacy schema op's timestamp (epoch-less mode).
      */
     uint64_t event_ts;
     uint32_t key_min;

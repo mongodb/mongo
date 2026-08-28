@@ -27,6 +27,7 @@ typedef struct {
     bool is_create;
     bool valid;
     bool newer_schema_op; /* legacy schema record above the checkpoint timestamp */
+    bool pending;         /* legacy operation begun whose outcome was never recorded */
     char uri[64];         /* filled when valid, so the checks need not rebuild it */
 } SLOT_STATE;
 
@@ -38,6 +39,24 @@ typedef struct {
     uint32_t skipped_slots;
     uint32_t skipped_rows;
 } VERIFY_STATS;
+
+/*
+ * record_op_type --
+ *     Parse an event type from a record file.
+ */
+static EVENT_TYPE
+record_op_type(const char *op)
+{
+    if (strcmp(op, "CREATE") == 0)
+        return (EVENT_CREATE);
+    if (strcmp(op, "DROP") == 0)
+        return (EVENT_DROP);
+    if (strcmp(op, "INSERT") == 0)
+        return (EVENT_INSERT);
+    if (strcmp(op, "PENDING") == 0)
+        return (EVENT_PENDING);
+    return (EVENT_NONE); /* unrecognized operation */
+}
 
 /*
  * parse_record_uri --
@@ -77,61 +96,61 @@ parse_schema_records(const char *fname, uint32_t node, uint32_t t, uint64_t dura
         /* A worker killed mid-write leaves a partial line, which can only be the file's last. */
         const bool torn = strchr(line, '\n') == NULL;
 
-        char op[16];
+        char op[16], rec_uri[128];
+        uint64_t op_ts; /* publish epoch, legacy schema timestamp, or insert commit timestamp */
+        uint32_t key_max = 0, key_min = 0;
 
-        if (sscanf(line, "%15s", op) != 1) {
+        /* Every record is "<op> <op_ts> <uri>"; only an insert appends its key range. */
+        const int fields = sscanf(line, "%15s %" SCNu64 " %127s %" SCNu32 " %" SCNu32, op, &op_ts,
+          rec_uri, &key_min, &key_max);
+        if (fields < 3) {
             testutil_assertfmt(torn, "%s: unreadable record \"%s\"", fname, line);
             continue;
         }
 
-        char rec_uri[128];
-        uint64_t op_ts; /* publish epoch, legacy schema timestamp, or insert commit timestamp */
-        uint32_t key_max = 0, key_min = 0, s;
-        bool parsed = false;
+        const EVENT_TYPE op_type = record_op_type(op);
 
-        /* Every record is "<op> <op_ts> [<key range>] <uri>". */
-        if (strcmp(op, "CREATE") == 0 || strcmp(op, "DROP") == 0)
-            parsed = sscanf(line, "%*s %" SCNu64 " %127s", &op_ts, rec_uri) == 2;
-        else if (strcmp(op, "INSERT") == 0)
-            parsed = sscanf(line, "%*s %" SCNu64 " %" SCNu32 " %" SCNu32 " %127s", &op_ts, &key_min,
-                       &key_max, rec_uri) == 4;
-        else
-            testutil_assertfmt(false, "%s: unknown record op \"%s\"", fname, op);
-
-        if (!parsed) {
+        if (fields != (op_type == EVENT_INSERT ? 5 : 3)) {
             testutil_assertfmt(torn, "%s: malformed record \"%s\"", fname, line);
             continue;
         }
 
+        uint32_t s;
         if (!parse_record_uri(rec_uri, node, t, pool_size, &s))
             continue;
-        /* Legacy schema entries above the checkpoint timestamp may or may not have been drained. */
-        if (op_ts > durable_ts) {
-            if (epoch_less && (strcmp(op, "CREATE") == 0 || strcmp(op, "DROP") == 0))
-                states[s].newer_schema_op = true;
-            continue;
-        }
 
-        if (strcmp(op, "INSERT") == 0) {
-            /*
-             * Each CREATE may be followed by several rounds of INSERT's, keep only the latest one
-             * because earlier values are overwritten.
-             */
-            const bool latest_insert = states[s].valid && states[s].is_create &&
-              op_ts > states[s].schema_ts && op_ts > states[s].commit_ts;
+        SLOT_STATE *slot = &states[s];
 
-            if (latest_insert) {
-                states[s].commit_ts = op_ts;
-                states[s].key_min = key_min;
-                states[s].key_max = key_max;
+        if (op_type == EVENT_PENDING) {
+            /* Epoch-less operation began. */
+            slot->pending = true;
+        } else if (op_type == EVENT_CREATE || op_type == EVENT_DROP) {
+            slot->pending = false;
+            if (op_ts > durable_ts) {
+                if (epoch_less)
+                    /* Epoch-less schema op is above the last checkpoint. */
+                    slot->newer_schema_op = true;
+            } else if (op_ts > slot->schema_ts) {
+                /* Apply new schema operation and update the slot state. */
+                slot->schema_ts = op_ts;
+                slot->commit_ts = DATA_COMMIT_TS_NONE;
+                slot->is_create = op_type == EVENT_CREATE;
+                slot->valid = true;
+                testutil_snprintf(slot->uri, sizeof(slot->uri), "%s", rec_uri);
             }
-        } else if (op_ts > states[s].schema_ts) { /* most recent CREATE or DROP */
-            states[s].schema_ts = op_ts;
-            states[s].commit_ts = DATA_COMMIT_TS_NONE;
-            states[s].is_create = strcmp(op, "CREATE") == 0;
-            states[s].valid = true;
-            testutil_snprintf(states[s].uri, sizeof(states[s].uri), "%s", rec_uri);
-        }
+        } else if (op_type == EVENT_INSERT) {
+            /*
+             * Keep only the newest durable insert into the slot's current create: earlier values
+             * are overwritten, and one below the create belongs to a past generation.
+             */
+            if (op_ts <= durable_ts && slot->valid && slot->is_create && op_ts > slot->schema_ts &&
+              op_ts > slot->commit_ts) {
+                slot->commit_ts = op_ts;
+                slot->key_min = key_min;
+                slot->key_max = key_max;
+            }
+        } else
+            testutil_assertfmt(false, "%s: unknown record op \"%s\"", fname, op);
     }
     (void)fclose(fp);
 }
@@ -156,7 +175,8 @@ check_schema_presence(WT_SESSION *session, const TEST_CONFIG *cfg,
         const int ret = md_cursor->search(md_cursor);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
 
-        const bool uncertain_tail = cfg->epoch_less && states[s].newer_schema_op;
+        const bool uncertain_tail =
+          cfg->epoch_less && (states[s].newer_schema_op || states[s].pending);
         /* A legacy step-up rebuilds shared metadata from local metadata, and enqueue creates
          * only, so a drop applied while following is resurrected. */
         const bool switched_legacy_drop =
@@ -195,7 +215,7 @@ check_data_rows(WT_SESSION *session, const SLOT_STATE states[MAX_POOL_SIZE], uin
             continue;
         if (last_ckpt_ts > 0 && states[s].commit_ts > last_ckpt_ts)
             continue;
-        if (states[s].newer_schema_op) {
+        if (states[s].newer_schema_op || states[s].pending) {
             ++stats->skipped_rows;
             continue;
         }

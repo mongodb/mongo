@@ -57,6 +57,18 @@ struct __wt_prefetch {
     WT_PAGE *prefetch_prev_ref_home;
     uint64_t prefetch_disk_read_count; /* Sequential cache requests that caused a leaf read */
     uint64_t prefetch_skipped_with_parent;
+
+    /* Set by a caller that knows pre-fetch should be triggered. */
+    bool scan_hint;
+};
+
+/*
+ * WT_PREFETCH_SCAN --
+ *	The session pre-fetch state a declared scan replaced, so it can be put back.
+ */
+struct __wt_prefetch_scan {
+    bool prefetch_set;  /* The scan set WT_SESSION_PREFETCH_ENABLED */
+    bool scan_hint_set; /* The scan set the hint */
 };
 
 /*

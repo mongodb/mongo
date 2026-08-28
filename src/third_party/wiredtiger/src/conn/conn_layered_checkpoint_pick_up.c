@@ -753,6 +753,7 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
     WT_DECL_RET;
     WT_DISAGG_METADATA_OP *latest_entry;
     WT_DISAGG_STABLE_BTREE_IDS stable_btree_ids;
+    WT_PREFETCH_SCAN prefetch_scan;
     WT_SHARED_METADATA_OP latest_op;
     WT_TIMER apply_timer;
     wt_timestamp_t latest_epoch;
@@ -769,6 +770,7 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
     for (i = 0; i < WT_DISAGG_CURSOR_COUNT; i++)
         md_cursors[i] = sh_cursors[i] = NULL;
     md_write_cursor = NULL;
+    WT_CLEAR(prefetch_scan);
     WT_CLEAR(stable_btree_ids);
 
     metadata_checkpoint_name = NULL;
@@ -779,6 +781,14 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
     strict = F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_STRICT_CHECKPOINT_METADATA);
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
+    /*
+     * The walk below is a bounded, forward-only scan of the shared metadata, where crossing a page
+     * boundary costs a page log round trip. Declare it: the scan runs on an internal session, and
+     * it interleaves cache-resident local metadata with pages that must be fetched, so neither of
+     * the prefetch heuristics recognizes it.
+     */
+    __wti_prefetch_scan_begin(session, &prefetch_scan);
 
     __wt_timer_start(session, &apply_timer);
     __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
@@ -1178,6 +1188,8 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
 
 done:
 err:
+    __wti_prefetch_scan_end(session, &prefetch_scan);
+
     __wt_free(session, stable_btree_ids.ids);
     __wt_free(session, first_uri);
     __wt_free(session, second_uri);

@@ -1115,19 +1115,5 @@ __wti_rts_btree_abort_updates(
     /* Mark the page as dirty to reconcile the page. */
     if (!dryrun && page->modify)
         __wt_page_modify_set(session, page);
-
-    /*
-     * If the page is instantiated and the fast-truncate that produced it has just been rolled back,
-     * the page-delete information no longer describes anything: discard it and clear the
-     * instantiated flag together, as transaction rollback does. Leaving it in place would let a
-     * later reconciliation that skips the write carry it forward, re-asserting the rolled-back
-     * truncate.
-     */
-    if (!dryrun && page->modify != NULL && page->modify->instantiated && ref->page_del != NULL &&
-      (ref->page_del->prepare_state == WT_PREPARE_INPROGRESS ||
-        ref->page_del->pg_del_durable_ts > rollback_timestamp)) {
-        __wt_free(session, ref->page_del);
-        page->modify->instantiated = false;
-    }
     return (0);
 }
