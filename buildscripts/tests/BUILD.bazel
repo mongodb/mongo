@@ -174,6 +174,19 @@ py_test(
 )
 
 py_test(
+    name = "test_evergreen_custom_build_version_ordering",
+    srcs = ["test_evergreen_custom_build_version_ordering.py"],
+    data = ["//etc:evergreen_custom_build_version_ordering_data"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_gather_failed_tests",
     srcs = ["test_gather_failed_tests.py"],
     visibility = ["//visibility:public"],

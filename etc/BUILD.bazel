@@ -12,6 +12,18 @@ exports_files([
     "coverity_config_schema.json",
 ])
 
+filegroup(
+    name = "evergreen_custom_build_version_ordering_data",
+    srcs = [
+        "evergreen_yml_components/custom_builds/tasks.yml",
+        "evergreen_yml_components/definitions.yml",
+        "evergreen_yml_components/tasks/compile_tasks.yml",
+        "evergreen_yml_components/tasks/compile_tasks_nightly.yml",
+        "evergreen_yml_components/tasks/compile_tasks_shared.yml",
+        "evergreen_yml_components/tasks/misc_tasks.yml",
+    ],
+)
+
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
 # exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to
 # the compiler executable.
