@@ -58,11 +58,7 @@ selector:
     # expected event sequence is updated for the 9.0 last-lts binary.
     - jstests/multiVersion/genericChangeStreams/change_streams_event_resumability.js
 
-    # TODO SERVER-132953: featureFlagBlockReplicaSetWrites is FCV-gated at 9.0. The test
-    # downgrades to last-lts and asserts blockReplicaSetWrites is rejected with IllegalOperation on the
-    # old FCV. Now that last-lts is 9.0 (>= 9.0), the feature is available at the downgrade FCV and the
-    # command succeeds, breaking the rejection expectation. Documented for removal once 9.0 is lastLTS
-    # (SERVER-123007).
+    # TODO SERVER-123007: Remove the part not required anymore now that 9.0 is lastLTS
     - jstests/multiVersion/genericSetFCVUsage/replica_set_write_block_upgrade_downgrade.js
 
     # TODO SERVER-132996: this test launches every entry in allSupportedVersions, including the
