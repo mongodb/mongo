@@ -85,6 +85,7 @@ mongo_cc_library(
         ":persistent_samples",
         ":sampling_math",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/compiler/ce/ndv:field_stats",
         "//src/mongo/db/query/compiler/ce/ndv:field_stats_loader",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],

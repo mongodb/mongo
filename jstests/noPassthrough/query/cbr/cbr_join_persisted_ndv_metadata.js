@@ -99,6 +99,131 @@ describe("persistedNdv in join explain", function () {
         });
     });
 
+    it("surfaces composite persistedNdv for a two-field join", function () {
+        const orders = this.db[jsTestName() + "_orders_composite"];
+        const products = this.db[jsTestName() + "_products_composite"];
+        assert.commandWorked(
+            orders.insertMany(
+                Array.from({length: 100}, (_, i) => ({_id: i, productId: i % 10, region: i % 2})),
+            ),
+        );
+        // Both join keys are non-unique, individually and as a pair, so the join optimizer
+        // requests the composite NDV instead of shortcutting through index uniqueness.
+        assert.commandWorked(
+            products.insertMany(
+                Array.from({length: 20}, (_, i) => ({_id: i, sku: i % 5, region: i % 2})),
+            ),
+        );
+        assert.commandWorked(orders.createIndex({dummy: 1, productId: 1, region: 1}));
+        assert.commandWorked(products.createIndex({dummy: 1, sku: 1, region: 1}));
+
+        // Deliberately unsorted key order; the persisted statistic is canonically sorted.
+        assert.commandWorked(
+            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+        );
+
+        // Two equality predicates on one join edge: both are $expr equalities, selecting the
+        // strict tuple variant of the composite statistic.
+        const pipeline = [
+            {
+                $lookup: {
+                    from: products.getName(),
+                    as: "product",
+                    let: {p: "$productId", r: "$region"},
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [{$eq: ["$sku", "$$p"]}, {$eq: ["$region", "$$r"]}],
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+            {$unwind: "$product"},
+        ];
+
+        joinTestWrapper(this.db, () => {
+            assert.commandWorked(
+                this.db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+            );
+
+            const explain = orders.explain().aggregate(pipeline);
+            const queryPlanner = getQueryPlanner(explain);
+            assert(queryPlanner.winningPlan.usedJoinOptimization, "expected join optimization", {
+                winningPlan: queryPlanner.winningPlan,
+            });
+
+            const persistedNdv = queryPlanner.fieldStatsMetadata[products.getFullName()].ndv;
+            assert(persistedNdv, "expected composite ndv metadata", {
+                fieldStatsMetadata: queryPlanner.fieldStatsMetadata,
+            });
+            assert.eq(persistedNdv.length, 1, "expected one served entry", {persistedNdv});
+            assert.eq(persistedNdv[0].fieldPaths, ["region", "sku"], "unexpected fieldPaths", {
+                persistedNdv,
+            });
+        });
+    });
+
+    it("serves the composite statistic for mixed equality semantics", function () {
+        const orders = this.db[jsTestName() + "_orders_mixed"];
+        const products = this.db[jsTestName() + "_products_mixed"];
+        assert.commandWorked(
+            orders.insertMany(
+                Array.from({length: 100}, (_, i) => ({_id: i, productId: i % 10, region: i % 2})),
+            ),
+        );
+        assert.commandWorked(
+            products.insertMany(
+                Array.from({length: 20}, (_, i) => ({_id: i, sku: i % 5, region: i % 2})),
+            ),
+        );
+        assert.commandWorked(orders.createIndex({dummy: 1, productId: 1, region: 1}));
+        assert.commandWorked(products.createIndex({dummy: 1, sku: 1, region: 1}));
+
+        assert.commandWorked(
+            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+        );
+
+        // localField/foreignField contributes a regular-equality predicate on "sku" and the
+        // $expr contributes a strict one on "region", so the served sketch is the variant
+        // folding "sku".
+        const pipeline = [
+            {
+                $lookup: {
+                    from: products.getName(),
+                    localField: "productId",
+                    foreignField: "sku",
+                    as: "product",
+                    let: {r: "$region"},
+                    pipeline: [{$match: {$expr: {$eq: ["$region", "$$r"]}}}],
+                },
+            },
+            {$unwind: "$product"},
+        ];
+
+        joinTestWrapper(this.db, () => {
+            assert.commandWorked(
+                this.db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+            );
+
+            const explain = orders.explain().aggregate(pipeline);
+            const queryPlanner = getQueryPlanner(explain);
+            assert(queryPlanner.winningPlan.usedJoinOptimization, "expected join optimization", {
+                winningPlan: queryPlanner.winningPlan,
+            });
+
+            const persistedNdv = queryPlanner.fieldStatsMetadata[products.getFullName()].ndv;
+            assert(persistedNdv, "expected composite ndv metadata", {
+                fieldStatsMetadata: queryPlanner.fieldStatsMetadata,
+            });
+            assert.eq(persistedNdv[0].fieldPaths, ["region", "sku"], "unexpected fieldPaths", {
+                persistedNdv,
+            });
+        });
+    });
+
     it("omits persistedNdv when no statistics are served", function () {
         joinTestWrapper(this.db, () => {
             assert.commandWorked(

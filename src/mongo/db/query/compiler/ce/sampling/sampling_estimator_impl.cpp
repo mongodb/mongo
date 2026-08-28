@@ -25,6 +25,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/ce/ndv/field_stats.h"
 #include "mongo/db/query/compiler/ce/ndv/field_stats_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/math.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
@@ -45,6 +46,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string_view>
 
@@ -1079,7 +1081,8 @@ auto& persistentSampleMisses = *MetricBuilder<Counter64>{"query.sampling.persist
 
 // Hit = served an NDV from persisted field statistics. Miss = fell back to the sample-based
 // estimate although persisted NDV statistics were enabled and requested. Counted once per
-// estimator and field path; memoized re-reads within one estimator do not count again.
+// estimator, canonical path set and folding variant; memoized re-reads within one estimator do
+// not count again.
 auto& persistentNDVHits = *MetricBuilder<Counter64>{"query.sampling.persistentNdv.hits"};
 auto& persistentNDVMisses = *MetricBuilder<Counter64>{"query.sampling.persistentNdv.misses"};
 
@@ -1192,63 +1195,186 @@ bool SamplingEstimatorImpl::persistentNDVStatsEnabled() const {
     return *_persistentNDVEnabled;
 }
 
-boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPersistentStats(
-    const std::vector<FieldPathAndEqSemantics>& fields,
-    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
-    // TODO SERVER-131766: serve multi-field NDV once composite statistics are persisted.
-    // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
-    // distinct values fall within a range. The persisted sketch counts null and missing separately
-    // ($expr semantics); regular-eq callers accept being off by at most one.
-    if (fields.size() != 1 || bounds.has_value() || !persistentNDVStatsEnabled()) {
+boost::optional<size_t> SamplingEstimatorImpl::selectPersistedNDVSketchIndex(
+    const std::vector<std::pair<std::string, bool>>& sortedFields,
+    const SortedFieldPaths& sortedPaths) const {
+    // A single-field statistic persists exactly one sketch; it serves requests of either
+    // equality semantics (the two answers differ by at most one distinct value). A composite
+    // statistic persists sketches[0], where every field counts null and missing separately,
+    // plus sketches[i + 1] for each sorted field i, where that one field counts null and
+    // missing as the same value. No sketch merges null and missing for more than one field.
+    if (sortedFields.size() == 1) {
+        return 0;
+    }
+
+    size_t foldedCount = 0;
+    size_t sketchIndex = 0;
+    for (size_t i = 0; i < sortedFields.size(); ++i) {
+        if (!sortedFields[i].second /* isExprEq */) {
+            ++foldedCount;
+            sketchIndex = i + 1;
+        }
+    }
+    if (foldedCount > 1) {
+        // No persisted variant folds several fields; the caller falls back to the sample.
+        LOGV2_DEBUG(13176600,
+                    5,
+                    "Persisted NDV statistics cannot serve a request folding several fields",
+                    logAttrs(_nss),
+                    "paths"_attr = sortedPaths,
+                    "numFoldedFields"_attr = foldedCount);
+        return boost::none;
+    }
+    // When no field is folded, 'sketchIndex' was never assigned and still selects the strict
+    // tuple sketch at index 0.
+    return sketchIndex;
+}
+
+const boost::optional<CardinalityEstimate>* PersistedNDVStatsCache::findEstimate(
+    const SortedFieldPaths& sortedPaths, size_t sketchIndex) const {
+    const auto it = _estimates.find(std::pair(sortedPaths, sketchIndex));
+    return it == _estimates.end() ? nullptr : &it->second;
+}
+
+void PersistedNDVStatsCache::storeEstimate(const SortedFieldPaths& sortedPaths,
+                                           size_t sketchIndex,
+                                           boost::optional<CardinalityEstimate> estimate) {
+    _estimates.emplace(std::pair(sortedPaths, sketchIndex), std::move(estimate));
+}
+
+const boost::optional<PersistedNDVEntry>& PersistedNDVStatsCache::getOrLoadDoc(
+    const SortedFieldPaths& sortedPaths,
+    const std::function<boost::optional<PersistedNDVEntry>()>& load) {
+    if (const auto it = _docs.find(sortedPaths); it != _docs.end()) {
+        return it->second;
+    }
+    return _docs.emplace(sortedPaths, load()).first->second;
+}
+
+boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
+    const SortedFieldPaths& sortedPaths, size_t numFields) const {
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
+    if (!collection) {
         return boost::none;
     }
 
-    const std::string path = fields.front().path.fullPath();
-    if (const auto it = _persistedNDVEstimates.find(path); it != _persistedNDVEstimates.end()) {
-        return it->second;
+    auto swDoc = loadFieldStats(_opCtx, _nss.dbName(), collection->uuid(), sortedPaths);
+    if (!swDoc.isOK()) {
+        LOGV2_DEBUG(13176000,
+                    5,
+                    "Found no usable persisted NDV statistics",
+                    logAttrs(_nss),
+                    "paths"_attr = sortedPaths,
+                    "reason"_attr = swDoc.getStatus());
+        return boost::none;
     }
 
+    // The _id lookup encodes the identity, but the top-level copies of these fields come
+    // from storage all the same; treat a document whose copies disagree as unusable
+    // instead of trusting it.
+    const auto& docPaths = swDoc.getValue().getSortedFieldPaths();
+    const bool identityMatches = swDoc.getValue().getSchemaVersion() == kFieldStatsSchemaVersion &&
+        swDoc.getValue().getCollectionUuid() == collection->uuid() &&
+        std::equal(docPaths.begin(), docPaths.end(), sortedPaths.begin(), sortedPaths.end());
+    if (!identityMatches) {
+        LOGV2_DEBUG(13176601,
+                    5,
+                    "Ignoring persisted NDV statistics document with inconsistent "
+                    "identity fields",
+                    logAttrs(_nss),
+                    "paths"_attr = sortedPaths);
+        return boost::none;
+    }
+
+    // A single-field statistic carries exactly one sketch, a composite one carries one
+    // per folding variant. Any other shape was written by a version that disagrees with
+    // ours, so fall back to the sample rather than asserting on stored data.
+    const auto& sketches = swDoc.getValue().getNdv().getSketches();
+    const size_t expectedNumSketches = numFields == 1 ? 1 : numFields + 1;
+    if (sketches.size() != expectedNumSketches) {
+        LOGV2_DEBUG(13176002,
+                    5,
+                    "Ignoring unusable persisted NDV statistics document",
+                    logAttrs(_nss),
+                    "paths"_attr = sortedPaths,
+                    "expectedNumSketches"_attr = expectedNumSketches,
+                    "numSketches"_attr = sketches.size());
+        return boost::none;
+    }
+
+    // Keep only what serving needs; the sketch registers (16KB each) are dropped here
+    // rather than staying resident in the planner for its lifetime.
+    PersistedNDVEntry summary;
+    summary.sortedFieldPaths = sortedPaths;
+    summary.createdAt = swDoc.getValue().getCreatedAt();
+    summary.ndvPerSketch.reserve(sketches.size());
+    for (const auto& sketch : sketches) {
+        summary.ndvPerSketch.push_back(sketch.getNdv());
+    }
+    return summary;
+}
+
+boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPersistentStats(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+    // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
+    // distinct values fall within a range.
+    if (fields.empty() || fields.size() > ce::kNdvMaxFields || bounds.has_value() ||
+        !persistentNDVStatsEnabled()) {
+        return boost::none;
+    }
+
+    // NDV(a, b) == NDV(b, a): statistics are keyed on canonically sorted paths, so sort a copy
+    // of the request. The caller's order stays untouched for the sample-based fallback.
+    std::vector<std::pair<std::string, bool>> sortedFields;
+    sortedFields.reserve(fields.size());
+    for (const auto& field : fields) {
+        sortedFields.emplace_back(field.path.fullPath(), field.isExprEq);
+    }
+    std::sort(sortedFields.begin(), sortedFields.end());
+
+    const size_t numFields = sortedFields.size();
+    SortedFieldPaths sortedPaths;
+    sortedPaths.reserve(numFields);
+    for (const auto& [path, _] : sortedFields) {
+        sortedPaths.push_back(path);
+    }
+
+    const auto maybeSketchIndex = selectPersistedNDVSketchIndex(sortedFields, sortedPaths);
+    if (!maybeSketchIndex) {
+        return boost::none;
+    }
+    const size_t sketchIndex = *maybeSketchIndex;
+
+    if (const auto* cached = _persistedNDVCache.findEstimate(sortedPaths, sketchIndex)) {
+        return *cached;
+    }
+
+    // Load the statistics document once per path set; further variants of the same statistic
+    // are served from the cached summary.
+    const boost::optional<PersistedNDVEntry>& doc = _persistedNDVCache.getOrLoadDoc(
+        sortedPaths, [&] { return loadPersistedNDVStats(sortedPaths, numFields); });
+
     const auto estimate = [&]() -> boost::optional<CardinalityEstimate> {
-        const CollectionPtr& collection = _collections.lookupCollection(_nss);
-        if (!collection) {
+        if (!doc) {
             return boost::none;
         }
 
-        auto swDoc = loadFieldStats(_opCtx, _nss.dbName(), collection->uuid(), {path});
-        if (!swDoc.isOK()) {
-            LOGV2_DEBUG(13176000,
+        // The selected variant must hold a non-negative NDV.
+        const auto ndv = doc->ndvPerSketch[sketchIndex];
+        if (ndv < 0) {
+            LOGV2_DEBUG(13176602,
                         5,
-                        "Found no usable persisted NDV statistics",
+                        "Ignoring persisted NDV statistics with a negative NDV",
                         logAttrs(_nss),
-                        "path"_attr = path,
-                        "reason"_attr = swDoc.getStatus());
+                        "paths"_attr = sortedPaths,
+                        "ndv"_attr = ndv);
             return boost::none;
         }
-
-        // A single-field statistic carries exactly one sketch, holding a non-negative NDV. Any
-        // other shape was written by a version that disagrees with ours, so fall back to the
-        // sample rather than asserting on stored data.
-        const auto& sketches = swDoc.getValue().getNdv().getSketches();
-        const bool usable = sketches.size() == 1 && sketches.front().getNdv() >= 0;
-        if (!usable) {
-            LOGV2_DEBUG(13176002,
-                        5,
-                        "Ignoring unusable persisted NDV statistics document",
-                        logAttrs(_nss),
-                        "path"_attr = path,
-                        "expectedNumSketches"_attr = 1,
-                        "numSketches"_attr = sketches.size(),
-                        "ndv"_attr = sketches.empty()
-                            ? boost::none
-                            : boost::make_optional(sketches.front().getNdv()));
-            return boost::none;
-        }
-
-        const auto ndv = sketches.front().getNdv();
 
         // EstimationSource::Sampling keeps downstream ranking behavior identical to the
         // sample-based estimate; explain surfaces the persisted origin via
-        // ceSamplingMetadata.persistedNdv instead.
+        // fieldStatsMetadata instead.
         CardinalityEstimate persistedEstimate{CardinalityType{static_cast<double>(ndv)},
                                               EstimationSource::Sampling};
         // The statistics may predate writes; never serve more than the current collection
@@ -1256,21 +1382,26 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
         if (cost_based_ranker::exactGt(persistedEstimate, _collectionCard)) {
             persistedEstimate = _collectionCard;
         }
-        // Surfaced in explain as queryPlanner.ceSamplingMetadata.<ns>.persistedNdv. Recorded
-        // only on this non-memoized path, so each path appears once.
-        _persistedNDVStatsUsed.push_back(
-            {std::vector<std::string>{path}, swDoc.getValue().getCreatedAt()});
+        // Surfaced in explain as queryPlanner.fieldStatsMetadata.<ns>.ndv, one entry per
+        // statistics document, however many of its variants were served.
+        const bool alreadyRecorded =
+            std::any_of(_persistedNDVStatsUsed.begin(),
+                        _persistedNDVStatsUsed.end(),
+                        [&](const auto& entry) { return entry.sortedFieldPaths == sortedPaths; });
+        if (!alreadyRecorded) {
+            _persistedNDVStatsUsed.push_back(*doc);
+        }
         LOGV2_DEBUG(13176001,
                     5,
                     "Serving NDV from persisted statistics",
                     logAttrs(_nss),
-                    "path"_attr = path,
+                    "paths"_attr = sortedPaths,
                     "estimate"_attr = persistedEstimate);
         return persistedEstimate;
     }();
 
     (estimate ? persistentNDVHits : persistentNDVMisses).incrementRelaxed();
-    _persistedNDVEstimates.emplace(path, estimate);
+    _persistedNDVCache.storeEstimate(sortedPaths, sketchIndex, estimate);
     return estimate;
 }
 

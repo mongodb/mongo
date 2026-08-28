@@ -34,6 +34,10 @@ struct PersistedNDVEntry {
     // When 'analyze' built this statistic; one namespace may serve several NDV statistics, each
     // analyzed at its own time.
     Date_t createdAt;
+    // The NDV of each persisted sketch variant, in the persisted order (see NdvStats in
+    // field_stats.idl). Lets the reader cache a loaded statistic compactly, without the
+    // 16KB-per-sketch registers.
+    std::vector<long long> ndvPerSketch;
 };
 
 class SamplingEstimator {
@@ -89,9 +93,11 @@ public:
      * 'fields' specifies which fields should follow strict, $expr-style equality (null !=
      * missing) vs. regular equality semantics (null == missing).
      *
-     * Note: when the estimate is served from persisted NDV statistics (single field, no bounds),
-     * the equality semantics are ignored; the persisted sketch counts null and missing separately
-     * ($expr semantics), and regular-eq callers accept being off by at most one.
+     * Note: when the estimate is served from persisted NDV statistics (no bounds, at most
+     * kNdvMaxFields fields), the semantics select the persisted folding variant. A single-field
+     * statistic carries only the strict ($expr) sketch and serves both semantics, off by at most
+     * one; a composite statistic carries one variant per folded field, and requests folding
+     * several fields fall back to the sample.
      */
     virtual CardinalityEstimate estimateNDV(
         const std::vector<FieldPathAndEqSemantics>& fields,

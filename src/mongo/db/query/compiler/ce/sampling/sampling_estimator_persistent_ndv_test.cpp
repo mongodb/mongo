@@ -18,6 +18,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -136,6 +137,40 @@ protected:
     }
 
     /**
+     * Persists a composite field-stats document over 'paths' whose n+1 sketches carry
+     * distinguishable NDVs: 'baseNdv' in the strict tuple sketch and baseNdv + 1 + i in the
+     * variant folding the i-th sorted path, so tests can tell exactly which sketch was served.
+     * 'sketchCountOverride' produces a malformed document with that many sketches instead.
+     */
+    void persistCompositeNDV(std::vector<std::string> paths,
+                             long long baseNdv,
+                             boost::optional<size_t> sketchCountOverride = boost::none) {
+        const UUID collUuid = collectionUuid();
+        std::sort(paths.begin(), paths.end());
+
+        NdvStats ndvStats;
+        std::vector<NdvSketch> sketches;
+        const size_t numSketches = sketchCountOverride.value_or(paths.size() + 1);
+        for (size_t i = 0; i < numSketches; ++i) {
+            NdvSketch sketch;
+            sketch.setNdv(baseNdv + static_cast<long long>(i));
+            sketch.setRegisters(std::vector<std::uint8_t>(1 << 14));
+            sketch.setPrecision(14);
+            sketches.push_back(std::move(sketch));
+        }
+        ndvStats.setSketches(std::move(sketches));
+
+        FieldStatsDoc doc;
+        doc.set_id(makeFieldStatsId(collUuid, paths));
+        doc.setSchemaVersion(kFieldStatsSchemaVersion);
+        doc.setCollectionUuid(collUuid);
+        doc.setSortedFieldPaths(paths);
+        doc.setCreatedAt(kCreatedAt);
+        doc.setNdv(std::move(ndvStats));
+        insertStatsDoc(doc.toBSON());
+    }
+
+    /**
      * Runs 'fn' with an estimator over the test collection and a generated sample. The estimator
      * holds references to the collection acquisition, so all three must share the same scope.
      */
@@ -244,7 +279,9 @@ TEST_F(PersistentNDVTest, ServesBothEqualitySemanticsIdentically) {
     });
 }
 
-TEST_F(PersistentNDVTest, FallsBackForMultipleFields) {
+TEST_F(PersistentNDVTest, FallsBackForMultipleFieldsWithoutCompositeStats) {
+    // A single-field statistic must not serve a composite request; without a composite document
+    // the lookup misses and the sample answers.
     persistNDV(kPersistedNDV);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
         ASSERT_NE(estimator.estimateNDV({{.path = "a"}, {.path = "b"}}).toDouble(), kPersistedNDV);
@@ -304,11 +341,194 @@ TEST_F(PersistentNDVTest, MalformedStatsDocFallsBack) {
     ASSERT_NE(estimateForA(), kPersistedNDV);
 }
 
+TEST_F(PersistentNDVTest, InconsistentSchemaVersionFallsBack) {
+    // The _id string claims the current schema version; a body disagreeing with it must not be
+    // trusted.
+    BSONObjBuilder bob;
+    bob.append("schemaVersion", 99);
+    bob.appendElementsUnique(makeStatsDoc(kPersistedNDV));
+    insertStatsDoc(bob.obj());
+    ASSERT_NE(estimateForA(), kPersistedNDV);
+}
+
+TEST_F(PersistentNDVTest, InconsistentBodyUuidFallsBack) {
+    // A body whose collectionUuid disagrees with the _id's identity must not be trusted.
+    BSONObjBuilder bob;
+    UUID::gen().appendToBuilder(&bob, "collectionUuid");
+    bob.appendElementsUnique(makeStatsDoc(kPersistedNDV));
+    insertStatsDoc(bob.obj());
+    ASSERT_NE(estimateForA(), kPersistedNDV);
+}
+
+TEST_F(PersistentNDVTest, InconsistentBodyPathsFallsBack) {
+    // Same for sortedFieldPaths disagreeing with the requested path set.
+    BSONObjBuilder bob;
+    bob.append("sortedFieldPaths", BSON_ARRAY("z"));
+    bob.appendElementsUnique(makeStatsDoc(kPersistedNDV));
+    insertStatsDoc(bob.obj());
+    ASSERT_NE(estimateForA(), kPersistedNDV);
+}
+
 TEST_F(PersistentNDVTest, MissingNdvSectionFallsBack) {
     // The ndv section is required by the schema, so a stored document lacking it fails to
     // parse on the read path and must not be served.
     insertStatsDoc(makeStatsDoc(kPersistedNDV).removeField("ndv"));
     ASSERT_NE(estimateForA(), kPersistedNDV);
+}
+
+// --- Composite NDV (SERVER-131766) ---
+
+// The composite sketch layout persisted by persistCompositeNDV({"a", "b"}, 200):
+// sketches[0] = 200 (all strict), sketches[1] = 201 (fold "a"), sketches[2] = 202 (fold "b").
+constexpr long long kCompositeBase = 200;
+
+TEST_F(PersistentNDVTest, ServesCompositeStrictVariant) {
+    persistCompositeNDV({"a", "b"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // All fields under $expr semantics select the strict tuple sketch.
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase);
+    });
+}
+
+TEST_F(PersistentNDVTest, ServesCompositeFoldedVariants) {
+    persistCompositeNDV({"a", "b"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // Exactly one regular-eq field selects the variant folding that field.
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = false}, {.path = "b", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase + 1);
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = false}})
+                .toDouble(),
+            kCompositeBase + 2);
+    });
+}
+
+TEST_F(PersistentNDVTest, CompositeRequestsAreOrderInsensitive) {
+    persistCompositeNDV({"a", "b"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // NDV(a, b) == NDV(b, a): both orders hit the same document and variant, and the
+        // second call is memoized rather than re-read.
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase);
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "b", .isExprEq = true}, {.path = "a", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase);
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 1u);
+        // The folded variant on the same paths is a separate estimate served from the cached
+        // document; the statistic still counts as one used document.
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "b", .isExprEq = false}, {.path = "a", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase + 2);
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 1u);
+        ASSERT_EQ(estimator.getPersistedNDVMetadata().size(), 1u);
+    });
+}
+
+TEST_F(PersistentNDVTest, PathSetsWithEqualConcatenationDoNotCollide) {
+    // "a" + "bc" and "ab" + "c" concatenate to the same string; the caches must still treat
+    // them as different path sets. Only the first has a persisted statistic.
+    persistCompositeNDV({"a", "bc"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "bc", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase);
+        // The other path set must miss, not be served from the ("a", "bc") cache entries.
+        const auto estimate =
+            estimator
+                .estimateNDV({{.path = "ab", .isExprEq = true}, {.path = "c", .isExprEq = true}})
+                .toDouble();
+        for (long long persisted = kCompositeBase; persisted <= kCompositeBase + 2; ++persisted) {
+            ASSERT_NE(estimate, persisted);
+        }
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 1u);
+    });
+}
+
+TEST_F(PersistentNDVTest, CompositeFallsBackWhenSeveralFieldsFolded) {
+    persistCompositeNDV({"a", "b"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // Two regular-eq fields have no persisted variant; the sample answers instead.
+        const auto estimate =
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = false}, {.path = "b", .isExprEq = false}})
+                .toDouble();
+        for (long long persisted = kCompositeBase; persisted <= kCompositeBase + 2; ++persisted) {
+            ASSERT_NE(estimate, persisted);
+        }
+    });
+}
+
+TEST_F(PersistentNDVTest, CompositeWrongSketchCountFallsBack) {
+    // Two fields require exactly three sketches; a two-sketch document is malformed.
+    persistCompositeNDV({"a", "b"}, kCompositeBase, 2 /* sketchCountOverride */);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        ASSERT_NE(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = true}})
+                .toDouble(),
+            kCompositeBase);
+    });
+}
+
+TEST_F(PersistentNDVTest, CompositeMetadataRecordsAllPaths) {
+    persistCompositeNDV({"a", "b"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        estimator.estimateNDV({{.path = "b", .isExprEq = true}, {.path = "a", .isExprEq = true}});
+
+        const auto meta = estimator.getPersistedNDVMetadata();
+        ASSERT_EQ(meta.size(), 1u);
+        ASSERT_EQ(meta.front().sortedFieldPaths, (std::vector<std::string>{"a", "b"}));
+        ASSERT_EQ(meta.front().createdAt, kCreatedAt);
+    });
+}
+
+TEST_F(PersistentNDVTest, ServesThreeFieldVariants) {
+    // persistCompositeNDV({"a", "b", "c"}, base) persists sketches [base .. base + 3]:
+    // all-strict first, then one folded variant per sorted field.
+    persistCompositeNDV({"a", "b", "c"}, kCompositeBase);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        ASSERT_EQ(estimator
+                      .estimateNDV({{.path = "a", .isExprEq = true},
+                                    {.path = "b", .isExprEq = true},
+                                    {.path = "c", .isExprEq = true}})
+                      .toDouble(),
+                  kCompositeBase);
+        ASSERT_EQ(estimator
+                      .estimateNDV({{.path = "a", .isExprEq = false},
+                                    {.path = "b", .isExprEq = true},
+                                    {.path = "c", .isExprEq = true}})
+                      .toDouble(),
+                  kCompositeBase + 1);
+        ASSERT_EQ(estimator
+                      .estimateNDV({{.path = "a", .isExprEq = true},
+                                    {.path = "b", .isExprEq = false},
+                                    {.path = "c", .isExprEq = true}})
+                      .toDouble(),
+                  kCompositeBase + 2);
+        ASSERT_EQ(estimator
+                      .estimateNDV({{.path = "a", .isExprEq = true},
+                                    {.path = "b", .isExprEq = true},
+                                    {.path = "c", .isExprEq = false}})
+                      .toDouble(),
+                  kCompositeBase + 3);
+    });
 }
 
 }  // namespace mongo::ce

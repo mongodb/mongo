@@ -14,14 +14,64 @@
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
+
+#include <functional>
+#include <utility>
 
 namespace mongo::ce {
 /**
  * Helper function to extract the top level fields from a given MatchExpression.
  */
 StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
+
+/**
+ * The canonically (lexicographically) sorted field paths a persisted NDV statistic describes.
+ */
+using SortedFieldPaths = std::vector<std::string>;
+
+/**
+ * Caches persisted NDV statistics for one estimator, and therefore for one query's planning:
+ * plan enumeration costs the same join edge in many candidate orders, so estimateNDV() is
+ * called with the same field paths many times within one optimization. Caching the compact
+ * document summary per sorted path set and the estimate per (path set, sketch variant) makes
+ * only the first such call read the statistics document. Nothing is shared across queries.
+ */
+class PersistedNDVStatsCache {
+public:
+    /**
+     * Returns the memoized estimate for the given path set and sketch variant, or nullptr when
+     * none was stored yet. The pointee may be an empty optional: misses are memoized too.
+     */
+    const boost::optional<CardinalityEstimate>* findEstimate(const SortedFieldPaths& sortedPaths,
+                                                             size_t sketchIndex) const;
+
+    void storeEstimate(const SortedFieldPaths& sortedPaths,
+                       size_t sketchIndex,
+                       boost::optional<CardinalityEstimate> estimate);
+
+    /**
+     * Returns the cached document summary for the given path set, invoking 'load' on the first
+     * request. The entry is boost::none when no usable document exists; that outcome is cached
+     * as well, so an absent document is looked up only once.
+     */
+    const boost::optional<PersistedNDVEntry>& getOrLoadDoc(
+        const SortedFieldPaths& sortedPaths,
+        const std::function<boost::optional<PersistedNDVEntry>()>& load);
+
+private:
+    // Loaded statistics (including misses) per sorted path set as compact PersistedNDVEntry
+    // summaries (no 16KB sketch registers), so serving several folding variants of one statistic
+    // reads the document once.
+    stdx::unordered_map<SortedFieldPaths, boost::optional<PersistedNDVEntry>> _docs;
+    // Persisted-NDV estimates (including misses), keyed by the sorted field paths plus the
+    // folding variant the request's equality semantics select, so repeated estimateNDV() calls
+    // during plan enumeration do not recompute.
+    stdx::unordered_map<std::pair<SortedFieldPaths, size_t>, boost::optional<CardinalityEstimate>>
+        _estimates;
+};
 
 /**
  * This CE Estimator estimates cardinality of predicates by running a filter/MatchExpression against
@@ -328,9 +378,8 @@ protected:
     // Lazily computed on the first estimateNDV() call: whether persisted NDV statistics may be
     // served (feature flag and knob).
     mutable boost::optional<bool> _persistentNDVEnabled;
-    // Memoizes persisted-NDV lookups (including misses) per field path, so repeated estimateNDV()
-    // calls during plan enumeration do not repeat the read.
-    mutable StringMap<boost::optional<CardinalityEstimate>> _persistedNDVEstimates;
+    // Caches loaded statistics documents and memoized estimates for this estimator.
+    mutable PersistedNDVStatsCache _persistedNDVCache;
     // Field paths whose NDV was served from persisted statistics; surfaced in explain via
     // getSamplingMetadata().
     mutable std::vector<PersistedNDVEntry> _persistedNDVStatsUsed;
@@ -343,9 +392,12 @@ protected:
 private:
     /**
      * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
-     * eligible: feature flag and knob enabled, a single field and no bounds. Returns boost::none
-     * when ineligible or when no usable statistics exist; the caller then falls back to the
-     * sample-based estimate. Results, including misses, are memoized per field path.
+     * eligible: feature flag and knob enabled, at most kNdvMaxFields fields and no bounds.
+     * The request's equality semantics select the persisted folding variant; composite requests
+     * folding several fields have none and are ineligible. Returns boost::none when ineligible
+     * or when no usable statistics exist; the caller then falls back to the sample-based
+     * estimate. Loaded documents are cached per sorted path set and results, including misses,
+     * are memoized per path set and variant.
      */
     boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
         const std::vector<FieldPathAndEqSemantics>& fields,
@@ -356,6 +408,22 @@ private:
      * internalQueryEnablePersistentNDVStats knob are both enabled. Computed once per instance.
      */
     bool persistentNDVStatsEnabled() const;
+
+    /**
+     * Picks the persisted sketch variant a request's equality semantics need: 0 for the strict
+     * tuple sketch, i + 1 for the variant folding the i-th sorted field. Returns boost::none
+     * when no persisted variant can serve the request (several folded fields).
+     */
+    boost::optional<size_t> selectPersistedNDVSketchIndex(
+        const std::vector<std::pair<std::string, bool>>& sortedFields,
+        const SortedFieldPaths& sortedPaths) const;
+
+    /**
+     * Loads and validates the field-stats document for the given sorted path set, returning a
+     * compact summary, or boost::none when no usable document exists.
+     */
+    boost::optional<PersistedNDVEntry> loadPersistedNDVStats(const SortedFieldPaths& sortedPaths,
+                                                             size_t numFields) const;
 
     /**
      * Constructs a sampling SBE plan using the random-walk method.
