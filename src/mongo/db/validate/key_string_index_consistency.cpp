@@ -719,6 +719,8 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                                                  const IndexCatalogEntry* index,
                                                  ConcurrentProgressMeterHolder& progress,
                                                  ValidateResults* results) {
+    invariant(results);
+
     const IndexDescriptor* descriptor = index->descriptor();
     const auto indexName = descriptor->indexName();
     auto& indexResults = results->getIndexValidateResult(indexName);
@@ -839,7 +841,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         }
     }
 
-    if (results && this->getMultikeyMetadataPathCount(&indexInfo) > 0) {
+    if (this->getMultikeyMetadataPathCount(&indexInfo) > 0) {
         results->addError(str::stream()
                           << "Index '" << descriptor->indexName()
                           << "' has one or more missing multikey metadata index keys");
@@ -874,11 +876,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                 opCtx, _validateState->getCollection(), isMultikey, documentPaths);
             wuow.commit();
 
-            if (results) {
-                results->addWarning(str::stream() << "Updated index multikey metadata"
-                                                  << ": " << descriptor->indexName());
-                results->setRepaired(true);
-            }
+            results->addWarning(str::stream() << "Updated index multikey metadata"
+                                              << ": " << descriptor->indexName());
+            results->setRepaired(true);
         }
 
         // If this index does not need to be multikey, then unset the flag.
@@ -897,11 +897,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             index->forceSetMultikey(opCtx, _validateState->getCollection(), isMultikey, {});
             wuow.commit();
 
-            if (results) {
-                results->addWarning(str::stream() << "Unset index multikey metadata"
-                                                  << ": " << descriptor->indexName());
-                results->setRepaired(true);
-            }
+            results->addWarning(str::stream() << "Unset index multikey metadata"
+                                              << ": " << descriptor->indexName());
+            results->setRepaired(true);
         }
     }
 
