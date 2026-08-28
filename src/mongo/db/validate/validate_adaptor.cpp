@@ -40,6 +40,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/record_store_slicer.h"
+#include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_timeseries.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -55,6 +56,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -615,9 +617,10 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults& validateResults,
-                                          ValidationVersion validationVersion) {
+                                          ValidationVersion validationVersion,
+                                          boost::optional<int64_t> targetRecordsPerSlice) {
     const auto& coll = _validateState->getCollection();
-    const auto totalRecords = coll->getRecordStore()->numRecords();
+    const int64_t totalRecords = coll->getRecordStore()->numRecords();
 
     // In case validation occurs twice and the progress meter persists after index traversal.
     const bool progressStillActive = ([&] {
@@ -639,25 +642,20 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     int64_t dataSizeTotal{0};
     int64_t numRecords{0};
 
-    // Split the record store into slices targeting ~kTargetRecordsPerSlice records each. Small
+    // Split the record store into slices targeting ~targetRecordsPerSlice records each. Small
     // collections collapse to a single slice and run single-threaded, larger collections are split
     // into enough slices to keep the worker pool busy and allow "work stealing", as no guarantee
     // can be made that the cost of each slice is equal.
 
-    static constexpr int64_t kTargetRecordsPerSlice{5000};
-    static constexpr int64_t kTimeseriesSliceDivisor{4};
-    const int64_t targetRecordsPerSlice = coll->isTimeseriesCollection()
-        ? kTargetRecordsPerSlice / kTimeseriesSliceDivisor
-        : kTargetRecordsPerSlice;
-    const size_t sliceCount =
-        std::max<int64_t>(1, (totalRecords + targetRecordsPerSlice - 1) / targetRecordsPerSlice);
+    const int64_t sliceCount = targetRecordsPerSlice.has_value() && (*targetRecordsPerSlice > 0)
+        ? std::clamp<int64_t>((totalRecords + *targetRecordsPerSlice - 1) / *targetRecordsPerSlice,
+                              1,
+                              gValidateParallelMaxRecordStoreSlices.load())
+        : 1;
 
-    // TODO(SERVER-76346): Remove the feature flag once parallel validation is the permanent
-    // default.
     const bool hashDrillDown = _validateState->getHashPrefixes().has_value() ||
         _validateState->getRevealHashedIds().has_value();
-    const bool parallelEligible = gFeatureFlagParallelCollectionValidation.isEnabled() &&
-        !_validateState->isBackground() &&
+    const bool parallelEligible = !_validateState->isBackground() &&
         _validateState->getRepairMode() == collection_validation::RepairMode::kNone &&
         _keyBasedIndexConsistency.canMergeResults() && !hashDrillDown && sliceCount > 1;
 

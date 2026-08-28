@@ -18,6 +18,30 @@ server_parameters:
         default: 0
         redact: false
 
+    validateParallelTargetRecordsPerSlice:
+        description:
+            "Target number of records per record store slice when validation splits a
+            collection for parallel traversal. A value of 0 disables slicing, forcing
+            single-threaded traversal."
+        set_at: [startup, runtime]
+        cpp_varname: gValidateParallelTargetRecordsPerSlice
+        cpp_vartype: Atomic<int>
+        validator: {gte: 0}
+        default: 5000
+        redact: false
+
+    validateParallelMaxRecordStoreSlices:
+        description:
+            "Upper bound on the number of record store slices a single validation may split a
+            collection into. This bounds the peak memory of a parallel validation independently
+            of collection size. A value of 1 disables slicing, forcing single-threaded traversal."
+        set_at: [startup, runtime]
+        cpp_varname: gValidateParallelMaxRecordStoreSlices
+        cpp_vartype: Atomic<int>
+        validator: {gte: 1}
+        default: 256
+        redact: false
+
     maxValidateMemoryUsageMB:
         description: "Limits the amount of memory that a single validate command will use."
         set_at: [startup, runtime]

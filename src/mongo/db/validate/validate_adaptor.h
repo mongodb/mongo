@@ -183,7 +183,8 @@ public:
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults& results,
-                             ValidationVersion validationVersion);
+                             ValidationVersion validationVersion,
+                             boost::optional<int64_t> targetRecordsPerSlice);
     /**
      * Computes the hash of the collection's local catalog idents and sets it in 'results'.
      **/

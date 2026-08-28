@@ -35,6 +35,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_adaptor.h"
+#include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
@@ -199,7 +200,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         // sound enough to validate
         tempValidateResults.getIndexResultsMap() = result->getIndexResultsMap();
         indexValidator->traverseRecordStore(
-            opCtx, tempValidateResults, validateState->validationVersion());
+            opCtx, tempValidateResults, validateState->validationVersion(), boost::none);
     }
 
     LOGV2_OPTIONS(
@@ -597,6 +598,13 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
     }
 }
 
+boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice() {
+    if (!gFeatureFlagParallelCollectionValidation.isEnabled()) {
+        return boost::none;
+    }
+    return gValidateParallelTargetRecordsPerSlice.load();
+}
+
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj,
@@ -882,6 +890,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             timestamp,
             hashPrefixes,
             revealHashedIds,
+            getTargetRecordsPerRecordStoreSlice(),
             sizeStats};
 }
 
@@ -1059,7 +1068,10 @@ Status validate(OperationContext* opCtx,
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
 
-        indexValidator.traverseRecordStore(opCtx, *results, validateState.validationVersion());
+        indexValidator.traverseRecordStore(opCtx,
+                                           *results,
+                                           validateState.validationVersion(),
+                                           validateState.getTargetRecordsPerRecordStoreSlice());
 
         if (validateState.isCollHashValidation()) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);

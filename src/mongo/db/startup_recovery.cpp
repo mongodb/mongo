@@ -811,7 +811,13 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
         : collection_validation::ValidationOptions(
               collection_validation::ValidateMode::kForegroundFull,
               collection_validation::RepairMode::kNone,
-              /*logDiagnostics=*/false);
+              /*logDiagnostics=*/false,
+              currentValidationVersion,
+              /*verifyConfigurationOverride=*/boost::none,
+              /*readTimestamp=*/boost::none,
+              /*hashPrefixes=*/boost::none,
+              /*revealHashedIds=*/boost::none,
+              collection_validation::getTargetRecordsPerRecordStoreSlice());
     if (parsedOptions.getRepairMode() != collection_validation::RepairMode::kNone) {
         return Status{ErrorCodes::InvalidOptions,
                       "Repair is not allowed in offline validation mode"};

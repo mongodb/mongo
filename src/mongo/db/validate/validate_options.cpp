@@ -13,6 +13,7 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      boost::optional<Timestamp> readTimestamp,
                                      boost::optional<std::vector<std::string>> hashPrefixes,
                                      boost::optional<std::vector<std::string>> revealHashedIds,
+                                     boost::optional<int64_t> targetRecordsPerRecordStoreSlice,
                                      bool sizeStats)
     : _validateMode(validateMode),
       _repairMode(repairMode),
@@ -22,6 +23,7 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
       _readTimestamp(readTimestamp),
       _hashPrefixes(std::move(hashPrefixes)),
       _revealHashedIds(std::move(revealHashedIds)),
+      _targetRecordsPerRecordStoreSlice(targetRecordsPerRecordStoreSlice),
       _sizeStats(sizeStats) {}
 
 }  // namespace mongo::collection_validation

@@ -721,6 +721,115 @@ TEST_F(CollectionValidationTest, HashPrefixesCases) {
         ErrorCodes::InvalidOptions);
 }
 
+// Documents inserted by the slicing tests below, and the per-slice target that splits them across
+// many slices.
+static constexpr int kCountDocs{1'000};
+static constexpr int64_t kTargetRecordsPerSlice{10};
+
+TEST_F(CollectionValidationTest, LargeCollectionSlicesOnParallelExecution) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+    ValidateResults results;
+    collection_validation::ValidationOptions opts(
+        collection_validation::ValidateMode::kForeground,
+        collection_validation::RepairMode::kNone,
+        /*logDiagnostics=*/false,
+        currentValidationVersion,
+        /*verifyConfigurationOverride=*/boost::none,
+        /*readTimestamp=*/boost::none,
+        /*hashPrefixes=*/boost::none,
+        /*revealHashedIds=*/boost::none,
+        /*targetRecordsPerRecordStoreSlice=*/kTargetRecordsPerSlice);
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+    // Do not strictly validate on a particular count, simply check that it's more than one, and the
+    // value is populated.
+    ASSERT_GT(results.getNumRecordStoreSlices().value_or(-1), 1)
+        << "Expected more than one record store slice";
+}
+
+TEST_F(CollectionValidationTest, LargeCollectionDoesNotSliceOnSerialExecution) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
+                                                  collection_validation::RepairMode::kNone,
+                                                  /*logDiagnostics=*/false,
+                                                  currentValidationVersion,
+                                                  /*verifyConfigurationOverride=*/boost::none,
+                                                  /*readTimestamp=*/boost::none,
+                                                  /*hashPrefixes=*/boost::none,
+                                                  /*revealHashedIds=*/boost::none,
+                                                  /*targetRecordsPerRecordStoreSlice=*/boost::none);
+    ValidateResults results;
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+    // Ensure that only one slice was run, or the value is unpopulated.
+    ASSERT_EQ(results.getNumRecordStoreSlices().value_or(1), 1);
+}
+
+TEST_F(CollectionValidationTest, ParallelTraversalAgreesWithSerialTraversal) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+
+    auto validateWithSliceTarget = [&](boost::optional<int64_t> targetRecordsPerSlice) {
+        collection_validation::ValidationOptions opts(
+            collection_validation::ValidateMode::kForeground,
+            collection_validation::RepairMode::kNone,
+            /*logDiagnostics=*/false,
+            currentValidationVersion,
+            /*verifyConfigurationOverride=*/boost::none,
+            /*readTimestamp=*/boost::none,
+            /*hashPrefixes=*/boost::none,
+            /*revealHashedIds=*/boost::none,
+            /*targetRecordsPerRecordStoreSlice=*/targetRecordsPerSlice);
+        ValidateResults results;
+        ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+        return results;
+    };
+
+    const auto serialResults = validateWithSliceTarget(boost::none);
+    ASSERT_TRUE(serialResults.isValid());
+    ASSERT_EQ(kCountDocs, serialResults.getNumRecords().value_or(-1));
+
+    // Slicing must not change what validation reports. The slice totals are cross-checked against a
+    // separate counting traversal on the caller's snapshot, so a gap or an overlap between slices
+    // -- or a worker reading from a snapshot other than the caller's -- surfaces as a record count
+    // mismatch and an invalid result.
+    const auto parallelResults = validateWithSliceTarget(kTargetRecordsPerSlice);
+    ASSERT_TRUE(parallelResults.isValid());
+    ASSERT_EQ(kCountDocs, parallelResults.getNumRecords().value_or(-1));
+    ASSERT_GT(parallelResults.getNumRecordStoreSlices().value_or(-1), 1);
+}
+
+// Every in-flight slice holds an index consistency bucket array of its own until the results are
+// merged, so the slice count must stay bounded no matter how small the per-slice target is
+// relative to the collection.
+TEST_F(CollectionValidationTest, SliceCountIsCappedRegardlessOfTarget) {
+    static constexpr int kMaxSlices{4};
+    unittest::ServerParameterGuard maxSlicesGuard{"validateParallelMaxRecordStoreSlices",
+                                                  kMaxSlices};
+
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+
+    // A target of one record per slice would ask for kCountDocs slices without the cap.
+    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
+                                                  collection_validation::RepairMode::kNone,
+                                                  /*logDiagnostics=*/false,
+                                                  currentValidationVersion,
+                                                  /*verifyConfigurationOverride=*/boost::none,
+                                                  /*readTimestamp=*/boost::none,
+                                                  /*hashPrefixes=*/boost::none,
+                                                  /*revealHashedIds=*/boost::none,
+                                                  /*targetRecordsPerRecordStoreSlice=*/1);
+    ValidateResults results;
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+
+    ASSERT_TRUE(results.isValid());
+    ASSERT_EQ(kCountDocs, results.getNumRecords().value_or(-1));
+    const auto numSlices = results.getNumRecordStoreSlices().value_or(1);
+    ASSERT_GT(numSlices, 1);
+    ASSERT_LTE(numSlices, kMaxSlices);
+}
+
 enum class SchemaViolationTestMode { ExpectFailOnDocumentInsert, ExpectFailOnCollectionValidation };
 std::ostream& operator<<(std::ostream& os, SchemaViolationTestMode mode) {
     switch (mode) {

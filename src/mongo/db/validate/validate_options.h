@@ -94,6 +94,7 @@ public:
                       boost::optional<Timestamp> readTimestamp = boost::none,
                       boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
                       boost::optional<std::vector<std::string>> revealHashedIds = boost::none,
+                      boost::optional<int64_t> targetRecordsPerRecordStoreSlice = boost::none,
                       bool sizeStats = false);
 
     virtual ~ValidationOptions() = default;
@@ -206,6 +207,10 @@ public:
         return _verifyConfigurationOverride;
     }
 
+    const boost::optional<int64_t>& getTargetRecordsPerRecordStoreSlice() const {
+        return _targetRecordsPerRecordStoreSlice;
+    }
+
 private:
     ValidateMode _validateMode;
 
@@ -223,6 +228,8 @@ private:
     boost::optional<std::vector<std::string>> _hashPrefixes;
 
     boost::optional<std::vector<std::string>> _revealHashedIds;
+
+    boost::optional<int64_t> _targetRecordsPerRecordStoreSlice;
 
     // Opt-in: when true (and running collHash validation), the record store and index scans
     // accumulate a storage size summary that is read back and logged.

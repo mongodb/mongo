@@ -126,6 +126,10 @@ function runModalValidate(innerOptions) {
         `validateCollectionName=${collName}`,
         "--setParameter",
         `collectionValidateOptions={options: ${innerOptions}}`,
+        // TODO(SERVER-133839): Support size metrics under parallel validation and drop this
+        // override.
+        "--setParameter",
+        "validateParallelTargetRecordsPerSlice=0",
     );
     assert.eq(
         MongoRunner.EXIT_CLEAN,

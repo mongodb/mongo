@@ -332,6 +332,10 @@ public:
         return _repairMode;
     }
 
+    boost::optional<long long> getNumRecordStoreSlices() const {
+        return _numRecordStoreSlices;
+    }
+
     void setRepairMode(collection_validation::RepairMode mode);
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
@@ -384,6 +388,11 @@ private:
 
     // Maps index names to index-specific validation results.
     ValidateResultsMap _indexResultsMap;
+
+    // Collection Scan Metadata
+    // Populate only if parallel record store scan. Reports the number of slices scanned in Phase 1
+    // traversal.
+    boost::optional<long long> _numRecordStoreSlices;
 };
 
 }  // namespace mongo

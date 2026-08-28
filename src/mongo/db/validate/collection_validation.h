@@ -29,6 +29,12 @@ namespace collection_validation {
                                                bool equalLength);
 
 /**
+ * The target number of records per record store slice to use when splitting a collection for
+ * parallel traversal, or boost::none when parallel validation is not enabled.
+ */
+boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice();
+
+/**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
  * validation.
  * Optionally skips parsing 'atClusterTime' for unreplicated collections, which is desired with

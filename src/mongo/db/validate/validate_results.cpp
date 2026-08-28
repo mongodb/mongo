@@ -240,6 +240,10 @@ void ValidateResults::merge(const ValidateResults& other) {
 
     ValidateResults tmp = *this;
 
+    // Increment the number of slices. When using parallel validation and merging results, this
+    // tracks the number of constituent slices for debugging and test.
+    tmp._numRecordStoreSlices = tmp._numRecordStoreSlices.value_or(0) + 1;
+
     // Per-index results. Indexes absent from this result are copied in wholesale; shared indexes
     // have their errors, warnings and counters combined via the public interface. The per-index
     // continuation/fatal flags have no public setter and aren't produced during the record-store
