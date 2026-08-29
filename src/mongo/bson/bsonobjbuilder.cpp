@@ -6,12 +6,77 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/logv2/log.h"
 
+#include <array>
+#include <cstddef>
+#include <memory_resource>
 #include <string>
 #include <string_view>
+
+#include <absl/container/flat_hash_set.h>
+#include <absl/hash/hash.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+namespace {
+
+/**
+ * Refers to a field name stored inside a BSONObjBuilder's buffer, by the field name's offset into
+ * that buffer plus its length. Appending more data to the builder can reallocate the buffer and
+ * thus invalidate any pointers into it, but the offsets remain valid.
+ */
+struct FieldNameRef {
+    size_t offset;
+    size_t length;
+};
+
+/**
+ * Resolves a lookup key into the field name it refers to. A key is either a FieldNameRef, which has
+ * to be resolved against the builder's current buffer, or already a field name.
+ */
+template <class B>
+std::string_view toView(const B& b, FieldNameRef key) {
+    return std::string_view(b.buf() + key.offset, key.length);
+}
+
+template <class B>
+std::string_view toView(const B&, std::string_view key) {
+    return key;
+}
+
+/**
+ * Transparent hasher for a hash set of FieldNameRefs, allowing lookups by field name. 'b' is the
+ * builder owning the buffer the FieldNameRefs point into, and must outlive the hash set.
+ */
+template <class B>
+struct FieldNameHash {
+    using is_transparent = void;
+
+    template <class T>
+    size_t operator()(const T& key) const {
+        return absl::Hash<std::string_view>{}(toView(*b, key));
+    }
+
+    const B* b;
+};
+
+/**
+ * Transparent equality comparator matching FieldNameHash. Either argument may be a FieldNameRef
+ * or a field name.
+ */
+template <class B>
+struct FieldNameEq {
+    using is_transparent = void;
+
+    template <class T, class U>
+    bool operator()(const T& lhs, const U& rhs) const {
+        return toView(*b, lhs) == toView(*b, rhs);
+    }
+
+    const B* b;
+};
+
+}  // namespace
 
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(std::string_view fieldName, int t) {
@@ -191,17 +256,27 @@ Derived& BSONObjBuilderBase<Derived, B>::appendElementsRenamed(const BSONObj& x,
 /* add all the fields from the object specified to this object if they don't exist */
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendElementsUnique(const BSONObj& x) {
-    std::set<std::string> have;
-    {
-        BSONObjIterator i = iterator();
-        while (i.more())
-            have.insert(i.next().fieldName());
+    // Objects normally have few fields, so serve the hash set's allocations from a small stack
+    // buffer. Once the buffer is exhausted, the monotonic resource falls back to its upstream
+    // resource, which allocates on the heap.
+    static constexpr size_t kStackBufferSize = 4 * 1024;
+    alignas(std::max_align_t) std::array<std::byte, kStackBufferSize> stackBuffer;
+    std::pmr::monotonic_buffer_resource resource(stackBuffer.data(), stackBuffer.size());
+
+    using Allocator = std::pmr::polymorphic_allocator<FieldNameRef>;
+    absl::flat_hash_set<FieldNameRef, FieldNameHash<B>, FieldNameEq<B>, Allocator> have(
+        0, FieldNameHash<B>{&_b}, FieldNameEq<B>{&_b}, Allocator{&resource});
+
+    for (BSONObjIterator i = iterator(); i.more();) {
+        BSONElement e = i.next();
+        std::string_view fieldName = e.fieldNameStringData();
+        have.emplace(static_cast<size_t>(fieldName.data() - _b.buf()), fieldName.size());
     }
 
     BSONObjIterator it(x);
     while (it.more()) {
         BSONElement e = it.next();
-        if (have.count(e.fieldName()))
+        if (have.contains(e.fieldNameStringData()))
             continue;
         append(e);
     }
