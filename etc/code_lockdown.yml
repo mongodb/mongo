@@ -126,6 +126,7 @@ groups:
       - "Query Execution"
       - "Query Optimization"
       - "Catalog and Routing"
+      - "Cluster Scalability"
     slack_tags:
       - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
       - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
@@ -253,6 +254,10 @@ teams:
   - name: "Catalog and Routing"
     slack_tags:
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+  - name: "Cluster Scalability"
+    slack_tags:
+      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+      - "<@U02PN9DPVK9>" # rachita.dhawan@mongodb.com - Lead
   - name: "Query Execution"
     slack_tags:
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
