@@ -5,7 +5,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {verifyGetDiagnosticData, getNextSample} from "jstests/libs/ftdc.js";
 
 const kDefaultPeriod = 1000;
-const kDefaultTimeout = 166;
+const kDefaultTimeout = 100;
 const kDefaultMinThreads = 1;
 const kDefaultMaxThreads = 1;
 
