@@ -9,6 +9,8 @@ to using the output in linkopts/additional_linker_inputs.
 """
 
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 _ASM_TEMPLATE_LINUX = """\
     .section .rodata,"a"

@@ -3,6 +3,7 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_proc_macro", "rust_shared_library", "rust_test")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/config:python_genrule.bzl", "python_genrule")
 
 package(default_visibility = ["//visibility:public"])

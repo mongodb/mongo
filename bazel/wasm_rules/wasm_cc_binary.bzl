@@ -7,6 +7,8 @@ not compiled directly by this rule.
 
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("//bazel/toolchains/cc/mongo_wasm/toolchain:wasi_transition.bzl", "wasi_transition")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 # Flags that leak from host-oriented deps but are invalid for WASI linking.
 _WASI_INVALID_LINK_FLAGS = ["-pthread", "-ldl", "-lrt", "-lm"]

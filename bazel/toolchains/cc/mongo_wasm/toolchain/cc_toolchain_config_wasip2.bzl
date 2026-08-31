@@ -22,8 +22,12 @@ load(
     "//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl",
     "all_link_actions",
 )
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 def _wasi_cc_toolchain_config_wasip2_impl(ctx):
+    wasi_sdk = ctx.executable.clang.dirname.rsplit("/", 1)[0]
+
     # We must use action configs instead of tool paths because of the external dependency.
     # This defines the binaries we use.
     action_configs = [
@@ -78,10 +82,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             flag_groups = [flag_group(flags = [
                 "--target=wasm32-wasip2",
                 "-no-canonical-prefixes",
-                # This may change depending on the repo rule used to generate it.
-                # find $(bazel info output_base) -name wasi-sysroot # BASH SCRIPT
-                # can be used to find it if we use a different repository rule later.
-                "--sysroot={}".format("external/_main~_repo_rules~wasi_sdk/share/wasi-sysroot"),
+                "--sysroot={}/share/wasi-sysroot".format(wasi_sdk),
                 "-fno-common",
                 "-Oz",
                 "-ffunction-sections",
@@ -156,9 +157,8 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
         )],
     )
 
-    # WASI SDK paths (relative to execroot), matching the default search order
-    # reported by: wasm32-wasip2-clang++ -v -x c++ /dev/null -fsyntax-only
-    wasi_sdk = "external/_main~_repo_rules~wasi_sdk"
+    # WASI sysroot, matching the default search order reported by:
+    # wasm32-wasip2-clang++ -v -x c++ /dev/null -fsyntax-only
     wasi_sysroot = wasi_sdk + "/share/wasi-sysroot"
 
     # Linker flags

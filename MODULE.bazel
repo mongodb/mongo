@@ -54,6 +54,7 @@ spidermonkey_wasi_repo(
 
 bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
+bazel_dep(name = "rules_shell", version = "0.4.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 single_version_override(

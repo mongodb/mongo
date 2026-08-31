@@ -29,7 +29,7 @@ build --incompatible_default_to_explicit_init_py
 # https://github.com/bazelbuild/bazel/issues/8766
 # there is WIP to allow users to inject constraints
 # this flag is required because the default for BZLMOD is @platform//host:host
-build --platforms=@internal_platforms_do_not_use//host
+build --platforms=//bazel/platforms:host
 common --enable_workspace=false
 
 # Improves build performance after first clean pull by

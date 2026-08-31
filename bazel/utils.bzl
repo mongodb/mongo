@@ -116,6 +116,9 @@ toolchain(
 _NOOP_CC_TOOLCHAIN_CONFIG_BZL = """\
 \"\"\"Hollow cc toolchain config for the no-op mongo toolchain.\"\"\"
 
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+
 def _impl(ctx):
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
@@ -167,6 +170,7 @@ def generate_noop_toolchain(ctx, substitutions, resolvable = False):
 # {} not supported on this platform
 
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:noop_cc_toolchain_config.bzl", "noop_cc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])

@@ -224,6 +224,8 @@ export GDB_ADD_INDEX
     ctx.file(
         "BUILD.bazel",
         """
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
 filegroup(
     name = "python_runtime",
     srcs = glob(["stow/python313-%s/**"]),

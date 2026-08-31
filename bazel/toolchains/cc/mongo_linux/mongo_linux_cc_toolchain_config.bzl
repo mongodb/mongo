@@ -24,6 +24,8 @@ load(
 )
 load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "DEFINES")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl", "clang_resource_dir")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 all_non_assembly_compile_actions = [
     ACTION_NAMES.c_compile,

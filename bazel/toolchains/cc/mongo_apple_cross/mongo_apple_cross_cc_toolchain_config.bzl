@@ -19,6 +19,8 @@ load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "get_common_features",
 )
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 _OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
 

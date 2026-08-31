@@ -1,6 +1,7 @@
-load("//bazel/uv:defs.bzl", "dependency")
 load("@npm//:eslint/package_json.bzl", "bin")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//bazel/uv:defs.bzl", "dependency")
 
 exports_files([
     "candle_wrapper.py",

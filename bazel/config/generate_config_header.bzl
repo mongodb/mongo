@@ -4,6 +4,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
 load("//bazel:utils.bzl", "write_target")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 def _strip_sysroot_flags(flags):
     """Remove --sysroot and sysroot-debug-prefix-map flags.

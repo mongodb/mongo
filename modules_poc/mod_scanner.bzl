@@ -2,6 +2,8 @@
 # mixed with skylib's run_binary.bzl, and then enhanced to use unused_inputs_list.
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 def _run_mod_scan(
         ctx,  # type: ctx

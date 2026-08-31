@@ -109,6 +109,16 @@ constraint_value(
     constraint_setting = ":mongo_apple_cross_toolchain",
 )
 
+# Main-repo handle for the generated host platform. `--platforms` is set to this rather than
+# straight to @internal_platforms_do_not_use//host because `bazel info` does not compute the main
+# repo mapping, so an apparent repo name in that flag fails to resolve there even though it works
+# for build/query.
+alias(
+    name = "host",
+    actual = "@internal_platforms_do_not_use//host",
+    visibility = ["//visibility:public"],
+)
+
 platform(
     name = "windows_amd64",
     constraint_values = [

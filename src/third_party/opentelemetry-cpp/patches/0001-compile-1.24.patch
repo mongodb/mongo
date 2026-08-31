@@ -1773,7 +1773,7 @@ index e73e4c059ac..5a4979409bc 100644
 +mongo_cc_library(
      name = "resource",
      srcs = glob(["**/*.cc"]),
-+    hdrs = glob(["**/*.h"]),
++    hdrs = glob(["**/*.h"], allow_empty = True),
      include_prefix = "src/resource",
 +    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
      deps = [

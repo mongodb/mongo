@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@multiversion_compat_settings//:settings.bzl", "LAST_CONTINUOUS_IS_LAST_LTS", "LAST_PATCH_HAS_GA_RELEASE")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/resmoke/multiversion:multiversion.bzl", "multiversion_setup")
 
 # Visibility is restricted to tests because multiversion_setup downloads

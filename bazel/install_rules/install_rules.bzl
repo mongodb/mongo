@@ -12,6 +12,7 @@ load("//bazel/install_rules:pretty_printer_tests.bzl", "mongo_pretty_printer_tes
 load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 load("//bazel/toolchains/cc:mongo_errors.bzl", "DWP_ERROR_MESSAGE")
 load("//bazel:transitions.bzl", "extensions_transition")
+load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
 
 _WINDOWS_BINARY_EXTENSIONS = {
     ".dll": True,
@@ -602,7 +603,7 @@ def mongo_install_rule_impl(ctx):
     )
     ctx.actions.write(
         output = deps_file,
-        content = json_out.to_json(),
+        content = json.encode(json_out),
     )
 
     if len(installed_tests) > 0:
@@ -700,7 +701,7 @@ def mongo_install_rule_impl(ctx):
             deps_files = depset([deps_file], transitive = [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps]),
             install_owners = install_owners,
             test_file = installed_test_list_file,
-            src_map = depset([json_out.to_json()]),
+            src_map = depset([json.encode(json_out)]),
             source_files = source_files,
         ),
     ]

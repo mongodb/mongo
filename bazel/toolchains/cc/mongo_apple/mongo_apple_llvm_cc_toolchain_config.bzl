@@ -38,6 +38,8 @@ load(
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@//bazel/config:configs.bzl", "sdkroot_provider")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl", "get_apple_features")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 _OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
 

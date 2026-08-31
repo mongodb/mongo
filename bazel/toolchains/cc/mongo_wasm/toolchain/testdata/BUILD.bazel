@@ -1,4 +1,5 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
 
 package(default_visibility = ["//visibility:private"])

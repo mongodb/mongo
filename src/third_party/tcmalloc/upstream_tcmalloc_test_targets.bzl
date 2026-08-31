@@ -1,6 +1,7 @@
 """Thin Mongo wrappers around upstream vendored tcmalloc tests."""
 
 load("@com_google_tcmalloc//tcmalloc:variants.bzl", "test_variants")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//bazel:mongo_src_rules.bzl", "PDB_GENERATION_ENABLED", "SEPARATE_DEBUG_ENABLED")
 load("//bazel:separate_debug.bzl", "extract_debuginfo_test")
 load(
@@ -82,7 +83,7 @@ def _wrapper_tags(package_name, upstream_name):
     return tags
 
 def _declare_known_failure_marker(shadow_name, tags):
-    native.sh_test(
+    sh_test(
         name = "known_failure_skipped_" + shadow_name,
         srcs = ["//src/third_party/tcmalloc:known_failure_skipped_test.sh"],
         args = ["//" + native.package_name() + ":" + shadow_name],

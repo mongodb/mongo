@@ -1,3 +1,6 @@
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
+
 SKIP_FUNCTIONS = []
 
 def _bolt_instrument_impl(ctx):

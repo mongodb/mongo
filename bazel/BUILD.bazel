@@ -1,6 +1,7 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/uv:defs.bzl", "dependency")
 load(":separate_debug.bzl", "gdb_index_message")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])

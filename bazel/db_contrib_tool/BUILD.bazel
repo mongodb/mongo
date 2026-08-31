@@ -1,3 +1,5 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
 # Visibility is restricted to because db-contrib-tool downloads binaries
 # from external sources at build time.
 # Non-hermetic external downloads should not influence the core build graph.

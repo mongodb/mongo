@@ -1,4 +1,8 @@
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load("@rules_cc//cc/common:cc_shared_library_info.bzl", "CcSharedLibraryInfo")
+load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 TagInfo = provider(
     doc = "A rule provider to pass around tags that were passed to rules.",
