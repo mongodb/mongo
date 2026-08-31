@@ -494,7 +494,7 @@ StatusWith<int64_t> WiredTigerRecordStore::wtCompact(OperationContext* opCtx,
     if (options.freeSpaceTargetMB) {
         config << ",free_space_target=" << std::to_string(*options.freeSpaceTargetMB) << "MB";
     }
-    const std::string uri(getURI());
+    const std::string& uri = getURI();
     int ret = s->compact(uri.c_str(), config.str().c_str());
 
     if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
@@ -655,8 +655,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
         }
     }
 
-    uassertStatusOK(
-        WiredTigerUtil::setTableLogging(*ru.getSession(), std::string{getURI()}, _isLogged));
+    uassertStatusOK(WiredTigerUtil::setTableLogging(*ru.getSession(), getURI(), _isLogged));
 
     // If no SizeStorer is in use, start counting at zero. In practice, this will only ever be the
     // case for temporary RecordStores (those not associated with any collection) and in unit
@@ -753,10 +752,8 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
         return dataSize();
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
-    auto result = WiredTigerUtil::getStatisticsValue(*session,
-                                                     "statistics:" + std::string{getURI()},
-                                                     "statistics=(size)",
-                                                     WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
 
     return result.getValue();
@@ -771,7 +768,7 @@ int64_t WiredTigerRecordStore::Capped::storageSize(RecoveryUnit& ru,
 
 int64_t WiredTigerRecordStore::freeStorageSize(RecoveryUnit& ru) const {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
-    return WiredTigerUtil::getIdentReuseSize(*session, std::string{getURI()});
+    return WiredTigerUtil::getIdentReuseSize(*session, getURI());
 }
 
 boost::optional<int64_t> WiredTigerRecordStore::approxNumLeafPages(RecoveryUnit& ru) const {
@@ -779,10 +776,8 @@ boost::optional<int64_t> WiredTigerRecordStore::approxNumLeafPages(RecoveryUnit&
     // WT maintains this count incrementally and persists it in the checkpoint metadata, so
     // reading it does not require a tree walk. It is only populated at the "fast" statistics
     // level; "size" statistics bypass btree statistics entirely.
-    auto result = WiredTigerUtil::getStatisticsValue(*session,
-                                                     "statistics:" + std::string{getURI()},
-                                                     "statistics=(fast)",
-                                                     WT_STAT_DSRC_BTREE_ROW_LEAF_PAGES);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:" + getURI(), "statistics=(fast)", WT_STAT_DSRC_BTREE_ROW_LEAF_PAGES);
     // A positive count is always trustworthy: a table whose checkpoint metadata predates the
     // counter holds WT's internal "never tracked" marker (UINT64_MAX) rather than a partially
     // tracked count, and the marker reads as 0 here because the statistics API clamps negative
@@ -1153,7 +1148,7 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
     }
 
     int err = WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(ru).getSession(),
-                                          std::string{getURI()},
+                                          getURI(),
                                           options.verifyConfigurationOverride(),
                                           results->getErrorsUnsafe());
     if (!err) {
@@ -1193,7 +1188,7 @@ void WiredTigerRecordStore::appendNumericCustomStats(RecoveryUnit& ru,
 
     BSONObjBuilder bob(result->subobjStart(_engineName));
 
-    appendNumericStats(*session, std::string{getURI()}, bob);
+    appendNumericStats(*session, getURI(), bob);
 }
 
 void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
@@ -1212,7 +1207,7 @@ void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
     }
 
     std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(*session, std::string{getURI()}, &type, &sourceURI);
+    WiredTigerUtil::fetchTypeAndSourceURI(*session, getURI(), &type, &sourceURI);
     StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(*session, sourceURI);
     std::string_view creationStringName("creationString");
     if (!metadataResult.isOK()) {
@@ -1226,7 +1221,7 @@ void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
         bob.append("type", type);
     }
 
-    appendNumericStats(*session, std::string{getURI()}, bob);
+    appendNumericStats(*session, getURI(), bob);
 }
 
 void WiredTigerRecordStore::updateStatsAfterRepair(long long numRecords, long long dataSize) {
@@ -1573,7 +1568,7 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
       _maxSize(oplogParams.oplogMaxSize) {
     invariant(WiredTigerRecordStore::keyFormat() == KeyFormat::Long);
     invariant(oplogParams.oplogMaxSize);
-    checkOplogFormatVersion(ru, std::string{getURI()});
+    checkOplogFormatVersion(ru, getURI());
     // The oplog always needs to be marked for size adjustment since it is journaled and also
     // may change during replication recovery (if truncated).
     sizeRecoveryState(getGlobalServiceContext())

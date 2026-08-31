@@ -140,7 +140,7 @@ std::unique_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::
 
 WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
                                                 uint64_t tableId,
-                                                std::string_view uri)
+                                                const std::string& uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}
@@ -257,7 +257,7 @@ std::unique_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::ge
 
 WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
                                                uint64_t tableId,
-                                               std::string_view uri)
+                                               const std::string& uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}

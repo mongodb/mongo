@@ -37,7 +37,7 @@ class WiredTigerIntegerKeyedContainer : public WiredTigerContainer,
 public:
     class Cursor : public IntegerKeyedContainerBase::Cursor {
     public:
-        Cursor(RecoveryUnit& ru, uint64_t tableId, std::string_view uri);
+        Cursor(RecoveryUnit& ru, uint64_t tableId, const std::string& uri);
 
         boost::optional<std::span<const char>> find(int64_t key) final;
 
@@ -84,7 +84,7 @@ class WiredTigerStringKeyedContainer : public WiredTigerContainer, public String
 public:
     class Cursor : public StringKeyedContainerBase::Cursor {
     public:
-        Cursor(RecoveryUnit& ru, uint64_t tableId, std::string_view uri);
+        Cursor(RecoveryUnit& ru, uint64_t tableId, const std::string& uri);
 
         boost::optional<std::span<const char>> find(std::span<const char> key) final;
 

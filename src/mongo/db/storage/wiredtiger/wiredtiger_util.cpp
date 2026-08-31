@@ -1604,8 +1604,8 @@ void WiredTigerUtil::logMetadata(WiredTigerSession& session, std::string_view ur
     }
 }
 
-void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, std::string_view uri) {
-    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.data(), nullptr, nullptr, nullptr)),
+void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, const std::string& uri) {
+    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.c_str(), nullptr, nullptr, nullptr)),
                   *ru.getSession());
 }
 

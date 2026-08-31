@@ -40,7 +40,9 @@ void setKeyOnCursor(WT_CURSOR* c, const std::variant<std::span<const char>, int6
 }
 }  // namespace
 
-WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session)
+WiredTigerCursor::WiredTigerCursor(Params params,
+                                   const std::string& uri,
+                                   WiredTigerSession& session)
     : _tableID(params.tableID), _session(session), _sizeStats(params.sizeStats) {
     invariant(!(params.sizeStats && params.random),
               "size_stats is incompatible with a random cursor");

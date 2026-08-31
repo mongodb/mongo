@@ -123,7 +123,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
     std::string ident = std::string{rs->getIdent()};
-    std::string uri = std::string{checked_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     int N = 12;
 
@@ -208,7 +208,7 @@ private:
         WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtRS->setSizeStorer(&sizeStorer);
         ident = std::string{wtRS->getIdent()};
-        uri = std::string{wtRS->getURI()};
+        uri = wtRS->getURI();
     }
     void tearDown() override {
         rs.reset();

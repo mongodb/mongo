@@ -17,7 +17,7 @@ TEST(WiredTigerSessionTest, CacheMixedOverwrite) {
     WiredTigerHarnessHelper helper;
     std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
     std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Close all cached cursors to establish a 'before' state.
     auto session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
@@ -91,7 +91,7 @@ TEST(WiredTigerSessionTest, CacheMixedOverwrite) {
 TEST(WiredTigerSessionTest, StaleCursorNotReturnedToCacheAfterRollbackToStable) {
     WiredTigerHarnessHelper helper;
     std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
     auto& conn = helper.connection();
 
     std::unique_ptr<RecoveryUnit> ruA = helper.newRecoveryUnit();
@@ -127,7 +127,7 @@ TEST(WiredTigerSessionTest, CursorNotCachedAfterCleanShutdown) {
     WiredTigerHarnessHelper helper;
     auto& conn = helper.connection();
     std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
     auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
@@ -156,7 +156,7 @@ TEST(WiredTigerSessionTest, VerifyConfig) {
     WiredTigerHarnessHelper helper;
     std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
     std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
 

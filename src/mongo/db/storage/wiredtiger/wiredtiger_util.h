@@ -387,7 +387,7 @@ public:
     /**
      * Truncates the table identified by uri, removing all entries from it.
      */
-    static void truncate(WiredTigerRecoveryUnit& ru, std::string_view uri);
+    static void truncate(WiredTigerRecoveryUnit& ru, const std::string& uri);
 
     static uint64_t genTableId();
 

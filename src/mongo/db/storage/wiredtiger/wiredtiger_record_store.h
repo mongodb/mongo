@@ -153,8 +153,8 @@ public:
 
     bool isColdCollection() const override;
 
-    std::string_view getURI() const {
-        return std::visit([](const auto& v) -> std::string_view { return v.uri(); }, _container);
+    const std::string& getURI() const {
+        return std::visit([](const auto& v) -> const std::string& { return v.uri(); }, _container);
     }
 
     uint64_t tableId() const {

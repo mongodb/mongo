@@ -48,7 +48,7 @@ public:
      *
      * If 'random' is true, every next calls will yield records in a random order.
      */
-    WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session);
+    WiredTigerCursor(Params params, const std::string& uri, WiredTigerSession& session);
 
     // Prevent duplication of the logical owned-ness of the cursors via move or copy.
     WiredTigerCursor(WiredTigerCursor&&) = delete;
@@ -152,7 +152,7 @@ private:
 class WiredTigerDirectCrudCursor : public KVEngineDirectCrudCursor {
 public:
     WiredTigerDirectCrudCursor(WiredTigerCursor::Params params,
-                               std::string_view uri,
+                               const std::string& uri,
                                WiredTigerSession& session)
         : _cursor(params, uri, session) {}
 

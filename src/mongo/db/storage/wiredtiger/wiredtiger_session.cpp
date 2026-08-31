@@ -75,14 +75,11 @@ WiredTigerSession::~WiredTigerSession() {
 }
 
 void WiredTigerSession::_openCursor(WT_SESSION* session,
-                                    std::string_view uri,
+                                    const std::string& uri,
                                     const char* config,
                                     WT_CURSOR** cursorOut) {
-    // TODO SERVER-128957: Dangerous assumption of null-terminated std::string_view.
-    const char* uriData = uri.data();
-
     // TODO: SERVER-110391 Add an invariant here to catch stale sessions.
-    int ret = session->open_cursor(session, uriData, nullptr, config, cursorOut);
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, config, cursorOut);
     if (ret == 0) {
         return;
     }
@@ -140,7 +137,7 @@ WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& co
     return nullptr;
 }
 
-WT_CURSOR* WiredTigerSession::getNewCursor(std::string_view uri, const char* config) {
+WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* config) {
     WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;
