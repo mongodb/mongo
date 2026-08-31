@@ -743,6 +743,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
                                         const std::vector<bool>& fromMigrate,
                                         const ShardingWriteRouter& shardingWriteRouter,
                                         const CollectionPtr& collectionPtr,
+                                        bool useReplicatedSizeCount,
                                         OperationLogger* operationLogger) {
     invariant(begin != end);
 
@@ -807,7 +808,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         oplogEntry.setObject2(docKey);
 
         boost::optional<int32_t> replicatedSizeDelta;
-        if (isReplicatedFastCountEnabled(opCtx)) {
+        if (useReplicatedSizeCount) {
             replicatedSizeDelta = insertedDoc.objsize();
         }
         boost::optional<int64_t> docHash;
@@ -1030,6 +1031,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                    std::move(fromMigrate),
                                    *shardingWriteRouter,
                                    coll,
+                                   useReplicatedSizeCount,
                                    _operationLogger.get());
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
