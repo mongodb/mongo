@@ -29,7 +29,7 @@
 
 import re
 import wiredtiger
-import functools, json, os, shutil, subprocess, wttest
+import functools, json, os, shutil, subprocess, unittest, wttest
 from run import wt_builddir
 
 # These routines help run the various page log sources used by disaggregated storage.
@@ -121,6 +121,13 @@ def disagg_test_class(cls):
 
     return disagg_test_case_class
 
+# Disaggregated storage is not a supported feature on this release branch, so its scenarios are
+# not run here. The dedicated disagg Evergreen tasks are already gone, but the layered and disagg
+# Python tests are still picked up by the ordinary unit-test task, which runs the whole suite.
+# Only the disaggregated scenarios are skipped: tests that also generate a non_disagg scenario
+# keep that coverage.
+DISAGG_SKIP_REASON = 'disaggregated storage is not supported on this release branch'
+
 # This mixin class provides disaggregated storage configuration methods and a few utility functions.
 class DisaggConfigMixin:
 
@@ -190,6 +197,11 @@ class DisaggConfigMixin:
 
     # Load disaggregated storage extension.
     def disagg_conn_extensions(self, extlist):
+        # Every disaggregated scenario loads the page log extension here, which makes this the one
+        # place that has to opt out of disaggregated storage on this branch.
+        if self.is_disagg_scenario():
+            raise unittest.SkipTest(DISAGG_SKIP_REASON)
+
         # Handle non_disaggregated storage scenarios.
         if not self.is_disagg_scenario():
             return ''
