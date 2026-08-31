@@ -953,7 +953,13 @@ intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const exp
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
     assertNoRestrictedBinDataSubtype(exprElement);
-    return new ExpressionConstant(expCtx, Value(exprElement));
+    Value exprValue = Value(exprElement);
+    // Shred values when parsing collection-validator constants to avoid lazily
+    // populating the BSON cache on write paths.
+    if (MONGO_unlikely(expCtx->getIsParsingCollectionValidator())) {
+        exprValue = exprValue.shred();
+    }
+    return new ExpressionConstant(expCtx, std::move(exprValue));
 }
 
 

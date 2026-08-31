@@ -688,6 +688,20 @@ TEST(ShredDocument, OutputHasNoBackingBSON) {
     // Accessing a field shouldn't change the size since all fields are already cached.
     shredded["a"];
     ASSERT_EQ(shredded.getCurrentApproximateSize(), shreddedSize);
+
+    // shred() recurses through arrays, so an object reached through 'subArray' is cache-only too.
+    // Measure on the nested document rather than on 'shredded': Document::getApproximateSize()
+    // memoizes into '_snapshottedSize', so a delta taken on the outer document would not observe
+    // a nested cache being populated. getCurrentApproximateSize() recomputes.
+    Document nestedInArray = shredded["subArray"].getArray()[0].getDocument();
+    auto nestedInArraySize = nestedInArray.getCurrentApproximateSize();
+    nestedInArray["a"];
+    ASSERT_EQ(nestedInArray.getCurrentApproximateSize(), nestedInArraySize);
+
+    Document nestedInObject = shredded["subObj"].getDocument();
+    auto nestedInObjectSize = nestedInObject.getCurrentApproximateSize();
+    nestedInObject["a"];
+    ASSERT_EQ(nestedInObject.getCurrentApproximateSize(), nestedInObjectSize);
 }
 
 TEST(ShredDocument, HandlesModifiedDocuments) {
