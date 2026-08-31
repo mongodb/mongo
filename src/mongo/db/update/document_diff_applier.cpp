@@ -547,7 +547,7 @@ public:
                             std::copy(diffData, diffData + diffLen, std::back_inserter(newData));
 
                             BSONBinData postBinData(&newData[0], newLen, elt.binDataType());
-                            builder->append(binary.newElt.fieldName(), postBinData);
+                            builder->append(binary.newElt.fieldNameStringData(), postBinData);
                         } else {
                             // Offset is larger than the length of the preimage. This means that we
                             // are re-applying this diff and some future oplog entry will shrink

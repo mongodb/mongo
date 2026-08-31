@@ -66,7 +66,7 @@ struct IndexKeyDatum {
                 MONGO_verify(keyDataIt.more());
                 BSONElement keyDataElt = keyDataIt.next();
 
-                if (field == keyPatternElt.fieldName())
+                if (field == keyPatternElt.fieldNameStringData())
                     return boost::make_optional(keyDataElt);
             }
         }

@@ -423,7 +423,7 @@ void MatchesSingleElementEvaluator::visit(const ElemMatchObjectMatchExpression* 
             }
             if (matchesBSON(sub, inner.Obj(), nullptr)) {
                 if (details && details->needRecord()) {
-                    details->setElemMatchKey(inner.fieldName());
+                    details->setElemMatchKey(inner.fieldNameStringData());
                 }
                 return true;
             }
@@ -449,7 +449,7 @@ void MatchesSingleElementEvaluator::visit(const ElemMatchValueMatchExpression* e
 
             if (arrayElementMatchesAll(inner)) {
                 if (details && details->needRecord()) {
-                    details->setElemMatchKey(inner.fieldName());
+                    details->setElemMatchKey(inner.fieldNameStringData());
                 }
                 return true;
             }

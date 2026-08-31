@@ -163,7 +163,8 @@ bool BSONElementIterator::subCursorHasMore() {
         // If the subcursor doesn't have more, see if the current element is an array offset
         // match (see comment in BSONElementIterator::more() for an example).  If it is indeed
         // an array offset match, create a new subcursor and examine it.
-        if (_arrayIterationState.isArrayOffsetMatch(_arrayIterationState._current.fieldName())) {
+        if (_arrayIterationState.isArrayOffsetMatch(
+                _arrayIterationState._current.fieldNameStringData())) {
             if (_arrayIterationState.nextEntireRest()) {
                 // Our path terminates at the array offset.  _next should point at the current
                 // array element. _next._arrayOffset should be EOO, since this is not an implicit
@@ -272,7 +273,7 @@ bool BSONElementIterator::more() {
                     return true;
                 }
                 emptyArray = false;
-            } else if (_arrayIterationState.isArrayOffsetMatch(eltInArray.fieldName())) {
+            } else if (_arrayIterationState.isArrayOffsetMatch(eltInArray.fieldNameStringData())) {
                 // The path we're traversing has an array offset component, and the current
                 // array element corresponds to the offset we're looking for (for example: our
                 // path has a ".0" component, and we're looking at the first element of the

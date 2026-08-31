@@ -135,7 +135,7 @@ void MatchExpressionEvaluator::visitPathExpression(const PathMatchExpression* ex
             continue;
         }
         if (_details && _details->needRecord() && !e.arrayOffset().eoo()) {
-            _details->setElemMatchKey(e.arrayOffset().fieldName());
+            _details->setElemMatchKey(e.arrayOffset().fieldNameStringData());
         }
         _result = true;
         return;

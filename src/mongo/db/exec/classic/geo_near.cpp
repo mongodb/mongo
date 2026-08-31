@@ -615,7 +615,7 @@ static int getFieldPosition(const IndexDescriptor* index, const string& fieldNam
 
     BSONObjIterator specIt(index->keyPattern());
     while (specIt.more()) {
-        if (specIt.next().fieldName() == fieldName) {
+        if (specIt.next().fieldNameStringData() == fieldName) {
             break;
         }
         ++fieldPosition;

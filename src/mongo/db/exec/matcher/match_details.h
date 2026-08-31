@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo {
 
@@ -50,7 +51,7 @@ public:
     bool hasElemMatchKey() const;
     std::string elemMatchKey() const;
 
-    void setElemMatchKey(const std::string& elemMatchKey);
+    void setElemMatchKey(std::string_view elemMatchKey);
 
 private:
     bool _loadedRecord;

@@ -29,7 +29,7 @@ std::string MatchDetails::elemMatchKey() const {
     return *(_elemMatchKey.get());
 }
 
-void MatchDetails::setElemMatchKey(const std::string& elemMatchKey) {
+void MatchDetails::setElemMatchKey(std::string_view elemMatchKey) {
     if (_elemMatchKeyRequested) {
         _elemMatchKey.reset(new std::string(elemMatchKey));
     }
