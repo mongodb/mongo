@@ -155,6 +155,23 @@
               # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
               enableOTELTracing: false
 
+# last-patch fixture, mirroring its last-lts/last-continuous siblings. Add a new
+# shape here when enabling last-patch for another suite.
+- name: sharded_fixture_last_patch_new_old_old_new
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 2
+        old_bin_version: last_patch
+        mixed_bin_versions: new_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
 - name: sharded_fixture_last_lts_3_nodes
   value:
     executor:
@@ -288,6 +305,18 @@
               # need to set this variable so that the right version of mongos is chosen.
               mongosBinVersion: "last-continuous"
 
+- name: replica_sets_multiversion_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: "last-patch"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-patch"
+
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
     executor:
@@ -361,6 +390,16 @@
               useRandomBinVersionsWithinReplicaSet: "last-continuous"
               mongosBinVersion: "last-continuous"
 
+- name: sharding_multiversion_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: "last-patch"
+              mongosBinVersion: "last-patch"
+
 - name: sharding_multiversion_mongos_testdata_last_lts
   value:
     executor:
@@ -378,6 +417,15 @@
           global_vars:
             TestData:
               mongosBinVersion: "last-continuous"
+
+- name: sharding_multiversion_mongos_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              mongosBinVersion: "last-patch"
 
 - name: jstestfuzz_replication_multiversion_hooks
   value:

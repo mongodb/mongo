@@ -160,6 +160,9 @@ filters:
   - "/replica_sets_last_lts.yml":
     approvers:
       - 10gen/server-jstest-infra
+  - "/replica_sets_last_patch.yml":
+    approvers:
+      - 10gen/server-jstest-infra
   - "/replica_sets_max_mirroring.yml":
     approvers:
       - 10gen/server-replication-reviewers
@@ -194,6 +197,9 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "/sharding_last_lts.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "/sharding_last_patch.yml":
     approvers:
       - 10gen/server-catalog-and-routing
   - "/sharding_max_mirroring.yml":
