@@ -305,6 +305,37 @@ class InstallRulesScriptTest(unittest.TestCase):
                 )
             )
 
+    def test_directory_install_handles_long_destination_paths(self) -> None:
+        with _temporary_directory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            source = root / "source"
+            source.mkdir()
+            install_dir = root / "install-dist-test"
+            destination_prefix = install_dir / "lib" / "source"
+            target_path_length = 240
+            filename_length = target_path_length - len(str(destination_prefix)) - 1
+            if filename_length < 16:
+                self.skipTest("test temporary directory leaves insufficient path-length headroom")
+            source_file = source / ("long-data-file-" + "x" * (filename_length - 15))
+            source_file.write_text("long path data\n", encoding="utf-8")
+
+            depfile = root / "install-deps.json"
+            depfile.write_text(
+                json.dumps({"bins": [], "libs": [], "roots": {str(source): "lib"}, "includes": {}}),
+                encoding="utf-8",
+            )
+            script = pathlib.Path(__file__).with_name("install_rules.py")
+
+            with mock.patch.object(
+                sys,
+                "argv",
+                [str(script), "--depfile", str(depfile), "--install-dir", str(install_dir)],
+            ):
+                runpy.run_path(str(script), run_name="__main__")
+
+            installed_file = destination_prefix / source_file.name
+            self.assertEqual("long path data\n", installed_file.read_text(encoding="utf-8"))
+
     def test_repeat_directory_install_preserves_source_mode(self) -> None:
         with _temporary_directory() as temp_dir:
             root = pathlib.Path(temp_dir)

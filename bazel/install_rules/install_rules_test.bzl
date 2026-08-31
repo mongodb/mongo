@@ -1,5 +1,6 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@rules_pkg//pkg:providers.bzl", "PackageFilesInfo")
+load("//bazel:separate_debug.bzl", "TagInfo")
 load(":install_rules.bzl", "MongoInstallInfo", "mongo_install_rule")
 load(":providers.bzl", "TestBinaryInfo")
 
@@ -16,6 +17,25 @@ _generated_file = rule(
     attrs = {
         "output": attr.string(mandatory = True),
         "test_binary": attr.bool(),
+    },
+)
+
+def _generated_test_with_data_impl(ctx):
+    output = ctx.actions.declare_file(ctx.attr.output)
+    ctx.actions.write(output = output, content = "test input\n")
+    return [
+        DefaultInfo(
+            files = depset([output]),
+            data_runfiles = ctx.runfiles(files = ctx.files.data),
+        ),
+        TagInfo(tags = ["mongo_unittest"]),
+    ]
+
+_generated_test_with_data = rule(
+    implementation = _generated_test_with_data_impl,
+    attrs = {
+        "output": attr.string(mandatory = True),
+        "data": attr.label_list(allow_files = True),
     },
 )
 
@@ -172,6 +192,38 @@ def _multi_destination_test_impl(ctx):
     return analysistest.end(env)
 
 _multi_destination_test = analysistest.make(_multi_destination_test_impl)
+
+def _test_data_installation_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = _install_actions(env)
+    asserts.equals(env, 1, len(actions))
+
+    target = analysistest.target_under_test(env)
+    package_files = target[PackageFilesInfo].dest_src_map
+    asserts.true(
+        env,
+        ctx.attr.expected_destination in package_files,
+        "test data must be present in the installed runfiles layout",
+    )
+
+    input_basenames = [file.basename for file in actions[0].inputs.to_list()]
+    asserts.true(
+        env,
+        ctx.attr.expected_data_basename in input_basenames,
+        "test data must be an input to the install action",
+    )
+
+    source_basenames = [file.basename for file in target[MongoInstallInfo].source_files.to_list()]
+    asserts.true(env, ctx.attr.expected_data_basename in source_basenames)
+    return analysistest.end(env)
+
+_test_data_installation_test = analysistest.make(
+    _test_data_installation_test_impl,
+    attrs = {
+        "expected_data_basename": attr.string(mandatory = True),
+        "expected_destination": attr.string(mandatory = True),
+    },
+)
 
 def _expected_failure_test_impl(ctx):
     env = analysistest.begin(ctx)
@@ -409,6 +461,32 @@ def install_rules_test_suite(name):
         target_under_test = ":" + multi_target,
     )
 
+    runfiles_data = name + "_runfiles_data"
+    _generated_file(
+        name = runfiles_data,
+        output = "test_inputs/runfiles_data.txt",
+        testonly = True,
+    )
+    runfiles_test_input = name + "_runfiles_test_input"
+    _generated_test_with_data(
+        name = runfiles_test_input,
+        output = "test_inputs/runfiles_test.exe",
+        data = [":" + runfiles_data],
+        testonly = True,
+    )
+    runfiles_install = name + "_runfiles_install"
+    _install_rule(
+        name = runfiles_install,
+        srcs = [":" + runfiles_test_input],
+    )
+    runfiles_test = name + "_test_data_installation_test"
+    _test_data_installation_test(
+        name = runfiles_test,
+        target_under_test = ":" + runfiles_install,
+        expected_data_basename = "runfiles_data.txt",
+        expected_destination = "bin/_main/bazel/install_rules/test_inputs/runfiles_data.txt",
+    )
+
     native.test_suite(
         name = name,
         tests = [
@@ -418,6 +496,7 @@ def install_rules_test_suite(name):
             ":" + invalid_test,
             ":" + diamond_test,
             ":" + multi_test,
+            ":" + runfiles_test,
         ],
     )
 

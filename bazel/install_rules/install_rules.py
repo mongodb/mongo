@@ -276,7 +276,9 @@ def _copy_file_atomically(src: str, dst: str) -> None:
     destination_dir = os.path.dirname(dst)
     temporary_fd, temporary_dst = tempfile.mkstemp(
         dir=destination_dir,
-        prefix=f".{os.path.basename(dst)}.",
+        # Do not repeat the destination basename here. Runfiles paths can be long enough on
+        # Windows that the final destination is valid but the temporary path exceeds MAX_PATH.
+        prefix=".tmp-",
     )
     os.close(temporary_fd)
     try:
