@@ -18,9 +18,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/stringify.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest_main_core.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/demangle.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <array>
 #include <cstddef>
@@ -44,6 +46,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
+namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 namespace mus = mongo::unittest::stringify;
@@ -75,6 +78,116 @@ public:
 TEST(UnitTestSelfTest, TestAssertThrowsWhatSuccess) {
     ASSERT_THROWS_WHAT(throw MyException(), MyException, "whatever");
     ASSERT_THROWS_WHAT(throw MyException(), MyException, mongo::unittest::match::Eq("whatever"));
+}
+
+class ExcusedTripwireTest : public mongo::unittest::Test {
+public:
+    void setUp() override {
+        assertAllTripwiresExcused();
+    }
+    void tearDown() override {
+        assertAllTripwiresExcused();
+    }
+    void assertAllTripwiresExcused() {
+        ASSERT_EQ(TestingProctor::instance().excusedTripwireCount(),
+                  assertionCount.tripwire.load());
+    }
+};
+
+TEST_F(ExcusedTripwireTest, Tassert) {
+    ASSERT_TASSERT_CODE(([&] {
+                            tassert(ErrorCodes::BadValue, "test", false);
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, Tasserted) {
+    ASSERT_TASSERT_CODE(([&] {
+                            tasserted(ErrorCodes::BadValue, "test");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, MultipleTasserts) {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tasserted(ErrorCodes::BadValue, "first");
+                            } catch (...) {
+                            }
+                            tasserted(ErrorCodes::BadValue, "second");
+                        }()),
+                        ErrorCodes::BadValue,
+                        2);
+}
+
+TEST_F(ExcusedTripwireTest, GuardExcusesCaughtTassert) {
+    const auto tw0 = assertionCount.tripwire.load();
+    unittest::TassertGuard guard;
+    try {
+        tassert(ErrorCodes::BadValue, "test", false);
+    } catch (...) {
+    }
+    ASSERT_EQ(assertionCount.tripwire.load(), tw0 + 1);
+}
+
+using ExcusedTripwireDeathTest = ExcusedTripwireTest;
+DEATH_TEST_F(ExcusedTripwireDeathTest, NoThrow, "Actual: does not throw") {
+    ASSERT_TASSERT_CODE(([&] {
+                            tassert(ErrorCodes::BadValue, "test", true);
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, CaughtPreviousTassert) {
+    const auto tw0 = assertionCount.tripwire.load();
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tassert(ErrorCodes::BadValue, "test in try/catch", false);
+                            } catch (...) {
+                            }
+                            ASSERT_EQ(assertionCount.tripwire.load(), tw0 + 1);
+
+                            // Something else can throw with the same code to trigger the internal
+                            // ASSERT_THROWS.
+                            uasserted(ErrorCodes::BadValue, "test out of try/catch");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, CaughtPreviousTassertNoThrow, "Actual: does not throw") {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tassert(ErrorCodes::BadValue, "test", false);
+                            } catch (...) {
+                            }
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, TassertTwice, "Unexpected tasserts triggered") {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tasserted(ErrorCodes::BadValue, "test in try/catch");
+                            } catch (...) {
+                            }
+                            tasserted(ErrorCodes::BadValue, "test outside of try/catch");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_REGEX_F(ExcusedTripwireDeathTest, WrongCode, "Expected:.*is equal to InternalError") {
+    ASSERT_TASSERT_CODE(([&] {
+                            tasserted(ErrorCodes::BadValue, "test");
+                        }()),
+                        ErrorCodes::InternalError);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, GuardWrongCount, "Unexpected tasserts triggered") {
+    unittest::TassertGuard guard(0);
+    try {
+        tasserted(ErrorCodes::BadValue, "test");
+    } catch (...) {
+    }
 }
 
 TEST(UnitTestSelfTest, TestSuccessfulNumericComparisons) {
@@ -641,3 +754,4 @@ TEST_F(MockNicenessTest, TryFlagsVsMockWrappers) {
 }
 
 }  // namespace
+}  // namespace mongo

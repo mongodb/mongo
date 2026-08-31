@@ -46,7 +46,6 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] AssertionCount {
 public:
-    AssertionCount();
     void rollover();
     void condrollover(int newValue);
 

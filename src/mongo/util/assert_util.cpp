@@ -91,8 +91,6 @@ bool getScopedDebugInfoStackEnabled() {
 
 AssertionCount assertionCount;
 
-AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
-
 namespace {
 Atomic<AssertionIncrementObserver> gAssertionIncrementObserver{nullptr};
 

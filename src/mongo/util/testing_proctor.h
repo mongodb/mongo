@@ -53,8 +53,21 @@ public:
      */
     void exitAbruptlyIfDeferredErrors(bool verbose = true) const;
 
+    /**
+     * Intended for test utilities to discount expected tripwire failures from
+     * crashing and failing tests.
+     */
+    void excuseTripwires(int tripwires) {
+        _excusedTripwires.fetchAndAdd(tripwires);
+    }
+
+    int excusedTripwireCount() const {
+        return _excusedTripwires.load();
+    }
+
 private:
     boost::optional<bool> _diagnosticsEnabled;
+    Atomic<int> _excusedTripwires{0};
 };
 
 }  // namespace mongo

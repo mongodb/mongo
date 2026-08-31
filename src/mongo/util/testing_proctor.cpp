@@ -34,7 +34,8 @@ void TestingProctor::setEnabled(bool enable) {
 }
 
 void TestingProctor::exitAbruptlyIfDeferredErrors(bool verbose) const {
-    if (isInitialized() && isEnabled() && haveTripwireAssertionsOccurred()) {
+    if (isInitialized() && isEnabled() &&
+        excusedTripwireCount() != assertionCount.tripwire.load()) {
         if (verbose) {
             warnIfTripwireAssertionsOccurred();
         }
