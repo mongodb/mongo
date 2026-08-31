@@ -6,8 +6,8 @@ logging:
   fixture:
     format: '[%(name)s] %(message)s'
     handlers:
-      - class: buildlogger
+      - class: logging.StreamHandler
   tests:
     format: '[%(name)s] %(asctime)s %(message)s'
     handlers:
-      - class: buildlogger
+      - class: logging.StreamHandler
