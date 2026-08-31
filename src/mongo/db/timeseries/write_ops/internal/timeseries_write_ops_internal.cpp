@@ -6,6 +6,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_exec_util.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -146,10 +147,10 @@ bool batchContainsExecutedStatements(OperationContext* opCtx,
                                      size_t start,
                                      size_t numDocs) {
     if (isTimeseriesWriteRetryable(opCtx)) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
         for (size_t index = 0; index < numDocs; index++) {
-            auto stmtId = request.getStmtIds() ? request.getStmtIds()->at(start + index)
-                                               : request.getStmtId().value_or(0) + start + index;
-            if (TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
+            auto stmtId = getStmtIdForWriteAt(request, start + index);
+            if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
                 return true;
             }
         }
@@ -171,8 +172,7 @@ void filterOutExecutedMeasurements(OperationContext* opCtx,
     auto& originalUserMeasurementBatch = request.getDocuments();
     std::function<void(size_t)> filterOutExecutedMeasurement = [&](size_t index) {
         invariant(index < request.getDocuments().size());
-        auto stmtId = request.getStmtIds() ? request.getStmtIds()->at(index)
-                                           : request.getStmtId().value_or(0) + index;
+        auto stmtId = getStmtIdForWriteAt(request, index);
         if (!TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
             filteredBatch.emplace_back(originalUserMeasurementBatch.at(index));
             filteredIndices.emplace_back(index);
@@ -570,33 +570,20 @@ void processUnorderedCommitResult(OperationContext* opCtx,
 };
 
 /**
- * If no statement has been retried in 'request', fills stmtIds with stmtIds based on 'request'
- * which can explicitly specify all StmtIds, the begin StmtId, or none at all (implied start from
- * zero). Otherwise, sets 'containsRetry' to true and returns empty 'stmtIds'.
+ * Fills in the stmtIds of each batch in 'writeBatches' from the measurements it staged. Does
+ * nothing if the write is not retryable, as stmtIds are only tracked for retryable writes.
  */
-void getStmtIdVectorFromRequest(OperationContext* opCtx,
-                                const mongo::write_ops::InsertCommandRequest& request,
-                                bool* containsRetry,
-                                std::vector<StmtId>& stmtIds) {
-    if (isTimeseriesWriteRetryable(opCtx)) {
-        std::vector<StmtId> stmtIdsVec(request.getDocuments().size());
-        // The driver can specify all stmtIds, the begin index, or none.
-        if (request.getStmtIds()) {
-            stmtIdsVec = request.getStmtIds().get();
-        } else {
-            // Fill stmtIdsVec with 0 ... N-1 if no stmtId was provided by the driver.
-            // Otherwise, begin at the index provided.
-            std::iota(stmtIdsVec.begin(), stmtIdsVec.end(), request.getStmtId().value_or(0));
+void populateStmtIds(OperationContext* opCtx,
+                     const mongo::write_ops::InsertCommandRequest& request,
+                     bucket_catalog::TimeseriesWriteBatches& writeBatches) {
+    if (!isTimeseriesWriteRetryable(opCtx)) {
+        return;
+    }
+    for (auto& writeBatch : writeBatches) {
+        writeBatch->stmtIds.reserve(writeBatch->userBatchIndices.size());
+        for (auto userBatchIndex : writeBatch->userBatchIndices) {
+            writeBatch->stmtIds.push_back(getStmtIdForWriteAt(request, userBatchIndex));
         }
-
-        for (auto& stmtId : stmtIdsVec) {
-            if (TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
-                *containsRetry = true;
-                return;
-            }
-        }
-
-        stmtIds = std::move(stmtIdsVec);
     }
 }
 
@@ -689,10 +676,7 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
 
     // Early exit before staging if any statements in the user's batch have been retried. Fallback
     // to unordered one-by-one to handle this.
-    std::vector<StmtId> stmtIds;
-    bool containsRetry = false;
-    getStmtIdVectorFromRequest(opCtx, request, &containsRetry, stmtIds);
-    if (containsRetry) {
+    if (batchContainsExecutedStatements(opCtx, request, 0, request.getDocuments().size())) {
         stageStatus = StageWritesStatus::kContainsRetry;
         return {};
     }
@@ -725,16 +709,7 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     invariant(!swWriteBatches.getValue().empty());
 
     auto& writeBatches = swWriteBatches.getValue();
-
-    // Map user batch indexes to stmtIds
-    if (isTimeseriesWriteRetryable(opCtx)) {
-        for (auto& writeBatch : writeBatches) {
-            for (auto userBatchIndex : writeBatch->userBatchIndices) {
-                writeBatch->stmtIds.push_back(stmtIds.at(userBatchIndex));
-            }
-        }
-    }
-
+    populateStmtIds(opCtx, request, writeBatches);
     return std::move(writeBatches);
 }
 
@@ -1337,25 +1312,13 @@ void rewriteIndicesForSubsetOfBatch(OperationContext* opCtx,
                                     const mongo::write_ops::InsertCommandRequest& request,
                                     const std::vector<size_t>& originalIndices,
                                     bucket_catalog::TimeseriesWriteBatches& writeBatches) {
-    auto stmtIds = request.getStmtIds();
-    auto retryableWrites = isTimeseriesWriteRetryable(opCtx);
     for (auto& writeBatch : writeBatches) {
-        for (size_t i = 0; i < writeBatch->userBatchIndices.size(); i++) {
-            invariant(i < writeBatch->userBatchIndices.size());
-            auto shiftedIndex = writeBatch->userBatchIndices[i];
-            invariant(shiftedIndex < originalIndices.size());
-            auto originalIndex = originalIndices[shiftedIndex];
-            writeBatch->userBatchIndices[i] = originalIndex;
-            if (retryableWrites) {
-                if (stmtIds) {
-                    invariant(originalIndex < stmtIds->size());
-                }
-                auto stmtId = stmtIds ? stmtIds->at(originalIndex)
-                                      : request.getStmtId().value_or(0) + originalIndex;
-                writeBatch->stmtIds.push_back(stmtId);
-            }
+        for (auto& index : writeBatch->userBatchIndices) {
+            invariant(index < originalIndices.size());
+            index = originalIndices[index];
         }
     }
+    populateStmtIds(opCtx, request, writeBatches);
 }
 
 void processErrorsForSubsetOfBatch(
@@ -1476,16 +1439,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         }
     }
 
-    if (isTimeseriesWriteRetryable(opCtx)) {
-        auto stmtIds = request.getStmtIds();
-        for (auto& writeBatch : writeBatches) {
-            for (auto userBatchIndex : writeBatch->userBatchIndices) {
-                auto stmtId = stmtIds ? stmtIds->at(userBatchIndex)
-                                      : request.getStmtId().value_or(0) + userBatchIndex;
-                writeBatch->stmtIds.push_back(stmtId);
-            }
-        }
-    }
+    populateStmtIds(opCtx, request, writeBatches);
 
     return std::move(writeBatches);
 }
