@@ -10,52 +10,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {getOplogEntriesForTxnOnNode} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// TODO (SERVER-115115): Remove this function once stopReplicaSet includes built-in consistency
-// checks.
-function checkCollectionDataConsistency(primary, secondary, dbs, colls) {
-    jsTest.log.info("Checking collection data consistency between primary and secondary");
-
-    for (let i = 0; i < dbs.length; i++) {
-        const dbName = dbs[i];
-        const collName = colls[i];
-
-        const primaryColl = primary.getDB(dbName).getCollection(collName);
-        const secondaryColl = secondary.getDB(dbName).getCollection(collName);
-
-        // Check document count
-        const primaryCount = primaryColl.count();
-        const secondaryCount = secondaryColl.count();
-        assert.eq(
-            primaryCount,
-            secondaryCount,
-            `Document count mismatch for ${dbName}.${collName}: ` +
-                `primary=${primaryCount}, secondary=${secondaryCount}`,
-        );
-
-        // Check actual documents (sorted by _id for consistent comparison)
-        const primaryDocs = primaryColl.find().sort({_id: 1}).toArray();
-        const secondaryDocs = secondaryColl.find().sort({_id: 1}).toArray();
-
-        assert.eq(
-            primaryDocs.length,
-            secondaryDocs.length,
-            `Document array length mismatch for ${dbName}.${collName}`,
-        );
-
-        for (let j = 0; j < primaryDocs.length; j++) {
-            assert.docEq(
-                primaryDocs[j],
-                secondaryDocs[j],
-                `Document mismatch at index ${j} in ${dbName}.${collName}`,
-            );
-        }
-
-        jsTest.log.info(
-            `✓ Collection ${dbName}.${collName} is consistent ` + `(${primaryCount} documents)`,
-        );
-    }
-}
-
 export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort) {
     Random.setRandomSeed();
     const checkTransactionTableEntry = (
