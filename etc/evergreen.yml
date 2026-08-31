@@ -6435,9 +6435,14 @@ tasks:
     - func: "f_expansions_write"
 
     # setup garasign: login to container registry
+    - command: ec2.assume_role
+      params:
+        role_arn: ${ecr_role_evergreen_arn}
     - command: subprocess.exec
       params:
         binary: bash
+        include_expansions_in_env:
+          [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
         args:
         - "./src/evergreen/garasign_setup.sh"
 

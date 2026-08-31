@@ -31,7 +31,7 @@ podman run \
   --env-file=signing-envfile \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
-  ${garasign_jsign_image} \
+  ${garasign_jsign_image_ecr} \
   /bin/bash -c "$(cat ./jsign_signing_commands.sh)"
 
 # generating checksums
