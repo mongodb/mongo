@@ -187,8 +187,13 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     }
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->ns(), collection->uuid(), -docsRemoved, -sizeSaved);
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection->ns(),
+            collection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = -sizeSaved, .count = -docsRemoved},
+                .recordStore = collection->getRecordStore(),
+            });
     }
 
     // Update the next record to be deleted. The next record must exist as we're using the same

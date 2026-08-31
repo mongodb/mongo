@@ -2166,16 +2166,22 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
     if (isReplicatedFastCountEnabled(opCtx)) {
         if (const auto& sizeMetadata = p().preparedSizeMetadata) {
             const auto catalog = CollectionCatalog::get(opCtx);
-            auto& uncommittedChanges = UncommittedFastCountChange::getForWrite(opCtx);
+            auto& uncommittedChanges = UncommittedFastCountChanges::getForWrite(opCtx);
             for (const auto& metadata : *sizeMetadata) {
-                const auto nss = catalog->lookupNSSByUUID(opCtx, metadata.getUuid());
+                const Collection* collection =
+                    catalog->lookupCollectionByUUID(opCtx, metadata.getUuid());
                 massert(12615200,
                         fmt::format("Expected catalog to contain namespace string for collection "
                                     "in config.transactions with UUID {}",
                                     metadata.getUuid().toString()),
-                        nss.has_value());
+                        collection);
                 uncommittedChanges.record(
-                    *nss, metadata.getUuid(), metadata.getCt(), metadata.getSz());
+                    collection->ns(),
+                    metadata.getUuid(),
+                    UncommittedFastCountChange{
+                        .delta = {.size = metadata.getSz(), .count = metadata.getCt()},
+                        .recordStore = collection->getRecordStore(),
+                    });
             }
         }
     }

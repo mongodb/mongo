@@ -305,7 +305,7 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
 }
 
 TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) {
-    // Tests that the 'UncommittedFastCountChange' is reset when there is a new
+    // Tests that 'UncommittedFastCountChanges' is reset when there is a new
     // 'RecoveryUnit::Snapshot', even across a single OperationContext.
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
@@ -797,7 +797,7 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
 
     // Before restoring, no uncommitted fast count changes have been seeded.
     {
-        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
+        const auto& uncommitted = UncommittedFastCountChanges::getForRead(_opCtx);
         EXPECT_EQ(uncommitted.find(_uuid1), (CollectionSizeCount{.size = 0, .count = 0}));
         EXPECT_EQ(uncommitted.find(_uuid2), (CollectionSizeCount{.size = 0, .count = 0}));
     }
@@ -809,7 +809,7 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
         restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord));
 
     {
-        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
+        const auto& uncommitted = UncommittedFastCountChanges::getForRead(_opCtx);
         EXPECT_EQ(uncommitted.find(_uuid1),
                   (CollectionSizeCount{.size = docA.objsize() + docB.objsize(), .count = 2}));
         EXPECT_EQ(uncommitted.find(_uuid2),

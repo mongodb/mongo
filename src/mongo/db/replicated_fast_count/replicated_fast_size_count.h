@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/container/flat_map.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

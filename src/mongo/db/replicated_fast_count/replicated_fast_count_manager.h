@@ -9,6 +9,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
@@ -81,7 +82,7 @@ public:
     /**
      * Registers the fast count commit function that will be called on commit to apply the changes
      * to the in-memory metadata. This function is initialized in this way to avoid introducing a
-     * circular dependency by having the UncommittedFastCountChange class depend directly on
+     * circular dependency by having the UncommittedFastCountChanges class depend directly on
      * ReplicatedFastCountManager, since the former is depended on by the collection write path and
      * the latter depends on the collection write path.
      */
@@ -133,11 +134,8 @@ public:
      *
      * This function updates the in-memory representation of each collection's size and count only.
      * It does not write anything to disk.
-     *
-     * Any UUID in `changes` not found in the collection catalog is skipped.
      */
-    void commit(OperationContext* opCtx,
-                const boost::container::flat_map<UUID, CollectionSizeCount>& changes);
+    void commit(OperationContext* opCtx, UncommittedFastCountChangeMap& changes);
 
     /**
      * Returns the persisted singleton timestamp from the timestamp store, or boost::none if the

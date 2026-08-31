@@ -269,8 +269,13 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     }
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            oplogCollection->ns(), oplogCollection->uuid(), nRecords, totalLength);
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            oplogCollection->ns(),
+            oplogCollection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = totalLength, .count = static_cast<int64_t>(nRecords)},
+                .recordStore = oplogCollection->getRecordStore(),
+            });
     }
 
     if (auto* checkpointer = Checkpointer::get(opCtx)) {

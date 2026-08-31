@@ -86,8 +86,7 @@ std::pair<bool, boost::optional<Timestamp>> ReplicatedFastCountManager::_compute
 }
 
 void ReplicatedFastCountManager::initializeFastCountCommitFn() {
-    setFastCountCommitFn([](OperationContext* opCtx,
-                            const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
+    setFastCountCommitFn([](OperationContext* opCtx, UncommittedFastCountChangeMap& changes) {
         getReplicatedFastCountManager(opCtx->getServiceContext()).commit(opCtx, changes);
     });
 }
@@ -515,22 +514,16 @@ void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContex
           "numOplogDeltas"_attr = deltasByUuid.size());
 }
 
-void ReplicatedFastCountManager::commit(
-    OperationContext* opCtx, const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
-    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
-    for (const auto& [uuid, delta] : changes) {
-        if (delta.count == 0 && delta.size == 0) {
+void ReplicatedFastCountManager::commit(OperationContext* opCtx,
+                                        UncommittedFastCountChangeMap& changes) {
+    for (auto& [uuid, change] : changes) {
+        if (change.delta.count == 0 && change.delta.size == 0) {
             continue;
         }
-        const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
-        // In a single WUOW, if the collection size/count is changed and then the collection is
-        // dropped, the collection will be removed from the catalog before we attempt to write these
-        // uncommitted size/count changes. So, we necessarily skip updating the collection's record
-        // store.
-        if (!collection) {
-            continue;
-        }
-        collection->getRecordStore()->adjustAccurateSizeCount(delta.size, delta.count);
+        invariant(change.recordStore,
+                  fmt::format("Missing RecordStore for fast count change on collection {}",
+                              uuid.toString()));
+        change.recordStore->adjustAccurateSizeCount(change.delta.size, change.delta.count);
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
         // invariant(stored.metadata.sizeCount.size >= 0 && stored.metadata.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw

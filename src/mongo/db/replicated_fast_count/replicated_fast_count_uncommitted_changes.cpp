@@ -13,38 +13,40 @@ namespace mongo {
 namespace {
 // Decoration on the Snapshot to ensure the uncommitted changes are preserved across the lifetime of
 // a multi-document transaction.
-const auto getUncommittedFastCountChange =
-    RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<UncommittedFastCountChange>>();
+const auto getUncommittedFastCountChanges =
+    RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<UncommittedFastCountChanges>>();
 
-std::shared_ptr<UncommittedFastCountChange>& getUncommittedFastCountChangeFromOpCtx(
+std::shared_ptr<UncommittedFastCountChanges>& getUncommittedFastCountChangeFromOpCtx(
     OperationContext* opCtx) {
-    return getUncommittedFastCountChange(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    return getUncommittedFastCountChanges(
+        shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 }  // namespace
 
-const UncommittedFastCountChange& UncommittedFastCountChange::getForRead(OperationContext* opCtx) {
+const UncommittedFastCountChanges& UncommittedFastCountChanges::getForRead(
+    OperationContext* opCtx) {
     // TODO SERVER-119919: Re-evaluate why this bypasses reference counting.
-    std::shared_ptr<UncommittedFastCountChange>& ptr =
+    std::shared_ptr<UncommittedFastCountChanges>& ptr =
         getUncommittedFastCountChangeFromOpCtx(opCtx);
     if (ptr) {
         return *ptr;
     }
 
-    static UncommittedFastCountChange empty;
+    static UncommittedFastCountChanges empty;
     return empty;
 }
 
 
-UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationContext* opCtx) {
-    std::shared_ptr<UncommittedFastCountChange>& ptr =
+UncommittedFastCountChanges& UncommittedFastCountChanges::getForWrite(OperationContext* opCtx) {
+    std::shared_ptr<UncommittedFastCountChanges>& ptr =
         getUncommittedFastCountChangeFromOpCtx(opCtx);
     if (ptr) {
         return *ptr;
     }
 
-    auto metaChange = std::make_shared<UncommittedFastCountChange>();
+    auto changes = std::make_shared<UncommittedFastCountChanges>();
 
-    ptr = std::move(metaChange);
+    ptr = std::move(changes);
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
@@ -54,33 +56,38 @@ UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationCon
 
             fn(opCtx, getUncommittedFastCountChangeFromOpCtx(opCtx)->_trackedChanges);
             // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
-            // UncommittedFastCountChange don't need manual cleanup.
+            // UncommittedFastCountChanges don't need manual cleanup.
         });
     return *ptr;
 }
 
-CollectionSizeCount UncommittedFastCountChange::find(const UUID& uuid) const {
+CollectionSizeCount UncommittedFastCountChanges::find(const UUID& uuid) const {
     auto it = _trackedChanges.find(uuid);
     if (it != _trackedChanges.end()) {
-        return it->second;
+        return it->second.delta;
     }
     return {};
 }
 
-void UncommittedFastCountChange::record(const NamespaceString& nss,
-                                        const UUID& uuid,
-                                        int64_t numDelta,
-                                        int64_t sizeDelta) {
+void UncommittedFastCountChanges::record(const NamespaceString& nss,
+                                         const UUID& uuid,
+                                         UncommittedFastCountChange change) {
     if (!isReplicatedFastCountEligible(nss)) {
         return;
     }
-    if (numDelta == 0 && sizeDelta == 0) {
+    if (change.delta.count == 0 && change.delta.size == 0) {
         return;
     }
 
+    invariant(change.recordStore,
+              fmt::format("Cannot record a fast count change without a RecordStore for {}",
+                          nss.toStringForErrorMsg()));
+
     auto& collChanges = _trackedChanges[uuid];
-    collChanges.count += numDelta;
-    collChanges.size += sizeDelta;
+    if (!collChanges.recordStore) {
+        collChanges.recordStore = change.recordStore;
+    }
+    collChanges.delta = collChanges.delta + change.delta;
 }
 
 }  // namespace mongo

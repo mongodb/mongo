@@ -110,7 +110,7 @@ void checkUncommittedSizeCount(OperationContext* opCtx,
                                UUID uuid,
                                CollectionSizeCount expectedSizeCount) {
     const CollectionSizeCount uncommittedSizeAndCount =
-        UncommittedFastCountChange::getForRead(opCtx).find(uuid);
+        UncommittedFastCountChanges::getForRead(opCtx).find(uuid);
     EXPECT_EQ(uncommittedSizeAndCount, expectedSizeCount);
 }
 

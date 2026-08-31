@@ -25,6 +25,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -921,24 +922,27 @@ TEST_F(ReplicatedFastCountManagerFinalizeContainerTest,
 using ReplicatedFastCountManagerCommitTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerCommitTest, CommitNothing) {
-    manager->commit(operationContext(), boost::container::flat_map<UUID, CollectionSizeCount>{});
-}
-
-TEST_F(ReplicatedFastCountManagerCommitTest, CollectionNotFoundDoesNothing) {
-    manager->commit(operationContext(),
-                    boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}}});
+    UncommittedFastCountChangeMap changes{};
+    manager->commit(operationContext(), changes);
 }
 
 TEST_F(ReplicatedFastCountManagerCommitTest, CommitZeros) {
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    const auto catalog = CollectionCatalog::latest(operationContext()->getServiceContext());
+    RecordStore* rs =
+        catalog->lookupCollectionByUUID(operationContext(), collA.uuid)->getRecordStore();
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 0, .count = 0});
 
-    manager->commit(operationContext(),
-                    boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = 0, .count = 0}}});
+    UncommittedFastCountChangeMap changes{
+        {collA.uuid,
+         UncommittedFastCountChange{
+             .delta = {.size = 0, .count = 0},
+             .recordStore = rs,
+         }},
+    };
+    manager->commit(operationContext(), changes);
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 0, .count = 0});
 }
@@ -948,25 +952,69 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
+    const auto catalog = CollectionCatalog::latest(operationContext()->getServiceContext());
+    RecordStore* rsA =
+        catalog->lookupCollectionByUUID(operationContext(), collA.uuid)->getRecordStore();
+    RecordStore* rsB =
+        catalog->lookupCollectionByUUID(operationContext(), collB.uuid)->getRecordStore();
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 0, .count = 0});
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 0, .count = 0});
 
-    manager->commit(operationContext(),
-                    boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}},
-                        {collB.uuid, CollectionSizeCount{.size = 111, .count = 17}}});
+    {
+        UncommittedFastCountChangeMap changes{
+            {collA.uuid,
+             UncommittedFastCountChange{
+                 .delta = {.size = 42, .count = 2},
+                 .recordStore = rsA,
+             }},
+            {collB.uuid,
+             UncommittedFastCountChange{
+                 .delta = {.size = 111, .count = 17},
+                 .recordStore = rsB,
+             }},
+        };
+        manager->commit(operationContext(), changes);
 
-    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42, .count = 2});
-    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111, .count = 17});
+        checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42, .count = 2});
+        checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111, .count = 17});
+    }
 
-    manager->commit(operationContext(),
-                    boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = -10, .count = -3}},
-                        {collB.uuid, CollectionSizeCount{.size = -11, .count = -4}}});
+    {
+        UncommittedFastCountChangeMap changes{
+            {collA.uuid,
+             UncommittedFastCountChange{
+                 .delta = {.size = -10, .count = -3},
+                 .recordStore = rsA,
+             }},
+            {collB.uuid,
+             UncommittedFastCountChange{
+                 .delta = {.size = -11, .count = -4},
+                 .recordStore = rsB,
+             }},
+        };
+        manager->commit(operationContext(), changes);
 
-    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42 - 10, .count = 2 - 3});
-    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111 - 11, .count = 17 - 4});
+        checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42 - 10, .count = 2 - 3});
+        checkCommittedSizeCount(
+            operationContext(), collB.uuid, {.size = 111 - 11, .count = 17 - 4});
+    }
+}
+
+using ReplicatedFastCountManagerCommitDeathTest = ReplicatedFastCountManagerCommitTest;
+
+DEATH_TEST_F(ReplicatedFastCountManagerCommitDeathTest,
+             MissingRecordStoreTerminates,
+             "Missing RecordStore for fast count change") {
+    // Deltas are non-zero to avoid early return.
+    UncommittedFastCountChangeMap changes{
+        {collA.uuid,
+         UncommittedFastCountChange{
+             .delta = {.size = 1, .count = 1},
+             .recordStore = nullptr,
+         }},
+    };
+    manager->commit(operationContext(), changes);
 }
 
 using ReplicatedFastCountManagerFindPersistedTest = ReplicatedFastCountManagerTest;

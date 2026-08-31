@@ -1033,14 +1033,14 @@ long long CollectionImpl::getCappedMaxSize() const {
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
         ? _shared->_recordStore->accurateNumRecords() +
-            UncommittedFastCountChange::getForRead(opCtx).find(uuid()).count
+            UncommittedFastCountChanges::getForRead(opCtx).find(uuid()).count
         : _shared->_recordStore->numRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
         ? _shared->_recordStore->accurateDataSize() +
-            UncommittedFastCountChange::getForRead(opCtx).find(uuid()).size
+            UncommittedFastCountChanges::getForRead(opCtx).find(uuid()).size
         : _shared->_recordStore->dataSize();
 }
 

@@ -408,13 +408,18 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
         if (isReplicatedFastCountEnabled(opCtx)) {
-            UncommittedFastCountChange::getForWrite(opCtx).record(
+            UncommittedFastCountChanges::getForWrite(opCtx).record(
                 collection->ns(),
                 collection->uuid(),
-                records.size(),
-                std::accumulate(records.begin(), records.end(), 0LL, [](auto acc, const Record& r) {
-                    return acc + r.data.size();
-                }));
+                UncommittedFastCountChange{
+                    .delta = {.size = std::accumulate(
+                                  records.begin(),
+                                  records.end(),
+                                  0LL,
+                                  [](auto acc, const Record& r) { return acc + r.data.size(); }),
+                              .count = static_cast<int64_t>(records.size())},
+                    .recordStore = collection->getRecordStore(),
+                });
         }
     }
 
@@ -781,8 +786,13 @@ void updateDocument(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->ns(), collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection->ns(),
+            collection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = newDoc.objsize() - oldDoc.value().objsize(), .count = 0},
+                .recordStore = collection->getRecordStore(),
+            });
     }
 }
 
@@ -880,8 +890,13 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->ns(), collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection->ns(),
+            collection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = newDoc.objsize() - oldDoc.value().objsize(), .count = 0},
+                .recordStore = collection->getRecordStore(),
+            });
     }
     return newDoc;
 }
@@ -976,8 +991,13 @@ void deleteDocument(OperationContext* opCtx,
         opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->ns(), collection->uuid(), -1, -doc.value().objsize());
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection->ns(),
+            collection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = -doc.value().objsize(), .count = -1},
+                .recordStore = collection->getRecordStore(),
+            });
     }
 
     if (opDebug) {
@@ -1048,8 +1068,13 @@ repl::OpTime truncateRange(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->ns(), collection->uuid(), -docsDeleted, -bytesDeleted);
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection->ns(),
+            collection->uuid(),
+            UncommittedFastCountChange{
+                .delta = {.size = -bytesDeleted, .count = -docsDeleted},
+                .recordStore = collection->getRecordStore(),
+            });
     }
     return opTime;
 }
