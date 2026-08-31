@@ -1313,8 +1313,13 @@ __ckpt_get_blkmods(
     WT_ASSERT(session, ret != WT_NOTFOUND);
     WT_ERR(ret);
     WT_ERR(metadata_cursor->get_value(metadata_cursor, &file_config));
-    WT_ERR(
-      __wt_config_getones(session, file_config, "checkpoint_backup_info", &backup_config_value));
+    /*
+     * A file whose metadata was last written before this field existed has no backup info. There is
+     * no previous bitmap, so there is no bit that can have been cleared and nothing to check.
+     */
+    WT_ERR_NOTFOUND_OK(
+      __wt_config_getones(session, file_config, "checkpoint_backup_info", &backup_config_value),
+      false);
 
     if ((backup_config_value.len > 0) && (backup_config_value.type == WT_CONFIG_ITEM_STRUCT)) {
         __wt_config_subinit(session, &blkconf, &backup_config_value);
