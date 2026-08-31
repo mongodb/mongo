@@ -152,6 +152,17 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         continue;
                     }
 
+                    // TODO(SERVER-134200): The system.resharding.* can be unaccessible during
+                    // resharding operation, in the window between commit of temporary collection
+                    // placement metadata to config and recipient shard fetching the new placement
+                    // metadata from global catalog. This is a known limitation that can lead to
+                    // transient errors and create noise. Therefore until the flaw of resharding
+                    // pipeline is fixed, the validation is skipped for temporary resharding
+                    // collections.
+                    if (nss.isTemporaryReshardingCollection()) {
+                        continue;
+                    }
+
                     BSONObjBuilder requestBuilder;
                     requestBuilder.append("aggregate", nss.coll());
                     requestBuilder.append("$db",
