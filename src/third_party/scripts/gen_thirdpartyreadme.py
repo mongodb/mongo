@@ -21,20 +21,18 @@ def main():
     test_filepaths()
     sbom = load_sbom()
 
-    component_chart = sbom_to_component_chart(sbom)
+    component_chart, footnotes = sbom_to_component_chart(sbom)
     right_pad_chart_values(component_chart)
     component_chart_string = chart_to_string(component_chart)
 
     component_links_string = sbom_to_component_links_string(sbom)
 
-    wiredtiger_chart = folders_to_wiredtiger_chart()
-    right_pad_chart_values(wiredtiger_chart)
-    wiredtiger_chart_string = chart_to_string(wiredtiger_chart)
+    footnotes_string = "\n".join(f"[{i}]: {text}" for i, text in enumerate(footnotes, start=1))
 
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
-        "wiredtiger_chart": wiredtiger_chart_string,
+        "license_footnotes": footnotes_string,
     }
     create_markdown_with_template(template_data)
 
@@ -57,24 +55,51 @@ def load_sbom() -> dict:
         sys.exit(1)
 
 
-def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
+def licenses_to_string(licenses: list[dict]) -> str:
+    parts = []
+    for lic in licenses:
+        if "license" in lic:
+            for key in ["id", "name"]:
+                if key in lic["license"]:
+                    parts.append(lic["license"][key])
+        elif "expression" in lic:
+            parts.append(lic["expression"])
+    # dict.fromkeys dedupes while preserving order; silkbomb's `update
+    # --select-licenses` step can emit the same license as both an "id" and
+    # "name" entry (e.g. two "MIT" entries) when it isn't able to resolve a
+    # single concluded license.
+    return ", ".join(dict.fromkeys(parts))
+
+
+def has_concluded_license(licenses: list[dict]) -> bool:
+    return any(
+        lic.get("license", {}).get("acknowledgement") == "concluded" for lic in licenses
+    )
+
+
+def sbom_to_component_chart(sbom: dict) -> tuple[list[list[str]], list[str]]:
     components = sbom["components"]
     component_chart = []
+    footnotes = []
 
     for component in components:
         if is_first_party(component):
             continue
         check_component_validity(component)
         name = component["name"]
-        license_string = []
-        for lic in component["licenses"]:
-            if "license" in lic:
-                for key in ["id", "name"]:
-                    if key in lic["license"]:
-                        license_string.append(lic["license"][key])
-            elif "expression" in lic:
-                license_string.append(lic["expression"])
-        license_string = ", ".join(license_string)
+        license_string = licenses_to_string(component["licenses"])
+        # evidence.licenses preserves the originally declared license as silkbomb's
+        # `update --select-licenses` step resolves it to a single concluded license
+        # in component["licenses"]. Only footnote when a resolution actually
+        # occurred (acknowledgement == "concluded") -- unresolved multi-entry
+        # lists stay tagged "declared" and are not a declared/concluded divergence.
+        declared_licenses = component.get("evidence", {}).get("licenses")
+        if declared_licenses and has_concluded_license(component["licenses"]):
+            declared_string = licenses_to_string(declared_licenses)
+            if declared_string and declared_string != license_string:
+                footnote_index = len(footnotes) + 1
+                footnotes.append(f"Declared as {declared_string}; concluded via automated SPDX resolution.")
+                license_string += f" [{footnote_index}]"
         version = component["version"]
         if component["scope"] == "excluded":
             emits_persisted_data = ""
@@ -109,7 +134,7 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
             "Distributed in Release Binaries",
         ],
     )
-    return component_chart
+    return component_chart, footnotes
 
 
 def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
@@ -125,27 +150,6 @@ def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
 
     return "\n".join(link_list)
 
-
-WIREDTIGER_3RDPARTY_PATH = "src/third_party/wiredtiger/test/3rdparty"
-_WIREDTIGER_FOLDER_RE = re.compile(r"(.*-\d+\.\d+(\.\d+)?).*")
-
-
-def folders_to_wiredtiger_chart() -> list[list[str]]:
-    wiredtiger_chart = [["Name"]]
-
-    try:
-        folder_names = os.listdir(WIREDTIGER_3RDPARTY_PATH)
-    except FileNotFoundError:
-        logging.warning("Warning: %s does not exist. Skipping wiredtiger chart.", WIREDTIGER_3RDPARTY_PATH)
-        return wiredtiger_chart
-
-    for folder in folder_names:
-        m = _WIREDTIGER_FOLDER_RE.fullmatch(folder)
-        if m:
-            name, version = m.group(1).rsplit("-", 1)
-            bisect.insort(wiredtiger_chart, [f"pkg:pypi/{name}@{version}"])
-
-    return wiredtiger_chart
 
 def is_first_party(component: dict) -> bool:
     for prop in component.get("properties", []):

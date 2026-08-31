@@ -204,24 +204,6 @@ py_library(
 )
 
 py_binary(
-    name = "sbom_linter",
-    srcs = [
-        "sbom_linter.py",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "jsonschema",
-            group = "build-metrics",
-        ),
-        dependency(
-            "license-expression",
-            group = "lint",
-        ),
-    ],
-)
-
-py_binary(
     name = "quickmongolint",
     srcs = [
         "quickmongolint.py",

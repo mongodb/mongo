@@ -1082,7 +1082,7 @@ def run_rules_lint(
         lr.check_copybara_forbidden_text([] if lint_all else files_to_lint)
 
     if should_run(LINT_SBOM, lint_all or "sbom.private.json" in files_to_lint):
-        lr.run_bazel("//buildscripts:sbom_linter")
+        lr.run_bazel("//buildscripts/tests/sbom_linter:sbom_linter")
 
     if should_run(
         LINT_QUICKMONGOLINT,

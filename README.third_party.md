@@ -127,22 +127,6 @@ a notice will be included in
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
 
-## WiredTiger Vendored Test Libraries
-
-The following libraries are transitively included by WiredTiger,
-and are used by that component for testing. They don't appear in
-released binary artifacts.
-
-| Name                           |
-| ------------------------------ |
-| pkg:pypi/concurrencytest@0.1.2 |
-| pkg:pypi/discover@0.4.0        |
-| pkg:pypi/extras@0.0.3          |
-| pkg:pypi/iso8601@2.1.0         |
-| pkg:pypi/python-subunit@1.4.4  |
-| pkg:pypi/testscenarios@0.4     |
-| pkg:pypi/testtools@2.7.1       |
-
 ## Dynamically Linked Libraries
 
 Sometimes MongoDB needs to load libraries provided and managed by the

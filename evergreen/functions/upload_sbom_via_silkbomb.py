@@ -60,6 +60,7 @@ def upload_sbom_via_silkbomb(
         branch_name,
         "--repo",
         repo_name,
+        "--sort",
     ]
 
     command = [

@@ -1,13 +1,17 @@
-"""Unit tests for the buildscripts/sbom_linter.py script."""
+"""Unit tests for the buildscripts/tests/sbom_linter/sbom_linter.py script."""
 
 import os
 import shutil
 import sys
+import tempfile
 import unittest
 
-from buildscripts import sbom_linter
+from buildscripts.tests.sbom_linter import sbom_linter
 
-TEST_DIR = os.path.join("buildscripts", "tests", "sbom_linter")
+# Resolved relative to this test file's own directory (not the process cwd), since
+# sbom_linter.main() changes the process cwd to BUILD_WORKSPACE_DIRECTORY when invoked
+# via --check-metadata, and `bazel test` vs `bazel run` resolve relative paths differently.
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 @unittest.skipIf(
@@ -17,11 +21,10 @@ TEST_DIR = os.path.join("buildscripts", "tests", "sbom_linter")
 class TestSbom(unittest.TestCase):
     def setUp(self):
         sbom_linter.SKIP_FILE_CHECKING = True
-        self.output_dir = os.path.join(TEST_DIR, "outputs")
+        # A real temp directory (not cwd-relative) so it stays valid even if
+        # sbom_linter.main() changes the process cwd during a test.
+        self.output_dir = tempfile.mkdtemp(prefix="sbom_linter_test_outputs_")
         self.input_dir = os.path.join(TEST_DIR, "inputs")
-
-        if not os.path.exists(self.output_dir):
-            os.mkdir(self.output_dir)
 
     def tearDown(self):
         shutil.rmtree(self.output_dir)
@@ -156,6 +159,34 @@ class TestSbom(unittest.TestCase):
         if not error_manager.zero_error():
             error_manager.print_errors()
         self.assertTrue(error_manager.zero_error())
+
+    def test_load_metadata_yaml_valid(self):
+        """load_metadata parses a YAML flat-list into a CycloneDX BOM dict."""
+        path = os.path.join(self.input_dir, "metadata_valid.cdx.yaml")
+        bom = sbom_linter.load_metadata(path)
+        self.assertIn("components", bom)
+        self.assertIn("metadata", bom)
+        self.assertEqual(bom["metadata"]["component"]["type"], "application")
+        self.assertEqual(bom["components"][0]["name"], "test-dep")
+        self.assertEqual(bom["dependencies"], [{"ref": "test-app", "dependsOn": ["test-dep"]}])
+
+    def test_load_metadata_invalid_depends_on_type(self):
+        """load_metadata exits 1 when dependsOn is a scalar string instead of a list."""
+        path = os.path.join(self.input_dir, "metadata_invalid_depends_on.cdx.yaml")
+        with self.assertRaises(SystemExit) as cm:
+            sbom_linter.load_metadata(path)
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_check_metadata_valid(self):
+        """--check-metadata returns 0 and prints OK for a valid YAML metadata file."""
+        path = os.path.join(self.input_dir, "metadata_valid.cdx.yaml")
+        saved_argv = sys.argv
+        try:
+            sys.argv = ["buildscripts/tests/sbom_linter/sbom_linter.py", "--check-metadata", path]
+            result = sbom_linter.main()
+        finally:
+            sys.argv = saved_argv
+        self.assertEqual(result, 0)
 
 
 if __name__ == "__main__":

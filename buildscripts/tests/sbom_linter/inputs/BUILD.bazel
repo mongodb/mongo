@@ -1,5 +1,17 @@
 package(default_visibility = ["//visibility:public"])
 
+# Exported so //buildscripts/tests/sbom_linter:test_sbom can depend on these fixture files as
+# data. Bazel's glob() never crosses package boundaries, and this directory is its own package
+# (it has its own BUILD.bazel for the sh_binary targets below), so the parent package's glob()
+# cannot see into it directly.
+filegroup(
+    name = "test_data",
+    srcs = glob(
+        ["*"],
+        exclude = ["BUILD.bazel"],
+    ),
+)
+
 sh_binary(
     name = "kafka_missing_version_import",
     srcs = ["kafka_missing_version_import.sh"],

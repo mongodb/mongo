@@ -1,14 +1,20 @@
 import argparse
+import copy
 import json
 import os
 import sys
 
 import jsonschema
+import yaml
 from license_expression import get_spdx_licensing
 from referencing import Registry, Resource
 
-BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
-SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
+# Resolved relative to this script's own directory (not the process cwd) since these are
+# fixed resource files shipped alongside sbom_linter.py, unlike user-supplied --input-file /
+# --check-metadata paths which are intentionally resolved relative to the invocation cwd.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BOM_SCHEMA_LOCATION = os.path.join(_SCRIPT_DIR, "bom-1.6.schema.json")
+SPDX_SCHEMA_LOCATION = os.path.join(_SCRIPT_DIR, "spdx.schema.json")
 SPDX_SCHEMA_REF = "spdx.schema.json"
 
 # directory to scan for third party libraries
@@ -23,7 +29,7 @@ SKIP_FILE_CHECKING = False
 UNDEFINED_THIRD_PARTY_ERROR = (
     "The following files in src/third_party do not have components defined in the sbom:"
 )
-FORMATTING_ERROR = "File has incorrect formatting, re-run `buildscripts/sbom_linter.py` with the `--format` option to fix this."
+FORMATTING_ERROR = "File has incorrect formatting, re-run `buildscripts/tests/sbom_linter/sbom_linter.py` with the `--format` option to fix this."
 MISSING_PURL_CPE_ERROR = "Component must include a 'purl' or 'cpe' field."
 MISSING_EVIDENCE_ERROR = (
     "Component must include an 'evidence.occurrences' field when the scope is required."
@@ -225,9 +231,10 @@ def validate_component(component: dict, third_party_libs: set, error_manager: Er
 def validate_location(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
     if "evidence" in component:
         if "occurrences" not in component["evidence"]:
-            error_manager.append_full_error_message(
-                "'evidence.occurrences' field must include at least one location."
-            )
+            # validate_evidence already errors and returns before calling this function
+            # when scope is "required", so reaching here means occurrences is legitimately
+            # absent (e.g. a component whose evidence only carries silkbomb-added licenses).
+            return
 
         occurrences = component["evidence"]["occurrences"]
         for occurrence in occurrences:
@@ -288,6 +295,51 @@ def lint_sbom(
     return error_manager
 
 
+def load_metadata(path: str) -> dict:
+    """Load a metadata.cdx.yaml file and return a CycloneDX BOM dict.
+
+    The file is a structured CycloneDX document with ``metadata.component`` and
+    ``components`` sections at the top level. Each component (including the primary one)
+    may carry an inline ``dependsOn`` list of bom-ref strings which is hoisted into
+    the top-level ``dependencies`` section and then removed from the component entry.
+
+    Raises SystemExit on schema validation failure.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        bom = yaml.safe_load(f)
+
+    # Hoist inline dependsOn from metadata.component and each component entry
+    # into the top-level dependencies section.
+    dependencies: list[dict] = list(bom.get("dependencies", []))
+    for entry in [bom.get("metadata", {}).get("component", {})] + bom.get("components", []):
+        if "dependsOn" in entry:
+            bom_ref = entry.get("bom-ref", "")
+            dependencies.append({"ref": bom_ref, "dependsOn": entry.pop("dependsOn")})
+    if dependencies:
+        bom["dependencies"] = dependencies
+
+    # Strip non-CycloneDX extension fields before schema validation, then validate
+    # a copy so the originals remain accessible to callers (e.g. generate_sbom.py
+    # reads branchOverrides from each component during version detection).
+    validation_bom = copy.deepcopy(bom)
+    for entry in [validation_bom.get("metadata", {}).get("component", {})] + validation_bom.get(
+        "components", []
+    ):
+        entry.pop("branchOverrides", None)
+
+    try:
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(
+            schema, registry=local_schema_registry()
+        ).validate(validation_bom)
+    except jsonschema.ValidationError as error:
+        print(f"load_metadata: {path} failed CycloneDX schema validation", file=sys.stderr)
+        print(error.message, file=sys.stderr)
+        sys.exit(1)
+
+    return bom
+
+
 def main() -> int:
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
@@ -308,7 +360,19 @@ def main() -> int:
         default="sbom.private.json",
         help="The file to output to when formatting is specified.",
     )
+    parser.add_argument(
+        "--check-metadata",
+        metavar="FILE",
+        default=None,
+        help="Validate a metadata.cdx.yaml file against the CycloneDX schema and exit.",
+    )
     args = parser.parse_args()
+
+    if args.check_metadata:
+        load_metadata(args.check_metadata)
+        print(f"{args.check_metadata}: OK")
+        return 0
+
     should_format = args.format
     input_file = args.input_file
     output_file = args.output_file

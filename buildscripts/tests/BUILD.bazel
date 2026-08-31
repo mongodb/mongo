@@ -322,13 +322,14 @@ py_test(
     name = "test_generate_sbom",
     srcs = ["test_generate_sbom.py"],
     data = [
-        "//buildscripts/sbom:metadata.cdx.json",
+        "//buildscripts/sbom:metadata.cdx.yaml",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/sbom:config",
         "//buildscripts/sbom:endorctl_utils",
         "//buildscripts/sbom:sbom_utils",
+        "//buildscripts/tests/sbom_linter:sbom_linter_lib",
     ],
 )
 

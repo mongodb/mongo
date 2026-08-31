@@ -3,7 +3,6 @@
 Tests for buildscripts/sbom/*.py
 """
 
-import json
 import logging
 import os
 import sys
@@ -12,6 +11,7 @@ import unittest
 from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
 from buildscripts.sbom.sbom_utils import is_valid_purl, reconcile_dependency_refs
+from buildscripts.tests.sbom_linter.sbom_linter import load_metadata
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -189,14 +189,8 @@ class TestConfigRegex(unittest.TestCase):
 class TestMetadataFile(unittest.TestCase):
     """Unit tests for SBOM metadata file validation and version tag consistency."""
 
-    TEST_DIR = os.path.join("buildscripts", "sbom")
+    METADATA_FILE = os.path.join("buildscripts", "sbom", "metadata.cdx.yaml")
     VERSION_TAG = "{{VERSION}}"
-
-    def read_sbom_json_file(self, file_path: str) -> dict:
-        """Load a JSON SBOM file (schema is not validated)"""
-        with open(file_path, "r", encoding="utf-8") as input_json:
-            sbom_json = input_json.read()
-        return json.loads(sbom_json)
 
     def test_metadata_sbom_version_tags(self):
         """Test that SBOM metadata components have consistent version tags.
@@ -206,9 +200,7 @@ class TestMetadataFile(unittest.TestCase):
         the VERSION_TAG is either present in all component properties or absent from all,
         maintaining consistency across bom-ref, version, purl, and cpe fields.
         """
-        sbom_metadata_file = os.path.join(self.TEST_DIR, "metadata.cdx.json")
-        print(sbom_metadata_file)
-        meta_bom = self.read_sbom_json_file(sbom_metadata_file)
+        meta_bom = load_metadata(self.METADATA_FILE)
         for component in meta_bom["components"]:
             with self.subTest(component=component):
                 properties = []
