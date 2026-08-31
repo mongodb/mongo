@@ -386,6 +386,14 @@ feature_flags:
         fcv_gated: true
         version: 8.3
 
+    featureFlagGeoSinCosRoundingRecovery:
+        description: >-
+            Feature flag to enable recovery from S2 validation failures caused by sin/cos
+            rounding differences across glibc versions.
+        cpp_varname: gFeatureFlagGeoSinCosRoundingRecovery
+        default: false
+        fcv_gated: false
+
     featureFlagCostBasedRanker:
         description: "Feature flag to enable the cost-based ranker for query plans."
         cpp_varname: gFeatureFlagCostBasedRanker

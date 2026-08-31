@@ -10,16 +10,21 @@
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <cmath>
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <s1angle.h>
@@ -178,7 +183,9 @@ static Status coordToPoint(double lng, double lat, S2Point* out) {
     return Status::OK();
 }
 
-static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
+static Status parseGeoJSONCoordinate(const BSONElement& elem,
+                                     S2Point* out,
+                                     Point* rawOut = nullptr) {
     if (BSONType::array != elem.type()) {
         return BAD_VALUE("GeoJSON coordinates must be an array, instead got type "
                          << typeName(elem.type()));
@@ -188,6 +195,10 @@ static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
     Status status = parseFlatPoint(elem, &p, true);
     if (!status.isOK())
         return status;
+
+    if (rawOut) {
+        *rawOut = p;
+    }
 
     status = coordToPoint(p.x, p.y, out);
     return status;
@@ -243,74 +254,227 @@ static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopEl
     return Status::OK();
 }
 
-static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
-                                             bool skipValidation,
-                                             S2Polygon* out) {
-    if (BSONType::array != elem.type()) {
-        return BAD_VALUE("Polygon coordinates must be an array, instead got type "
-                         << typeName(elem.type()));
+// Drops adjacent duplicate vertices and then the closing vertex.
+static void normalizeRingVertices(vector<S2Point>* points) {
+    eraseDuplicatePoints(points);
+    if (!points->empty()) {
+        points->pop_back();
+    }
+}
+
+// Parses one ring element of a polygon into its normalized vertex list.
+static StatusWith<vector<S2Point>> parseRingVertices(const BSONElement& ringElt) {
+    vector<S2Point> points;
+    if (auto status = parseArrayOfCoordinates(ringElt, &points); !status.isOK()) {
+        return status;
+    }
+    if (auto status = isLoopClosed(points, ringElt); !status.isOK()) {
+        return status;
+    }
+    normalizeRingVertices(&points);
+    return points;
+}
+
+// Returns the loop if 'points' forms a usable ring, otherwise the reason it does not.
+static StatusWith<std::unique_ptr<S2Loop>> buildLoop(const vector<S2Point>& points,
+                                                     bool skipValidation) {
+    // At least 3 vertices.
+    if (points.size() < 3) {
+        return BAD_VALUE("Loop must have at least 3 different vertices, "
+                         << points.size() << " unique vertices were provided");
     }
 
-    std::vector<std::unique_ptr<S2Loop>> loops;
-    Status status = Status::OK();
+    auto loop = std::make_unique<S2Loop>(points);
+
+    // Check whether this loop is valid if validation hasn't been already done on 2dSphere index
+    // insertion which is controlled by the 'skipValidation' flag.
+    // 1. At least 3 vertices, checked above.
+    // 2. All vertices must be unit length. Guaranteed by parsePoints().
+    // 3. Loops are not allowed to have any duplicate vertices.
+    // 4. Non-adjacent edges are not allowed to intersect.
     string err;
+    if (!skipValidation && !loop->IsValid(&err)) {
+        return BAD_VALUE("Loop is not valid: " << err);
+    }
+    return std::move(loop);
+}
 
-    BSONObjIterator it(elem.Obj());
-    // Iterate all loops of the polygon.
-    while (it.more()) {
-        // Parse the array of vertices of a loop.
-        BSONElement coordinateElt = it.next();
-        vector<S2Point> points;
-        status = parseArrayOfCoordinates(coordinateElt, &points);
-        if (!status.isOK())
-            return status;
+// Composes the user-facing error for a rejected ring out of the reason the ring was rejected and
+// the offending coordinates.
+static Status ringRejected(const Status& reason, const BSONElement& ringElt, bool afterRecovery) {
+    return BAD_VALUE(reason.reason() << (afterRecovery ? " after recovery attempted" : "") << ": "
+                                     << boundedSnippet(ringElt));
+}
 
-        // Check if the loop is closed.
-        status = isLoopClosed(points, coordinateElt);
-        if (!status.isOK())
-            return status;
+struct RecoveredRing {
+    vector<S2Point> points;
+    // False means nothing actually collapsed, and there is no recovery.
+    bool shifted = false;
+};
 
-        eraseDuplicatePoints(&points);
-        // Drop the duplicated last point.
-        points.resize(points.size() - 1);
+// Shift vertices with distinct GeoJSON coordinates that collapsed to the same S2Point, by
+// adding 1 ULP, 2 ULP, and so on, to the originally collapsed S2Point's x-dimension, so all
+// vertices in the ring remain pairwise distinguishable. All vertices in the ring are grouped by
+// original S2Point.
+//
+// Returns the shifted points on success, along with whether any vertex actually had to be shifted.
+// When nothing was shifted the points are unchanged from originalS2Points.
+// Returns a failed Status only if a group's cumulative shifting would produce a S2Point
+// that fails S2::IsUnitLength().
+//
+// The shifted S2Points satisfy:
+// 1) Vertices with the same GeoJSON coordinates in the ring get the same S2Point;
+// 2) Vertices with the same original S2Point but different GeoJSON coordinates will have S2Point
+//    P, P + 1 ULP, P + 2 ULP, and so on, in the order each distinct GeoJSON coordinate first
+//    appears in the ring. Each original S2Point group is numbered independently of the others.
+//
+// Example:
+// We use A, A', A'' to represent vertices that share the same original S2Point but have
+// different GeoJSON coordinates, and B for a vertex with an unrelated original S2Point.
+// PA and PB represents the original S2Point.
+//
+// Input  [A, A', B, A', A''] -> [PA, PA + 1 ULP, PB, PA + 1 ULP, PA + 2 ULP]
+// Input  [A, B, A', A] -> [PA, PB, PA + 1 ULP, PA]
+//
+// Note: the shifted PA + 1 ULP, PA + 2 ULP may collide with another vertex.
+// Leave for future work if such rare cases cause geo parsing validation failure.
+static StatusWith<RecoveredRing> recoverCollapsedVerticesByShift(
+    const vector<S2Point>& originalS2Points,
+    const vector<double>& rawLngs,
+    const vector<double>& rawLats) {
+    struct GroupState {
+        S2Point lastDistinctPoint;  // Shifted point of the most recent DISTINCT raw coordinate.
+        std::map<std::pair<double, double>, S2Point> assigned;  // raw coordinate -> its point.
+    };
 
-        // At least 3 vertices.
-        if (points.size() < 3) {
-            return BAD_VALUE("Loop must have at least 3 different vertices, "
-                             << points.size() << " unique vertices were provided: "
-                             << boundedSnippet(coordinateElt));
+    RecoveredRing recovered{originalS2Points, /*shifted*/ false};
+    vector<S2Point>& shiftedPoints = recovered.points;
+    // Maps each ORIGINAL S2Point to its group's state, so accumulation
+    // happens per-group across the whole ring.
+    stdx::unordered_map<S2Point, GroupState> groups;
+    for (size_t i = 0; i < originalS2Points.size(); ++i) {
+        std::pair<double, double> raw{rawLngs[i], rawLats[i]};
+        auto [it, inserted] = groups.try_emplace(
+            originalS2Points[i], GroupState{originalS2Points[i], {{raw, originalS2Points[i]}}});
+        if (inserted) {
+            continue;  // First vertex seen for this S2Point value; becomes the anchor.
         }
-
-        loops.push_back(std::make_unique<S2Loop>(points));
-        S2Loop* loop = loops.back().get();
-
-        // Check whether this loop is valid if vaildation hasn't been already done on 2dSphere index
-        // insertion which is controlled by the 'skipValidation' flag.
-        // 1. At least 3 vertices.
-        // 2. All vertices must be unit length. Guaranteed by parsePoints().
-        // 3. Loops are not allowed to have any duplicate vertices.
-        // 4. Non-adjacent edges are not allowed to intersect.
-        if (!skipValidation && !loop->IsValid(&err)) {
-            return BAD_VALUE("Loop is not valid: " << boundedSnippet(coordinateElt) << " " << err);
+        GroupState& group = it->second;
+        if (auto assignedIt = group.assigned.find(raw); assignedIt != group.assigned.end()) {
+            // A literal repeat of a raw coordinate already seen in this group - reuse its
+            // assigned point so both occurrences remain equal to each other.
+            shiftedPoints[i] = assignedIt->second;
+            continue;
         }
-        // If the loop is more than one hemisphere, invert it.
-        loop->Normalize();
+        S2Point candidate =
+            S2Point(std::nextafter(group.lastDistinctPoint.x(), group.lastDistinctPoint.x() + 1.0),
+                    originalS2Points[i].y(),
+                    originalS2Points[i].z());
+        if (!S2::IsUnitLength(candidate)) {
+            return Status(ErrorCodes::BadValue,
+                          "Shifting a collapsed vertex would exceed unit-length precision");
+        }
+        shiftedPoints[i] = candidate;
+        group.lastDistinctPoint = candidate;
+        group.assigned.emplace(raw, candidate);
+        recovered.shifted = true;
+    }
 
-        // Check the first loop must be the exterior ring and any others must be
-        // interior rings or holes.
-        if (!skipValidation && loops.size() > 1 && !loops[0]->Contains(loop)) {
-            return BAD_VALUE(
-                "Secondary loops not contained by first exterior loop - "
-                "secondary loops must be holes: "
-                << boundedSnippet(coordinateElt)
-                << " first loop: " << boundedSnippet(elem.Obj().firstElement()));
+    return recovered;
+}
+
+// Recovers a ring whose distinct GeoJSON coordinates produced identical S2Points. On failure,
+// the returned Status reflects why recovery didn't happen: the raw coordinates failed to re-parse,
+// or shifting a collapsed vertex would exceed unit-length precision.
+static StatusWith<RecoveredRing> recoverCollapsedVertices(const BSONElement& coordinateElt) {
+    vector<S2Point> s2Points;
+    vector<double> rawLngs, rawLats;
+    {
+        BSONObjIterator coordIt(coordinateElt.Obj());
+        while (coordIt.more()) {
+            BSONElement coordElem = coordIt.next();
+            Point p;
+            S2Point s2p;
+            if (auto status = parseGeoJSONCoordinate(coordElem, &s2p, &p); !status.isOK()) {
+                return status;
+            }
+            rawLngs.push_back(p.x);
+            rawLats.push_back(p.y);
+            s2Points.push_back(s2p);
         }
     }
 
-    if (loops.empty()) {
-        return BAD_VALUE("Polygon has no loops.");
+    auto swShifted = recoverCollapsedVerticesByShift(s2Points, rawLngs, rawLats);
+    if (!swShifted.isOK()) {
+        return swShifted.getStatus();
+    }
+    RecoveredRing recovered = std::move(swShifted.getValue());
+    // Normalize the same way as the main parsing path.
+    normalizeRingVertices(&recovered.points);
+
+    return recovered;
+}
+
+// Parses one ring of a polygon into an S2Loop, retrying a rejected ring once. The rejection
+// could be caused by vertices with distinct GeoJSON coordinates collapsing into identical
+// S2Points due to sin/cos rounding issue, which may cause a ring valid on one platform become
+// invalid on another. The recover process aims to get consistent result across different platforms.
+static StatusWith<std::unique_ptr<S2Loop>> parseRingAsLoop(const BSONElement& ringElt,
+                                                           bool skipValidation) {
+    auto swPoints = parseRingVertices(ringElt);
+    if (!swPoints.isOK()) {
+        return swPoints.getStatus();
     }
 
+    auto swLoop = buildLoop(swPoints.getValue(), skipValidation);
+    if (swLoop.isOK()) {
+        return swLoop;
+    }
+
+    // The ring was rejected. Distinct GeoJSON coordinates can map to the same S2Point under some
+    // sin/cos implementations (e.g. glibc 2.26 vs 2.34+), which surfaces either as too few
+    // vertices after deduplication or as a duplicate-/intersecting-vertex rejection. Retry once
+    // with those vertices pulled apart.
+    if (!feature_flags::gFeatureFlagGeoSinCosRoundingRecovery.isEnabled()) {
+        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
+    }
+
+    auto swRecovered = recoverCollapsedVertices(ringElt);
+    if (!swRecovered.isOK()) {
+        LOGV2_DEBUG(12940103,
+                    1,
+                    "Could not separate collapsed polygon vertices",
+                    "reason"_attr = swRecovered.getStatus());
+        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
+    }
+    if (!swRecovered.getValue().shifted) {
+        // No vertex collapsed, so the original rejection stands on its own merits.
+        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
+    }
+
+    auto swRecoveredLoop = buildLoop(swRecovered.getValue().points, skipValidation);
+    if (!swRecoveredLoop.isOK()) {
+        LOGV2_DEBUG(12940102,
+                    1,
+                    "Polygon ring is still not valid after recovering from collapsed vertices",
+                    "reason"_attr = swRecoveredLoop.getStatus());
+        return ringRejected(swRecoveredLoop.getStatus(), ringElt, /*afterRecovery*/ true);
+    }
+
+    LOGV2_DEBUG(12940101,
+                1,
+                "Recovered collapsed vertices from sin/cos rounding errors",
+                "recoveredVertexCount"_attr = swRecoveredLoop.getValue()->num_vertices());
+    return swRecoveredLoop;
+}
+
+// Takes ownership of 'loops', checks the polygon-level and GeoJSON nesting rules, and
+// initializes 'out'.
+static Status initPolygonFromLoops(std::vector<std::unique_ptr<S2Loop>> loops,
+                                   const BSONElement& elem,
+                                   bool skipValidation,
+                                   S2Polygon* out) {
+    string err;
     std::vector<S2Loop*> rawLoops;
     ScopeGuard rawLoopsGuard = [&] {
         for (S2Loop* p : rawLoops)
@@ -362,6 +526,48 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     return Status::OK();
 }
 
+static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
+                                             bool skipValidation,
+                                             S2Polygon* out) {
+    if (BSONType::array != elem.type()) {
+        return BAD_VALUE("Polygon coordinates must be an array, instead got type "
+                         << typeName(elem.type()));
+    }
+
+    std::vector<std::unique_ptr<S2Loop>> loops;
+    BSONObjIterator it(elem.Obj());
+    // Iterate all loops of the polygon.
+    while (it.more()) {
+        BSONElement coordinateElt = it.next();
+        auto swLoop = parseRingAsLoop(coordinateElt, skipValidation);
+        if (!swLoop.isOK()) {
+            return swLoop.getStatus();
+        }
+
+        loops.push_back(std::move(swLoop.getValue()));
+        // If the loop is more than one hemisphere, invert it.
+        loops.back()->Normalize();
+
+        // Check the first loop must be the exterior ring and any others must be
+        // interior rings or holes.
+        if (!skipValidation && loops.size() > 1 && !loops[0]->Contains(loops.back().get())) {
+            return BAD_VALUE(
+                "Secondary loops not contained by first exterior loop - "
+                "secondary loops must be holes: "
+                << boundedSnippet(coordinateElt)
+                << " first loop: " << boundedSnippet(elem.Obj().firstElement()));
+        }
+    }
+
+    if (loops.empty()) {
+        return BAD_VALUE("Polygon has no loops.");
+    }
+
+    return initPolygonFromLoops(std::move(loops), elem, skipValidation, out);
+}
+
+// TODO: Refactor this function by using some of helpers function used in
+// parseGeoJSONPolygonCoordinate().
 static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimplePolygon* out) {
     if (BSONType::array != elem.type()) {
         return BAD_VALUE("Coordinates of polygon must be an array, instead got type "
