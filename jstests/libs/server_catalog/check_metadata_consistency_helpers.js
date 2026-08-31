@@ -42,6 +42,12 @@ export var MetadataConsistencyChecker = (function () {
                 return true;
             }
 
+            if (e.code === ErrorCodes.SnapshotUnavailable) {
+                // Metadata consistency check can fail with SnapshotUnavailable due to a newly
+                // elected primary not being able to satisfy snapshot reads yet (see SERVER-132175).
+                return true;
+            }
+
             return false;
         };
 
