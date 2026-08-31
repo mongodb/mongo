@@ -179,6 +179,15 @@ get_static_proc_name (unw_addr_space_t as, unw_word_t ip,
   return elf_w (get_proc_name) (as, getpid (), ip, buf, buf_len, offp);
 }
 
+static int
+get_static_elf_filename (unw_addr_space_t as, unw_word_t ip,
+                         char *buf, size_t buf_len, unw_word_t *offp,
+                         void *arg)
+{
+
+  return elf_w (get_elf_filename) (as, getpid (), ip, buf, buf_len, offp);
+}
+
 HIDDEN void
 mips_local_addr_space_init (void)
 {
@@ -194,6 +203,11 @@ mips_local_addr_space_init (void)
 # error Unsupported ABI
 #endif
   local_addr_space.addr_size = sizeof (void *);
+#ifndef UNW_REMOTE_ONLY
+# if defined(HAVE_DL_ITERATE_PHDR)
+  local_addr_space.iterate_phdr_function = dl_iterate_phdr;
+# endif
+#endif
   local_addr_space.caching_policy = UNWI_DEFAULT_CACHING_POLICY;
   local_addr_space.acc.find_proc_info = dwarf_find_proc_info;
   local_addr_space.acc.put_unwind_info = put_unwind_info;
@@ -203,6 +217,7 @@ mips_local_addr_space_init (void)
   local_addr_space.acc.access_fpreg = access_fpreg;
   local_addr_space.acc.resume = NULL;  /* mips_local_resume?  FIXME!  */
   local_addr_space.acc.get_proc_name = get_static_proc_name;
+  local_addr_space.acc.get_elf_filename = get_static_elf_filename;
   unw_flush_cache (&local_addr_space, 0, 0);
 }
 

@@ -30,6 +30,9 @@ common_init (struct cursor *c, unsigned use_prev_instr)
 {
   int ret, i;
 
+  for (i = UNW_AARCH64_PSTATE + 1; i < UNW_AARCH64_V0; ++i)
+    c->dwarf.loc[i] = DWARF_NULL_LOC;
+
   c->dwarf.loc[UNW_AARCH64_X0]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_X0);
   c->dwarf.loc[UNW_AARCH64_X1]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_X1);
   c->dwarf.loc[UNW_AARCH64_X2]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_X2);
@@ -65,6 +68,7 @@ common_init (struct cursor *c, unsigned use_prev_instr)
   c->dwarf.loc[UNW_AARCH64_PC]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_PC);
   c->dwarf.loc[UNW_AARCH64_PSTATE] = DWARF_REG_LOC (&c->dwarf,
                                                     UNW_AARCH64_PSTATE);
+  c->dwarf.loc[UNW_AARCH64_VG]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_VG);
   c->dwarf.loc[UNW_AARCH64_V0]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V0);
   c->dwarf.loc[UNW_AARCH64_V1]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V1);
   c->dwarf.loc[UNW_AARCH64_V2]  = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V2);
@@ -97,9 +101,6 @@ common_init (struct cursor *c, unsigned use_prev_instr)
   c->dwarf.loc[UNW_AARCH64_V29] = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V29);
   c->dwarf.loc[UNW_AARCH64_V30] = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V30);
   c->dwarf.loc[UNW_AARCH64_V31] = DWARF_REG_LOC (&c->dwarf, UNW_AARCH64_V31);
-
-  for (i = UNW_AARCH64_PSTATE + 1; i < UNW_AARCH64_V0; ++i)
-    c->dwarf.loc[i] = DWARF_NULL_LOC;
 
   ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_AARCH64_PC], &c->dwarf.ip);
   if (ret < 0)

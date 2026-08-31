@@ -1,9 +1,9 @@
 #! /bin/sh
 # test-driver - basic testsuite driver script.
 
-scriptversion=2013-07-13.22; # UTC
+scriptversion=2018-03-07.03; # UTC
 
-# Copyright (C) 2011-2014 Free Software Foundation, Inc.
+# Copyright (C) 2011-2021 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@ scriptversion=2013-07-13.22; # UTC
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # As a special exception to the GNU General Public License, if you
 # distribute this file as part of a program that contains a
@@ -42,11 +42,13 @@ print_usage ()
 {
   cat <<END
 Usage:
-  test-driver --test-name=NAME --log-file=PATH --trs-file=PATH
-              [--expect-failure={yes|no}] [--color-tests={yes|no}]
-              [--enable-hard-errors={yes|no}] [--]
+  test-driver --test-name NAME --log-file PATH --trs-file PATH
+              [--expect-failure {yes|no}] [--color-tests {yes|no}]
+              [--enable-hard-errors {yes|no}] [--]
               TEST-SCRIPT [TEST-SCRIPT-ARGUMENTS]
+
 The '--test-name', '--log-file' and '--trs-file' options are mandatory.
+See the GNU Automake documentation for information.
 END
 }
 
@@ -103,8 +105,11 @@ trap "st=130; $do_exit" 2
 trap "st=141; $do_exit" 13
 trap "st=143; $do_exit" 15
 
-# Test script is run here.
-"$@" >$log_file 2>&1
+# Test script is run here. We create the file first, then append to it,
+# to ameliorate tests themselves also writing to the log file. Our tests
+# don't, but others can (automake bug#35762).
+: >"$log_file"
+"$@" >>"$log_file" 2>&1
 estatus=$?
 
 if test $enable_hard_errors = no && test $estatus -eq 99; then
@@ -126,7 +131,7 @@ esac
 # know whether the test passed or failed simply by looking at the '.log'
 # file, without the need of also peaking into the corresponding '.trs'
 # file (automake bug#11814).
-echo "$res $test_name (exit status: $estatus)" >>$log_file
+echo "$res $test_name (exit status: $estatus)" >>"$log_file"
 
 # Report outcome to console.
 echo "${col}${res}${std}: $test_name"
@@ -140,9 +145,9 @@ echo ":copy-in-global-log: $gcopy" >> $trs_file
 # Local Variables:
 # mode: shell-script
 # sh-indentation: 2
-# eval: (add-hook 'write-file-hooks 'time-stamp)
+# eval: (add-hook 'before-save-hook 'time-stamp)
 # time-stamp-start: "scriptversion="
 # time-stamp-format: "%:y-%02m-%02d.%02H"
-# time-stamp-time-zone: "UTC"
+# time-stamp-time-zone: "UTC0"
 # time-stamp-end: "; # UTC"
 # End:

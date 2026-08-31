@@ -34,10 +34,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 # include "tdep-ia64/rse.h"
 #endif
 
-#if HAVE_DECL_PTRACE_SETREGSET
+#if HAVE_DECL_PTRACE_SETREGSET && (defined(__linux__) && !defined(UNW_TARGET_X86))
 #include <sys/uio.h>
 int
-_UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
+_UPT_access_reg (unw_addr_space_t as UNUSED, unw_regnum_t reg, unw_word_t *val,
                  int write, void *arg)
 {
   struct UPT_info *ui = arg;
@@ -77,9 +77,9 @@ badreg:
   Debug (1, "bad register %s [%u] (error: %s)\n", unw_regname(reg), reg, strerror (errno));
   return -UNW_EBADREG;
 }
-#elif HAVE_DECL_PTRACE_POKEUSER || HAVE_TTRACE
+#elif (HAVE_DECL_PTRACE_POKEUSER || defined(HAVE_TTRACE)) && (defined(__linux__) && !defined(UNW_TARGET_X86))
 int
-_UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
+_UPT_access_reg (UNUSED unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
                  int write, void *arg)
 {
   struct UPT_info *ui = arg;
@@ -321,10 +321,49 @@ _UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
   Debug (1, "bad register %s [%u] (error: %s)\n", unw_regname(reg), reg, strerror (errno));
   return -UNW_EBADREG;
 }
-#elif HAVE_DECL_PT_GETREGS
+#elif defined(HAVE_DECL_PT_GETREGS) && defined(__linux__)
+# include <sys/user.h>
+
 int
 _UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
                  int write, void *arg)
+{
+  struct UPT_info *ui = arg;
+  pid_t pid = ui->pid;
+  struct user_regs_struct regs;
+  char *r;
+
+#if UNW_DEBUG
+  Debug(16, "using getregs: reg: %s [%u], val: %lx, write: %u\n", unw_regname(reg), (unsigned) reg, (long) val, write);
+
+  if (write)
+    Debug (16, "%s [%u] <- %lx\n", unw_regname (reg), (unsigned) reg, (long) *val);
+#endif
+  if ((unsigned) reg >= ARRAY_SIZE (_UPT_reg_offset))
+    {
+      errno = EINVAL;
+      goto badreg;
+    }
+  r = (char *)&regs + _UPT_reg_offset[reg];
+  if (ptrace(PT_GETREGS, pid, NULL, &regs) == -1)
+    goto badreg;
+  if (write) {
+      memcpy(r, val, sizeof(unw_word_t));
+      if (ptrace(PT_SETREGS, pid, NULL, &regs) == -1)
+        goto badreg;
+  } else
+      memcpy(val, r, sizeof(unw_word_t));
+  return 0;
+
+ badreg:
+  Debug (1, "bad register %s [%u] (error: %s)\n", unw_regname(reg), reg, strerror (errno));
+  return -UNW_EBADREG;
+}
+
+#elif defined(HAVE_DECL_PT_GETREGS) && defined(__FreeBSD__)
+int
+_UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
+                int write, void *arg)
 {
   struct UPT_info *ui = arg;
   pid_t pid = ui->pid;
@@ -337,6 +376,7 @@ _UPT_access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
   if (write)
     Debug (16, "%s [%u] <- %lx\n", unw_regname (reg), (unsigned) reg, (long) *val);
 #endif
+
   if ((unsigned) reg >= ARRAY_SIZE (_UPT_reg_offset))
     {
       errno = EINVAL;

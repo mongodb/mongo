@@ -45,7 +45,7 @@ tdep_stash_frame (struct dwarf_cursor *d, struct dwarf_reg_state *rs)
     rs->reg.where[RBP] == DWARF_WHERE_EXPR) {
     /* Check for GCC generated alignment frame for rsp.  A simple
      * def_cfa_expr that loads a constant offset from rbp, where the
-     * addres of the rip was pushed on the stack */
+     * address of the rip was pushed on the stack */
     unw_word_t cfa_addr = rs->reg.val[DWARF_CFA_REG_COLUMN];
     unw_word_t rbp_addr = rs->reg.val[RBP];
     unw_word_t cfa_offset;
@@ -71,11 +71,13 @@ tdep_stash_frame (struct dwarf_cursor *d, struct dwarf_reg_state *rs)
       && DWARF_GET_LOC(d->loc[rs->ret_addr_column]) == d->cfa-8
       && (rs->reg.where[RBP] == DWARF_WHERE_UNDEF
           || rs->reg.where[RBP] == DWARF_WHERE_SAME
+          || rs->reg.where[RBP] == DWARF_WHERE_CFA
           || (rs->reg.where[RBP] == DWARF_WHERE_CFAREL
               && labs((long) rs->reg.val[RBP]) < (1 << 14)
               && rs->reg.val[RBP]+1 != 0))
       && (rs->reg.where[RSP] == DWARF_WHERE_UNDEF
           || rs->reg.where[RSP] == DWARF_WHERE_SAME
+          || rs->reg.where[RSP] == DWARF_WHERE_CFA
           || (rs->reg.where[RSP] == DWARF_WHERE_CFAREL
               && labs((long) rs->reg.val[RSP]) < (1 << 14)
               && rs->reg.val[RSP]+1 != 0)))
@@ -88,6 +90,10 @@ tdep_stash_frame (struct dwarf_cursor *d, struct dwarf_reg_state *rs)
       f->rbp_cfa_offset = rs->reg.val[RBP];
     if (rs->reg.where[RSP] == DWARF_WHERE_CFAREL)
       f->rsp_cfa_offset = rs->reg.val[RSP];
+    if (rs->reg.where[RBP] == DWARF_WHERE_CFA)
+      f->rbp_cfa_offset = 0;
+    if (rs->reg.where[RSP] == DWARF_WHERE_CFA)
+      f->rsp_cfa_offset = 0;
     Debug (4, " standard frame\n");
   }
 

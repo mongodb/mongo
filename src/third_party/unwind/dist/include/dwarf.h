@@ -32,11 +32,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 struct dwarf_cursor;    /* forward-declaration */
 struct elf_dyn_info;
 
-#include "dwarf-config.h"
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+
+#include "dwarf-config.h"
 
 #ifndef UNW_REMOTE_ONLY
   #if defined(HAVE_LINK_H)
@@ -422,7 +422,7 @@ extern int dwarf_search_unwind_table (unw_addr_space_t as,
                                       int need_unwind_info, void *arg);
 
 extern int dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
-                                    char *path, unw_word_t segbase, unw_word_t mapoff,
+                                    const char *path, unw_word_t segbase, unw_word_t mapoff,
                                     unw_word_t ip);
 extern void dwarf_put_unwind_info (unw_addr_space_t as,
                                    unw_proc_info_t *pi, void *arg);

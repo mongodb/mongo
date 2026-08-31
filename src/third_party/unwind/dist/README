@@ -1,6 +1,7 @@
 # libunwind
 
-[![Build Status](https://travis-ci.org/libunwind/libunwind.svg?branch=master)](https://travis-ci.org/libunwind/libunwind)
+[![CI - Unix](https://github.com/libunwind/libunwind/actions/workflows/CI-unix.yml/badge.svg)](https://github.com/libunwind/libunwind/actions/workflows/CI-unix.yml)
+[![CI - Windows](https://github.com/libunwind/libunwind/actions/workflows/CI-win.yml/badge.svg)](https://github.com/libunwind/libunwind/actions/workflows/CI-win.yml)
 
 This library supports several architecture/operating-system combinations:
 
@@ -15,13 +16,17 @@ This library supports several architecture/operating-system combinations:
 | Linux   | SuperH       | ✓      |
 | Linux   | IA-64        | ✓      |
 | Linux   | PARISC       | Works well, but C library missing unwind-info |
-| Linux   | Tilegx       | 64-bit mode only |
-| Linux   | MIPS         | Newly added |
+| Linux   | MIPS         | ✓      |
 | Linux   | RISC-V       | 64-bit only |
+| Linux   | LoongArch    | 64-bit only |
 | HP-UX   | IA-64        | Mostly works, but known to have serious limitations |
 | FreeBSD | x86-64       | ✓      |
 | FreeBSD | x86          | ✓      |
 | FreeBSD | AArch64      | ✓      |
+| FreeBSD | PPC32        | ✓      |
+| FreeBSD | PPC64        | ✓      |
+| QNX     | Aarch64      | ✓      |
+| QNX     | x86-64       | ✓      |
 | Solaris | x86-64       | ✓      |
 
 ## Libc Requirements
@@ -41,13 +46,13 @@ such dependencies
 |    arm       |     p      |            |
 |    hppa      |     p      |      p     |
 |    ia64      |     p      |      r     |
+|    loongarch |     p      |            |
 |    mips      |     p      |            |
 |    ppc32     |     r      |            |
 |    ppc64     |     r      |      r     |
 |    riscv     |     p      |      p     |
 |    s390x     |     p      |      p     |
 |    sh        |     r      |            |
-|    tilegx    |     r      |      r     |
 |    x86       |     p      |      r     |
 |    x86_64    |     p      |      p     |
 
@@ -57,9 +62,9 @@ In general, this library can be built and installed with the following
 commands:
 
     $ autoreconf -i # Needed only for building from git. Depends on libtool.
-    $ ./configure
+    $ ./configure --prefix=PREFIX
     $ make
-    $ make install prefix=PREFIX
+    $ make install
 
 where `PREFIX` is the installation prefix.  By default, a prefix of
 `/usr/local` is used, such that `libunwind.a` is installed in
@@ -88,18 +93,6 @@ libunwind should be configured and installed on HP-UX like this:
     $ ./configure CFLAGS="-g -O2 -mlp64" CXXFLAGS="-g -O2 -mlp64"
 
 Caveat: Unwinding of 32-bit (ILP32) binaries is not supported at the moment.
-
-### Workaround for older versions of GCC
-
-GCC v3.0 and GCC v3.2 ship with a bad version of `sys/types.h`.  The
-workaround is to issue the following commands before running
-`configure`:
-
-    $ mkdir $top_dir/include/sys
-    $ cp /usr/include/sys/types.h $top_dir/include/sys
-
-GCC v3.3.2 or later have been fixed and do not require this
-workaround.
 
 ### Building for PowerPC64 / Linux
 
@@ -136,27 +129,6 @@ After building the library, you can run a set of regression tests with:
 
     $ make check
 
-### Expected results on IA-64 Linux
-
-Unless you have a very recent C library and compiler installed, it is
-currently expected to have the following tests fail on IA-64 Linux:
-
-* `Gtest-init` (should pass starting with glibc-2.3.x/gcc-3.4)
-* `Ltest-init` (should pass starting with glibc-2.3.x/gcc-3.4)
-* `test-ptrace` (should pass starting with glibc-2.3.x/gcc-3.4)
-* `run-ia64-test-dyn1` (should pass starting with glibc-2.3.x)
-
-This does not mean that libunwind cannot be used with older compilers
-or C libraries, it just means that for certain corner cases, unwinding
-will fail.  Since they're corner cases, it is not likely for
-applications to trigger them.
-
-Note: If you get lots of errors in `Gia64-test-nat` and `Lia64-test-nat`, it's
-almost certainly a sign of an old assembler.  The GNU assembler used
-to encode previous-stack-pointer-relative offsets incorrectly.
-This bug was fixed on 21-Sep-2004 so any later assembler will be
-fine.
-
 ### Expected results on x86 Linux
 
 The following tests are expected to fail on x86 Linux:
@@ -171,10 +143,6 @@ The following tests are expected to fail on x86-64 Linux:
   and <http://gcc.gnu.org/bugzilla/show_bug.cgi?id=18749>)
 
 ### Expected results on PARISC Linux
-
-Caveat: GCC v3.4 or newer is needed on PA-RISC Linux.  Earlier
-versions of the compiler failed to generate the exception-handling
-program header (`GNU_EH_FRAME`) needed for unwinding.
 
 The following tests are expected to fail on x86-64 Linux:
 
@@ -232,10 +200,5 @@ commands:
 
 ## Contacting the Developers
 
-Please direct all questions regarding this library to <libunwind-devel@nongnu.org>.
-
-You can do this by sending an email to <libunwind-request@nongnu.org> with
-a body of "subscribe libunwind-devel", or you can subscribe and manage your
-subscription via the web-interface at <https://savannah.nongnu.org/mail/?group=libunwind>.
-
-You can also interact on our GitHub page: <https://github.com/libunwind/libunwind>.
+Please raise issues and pull requests through the GitHub repository:
+<https://github.com/libunwind/libunwind>.

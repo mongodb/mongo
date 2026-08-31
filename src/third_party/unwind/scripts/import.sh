@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=libunwind
-REVISION="v1.6-stable-mongo" # 2022-01-20
-VERSION="1.6.2"
+REVISION="mongodb/v1.8.1" # 2024-12-11
+VERSION="1.8.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/unwind
 if [[ -d $DEST_DIR/dist ]]; then

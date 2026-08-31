@@ -23,18 +23,18 @@
 # include "libunwind-x86.h"
 #elif defined __x86_64__
 # include "libunwind-x86_64.h"
-#elif defined __tilegx__
-# include "libunwind-tilegx.h"
 #elif defined __s390x__
 # include "libunwind-s390x.h"
 #elif defined __riscv || defined __riscv__
 # include "libunwind-riscv.h"
+#elif defined __loongarch64
+# include "libunwind-loongarch64.h"
 #else
 # error "Unsupported arch"
 #endif
 
 #else /* UNW_REMOTE_ONLY */
 
-# include "libunwind-s390x.h"
+# include "libunwind-aarch64.h"
 
 #endif /* UNW_REMOTE_ONLY */

@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <stdatomic.h>
 
 void
-unw_flush_cache (unw_addr_space_t as, unw_word_t lo, unw_word_t hi)
+unw_flush_cache (unw_addr_space_t as, unw_word_t lo UNUSED, unw_word_t hi UNUSED)
 {
 #if !UNW_TARGET_IA64
   struct unw_debug_frame_list *w = as->debug_frames;
@@ -37,10 +37,10 @@ unw_flush_cache (unw_addr_space_t as, unw_word_t lo, unw_word_t hi)
       struct unw_debug_frame_list *n = w->next;
 
       if (w->index)
-        munmap (w->index, w->index_size);
+        mi_munmap (w->index, w->index_size);
 
-      munmap (w->debug_frame, w->debug_frame_size);
-      munmap (w, sizeof (*w));
+      mi_munmap (w->debug_frame, w->debug_frame_size);
+      mi_munmap (w, sizeof (*w));
       w = n;
     }
   as->debug_frames = NULL;

@@ -37,7 +37,12 @@ extern "C" {
 #endif
 
 #include <inttypes.h>
+#include <stdint.h>
 #include <ucontext.h>
+
+#ifndef UNW_EMPTY_STRUCT
+#  define UNW_EMPTY_STRUCT uint8_t unused;
+#endif
 
 #define UNW_TARGET              ppc64
 #define UNW_TARGET_PPC64        1
@@ -67,9 +72,11 @@ extern "C" {
 #if __WORDSIZE==32
 typedef uint32_t unw_word_t;
 typedef int32_t unw_sword_t;
+#define UNW_WORD_MAX UINT32_MAX
 #else
 typedef uint64_t unw_word_t;
 typedef int64_t unw_sword_t;
+#define UNW_WORD_MAX UINT64_MAX
 #endif
 
 typedef double unw_tdep_fpreg_t;
@@ -239,6 +246,7 @@ ppc64_abi_t;
 typedef struct unw_tdep_save_loc
   {
     /* Additional target-dependent info on a save location.  */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_save_loc_t;
 
@@ -256,6 +264,7 @@ typedef ucontext_t unw_tdep_context_t;
 typedef struct
   {
     /* no ppc64-specific auxiliary proc-info */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_proc_info_t;
 

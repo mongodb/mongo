@@ -38,5 +38,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define JB_RP           0
 #define JB_MASK_SAVED   11
 #define JB_MASK         7
+#define	_JB_STK_SHIFT	4
 
 #endif

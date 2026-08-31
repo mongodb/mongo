@@ -54,6 +54,8 @@ _UCD_create(const char *filename)
 #define elf_header64 elf_header.h64
   bool _64bits;
 
+  mi_init ();
+
   struct UCD_info *ui = memset(malloc(sizeof(*ui)), 0, sizeof(*ui));
   ui->edi.di_cache.format = -1;
   ui->edi.di_debug.format = -1;
@@ -142,9 +144,7 @@ _UCD_create(const char *filename)
           cur->p_filesz = hdr64.p_filesz;
           cur->p_memsz  = hdr64.p_memsz ;
           cur->p_align  = hdr64.p_align ;
-          /* cur->backing_filename = NULL; - done by memset */
-          cur->backing_fd = -1;
-          cur->backing_filesize = hdr64.p_filesz;
+          cur->p_backing_file_index = -1;
           i++;
           cur++;
         }
@@ -167,9 +167,7 @@ _UCD_create(const char *filename)
           cur->p_filesz = hdr32.p_filesz;
           cur->p_memsz  = hdr32.p_memsz ;
           cur->p_align  = hdr32.p_align ;
-          /* cur->backing_filename = NULL; - done by memset */
-          cur->backing_fd = -1;
-          cur->backing_filesize = hdr32.p_memsz;
+          cur->p_backing_file_index = -1;
           i++;
           cur++;
         }
@@ -181,6 +179,10 @@ _UCD_create(const char *filename)
 		goto err;
 	}
 
+    ret = ucd_file_table_init(&ui->ucd_file_table);
+    if (ret != UNW_ESUCCESS) {
+		Debug(0, "error initializing backing file table\n");
+	}
     ret = _UCD_get_mapinfo(ui, phdrs, size);
     if (ret != UNW_ESUCCESS) {
 		Debug(0, "failure retrieving file mapping from core file\n");
@@ -192,23 +194,17 @@ _UCD_create(const char *filename)
 	  {
 		if (cur->p_type == PT_LOAD)
 		  {
-			Debug(2, " ofs:%08llx va:%08llx filesize:%08llx memsize:%08llx flg:%x",
+			Debug(2, "phdr[%u] ofs:%#010llx va:%#010llx filesize:%#010llx memsize:%#010llx flg:%#04x bf_idx=%d %s %s\n",
+				                i,
 								(unsigned long long) cur->p_offset,
 								(unsigned long long) cur->p_vaddr,
 								(unsigned long long) cur->p_filesz,
 								(unsigned long long) cur->p_memsz,
-								cur->p_flags
-			);
-			if (cur->p_filesz < cur->p_memsz)
-			  {
-				Debug(2, " partial");
-			  }
-			if (cur->p_flags & PF_X)
-			  {
-				Debug(2, " executable");
-			  }
+								cur->p_flags,
+								cur->p_backing_file_index,
+			                    (cur->p_filesz < cur->p_memsz)?"partial":"       ",
+			                    (cur->p_flags & PF_X)?"exec":"    ");
 		  }
-		Debug(2, "\n");
 		cur++;
 	  }
 
@@ -218,7 +214,10 @@ _UCD_create(const char *filename)
         goto err;
       }
 
-    ui->prstatus = &ui->threads[0];
+    ui->prstatus = &ui->threads[0].prstatus;
+#ifdef HAVE_ELF_FPREGSET_T
+    ui->fpregset = &ui->threads[0].fpregset;
+#endif
 
   return ui;
 
@@ -234,96 +233,29 @@ int _UCD_get_num_threads(struct UCD_info *ui)
 
 void _UCD_select_thread(struct UCD_info *ui, int n)
 {
-  if (n >= 0 && n < ui->n_threads)
-    ui->prstatus = &ui->threads[n];
+  if (n >= 0 && n < ui->n_threads) {
+    ui->prstatus = &ui->threads[n].prstatus;
+#ifdef HAVE_ELF_FPREGSET_T
+    ui->fpregset = &ui->threads[n].fpregset;
+#endif
+  }
 }
 
 pid_t _UCD_get_pid(struct UCD_info *ui)
 {
+#if defined(HAVE_PROCFS_STATUS)
+  return ui->prstatus->thread.pid;
+#else
   return ui->prstatus->pr_pid;
+#endif
 }
 
 int _UCD_get_cursig(struct UCD_info *ui)
 {
+#if defined(HAVE_PROCFS_STATUS)
+  return ui->prstatus->thread.info.si_signo;
+#else
   return ui->prstatus->pr_cursig;
+#endif
 }
 
-int _UCD_add_backing_file_at_segment(struct UCD_info *ui, int phdr_no, const char *filename)
-{
-  if ((unsigned)phdr_no >= ui->phdrs_count)
-    {
-      Debug(0, "There is no segment %d in this coredump\n", phdr_no);
-      return -1;
-    }
-
-  struct coredump_phdr *phdr = &ui->phdrs[phdr_no];
-  if (phdr->backing_filename)
-    {
-      Debug(0, "Backing file already added to segment %d\n", phdr_no);
-      return -1;
-    }
-
-  int fd = open(filename, O_RDONLY);
-  if (fd < 0)
-    {
-      Debug(0, "Can't open '%s'\n", filename);
-      return -1;
-    }
-
-  phdr->backing_fd = fd;
-  phdr->backing_filename = strdup(filename);
-
-  struct stat statbuf;
-  if (fstat(fd, &statbuf) != 0)
-    {
-      Debug(0, "Can't stat '%s'\n", filename);
-      goto err;
-    }
-  phdr->backing_filesize = (uoff_t)statbuf.st_size;
-
-  if (phdr->p_flags != (PF_X | PF_R))
-    {
-      Debug(1, "Note: phdr[%u] is not r-x: flags are 0x%x\n",
-                        phdr_no, phdr->p_flags);
-    }
-
-  if (phdr->backing_filesize > phdr->p_memsz)
-    {
-      /* This is expected */
-      Debug(2, "Note: phdr[%u] is %lld bytes, file is larger: %lld bytes\n",
-                        phdr_no,
-                        (unsigned long long)phdr->p_memsz,
-                        (unsigned long long)phdr->backing_filesize
-      );
-    }
-//TODO: else loudly complain? Maybe even fail?
-
-  /* Success */
-  return 0;
-
- err:
-  if (phdr->backing_fd >= 0)
-    {
-      close(phdr->backing_fd);
-      phdr->backing_fd = -1;
-    }
-  free(phdr->backing_filename);
-  phdr->backing_filename = NULL;
-  return -1;
-}
-
-int _UCD_add_backing_file_at_vaddr(struct UCD_info *ui,
-                                   unsigned long vaddr,
-                                   const char *filename)
-{
-  unsigned i;
-  for (i = 0; i < ui->phdrs_count; i++)
-    {
-      struct coredump_phdr *phdr = &ui->phdrs[i];
-      if (phdr->p_vaddr != vaddr)
-        continue;
-      /* It seems to match. Add it. */
-      return _UCD_add_backing_file_at_segment(ui, i, filename);
-    }
-  return -1;
-}

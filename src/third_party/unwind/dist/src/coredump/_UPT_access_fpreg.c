@@ -25,10 +25,32 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "_UCD_internal.h"
 
 int
-_UCD_access_fpreg (unw_addr_space_t as, unw_regnum_t reg, unw_fpreg_t *val,
-                   int write, void *arg)
+_UCD_access_fpreg (unw_addr_space_t  as UNUSED,
+                   unw_regnum_t      reg UNUSED,
+                   unw_fpreg_t      *val UNUSED,
+                   int               write,
+                   void             *arg)
 {
+  struct UCD_info *ui UNUSED = arg;
+
+  if (write)
+    {
+      Debug(0, "write is not supported\n");
+      return -UNW_EINVAL;
+    }
+
+#ifdef __s390x__
+  if (reg < UNW_S390X_F0 || reg > UNW_S390X_F15)
+    {
+      Debug(0, "bad regnum:%d\n", reg);
+      return -UNW_EINVAL;
+    }
+
+  *val = ui->fpregset->fprs[reg - UNW_S390X_F0].d;
+  return 0;
+#else
   print_error (__func__);
-  print_error (" not implemented\n");
+  print_error (" not implemented for this architecture\n");
   return -UNW_EINVAL;
+#endif
 }

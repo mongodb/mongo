@@ -1,8 +1,8 @@
 Installation Instructions
 *************************
 
-   Copyright (C) 1994-1996, 1999-2002, 2004-2016 Free Software
-Foundation, Inc.
+   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+Software Foundation, Inc.
 
    Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright
@@ -225,7 +225,7 @@ order to use an ANSI C compiler:
 
 and if that doesn't work, install pre-built binaries of GCC for HP-UX.
 
-   HP-UX 'make' updates targets which have the same time stamps as their
+   HP-UX 'make' updates targets which have the same timestamps as their
 prerequisites, which makes it generally unusable when shipped generated
 files such as 'configure' are involved.  Use GNU 'make' instead.
 

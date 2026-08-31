@@ -89,5 +89,7 @@ extern void *x86_64_r_uc_addr (ucontext_t *uc, int reg);
 extern NORETURN void x86_64_sigreturn (unw_cursor_t *cursor);
 #define x86_64_handle_signal_frame UNW_OBJ(handle_signal_frame)
 extern int x86_64_handle_signal_frame(unw_cursor_t *cursor);
+#define x86_64_os_step UNW_OBJ(os_step)
+extern HIDDEN int x86_64_os_step(struct cursor *c);
 
 #endif /* unwind_i_h */

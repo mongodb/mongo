@@ -60,6 +60,9 @@ struct unw_addr_space
     int big_endian;
     unsigned int addr_size;
 
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
+#endif
     unw_caching_policy_t caching_policy;
     _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
@@ -161,7 +164,6 @@ dwarf_getfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t *val)
 {
   char *valp = (char *) &val;
   unw_word_t addr;
-  int ret;
 
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
@@ -185,7 +187,6 @@ dwarf_putfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t val)
 {
   char *valp = (char *) &val;
   unw_word_t addr;
-  int ret;
 
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
@@ -247,7 +248,6 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #endif /* !UNW_LOCAL_ONLY */
 
 #define tdep_getcontext_trace           unw_getcontext
-#define tdep_init_mem_validate          UNW_OBJ(init_mem_validate)
 #define tdep_init_done                  UNW_OBJ(init_done)
 #define tdep_init                       UNW_OBJ(init)
 /* Platforms that support UNW_INFO_FORMAT_TABLE need to define
@@ -286,7 +286,6 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
-extern void tdep_init_mem_validate (void);
 extern int tdep_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
                                      unw_dyn_info_t *di, unw_proc_info_t *pi,
                                      int need_unwind_info, void *arg);

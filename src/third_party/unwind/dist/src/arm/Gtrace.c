@@ -70,7 +70,7 @@ trace_cache_free (void *arg)
   }
   tls_cache_destroyed = 1;
   tls_cache = NULL;
-  munmap (cache->frames, (1u << cache->log_size) * sizeof(unw_tdep_frame_t));
+  mi_munmap (cache->frames, (1u << cache->log_size) * sizeof(unw_tdep_frame_t));
   mempool_free (&trace_cache_pool, cache);
   Debug(5, "freed cache %p\n", cache);
 }
@@ -153,7 +153,7 @@ trace_cache_expand (unw_trace_cache_t *cache)
 
   Debug(5, "expanded cache from 2^%u to 2^%u buckets\n", cache->log_size,
         new_log_size);
-  munmap(cache->frames, old_size * sizeof(unw_tdep_frame_t));
+  mi_munmap(cache->frames, old_size * sizeof(unw_tdep_frame_t));
   cache->frames = new_frames;
   cache->log_size = new_log_size;
   cache->used = 0;
@@ -408,7 +408,7 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
   int depth = 0;
   int ret;
 
-  /* Check input parametres. */
+  /* Check input parameters. */
   if (unlikely(! cursor || ! buffer || ! size || (maxdepth = *size) <= 0))
     return -UNW_EINVAL;
 
@@ -514,7 +514,7 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
       if (likely(ret >= 0))
         ACCESS_MEM_FAST(ret, c->validate, d, cfa + LINUX_SC_LR_OFF, lr);
 #elif defined(__FreeBSD__)
-      printf("XXX\n");
+      #error implement UNW_ARM_FRAME_SIGRETURN on FreeBSD
 #endif
 
       /* Resume stack at signal restoration point. The stack is not
@@ -526,7 +526,7 @@ tdep_trace (unw_cursor_t *cursor, void **buffer, int *size)
       break;
 
     case UNW_ARM_FRAME_SYSCALL:
-      printf("XXX1\n");
+      Dprintf ("%s: implement me\n", __FUNCTION__);
       break;
 
     default:

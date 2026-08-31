@@ -87,6 +87,13 @@ empty_rstate_stack(dwarf_stackable_reg_state_t **rs_stack)
     pop_rstate_stack(rs_stack);
 }
 
+#ifdef UNW_TARGET_AARCH64
+
+static void
+aarch64_negate_ra_sign_state(dwarf_state_record_t *sr);
+
+#endif
+
 /* Run a CFI program to update the register state.  */
 static int
 run_cfi_program (struct dwarf_cursor *c, dwarf_state_record_t *sr,
@@ -390,9 +397,9 @@ run_cfi_program (struct dwarf_cursor *c, dwarf_state_record_t *sr,
           if (((ret = read_regnum (as, a, addr, &regnum, arg)) < 0)
               || ((ret = dwarf_read_uleb128 (as, a, addr, &val, arg)) < 0))
             break;
-          set_reg (sr, regnum, DWARF_WHERE_CFAREL, -(val * dci->data_align));
+          set_reg (sr, regnum, DWARF_WHERE_CFAREL, ~(val * dci->data_align) + 1);
           Debug (15, "CFA_GNU_negative_offset_extended cfa+0x%lx\n",
-                 (long) -(val * dci->data_align));
+                 (long) (~(val * dci->data_align) + 1));
           break;
 
         case DW_CFA_GNU_window_save:
@@ -403,6 +410,11 @@ run_cfi_program (struct dwarf_cursor *c, dwarf_state_record_t *sr,
             set_reg (sr, regnum, DWARF_WHERE_CFAREL,
                      (regnum - 16) * sizeof (unw_word_t));
           Debug (15, "CFA_GNU_window_save\n");
+          break;
+#elif UNW_TARGET_AARCH64
+          /* This is a specific opcode on aarch64, DW_CFA_AARCH64_negate_ra_state */
+          Debug (15, "DW_CFA_AARCH64_negate_ra_state\n");
+          aarch64_negate_ra_sign_state(sr);
           break;
 #else
           /* FALL THROUGH */
@@ -478,7 +490,9 @@ fetch_proc_info (struct dwarf_cursor *c, unw_word_t ip)
 }
 
 static int
-parse_dynamic (struct dwarf_cursor *c, unw_word_t ip, dwarf_state_record_t *sr)
+parse_dynamic (struct dwarf_cursor  *c UNUSED,
+			   unw_word_t            ip UNUSED,
+               dwarf_state_record_t *sr UNUSED)
 {
   Debug (1, "Not yet implemented\n");
   return -UNW_ENOINFO;
@@ -508,8 +522,10 @@ setup_fde (struct dwarf_cursor *c, dwarf_state_record_t *sr)
   for (i = 0; i < DWARF_NUM_PRESERVED_REGS + 2; ++i)
     set_reg (sr, i, DWARF_WHERE_SAME, 0);
 
+#if !defined(UNW_TARGET_ARM) && !(defined(UNW_TARGET_MIPS) && _MIPS_SIM == _ABI64)
   // SP defaults to CFA (but is overridable)
   set_reg (sr, TDEP_DWARF_SP, DWARF_WHERE_CFA, 0);
+#endif
 
   struct dwarf_cie_info *dci = c->pi.unwind_info;
   sr->rs_current.ret_addr_column  = dci->ret_addr_column;
@@ -559,14 +575,14 @@ dwarf_flush_rs_cache (struct dwarf_rs_cache *cache)
     cache->log_size = DWARF_DEFAULT_LOG_UNW_CACHE_SIZE;
   } else {
     if (cache->hash && cache->hash != cache->default_hash)
-      munmap(cache->hash, DWARF_UNW_HASH_SIZE(cache->prev_log_size)
-                           * sizeof (cache->hash[0]));
+      mi_munmap(cache->hash, DWARF_UNW_HASH_SIZE(cache->prev_log_size)
+                              * sizeof (cache->hash[0]));
     if (cache->buckets && cache->buckets != cache->default_buckets)
-      munmap(cache->buckets, DWARF_UNW_CACHE_SIZE(cache->prev_log_size)
-	                      * sizeof (cache->buckets[0]));
+      mi_munmap(cache->buckets, DWARF_UNW_CACHE_SIZE(cache->prev_log_size)
+                              * sizeof (cache->buckets[0]));
     if (cache->links && cache->links != cache->default_links)
-      munmap(cache->links, DWARF_UNW_CACHE_SIZE(cache->prev_log_size)
-	                      * sizeof (cache->links[0]));
+      mi_munmap(cache->links, DWARF_UNW_CACHE_SIZE(cache->prev_log_size)
+                              * sizeof (cache->links[0]));
     GET_MEMORY(cache->hash, DWARF_UNW_HASH_SIZE(cache->log_size)
                              * sizeof (cache->hash[0]));
     GET_MEMORY(cache->buckets, DWARF_UNW_CACHE_SIZE(cache->log_size)
@@ -767,6 +783,61 @@ eval_location_expr (struct dwarf_cursor *c, unw_word_t stack_val, unw_addr_space
   return 0;
 }
 
+
+#ifdef UNW_TARGET_AARCH64
+#include "libunwind-aarch64.h"
+
+static void
+aarch64_negate_ra_sign_state(dwarf_state_record_t *sr)
+{
+  unw_word_t ra_sign_state = sr->rs_current.reg.val[UNW_AARCH64_RA_SIGN_STATE];
+  ra_sign_state ^= 0x1;
+  set_reg(sr, UNW_AARCH64_RA_SIGN_STATE, DWARF_WHERE_SAME, ra_sign_state);
+}
+
+static unw_word_t
+aarch64_strip_pac_remote(unw_accessors_t *a, unw_addr_space_t as, void *arg, unw_word_t old_ip)
+{
+  if (a->ptrauth_insn_mask)
+    {
+      unw_word_t ip, insn_mask;
+
+      insn_mask = a->ptrauth_insn_mask(as, arg);
+      ip = old_ip & (~insn_mask);
+
+      Debug(15, "stripping pac from address, before: %lx, after: %lx\n", old_ip, ip);
+      return ip;
+    }
+  else
+    {
+      Debug(15, "return address %lx might be signed, but no means to obtain mask\n", old_ip);
+      return old_ip;
+    }
+}
+
+static unw_word_t
+aarch64_strip_pac_local(unw_word_t in_addr)
+{
+  unw_word_t out_addr = in_addr;
+
+#if defined(__aarch64__) && !defined(UNW_REMOTE_ONLY)
+  // Strip the PAC with XPACLRI instruction
+  register unsigned long long x30 __asm__("x30") = in_addr;
+  __asm__("hint 0x7" : "+r" (x30));
+  out_addr = x30;
+#endif
+
+  return out_addr;
+}
+
+static unw_word_t
+aarch64_get_ra_sign_state(struct dwarf_reg_state *rs)
+{
+   return rs->reg.val[UNW_AARCH64_RA_SIGN_STATE];
+}
+
+#endif
+
 static int
 apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
 {
@@ -777,6 +848,15 @@ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
   unw_accessors_t *a;
   int i, ret;
   void *arg;
+
+  /* In the case that we have incorrect CFI, the return address column may be
+   * outside the valid range of data and will read invalid data.  Protect
+   * against the errant read and indicate that we have a bad frame.  */
+  if (rs->ret_addr_column >= DWARF_NUM_PRESERVED_REGS) {
+    Dprintf ("%s: return address entry %zu is outside of range of CIE",
+             __FUNCTION__, rs->ret_addr_column);
+    return -UNW_EBADFRAME;
+  }
 
   prev_ip = c->ip;
   prev_cfa = c->cfa;
@@ -885,16 +965,28 @@ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
   if (DWARF_IS_NULL_LOC (c->loc[rs->ret_addr_column]))
     {
       c->ip = 0;
-      ret = 0;
     }
   else
   {
     ret = dwarf_get (c, c->loc[rs->ret_addr_column], &ip);
     if (ret < 0)
       return ret;
+#ifdef UNW_TARGET_AARCH64
+    if (aarch64_get_ra_sign_state(rs))
+      {
+        if (c->as != unw_local_addr_space)
+          {
+            ip = aarch64_strip_pac_remote(a, as, arg, ip);
+          }
+        else
+          {
+            ip = aarch64_strip_pac_local(ip);
+          }
+      }
+#endif
     c->ip = ip;
-    ret = 1;
   }
+  ret = (c->ip != 0) ? 1 : 0;
 
   /* XXX: check for ip to be code_aligned */
   if (c->ip == prev_ip && c->cfa == prev_cfa)
@@ -914,7 +1006,7 @@ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
 static int
 find_reg_state (struct dwarf_cursor *c, dwarf_state_record_t *sr)
 {
-  dwarf_reg_state_t *rs;
+  dwarf_reg_state_t *rs = NULL;
   struct dwarf_rs_cache *cache;
   int ret = 0;
   intrmask_t saved_mask;
@@ -960,13 +1052,11 @@ find_reg_state (struct dwarf_cursor *c, dwarf_state_record_t *sr)
 	  cache->links[c->prev_rs].hint = index + 1;
 	  c->prev_rs = index;
 	}
+      if (ret >= 0)
+        tdep_reuse_frame (c, cache->links[index].signal_frame);
       put_rs_cache (c->as, cache, &saved_mask);
     }
-  if (ret < 0)
-      return ret;
-  if (cache)
-    tdep_reuse_frame (c, cache->links[index].signal_frame);
-  return 0;
+  return ret;
 }
 
 /* The function finds the saved locations and applies the register
@@ -992,6 +1082,7 @@ dwarf_make_proc_info (struct dwarf_cursor *c)
      args_size, and set cursor appropriately.  Only
      needed for unw_resume */
   dwarf_state_record_t sr;
+  sr.args_size = 0;
   int ret;
 
   /* Lookup it up the slow way... */
@@ -1007,9 +1098,9 @@ dwarf_make_proc_info (struct dwarf_cursor *c)
 }
 
 static int
-dwarf_reg_states_dynamic_iterate(struct dwarf_cursor *c,
-				 unw_reg_states_callback cb,
-				 void *token)
+dwarf_reg_states_dynamic_iterate(struct dwarf_cursor     *c UNUSED,
+                                 unw_reg_states_callback  cb UNUSED,
+                                 void                    *token UNUSED)
 {
   Debug (1, "Not yet implemented\n");
   return -UNW_ENOINFO;

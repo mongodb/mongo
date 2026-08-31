@@ -115,7 +115,6 @@ tdep_init (void)
 
   mi_init ();
   dwarf_init ();
-  tdep_init_mem_validate ();
 
 #ifndef UNW_REMOTE_ONLY
   riscv_local_addr_space_init ();

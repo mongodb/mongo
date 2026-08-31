@@ -5,7 +5,7 @@
 #define CONFIG_BLOCK_SIGNALS /**/
 
 /* Enable Debug Frame */
-/* #undef CONFIG_DEBUG_FRAME */
+#define CONFIG_DEBUG_FRAME /**/
 
 /* Support for Microsoft ABI extensions */
 /* #undef CONFIG_MSABI_SUPPORT */
@@ -22,64 +22,67 @@
 /* Define to 1 if you have the <asm/ptrace_offsets.h> header file. */
 /* #undef HAVE_ASM_PTRACE_OFFSETS_H */
 
+/* Define to 1 if you have the <asm/vsyscall.h> header file. */
+/* #undef HAVE_ASM_VSYSCALL_H */
+
 /* Define to 1 if you have the <byteswap.h> header file. */
 #define HAVE_BYTESWAP_H 1
 
 /* Define to 1 if you have the declaration of `PTRACE_CONT', and to 0 if you
    don't. */
-#define HAVE_DECL_PTRACE_CONT 1
+/* #undef HAVE_DECL_PTRACE_CONT */
 
 /* Define to 1 if you have the declaration of `PTRACE_POKEDATA', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_POKEDATA 1
+/* #undef HAVE_DECL_PTRACE_POKEDATA */
 
 /* Define to 1 if you have the declaration of `PTRACE_POKEUSER', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_POKEUSER 1
+/* #undef HAVE_DECL_PTRACE_POKEUSER */
 
 /* Define to 1 if you have the declaration of `PTRACE_SETREGSET', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_SETREGSET 1
+/* #undef HAVE_DECL_PTRACE_SETREGSET */
 
 /* Define to 1 if you have the declaration of `PTRACE_SINGLESTEP', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_SINGLESTEP 1
+/* #undef HAVE_DECL_PTRACE_SINGLESTEP */
 
 /* Define to 1 if you have the declaration of `PTRACE_SYSCALL', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_SYSCALL 1
+/* #undef HAVE_DECL_PTRACE_SYSCALL */
 
 /* Define to 1 if you have the declaration of `PTRACE_TRACEME', and to 0 if
    you don't. */
-#define HAVE_DECL_PTRACE_TRACEME 1
+/* #undef HAVE_DECL_PTRACE_TRACEME */
 
 /* Define to 1 if you have the declaration of `PT_CONTINUE', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_CONTINUE 1
+/* #undef HAVE_DECL_PT_CONTINUE */
 
 /* Define to 1 if you have the declaration of `PT_GETFPREGS', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_GETFPREGS 1
+/* #undef HAVE_DECL_PT_GETFPREGS */
 
 /* Define to 1 if you have the declaration of `PT_GETREGS', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_GETREGS 1
+/* #undef HAVE_DECL_PT_GETREGS */
 
 /* Define to 1 if you have the declaration of `PT_IO', and to 0 if you don't.
-   */
-#define HAVE_DECL_PT_IO 0
+ */
+/* #undef HAVE_DECL_PT_IO */
 
 /* Define to 1 if you have the declaration of `PT_STEP', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_STEP 1
+/* #undef HAVE_DECL_PT_STEP */
 
 /* Define to 1 if you have the declaration of `PT_SYSCALL', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_SYSCALL 1
+/* #undef HAVE_DECL_PT_SYSCALL */
 
 /* Define to 1 if you have the declaration of `PT_TRACE_ME', and to 0 if you
    don't. */
-#define HAVE_DECL_PT_TRACE_ME 1
+/* #undef HAVE_DECL_PT_TRACE_ME */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -93,6 +96,9 @@
 /* Define to 1 if you have the `dl_phdr_removals_counter' function. */
 /* #undef HAVE_DL_PHDR_REMOVALS_COUNTER */
 
+/* Define to 1 if the system has the type `elf_fpregset_t'. */
+#define HAVE_ELF_FPREGSET_T 1
+
 /* Define to 1 if you have the <elf.h> header file. */
 #define HAVE_ELF_H 1
 
@@ -101,6 +107,9 @@
 
 /* Define to 1 if you have the <execinfo.h> header file. */
 #define HAVE_EXECINFO_H 1
+
+/* Define to 1 if you have the `execvpe' function. */
+#define HAVE_EXECVPE 1
 
 /* Define to 1 if you have the `getunwind' function. */
 /* #undef HAVE_GETUNWIND */
@@ -111,17 +120,11 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-/* Define to 1 if you have the `uca' library (-luca). */
-/* #undef HAVE_LIBUCA */
-
 /* Define to 1 if you have the <link.h> header file. */
 #define HAVE_LINK_H 1
 
 /* Define if you have liblzma */
 /* #undef HAVE_LZMA */
-
-/* Define to 1 if you have the <memory.h> header file. */
-#define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the `mincore' function. */
 #define HAVE_MINCORE 1
@@ -129,11 +132,20 @@
 /* Define to 1 if you have the `pipe2' function. */
 #define HAVE_PIPE2 1
 
+/* Define to 1 if the system has the type `procfs_status'. */
+/* #undef HAVE_PROCFS_STATUS */
+
+/* Define to 1 if you have the `sigaltstack' function. */
+#define HAVE_SIGALTSTACK 1
+
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#define HAVE_STDIO_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
@@ -208,13 +220,13 @@
 #define PACKAGE "libunwind"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "libunwind-devel@nongnu.org"
+#define PACKAGE_BUGREPORT "https://github.com/libunwind/libunwind"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "libunwind"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libunwind 1.6.2"
+#define PACKAGE_STRING "libunwind 1.8.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libunwind"
@@ -223,16 +235,18 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.6.2"
+#define PACKAGE_VERSION "1.8.1"
 
 /* The size of `off_t', as computed by sizeof. */
 #define SIZEOF_OFF_T 8
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.6.2"
+#define VERSION "1.8.1"
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */

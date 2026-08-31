@@ -40,7 +40,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
 | [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2                                    |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
-| [libunwind]                                          | MIT                               | 1.6.2                                    |                      | ✗                               |
+| [libunwind]                                          | MIT                               | v1.8.1                                   |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                           | 140.11.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |

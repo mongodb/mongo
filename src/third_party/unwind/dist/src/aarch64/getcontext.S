@@ -24,7 +24,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
-#include "offsets.h"
+#include "ucontext_i.h"
 
 /*  int _Uaarch64_getcontext_trace (unw_tdep_context_t *ucp)
 
@@ -39,10 +39,10 @@ _Uaarch64_getcontext_trace:
 	.cfi_startproc
 
 	/* Save only FP, SP, PC - exclude this call. */
-	str x29, [x0, #(LINUX_UC_MCONTEXT_OFF + LINUX_SC_X29_OFF)]
+	str x29, [x0, #(UC_MCONTEXT_OFF + SC_X29_OFF)]
 	mov x9, sp
-	str x9, [x0, #(LINUX_UC_MCONTEXT_OFF + LINUX_SC_SP_OFF)]
-	str x30, [x0, #(LINUX_UC_MCONTEXT_OFF + LINUX_SC_PC_OFF)]
+	str x9, [x0, #(UC_MCONTEXT_OFF + SC_SP_OFF)]
+	str x30, [x0, #(UC_MCONTEXT_OFF + SC_PC_OFF)]
 
 	ret
 	.cfi_endproc

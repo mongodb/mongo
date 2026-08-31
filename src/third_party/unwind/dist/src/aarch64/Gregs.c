@@ -24,6 +24,7 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#include "dwarf_i.h"
 #include "unwind_i.h"
 
 HIDDEN int
@@ -87,6 +88,44 @@ tdep_access_reg (struct cursor *c, unw_regnum_t reg, unw_word_t *valp,
     case UNW_AARCH64_PC:
     case UNW_AARCH64_PSTATE:
       loc = c->dwarf.loc[reg];
+      break;
+    case UNW_AARCH64_RA_SIGN_STATE:
+      Debug (1, "Reading from ra sign state not supported: %u\n", reg);
+      return -UNW_EBADREG;
+
+    case UNW_AARCH64_VG:
+      if (write)
+       {
+         Debug (1, "Writing to VG pseudo register not supported\n");
+         return -UNW_EBADREG;
+       }
+
+      if (DWARF_IS_REG_LOC(c->dwarf.loc[reg]))
+        loc = c->dwarf.loc[reg];
+      else
+        {
+          unw_addr_space_t as = c->dwarf.as;
+          unw_accessors_t *a = unw_get_accessors_int (as);
+          void *arg = c->dwarf.as_arg;
+          unw_word_t addr = DWARF_GET_LOC (c->dwarf.loc[reg]);
+          uint16_t val16;
+
+          /*
+           * If it's a memory location it means it must be in the signal context
+           * and it's saved as VL rather than VG so it needs to be scaled.
+           *
+           * linux/Documentation/arm64/sve.rst:
+           *  * Vector length (VL) = size of a Z-register in bytes
+           *
+           * https://github.com/ARM-software/abi-aa/blob/main/aadwarf64/aadwarf64.rst:
+           *  * Vector granule (VG) = Size in bits of the SVE vector registers
+           *    in the current call frame divided by 64.
+           */
+          int ret = dwarf_readu16 (as, a, &addr, &val16, arg);
+          if (!ret)
+            *valp = (val16 * 8) / 64;
+          return ret;
+        }
       break;
 
     case UNW_AARCH64_SP:

@@ -26,9 +26,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "_UPT_internal.h"
 
-#if HAVE_DECL_PTRACE_POKEDATA || HAVE_TTRACE
+#if HAVE_DECL_PTRACE_POKEDATA || defined(HAVE_TTRACE)
 int
-_UPT_access_mem (unw_addr_space_t as, unw_word_t addr, unw_word_t *val,
+_UPT_access_mem (unw_addr_space_t as UNUSED, unw_word_t addr, unw_word_t *val,
                  int write, void *arg)
 {
   struct UPT_info *ui = arg;

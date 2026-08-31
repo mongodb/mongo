@@ -47,5 +47,9 @@ $SRC_DIR/configure \
 CC=$TOOLCHAIN_ROOT/bin/gcc
 CXX=$TOOLCHAIN_ROOT/bin/g++
 
-make CC=$CC CXX=$CXX install
+make V=1 CC=$CC CXX=$CXX install | tee $DEST_DIR/make.out
 popd
+
+# Reformat the a make output as something that's almost usable in BUILD.bazel.
+PYTHON3=${PYTHON3:-python3}
+$PYTHON3 $DEST_DIR/scripts/analyze_make_out.py <$DEST_DIR/make.out >$DEST_DIR/make_output.json

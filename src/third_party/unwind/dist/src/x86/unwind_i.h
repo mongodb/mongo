@@ -52,7 +52,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define x86_scratch_loc                 UNW_OBJ(scratch_loc)
 #define x86_get_scratch_loc             UNW_OBJ(get_scratch_loc)
 #define x86_r_uc_addr                   UNW_OBJ(r_uc_addr)
-#define x86_sigreturn                   UNW_OBJ(sigreturn)
 
 extern void x86_local_addr_space_init (void);
 extern int x86_local_resume (unw_addr_space_t as, unw_cursor_t *cursor,
@@ -61,7 +60,6 @@ extern dwarf_loc_t x86_scratch_loc (struct cursor *c, unw_regnum_t reg);
 extern dwarf_loc_t x86_get_scratch_loc (struct cursor *c, unw_regnum_t reg);
 extern void *x86_r_uc_addr (ucontext_t *uc, int reg);
 
-extern void x86_sigreturn (unw_cursor_t *cursor);
 #define x86_handle_signal_frame UNW_OBJ(handle_signal_frame)
 extern int x86_handle_signal_frame(unw_cursor_t *cursor);
 

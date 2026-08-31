@@ -54,6 +54,10 @@ static void longjmp (jmp_buf env, int val);
 #endif
 #endif /* __GLIBC__ */
 
+#ifndef _JB_STK_SHIFT
+#define	_JB_STK_SHIFT	0
+#endif
+
 void
 _longjmp (jmp_buf env, int val)
 {
@@ -70,11 +74,7 @@ _longjmp (jmp_buf env, int val)
     {
       if (unw_get_reg (&c, UNW_REG_SP, &sp) < 0)
         abort ();
-#ifdef __FreeBSD__
-      if (sp != wp[JB_SP] + sizeof(unw_word_t))
-#else
-      if (sp != wp[JB_SP])
-#endif
+      if (sp != (wp[JB_SP] + _JB_STK_SHIFT))
         continue;
 
       if (!bsp_match (&c, wp))

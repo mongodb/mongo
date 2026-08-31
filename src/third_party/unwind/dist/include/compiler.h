@@ -31,6 +31,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define COMPILER_H
 
 #ifdef __GNUC__
+#ifndef __has_attribute
+#  define __has_attribute(x) (0)
+#endif
 # define CONST_ATTR     __attribute__((__const__))
 # define UNUSED         __attribute__((unused))
 # define NOINLINE       __attribute__((noinline))
@@ -40,9 +43,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 # if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ > 2)
 #  define ALWAYS_INLINE inline __attribute__((always_inline))
 #  define HIDDEN        __attribute__((visibility ("hidden")))
+#  if __has_attribute(fallthrough)
+#    define FALLTHROUGH __attribute__((fallthrough))
+#  else
+#    define FALLTHROUGH
+#  endif
 # else
 #  define ALWAYS_INLINE
 #  define HIDDEN
+#  define FALLTHROUGH
 # endif
 # define WEAK           __attribute__((weak))
 # if (__GNUC__ >= 3)
@@ -60,6 +69,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 # define NORETURN
 # define ALIAS(name)
 # define HIDDEN
+# define FALLTHROUGH
 # define WEAK
 # define likely(x)      (x)
 # define unlikely(x)    (x)

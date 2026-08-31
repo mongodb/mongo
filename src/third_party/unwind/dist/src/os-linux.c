@@ -26,6 +26,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #include "libunwind_i.h"
 #include "os-linux.h"
@@ -36,12 +39,11 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
                     char *path, size_t pathlen)
 {
   struct map_iterator mi;
-  int found = 0, rc;
+  int found = 0, rc = UNW_ESUCCESS;
   unsigned long hi;
   char root[sizeof ("/proc/0123456789/root")], *cp;
   char *full_path;
   struct stat st;
-
 
   if (maps_init (&mi, pid) < 0)
     return -1;
@@ -59,6 +61,18 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
       return -1;
     }
 
+  // get path only, no need to map elf image
+  if (!ei && path)
+    {
+      strncpy(path, mi.path, pathlen);
+      path[pathlen - 1] = '\0';
+      if (strlen(mi.path) >= pathlen)
+        rc = -UNW_ENOMEM;
+
+      maps_close (&mi);
+      return rc;
+    }
+
   full_path = mi.path;
 
   /* Get process root */
@@ -67,25 +81,30 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
   assert (cp + 6 < root + sizeof (root));
   memcpy (cp, "/root", 6);
 
+  size_t _len = strlen (mi.path) + 1;
   if (!stat(root, &st) && S_ISDIR(st.st_mode))
+    _len += strlen (root);
+  else
+    root[0] = '\0';
+
+  full_path = path;
+  if(!path)
+    full_path = (char*) malloc (_len);
+  else if(_len >= pathlen) // passed buffer is too small, fail
     {
-      full_path = (char*) malloc (strlen (root) + strlen (mi.path) + 1);
-      if (!full_path)
-        full_path = mi.path;
-      else
-        {
-          strcpy (full_path, root);
-          strcat (full_path, mi.path);
-        }
+      maps_close (&mi);
+      return -1;
     }
 
-  if (path)
-    {
-      strncpy(path, full_path, pathlen);
-    }
+  strcpy (full_path, root);
+  strcat (full_path, mi.path);
+
+  if (stat(full_path, &st) || !S_ISREG(st.st_mode))
+    strcpy(full_path, mi.path);
+
   rc = elf_map_image (ei, full_path);
 
-  if (full_path && full_path != mi.path)
+  if (!path)
     free (full_path);
 
   maps_close (&mi);

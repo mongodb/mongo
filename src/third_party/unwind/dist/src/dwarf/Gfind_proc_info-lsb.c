@@ -120,7 +120,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
   ei.image = NULL;
   *load_offset = 0;
 
-  ret = elf_w (load_debuglink) (file, &ei, is_local);
+  ret = elf_w (load_debuginfo) (file, &ei, is_local);
   if (ret != 0)
     return ret;
 
@@ -128,16 +128,16 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
   if (!shdr ||
       (shdr->sh_offset + shdr->sh_size > ei.size))
     {
-      munmap(ei.image, ei.size);
+      mi_munmap(ei.image, ei.size);
       return 1;
     }
 
 #if defined(SHF_COMPRESSED)
   if (shdr->sh_flags & SHF_COMPRESSED)
     {
-      unsigned long destSize;
       Elf_W (Chdr) *chdr = (shdr->sh_offset + ei.image);
 #ifdef HAVE_ZLIB
+      unsigned long destSize;
       if (chdr->ch_type == ELFCOMPRESS_ZLIB)
 	{
 	  *bufsize = destSize = chdr->ch_size;
@@ -146,7 +146,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
 	  if (!*buf)
 	    {
 	      Debug (2, "failed to allocate zlib .debug_frame buffer, skipping\n");
-	      munmap(ei.image, ei.size);
+	      mi_munmap(ei.image, ei.size);
 	      return 1;
 	    }
 
@@ -156,8 +156,8 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
 	  if (ret != Z_OK)
 	    {
 	      Debug (2, "failed to decompress zlib .debug_frame, skipping\n");
-	      munmap(*buf, *bufsize);
-	      munmap(ei.image, ei.size);
+	      mi_munmap(*buf, *bufsize);
+	      mi_munmap(ei.image, ei.size);
 	      return 1;
 	    }
 
@@ -169,7 +169,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
 	{
 	  Debug (2, "unknown compression type %d, skipping\n",
 		 chdr->ch_type);
-          munmap(ei.image, ei.size);
+          mi_munmap(ei.image, ei.size);
 	  return 1;
         }
     }
@@ -182,7 +182,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
       if (!*buf)
         {
           Debug (2, "failed to allocate .debug_frame buffer, skipping\n");
-          munmap(ei.image, ei.size);
+          mi_munmap(ei.image, ei.size);
           return 1;
         }
 
@@ -207,7 +207,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local,
         break;
       }
 
-  munmap(ei.image, ei.size);
+  mi_munmap(ei.image, ei.size);
   return 0;
 }
 
@@ -549,7 +549,7 @@ dwarf_find_eh_frame_section(struct dl_phdr_info *info)
          eh_frame);
 
 out:
-  munmap (ei.image, ei.size);
+  mi_munmap (ei.image, ei.size);
 
   return eh_frame;
 }
@@ -658,7 +658,7 @@ dwarf_callback (struct dl_phdr_info *info, size_t size, void *ptr)
     {
       if (p_dynamic)
         {
-          /* For dynamicly linked executables and shared libraries,
+          /* For dynamically linked executables and shared libraries,
              DT_PLTGOT is the value that data-relative addresses are
              relative to for that object.  We call this the "gp".  */
           Elf_W(Dyn) *dyn = (Elf_W(Dyn) *)(p_dynamic->p_vaddr + load_base);
@@ -804,7 +804,7 @@ dwarf_find_proc_info (unw_addr_space_t as, unw_word_t ip,
   cb_data.di_debug.format = -1;
 
   SIGPROCMASK (SIG_SETMASK, &unwi_full_mask, &saved_mask);
-  ret = dl_iterate_phdr (dwarf_callback, &cb_data);
+  ret = as->iterate_phdr_function (dwarf_callback, &cb_data);
   SIGPROCMASK (SIG_SETMASK, &saved_mask, NULL);
 
   if (ret > 0)
@@ -866,9 +866,9 @@ remote_lookup (unw_addr_space_t as,
                unw_word_t table, size_t table_size, int32_t rel_ip,
                struct table_entry *e, int32_t *last_ip_offset, void *arg)
 {
-  unsigned long table_len = table_size / sizeof (struct table_entry);
+  size_t table_len = table_size / sizeof (struct table_entry);
   unw_accessors_t *a = unw_get_accessors_int (as);
-  unsigned long lo, hi, mid;
+  size_t lo, hi, mid;
   unw_word_t e_addr = 0;
   int32_t start = 0;
   int ret;
@@ -910,15 +910,15 @@ dwarf_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
                            unw_dyn_info_t *di, unw_proc_info_t *pi,
                            int need_unwind_info, void *arg)
 {
-  const struct table_entry *e = NULL, *table;
+  const struct table_entry *e = NULL, *table = NULL;
   unw_word_t ip_base = 0, segbase = 0, last_ip, fde_addr;
   unw_accessors_t *a;
 #ifndef UNW_LOCAL_ONLY
   struct table_entry ent;
 #endif
   int ret;
-  unw_word_t debug_frame_base;
-  size_t table_len;
+  unw_word_t debug_frame_base = 0;
+  size_t table_len = 0;
 
 #ifdef UNW_REMOTE_ONLY
   assert (is_remote_table(di->format));
@@ -966,7 +966,7 @@ dwarf_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
   if (as == unw_local_addr_space)
     {
       e = lookup (table, table_len, ip - ip_base - di->load_offset);
-      if (e && &e[1] < &table[table_len / sizeof (unw_word_t)])
+      if (e && &e[1] < &table[table_len / sizeof (struct table_entry)])
 	last_ip = e[1].start_ip_offset + ip_base + di->load_offset;
       else
 	last_ip = di->end_ip;
@@ -1037,7 +1037,7 @@ dwarf_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
 }
 
 HIDDEN void
-dwarf_put_unwind_info (unw_addr_space_t as, unw_proc_info_t *pi, void *arg)
+dwarf_put_unwind_info (unw_addr_space_t as UNUSED, unw_proc_info_t *pi UNUSED, void *arg UNUSED)
 {
   return;       /* always a nop */
 }

@@ -25,6 +25,10 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#ifdef HAVE_ASM_VSYSCALL_H
+#include <asm/vsyscall.h>
+#endif
+
 #include "libunwind_i.h"
 #include "unwind_i.h"
 #include "ucontext_i.h"
@@ -32,7 +36,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <sys/syscall.h>
 
 HIDDEN void
-tdep_fetch_frame (struct dwarf_cursor *dw, unw_word_t ip, int need_unwind_info)
+tdep_fetch_frame (struct dwarf_cursor *dw, unw_word_t ip UNUSED, int need_unwind_info UNUSED)
 {
   struct cursor *c = (struct cursor *) dw;
   assert(! need_unwind_info || dw->pi_valid);
@@ -85,7 +89,7 @@ unw_is_signal_frame (unw_cursor_t *cursor)
 }
 
 HIDDEN int
-x86_64_handle_signal_frame (unw_cursor_t *cursor)
+x86_64_handle_signal_frame (unw_cursor_t *cursor UNUSED)
 {
 #if UNW_DEBUG /* To silence compiler warnings */
   /* Should not get here because we now use kernel-provided dwarf
@@ -155,3 +159,33 @@ x86_64_sigreturn (unw_cursor_t *cursor)
 }
 
 #endif
+
+static int
+is_vsyscall (struct dwarf_cursor *c UNUSED)
+{
+#if defined(VSYSCALL_START) && defined(VSYSCALL_END)
+  return c->ip >= VSYSCALL_START && c->ip < VSYSCALL_END;
+#elif defined(VSYSCALL_ADDR)
+  /* Linux 3.16 removes `VSYSCALL_START` and `VSYSCALL_END`.  Assume
+     a single page is mapped for vsyscalls.  */
+  return c->ip >= VSYSCALL_ADDR && c->ip < VSYSCALL_ADDR + unw_page_size;
+#else
+  return 0;
+#endif
+}
+
+HIDDEN int
+x86_64_os_step(struct cursor *c)
+{
+  if (is_vsyscall (&c->dwarf))
+    {
+      Debug (2, "in vsyscall region\n");
+      c->frame_info.cfa_reg_offset = 8;
+      c->frame_info.cfa_reg_rsp = -1;
+      c->frame_info.frame_type = UNW_X86_64_FRAME_GUESSED;
+      c->dwarf.loc[RIP] = DWARF_LOC (c->dwarf.cfa, 0);
+      c->dwarf.cfa += 8;
+      return (1);
+    }
+  return (0);
+}

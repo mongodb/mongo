@@ -45,9 +45,10 @@ intern_string (unw_addr_space_t as, unw_accessors_t *a,
   return -UNW_ENOMEM;
 }
 
-static inline int
-get_proc_name (unw_addr_space_t as, unw_word_t ip,
-               char *buf, size_t buf_len, unw_word_t *offp, void *arg)
+int
+unw_get_proc_name_by_ip (unw_addr_space_t as, unw_word_t ip,
+                         char *buf, size_t buf_len, unw_word_t *offp,
+                         void *arg)
 {
   unw_accessors_t *a = unw_get_accessors_int (as);
   unw_proc_info_t pi;
@@ -116,8 +117,8 @@ unw_get_proc_name (unw_cursor_t *cursor, char *buf, size_t buf_len,
 
 
 #endif
-  error = get_proc_name (tdep_get_as (c), ip, buf, buf_len, offp,
-                         tdep_get_as_arg (c));
+  error = unw_get_proc_name_by_ip (tdep_get_as (c), ip, buf, buf_len, offp,
+                                   tdep_get_as_arg (c));
 #if !defined(__ia64__)
   if (c->dwarf.use_prev_instr && offp != NULL && error == 0)
     *offp += 1;

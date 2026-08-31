@@ -78,6 +78,9 @@ struct unw_addr_space
   {
     struct unw_accessors acc;
     int big_endian;
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
+#endif
     unw_caching_policy_t caching_policy;
     _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
@@ -96,16 +99,18 @@ struct cursor
       {
         AARCH64_SCF_NONE,
         AARCH64_SCF_LINUX_RT_SIGFRAME,
+        AARCH64_SCF_FREEBSD_RT_SIGFRAME,
+        AARCH64_SCF_QNX_RT_SIGFRAME,
       }
     sigcontext_format;
     unw_word_t sigcontext_addr;
     unw_word_t sigcontext_sp;
     unw_word_t sigcontext_pc;
     int validate;
-    ucontext_t *uc;
+    unw_context_t *uc;
   };
 
-static inline ucontext_t *
+static inline unw_context_t *
 dwarf_get_uc(const struct dwarf_cursor *cursor)
 {
   const struct cursor *c = (struct cursor *) cursor->as_arg;
@@ -273,7 +278,6 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 
 #define tdep_getcontext_trace           UNW_ARCH_OBJ(getcontext_trace)
 #define tdep_init_done                  UNW_OBJ(init_done)
-#define tdep_init_mem_validate          UNW_OBJ(init_mem_validate)
 #define tdep_init                       UNW_OBJ(init)
 /* Platforms that support UNW_INFO_FORMAT_TABLE need to define
    tdep_search_unwind_table.  */
@@ -312,11 +316,10 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
-extern void tdep_init_mem_validate (void);
 extern int tdep_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
                                      unw_dyn_info_t *di, unw_proc_info_t *pi,
                                      int need_unwind_info, void *arg);
-extern void *tdep_uc_addr (unw_tdep_context_t *uc, int reg);
+extern void *tdep_uc_addr (unw_context_t *uc, int reg);
 extern int tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
                                unsigned long *segbase, unsigned long *mapoff,
                                char *path, size_t pathlen);
@@ -328,6 +331,6 @@ extern int tdep_access_fpreg (struct cursor *c, unw_regnum_t reg,
 extern int tdep_trace (unw_cursor_t *cursor, void **addresses, int *n);
 extern void tdep_stash_frame (struct dwarf_cursor *c,
                               struct dwarf_reg_state *rs);
-extern int tdep_getcontext_trace (unw_tdep_context_t *);
+extern int tdep_getcontext_trace (unw_context_t *);
 
 #endif /* AARCH64_LIBUNWIND_I_H */

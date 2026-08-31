@@ -112,7 +112,7 @@ unw_step (unw_cursor_t *cursor)
 
       unw_word_t invalid_prev_rip = 0;
       unw_word_t prev_ip = c->dwarf.ip, prev_cfa = c->dwarf.cfa;
-      struct dwarf_loc rbp_loc, rsp_loc, rip_loc;
+      struct dwarf_loc rbp_loc = DWARF_NULL_LOC, rsp_loc = DWARF_NULL_LOC, rip_loc = DWARF_NULL_LOC;
 
       /* We could get here because of missing/bad unwind information.
          Validate all addresses before dereferencing. */
@@ -122,7 +122,15 @@ unw_step (unw_cursor_t *cursor)
 
       Debug (13, "dwarf_step() failed (ret=%d), trying frame-chain\n", ret);
 
-      if (unw_is_signal_frame (cursor) > 0)
+      if ((ret = x86_64_os_step (c)) != 0)
+        {
+          if (ret < 0)
+            {
+              Debug (2, "returning 0\n");
+              return 0;
+            }
+        }
+      else if (unw_is_signal_frame (cursor) > 0)
         {
           ret = x86_64_handle_signal_frame(cursor);
           if (ret < 0)
@@ -193,7 +201,7 @@ unw_step (unw_cursor_t *cursor)
                             Debug (2, "new_ip 0x%lx looks valid\n", new_ip);
                             rip_fixup_success = 1;
                             c->frame_info.cfa_reg_offset = 8;
-                            c->frame_info.cfa_reg_rsp = 1;
+                            c->frame_info.cfa_reg_rsp = -1;
                             c->frame_info.rbp_cfa_offset = -1;
                             c->frame_info.rsp_cfa_offset = -1;
                             c->frame_info.frame_type = UNW_X86_64_FRAME_OTHER;
@@ -204,15 +212,19 @@ unw_step (unw_cursor_t *cursor)
                              */
                             c->dwarf.cfa += 8;
                             /* Optimised x64 binaries don't use RBP it seems? */
-                            rbp_loc = DWARF_LOC (rbp, 0);
-                            rsp_loc = DWARF_LOC (rsp, 0);
+                            rbp_loc = c->dwarf.loc[RBP];
+                            rsp_loc = DWARF_VAL_LOC (c, rsp + 8);
                             rip_loc = DWARF_LOC (rsp, 0);
                           }
                         else
-                          Debug (2, "new_ip 0x%lx dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, new_ip), &not_used) != 0\n", new_ip);
+                          {
+                            Debug (2, "new_ip 0x%lx dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, new_ip), &not_used) != 0\n", new_ip);
+                          }
                       }
-		                else
+                    else
+                      {
                         Debug (2, "rsp 0x%lx dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, rsp), &new_ip) != 0\n", rsp);
+                      }
                   }
               /*
                * If the previous rip we found on the stack didn't look valid fall back
@@ -253,7 +265,7 @@ unw_step (unw_cursor_t *cursor)
             }
           /* Mark all registers unsaved */
           for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
-          c->dwarf.loc[i] = DWARF_NULL_LOC;
+            c->dwarf.loc[i] = DWARF_NULL_LOC;
 
           c->dwarf.loc[RBP] = rbp_loc;
           c->dwarf.loc[RSP] = rsp_loc;

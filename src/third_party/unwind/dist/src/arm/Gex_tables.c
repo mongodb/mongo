@@ -119,10 +119,12 @@ arm_exidx_apply_cmd (struct arm_exbuf_data *edata, struct dwarf_cursor *c)
       dwarf_get (c, c->loc[UNW_ARM_R13], &c->cfa);
       break;
     case ARM_EXIDX_CMD_VFP_POP:
-      /* Skip VFP registers, but be sure to adjust stack */
       for (i = ARM_EXBUF_START (edata->data); i <= ARM_EXBUF_END (edata->data);
            i++)
+      {
+        c->loc[UNW_ARM_S0 + i] = DWARF_LOC (c->cfa, 0);
         c->cfa += 8;
+      }
       if (!(edata->data & ARM_EXIDX_VFP_DOUBLE))
         c->cfa += 4;
       break;
@@ -529,7 +531,7 @@ arm_find_proc_info2 (unw_addr_space_t as, unw_word_t ip,
       cb_data.di.format = -1;
 
       SIGPROCMASK (SIG_SETMASK, &unwi_full_mask, &saved_mask);
-      ret = dl_iterate_phdr (arm_phdr_cb, &cb_data);
+      ret = as->iterate_phdr_function (arm_phdr_cb, &cb_data);
       SIGPROCMASK (SIG_SETMASK, &saved_mask, NULL);
 
       if (cb_data.di.format != -1)

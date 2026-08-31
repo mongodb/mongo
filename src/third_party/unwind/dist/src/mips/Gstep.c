@@ -32,7 +32,7 @@ mips_handle_signal_frame (unw_cursor_t *cursor)
   struct cursor *c = (struct cursor *) cursor;
   unw_word_t sc_addr, sp_addr = c->dwarf.cfa;
   unw_word_t ra, fp;
-  int ret;
+  int i, ret;
 
   switch (unw_is_signal_frame (cursor)) {
   case 1:
@@ -50,6 +50,9 @@ mips_handle_signal_frame (unw_cursor_t *cursor)
     sc_addr += 4;
 
   c->sigcontext_addr = sc_addr;
+
+  for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
+    c->dwarf.loc[i] = DWARF_NULL_LOC;
 
   /* Update the dwarf cursor. */
   c->dwarf.loc[UNW_MIPS_R0]  = DWARF_LOC (sc_addr + LINUX_SC_R0_OFF, 0);
