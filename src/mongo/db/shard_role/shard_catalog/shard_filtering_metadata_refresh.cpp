@@ -58,6 +58,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -1033,25 +1034,45 @@ void FilteringMetadataCache::fixPotentiallyStaleShardingStatesAfterUpgrade(
         // it's been proven correct to maintain the legacy data around. However, this moves
         // us closer to a world with a simpler model.
         const auto shardId = ShardingState::get(opCtx)->shardId();
+        stdx::unordered_set<DatabaseName> knownIsDbPrimarySet;
         for (const auto& dbName : DatabaseShardingRuntime::getDatabaseNames(opCtx)) {
             BypassDatabaseMetadataAccess bypass{opCtx,
                                                 BypassDatabaseMetadataAccess::Type::kReadAndWrite};
             auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-            if (scopedDsr->getDbPrimaryShard(opCtx) != shardId) {
+            if (scopedDsr->getDbPrimaryShard(opCtx) == shardId) {
+                knownIsDbPrimarySet.emplace(dbName);
+            } else {
                 scopedDsr->clearDbMetadata(opCtx);
             }
         }
 
         // A legacy refresh could install metadata saying the collection is UNTRACKED, UNOWNED, or
-        // TRACKED with zero chunks owned by this shard. TRACKED collections that this shard owns
-        // chunks for are safe since the content must be the same before and after the legacy
-        // refresh. In order to avoid any misuse of the metadata, we force a clear of it to force an
-        // authoritative resync from disk.
+        // TRACKED with zero chunks owned by this shard. An UNTRACKED collection on the dbPrimary
+        // and TRACKED collections with owned chunks are safe since the content must be the
+        // same before and after the legacy refresh. In order to avoid any misuse of the metadata,
+        // we force a clear of it to force an authoritative resync from disk.
         for (const auto& nss : CollectionShardingRuntime::getCollectionNames(opCtx)) {
+            // Check the DSR to skip clearing UNTRACKED on the DB-primary (see SERVER-133992).
+            // Even though we conservatively avoid holding both the DSR and CSR locks at the same
+            // time, this can not race with a concurrent DB-primary change because:
+
+            // *movePrimary can not run concurrently with this code*
+            // This code runs in the `FcvOpObserver`, after the FCV is set to FCV 9.0, and:
+            // - We disallow & drain movePrimary during the FCV transition (i.e., `kUpgrading`),
+            //   so there can't be a running movePrimary that started before the `FcvOpObserver`.
+            // - Even though the FCV has just been set to FCV 9.0, the DB-primary (donor) holds
+            //   the `FCVChangeRegion` while running this code, so new movePrimary DDLs can't
+            //   start, as they acquire the `FixedFCVRegion` during DDL coordinator construction.
+
+            // Even if it could, *movePrimary clears UNTRACKED states from the DB-primary's CSR*
+            // On commit, movePrimary emits a `DropDatabaseMetadata` op, which clears all UNTRACKED
+            // CSR states for the DB (see `ShardServerOpObserver::onDropDatabaseMetadata`).
+            const bool isDbPrimary = knownIsDbPrimarySet.contains(nss.dbName());
+
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
             // TODO(SERVER-133001): Consider installing empty CSS on new shards for addShard instead
-            if (auto cm = scopedCsr->getCurrentMetadataIfKnown();
-                cm && (!cm->hasRoutingTable() || !cm->getShardPlacementVersion().isSet())) {
+            if (auto cm = scopedCsr->getCurrentMetadataIfKnown(); cm &&
+                (cm->hasRoutingTable() ? !cm->getShardPlacementVersion().isSet() : !isDbPrimary)) {
                 scopedCsr->clearCollectionMetadata(opCtx);
             }
         }

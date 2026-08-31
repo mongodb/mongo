@@ -1798,6 +1798,46 @@ TEST_F(AuthoritativeRefreshFixture, UntrackedIsClearedOutAfterUpgrade) {
     }
 }
 
+TEST_F(AuthoritativeRefreshFixture, UntrackedOnDbPrimaryIsPreservedAfterUpgrade) {
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        unittest::ServerParameterGuard crudFeatureFlag{"featureFlagAuthoritativeShardsCRUD", false};
+        BypassDatabaseMetadataAccess bypass(
+            opCtx,
+            BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
+        scopedDsr->setDbInfo_DEPRECATED(
+            opCtx, DatabaseType{kTestNss.dbName(), kMyShardName, {UUID::gen(), Timestamp{1, 1}}});
+    }
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+    auto status = onShardVersionMismatch(opCtx, kTestNss, boost::none);
+    ASSERT_OK(status);
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+    }
+
+    FilteringMetadataCache::get(opCtx)->fixPotentiallyStaleShardingStatesAfterUpgrade(
+        opCtx,
+        multiversion::FeatureCompatibilityVersion::kVersion_8_0,
+        multiversion::FeatureCompatibilityVersion::kVersion_9_0);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+    }
+}
+
 TEST_F(AuthoritativeRefreshFixture, TrackedWithZeroOwnedChunksIsClearedOutAfterUpgrade) {
     auto* opCtx = operationContext();
 

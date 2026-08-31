@@ -143,7 +143,8 @@ public:
      *
      * This affects both database and collection sharding metadata. In particular:
      * - Database metadata for which this shard isn't the primary shard will get cleared out
-     * - Collection metadata will be cleared out if it's for an untracked/unowned collection.
+     * - Collection metadata will be cleared out if it's for an untracked/unowned collection,
+     *   except for the database primary.
      */
     void fixPotentiallyStaleShardingStatesAfterUpgrade(
         OperationContext* opCtx,
