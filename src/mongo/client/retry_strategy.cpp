@@ -6,9 +6,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 
 #include <algorithm>
 #include <string_view>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
 namespace {
@@ -62,10 +66,23 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
 }
 
 auto DefaultRetryStrategy::getRetryParametersFromServerParameters() -> RetryParameters {
+    int64_t baseBackoff = gDefaultClientBaseBackoffMillis.loadRelaxed();
+    int64_t maxBackoff = gDefaultClientMaxBackoffMillis.loadRelaxed();
+    if (baseBackoff > maxBackoff) {
+        static logv2::SeveritySuppressor suppressor{
+            Seconds{10}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+        LOGV2_DEBUG(13238300,
+                    suppressor().toInt(),
+                    "defaultClientBaseBackoffMillis set to larger than "
+                    "defaultClientMaxBackoffMillis so using defaultClientMaxBackoffMillis.",
+                    "defaultClientBaseBackoffMillis"_attr = baseBackoff,
+                    "defaultClientMaxBackoffMillis"_attr = maxBackoff);
+        baseBackoff = maxBackoff;
+    }
     return {
         gDefaultClientMaxRetryAttempts.loadRelaxed(),
-        Milliseconds{gDefaultClientBaseBackoffMillis.loadRelaxed()},
-        Milliseconds{gDefaultClientMaxBackoffMillis.loadRelaxed()},
+        Milliseconds{baseBackoff},
+        Milliseconds{maxBackoff},
     };
 }
 
