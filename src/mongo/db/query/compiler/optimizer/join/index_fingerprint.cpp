@@ -266,6 +266,20 @@ std::vector<StringSet> usedIndexNamesPerNode(const CachedJoinPlan& plan, size_t 
     return names;
 }
 
+bool canReuseNodeFingerprint(const NodeFingerprint& cached, const NodeFingerprint& current) {
+    if (cached.usedFingerprint != current.usedFingerprint) {
+        return false;
+    }
+
+    // Getting here means that every index the plan uses is still present and unchanged. Now we
+    // check that the set of current relevant indexes is a subset of the cached relevant indexes. If
+    // it is not a subset, then that means a new relevant index was added.
+    return std::includes(cached.relevantIndexHashes.begin(),
+                         cached.relevantIndexHashes.end(),
+                         current.relevantIndexHashes.begin(),
+                         current.relevantIndexHashes.end());
+}
+
 std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                                                   const std::vector<ResolvedPath>& resolvedPaths,
                                                   const AvailableIndexes& perCollIdxs,

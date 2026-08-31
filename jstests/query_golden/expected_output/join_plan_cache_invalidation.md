@@ -368,7 +368,7 @@
 > Cache did not kick in at all
 
 
-### Hiding the index on the base collection's single-table predicate
+### TODO(SERVER-134231): Hiding the index on the base collection's single-table predicate
 ```json
 [
 	{
@@ -380,11 +380,11 @@
 	}
 ]
 ```
-> [!INFO]
-> As expected, the cache entry was correctly invalidated.
+> [!WARNING]
+> Cache entry was expected to be invalidated but was not!
 
 
-### Hiding the index on the $lookup collection's single-table predicate
+### TODO(SERVER-134231) Hiding the index on the $lookup collection's single-table predicate
 ```json
 [
 	{
@@ -396,8 +396,8 @@
 	}
 ]
 ```
-> [!INFO]
-> As expected, the cache entry was correctly invalidated.
+> [!WARNING]
+> Cache entry was expected to be invalidated but was not!
 
 
 ### Unhiding a potentially useful index on the base collection
@@ -846,7 +846,7 @@
 > Cache did not kick in at all
 
 
-### Dropping and recreating an index with a different keyPattern (different sparseness)
+### TODO(SERVER-134231) Dropping and recreating an index with a different keyPattern (different sparseness)
 ```json
 [
 	{
@@ -867,8 +867,8 @@
 	}
 ]
 ```
-> [!INFO]
-> As expected, the cache entry was correctly invalidated.
+> [!WARNING]
+> Cache entry was expected to be invalidated but was not!
 
 
 ### Dropping and recreating an index with a different keyPattern (different hidden state)
@@ -896,7 +896,7 @@
 > Cache did not kick in at all
 
 
-### Dropping and recreating an index with a different keyPattern (different collation)
+### TODO(SERVER-134231): Dropping and recreating an index with a different keyPattern (different collation)
 ```json
 [
 	{
@@ -919,8 +919,8 @@
 	}
 ]
 ```
-> [!INFO]
-> As expected, the cache entry was correctly invalidated.
+> [!WARNING]
+> Cache entry was expected to be invalidated but was not!
 
 
 ### Dropping and recreating an index with a different keyPattern (different index type)

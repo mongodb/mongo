@@ -4,7 +4,7 @@
  * the cache), a DDL operation on a referenced collection forces the next identical query to miss
  * the cache and re-optimize -- but only if it changed an index relevant to that plan. A DDL which
  * bumps the collection's version tag while leaving every node's relevant-index fingerprint intact
- * must leave the entry usable.
+ * must leave the entry usable, as should a DDL that drops or hides a relevant index that the cached plan does not use.
  *
  * TODO(SERVER-129272): Implement this test without relying on server logs once we have commands
  * to inspect the join plan cache.
@@ -16,6 +16,7 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
 
 const JOIN_PLAN_CACHE_HIT_LOG_ID = 11083906;
@@ -178,6 +179,16 @@ describe("join plan cache DDL invalidation", function () {
     // heuristics change), this fails loudly instead of the test silently exercising an unused index.
     function assertPipelineUsesInlj() {
         assertAllJoinsUseMethod(baseColl.explain().aggregate(pipeline), "INLJ");
+    }
+
+    // Returns the indexes in 'candidates' that 'explain's winning plan does not read from.
+    function getUnusedIndexes(explain, candidates) {
+        const used = new Set(
+            getAllPlanStages(getWinningPlanFromExplain(explain))
+                .filter((stage) => stage.indexName !== undefined)
+                .map((stage) => stage.indexName),
+        );
+        return candidates.filter((name) => !used.has(name));
     }
 
     // The pipeline joins on 'a' and has no single-table predicates, so 'a' is the only field
@@ -378,6 +389,76 @@ describe("join plan cache DDL invalidation", function () {
             "run after dropIndex on an index used by the cached plan should miss the cache",
         );
         assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    const CANDIDATE_SEEK_INDEXES = ["seekA", "seekAC"];
+
+    // Create 2 INLJ-eligible indexes on the join field such that the optimizer can consider 2 alternative indexes.
+    function createCandidateSeekIndexes() {
+        assert.commandWorked(foreignColl.createIndex({a: 1}, {name: "seekA"}));
+        assert.commandWorked(foreignColl.createIndex({a: 1, c: 1}, {name: "seekAC"}));
+    }
+
+    it("does not invalidate after dropIndex on a relevant index the cached plan does not use", function () {
+        createCandidateSeekIndexes();
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        const unused = getUnusedIndexes(
+            baseColl.explain().aggregate(pipeline),
+            CANDIDATE_SEEK_INDEXES,
+        );
+        // Guards against silently dropping the index the plan does use.
+        assert.eq(1, unused.length, "exactly one candidate index should go unused", {unused});
+        setForcedJoinMethod("any");
+
+        // Dropped index is INLJ-eligible and relevant to the join field but was not used so dropping it shouldn't invalidate the cache entry.
+        assert.commandWorked(foreignColl.dropIndex(unused[0]));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after dropIndex on a relevant but unused index should still hit the cache",
+        );
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "a second run after the revalidated entry adopted the new state should also hit",
+        );
+    });
+
+    it("does not invalidate when an unused relevant index is dropped and recreated", function () {
+        // The fingerprints record the index set the optimizer weighed when it chose this plan, so
+        // recreating an identical index restores exactly that state: the plan is still the one the
+        // optimizer would pick, and replanning could not change it.
+        createCandidateSeekIndexes();
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        const unused = getUnusedIndexes(
+            baseColl.explain().aggregate(pipeline),
+            CANDIDATE_SEEK_INDEXES,
+        );
+        // Guards against silently dropping the index the plan does use.
+        assert.eq(1, unused.length, "exactly one candidate index should go unused", {unused});
+        setForcedJoinMethod("any");
+
+        const recreateSpec = foreignColl.getIndexes().find((index) => index.name === unused[0]);
+        assert.commandWorked(foreignColl.dropIndex(unused[0]));
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "dropping an unused relevant index should not invalidate",
+        );
+
+        assert.commandWorked(foreignColl.createIndex(recreateSpec.key, {name: recreateSpec.name}));
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "recreating that index restores the state the plan was chosen in, so it should still hit",
+        );
     });
 
     it("re-caches (misses) after a relevant index is recreated with a different definition", function () {

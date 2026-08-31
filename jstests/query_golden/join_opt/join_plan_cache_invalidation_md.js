@@ -474,7 +474,7 @@ const cacheInvalidationExpected = [
     },
 
     {
-        case: "Hiding the index on the base collection's single-table predicate",
+        case: "TODO(SERVER-134231): Hiding the index on the base collection's single-table predicate",
         ddls: [
             {
                 collMod: "base_coll",
@@ -487,7 +487,7 @@ const cacheInvalidationExpected = [
     },
 
     {
-        case: "Hiding the index on the $lookup collection's single-table predicate",
+        case: "TODO(SERVER-134231) Hiding the index on the $lookup collection's single-table predicate",
         ddls: [
             {
                 collMod: "lookup_coll",
@@ -837,7 +837,7 @@ const cacheInvalidationExpected = [
     },
 
     {
-        case: "Dropping and recreating an index with a different keyPattern (different sparseness)",
+        case: "TODO(SERVER-134231) Dropping and recreating an index with a different keyPattern (different sparseness)",
         ddls: [
             {
                 "dropIndexes": "base_coll",
@@ -877,7 +877,7 @@ const cacheInvalidationExpected = [
     },
 
     {
-        case: "Dropping and recreating an index with a different keyPattern (different collation)",
+        case: "TODO(SERVER-134231): Dropping and recreating an index with a different keyPattern (different collation)",
         ddls: [
             {
                 "dropIndexes": "base_coll",

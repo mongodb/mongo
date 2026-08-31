@@ -143,6 +143,15 @@ public:
         return computeUsedIndexFingerprint(readyIndexes(mca, kNss), StringSet(usedIndexNames));
     }
 
+    // Fingerprints a node against the current catalog of 'kNss': one referencing 'relevantFields',
+    // whose plan reads from the indexes in 'usedIndexNames'. Used by the canReuseNodeFingerprint
+    // tests below, which compare one taken before a DDL against one taken after.
+    NodeFingerprint currentFingerprint(std::initializer_list<std::string> usedIndexNames,
+                                       std::initializer_list<std::string> relevantFields = {"a"}) {
+        return NodeFingerprint{.usedFingerprint = usedFingerprint(usedIndexNames),
+                               .relevantIndexHashes = relevantHashes(relevantFields)};
+    }
+
     // Deliberately not the fixture's makeCanonicalQuery(), which cannot express a sort and which
     // installs a pre-parsed filter. Going through ParsedFindCommandParams parses filter, projection
     // and sort the way a real find command would.
@@ -866,6 +875,106 @@ TEST_F(IndexFingerprintTest, UsedIndexFingerprintIsIndependentOfIndexCreationOrd
 }
 
 //
+// canReuseNodeFingerprint: the invalidation decision itself.
+//
+// 'a' is the relevant field throughout, 'a_1' the index the plan reads from and 'a_1_b_1' a second
+// relevant index it merely considered.
+//
+
+TEST_F(IndexFingerprintTest, ReusesWhenNothingChanged) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto cached = currentFingerprint({"a_1"});
+    ASSERT_TRUE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReusesWhenARelevantButUnusedIndexIsDropped) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1_b_1");
+    ASSERT_TRUE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReusesWhenEveryRelevantIndexButTheUsedOneIsDropped) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    addIndex(fromjson("{a: -1}"), "a_-1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1_b_1");
+    dropIndex("a_-1");
+    ASSERT_TRUE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReusesWhenAnIrrelevantIndexIsDropped) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{z: 1}"), "z_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("z_1");
+    ASSERT_TRUE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReplansWhenTheUsedIndexIsDropped) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1");
+    ASSERT_FALSE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReplansWhenTheUsedIndexIsRedefinedUnderTheSameName) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1");
+    addIndex(fromjson("{a: 1}"), "a_1", fromjson("{sparse: true}"));
+    ASSERT_FALSE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReplansWhenARelevantIndexIsAdded) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    ASSERT_FALSE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReplansWhenAnUnusedRelevantIndexIsDroppedAlongsideAnAddition) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    addIndex(fromjson("{a: 1, c: 1}"), "a_1_c_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1_b_1");
+    dropIndex("a_1_c_1");
+    addIndex(fromjson("{a: 1, d: 1}"), "a_1_d_1");
+    ASSERT_FALSE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReplansWhenAnUnusedRelevantIndexIsRecreatedWithADifferentKeyPattern) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    addIndex(fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    const auto cached = currentFingerprint({"a_1"});
+
+    dropIndex("a_1_b_1");
+    // Create index with same name but different key pattern. The optimizer sees this as a new
+    // relevant index it may use and thus invalidates the cache entry.
+    addIndex(fromjson("{a: 1, b: -1}"), "a_1_b_1");
+    ASSERT_FALSE(canReuseNodeFingerprint(cached, currentFingerprint({"a_1"})));
+}
+
+TEST_F(IndexFingerprintTest, ReusesWhenThePlanReadsFromNoIndexAndOneIsDropped) {
+    addIndex(fromjson("{a: 1}"), "a_1");
+    const auto cached = currentFingerprint({});
+
+    dropIndex("a_1");
+    ASSERT_TRUE(canReuseNodeFingerprint(cached, currentFingerprint({})));
+}
+
+//
 // makeNodeFingerprints: driving the above over a whole graph.
 //
 // End to end for the library: a real join graph plus real index catalogs in, one fingerprint per
@@ -1050,6 +1159,36 @@ TEST_F(IndexFingerprintTest, MakeNodeFingerprintsProducesOneFingerprintPerNode) 
     auto plan = planUsingNoIndexes();
     auto fingerprints = makeNodeFingerprints(ctx.joinGraph, ctx.resolvedPaths, perCollIdxs, *plan);
     ASSERT_EQ(2, fingerprints.size());
+}
+
+TEST_F(IndexFingerprintTest, MakeNodeFingerprintsKeepsAGraphReusableWhenAnUnusedIndexIsDropped) {
+    // End to end over a graph: the left node's plan reads from 'a_1' and merely considered
+    // 'a_1_b_1', while the right node's plan reads from nothing.
+    auto left = addGraphNode({.filter = fromjson("{a: 1}"), .nss = kNss});
+    auto right = addGraphNode({.filter = fromjson("{a: 1}"), .nss = kOtherNss});
+    ASSERT_TRUE(
+        graph.addSimpleEqualityEdge(left, right, addJoinPath(left, "x"), addJoinPath(right, "y"))
+            .has_value());
+    addIndexOn(kNss, fromjson("{a: 1}"), "a_1");
+    addIndexOn(kNss, fromjson("{a: 1, b: 1}"), "a_1_b_1");
+    auto joinGraph = freeze();
+
+    auto plan = joinPlanNode(accessPathPlanNode(left, {{"a_1", BSON("a" << 1)}}),
+                             accessPathPlanNode(right, {}));
+    const auto before = fingerprintGraph(joinGraph, {kNss, kOtherNss}, plan.get());
+
+    dropIndexOn(kNss, "a_1_b_1");
+    const auto after = fingerprintGraph(joinGraph, {kNss, kOtherNss}, plan.get());
+
+    ASSERT_NE(before, after);
+    ASSERT_TRUE(canReuseNodeFingerprint(before[left], after[left]));
+    ASSERT_TRUE(canReuseNodeFingerprint(before[right], after[right]));
+
+    // Whereas dropping the index the left node reads from does force a replan.
+    dropIndexOn(kNss, "a_1");
+    const auto afterUsedDrop = fingerprintGraph(joinGraph, {kNss, kOtherNss}, plan.get());
+    ASSERT_FALSE(canReuseNodeFingerprint(before[left], afterUsedDrop[left]));
+    ASSERT_TRUE(canReuseNodeFingerprint(before[right], afterUsedDrop[right]));
 }
 
 }  // namespace

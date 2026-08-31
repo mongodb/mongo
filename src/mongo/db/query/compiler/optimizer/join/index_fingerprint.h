@@ -29,6 +29,16 @@ std::vector<NodeFingerprint> makeNodeFingerprints(const JoinGraph& graph,
                                                   const CachedJoinPlan& plan);
 
 /**
+ * Whether a cached plan whose node was fingerprinted as 'cached' can still be reused now that the
+ * same node fingerprints as 'current'.
+ *
+ * An index the plan uses changing in any way forces a replan, as does any index becoming newly
+ * relevant. Dropping a relevant index the plan did not use cannot change which plan would be
+ * chosen, so the cached one is kept.
+ */
+bool canReuseNodeFingerprint(const NodeFingerprint& cached, const NodeFingerprint& current);
+
+/**
  * The names of the indexes 'plan' uses, per node of the join graph, in ascending NodeId order.
  * 'numNodes' is the number of nodes in the graph 'plan' was cached for.
  *

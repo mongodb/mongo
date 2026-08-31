@@ -428,9 +428,10 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
  * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
  * if it is stale and the query must be replanned.
  *
- * A bumped collection version alone is not enough to reject the entry: the DDL responsible may have
- * touched an index this plan could never use, which cannot change which plan the optimizer would
- * pick now. The per-node index fingerprints tell that case apart from a change that does matter.
+ * A bumped collection version alone is not enough to reject the entry. The DDL responsible may have
+ * touched an index this plan could never use, or one it considered but did not choose; neither can
+ * change which plan the optimizer would pick now. The per-node index fingerprints tell the two
+ * cases apart from an index change that does matter.
  */
 bool validateCacheEntry(JoinPlanCacheEntry& hit,
                         const MultipleCollectionAccessor& mca,
@@ -454,22 +455,27 @@ bool validateCacheEntry(JoinPlanCacheEntry& hit,
 
     auto currentFingerprints = makeNodeFingerprints(
         model.getGraph(), model.getResolvedPaths(), perCollIdxs, *hit.joinTree);
-    if (hit.nodeFingerprints != currentFingerprints) {
-        LOGV2_DEBUG(
-            13036802, 5, "Join plan cache entry invalidated by a change to a relevant index");
-        return false;
+    for (size_t node = 0; node < hit.nodeFingerprints.size(); ++node) {
+        if (!canReuseNodeFingerprint(hit.nodeFingerprints[node], currentFingerprints[node])) {
+            LOGV2_DEBUG(13036802,
+                        5,
+                        "Join plan cache entry invalidated by a change to an index it relies on",
+                        "node"_attr = node);
+            return false;
+        }
     }
 
-    // The catalog change left every relevant index untouched, so this entry is valid against the
-    // current collection state. Adopt that state's version tags so subsequent lookups take the
-    // fast path above instead of re-fingerprinting on every query.
+    // The catalog change either left the relevant indexes untouched or only dropped ones this plan
+    // does not use, so the entry is valid against the current collection state. Adopt that state's
+    // version tags so subsequent lookups take the fast path above instead of re-fingerprinting on
+    // every query.
     auto currentTags = makeCollectionTags(mca);
     hit.refreshCollectionTags(currentTags);
 
     LOGV2_DEBUG(13036803,
                 5,
-                "Join plan cache entry revalidated: the catalog change did not affect any relevant "
-                "index",
+                "Join plan cache entry revalidated: the catalog change did not affect any index "
+                "this plan relies on",
                 "cachedVersions"_attr = collectionVersionsForLog(cachedTags),
                 "currentVersions"_attr = collectionVersionsForLog(currentTags));
     return true;
