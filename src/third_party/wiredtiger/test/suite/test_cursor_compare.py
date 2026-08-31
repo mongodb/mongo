@@ -26,16 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys, wiredtiger, wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # Test cursor comparisons.
 class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
-    # Note: SWIG generates a TypeError instead of a RuntimeError for several cases.
-    # The same error on all platforms would be better.
-    expected_exception = TypeError if sys.platform.startswith('darwin') else RuntimeError
+    # SWIG 4.3 and later raise a TypeError where earlier versions raise a RuntimeError, and the
+    # build hosts do not all carry the same SWIG version. Accept either; the message check below
+    # is what actually pins down the failure.
+    expected_exception = (TypeError, RuntimeError)
 
     types = [
         ('file', dict(type='file:', lsm=False, dataset=SimpleDataSet)),
