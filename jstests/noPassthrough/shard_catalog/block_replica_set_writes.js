@@ -142,6 +142,11 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "replicaSetWritesBlockReason metric should be 0 (InsufficientDiskSpace)",
         );
         assert.eq(
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            false,
+            "replicaSetWritesBlockAllowDeletions metric should be false when deletions are blocked",
+        );
+        assert.eq(
             replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
             1,
             "repl.replicaSetWritesBlockCounters counter for InsufficientDiskSpace should be 1",
@@ -165,9 +170,29 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "replicaSetWritesBlockReason should be absent when replica set write block is disabled",
         );
         assert.eq(
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            true,
+            "replicaSetWritesBlockAllowDeletions should be true when replica set write blocking is disabled",
+        );
+        assert.eq(
             replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
             1,
             "repl.replicaSetWritesBlockCounters counter for InsufficientDiskSpace should not change on disable",
+        );
+    });
+
+    it("Test replica set writes block allowDeletions metric reports allowed deletions", function () {
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
+        assert.eq(
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            true,
+            "replicaSetWritesBlockAllowDeletions metric should be true when deletions are allowed",
         );
     });
 

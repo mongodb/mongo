@@ -88,7 +88,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
     ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
-    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
 
     const auto userNss = NamespaceString::createNamespaceString_forTest("userDB.coll");
     ASSERT_DOES_NOT_THROW(state->checkReplicaSetDeletionsAllowed(opCtx.get(), userNss));
@@ -112,7 +112,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
     ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
-    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
 
     const auto userNss = NamespaceString::createNamespaceString_forTest("userDB.coll");
     ASSERT_THROWS_CODE(state->checkReplicaSetDeletionsAllowed(opCtx.get(), userNss),

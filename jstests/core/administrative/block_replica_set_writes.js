@@ -194,6 +194,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             false /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
         );
+        let replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            false,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be false when deletions are blocked",
+        );
 
         assert.commandFailedWithCode(
             testColl.insert({_id: 2, x: 2}),
@@ -211,6 +217,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         disableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             "InsufficientDiskSpace" /* reason */,
+        );
+        replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            true,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be true when replica set write blocking is disabled",
         );
 
         assert.commandWorked(testColl.insert({_id: 2, x: 2}));
@@ -328,6 +340,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
+        );
+        const replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            true,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be true when deletions are allowed",
         );
         assert.commandWorked(testColl.remove({_id: 1}));
         assert.eq(

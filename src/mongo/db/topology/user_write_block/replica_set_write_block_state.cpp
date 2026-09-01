@@ -126,7 +126,7 @@ void ReplicaSetWriteBlockState::checkReplicaSetDeletionsAllowed(OperationContext
     }
 }
 
-bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled_forTest() const {
+bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled() const {
     return _deletionsBlocked.load();
 }
 
