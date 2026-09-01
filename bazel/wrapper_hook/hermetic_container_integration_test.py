@@ -1679,6 +1679,14 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
+                mock.patch.dict(
+                    hermetic_container_integration.os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE": "0",
+                    },
+                ),
                 mock.patch.object(
                     hermetic_container_integration,
                     "_podman_runtime_dir",
@@ -1705,6 +1713,149 @@ class LinuxHostContainerTest(unittest.TestCase):
 
         self.assertFalse(ready)
         self.assertIn("could not determine whether this user has running containers", detail)
+        self.assertEqual(
+            [
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "ps", "--quiet"],
+            ],
+            [call.args[0] for call in run.call_args_list],
+        )
+
+    def test_podman_daemon_status_recovers_task_scoped_runtime_when_listing_is_stale(self):
+        stale_error = (
+            "invalid internal status, try resetting the pause process with "
+            '"/usr/bin/podman system migrate": could not find any running process'
+        )
+        stale_result = subprocess.CompletedProcess(
+            args=["/usr/bin/podman", "info"],
+            returncode=125,
+            stdout="",
+            stderr=stale_error,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.dict(
+                    hermetic_container_integration.os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "mongodb_mongo_master_task-0",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE": "0",
+                    },
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=pathlib.Path(temp_dir),
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        stale_result,
+                        stale_result,
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "ps", "--quiet"],
+                            returncode=125,
+                            stdout="",
+                            stderr=stale_error,
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "system", "migrate"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "info"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                    ],
+                ) as run,
+            ):
+                ready, detail = hermetic_container_integration._docker_daemon_status(
+                    "/usr/bin/podman"
+                )
+
+        self.assertTrue(ready)
+        self.assertEqual("", detail)
+        self.assertEqual(
+            [
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "ps", "--quiet"],
+                ["/usr/bin/podman", "system", "migrate"],
+                ["/usr/bin/podman", "info"],
+            ],
+            [call.args[0] for call in run.call_args_list],
+        )
+
+    def test_podman_daemon_status_does_not_migrate_task_scoped_runtime_on_unrelated_failure(self):
+        # A task-scoped runtime is isolated, but an unrelated `podman ps` failure is
+        # not evidence that the runtime is stale: containers may still be running and
+        # reachable, so migration must stay refused.
+        stale_error = (
+            "invalid internal status, try resetting the pause process with "
+            '"/usr/bin/podman system migrate": could not find any running process'
+        )
+        stale_result = subprocess.CompletedProcess(
+            args=["/usr/bin/podman", "info"],
+            returncode=125,
+            stdout="",
+            stderr=stale_error,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.dict(
+                    hermetic_container_integration.os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "mongodb_mongo_master_task-0",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
+                        "MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE": "0",
+                    },
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=pathlib.Path(temp_dir),
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        stale_result,
+                        stale_result,
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "ps", "--quiet"],
+                            returncode=125,
+                            stdout="",
+                            stderr="error opening database: permission denied",
+                        ),
+                        # Only reached if the guard wrongly authorizes migration.
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "system", "migrate"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "info"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                    ],
+                ) as run,
+            ):
+                ready, detail = hermetic_container_integration._docker_daemon_status(
+                    "/usr/bin/podman"
+                )
+
+        self.assertFalse(ready)
+        self.assertIn("could not determine whether this user has running containers", detail)
+        self.assertIn("permission denied", detail)
         self.assertEqual(
             [
                 ["/usr/bin/podman", "info"],

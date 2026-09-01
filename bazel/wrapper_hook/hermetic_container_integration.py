@@ -199,6 +199,7 @@ CONTAINER_NETWORK_RETRY_DELAY_SECONDS = 1
 PODMAN_RUNTIME_DIR_PREFIX = "mongo-linux-podman-runtime-"
 PODMAN_STORAGE_DIR_PREFIX = "mongo-linux-podman-storage-"
 PODMAN_TASK_ID_ENV = "MONGO_PODMAN_TASK_ID"
+PODMAN_STALE_RUNTIME_MARKER = "invalid internal status"
 CROSS_HOST_ACTION_CONFIG_FILENAME = "mongo_cross_host_action.json"
 RESMOKE_DEPS_PATH_SUFFIX = "_resmoke_deps_path.txt"
 RESMOKE_DEPS_PATH_MAP_ENV = "DEPS_PATH_MAP_FILE"
@@ -2761,6 +2762,16 @@ def _podman_migration_is_allowed(env: Mapping[str, str]) -> bool:
     return env.get("MONGO_BAZEL_PODMAN_AUTO_MIGRATE", "1").strip() not in ("0", "false", "False")
 
 
+def _podman_runtime_is_task_scoped(env: Mapping[str, str]) -> bool:
+    """Report whether Podman's runtime directory is private to one task.
+
+    ``_podman_task_root`` gives each Evergreen task its own runtime and storage
+    root, so no other user or task can own containers inside it. That makes
+    recovery of a stale runtime safe without an explicit force opt-in.
+    """
+    return bool(env.get(PODMAN_TASK_ID_ENV, "").strip())
+
+
 def _podman_migration_force_is_allowed(env: Mapping[str, str]) -> bool:
     """Allow forcing migration when Podman cannot enumerate containers."""
     return env.get("MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE", "0").strip().casefold() in (
@@ -2818,7 +2829,7 @@ def _recover_stale_podman_runtime(
                 return True, ""
 
             recheck_detail = _podman_command_detail(recheck)
-            if "invalid internal status" not in recheck_detail:
+            if PODMAN_STALE_RUNTIME_MARKER not in recheck_detail:
                 return False, (
                     "Podman remained unavailable after acquiring the recovery lock: "
                     f"{recheck_detail or f'exit code {recheck.returncode}'}"
@@ -2835,8 +2846,20 @@ def _recover_stale_podman_runtime(
             has_running_containers, container_check_detail = _podman_has_running_containers(
                 podman_argv, runtime_env
             )
-            if has_running_containers is None and not _podman_migration_force_is_allowed(
-                runtime_env
+            # A listing that fails with the same stale-runtime signature is
+            # evidence that the runtime is broken, not that containers are
+            # reachable: every Podman command shares that state. Recover when the
+            # runtime is private to this task, which is the case the guard below
+            # is protecting against multi-tenant runtimes.
+            listing_blocked_by_stale_runtime = (
+                has_running_containers is None
+                and PODMAN_STALE_RUNTIME_MARKER in container_check_detail
+                and _podman_runtime_is_task_scoped(runtime_env)
+            )
+            if (
+                has_running_containers is None
+                and not listing_blocked_by_stale_runtime
+                and not _podman_migration_force_is_allowed(runtime_env)
             ):
                 return False, (
                     "Refusing to run `podman system migrate` because Podman could not "
@@ -2929,7 +2952,7 @@ def _docker_daemon_status(docker_command: str) -> tuple[bool, str]:
         return True, ""
 
     detail = (result.stderr or result.stdout).strip()
-    if _is_podman_command(argv) and "invalid internal status" in detail:
+    if _is_podman_command(argv) and PODMAN_STALE_RUNTIME_MARKER in detail:
         assert runtime_env is not None
         recovered, recovery_detail = _recover_stale_podman_runtime(argv, runtime_env)
         if recovered:
