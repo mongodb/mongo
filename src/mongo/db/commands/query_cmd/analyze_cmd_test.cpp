@@ -5,7 +5,8 @@
  * IDL-parse-time validation tests for the analyze command. These exercise only the IDL parser
  * generated from src/mongo/db/query/analyze_command.idl — no opCtx, no catalog, no fixture.
  * Runtime checks that require a real collection acquisition live in
- * jstests/noPassthrough/query/analyze_sample_persist.js and analyze_ndv_persist.js instead.
+ * jstests/noPassthrough/query/query-optimization/analyze_sample_persist.js and
+ * analyze_ndv_persist.js instead.
  */
 
 #include "mongo/bson/bsonmisc.h"

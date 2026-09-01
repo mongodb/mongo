@@ -108,7 +108,7 @@ last-continuous:
       ticket: SERVER-97245
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
       ticket: SERVER-131540
-    - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/replsets/clean_shutdown_log.js
       ticket: SERVER-132245
@@ -165,7 +165,7 @@ last-lts:
       ticket: SERVER-97245
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
       ticket: SERVER-131540
-    - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/replsets/clean_shutdown_log.js
       ticket: SERVER-132245
