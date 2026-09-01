@@ -18,13 +18,15 @@ filegroup(
 )
 """
 
-def _jstestfuzz_repository_impl(module_ctx):
-    commit = module_ctx.getenv("JSTESTFUZZ_COMMIT", "").strip()
+# The commit the deterministic fuzzer suites pin:
+_DETERMINISTIC_COMMIT = "101ae461ed7704ae4d8b5000cc43a6080ec1a804"
+
+def _fetch(name, branch, commit):
     git_repository(
-        name = "jstestfuzz",
+        name = name,
         remote = "https://github.com/10gen/jstestfuzz.git",
-        branch = None if commit else "master",
-        commit = commit or None,
+        branch = branch,
+        commit = commit,
         build_file_content = _BUILD_FILE_CONTENT,
         # Preserves the fetched commit before git_repository strips .git/, since some
         # consumers (e.g. jstestfuzz's file_namer.ts) shell out to `git rev-parse HEAD`
@@ -41,6 +43,20 @@ def _jstestfuzz_repository_impl(module_ctx):
             "--exclude=./.git --exclude=./node-v[0-9]* --exclude=./out " +
             "--exclude=./jstestfuzz_bundle.tar .",
         ],
+    )
+
+def _jstestfuzz_repository_impl(module_ctx):
+    commit = module_ctx.getenv("JSTESTFUZZ_COMMIT", "").strip()
+    _fetch(
+        name = "jstestfuzz",
+        branch = None if commit else "master",
+        commit = commit or None,
+    )
+
+    _fetch(
+        name = "jstestfuzz_deterministic",
+        branch = None,
+        commit = _DETERMINISTIC_COMMIT,
     )
 
 jstestfuzz_repository = module_extension(

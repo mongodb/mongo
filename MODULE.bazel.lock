@@ -505,7 +505,7 @@
     },
     "//bazel/repository_rules:jstestfuzz_repository.bzl%jstestfuzz_repository": {
       "general": {
-        "bzlTransitiveDigest": "qIdw1NjC9bsqZR+blMT6XRPKKx7JJpSrUOTemf/PF2Q=",
+        "bzlTransitiveDigest": "YHxRoEOGVK61CuEps73cmFOJ+0hajpHytJKc0G6qWV4=",
         "usagesDigest": "hfv5GZCbjEm9mqVjqsLkZAo40qQLmsIZVIL6T+or5E4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -520,6 +520,21 @@
               "remote": "https://github.com/10gen/jstestfuzz.git",
               "branch": "master",
               "commit": "",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\n# The whole prepared checkout (sources + installed node_modules + compiled\n# grammars + .jstestfuzz_commit_sha) as a single tarball. A tarball (rather\n# than a glob filegroup) because node_modules contains symlinks.\nfilegroup(\n    name = \"bundle\",\n    srcs = [\"jstestfuzz_bundle.tar\"],\n)\n",
+              "patch_cmds": [
+                "git rev-parse HEAD > .jstestfuzz_commit_sha",
+                "export TMP=${TMP:-${TMPDIR:-/tmp}}; export TMPDIR=$TMP; python3 src/scripts/npm_run.py compile",
+                "tar cf jstestfuzz_bundle.tar --exclude=./.git --exclude=./node-v[0-9]* --exclude=./out --exclude=./jstestfuzz_bundle.tar ."
+              ]
+            }
+          },
+          "jstestfuzz_deterministic": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:git.bzl",
+            "ruleClassName": "git_repository",
+            "attributes": {
+              "remote": "https://github.com/10gen/jstestfuzz.git",
+              "branch": "",
+              "commit": "101ae461ed7704ae4d8b5000cc43a6080ec1a804",
               "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\n# The whole prepared checkout (sources + installed node_modules + compiled\n# grammars + .jstestfuzz_commit_sha) as a single tarball. A tarball (rather\n# than a glob filegroup) because node_modules contains symlinks.\nfilegroup(\n    name = \"bundle\",\n    srcs = [\"jstestfuzz_bundle.tar\"],\n)\n",
               "patch_cmds": [
                 "git rev-parse HEAD > .jstestfuzz_commit_sha",

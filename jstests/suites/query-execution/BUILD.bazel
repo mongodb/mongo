@@ -2070,3 +2070,110 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+jstestfuzz_generate(
+    name = "aggregation_multiversion_fuzzer_deterministic_tests",
+    bundle = "@jstestfuzz_deterministic//:bundle",
+    npm_command = "agg-fuzzer",
+    num_generated_files = 44,
+    seed = "1726779665485",
+)
+
+[
+    resmoke_suite_test(
+        name = "aggregation_multiversion_fuzzer_deterministic_{}".format(version),
+        srcs = [":aggregation_multiversion_fuzzer_deterministic_tests"],
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_multiversion_fuzzer_deterministic_{}.yml".format(version),
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--mongodSetParameters={logComponentVerbosity: {command: 2}}",
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 8,
+        tags = [
+            "auxiliary",
+            "ci-fuzzer-deterministic",
+            "common",
+            "future_git_tag_incompatible",
+            "incompatible_debug_mode",
+            "multiversion",
+            "random_name",
+            "require_npm",
+        ],
+        target_compatible_with = select({
+            "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+            "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+            "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+            "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+            "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+            "@platforms//os:macos": ["@platforms//:incompatible"],
+            "@platforms//os:windows": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+            "//src/mongo/tools/mongobridge_tool:mongobridge",
+        ],
+    )
+    for version, multiversion in {
+        "last_lts": "last-lts",
+        "last_continuous": "last-continuous",
+    }.items()
+]
+
+jstestfuzz_generate(
+    name = "update_fuzzer_replication_deterministic_tests",
+    bundle = "@jstestfuzz_deterministic//:bundle",
+    npm_command = "update-fuzzer",
+    num_generated_files = 28,
+    seed = "1726779665485",
+)
+
+[
+    resmoke_suite_test(
+        name = "update_fuzzer_replication_deterministic_{}".format(version),
+        srcs = [":update_fuzzer_replication_deterministic_tests"],
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/update_fuzzer_replication_deterministic_{}.yml".format(version),
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--mongodSetParameters={logComponentVerbosity: {command: 2}}",
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 8,
+        tags = [
+            "auxiliary",
+            "ci-fuzzer-deterministic",
+            "future_git_tag_incompatible",
+            "incompatible_debug_mode",
+            "multiversion",
+            "random_name",
+            "require_npm",
+        ],
+        target_compatible_with = select({
+            "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+            "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+            "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+            "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+            "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+            "@platforms//os:macos": ["@platforms//:incompatible"],
+            "@platforms//os:windows": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+            "//src/mongo/tools/mongobridge_tool:mongobridge",
+        ],
+    )
+    for version, multiversion in {
+        "last_lts": "last-lts",
+        "last_continuous": "last-continuous",
+    }.items()
+]

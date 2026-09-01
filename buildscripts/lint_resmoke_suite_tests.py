@@ -52,6 +52,7 @@ TAG_EQUIVALENCES = {
     "release_critical": "ci-release-critical",
     "development_critical": "ci-development-critical",
     "experimental": "ci-experimental",
+    "fuzzer_deterministic": "ci-fuzzer-deterministic",
 }
 _EVERGREEN_TO_BAZEL = dict(TAG_EQUIVALENCES)
 _BAZEL_TO_EVERGREEN = {bazel: evg for evg, bazel in TAG_EQUIVALENCES.items()}

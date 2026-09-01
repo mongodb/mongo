@@ -549,7 +549,7 @@ jstestfuzz_repository = use_extension(
     "//bazel/repository_rules:jstestfuzz_repository.bzl",
     "jstestfuzz_repository",
 )
-use_repo(jstestfuzz_repository, "jstestfuzz")
+use_repo(jstestfuzz_repository, "jstestfuzz", "jstestfuzz_deterministic")
 
 setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl", "setup_mongo_windows_toolchain_extension")
 use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")

@@ -26,7 +26,7 @@ def _jstestfuzz_generate_impl(ctx):
     } if not seed else {}
 
     npm_cli = ctx.file._npm_cli.path
-    bundle = ctx.file._bundle
+    bundle = ctx.file.bundle
     tool_inputs = [bundle] + ctx.files._node_files
 
     template_files = ctx.files.js_tests
@@ -156,7 +156,7 @@ jstestfuzz_generate = rule(
             executable = True,
             cfg = "exec",
         ),
-        "_bundle": attr.label(
+        "bundle": attr.label(
             default = "@jstestfuzz//:bundle",
             allow_single_file = True,
             doc = "Tarball of the prepared jstestfuzz checkout (sources + " +
