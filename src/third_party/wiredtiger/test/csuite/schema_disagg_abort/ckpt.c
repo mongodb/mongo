@@ -207,7 +207,7 @@ thread_ts_run(void *arg)
              */
             const uint64_t stable_ts = query_ts(state->conn, TS_STABLE);
             if (frontier_ts >= stable_ts)
-                set_ts(state->cfg, state->conn, TS_FRONTIER, frontier_ts);
+                workload_set_frontier(state, frontier_ts);
         }
         __wt_atomic_store_bool(&state->ts_busy, false);
 

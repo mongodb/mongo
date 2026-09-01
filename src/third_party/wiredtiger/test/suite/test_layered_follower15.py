@@ -184,6 +184,82 @@ class test_layered_follower15(wttest.WiredTigerTestCase):
 
         self.teardown_follower_and_checkpoint_leader()
 
+    def test_uncommitted_modify_base_value_not_pruned(self):
+        """
+        Tests that an uncommitted MODIFY keeps its on-page base value during
+        update-restore eviction.
+        """
+        self.create_follower_and_tables()
+        key = self.SINGLE_KEY
+        sacrificial_key = 2
+        base_value = 'v1'
+        expected = base_value + 'X' * 100
+
+        self.commit_on_both({key: base_value}, 10)
+        # Keep a second key on the same follower page so reconciliation makes
+        # progress while the target MODIFY is restored.
+        self.commit_on_follower({sacrificial_key: 'discard-me'}, 10)
+        self.force_evict(self.conn_follow, self.uri, key)
+
+        # Make the on-page value eligible for ingest garbage collection.
+        self.set_stable_on_both(11)
+        self.session.checkpoint()
+        self.disagg_advance_checkpoint_and_wait(self.conn_follow)
+
+        restore_before = self.get_stat(
+            wiredtiger.stat.dsrc.cache_write_restore_invisible,
+            uri=self.uri,
+            conn=self.conn_follow)
+        reconcile_before = self.get_stat(
+            wiredtiger.stat.dsrc.rec_pages_eviction,
+            uri=self.uri,
+            conn=self.conn_follow)
+        gc_before = self.get_stat(
+            wiredtiger.stat.dsrc.rec_ingest_garbage_collection_keys_disk_image,
+            uri=self.uri,
+            conn=self.conn_follow)
+
+        cursor = self.session_follow.open_cursor(self.uri)
+        self.session_follow.begin_transaction()
+        cursor.set_key(key)
+        self.assertEqual(
+            cursor.modify([wiredtiger.Modify('X' * 100, 2, 100)]), 0)
+        cursor.close()
+
+        # Reconciliation must restore the uncommitted MODIFY while retaining
+        # the on-page value it needs as its reconstruction base.
+        self.force_evict(self.conn_follow, self.uri, key)
+        self.assertStatGreaterSoon(
+            wiredtiger.stat.dsrc.cache_write_restore_invisible,
+            restore_before,
+            uri=self.uri,
+            session=self.session_follow)
+        self.assertStatGreaterSoon(
+            wiredtiger.stat.dsrc.rec_pages_eviction,
+            reconcile_before,
+            uri=self.uri,
+            session=self.session_follow)
+        self.assertStatGreaterSoon(
+            wiredtiger.stat.dsrc.rec_ingest_garbage_collection_keys_disk_image,
+            gc_before,
+            uri=self.uri,
+            session=self.session_follow)
+        self.session_follow.commit_transaction(
+            f'commit_timestamp={self.timestamp_str(20)}')
+
+        self.session_follow.begin_transaction(
+            f'read_timestamp={self.timestamp_str(20)}')
+        cursor = self.session_follow.open_cursor(self.ingest_uri)
+        cursor.set_key(key)
+        self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.get_value(), expected)
+        cursor.set_key(sacrificial_key)
+        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+        self.session_follow.rollback_transaction()
+
+        self.teardown_follower_and_checkpoint_leader()
+
     def setup_multi_key_orphan_modify_precondition(self, num_keys, target_key):
         """
         Multi-key variant of setup_orphan_modify_precondition.

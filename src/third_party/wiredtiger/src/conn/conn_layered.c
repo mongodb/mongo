@@ -466,6 +466,12 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
     WT_ERR(__wt_calloc_one(session, &entry));
     entry->metadata_op = metadata_op;
     entry->schema_epoch = schema_epoch;
+    /*
+     * Record which side of the step-down boundary the operation was issued on. The schema lock held
+     * here serializes the boundary, making the relaxed load safe.
+     */
+    entry->in_step_down_window =
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE;
     WT_ERR(__wt_strdup(session, stable_uri, &entry->stable_uri));
     WT_ERR(__wt_strdup(session, table_name, &entry->table_name));
 
@@ -781,6 +787,52 @@ __disagg_handle_create_remove_pairing(WT_SESSION_IMPL *session, WT_CONNECTION_IM
 }
 
 /*
+ * __disagg_remove_is_checkpoint_violation --
+ *     Return whether a table visible at the checkpoint epoch is dropped and recreated at a future
+ *     epoch. This is an API violation because the checkpoint refers to the dropped table, while the
+ *     later CREATE refers to a different table with the same name.
+ */
+static bool
+__disagg_remove_is_checkpoint_violation(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn,
+  WT_DISAGG_METADATA_OP *entry, wt_timestamp_t schema_epoch)
+{
+    /* Only a published drop can invalidate the checkpoint. */
+    if (entry->metadata_op != WT_SHARED_METADATA_REMOVE ||
+      entry->schema_epoch == WT_SCHEMA_EPOCH_UNPUBLISHED)
+        return (false);
+
+    WT_DISAGGREGATED_STORAGE *disagg = &conn->disaggregated_storage;
+    WT_ASSERT_SPINLOCK_OWNED(session, &disagg->shared_metadata_queue_lock);
+
+    /* Check whether a recreated table exists after considering all later operations. */
+    WT_DISAGG_METADATA_OP *op;
+    bool recreated = false;
+
+    for (op = TAILQ_NEXT(entry, q); op != NULL; op = TAILQ_NEXT(op, q)) {
+        if (op->deferred || strcmp(op->stable_uri, entry->stable_uri) != 0)
+            continue;
+        /*
+         * Overwrite `recreated` each loop so a later REMOVE can cancel an earlier CREATE. Only the
+         * final value matters.
+         */
+        recreated = op->metadata_op == WT_SHARED_METADATA_CREATE;
+    }
+
+    /* No recreated table exists, so there is no API violation. */
+    if (!recreated)
+        return (false);
+
+    /* Exempt a table created and dropped entirely after the checkpoint epoch. */
+    for (op = TAILQ_FIRST(&disagg->shared_metadata_qh); op != entry; op = TAILQ_NEXT(op, q)) {
+        if (op->metadata_op == WT_SHARED_METADATA_CREATE && op->schema_epoch > schema_epoch &&
+          strcmp(op->stable_uri, entry->stable_uri) == 0)
+            return (false);
+    }
+
+    return (true);
+}
+
+/*
  * __disagg_requeue_skipped_creates --
  *     Return parked create entries to the head of the shared metadata queue, restoring their
  *     original order, so a later checkpoint revisits them.
@@ -844,6 +896,15 @@ __wt_disagg_shared_metadata_queue_process(
 
         /* Defer entries based on the schema epoch. */
         if (cur_schema_epoch != WT_SCHEMA_EPOCH_NONE && entry->schema_epoch > cur_schema_epoch) {
+            if (__disagg_remove_is_checkpoint_violation(session, conn, entry, cur_schema_epoch)) {
+                __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+                  "API violation: table \"%s\" was dropped at schema epoch %" PRIu64
+                  " and recreated, above the checkpoint's schema epoch %" PRIu64
+                  ": the checkpoint refers to the dropped generation",
+                  entry->table_name, entry->schema_epoch, cur_schema_epoch);
+                WT_ERR_PANIC(session, EINVAL,
+                  "API violation: checkpoint schema epoch refers to a dropped and recreated table");
+            }
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Defer metadata operation %s for table \"%s\" with schema epoch %" PRIu64,
               __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
@@ -920,6 +981,46 @@ err:
 }
 
 /*
+ * __disagg_publish_check_step_down --
+ *     Check a publish epoch against the step-down boundary: a table whose latest operation was
+ *     issued before the boundary must be published at or below it, so the step-down checkpoint
+ *     carries it, while one whose latest operation was issued inside the window belongs to the next
+ *     era and can only be published above it. The caller holds the schema and queue locks.
+ */
+static int
+__disagg_publish_check_step_down(
+  WT_SESSION_IMPL *session, const char *table_name, wt_timestamp_t schema_epoch)
+{
+    WT_DISAGG_METADATA_OP *latest;
+    wt_timestamp_t step_down_epoch;
+    bool in_step_down_window;
+
+    /* The schema lock held by the caller serializes the boundary, making the relaxed load safe. */
+    step_down_epoch = __wt_atomic_load_uint64_relaxed(
+      &S2C(session)->txn_global.step_down_disaggregated_schema_epoch);
+    if (step_down_epoch == WT_SCHEMA_EPOCH_NONE)
+        return (0);
+
+    latest = __wti_disagg_table_latest_create_remove(session, table_name);
+    in_step_down_window = latest != NULL && latest->in_step_down_window;
+
+    if (in_step_down_window && schema_epoch <= step_down_epoch)
+        WT_RET_MSG(session, EINVAL,
+          "Cannot publish for table \"%s\" at schema epoch %" PRIu64
+          " at or below the step down boundary %" PRIu64,
+          table_name, schema_epoch, step_down_epoch);
+    if (!in_step_down_window && schema_epoch > step_down_epoch)
+        WT_RET_MSG(session, EINVAL,
+          "Cannot publish for table \"%s\" at schema epoch %" PRIu64
+          " above the step down boundary %" PRIu64
+          ": the table's latest schema operation predates the boundary, so the step down "
+          "checkpoint has to carry it",
+          table_name, schema_epoch, step_down_epoch);
+
+    return (0);
+}
+
+/*
  * __wt_disagg_shared_metadata_queue_publish --
  *     Publish schema operations in the shared metadata queue for the given object.
  */
@@ -930,7 +1031,7 @@ __wt_disagg_shared_metadata_queue_publish(
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_DISAGG_METADATA_OP *entry, *tmp;
-    wt_timestamp_t prev_schema_epoch, step_down_epoch;
+    wt_timestamp_t prev_schema_epoch;
 
     conn = S2C(session);
     prev_schema_epoch = WT_SCHEMA_EPOCH_NONE;
@@ -939,10 +1040,6 @@ __wt_disagg_shared_metadata_queue_publish(
 
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
-    /* The schema lock held here serializes the boundary, making the relaxed load safe. */
-    step_down_epoch =
-      __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_disaggregated_schema_epoch);
-
     TAILQ_FOREACH_SAFE(entry, &conn->disaggregated_storage.shared_metadata_qh, q, tmp)
     {
         if (strcmp(entry->table_name, table_name) != 0)
@@ -950,15 +1047,7 @@ __wt_disagg_shared_metadata_queue_publish(
 
         /* Update unpublished schema epochs before any ordering or range checks. */
         if (entry->schema_epoch == WT_SCHEMA_EPOCH_UNPUBLISHED) {
-            /*
-             * While the step-down boundary is set, epochs are only assigned above it: anything
-             * lower would claim coverage by a final checkpoint that cannot include it.
-             */
-            if (step_down_epoch != WT_SCHEMA_EPOCH_NONE && schema_epoch <= step_down_epoch)
-                WT_ERR_MSG(session, EINVAL,
-                  "Cannot publish for table \"%s\" at schema epoch %" PRIu64
-                  " at or below the step down boundary %" PRIu64,
-                  table_name, schema_epoch, step_down_epoch);
+            WT_ERR(__disagg_publish_check_step_down(session, table_name, schema_epoch));
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Publishing metadata operation %s for table \"%s\" to schema epoch %" PRIu64,
               __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,

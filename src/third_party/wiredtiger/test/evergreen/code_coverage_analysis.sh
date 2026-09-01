@@ -30,13 +30,17 @@ fi
 
 virtualenv -p python3 venv
 source venv/bin/activate
-pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0
+pip3 install gcovr==8.6
 mkdir -p coverage_report
 output_flags="--html-self-contained --html-details coverage_report/2_coverage_report.html --json-summary-pretty --json-summary coverage_report/1_coverage_report_summary.json --json coverage_report/full_coverage_report.json"
 if [ ! -z $combine_coverage_report ]; then
-  gcovr --gcov-ignore-parse-errors -f $coverage_filter --add-tracefile $first_coverage_file_path --add-tracefile $second_coverage_file_path -j $num_jobs $output_flags
+  gcovr -f $coverage_filter --add-tracefile $first_coverage_file_path --add-tracefile $second_coverage_file_path -j $num_jobs $output_flags
 else
-  gcovr --gcov-ignore-parse-errors -f $coverage_filter -j $num_jobs $output_flags
+  # Convert the raw coverage data with parallel gcovr processes, then merge the
+  # resulting tracefiles into the report. A single gcovr process cannot do this:
+  # its -j option only creates threads, which are GIL-bound during parsing.
+  $python_binary test/evergreen/code_coverage/parallel_gcovr.py -j $num_jobs -f $coverage_filter -o coverage_tracefiles -v
+  gcovr -f $coverage_filter --add-tracefile 'coverage_tracefiles/*.json' $output_flags
   $python_binary test/evergreen/code_coverage_analysis.py -s coverage_report/1_coverage_report_summary.json -t time.txt
 fi
 

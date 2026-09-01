@@ -64,20 +64,18 @@ __drop_file(
       session, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE, "after dropping file entry", uri);
 
     /*
-     * Truncate history store for the dropped file if we can find its id from the metadata, this is
-     * a best-effort operation, as we don't fail drop if truncate returns an error. There is no
-     * history store to truncate for in-memory database, and we should not call truncate if
-     * connection is not ready for history store operations, or if we're truncating a disaggregated
-     * btree on a follower.
+     * Schedule the truncate of the dropped file's history store content, if we can find its id from
+     * the metadata. The truncate cannot be undone, so it must not run until the drop can no longer
+     * fail. There is no history store to truncate for in-memory database, and we should not
+     * truncate if the connection is not ready for history store operations, or if we're truncating
+     * a disaggregated btree on a follower.
      */
     WT_ERR(ret);
     if (id_found && !F_ISSET(conn, WT_CONN_IN_MEMORY) && F_ISSET_ATOMIC_32(conn, WT_CONN_READY) &&
       (!__wt_conn_is_disagg(session) ||
         __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ||
         !WT_BTREE_ID_SHARED(id)))
-        if (__wt_hs_btree_truncate(session, id) != 0)
-            __wt_verbose_warning(
-              session, WT_VERB_HS, "Failed to truncate history store for the file: %s", uri);
+        WT_ERR(__wt_meta_track_hs_truncate(session, uri, id));
 err:
     __wt_free(session, metadata_cfg);
     return (ret);

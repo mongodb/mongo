@@ -1568,17 +1568,27 @@ __verify_page_content_int(
     WT_DECL_RET;
     WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
-    WT_TIME_AGGREGATE *ta;
+    WT_TIME_AGGREGATE effective_ta, *ta;
     uint32_t cell_num;
 
     page = ref->page;
     dsk = page->dsk;
-    ta = &unpack.ta;
 
     /* Walk the page, verifying overflow pages and validating timestamps. */
     cell_num = 0;
     WT_CELL_FOREACH_ADDR (session, dsk, unpack) {
         ++cell_num;
+
+        /*
+         * The aggregate in a deleted-address cell predates the truncate, so validate the effective
+         * aggregate: the unpacked one with the page deletion applied as its stop point.
+         */
+        ta = &unpack.ta;
+        if (unpack.type == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+            WT_TIME_AGGREGATE_COPY(&effective_ta, &unpack.ta);
+            WT_TIME_AGGREGATE_MERGE_PAGE_DEL(&effective_ta, &unpack.page_del);
+            ta = &effective_ta;
+        }
 
         __wt_verbose_debug3(session, WT_VERB_VERIFY,
           "cell num: %" PRIu32 ", cell type: %s, page type: %s", cell_num - 1,

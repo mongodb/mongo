@@ -57,15 +57,11 @@ class test_layered_async_stepdown08(
     ]
     scenarios = make_scenarios(disagg_storages, worlds)
 
-    # The epoch a create is published at, above the step-down checkpoint's epoch so the create stays
-    # uncovered in the epoch world.
-    uncovered_epoch = 30
-
     def uri(self, name):
         return f'layered:{self.test_name}_{name}'
 
     # The step-down timestamp every test splits its work on.
-    cutoff = 5
+    cutoff_ts = 5
 
     def setup_world(self):
         """Configure the stable schema epoch only in the epoch world."""
@@ -102,14 +98,14 @@ class test_layered_async_stepdown08(
     def enter_window(self):
         """Set up the world, then open the step-down window by setting the timestamp."""
         self.setup_world()
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
 
     def step_down_checkpoint(self):
         """
         Take the final leader checkpoint at the step-down timestamp. Everything committed at or below
         the cutoff becomes durable here; the rows written above it belong to the follower era.
         """
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.cutoff))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.cutoff_ts))
         self.session.checkpoint()
 
     def checkpoint_covering_epoch(self, epoch, stable_ts):
@@ -154,7 +150,7 @@ class test_layered_async_stepdown08(
         before, before_rows = self.create_with_rows('before', 2)
         self.publish_and_make_stable(before, 20)
 
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
         after, after_rows = self.create_with_rows('after', 6)
         self.publish_if_epochs(after, 40)
 
@@ -167,65 +163,59 @@ class test_layered_async_stepdown08(
             self.assertEqual(self.read_kvs_at(after, 7), after_rows)
 
         assert_both_sides()
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)
         assert_both_sides()
 
     def create_tables_with_mixed_states(self):
         """
         Create a table for each state that can be alive at a step-down, take the step-down
         checkpoint, and return the URIs. Rows are written above that checkpoint's stable timestamp,
-        which is what keeps an unpublished table legal in the epoch world.
+        which is what keeps an unpublished table legal in the epoch-less world.
         """
         self.setup_world()
 
         # Published below the cutoff and covered by the checkpoint that follows.
         covered, covered_rows = self.create_with_rows('covered', 2)
         self.publish_and_make_stable(covered, 20)
+        tables = {'covered': (covered, covered_rows)}
 
-        # Published above the checkpoint's epoch, so the epoch world leaves it uncovered.
-        uncovered = self.uri('uncovered')
-        self.session.create(uncovered, self.table_config)
-        self.publish_if_epochs(uncovered, self.uncovered_epoch)
+        # A table the step-down checkpoint would leave behind, either published too high to be
+        # reached or never published at all. The epoch world refuses to declare the boundary while
+        # a table created in this era is in that state, so these two only exist without epochs.
+        if not self.use_epochs:
+            uncovered = self.uri('uncovered')
+            self.session.create(uncovered, self.table_config)
+            tables['uncovered'] = (uncovered, {})
 
-        # Created and never published.
-        unpublished = self.uri('unpublished')
-        self.session.create(unpublished, self.table_config)
+            unpublished = self.uri('unpublished')
+            self.session.create(unpublished, self.table_config)
+            tables['unpublished'] = (unpublished, {})
 
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
 
         # Created after the step-down timestamp. Its publish epoch has to exceed the stable schema
         # epoch the covered table advanced to, so the epoch world defers this entry by epoch and the
         # epoch-less world reaches it with no stable value to publish.
         window, window_rows = self.create_with_rows('window', 6)
         self.publish_if_epochs(window, 40)
+        tables['window'] = (window, window_rows)
 
         self.step_down_checkpoint()
-        return {
-          'covered': (covered, covered_rows),
-          'uncovered': (uncovered, {}),
-          'unpublished': (unpublished, {}),
-          'window': (window, window_rows),
-        }
+        return tables
 
     def assert_mixed_states(self, tables):
         """
-        Assert all three states of every table. The epoch world withholds an unpublished table from
-        the checkpoint and from shared metadata; the epoch-less world has no notion of publication,
+        Assert all three states of every table. The epoch-less world has no notion of publication,
         so it covers everything it has a constituent for.
         """
         covered, _ = tables['covered']
-        uncovered, _ = tables['uncovered']
-        unpublished, _ = tables['unpublished']
         window, _ = tables['window']
 
         self.assert_table_state(self.conn, covered, True, True, True)
 
-        if self.use_epochs:
-            self.assert_table_state(self.conn, uncovered, True, False, False)
-            self.assert_table_state(self.conn, unpublished, True, False, False)
-        else:
-            self.assert_table_state(self.conn, uncovered, True, True, True)
-            self.assert_table_state(self.conn, unpublished, True, True, True)
+        if not self.use_epochs:
+            self.assert_table_state(self.conn, tables['uncovered'][0], True, True, True)
+            self.assert_table_state(self.conn, tables['unpublished'][0], True, True, True)
 
         # A window create has no constituent to checkpoint or advertise, in either world.
         self.assert_table_state(self.conn, window, False, False, False)
@@ -266,10 +256,11 @@ class test_layered_async_stepdown08(
             uri, rows = tables[name]
             self.assertEqual(self.read_kvs_at(uri, 7), rows, f'{name} did not serve its rows')
 
-        # The epoch world left this constituent without a checkpoint, so a follower has nothing to
-        # open for it. The epoch-less world checkpointed it, so it reads as the empty table it is.
-        uncovered, _ = tables['uncovered']
-        self.assertEqual(self.read_kvs_at(uncovered, 7), {})
+        # Without epochs the checkpoint reached this constituent, so it reads as the empty table it
+        # is. With epochs the state cannot exist, because the boundary would have been refused.
+        if not self.use_epochs:
+            uncovered, _ = tables['uncovered']
+            self.assertEqual(self.read_kvs_at(uncovered, 7), {})
 
     def test_timestampless_step_down_keeps_constituents(self):
         """
@@ -302,13 +293,13 @@ class test_layered_async_stepdown08(
         # Published below the cutoff, so the step-down checkpoint covers it and its rows.
         self.publish_and_make_stable(before, 20)
 
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
         after, after_rows = self.create_with_rows('after', 6)
         self.publish_if_epochs(after, 40)
         self.assertTrue(self.stable_constituent_exists(self.conn, before))
         self.assert_table_state(self.conn, after, False, False, False)
 
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)
         self.assertTrue(self.stable_constituent_exists(self.conn, before))
         self.assert_table_state(self.conn, after, False, False, False)
 
@@ -336,10 +327,10 @@ class test_layered_async_stepdown08(
         follower_keys = sorted(self.local_metadata_keys(conn_follow, uri))
         self.close_follower(conn_follow, session_follow)
 
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
         self.session.create(uri, self.table_config)
         self.assertEqual(sorted(self.local_metadata_keys(self.conn, uri)), follower_keys)
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)
 
     def test_multiple_window_creates_requeue(self):
         """
@@ -379,7 +370,7 @@ class test_layered_async_stepdown08(
         self.dropUntilSuccess(self.session, uri)
         self.publish_if_epochs(uri, 20)
 
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)
         self.step_up()
         self.checkpoint_covering_epoch(20, 7)
 
@@ -395,7 +386,7 @@ class test_layered_async_stepdown08(
         reader = self.conn.open_session('')
         reader.begin_transaction()
 
-        self.set_step_down_ts(self.cutoff)
+        self.set_step_down_ts(self.cutoff_ts)
         uri, rows = self.create_with_rows('window_reader', 6)
         self.assertFalse(self.stable_constituent_exists(self.conn, uri))
 
@@ -410,7 +401,7 @@ class test_layered_async_stepdown08(
 
         # A reader that began after the timestamp sees the rows through the ingest constituent.
         self.assertEqual(self.read_kvs_at(uri, 7), rows)
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)
 
     def test_create_racing_step_down_timestamp(self):
         """
@@ -436,7 +427,7 @@ class test_layered_async_stepdown08(
         thread = threading.Thread(target=create_tables)
         thread.start()
         try:
-            self.set_step_down_ts(self.cutoff)
+            self.set_step_down_ts(self.cutoff_ts)
         except Exception as e:
             errors.append(e)
         thread.join()
@@ -445,4 +436,4 @@ class test_layered_async_stepdown08(
         for uri in uris:
             self.assertTrue(self.uri_in_local_metadata(self.conn, uri))
         self.assert_no_unexpected_tables(self.conn, uris)
-        self.complete_step_down(self.cutoff)
+        self.complete_step_down(self.cutoff_ts)

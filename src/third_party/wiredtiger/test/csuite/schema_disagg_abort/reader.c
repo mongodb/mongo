@@ -47,7 +47,7 @@ reader_step_down(WORKLOAD_STATE *state, uint64_t ts)
      * switches becomes illegal.
      */
     set_ts(state->cfg, conn, TS_STEPDOWN, ts);
-    set_ts(state->cfg, conn, TS_FRONTIER, ts);
+    workload_set_frontier(state, ts);
 
     WT_SESSION *session;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));

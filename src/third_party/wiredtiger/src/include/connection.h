@@ -208,6 +208,9 @@ struct __wt_disagg_metadata_op {
     /* Skip this operation in the current checkpoint and apply it in the next one. */
     bool deferred;
 
+    /* The operation was issued inside the step-down window, so it belongs to the next era. */
+    bool in_step_down_window;
+
     TAILQ_ENTRY(__wt_disagg_metadata_op) q; /* Linked list of entries. */
 };
 

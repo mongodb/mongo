@@ -836,6 +836,8 @@ extern int __wt_meta_track_fileop(WT_SESSION_IMPL *session, const char *olduri, 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, bool created)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_meta_track_hs_truncate(WT_SESSION_IMPL *session, const char *uri, uint32_t btree_id)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_track_init(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
@@ -939,10 +941,8 @@ extern int __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENT
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_prepared_discover_find_item(WT_SESSION_IMPL *session, uint64_t prepared_id,
+extern int __wt_prepared_discover_unlink_item(WT_SESSION_IMPL *session, uint64_t prepared_id,
   WT_PENDING_PREPARED_ITEM **prepared_item) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_prepared_discover_remove_item(WT_SESSION_IMPL *session, uint64_t prepared_id)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags,
@@ -1900,6 +1900,8 @@ extern void __wt_optrack_record_funcid(
 extern void __wt_os_stdio(WT_SESSION_IMPL *session);
 extern void __wt_page_block_meta_assign(WT_SESSION_IMPL *session, WT_PAGE_BLOCK_META *meta);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
+extern void __wt_prepared_discover_free_item(
+  WT_SESSION_IMPL *session, WT_PENDING_PREPARED_ITEM *prepared_item);
 extern void __wt_random_init(WT_SESSION_IMPL *session, WT_RAND_STATE *rnd_state)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_random_init_default(WT_RAND_STATE *rnd_state)
@@ -2600,6 +2602,8 @@ static WT_INLINE uint64_t __wt_txn_oldest_id(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE void __wt_block_header_byteswap(WT_BLOCK_HEADER *blk);
 static WT_INLINE void __wt_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to);
+static WT_INLINE void __wt_btcur_skip_page_inc(
+  WT_REF *ref, WT_PAGE_WALK_SKIP_STATS *walk_skip_stats);
 static WT_INLINE void __wt_btree_advance_ingest_max(WT_BTREE *btree, wt_timestamp_t durable_ts);
 static WT_INLINE void __wt_btree_disable_bulk(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_btree_row_leaf_entries_update(WT_BTREE *btree, uint64_t sample);

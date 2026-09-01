@@ -1555,7 +1555,7 @@ __wti_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
      */
     WT_RET(__wt_scr_alloc(session, 0, &from_path));
     WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-    tmp_id = __wt_atomic_add_uint32(&log->tmp_fileid, 1);
+    tmp_id = __wt_atomic_add_uint32_relaxed(&log->tmp_fileid, 1);
     WT_ERR(__wt_log_filename(session, tmp_id, WTI_LOG_TMPNAME, from_path));
     WT_ERR(__wt_log_filename(session, lognum, dest, to_path));
     __wt_spin_lock(session, &log->log_fs_lock);

@@ -226,16 +226,16 @@ class test_checkpoint32(wttest.WiredTigerTestCase):
         cursor.close()
         self.reopen_conn()
 
-        # Get the existing on-disk delete page skip statistic value.
-        prev_cur_del_page_skip = self.get_stat(stat.conn.cursor_tree_walk_del_page_skip)
+        # Get the existing on-disk deleted leaf page skip statistic value.
+        prev_cur_del_leaf_page_skip = self.get_stat(stat.conn.cursor_tree_walk_del_leaf_page_skip)
 
         # Now read the removed data; the deleted pages are skipped from their on-disk address cells.
         self.check(ds, 0, value_a)
 
-        # Get the new on-disk delete page skip statistic value.
-        cur_del_page_skip = self.get_stat(stat.conn.cursor_tree_walk_del_page_skip)
+        # Get the new on-disk deleted leaf page skip statistic value.
+        cur_del_leaf_page_skip = self.get_stat(stat.conn.cursor_tree_walk_del_leaf_page_skip)
 
-        self.assertGreater(cur_del_page_skip, prev_cur_del_page_skip)
+        self.assertGreater(cur_del_leaf_page_skip, prev_cur_del_leaf_page_skip)
 
 if __name__ == '__main__':
     wttest.run()

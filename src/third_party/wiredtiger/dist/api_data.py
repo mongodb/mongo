@@ -373,7 +373,8 @@ file_config = format_meta + file_runtime_config + tiered_config + file_disaggreg
         these names are also available. See @ref compression for more information'''),
     Config('block_manager', 'default', r'''
         configure a manager for file blocks. Permitted values are \c "default" or the
-        disaggregated storage block manager backed by \c PALI.''',
+        disaggregated storage block manager backed by \c PALI, which requires a page log
+        service to be configured.''',
         choices=['default', 'disagg']),
     Config('checksum', 'on', r'''
         configure block checksums; the permitted values are \c on, \c off, \c uncompressed and
@@ -626,7 +627,9 @@ connection_runtime_config = [
         min='1MB', max='10TB'),
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
-        available in cache before giving up. Default or 0 will wait forever. 1 will never wait''',
+        available in cache before giving up. Default or 0 will wait forever. Individual
+        sessions and transactions can bypass this wait with their own \c ignore_cache_size
+        configuration''',
         min=0),
     Config('cache_stuck_timeout_ms', '300000', r'''
         the number of milliseconds to wait before a stuck cache times out in diagnostic mode.
@@ -1390,12 +1393,16 @@ session_config = [
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
         available in cache before giving up. Default value will be the global setting of the
-        connection config. 0 will wait forever. 1 will never wait''',
+        connection config. 0 will wait forever. Use the \c ignore_cache_size configuration to
+        allow operations to proceed regardless of cache usage''',
         min=0),
     Config('ignore_cache_size', 'false', r'''
         when set, operations performed by this session ignore the cache size and are not blocked
-        when the cache is full. Note that use of this option for operations that create cache
-        pressure can starve ordinary sessions that obey the cache size.''',
+        when the cache is full. WT_SESSION::reconfigure returns \c EINVAL if this setting is
+        specified while a transaction is running; use the \c ignore_cache_size setting of
+        WT_SESSION::begin_transaction to configure a single transaction. Note that use of this
+        option for operations that create cache pressure can starve ordinary sessions that obey
+        the cache size.''',
         type='boolean'),
     Config('isolation', 'snapshot', r'''
         the default isolation level for operations in this session''',
@@ -2031,6 +2038,13 @@ methods = {
 ]),
 
 'WT_SESSION.begin_transaction' : Method([
+    Config('ignore_cache_size', 'false', r'''
+        when set, operations performed by this transaction ignore the cache size and are not
+        blocked when the cache is full. The setting applies until the transaction is resolved.
+        Setting it to \c false has no effect: it does not override a session configured with
+        \c ignore_cache_size. Note that use of this option for operations that create cache
+        pressure can starve ordinary transactions that obey the cache size.''',
+        type='boolean'),
     Config('ignore_prepare', 'false', r'''
         whether to ignore updates by other prepared transactions when doing of read operations
         of this transaction. When \c true, forces the transaction to be read-only. Use \c force

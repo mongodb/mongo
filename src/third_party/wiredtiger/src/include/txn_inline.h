@@ -1979,12 +1979,16 @@ __txn_remove_from_global_table(WT_SESSION_IMPL *session)
 static WT_INLINE int
 __wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, uint64_t prepared_id)
 {
-    WT_DECL_RET;
     WT_PENDING_PREPARED_ITEM *prepared_item;
     WT_TXN *txn;
     WT_TXN_OP *tmp_mod;
     txn = session->txn;
-    WT_RET(__wt_prepared_discover_find_item(session, prepared_id, &prepared_item));
+
+    /*
+     * Unlink the item before touching the transaction: nothing after this can fail, so a claim
+     * failure leaves the transaction untouched and the caller can discard its state.
+     */
+    WT_RET(__wt_prepared_discover_unlink_item(session, prepared_id, &prepared_item));
     txn->time_point.prepared_id = prepared_id;
     txn->time_point.prepare_timestamp = prepared_item->prepare_timestamp;
     F_SET(&txn->time_point, WT_TXN_TIME_POINT_HAS_PREPARED_ID | WT_TXN_TIME_POINT_HAS_TS_PREPARE);
@@ -2006,11 +2010,11 @@ __wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, uint64_t prepared_id)
     txn->prepare_count = prepared_item->prepare_count;
     prepared_item->prepare_count = 0;
 #endif
-    WT_RET(__wt_prepared_discover_remove_item(session, prepared_id));
+    __wt_prepared_discover_free_item(session, prepared_item);
 
     /* There's no txn id since claimed prepared txn is from recovery */
     WT_ASSERT(session, !F_ISSET(&session->txn->time_point, WT_TXN_TIME_POINT_HAS_ID));
-    return (ret);
+    return (0);
 }
 
 /*
@@ -2072,6 +2076,7 @@ static WT_INLINE int
 __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
     WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
     WT_TXN *txn;
     uint64_t prepared_id;
 
@@ -2086,13 +2091,13 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_RUNNING));
 
-    WT_RET(__wt_txn_config(session, conf));
+    WT_ERR(__wt_txn_config(session, conf));
 
     if (conf != NULL) {
-        WT_RET(__wt_conf_gets_def(session, conf, claim_prepared_id, 0, &cval));
+        WT_ERR(__wt_conf_gets_def(session, conf, claim_prepared_id, 0, &cval));
         if (cval.len != 0) {
-            WT_RET(__wt_txn_parse_prepared_id(session, &prepared_id, &cval));
-            WT_RET(__wt_txn_claim_prepared_txn(session, prepared_id));
+            WT_ERR(__wt_txn_parse_prepared_id(session, &prepared_id, &cval));
+            WT_ERR(__wt_txn_claim_prepared_txn(session, prepared_id));
             return (0);
         }
     }
@@ -2104,14 +2109,14 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
     if (txn->isolation == WT_ISO_SNAPSHOT &&
       !(F_ISSET(txn, WT_TXN_AUTOCOMMIT) && F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
         if (session->ncursors > 0)
-            WT_RET(__wt_session_copy_values(session));
+            WT_ERR(__wt_session_copy_values(session));
 
         /*
          * Stall here if the cache is completely full. Eviction check can return rollback, but the
          * WT_SESSION.begin_transaction API can't, continue on.
          */
-        WT_RET_ERROR_OK(
-          __wt_evict_app_assist_worker_check(session, false, true, true, false, NULL), WT_ROLLBACK);
+        WT_ERR_ERROR_OK(__wt_evict_app_assist_worker_check(session, false, true, true, false, NULL),
+          WT_ROLLBACK, false);
 
         __wt_txn_get_snapshot(session);
     }
@@ -2146,6 +2151,22 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
     __txn_clear_bytes_dirty(session);
 
     return (0);
+
+err:
+    /*
+     * In the event that we error we should clear the flags on the transaction so they are not set
+     * in a subsequent call to transaction begin.
+     *
+     * Wiping the flags is only safe before a snapshot is allocated: the release path keys on
+     * WT_TXN_HAS_SNAPSHOT to know it must give the snapshot back.
+     */
+    WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
+    if (F_ISSET(txn, WT_TXN_IGNORE_CACHE_SIZE))
+        F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    txn->flags = 0;
+    txn->time_point.flags = 0;
+    txn->operation_timeout_us = 0;
+    return (ret);
 }
 
 /*

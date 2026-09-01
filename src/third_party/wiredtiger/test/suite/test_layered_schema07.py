@@ -642,16 +642,18 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
         # Checkpoint with stable schema epoch lower than the published epoch: the operation is
         # counted as unstable and deferred to the next checkpoint.
+        before_apply = self.get_stat(stat.conn.checkpoint_disagg_metadata_apply)
         self.set_stable_epoch(5)
         self.leader_checkpoint(1)
         self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_unstable, 1)
-        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_apply, 0)
+        self.assertStatGreaterSoon(stat.conn.checkpoint_disagg_metadata_apply, before_apply)
 
         # Checkpoint with stable schema epoch matching the published epoch: the operation is applied.
+        before_apply = self.get_stat(stat.conn.checkpoint_disagg_metadata_apply)
         self.set_stable_epoch(10)
         self.leader_checkpoint(2)
         self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_unstable, 1)
-        self.assertStatEqualSoon(stat.conn.checkpoint_disagg_metadata_apply, 1)
+        self.assertStatGreaterSoon(stat.conn.checkpoint_disagg_metadata_apply, before_apply)
 
         # Publish drop with a valid epoch: success stat increments.
         self.session.drop(self.uri)

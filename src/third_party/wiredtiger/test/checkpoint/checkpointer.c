@@ -28,6 +28,8 @@
 
 #include "test_checkpoint.h"
 
+#define VERIFY_MAX_ROLLBACK_RETRY 10
+
 static WT_THREAD_RET checkpointer(void *);
 static WT_THREAD_RET clock_thread(void *);
 static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
@@ -478,6 +480,9 @@ do_cursor_next(WT_CURSOR *cursor)
     while ((ret = cursor->next(cursor)) != WT_NOTFOUND) {
         if (ret == 0)
             break;
+        else if (ret == WT_ROLLBACK)
+            /* The caller restarts the walk in a new transaction. */
+            return (ret);
         else if (ret != WT_PREPARE_CONFLICT) {
             (void)log_print_err("cursor->next", ret, 1);
             return (ret);
@@ -511,12 +516,12 @@ do_cursor_prev(WT_CURSOR *cursor)
 }
 
 /*
- * verify_consistency --
- *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
- *     The key/values should match across all tables.
+ * verify_consistency_once --
+ *     A single pass of the consistency check. Returns WT_ROLLBACK if the reading transaction was
+ *     rolled back before the pass completed.
  */
-int
-verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
+static int
+verify_consistency_once(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
 {
     WT_CURSOR **cursors;
     uint64_t key_count;
@@ -578,7 +583,7 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
             if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)
                 continue;
             else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND) {
-                (void)log_print_err(
+                ret = log_print_err(
                   "verify_consistency tables with different amount of data", EFAULT, 1);
                 goto err;
             }
@@ -596,14 +601,49 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
     fflush(stdout);
 
 err:
+    /* The walk reports the end of the tables as WT_NOTFOUND, which is not a failure. */
+    if (ret == WT_NOTFOUND)
+        ret = 0;
+
     for (i = 0; i < g.ntables; i++) {
-        if (cursors[i] != NULL && (ret = cursors[i]->close(cursors[i])) != 0)
-            (void)log_print_err("verify_consistency:cursor close", ret, 1);
+        if (cursors[i] != NULL && (t_ret = cursors[i]->close(cursors[i])) != 0) {
+            (void)log_print_err("verify_consistency:cursor close", t_ret, 1);
+            if (ret == 0)
+                ret = t_ret;
+        }
     }
-    if (!use_checkpoint)
-        testutil_check(session->commit_transaction(session, NULL));
+    if (!use_checkpoint) {
+        if (ret == WT_ROLLBACK)
+            testutil_check(session->rollback_transaction(session, NULL));
+        else
+            testutil_check(session->commit_transaction(session, NULL));
+    }
     free(cursors);
     return (ret);
+}
+
+/*
+ * verify_consistency --
+ *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
+ *     The key/values should match across all tables.
+ */
+int
+verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
+{
+    int i, ret;
+
+    ret = WT_ROLLBACK;
+
+    /*
+     * A pass reads every table under one long-running transaction, which cache pressure can roll
+     * back; that says nothing about consistency. Repeat the pass instead: whatever data the new
+     * transaction sees, the tables must still agree.
+     */
+    for (i = 0; i < VERIFY_MAX_ROLLBACK_RETRY; i++)
+        if ((ret = verify_consistency_once(session, verify_ts, use_checkpoint)) != WT_ROLLBACK)
+            return (ret);
+
+    return (log_print_err("verify_consistency: too many rollbacks", ret, 1));
 }
 
 /*

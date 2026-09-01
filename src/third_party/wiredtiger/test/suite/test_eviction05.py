@@ -31,7 +31,6 @@ from wiredtiger import stat
 
 #
 # Test that eviction max page size stats for clean, dirty, and updates are set properly and eviction max stats per database run are not reset after a checkpoint.
-@wttest.skip_for_hook("disagg", "Fails due to evict a page.")
 class test_eviction05(wttest.WiredTigerTestCase):
 
     test_name = __qualname__

@@ -127,7 +127,9 @@ def get_function_coverage(function_file: str, start_line_number: int, end_line_n
         if file_data['file'] == function_file:
             for line_info in file_data['lines']:
                 if start_line_number <= line_info['line_number'] <= end_line_number:
-                    if not line_info['gcovr/noncode']:
+                    # gcovr 6.0+ omits non-code lines from the report entirely; older
+                    # versions included them with a flag.
+                    if not line_info.get('gcovr/noncode', False):
                         num_lines_in_function += 1
                         if int(line_info['count']) > 0:
                             num_covered_lines_in_function += 1

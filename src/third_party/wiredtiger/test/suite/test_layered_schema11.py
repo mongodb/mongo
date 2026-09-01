@@ -151,10 +151,9 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
     def test_recreate_after_drop_then_create(self):
         """
-        When the queue contains REMOVE followed by CREATE for the same table, a checkpoint
-        below the CREATE's epoch must not resurrect the dropped incarnation's stable
-        constituent, and a checkpoint covering the CREATE must pick the table up (not
-        blocked by the REMOVE).
+        A checkpoint below a published drop is legal while no recreate is queued; once a
+        checkpoint covers the drop, the table leaves shared metadata, and a later recreate is
+        picked up with its own stable constituent.
         """
         # Step 1: Leader creates uri and checkpoints at epoch 10.
         self.set_stable_epoch(1)
@@ -167,20 +166,18 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         conn_follow, session_follow = self.open_follower_epoch()
         self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
-        # Step 3: Both follower and leader drop uri at epoch 25 (REMOVE(25) queued), then
-        # re-create it at epoch 40 (CREATE(40) queued). The latest queue entry for uri is now
-        # CREATE.
+        # Step 3: Both nodes drop uri at epoch 25; the follower also re-creates it at epoch 40.
+        # The leader publishes the drop but cannot re-create yet: a checkpoint below the
+        # published drop with the recreate queued behind it panics.
         session_follow.drop(self.uri)
         self.publish(self.uri, 25, session_follow)
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 40, session_follow)
         self.session.drop(self.uri)
         self.publish(self.uri, 25)
-        self.session.create(self.uri, self.table_config)
-        self.publish(self.uri, 40)
 
-        # Step 4: Leader checkpoints at epoch 10; both ops deferred. Shared metadata still has
-        # the original entry from step 1.
+        # Step 4: Leader checkpoints at epoch 10; the published REMOVE(25) defers - legal with
+        # no recreate queued. Shared metadata still has the original entry from step 1.
         self.set_stable_epoch(10)
         self.leader_checkpoint(2)
 
@@ -190,10 +187,18 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.disagg_advance_checkpoint(conn_follow)
         self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
-        # Step 6: A checkpoint covering CREATE(40) supplies the recreated table's own
-        # constituent; the pending REMOVE(25) does not block it.
-        self.set_stable_epoch(40)
+        # Step 6: A checkpoint covering the drop applies the REMOVE(25); the first generation
+        # leaves shared metadata.
+        self.set_stable_epoch(25)
         self.leader_checkpoint(3)
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri))
+
+        # Step 7: With the drop drained, the leader re-creates the table at epoch 40; a
+        # checkpoint covering the CREATE supplies the recreated table's own constituent.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 40)
+        self.set_stable_epoch(40)
+        self.leader_checkpoint(4)
         self.disagg_advance_checkpoint(conn_follow)
         self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 

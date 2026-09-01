@@ -117,9 +117,10 @@ schema_op_stall_report(WORKLOAD_STATE *state)
 
 /*
  * schema_op_execute --
- *     Execute one schema operation: create or drop the test's tables, on either role.
+ *     Execute one schema operation: create or drop the test's tables, on either role. Returns
+ *     ECANCELED when the operation was abandoned because it can no longer complete.
  */
-static void
+static int
 schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT *ev)
 {
     const bool is_create = ev->type == EVENT_CREATE;
@@ -141,9 +142,19 @@ schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT
 
         struct timespec now;
         __wt_epoch(NULL, &now);
-        if (WT_TIMEDIFF_SEC(now, start) > MAX_OP_WAIT) {
-            int err, sub_err;
-            const char *err_msg;
+        const bool timed_out = WT_TIMEDIFF_SEC(now, start) > MAX_OP_WAIT;
+        /* Leader is gone, so no one produces checkpoints to unblock this operation. */
+        const bool abandoned = !state->generates && (!state->cfg->peer_alive || timed_out);
+        int err, sub_err;
+        const char *err_msg;
+        if (abandoned) {
+            session->get_last_error(session, &err, &sub_err, &err_msg);
+            println("Node %" PRIu32 ": abandoning follower %s %s (%s): %s", state->cfg->node_id,
+              is_create ? "CREATE" : "DROP", ev->uri,
+              timed_out ? "no checkpoint arrived" : "peer left", err_msg);
+            return (ECANCELED);
+        }
+        if (timed_out) {
             session->get_last_error(session, &err, &sub_err, &err_msg);
             schema_op_stall_report(state);
             testutil_die(ETIMEDOUT, "node%" PRIu32 " %s %s %s: EBUSY for %d seconds: %s",
@@ -163,6 +174,8 @@ schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT
 
     testutil_assertfmt(ret == 0, "node%" PRIu32 " %s %s: %s", state->cfg->node_id,
       is_create ? "CREATE" : "DROP", ev->uri, wiredtiger_strerror(ret));
+
+    return (0);
 }
 
 /*
@@ -240,13 +253,14 @@ worker_ts(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
 
 /*
  * apply_event --
- *     Apply one event on this node.
+ *     Apply one event on this node. Returns ECANCELED when a schema operation was abandoned.
  */
-static void
+static int
 apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, SCHEMA_EVENT *ev)
 {
     /* The role is fixed for the phase, step-down window included: a leader relays throughout. */
     const bool relay = state->leads;
+    int ret = 0;
 
     if (ctx->record_fp == NULL)
         ctx->record_fp = worker_record_open(state, thread_index);
@@ -269,7 +283,9 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, SCHEM
              */
             record_pending_line(ctx->record_fp, ev);
 
-        schema_op_execute(state, ctx->session, ev);
+        /* Operation failed: none of the bookkeeping below applies. */
+        if ((ret = schema_op_execute(state, ctx->session, ev)) != 0)
+            break;
 
         if (state->cfg->epoch_less)
             ev->event_ts = worker_ts(state, ev);
@@ -289,6 +305,11 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, SCHEM
         testutil_assert(!state->cfg->epoch_less);
         ev->event_ts = worker_ts(state, ev);
         schema_op_publish(ctx->session, ev->uri, ev->event_ts);
+        if (state->generates && ev->type == EVENT_PUBLISH_DROP) {
+            testutil_assert(ev->slot < state->cfg->pool_size);
+            __wt_atomic_store_uint64(
+              &state->workers[thread_index].table[ev->slot].drop_epoch, ev->event_ts);
+        }
         if (relay)
             (void)pipe_relay_event(state->cfg, ev);
         record_event_line(ctx->record_fp, ev);
@@ -302,7 +323,10 @@ apply_event(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index, SCHEM
     }
 
     /* The generator paces itself on how far its emissions lead the workers. */
-    (void)__wt_atomic_add_uint64(&state->applied, 1);
+    if (ret == 0)
+        (void)__wt_atomic_add_uint64(&state->applied, 1);
+
+    return (ret);
 }
 
 /*
@@ -314,14 +338,19 @@ static void
 worker_apply_loop(WORKLOAD_STATE *state, WORKER_CTX *ctx, uint32_t thread_index)
 {
     bool *busyp = &state->workers[thread_index].busy;
+    bool abandoned = false;
 
     while (workload_active(state, STAGE_WORKERS) || !evq_is_empty(state, thread_index)) {
         /* Publish busy before checking the queue so the drain barrier never races an apply. */
         __wt_atomic_store_bool(busyp, true);
         SCHEMA_EVENT ev;
         const bool popped = evq_dequeue(state, thread_index, &ev);
-        if (popped)
-            apply_event(state, ctx, thread_index, &ev);
+        /*
+         * Keep draining the queue even if this node is abandoned by the leader. Other workers may
+         * still be processing events.
+         */
+        if (popped && !abandoned)
+            abandoned = apply_event(state, ctx, thread_index, &ev) == ECANCELED;
         __wt_atomic_store_bool(busyp, false);
         if (!popped)
             __wt_sleep(0, WT_THOUSAND);

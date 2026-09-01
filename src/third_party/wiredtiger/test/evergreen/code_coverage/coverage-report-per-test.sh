@@ -26,7 +26,7 @@ mkdir -p coverage_report
 # Setup the Python environment
 virtualenv -p python3 venv
 source venv/bin/activate
-pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0 pygit2==1.10.1 requests
+pip3 install gcovr==8.6 pygit2==1.10.1 requests
 
 ######################################################
 # Obtain the complexity metrics for the 'current' code

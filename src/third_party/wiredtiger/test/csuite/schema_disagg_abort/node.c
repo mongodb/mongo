@@ -61,6 +61,18 @@ workload_counter_advance(WORKLOAD_STATE *state, uint64_t v)
 }
 
 /*
+ * workload_set_frontier --
+ *     Set the frontier timestamps on the connection and mirror the stable schema epoch, so the
+ *     generator can free slots whose published drops the epoch has covered.
+ */
+void
+workload_set_frontier(WORKLOAD_STATE *state, uint64_t ts)
+{
+    set_ts(state->cfg, state->conn, TS_FRONTIER, ts);
+    __wt_atomic_store_uint64(&state->stable_epoch, ts);
+}
+
+/*
  * workload_active --
  *     The condition a phase loop runs on: true until the shutdown has reached the caller's stage.
  */
@@ -263,8 +275,13 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     for (uint32_t i = 0; i < cfg->thread_count; i++) {
         state->workers[i].busy = false;
         state->workers[i].evq.head = state->workers[i].evq.tail = 0;
-        for (uint32_t j = 0; j < cfg->pool_size; j++)
-            state->workers[i].table[j].stepdown_insert = false;
+        /*
+         * A leading phase checkpoints every slot, including inherited ingest data; a follower phase
+         * covers nothing, so the slots it inherits stay blocked.
+         */
+        if (as_leader)
+            for (uint32_t j = 0; j < cfg->pool_size; j++)
+                state->workers[i].table[j].uncovered_insert = false;
         /* State and slot generation survive role transitioning. */
     }
 
@@ -342,7 +359,7 @@ node_step_up(WORKLOAD_STATE *state, uint64_t final_ts)
 
     /* Restore the timestamps on the new leader's connection. */
     if (final_ts != 0)
-        set_ts(state->cfg, state->conn, TS_FRONTIER, final_ts);
+        workload_set_frontier(state, final_ts);
 }
 
 /*
@@ -432,7 +449,7 @@ node_main(TEST_CONFIG *cfg)
     node_open(state, role->name);
     /* Seed the timestamp sequence; epoch mode also enters the schema epoch world at this value. */
     workload_seed_counter(state, TS_BOOTSTRAP);
-    set_ts(cfg, state->conn, TS_FRONTIER, TS_BOOTSTRAP);
+    workload_set_frontier(state, TS_BOOTSTRAP);
     println("Node %" PRIu32 ": starting as %s", cfg->node_id, role->name);
 
     return (node_run(cfg, state, role));

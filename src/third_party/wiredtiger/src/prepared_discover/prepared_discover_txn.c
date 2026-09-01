@@ -11,11 +11,11 @@
 #define WT_DEFAULT_PENDING_PREPARED_DISCOVER_HASHSIZE 256
 
 /*
- * __wt_prepared_discover_find_item --
+ * __prepared_discover_find_item --
  *     Find a pending prepared item by its ID in the pending prepared items hash map.
  */
-int
-__wt_prepared_discover_find_item(
+static int
+__prepared_discover_find_item(
   WT_SESSION_IMPL *session, uint64_t prepared_id, WT_PENDING_PREPARED_ITEM **prepared_item)
 {
     WT_CONNECTION_IMPL *conn;
@@ -130,7 +130,7 @@ __prepared_discover_find_or_create_item(WT_SESSION_IMPL *session, uint64_t prepa
     WT_TXN_GLOBAL *txn_global;
     uint64_t bucket;
 
-    if (__wt_prepared_discover_find_item(session, prepared_id, prepared_item) == 0)
+    if (__prepared_discover_find_item(session, prepared_id, prepared_item) == 0)
         return (0);
 
     conn = S2C(session);
@@ -151,11 +151,13 @@ __prepared_discover_find_or_create_item(WT_SESSION_IMPL *session, uint64_t prepa
 }
 
 /*
- * __wt_prepared_discover_remove_item --
- *     Find and remove a pending prepared item by its ID in the pending prepared items hash map.
+ * __wt_prepared_discover_unlink_item --
+ *     Find and unlink a pending prepared item by its ID in the pending prepared items hash map. The
+ *     caller owns the item and must free it with __wt_prepared_discover_free_item.
  */
 int
-__wt_prepared_discover_remove_item(WT_SESSION_IMPL *session, uint64_t prepared_id)
+__wt_prepared_discover_unlink_item(
+  WT_SESSION_IMPL *session, uint64_t prepared_id, WT_PENDING_PREPARED_ITEM **prepared_item)
 {
     WT_CONNECTION_IMPL *conn;
     WT_PENDING_PREPARED_ITEM *item;
@@ -171,16 +173,25 @@ __wt_prepared_discover_remove_item(WT_SESSION_IMPL *session, uint64_t prepared_i
         TAILQ_FOREACH (item, &pending_prepare_items->hash[bucket], hashq) {
             if (item->prepared_id == prepared_id) {
                 TAILQ_REMOVE(&pending_prepare_items->hash[bucket], item, hashq);
-                /* Clean up memory of unclaimed mod array */
-                WT_ASSERT_ALWAYS(
-                  session, item->mod_count == 0, "Removing an unclaimed prepared item.");
-                __wt_free(session, item->mod);
-                __wt_free(session, item);
+                *prepared_item = item;
                 return (0);
             }
         }
     }
     return (WT_NOTFOUND);
+}
+
+/*
+ * __wt_prepared_discover_free_item --
+ *     Free a pending prepared item the caller has removed from the pending prepared items hash map.
+ */
+void
+__wt_prepared_discover_free_item(WT_SESSION_IMPL *session, WT_PENDING_PREPARED_ITEM *prepared_item)
+{
+    /* Clean up memory of unclaimed mod array */
+    WT_ASSERT_ALWAYS(session, prepared_item->mod_count == 0, "Freeing an unclaimed prepared item.");
+    __wt_free(session, prepared_item->mod);
+    __wt_free(session, prepared_item);
 }
 
 /*

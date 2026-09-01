@@ -92,11 +92,5 @@ TEST_CASE("cache_max_wait_ms", "[session_config]")
      */
     REQUIRE(__ut_session_config_int(session, "cache_max_wait_ms=-1") == 0);
     REQUIRE(session->cache_max_wait_us == 0);
-
-    /*
-     * Special treatment of a special value 1.
-     */
-    REQUIRE(__ut_session_config_int(session, "cache_max_wait_ms=1") == 0);
-    REQUIRE(session->cache_max_wait_us == 1);
 }
 #endif

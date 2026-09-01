@@ -570,6 +570,7 @@ void trace_init(void);
 void trace_ops_init(TINFO *);
 void trace_teardown(void);
 void track(const char *, uint64_t);
+void track_msg(const char *, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
 void track_ops(TINFO *);
 void val_gen(TABLE *, WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void val_gen_init(WT_ITEM *);

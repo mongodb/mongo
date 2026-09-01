@@ -104,8 +104,8 @@ class test_eviction07(wttest.WiredTigerTestCase):
 
         try:
             # Reading statistics is a cursor operation that can itself be pulled into an eviction
-            # assist, so read them from a session that never waits for the cache.
-            stat_session = self.conn.open_session('cache_max_wait_ms=1')
+            # assist, so read them from a session that ignores the cache size.
+            stat_session = self.conn.open_session('ignore_cache_size=true')
 
             for _ in range(8):
                 pin_session = self.conn.open_session()

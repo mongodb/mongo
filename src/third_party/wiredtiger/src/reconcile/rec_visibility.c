@@ -1019,6 +1019,19 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
 }
 
 /*
+ * __rec_upd_select_track_modify_base --
+ *     Track whether a retained update chain needs the on-page value to reconstruct a modify.
+ */
+static WT_INLINE void
+__rec_upd_select_track_modify_base(WTI_UPDATE_SELECT *upd_select, WT_UPDATE *upd)
+{
+    if (upd->type == WT_UPDATE_MODIFY)
+        upd_select->modify_needs_onpage_value = true;
+    else if (WT_UPDATE_DATA_VALUE(upd))
+        upd_select->modify_needs_onpage_value = false;
+}
+
+/*
  * __rec_upd_select_inmem --
  *     Select the update to write to disk image for in-memory btree. For in-memory btree, we select
  *     the first globally visible update in the update chain that is not a tombstone. If there is no
@@ -1068,6 +1081,11 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
                     found_last_upd_to_keep = false;
                     WT_STAT_CONN_DSRC_INCR(session, rec_ingest_keep_prepare_rollback);
                 }
+                /*
+                 * A rolled-back prepared MODIFY is retained and may still be reconstructed during
+                 * draining.
+                 */
+                __rec_upd_select_track_modify_base(upd_select, upd);
             }
 
             continue;
@@ -1085,6 +1103,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
           session_txnid != WT_TXN_NONE && upd->txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
         /*
@@ -1115,6 +1134,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
         /*
@@ -1130,6 +1150,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
         if (upd->prepare_state == WT_PREPARE_INPROGRESS) {
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
 
@@ -1145,12 +1166,14 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
           upd->upd_durable_ts > r->rec_start_pinned_stable_ts) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
 
         if (WT_REC_CAN_PRUNE_UPD(upd->txnid, upd->upd_durable_ts, r)) {
             first_pruned_update = upd;
             found_last_upd_to_keep = upd_select->upd != NULL;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             /* Mark we are making progress for eviction so eviction doesn't stall. */
             r->update_used = true;
             break;
@@ -1158,7 +1181,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
         if (!found_last_upd_to_keep) {
             upd_select->upd = upd;
-            upd_select->was_modify = upd->type == WT_UPDATE_MODIFY;
+            __rec_upd_select_track_modify_base(upd_select, upd);
 
             /*
              * Non-timestamped tombstones on ingest btrees are written non-transactionally by the

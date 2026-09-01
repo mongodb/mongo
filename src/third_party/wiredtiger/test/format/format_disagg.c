@@ -308,7 +308,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
 
-    track("[stepdown] stopping checkpoint and timestamp threads", 0ULL);
+    track_msg("[stepdown] stopping checkpoint and timestamp threads");
 
     /*
      * Stop the checkpoint thread before notifying WT. An uncontrolled checkpoint taken after
@@ -346,7 +346,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     testutil_check(g.wts_conn->set_timestamp(g.wts_conn, config));
     lock_writeunlock(session, &g.timestamp_lock);
 
-    track(
+    track_msg(
       "[stepdown] notified WT at ts=%" PRIu64 "; draining in-flight transactions", step_down_ts);
 
     /*
@@ -361,19 +361,21 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     }
     testutil_assertfmt(
       drain_polls > 0, "step-down drain timed out at step_down_ts=%" PRIu64, step_down_ts);
+    track_msg("[stepdown] drain complete after %" PRIu64 "ms",
+      (60 * WT_THOUSAND / 250 - drain_polls) * 250);
 
     /*
      * Let the workers keep writing above the boundary for a window: post-step-down leader writes
      * are routed to ingest and this exercises that path before the checkpoint.
      */
-    track("[stepdown] post-drain ingest write window", 0ULL);
+    track_msg("[stepdown] post-drain ingest write window");
     __wt_sleep(DISAGG_STEPDOWN_INGEST_WINDOW_SEC, 0);
 
     /*
      * Pause worker writes and wait until every worker acknowledges with no transaction in flight,
      * guaranteeing no writer is still active (e.g. stuck in eviction) when the checkpoint starts.
      */
-    track("[stepdown] pausing worker writes", 0ULL);
+    track_msg("[stepdown] pausing worker writes");
     stepdown_pause_worker_writes();
     for (drain_polls = 60 * WT_THOUSAND / 250; drain_polls > 0; --drain_polls) {
         if (stepdown_writers_paused())
@@ -382,6 +384,8 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     }
     testutil_assertfmt(
       drain_polls > 0, "step-down write pause timed out at step_down_ts=%" PRIu64, step_down_ts);
+    track_msg(
+      "[stepdown] writes paused after %" PRIu64 "ms", (60 * WT_THOUSAND / 250 - drain_polls) * 250);
 
     /*
      * Pin stable at exactly step_down_ts. Use prepare_commit_lock consistent with timestamp_once().
@@ -398,14 +402,14 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
      * checkpoint captures exactly the content up to the cut-over with no concurrent writes
      * competing for cache.
      */
-    track("[stepdown] taking step-down checkpoint", 0ULL);
+    track_msg("[stepdown] taking step-down checkpoint");
     testutil_check(session->checkpoint(session, NULL));
 
     testutil_check(timestamp_query("get=stable", &stable_after));
     testutil_assertfmt(stable_after == step_down_ts,
       "step-down checkpoint: stable=%" PRIu64 " != step_down_ts=%" PRIu64, stable_after,
       step_down_ts);
-    track("[stepdown] checkpoint verified", 0ULL);
+    track_msg("[stepdown] checkpoint verified");
 
     /*
      * Reset the leader-side KEK push history. This races with disagg_key_rotation() appending to or
@@ -414,7 +418,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     disagg_key_history_clear();
 
     /* Complete the role transition while the workers are read-only. */
-    track("[role change] leader -> follower (async)", 0ULL);
+    track_msg("[role change] leader -> follower (async)");
     WT_RELEASE_WRITE_WITH_BARRIER(g.disagg_leader, false);
     testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=follower)"));
 
@@ -483,7 +487,7 @@ disagg_switch_roles(void)
          */
         disagg_key_history_clear();
 
-        track("[role change] leader -> follower (sync)", 0ULL);
+        track_msg("[role change] leader -> follower (sync)");
         timestamp_sync_threads_commit_ts();
         timestamp_once(session, false, false);
         testutil_check(session->checkpoint(session, NULL));
@@ -492,7 +496,7 @@ disagg_switch_roles(void)
         wts_prepare_discover(g.wts_conn);
     } else {
         /* Stepping up: [follower -> leader] */
-        track("[role change] follower -> leader", 0ULL);
+        track_msg("[role change] follower -> leader");
 
         /*
          * Push stable past the follower phase's commits before stepping up; otherwise eviction

@@ -888,12 +888,6 @@ __wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy, bool rea
     if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (0);
 
-    /* Setting cache_max_wait_us to 1 effectively means "disable eviction when possible" */
-    uint64_t cache_max_wait_us =
-      session->cache_max_wait_us != 0 ? session->cache_max_wait_us : conn->evict->cache_max_wait_us;
-    if (cache_max_wait_us == 1)
-        return (0);
-
     /*
      * If the current transaction is keeping the oldest ID pinned, it is in the middle of an
      * operation. This may prevent the oldest ID from moving forward, leading to deadlock, so only

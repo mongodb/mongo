@@ -511,14 +511,6 @@ __session_config_int(WT_SESSION_IMPL *session, WT_CONF *conf)
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
 
-    if ((ret = __wt_conf_getones(session, conf, ignore_cache_size, &cval)) == 0) {
-        if (cval.val)
-            F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
-        else
-            F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
-    }
-    WT_RET_NOTFOUND_OK(ret);
-
     if ((ret = __wt_conf_getones(session, conf, cache_cursors, &cval)) == 0) {
         if (cval.val)
             F_SET(session, WT_SESSION_CACHE_CURSORS);
@@ -554,14 +546,8 @@ __session_config_int(WT_SESSION_IMPL *session, WT_CONF *conf)
     }
     WT_RET_NOTFOUND_OK(ret);
 
-    if ((ret = __wt_conf_getones(session, conf, cache_max_wait_ms, &cval)) == 0) {
-        if (cval.val > 1)
-            session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
-        else if (cval.val == 1)
-            session->cache_max_wait_us = 1;
-        else
-            session->cache_max_wait_us = 0;
-    }
+    if ((ret = __wt_conf_getones(session, conf, cache_max_wait_ms, &cval)) == 0)
+        session->cache_max_wait_us = cval.val > 0 ? (uint64_t)(cval.val * WT_THOUSAND) : 0;
     WT_RET_NOTFOUND_OK(ret);
 
     return (0);

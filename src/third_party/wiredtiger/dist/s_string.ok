@@ -159,6 +159,7 @@ Dxxx
 EACCES
 EB
 EBUSY
+ECANCELED
 EDC
 EEXIST
 EFAULT
@@ -1164,8 +1165,11 @@ fwrite
 gb
 gc
 gcc
+gcda
+gcno
 gcov
 gcovr
+gcovr's
 gcp
 gdb
 gdb's
@@ -1936,6 +1940,8 @@ topologies
 totalsec
 tp
 traceapi
+tracefile
+tracefiles
 tracepat
 transactional
 transactionally

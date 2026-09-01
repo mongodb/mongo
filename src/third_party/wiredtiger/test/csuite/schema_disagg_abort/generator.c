@@ -43,10 +43,7 @@ generator_emit(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
  *     state's valid moves at random. Reports whether an event was emitted; taking no move is valid,
  *     and lingering widens the window a checkpoint can land in.
  *
- * One gate keeps every move safe to execute: an insert only after its table's create completes, so
- *     its commit exceeds the create's publish epoch or legacy operation timestamp. A table with
- *     data that no checkpoint covers yet is left droppable on purpose - the drop retries in EBUSY
- *     until the checkpoint thread's next checkpoint clears it.
+ * A recreate waits until the stable schema epoch passes the slot's published drop.
  */
 static bool
 generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
@@ -55,8 +52,9 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
     WT_RAND_STATE *rnd = &state->gen_rnd[t];
     const uint32_t slot = __wt_random(rnd) % state->cfg->pool_size;
     TABLE_STATE *slot_state = &state->workers[t].table[slot].state;
-    /* Set while stepping down; such a slot cannot be dropped until the term ends. */
-    bool *stepdown_insert = &state->workers[t].table[slot].stepdown_insert;
+    uint64_t *drop_epoch = &state->workers[t].table[slot].drop_epoch;
+    /* Set when no checkpoint of this phase can cover the insert; such a slot is not droppable. */
+    bool *uncovered_insert = &state->workers[t].table[slot].uncovered_insert;
 
     SCHEMA_EVENT ev = {0}; /* EVENT_NONE until a move is taken */
     switch (*slot_state) {
@@ -86,27 +84,39 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         /* Take (more) data, drop the table, or linger. */
         if (__wt_random(rnd) % GEN_INSERT_ODDS == 0) {
             ev.type = EVENT_INSERT;
-            if (stepping_down)
-                *stepdown_insert = true;
-        } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 && (!stepping_down || !*stepdown_insert)) {
-            /* Such a drop would wait on a checkpoint the step-down cannot take. */
+            if (stepping_down || !state->leads)
+                *uncovered_insert = true;
+        } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 && !*uncovered_insert) {
+            /* Such a drop would wait on a checkpoint this phase cannot take. */
             ev.type = EVENT_DROP;
             *slot_state = state->cfg->epoch_less ? TABLE_NONE : TABLE_DROPPED;
         }
         break;
     case TABLE_DROPPED:
         testutil_assert(!state->cfg->epoch_less);
-        /* Publish the drop, which frees the slot, or linger in the window. */
+        /* Publish the drop, or linger in the window. */
         if (__wt_random(rnd) % 2 == 0) {
             ev.type = EVENT_PUBLISH_DROP;
+            *slot_state = TABLE_REMOVED;
+        }
+        break;
+    case TABLE_REMOVED: {
+        /* Free the slot once the stable epoch passes the published drop; zero is not applied yet.
+         */
+        const uint64_t published_drop = __wt_atomic_load_uint64(drop_epoch);
+        if (published_drop != 0 &&
+          __wt_atomic_load_uint64(&state->stable_epoch) >= published_drop) {
+            __wt_atomic_store_uint64(drop_epoch, 0);
             *slot_state = TABLE_NONE;
         }
         break;
+    }
     }
     if (ev.type == EVENT_NONE)
         return (false);
 
     ev.thread_id = t;
+    ev.slot = slot;
     testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot,
       state->workers[t].table[slot].gen);
     if (ev.type == EVENT_INSERT) {
@@ -202,10 +212,11 @@ generator_flush_publishes(WORKLOAD_STATE *state)
             SCHEMA_EVENT ev = {0};
             ev.type = *slot_state == TABLE_CREATED ? EVENT_PUBLISH_CREATE : EVENT_PUBLISH_DROP;
             ev.thread_id = t;
+            ev.slot = slot;
             testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t,
               slot, state->workers[t].table[slot].gen);
 
-            *slot_state = *slot_state == TABLE_CREATED ? TABLE_PUBLISHED : TABLE_NONE;
+            *slot_state = *slot_state == TABLE_CREATED ? TABLE_PUBLISHED : TABLE_REMOVED;
             generator_emit(state, &ev);
         }
 }

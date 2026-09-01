@@ -31,7 +31,6 @@ class test_rollback(wttest.WiredTigerTestCase):
     test_name = __qualname__
     uri = f"table:{test_name}.wt"
 
-    @wttest.skip_for_hook("disagg", "disagg requires an additional condition to evict pages")
     def test_wt_rollback_cursor_next_no_retry(self):
         """
         Try to insert a key value pair while the cache is full, and verify cursor->next() calls
@@ -66,7 +65,7 @@ class test_rollback(wttest.WiredTigerTestCase):
 
         # Configure the connection with an unrealistically small cache_max_wait_ms value and
         # a very low eviction trigger threshold.
-        self.conn.reconfigure('cache_max_wait_ms=2,cache_size=1MB')
+        self.conn.reconfigure('cache_max_wait_ms=1,cache_size=1MB')
 
         # Start a new transaction and insert a value far too large for cache.
         self.session.begin_transaction()

@@ -1502,6 +1502,17 @@ config_disagg_storage(void)
              */
             if (!config_explicit(NULL, "ops.throttle.sleep_us"))
                 config_single(NULL, "ops.throttle.sleep_us=1000", false);
+
+            /*
+             * Prepared and truncate operations aren't accounted for by the async step-down drain,
+             * so either could straddle step_down_ts and break the checkpoint's boundary guarantee.
+             */
+            if (config_explicit(NULL, "ops.prepare"))
+                WARN("%s", "turning off ops.prepare to work with disagg.stepdown_async");
+            config_off(NULL, "ops.prepare");
+            if (config_explicit(NULL, "ops.truncate"))
+                WARN("%s", "turning off ops.truncate to work with disagg.stepdown_async");
+            config_off_all("ops.truncate");
         }
     } else {
         g.disagg_leader = strcmp(mode, "leader") == 0;

@@ -47,9 +47,12 @@ class LayeredStepdownMixin:
             config += ',step_down_disaggregated_schema_epoch=' + self.timestamp_str(epoch)
         self.conn.set_timestamp(config)
 
-    # Complete a planned step-down: advance stable to the cutoff, take the step-down checkpoint
-    # and demote to follower.
-    def complete_step_down(self, cutoff):
+    # Complete a planned step-down: advance stable to the cutoff, and the stable schema epoch to
+    # the boundary when given, take the step-down checkpoint and demote to follower.
+    def complete_step_down(self, cutoff, epoch=None):
+        if epoch is not None:
+            self.conn.set_timestamp(
+                'stable_disaggregated_schema_epoch=' + self.timestamp_str(epoch))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(cutoff))
         ckpt_session = self.conn.open_session()
         ckpt_session.checkpoint()

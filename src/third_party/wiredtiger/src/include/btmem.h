@@ -887,7 +887,8 @@ struct __wt_page {
  *	Statistics to track how many deleted pages are skipped as part of the tree walk.
  */
 struct __wt_page_walk_skip_stats {
-    size_t total_del_pages_skipped;
+    size_t total_del_internal_pages_skipped;
+    size_t total_del_leaf_pages_skipped;
     size_t total_inmem_del_pages_skipped;
     uint64_t total_skip_lock_contended;
 };

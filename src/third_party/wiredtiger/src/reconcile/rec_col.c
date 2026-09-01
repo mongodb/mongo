@@ -111,13 +111,12 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
     WT_PAGE_DELETED *page_del;
     WTI_REC_KV *val;
     WT_REF *ref;
-    WT_TIME_AGGREGATE ft_ta, ta;
+    WT_TIME_AGGREGATE ta;
 
     btree = S2BT(session);
     page = pageref->page;
     child = NULL;
     WT_TIME_AGGREGATE_INIT(&ta);
-    WT_TIME_AGGREGATE_INIT_MERGE(&ft_ta);
 
     val = &r->v;
     vpack = &_vpack;
@@ -207,8 +206,9 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
             }
             WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
         }
+        /* A fast-truncate supplies the global stop point for every record on the child page. */
         if (page_del != NULL)
-            WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
+            WT_TIME_AGGREGATE_MERGE_PAGE_DEL(&ta, page_del);
 
         /* Boundary: split or write the page. */
         if (__wti_rec_need_split(r, val->len))
@@ -220,8 +220,6 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
          */
         __wti_rec_image_copy(session, r, val);
         WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
-        if (page_del != NULL)
-            WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
         WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
     }
     WT_INTL_FOREACH_END;

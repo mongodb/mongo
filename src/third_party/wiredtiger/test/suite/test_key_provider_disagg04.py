@@ -101,6 +101,10 @@ class test_key_provider_disagg04(KeyProviderBase):
         self.key_provider_version = self.start_version
         self.reopen_conn()
 
+        # The first checkpoint persists a key even though nothing has been written yet, so this
+        # reopen loads one back at timestamp zero. The restarts below assert on the message.
+        self.ignoreStdoutPatternIfExists(r'Loading persisted crypt key: lsn=\d+, timestamp=0')
+
         ds1 = SimpleDataSet(self, self.uri, self.nentries)
         ds1.populate()
         self.write_and_checkpoint()

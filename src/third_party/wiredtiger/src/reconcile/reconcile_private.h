@@ -455,18 +455,18 @@ struct __wti_update_select {
      */
     WT_UPDATE *prepare_rollback_upd;
 
-    bool was_modify; /* There was a MODIFY on the update chain */
+    bool modify_needs_onpage_value; /* A retained MODIFY needs the on-page value */
 };
 
-#define WTI_UPDATE_SELECT_INIT(upd_select)         \
-    do {                                           \
-        (upd_select)->upd = NULL;                  \
-        (upd_select)->tombstone = NULL;            \
-        (upd_select)->upd_saved = false;           \
-        (upd_select)->no_ts_tombstone = false;     \
-        (upd_select)->prepare_rollback_upd = NULL; \
-        (upd_select)->was_modify = false;          \
-        WT_TIME_WINDOW_INIT(&(upd_select)->tw);    \
+#define WTI_UPDATE_SELECT_INIT(upd_select)               \
+    do {                                                 \
+        (upd_select)->upd = NULL;                        \
+        (upd_select)->tombstone = NULL;                  \
+        (upd_select)->upd_saved = false;                 \
+        (upd_select)->no_ts_tombstone = false;           \
+        (upd_select)->prepare_rollback_upd = NULL;       \
+        (upd_select)->modify_needs_onpage_value = false; \
+        WT_TIME_WINDOW_INIT(&(upd_select)->tw);          \
     } while (0)
 
 #define WT_REC_RESULT_SINGLE_PAGE(session, r)                                    \

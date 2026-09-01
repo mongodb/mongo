@@ -332,7 +332,9 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        # Open the follower and set an initial stable epoch, so that we enable the epoch-based
+        # semantics when we create missing stable tables during step up.
+        conn_follow, session_follow = self.open_follower_epoch(10)
 
         # Create uri but do not call publish.
         session_follow.create(self.uri, self.table_config)

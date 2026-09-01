@@ -171,6 +171,26 @@ track(const char *tag, uint64_t cnt)
 }
 
 /*
+ * track_msg --
+ *     Print a message that stays on the terminal, unlike track()'s carriage-return progress line.
+ */
+void
+track_msg(const char *fmt, ...)
+{
+    va_list ap;
+
+    if (GV(QUIET))
+        return;
+
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    printf("\n");
+    if (fflush(stdout) == EOF)
+        testutil_die(errno, "fflush");
+}
+
+/*
  * path_setup --
  *     Build the standard paths and shell commands we use.
  */

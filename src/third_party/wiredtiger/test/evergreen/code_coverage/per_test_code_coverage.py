@@ -106,7 +106,11 @@ def run_gcovr(build_dir_base: str, gcovr_dir: str):
                 f"task_info_path = {task_info_path}, coverage_output_dir = {coverage_output_dir}")
             os.mkdir(coverage_output_dir)
             shutil.copy(src=task_info_path, dst=coverage_output_dir)
-            gcovr_command = (f"gcovr {build_copy_name} --gcov-ignore-parse-errors -f src -j 16 "
+            gcovr_command = (f"gcovr {build_copy_name} "
+                             "--include-internal-functions "
+                             "--gcov-ignore-parse-errors=negative_hits.warn_once_per_file "
+                             "--gcov-ignore-parse-errors=suspicious_hits.warn_once_per_file "
+                             "-f src -j 16 "
                              "--html-self-contained --html-details "
                              f"{coverage_output_dir}/2_coverage_report.html --json-summary-pretty "
                              f"--json-summary {coverage_output_dir}/1_coverage_report_summary.json "

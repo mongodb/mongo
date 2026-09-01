@@ -75,7 +75,7 @@ class test_key_provider_disagg02(KeyProviderBase, suite_subprocess):
         self.session.checkpoint(f"debug=(checkpoint_crash_trigger_point={self.crash_point})") # Expected to fail
 
     def test_key_provider_disagg02(self):
-        self.conn.close()
+        self.conn.close('debug=(skip_checkpoint=true)')
 
         subdir = 'SUBPROCESS'
         new_home_dir = self.crash_in_subprocess(subdir,

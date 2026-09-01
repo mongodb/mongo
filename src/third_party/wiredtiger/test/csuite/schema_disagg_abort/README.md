@@ -14,6 +14,8 @@ the durable state against per-operation record files.
 - In epoch mode, creates and drops have separate operation and publish events, allowing checkpoints
   and crashes to land between the two. In legacy mode each schema operation is complete without a
   publish event. Inserts are generated only after the create is complete.
+- A published drop parks the slot in REMOVED until the stable schema epoch passes the drop's epoch;
+  recreating the name earlier is an API violation WiredTiger panics on.
 - Leaders write checkpoints to the shared page log; followers adopt them. Role changes are events in
   the same stream, so all earlier work is drained before the connection is reconfigured.
 
@@ -50,6 +52,7 @@ stateDiagram-v2
     state "CREATED - create publish pending" as CREATED
     state "PUBLISHED - create published" as PUBLISHED
     state "DROPPED - drop publish pending" as DROPPED
+    state "REMOVED - drop published, coverage pending" as REMOVED
 
     [*] --> NONE
     NONE --> CREATED : create
@@ -59,7 +62,9 @@ stateDiagram-v2
     PUBLISHED --> PUBLISHED : insert or linger
     PUBLISHED --> DROPPED : drop
     DROPPED --> DROPPED : linger
-    DROPPED --> NONE : publish drop
+    DROPPED --> REMOVED : publish drop
+    REMOVED --> REMOVED : await coverage
+    REMOVED --> NONE : stable epoch covers the drop
 ```
 
 ## Threads

@@ -306,6 +306,11 @@ deleted the page.
 Prepared truncations cannot be represented on disk.
 Truncations that are globally visible do not result in a cell in the parent page at all.)
 
+The time aggregate packed in the cell describes the child page as it was before the
+truncate, so its stop information is stale.
+The effective aggregate for the deleted pages is the packed one with the truncate applied as
+its global stop point, and that is what the parent page's aggregate is built from.
+
 These fields are, however, only present if the page header includes the \c
 WT_PAGE_FT_UPDATE flag, whose value is 0x20.
 Proper support for timestamped fast-truncate only appeared in WT 11.0; earlier versions
@@ -418,6 +423,21 @@ If the page is in memory and unmodified and the address cell contains page-delet
 information, it checks for the visibility of that deletion.
 Failing that, it checks the time aggregate in case all the values on the page are no
 longer visible, e.g. because the page was slow-truncated and reconciled.
+
+In a disaggregated tree these checks also apply to an internal page, but only while it is
+still on disk, and skipping one skips its whole subtree.
+An internal page resident in memory cannot be judged by its aggregate, because a descendant
+may be dirty with newer data and reconciliation is what propagates that upwards; one still
+on disk has no resident descendants, so the aggregate in its address cell describes the
+entire subtree beneath it.
+That aggregate is only a useful bound because internal page reconciliation applies the
+truncate to each deleted child's aggregate before merging it into the parent (see @ref
+ft_on_disk_format).
+
+Trees on the local block manager do not take this shortcut.
+There, reading an internal page in is what marks it dirty for the deleted children it
+references, and the reconciliation that follows is what frees their blocks, so skipping the
+read would leave the space held until the checkpoint cleanup thread came around.
 
 For an unmodified in-memory page the deletion information in the address should be the
 same as present in the ref's \c page_del structure.
@@ -613,6 +633,11 @@ deletion information to the packing code.}
 @row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_UPDATE_PAGE_DEL,
 Akin to \c WT_TIME_AGGREGATE_UPDATE but for a \c WT_PAGE_DELETED; used in internal page
 reconciliation.}
+@row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_MERGE_PAGE_DEL,
+Replace the stop information in an aggregate unpacked from a \c WT_CELL_ADDR_DEL cell with the
+global stop point supplied by its \c WT_PAGE_DELETED; the unpacked stop information describes
+the child page before the truncate and cannot be used as-is. Used by internal page
+reconciliation and verification.}
 
 @row{txn_inline.h, Function, \c __wt_txn_op_delete_apply_prepare_state,
 The code for updating \c WT_PAGE_DELETED at prepare time.}
@@ -713,8 +738,12 @@ page type.}
 @row{bt_vrfy.c, Hook, in \c __verify_tree,
 Allow namespace gaps in VLCS.}
 @row{bt_vrfy.c, Hook, in \c __verify_page_content_int,
-Handle deleted-address cells.}
+Handle deleted-address cells: validate the effective aggregate\, that is\, the unpacked
+aggregate with the page deletion applied as its stop point.}
 
+@row{bt_vrfy_dsk.c, Hook, in \c __verify_dsk_addr_validity,
+Validate the effective aggregate for deleted-address cells rather than the stale stop
+information unpacked from the cell.}
 @row{bt_vrfy_dsk.c, Function, \c __verify_dsk_addr_page_del,
 Validate and crosscheck the page deletion information discovered in on-disk address
 cells.}

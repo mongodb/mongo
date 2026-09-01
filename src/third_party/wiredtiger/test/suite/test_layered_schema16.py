@@ -32,10 +32,11 @@
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
+from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_schema16(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
+class test_layered_schema16(wttest.WiredTigerTestCase, suite_subprocess, DisaggSchemaEpochMixin):
     test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
@@ -53,6 +54,122 @@ class test_layered_schema16(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         cursor[1] = 'value'
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
         cursor.close()
+
+    def subprocess_checkpoint_below_published_recreated_drop_panics(self):
+        """Subprocess body: a checkpoint below a published drop with a recreate pending panics."""
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+
+        # Checkpoint the original table and its row so later checkpoints can refer to this
+        # generation.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 2)
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        cursor[1] = 'value'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        cursor.close()
+        self.set_stable_epoch(2)
+        self.leader_checkpoint(2)
+
+        # Drop the table and recreate it, publishing both above the next checkpoint's epoch.
+        self.session.drop(self.uri)
+        self.publish(self.uri, 4)
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+
+        # The checkpoint at epoch 3 refers to the dropped generation while the recreate is
+        # queued behind the drop: an API violation.
+        self.set_stable_epoch(3)
+        self.leader_checkpoint(3)  # Expected to panic.
+
+    def test_checkpoint_below_published_recreated_drop_panics(self):
+        """
+        A checkpoint whose schema epoch is below a table's published drop cannot be satisfied once
+        the table has been recreated: the epoch refers to a generation whose data the drop
+        destroyed while a new generation exists. WiredTiger panics rather than emit a checkpoint
+        with missing durable rows. A checkpoint below a published drop with no recreate is legal.
+        """
+        # Set timestamps so the fixture can close the parent connection cleanly; the real test
+        # runs in a subprocess so that the panic/abort does not kill the test runner.
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.run_panic_subprocess('checkpoint_below_published_recreated_drop_panics',
+            'checkpoint schema epoch refers to a dropped and recreated table')
+
+    def test_recreate_redropped_before_checkpoint_is_legal(self):
+        """
+        A recreated generation dropped again before the checkpoint runs leaves nothing for the
+        checkpoint to resolve: a checkpoint below the original published drop carries the first
+        generation forward, exactly as a plain drop does.
+        """
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+
+        # Checkpoint the original table and its row so later checkpoints can refer to this
+        # generation.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 2)
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        cursor[1] = 'value'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        cursor.close()
+        self.set_stable_epoch(2)
+        self.leader_checkpoint(2)
+
+        # Drop, re-create, and drop again, all published above the next checkpoint's epoch.
+        self.session.drop(self.uri)
+        self.publish(self.uri, 4)
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+        self.session.drop(self.uri)
+        self.publish(self.uri, 6)
+
+        # The checkpoint at epoch 3 still refers to the first generation: legal, no panic.
+        self.set_stable_epoch(3)
+        self.leader_checkpoint(3)
+        self.assertTrue(self.uri_in_shared_metadata(self.conn, self.uri))
+
+        # Once the epoch covers all three operations, the table leaves shared metadata.
+        self.set_stable_epoch(6)
+        self.leader_checkpoint(6)
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri))
+
+    def test_create_drop_recreate_above_checkpoint_epoch(self):
+        """
+        A table created, dropped and recreated entirely above the checkpoint's schema epoch never
+        existed at that epoch: all three entries defer without a violation, and the recreated
+        table appears once the epoch covers it.
+        """
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        self.set_stable_epoch(1)
+
+        # Create, drop, re-create and publish all three, all above the next checkpoint's epoch.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 5)
+        self.session.drop(self.uri)
+        self.publish(self.uri, 6)
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 7)
+
+        # The checkpoint at epoch 3 predates the table entirely: no violation.
+        self.set_stable_epoch(3)
+        self.leader_checkpoint(3)
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri))
+
+        # Once the epoch covers all three operations they apply in order: the create/drop pair
+        # cancels and the recreated table appears.
+        self.set_stable_epoch(7)
+        self.leader_checkpoint(7)
+        self.assertTrue(self.uri_in_shared_metadata(self.conn, self.uri))
 
     def test_recreate_above_stable_epoch_not_resurrected(self):
         """

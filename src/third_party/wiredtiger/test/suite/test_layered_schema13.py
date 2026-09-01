@@ -136,7 +136,7 @@ class test_layered_schema13(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch(10)
 
         session_follow.create(self.uri, self.table_config)
         # No schema_epoch in the config: returns success without publishing anything.

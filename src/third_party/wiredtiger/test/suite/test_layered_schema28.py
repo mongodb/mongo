@@ -81,25 +81,17 @@ class test_layered_schema28(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.set_stable_epoch(10, conn_follow)
         self.assertEqual(self.stable_id(conn_follow, self.uri), first_id)
 
-        # Both nodes drop and recreate the table; the publishes sit above the stable epoch.
-        # The follower's recreate has no stable constituent, only the queued create intent.
+        # Both nodes drop the table; the publishes sit above the stable epoch. The leader
+        # cannot recreate yet: a checkpoint below its published drop with the recreate queued
+        # behind it panics.
         self.session.drop(self.uri)
         self.publish(self.uri, 20)
-        self.session.create(self.uri, self.table_config)
-        self.publish(self.uri, 30)
 
         session_follow.drop(self.uri)
         self.publish(self.uri, 20, session_follow)
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 30, session_follow)
         self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
-
-        # A row the recreated table carries into the next era.
-        cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction()
-        cursor[1] = 'second'
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
-        cursor.close()
 
         # A checkpoint cut below the REMOVE's epoch: the shared metadata still carries the
         # first incarnation, while the follower's local state is already the second.
@@ -109,6 +101,18 @@ class test_layered_schema28(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
         # The stale pickup must not resurrect the first incarnation's stable constituent.
         self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+
+        # The leader recreates only now: the next checkpoint covers the drop, so no checkpoint
+        # below the drop's epoch ever meets the recreate queued behind it.
+        self.session.create(self.uri, self.table_config)
+        self.publish(self.uri, 30)
+
+        # A row the recreated table carries into the next era.
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        cursor[1] = 'second'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
+        cursor.close()
 
         # A checkpoint covering the recreate supplies the right constituent.
         self.set_stable_epoch(30)

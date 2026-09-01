@@ -860,6 +860,17 @@ __wt_txn_config(WT_SESSION_IMPL *session, WT_CONF *conf)
     if (cval.val == 0)
         txn->txn_log.txn_logsync = 0;
 
+    /*
+     * Exempt this transaction from the cache size. Track that we set the session flag so it is
+     * cleared on release, unless the session was already configured to ignore the cache size. A
+     * false setting is not an override of the session-level setting.
+     */
+    WT_ERR(__wt_conf_gets_def(session, conf, ignore_cache_size, 0, &cval));
+    if (cval.val && !F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE)) {
+        F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+        F_SET(txn, WT_TXN_IGNORE_CACHE_SIZE);
+    }
+
     /* Check if prepared updates should be ignored during reads. */
     WT_ERR(__wt_conf_gets_def(session, conf, ignore_prepare, 0, &cval));
     if (cval.len > 0 && WT_CONF_STRING_MATCH(force, cval))
@@ -897,15 +908,6 @@ __wt_txn_config(WT_SESSION_IMPL *session, WT_CONF *conf)
     }
 
 err:
-    if (ret != 0) {
-        /*
-         * In the event that we error during configuration we should clear the flags on the
-         * transaction so they are not set in a subsequent call to transaction begin.
-         */
-        txn->flags = 0;
-        txn->time_point.flags = 0;
-        txn->operation_timeout_us = 0;
-    }
     return (ret);
 }
 
@@ -932,6 +934,22 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, WT_CONF *conf)
           WT_ISO_SNAPSHOT :
           WT_CONFIG_LIT_MATCH("read-uncommitted", cval) ? WT_ISO_READ_UNCOMMITTED :
                                                           WT_ISO_READ_COMMITTED;
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    ret = __wt_conf_getones(session, conf, ignore_cache_size, &cval);
+    if (ret == 0)
+        /*
+         * Can only reconfigure this if a transaction is not active: it would otherwise race with a
+         * transaction that has claimed the flag for itself.
+         */
+        WT_RET(__wt_txn_context_check(session, false));
+
+    if (ret == 0) {
+        if (cval.val)
+            F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+        else
+            F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
     }
     WT_RET_NOTFOUND_OK(ret);
 
@@ -1001,6 +1019,8 @@ __txn_release(WT_SESSION_IMPL *session)
      * Purposely do NOT clear the commit and durable timestamps on release. Other readers may still
      * find these transactions in the durable queue and will need to see those timestamps.
      */
+    if (F_ISSET(txn, WT_TXN_IGNORE_CACHE_SIZE))
+        F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
     txn->flags = 0;
     txn->time_point.flags = 0;
     txn->time_point.prepare_timestamp = WT_TS_NONE;
