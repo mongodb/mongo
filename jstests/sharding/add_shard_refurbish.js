@@ -94,8 +94,16 @@ describe("add shard with refurbished replicaset", function () {
     });
 
     afterEach(() => {
-        this.rs.stopSet();
+        // Stop the ShardingTest first so its metadata consistency checks run while the manually
+        // added shard is still up. Stopping the shard first would make those checks wait for the
+        // unreachable shard (up to 120s under the continuous config stepdown suite), which can time
+        // the test out.
         this.st.stop({skipValidation: true});
+        try {
+            this.st.stop({skipValidation: true});
+        } finally {
+            this.rs.stopSet();
+        }
     });
 
     it("cleanup: shardIdentity", () => {
