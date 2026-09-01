@@ -15,4 +15,5 @@ sh_binary(
         "//buildscripts:resmoke",
         "@db_contrib_tool//:db-contrib-tool",
     ],
+    env = {"DB_CONTRIB_TOOL": "$(rootpath @db_contrib_tool//:db-contrib-tool)"},
 )
