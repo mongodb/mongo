@@ -54,6 +54,9 @@ selector:
     # will conflict with tests that explicitly set cluster parameters.
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/query/queryable_encryption/query_settings_fle.js
+    # failCommand closeConnection tests rely on exact command execution counts,
+    # which are invalidated by the shard-transition retry override.
+    - jstests/core/testing/failcommand_failpoint.js
     # These tests expect index creation to fail on a shard that contains an initial document with
     # parallel arrays. The index creation will succeed on the shard without a document and
     # as we transition to dedicated, the balancer will try an insert the document with a parallel
