@@ -100,6 +100,9 @@ describe("join optimization serverStatus metrics", function () {
                 // Lets the persisted NDV cases below serve statistics; with none persisted this
                 // only makes the other cases count lookup misses, which they do not assert on.
                 internalQueryEnablePersistentNDVStats: true,
+                // Disable FTDC: its internal $collStats aggregates have no $lookup and can pollute
+                // the "noLookup" fallback counter this suite asserts exact deltas on.
+                diagnosticDataCollectionEnabled: false,
             },
         });
         assert.neq(null, this.conn, "mongod was unable to start up");
