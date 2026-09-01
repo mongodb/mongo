@@ -143,10 +143,9 @@ TEST_P(RenameCollectionParticipantServiceTest,
  * the rename completed but the source was not dropped. The test ensures that after the retry
  * source gets dropped and the target stays intact.
  * NOTE: This case is only applicable for cross-db rename.
- * TODO: SERVER-130940 Re-enable this test
  */
 TEST_F(RenameCollectionParticipantServiceTest,
-       DISABLED_RetryAfterCrossDatabaseRenameBeforeSourceDropDropsSource) {
+       RetryAfterCrossDatabaseRenameBeforeSourceDropDropsSource) {
     const auto sourceNss =
         NamespaceString::createNamespaceString_forTest("renameParticipantSource", "source");
     const auto targetNss =

@@ -20,6 +20,12 @@ export const $config = (function () {
         getRandomDb: function (db) {
             return db.getSiblingDB(this.dbPrefix + Random.randInt(this.dbCount));
         },
+        getOtherDb: function (db) {
+            let splitName = db.getName().split("_");
+            let currentDbIndex = Number(splitName[splitName.length - 1]);
+            let newIndex = (currentDbIndex + 1) % this.dbCount;
+            return db.getSiblingDB(this.dbPrefix + newIndex);
+        },
         getRandomCollection: function (db) {
             return db[this.collPrefix + Random.randInt(this.collCount)];
         },
@@ -102,6 +108,34 @@ export const $config = (function () {
                     ErrorCodes.IllegalOperation,
                 ],
             );
+        },
+        renameAcrossDatabases: function (db, collName, connCache) {
+            // TODO (SERVER-131660): Re-enable this once rename across databases is fixed on older
+            // versions.
+            if (Boolean(TestData.multiversionBinVersion) || Boolean(TestData.mixedBinVersions)) {
+                jsTestLog("Skipping rename across databases state as multiversion is enabled");
+                return;
+            }
+            db = this.getRandomDb(db);
+            const srcColl = this.getRandomCollection(db);
+            const srcCollName = srcColl.getFullName();
+            const destDb = this.getOtherDb(db);
+            const destCollNS = this.getRandomCollection(destDb).getFullName();
+
+            jsTestLog(
+                "Executing rename across databases state:" + srcCollName + " to " + destCollNS,
+            );
+            const res = db.adminCommand({
+                renameCollection: srcCollName,
+                to: destCollNS,
+                dropTarget: true,
+            });
+            assert.commandWorkedOrFailedWithCode(res, [
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.ConflictingOperationInProgress,
+                ErrorCodes.IllegalOperation,
+                ErrorCodes.CommandFailed,
+            ]);
         },
         movePrimary: function (db, collName, connCache) {
             db = this.getRandomDb(db);

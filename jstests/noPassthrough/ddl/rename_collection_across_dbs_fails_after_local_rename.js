@@ -172,21 +172,18 @@ describe("cross-database renameCollection participant idempotency", function () 
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: false,
             targetExists: false,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "untracked",
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: true,
             targetExists: false,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "untracked",
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: true,
             targetExists: true,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "untracked",
@@ -211,21 +208,18 @@ describe("cross-database renameCollection participant idempotency", function () 
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: false,
             targetExists: false,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "unsplittable",
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: true,
             targetExists: false,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "unsplittable",
             failpoint: kBeforeSourceDropFailpoint,
             dropTarget: true,
             targetExists: true,
-            skip: "TODO SERVER-130940: Re-enable this",
         },
         {
             collectionType: "unsplittable",
@@ -247,10 +241,9 @@ describe("cross-database renameCollection participant idempotency", function () 
         },
     ];
     for (const testCase of kRetryCases) {
-        const {collectionType, failpoint, dropTarget, targetExists, skip} = testCase;
+        const {collectionType, failpoint, dropTarget, targetExists} = testCase;
         const label = `${collectionType}, ${failpoint}, dropTarget=${dropTarget}, targetExists=${targetExists}`;
-        const register = skip ? it.skip : it;
-        register(`retries successfully: ${label}`, function () {
+        it(`retries successfully: ${label}`, function () {
             runRenameCollectionAcrossDBs(this.shardingTest, {
                 collectionType,
                 failpointName: failpoint,
