@@ -46,7 +46,9 @@ for sbom_file in sbom.private.json sbom.json; do
         --sbom-in "/workdir/${sbom_file}" \
         --sbom-out "/workdir/${sbom_file}" \
         --select-licenses \
-        --sort
+        --sort \
+        --no-update-timestamp \
+        --no-update-sbom-version
 done
 
 echo "--> Script finished successfully."
