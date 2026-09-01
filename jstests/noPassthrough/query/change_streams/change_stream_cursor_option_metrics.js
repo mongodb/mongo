@@ -25,7 +25,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {ServerStatusMetrics} from "jstests/change_streams/change_stream_metrics_util.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

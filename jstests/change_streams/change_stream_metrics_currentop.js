@@ -19,7 +19,7 @@ import {
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
-import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
+import {TestDataModifyGuard} from "jstests/libs/query/change_stream_metrics_util.js";
 
 describe("change stream cursor metrics in currentOp", function () {
     const testDB = db.getSiblingDB(jsTestName());

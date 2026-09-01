@@ -118,7 +118,9 @@ private:
             kIxscanKeyPair,
 
             /** Clustered-scan bounds. Value converted to RecordId via record_id_helpers::keyForElem
-             * (handles scalar and compound BSON _id). Min == max for a point seek. */
+             * (handles scalar and compound BSON _id), collation-transformed first via
+             * CollationIndexKey::collationAwareIndexKeyAppend when the collection has a non-simple
+             * collation. Min == max for a point seek. */
             kClusteredRecordIdPair,
         };
 
@@ -143,9 +145,10 @@ private:
         Ordering ordering = Ordering::allAscending();
         int direction = 1;
 
-        // Borrowed from the _id index's catalog entry or null for a simple index. Safe to borrow:
-        // the executor (and this binder) is always torn down via resetPlan() before the acquisition
-        // is dropped, so it never outlives the catalog entry it points into.
+        // Borrowed from the _id index's (or, for kClusteredRecordIdPair, the collection's default)
+        // collator, or null for a simple/no collation. Safe to borrow: the executor (and this
+        // binder) is always torn down via resetPlan() before the acquisition is dropped, so it
+        // never outlives the catalog entry it points into.
         const CollatorInterface* collator = nullptr;
     };
 

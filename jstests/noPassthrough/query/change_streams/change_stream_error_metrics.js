@@ -23,7 +23,7 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {ServerStatusMetrics} from "jstests/change_streams/change_stream_metrics_util.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 
 let st, mongos, testDB, testColl;
 

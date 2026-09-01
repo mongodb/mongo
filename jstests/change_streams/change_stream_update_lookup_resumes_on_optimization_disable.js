@@ -17,7 +17,7 @@
 import {
     ServerStatusMetrics,
     UpdateLookupExecutor,
-} from "jstests/change_streams/change_stream_metrics_util.js";
+} from "jstests/libs/query/change_stream_metrics_util.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection,

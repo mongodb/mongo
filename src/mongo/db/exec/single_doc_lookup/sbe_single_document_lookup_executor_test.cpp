@@ -28,6 +28,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -114,6 +115,28 @@ protected:
         opts.collation = fromjson("{locale: 'en', strength: 2}");
         opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
         ASSERT_OK(storageInterface()->createCollection(operationContext(), kNss, opts));
+    }
+
+    // Mimics the secondary index a collection clustered by _id gets when it's also sharded with
+    // {_id: "hashed"}: a real "_id_hashed" index coexisting with the (indexless) cluster key. Must
+    // be called on an empty collection, before any documents are inserted.
+    void createHashedIdIndex() {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), kNss, AcquisitionPrerequisites::OperationType::kWrite),
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), &coll};
+        ASSERT_OK(
+            writer.getWritableCollection(operationContext())
+                ->getIndexCatalog()
+                ->createIndexOnEmptyCollection(
+                    operationContext(),
+                    writer.getWritableCollection(operationContext()),
+                    BSON("v" << 2 << "key" << BSON("_id" << "hashed") << "name" << "_id_hashed"))
+                .getStatus());
+        wuow.commit();
     }
 
     void insertDocuments(std::vector<BSONObj> docs) {
@@ -534,6 +557,61 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCollectionUsesBoundedScan) 
         << "Clustered _id lookup must be bounded; got numReads=" << specific->numReads;
 }
 
+// A collection clustered by _id and also sharded with {_id: "hashed"} carries a real secondary
+// "_id_hashed" index alongside its (indexless) cluster key. The query planner offers both a
+// bounded-collscan solution and an IXSCAN(_id_hashed) solution for an _id-equality lookup; SBE
+// must still resolve it via the clustered bounded scan, not the hashed index (SlotBinder::bind()'s
+// literal-KeyString rebind is only valid against the real ascending "_id_" index).
+TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCollectionWithHashedIdIndexUsesBoundedScan) {
+    createClusteredCollection();
+    createHashedIdIndex();
+    insertDocuments({fromjson("{_id: 1, x: 1}"), fromjson("{_id: 2, x: 2}")});
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 1, x: 1}"));
+
+    const auto* root = strategy.getCachedPlanRoot_forTest();
+    ASSERT_TRUE(root);
+
+    auto stats = root->getStats(/*includeDebugInfo=*/true);
+    std::function<const sbe::PlanStageStats*(const sbe::PlanStageStats*)> findScan;
+    findScan = [&](const sbe::PlanStageStats* s) -> const sbe::PlanStageStats* {
+        if (s->common.stageType == "scan"sv || s->common.stageType == "ixscan"sv) {
+            return s;
+        }
+        for (const auto& child : s->children) {
+            if (auto found = findScan(child.get())) {
+                return found;
+            }
+        }
+        return nullptr;
+    };
+    const auto* scanStats = findScan(stats.get());
+    ASSERT_TRUE(scanStats) << "Expected a scan stage in the plan";
+    ASSERT_EQ(scanStats->common.stageType, "scan"sv)
+        << "Expected the bounded clustered collscan, not an ixscan over the hashed _id index";
+}
+
+// A non-clustered collection sharded with {_id: "hashed"} carries both the real ascending "_id_"
+// index and a secondary "_id_hashed" index. QueryPlanner::plan() may offer an indexed solution for
+// either one; PreparedExecutor::make() takes solutions[0] unconditionally. SBE must resolve the
+// lookup via the real "_id_" index, not decline just because the hashed index happened to be
+// offered first -- the document is still perfectly reachable through the ordinary ixscan path.
+TEST_F(SbeSingleDocumentLookupExecutorTest,
+       NonClusteredCollectionWithHashedIdIndexUsesRealIdIndex) {
+    createCollection();
+    createHashedIdIndex();
+    insertDocuments({fromjson("{_id: 1, x: 1}"), fromjson("{_id: 2, x: 2}")});
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 1, x: 1}"));
+    ASSERT_EQ(idIndexAccesses(), 1);
+}
+
 // --- $indexStats recording ---------------------------------------------------------------------
 
 TEST_F(SbeSingleDocumentLookupExecutorTest, IxscanLookupRecordsIdIndexUsage) {
@@ -655,9 +733,9 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCompoundIdEngagesSlotBinder
 //
 // For the IXSCAN shape, the strategy adopts the collection's default collation onto the query (so
 // the planner selects the collation-aware _id index) and SlotBinder encodes collation comparison
-// keys, so it resolves the lookup via the _id index. The clustered shape still declines a
-// non-simple collation: its RecordId encoding can't apply collation keys, so it falls back rather
-// than compute wrong seek bounds.
+// keys, so it resolves the lookup via the _id index. The clustered shape applies the same
+// collation transform to its RecordId seek key (mirroring record_id_helpers::keyForDoc's
+// insert-time encoding), so it resolves the lookup directly too.
 
 // A non-simple default collation makes the _id index collation-aware. The fast path adopts that
 // collation (so the planner selects the _id index) and encodes collation comparison keys for the
@@ -678,16 +756,18 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NonSimpleCollationEngagesIxscanFastP
     ASSERT_EQ(collectionScans(), 0);
 }
 
-TEST_F(SbeSingleDocumentLookupExecutorTest, NonSimpleCollationDeclinesClusteredFastPath) {
+// The seek key must go through the same collation transform as insert-time RecordId encoding
+// (record_id_helpers::keyForDoc), not just avoid declining. Querying with a different case than
+// the stored value only succeeds if the fast path actually applies the collation.
+TEST_F(SbeSingleDocumentLookupExecutorTest, NonSimpleCollationEngagesClusteredFastPath) {
     createClusteredCollectionWithCaseInsensitiveCollation();
     insertDocuments({fromjson("{_id: 'abc', x: 1}")});
 
     auto strategy = makeStrategy();
-    auto result = lookup(&strategy, fromjson("{_id: 'abc'}"));
+    auto result = lookup(&strategy, fromjson("{_id: 'ABC'}"));
 
-    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
-    ASSERT_FALSE(strategy.getCachedPlanRoot_forTest())
-        << "A declined plan shape must not be cached";
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(result.document->toBson(), fromjson("{_id: 'abc', x: 1}"));
 }
 
 // A simple (or absent) collation is unaffected: the fast path still engages for a string _id.
