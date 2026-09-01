@@ -640,6 +640,12 @@ class AdapterTest(unittest.TestCase):
                         adapters.run_yaml,
                         "Evergreen and YAML validation is unsupported on Windows",
                     ),
+                    (
+                        adapters.run_sbom,
+                        "SBOM validation is unsupported on Windows (jsonschema_specifications' "
+                        "nested schema resources exceed Windows MAX_PATH); SBOM generation only "
+                        "runs in Evergreen on Linux",
+                    ),
                 )
                 for runner, reason in checks:
                     with self.subTest(reason=reason):

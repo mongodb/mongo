@@ -306,6 +306,11 @@ def _run_lint_stage(
             "target-coverage": "Bazel target coverage is unsupported on Windows",
             "rules-lint": "rules_lint is unsupported on Windows",
             "yaml": "Evergreen and YAML validation is unsupported on Windows",
+            "sbom": (
+                "SBOM validation is unsupported on Windows (jsonschema_specifications' "
+                "nested schema resources exceed Windows MAX_PATH); SBOM generation only "
+                "runs in Evergreen on Linux"
+            ),
         }
         if stage in unsupported_reasons:
             return RunOutcome(0, skipped_reason=unsupported_reasons[stage])
