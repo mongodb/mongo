@@ -38,6 +38,23 @@ def _display_name_index(commands: list[dict], display_name: str) -> int:
     )
 
 
+def _expansion_update_indices(commands: list[dict], file_name: str) -> list[int]:
+    return [
+        index
+        for index, command in enumerate(commands)
+        if command.get("command") == "expansions.update"
+        and command.get("params", {}).get("file") == file_name
+    ]
+
+
+def _script_index(commands: list[dict], script_name: str) -> int:
+    return next(
+        index
+        for index, command in enumerate(commands)
+        if script_name in command.get("params", {}).get("args", [])
+    )
+
+
 class CustomBuildVersionOrderingTest(unittest.TestCase):
     def test_shared_version_expansions_do_not_require_the_venv(self):
         shared_commands = _function_commands("get and apply version expansions")
@@ -82,9 +99,16 @@ class CustomBuildVersionOrderingTest(unittest.TestCase):
                     _func_index(commands, "set up venv"),
                     _func_index(commands, package_test_function),
                 )
-                self.assertIn(
-                    "set_version_override.sh", str(_function_commands(package_test_function))
+                package_test_commands = _function_commands(package_test_function)
+                apply_indices = _expansion_update_indices(
+                    package_test_commands, "src/version_expansions.yml"
                 )
+                self.assertEqual(2, len(apply_indices))
+                override_index = _script_index(
+                    package_test_commands, "src/evergreen/custom_builds/set_version_override.sh"
+                )
+                self.assertGreater(override_index, apply_indices[0])
+                self.assertLess(override_index, apply_indices[-1])
 
     def test_packager_functions_apply_custom_version_before_packaging(self):
         packager_functions = (
