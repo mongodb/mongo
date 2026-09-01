@@ -253,7 +253,7 @@ testing = [
     "avro-python3>=1.10.2,<2",
     # evergreen-py upstream caps at python<3.14; project is constrained to
     # python 3.13 so we only need the marker for forward-compatibility.
-    "evergreen-py>=3.15.0,<4 ; python_version < '3.14'",
+    "evergreen-py>=3.19.2,<4 ; python_version < '3.14'",
     "mock>=5.1.0,<6",
     "shrub-py>=3.1.4,<4",
     "ocspresponder>=0.5.0,<0.6",
