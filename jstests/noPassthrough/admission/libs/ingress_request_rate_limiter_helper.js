@@ -48,7 +48,7 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  * covers all resharding NetworkInterfaceTL names.
  *
  * Authoritative upstream source (production config):
- *   https://github.com/10gen/mongotune/blob/39ab8374c3a2a4018253cd0c8aba51818ccb0b03/configurations/dsi/mongotune_policies.yml#L371
+ *   https://github.com/10gen/mongotune/blob/3c9fab88663772d957b901cf7501aaae5a352057/crates/mongotune-core/src/exemptions.rs#L28
  *
  * The suite-level counterpart (which adds Resmoke-Hook, MongoDB Automation Agent, mongotune,
  * mongot, and other ops-tooling names not relevant here) is the appNameExemptions anchor in:
@@ -66,8 +66,6 @@ export const kInternalConnectionAppNameExemptions = [
     "NetworkInterfaceTL-Sharding-Fixed",
     "NetworkInterfaceTL-ShardingCoordinatorNetwork",
     "NetworkInterfaceTL-StandaloneNetwork",
-    "ReplCoordExtern",
-    "InitialSyncer",
     "Rollback",
     "Cloner",
     "OplogFetcher",

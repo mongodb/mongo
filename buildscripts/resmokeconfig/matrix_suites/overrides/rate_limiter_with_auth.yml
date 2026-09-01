@@ -54,7 +54,7 @@
 
     # AppName prefixes for MongoDB-internal connections exempt from the ingress request rate limiter (IRRL) once authenticated.
     # Authoritative upstream source (production config):
-    #   https://github.com/10gen/mongotune/blob/39ab8374c3a2a4018253cd0c8aba51818ccb0b03/configurations/dsi/mongotune_policies.yml#L371
+    #   https://github.com/10gen/mongotune/blob/3c9fab88663772d957b901cf7501aaae5a352057/crates/mongotune-core/src/exemptions.rs#L28
     #
     # This list includes ops-tooling names (Resmoke-Hook, MongoDB Automation Agent, mongotune,
     # mongot, etc.) that are only relevant in suite-level passthrough tests. The noPassthrough
@@ -65,7 +65,6 @@
     # When adding a new internal executor, update both this anchor and the JS list above.
     appNameExemptions: &appNameExemptions >
       {"appNames":["Cloner",
-                  "InitialSyncer",
                   "MongoDB Automation Agent",
                   "MongoDB Backup Module",
                   "MongoDB CPS Module",
@@ -90,7 +89,6 @@
                   "Reshard",
                   "Resmoke-Admin",
                   "Resmoke-Hook",
-                  "ReplCoordExtern",
                   "Rollback"]}
 
     rateLimiterParamsCommon: &rateLimiterParamsCommon

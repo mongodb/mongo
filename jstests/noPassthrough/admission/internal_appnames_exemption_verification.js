@@ -107,17 +107,6 @@ const KNOWN_RATE_LIMITED = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// Exemption entries that intentionally match no appName the server currently produces, and are
-// deliberately retained (they mirror the production mongotune exemption list). They are excluded
-// from the unusedExemptions check.
-//   - "ReplCoordExtern": the real appName is NetworkInterfaceTL-ReplCoordExternNetwork (already
-//     covered by the "NetworkInterfaceTL-Repl" prefix); kept as a defensive alias.
-//   - "InitialSyncer": no current source produces this; kept in sync with the production list.
-// TODO (TUNE-1122): Remove once TUNE-1122 has been addressed.
-// ---------------------------------------------------------------------------
-const ALLOWED_UNMATCHED_EXEMPTIONS = new Set(["ReplCoordExtern", "InitialSyncer"]);
-
-// ---------------------------------------------------------------------------
 // matchesSet returns true when any entry in `set` matches `name`. Entries are prefixes, so a short
 // entry like "NetworkInterfaceTL-Repl" matches every appName that starts with it. Append "$" to an
 // entry to require an exact match instead.
@@ -158,10 +147,8 @@ const misdeclaredRateLimited = [...KNOWN_RATE_LIMITED]
     .filter((n) => !expectedRateLimited.has(n))
     .sort();
 
-// Exemption entries that match no known appName (renamed/removed component), excluding the
-// deliberately retained aliases in ALLOWED_UNMATCHED_EXEMPTIONS.
+// Exemption entries that match no known appName (renamed/removed component)
 const unusedExemptions = [...kInternalConnectionAppNameExemptions]
-    .filter((entry) => !ALLOWED_UNMATCHED_EXEMPTIONS.has(entry))
     .filter((entry) => ![...ALL_KNOWN_APPNAMES].some((n) => matchesSet(n, new Set([entry]))))
     .sort();
 

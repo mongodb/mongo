@@ -54,22 +54,20 @@ executor:
         featureFlagIngressRateLimiting: true
         ingressRequestRateLimiterApplicationExemptions:
           "{\"appNames\":[\"Cloner\"\
-          ,\n            \"InitialSyncer\",\n            \"MongoDB Automation Agent\"\
-          ,\n            \"MongoDB Backup Module\",\n            \"MongoDB CPS Module\"\
-          ,\n            \"MongoDB CPS PIT Module\",\n            \"MongoDB DB Check\
-          \ Module\",\n            \"MongoDB Internal Client\",\n            \"MongoDB\
-          \ Lifecycle Management Module\",\n            \"MongoDB Monitoring Module\"\
-          ,\n            \"MongoDB Online Archive Module\",\n            \"MongoDB\
-          \ PIT Restore Module\",\n            \"mongot\",\n            \"mongotune\"\
-          ,\n            \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\",\n\
-          \            \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\",\n\
-          \            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n            \"\
-          NetworkInterfaceTL-Repl\",\n            \"NetworkInterfaceTL-Reshard\",\n\
-          \            \"NetworkInterfaceTL-Sharding-Fixed\",\n            \"NetworkInterfaceTL-ShardingCoordinatorNetwork\"\
+          ,\n            \"MongoDB Automation Agent\",\n            \"MongoDB Backup\
+          \ Module\",\n            \"MongoDB CPS Module\",\n            \"MongoDB\
+          \ CPS PIT Module\",\n            \"MongoDB DB Check Module\",\n        \
+          \    \"MongoDB Internal Client\",\n            \"MongoDB Lifecycle Management\
+          \ Module\",\n            \"MongoDB Monitoring Module\",\n            \"\
+          MongoDB Online Archive Module\",\n            \"MongoDB PIT Restore Module\"\
+          ,\n            \"mongot\",\n            \"mongotune\",\n            \"NetworkInterfaceTL-AddShardCoordinator-TaskExecutor\"\
+          ,\n            \"NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork\"\
+          ,\n            \"NetworkInterfaceTL-HelloMe-TaskExecutor\",\n          \
+          \  \"NetworkInterfaceTL-Repl\",\n            \"NetworkInterfaceTL-Reshard\"\
+          ,\n            \"NetworkInterfaceTL-Sharding-Fixed\",\n            \"NetworkInterfaceTL-ShardingCoordinatorNetwork\"\
           ,\n            \"NetworkInterfaceTL-StandaloneNetwork\",\n            \"\
           OplogFetcher\",\n            \"Reshard\",\n            \"Resmoke-Admin\"\
-          ,\n            \"Resmoke-Hook\",\n            \"ReplCoordExtern\",\n   \
-          \         \"Rollback\"]}\n"
+          ,\n            \"Resmoke-Hook\",\n            \"Rollback\"]}\n"
         ingressRequestRateLimiterEnabled: true
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
