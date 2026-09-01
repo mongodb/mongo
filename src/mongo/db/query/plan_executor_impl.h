@@ -25,7 +25,6 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
-#include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -66,8 +65,6 @@ template <typename F, typename H>
     invariant(shard_role_details::getRecoveryUnit(opCtx));
     invariant(!expCtx->getTemporarilyUnavailableException());
 
-    // We do not catch ErrorCodes::WriteConflictRetryLimitExceeded. It is thrown to escape
-    // this template so the adaptive retry limit can fire.
     try {
         return f();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
@@ -198,12 +195,6 @@ public:
     }
 
     /**
-     * Returns the current value of the process-wide WCE-retry-streak waiter gauge. Test-only
-     * accessor; production code reads the gauge via `Atomic64Metric` through serverStatus.
-     */
-    static int32_t getWriteConflictRetryWaiterCount_forTest();
-
-    /**
      * It is used to detect if the plan executor obtained after multiplanning is using a distinct
      * scan stage. That's because in this scenario modifications to the pipeline in the context of
      * aggregation need to be made.
@@ -255,11 +246,9 @@ public:
 
 private:
     // Co-locates per-call state passed between the two work loops and _handleNeedYield.
-    // Non-copyable/non-movable because it owns a WCStormWaiterGuard.
     struct WriteConflictRetryState {
         size_t writeConflictsInARow = 0;
         size_t tempUnavailErrorsInARow = 0;
-        WCStormWaiterGuard streakGuard;
     };
 
     const QuerySolution* getQuerySolution() const {

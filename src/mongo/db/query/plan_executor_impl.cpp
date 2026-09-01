@@ -28,7 +28,6 @@
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/write_conflict_backoff.h"
-#include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
@@ -66,11 +65,6 @@ logv2::SeveritySuppressor longCollectionScanLogSeveritySuppressor{
     Seconds(300), logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
 
 }  // namespace
-
-
-int32_t PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest() {
-    return wceWaitersCount();
-}
 
 
 const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
@@ -422,10 +416,9 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
         return PlanExecutor::ADVANCED;
     }
 
-    // Per-call retry state: streak counters and the RAII gauge guard. Counters are incremented
-    // on every WriteConflict or TemporarilyUnavailable error accordingly, and reset to 0 on any
-    // successful call to _root->work. The guard's destructor releases the gauge if still held on
-    // any function-exit path (return / EOF / exception).
+    // Per-call retry state: streak counters incremented on every WriteConflict or
+    // TemporarilyUnavailable error accordingly, and reset to 0 on any successful call to
+    // _root->work.
     WriteConflictRetryState retryState;
 
     // Capped insert notifier; declared outside the loop so that it (and thus the capped-insert
@@ -466,9 +459,6 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
         PlanStage::StageState code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
-            // A successful work() step (or NEED_TIME / IS_EOF) ends any WCE streak. release()
-            // is idempotent and is a no-op if no streak was active.
-            retryState.streakGuard.release();
             retryState.writeConflictsInARow = 0;
             retryState.tempUnavailErrorsInARow = 0;
         }
@@ -633,9 +623,7 @@ void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
             retryState.writeConflictsInARow);
     } else if (!_oplogWaitConfig || !_oplogWaitConfig->waitedForOplogVisiblity()) {
         // If we didn't wait for oplog visibility, then we must be yielding because of a
-        // WriteConflictException. Oplog-visibility yields and TUE yields (handled above) do
-        // not contribute to the retry-limit gauge - only the WCE path below acquires the
-        // streak guard.
+        // WriteConflictException.
         if (!_yieldPolicy->canAutoYield() ||
             MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
             throwWriteConflictException(
@@ -645,18 +633,7 @@ void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
 
         retryState.writeConflictsInARow++;
 
-        checkWriteConflictStorm(_opCtx, retryState.streakGuard, retryState.writeConflictsInARow);
-
-        // Fall back to the legacy hold-ticket sleep path once the op has hit the threshold.
-        // Holding the ticket during the sleep throttles concurrent ops entering the conflict
-        // zone, which helps under a write-conflict storm.
-        const bool releaseTicketEnabled =
-            internalQueryEnableWriteConflictBackoffWithoutTicket.loadRelaxed();
-        const bool fallbackToHoldTicket = releaseTicketEnabled &&
-            static_cast<int64_t>(retryState.writeConflictsInARow) >
-                gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles.loadRelaxed();
-
-        if (releaseTicketEnabled && !fallbackToHoldTicket) {
+        if (internalQueryEnableWriteConflictBackoffWithoutTicket.loadRelaxed()) {
             // Defer the logAndBackoff() call to the yield handler.
             _writeConflictsInARowToLog = retryState.writeConflictsInARow;
         } else {
@@ -735,10 +712,9 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
-    // Per-call retry state: streak counters and the RAII gauge guard. Counters are incremented
-    // on every WriteConflict or TemporarilyUnavailable error accordingly, and reset to 0 on any
-    // successful call to _root->work. The guard's destructor releases the gauge if still held on
-    // any function-exit path (return / EOF / exception / stashResult-break).
+    // Per-call retry state: streak counters incremented on every WriteConflict or
+    // TemporarilyUnavailable error accordingly, and reset to 0 on any successful call to
+    // _root->work.
     WriteConflictRetryState retryState;
 
     size_t numResults = 0;
@@ -760,9 +736,6 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
         PlanStage::StageState code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
-            // A successful work() step (or NEED_TIME / IS_EOF) ends any WCE streak. release()
-            // is idempotent and is a no-op if no streak was active.
-            retryState.streakGuard.release();
             retryState.writeConflictsInARow = 0;
             retryState.tempUnavailErrorsInARow = 0;
         }

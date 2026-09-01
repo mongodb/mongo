@@ -5,13 +5,9 @@
  * (which releases resources and backs off, then re-drives the stage) and ultimately inserts exactly
  * one document with a stable _id.
  *
- * The case that distinguishes the new path from the old in-stage loop is the retry-limit case:
- * routing the insert through the executor makes it subject to the adaptive WriteConflict retry
- * limit (internalQueryWriteConflictRetryLimitMax), so it can throw WriteConflictRetryLimitExceeded
- * -- something the old unbounded in-stage writeConflictRetry loop could never do. The remaining
- * cases guard that the refactor preserves existing behavior: retry-to-success, _id stability across
- * retries, in-transaction surfacing of the conflict, an explain that performs no insert, and a
- * single oplog entry for a capped collection.
+ * The cases guard that the refactor preserves existing behavior: retry-to-success, _id stability
+ * across retries, in-transaction surfacing of the conflict, an explain that performs no insert,
+ * and a single oplog entry for a capped collection.
  *
  * Resource release (locks/tickets) during backoff is internal and not directly observable from a
  * jstest, so it is not asserted here.
@@ -44,10 +40,6 @@ describe("upsert insert write-conflict retry", function () {
                     // Disable the periodic noop writer so its oplog writes can't consume the
                     // WTWriteConflictException failpoint firings out from under the upsert insert.
                     writePeriodicNoops: false,
-                    // Disable the WCE retry limit so the test doesn't depend on the server's
-                    // defaults; the retry-limit case turns it back on explicitly.
-                    internalQueryWriteConflictRetryLimitMax: 0,
-                    internalQueryWriteConflictRetryLimitWaitersThreshold: 0,
                 },
             },
         });
@@ -124,41 +116,6 @@ describe("upsert insert write-conflict retry", function () {
         assert.eq(insertedId, res.lastErrorObject.upserted, res);
         assert.eq(1, coll.find({_id: insertedId}).itcount(), {docs: coll.find().toArray()});
         assert.eq(1, coll.find().itcount(), {docs: coll.find().toArray()});
-    });
-
-    it("an upsert insert that exceeds the retry limit fails with WriteConflictRetryLimitExceeded", function () {
-        coll.drop();
-        assert.commandWorked(db.createCollection(collName));
-        const kLimit = 5;
-        // Routing the insert through the executor makes it subject to the adaptive retry limit.
-        // Set the waiters threshold to 0 so adaptive scaling is disabled and the effective limit
-        // is exactly kLimit; the op then aborts with WriteConflictRetryLimitExceeded after kLimit
-        // consecutive conflicts -- the old unbounded in-stage writeConflictRetry loop could never
-        // throw this.
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryWriteConflictRetryLimitMax: kLimit,
-                internalQueryWriteConflictRetryLimitWaitersThreshold: 0,
-            }),
-        );
-        try {
-            const fp = configureFailPoint(primary, "WTWriteConflictException", {}, {times: 50});
-            const res = db.runCommand({
-                update: collName,
-                updates: [{q: {x: 99}, u: {$set: {y: 1}}, upsert: true}],
-            });
-            fp.off();
-
-            assert.commandFailedWithCode(res, ErrorCodes.WriteConflictRetryLimitExceeded);
-            assert.eq(0, coll.find({x: 99}).itcount(), {docs: coll.find().toArray()});
-        } finally {
-            // Reset before the next case: the other cases inject more conflicts than this limit and
-            // would otherwise abort.
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryWriteConflictRetryLimitMax: 0}),
-            );
-        }
     });
 
     it("an explained upsert does not perform the insert", function () {

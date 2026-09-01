@@ -1,12 +1,12 @@
 /**
  * This test checks that write operations do not hold write locks while sleeping for backoff after a
  * write conflict. Specifically, it tests:
- * 1. A batched delete (classic executor) does not hold write tickets while sleeping.
+ * 1. A batched delete (classic executor) does not hold write tickets while sleeping, and
+ *    does hold the ticket when release-ticket backoff is disabled
+ *    (internalQueryEnableWriteConflictBackoffWithoutTicket: false, the legacy stepped sleep).
  * 2. An express update does not hold write tickets while sleeping.
  * 3. An express delete does not hold write tickets while sleeping.
- * 4. An express update DOES hold the write ticket when the MaxReleaseTicketCycles fallback
- *    threshold is crossed.
- * 5. An express update does not hold write tickets while sleeping for TemporarilyUnavailable
+ * 4. An express update does not hold write tickets while sleeping for TemporarilyUnavailable
  *    backoff (WaitingForBackoff path).
  * @tags: [requires_fcv_83]
  */
@@ -22,9 +22,9 @@ import {Thread} from "jstests/libs/parallelTester.js";
  * expectTicketHeld is true the concurrent insert is expected to time out (the delete thread
  * still holds the ticket during the sleep).
  */
-function runScenario({maxReleaseCycles, expectTicketHeld}) {
+function runScenario({releaseTicket, expectTicketHeld}) {
     jsTestLog(
-        `Running scenario: maxReleaseCycles=${maxReleaseCycles} expectTicketHeld=${expectTicketHeld}`,
+        `Running scenario: releaseTicket=${releaseTicket} expectTicketHeld=${expectTicketHeld}`,
     );
 
     const rst = new ReplSetTest({
@@ -33,10 +33,7 @@ function runScenario({maxReleaseCycles, expectTicketHeld}) {
             setParameter: {
                 // Fixed ticket count so we can force writers to compete for the single ticket.
                 executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
-                // Defensive: this is the default, but set it explicitly so the test is robust
-                // against future default flips.
-                internalQueryEnableWriteConflictBackoffWithoutTicket: true,
-                internalQueryWriteConflictBackoffMaxReleaseTicketCycles: maxReleaseCycles,
+                internalQueryEnableWriteConflictBackoffWithoutTicket: releaseTicket,
             },
         },
     });
@@ -117,7 +114,7 @@ function runScenario({maxReleaseCycles, expectTicketHeld}) {
         );
         jsTestLog("Insert timed out as expected -- delete thread is holding the write ticket");
     } else {
-        // With the default (M = INT_MAX) the delete releases its ticket before sleeping, so
+        // With release-ticket backoff on, the delete releases its ticket before sleeping, so
         // the concurrent insert should get the ticket promptly.
         assert.commandWorked(insertRes);
         jsTestLog("Insert succeeded -- delete thread released the write ticket");
@@ -132,14 +129,14 @@ function runScenario({maxReleaseCycles, expectTicketHeld}) {
     rst.stopSet();
 }
 
-// Default behavior: release ticket before sleep (M = INT_MAX).
-runScenario({maxReleaseCycles: 2147483647, expectTicketHeld: false});
+// Default behavior: release the ticket before sleeping.
+runScenario({releaseTicket: true, expectTicketHeld: false});
 
-// Fallback behavior: M = 0 forces hold-ticket + sleep from the first WCE.
-runScenario({maxReleaseCycles: 0, expectTicketHeld: true});
+// Legacy behavior: hold the ticket across the stepped-schedule sleep.
+runScenario({releaseTicket: false, expectTicketHeld: true});
 
 // =====================================================================================
-// Tests 2-5: Express executor tests on a shared ReplSet.
+// Tests 2-4: Express executor tests on a shared ReplSet.
 // =====================================================================================
 
 const rst = new ReplSetTest({
@@ -363,117 +360,7 @@ const expressDeleteResult = expressDeleteThread.returnData();
 jsTest.log("Express delete thread completed with result: " + tojson(expressDeleteResult));
 
 // =====================================================================================
-// Test 4: Express executor HOLDS the write ticket during backoff once the
-//         MaxReleaseTicketCycles fallback threshold is crossed.
-//
-// With maxReleaseTicketCycles=0, any numAttempts > 0 triggers the fallback. The first WCE
-// (numAttempts=0) still uses the release-ticket path; the second WCE (numAttempts=1 > 0)
-// takes the hold-ticket path. We use skip=1 on the hang failpoint to skip the first
-// (release-ticket) activation and catch the thread at the second (hold-ticket) activation,
-// then verify that a concurrent write cannot acquire the ticket during that sleep.
-// =====================================================================================
-
-// Reset the write ticket limit before starting the fallback test.
-assert.commandWorked(
-    primary.adminCommand({
-        setParameter: 1,
-        executionControlConcurrentWriteTransactions: 100,
-    }),
-);
-
-// Lower the fallback threshold to 0 so the hold-ticket path is taken on the second WCE.
-assert.commandWorked(
-    primary.adminCommand({
-        setParameter: 1,
-        internalQueryWriteConflictBackoffMaxReleaseTicketCycles: 0,
-    }),
-);
-
-// Insert a fresh document for the fallback test.
-const fallbackTestDocId = numDocs + 30;
-assert.commandWorked(coll.insertOne({_id: fallbackTestDocId, a: "foo", b: 40}));
-
-// Verify the update-by-_id uses the express executor.
-{
-    const explainCmd = {
-        explain: {
-            update: coll.getName(),
-            updates: [{q: {_id: fallbackTestDocId}, u: {$set: {a: "bar"}}}],
-        },
-        verbosity: "queryPlanner",
-    };
-    const explain = assert.commandWorked(db.runCommand(explainCmd));
-    assert(isExpress(db, explain), "Update by _id should use express executor: " + tojson(explain));
-}
-
-// Configure the hang failpoint with skip=1: skip the first activation (release-ticket path at
-// numAttempts=0) and only pause at the second activation (hold-ticket path at numAttempts=1).
-const fallbackHangFp = configureFailPoint(
-    primary,
-    "expressExecutorHangBeforeLogAndBackoff",
-    {},
-    {"skip": 1},
-);
-
-// Enable the WCE failpoint so every express write attempt conflicts.
-const fallbackWCEFp = configureFailPoint(primary, "throwWriteConflictExceptionInExpressWrite");
-
-// Start an express update thread.
-const fallbackThread = new Thread(
-    function (host, docId) {
-        const conn = new Mongo(host);
-        const db = conn.getDB("test");
-        const coll = db.write_conflict_test;
-
-        const result = db.runCommand({
-            update: coll.getName(),
-            updates: [{q: {_id: docId}, u: {$set: {a: "baz"}}}],
-        });
-        return result;
-    },
-    primary.host,
-    fallbackTestDocId,
-);
-
-fallbackThread.start();
-
-// Wait for the second hang activation - the thread is now in the hold-ticket fallback path.
-fallbackHangFp.wait();
-
-jsTestLog("Express fallback thread is paused in the hold-ticket backoff path");
-
-// Reduce available tickets to 1. The express thread is holding the only ticket, so any
-// concurrent writer must wait.
-assert.commandWorked(
-    primary.adminCommand({
-        setParameter: 1,
-        executionControlConcurrentWriteTransactions: 1,
-    }),
-);
-
-// A concurrent write should fail to acquire the ticket within maxTimeMS because the express
-// thread is holding it while sleeping (the hold-ticket fallback path).
-assert.commandFailedWithCode(
-    db.runCommand({
-        insert: coll.getName(),
-        documents: [{_id: numDocs + 31, a: "bar", b: 400}],
-        maxTimeMS: 3000,
-    }),
-    [ErrorCodes.MaxTimeMSExpired, ErrorCodes.LockTimeout],
-);
-
-jsTestLog("Concurrent write correctly failed - express fallback thread is holding the ticket");
-
-// Disable the failpoints and allow the express thread to finish.
-fallbackHangFp.off();
-fallbackWCEFp.off();
-jsTestLog("Failpoints disabled, allowing blocked express fallback operation to proceed");
-
-fallbackThread.join();
-jsTest.log("Express fallback thread completed with result: " + tojson(fallbackThread.returnData()));
-
-// =====================================================================================
-// Test 5: Express executor releases the write ticket while sleeping for
+// Test 4: Express executor releases the write ticket while sleeping for
 //         TemporarilyUnavailable backoff (WaitingForBackoff path).
 // =====================================================================================
 

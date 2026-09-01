@@ -69,22 +69,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "write_conflict_storm",
-    srcs = [
-        "write_conflict_storm.cpp",
-    ],
-    hdrs = [
-        "write_conflict_storm.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/db/commands/server_status:server_status_metric",
-        "//src/mongo/db/query:query_knobs",
-    ],
-)
-
 # Tailable-cursor await-data state (an OperationContext decoration). Kept as its own leaf
 # library so lower layers (e.g. the aggregation pipeline) can read it without depending on
 # 'query_common', which pulls in 'canonical_query_base' and would form a dependency cycle.
@@ -830,7 +814,6 @@ mongo_cc_unit_test(
         "find_common_test.cpp",
         "getmore_request_test.cpp",
         "hint_parser_test.cpp",
-        "plan_executor_impl_test.cpp",
         "plan_insert_listener_test.cpp",
     ],
     data = [
