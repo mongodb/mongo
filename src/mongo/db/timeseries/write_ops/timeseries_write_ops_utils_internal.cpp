@@ -29,9 +29,11 @@
 
 namespace mongo::timeseries::write_ops_utils {
 
+MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailureInsert);
+MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailureUpdate);
+
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(timeseriesDataIntegrityCheckFailureUpdate);
 
 // Return a verifierFunction that is used to perform a data integrity check on inserts into
 // a compressed column.
@@ -39,16 +41,18 @@ doc_diff::VerifierFunc makeVerifierFunction(std::shared_ptr<bucket_catalog::Writ
                                             OperationSource source) {
     return [measurements = batch->measurements, batch, source](const BSONObj& docToWrite,
                                                                const BSONObj& pre) {
+        auto throwCompressionFailure = [&](const BSONObj&) {
+            uasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
+                                                           batch->bucketId.oid,
+                                                           batch->bucketId.keySignature),
+                      "Failpoint-triggered data integrity check failure");
+        };
         timeseriesDataIntegrityCheckFailureUpdate.executeIf(
-            [&](const BSONObj&) {
-                uasserted(  // In testing, we want any failures within this check to invariant.
-                            // In production,
-                    timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
-                                                         batch->bucketId.oid,
-                                                         batch->bucketId.keySignature),
-                    "Failpoint-triggered data integrity check failure");
-            },
+            throwCompressionFailure,
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
+        timeseriesDataIntegrityCheckFailureInsert.executeIf(
+            throwCompressionFailure,
+            [&source](const BSONObj&) { return source == OperationSource::kTimeseriesInsert; });
 
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
         auto failed = [&measurements, &batch, &docToWrite, &pre](std::string_view reason,

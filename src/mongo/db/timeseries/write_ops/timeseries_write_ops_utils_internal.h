@@ -7,7 +7,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
-#include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/allocator.h"
 
@@ -27,6 +26,9 @@
  */
 
 namespace mongo::timeseries::write_ops_utils {
+
+extern FailPoint timeseriesDataIntegrityCheckFailureInsert;
+extern FailPoint timeseriesDataIntegrityCheckFailureUpdate;
 
 /**
  * Holds the bucket document used for writing to disk. The uncompressed bucket document is always

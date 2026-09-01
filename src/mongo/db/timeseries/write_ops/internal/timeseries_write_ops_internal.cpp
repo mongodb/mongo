@@ -870,7 +870,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                 "bucketId"_attr = bucketId);
 
             for (auto index : batch->userBatchIndices) {
-                populateError(opCtx, start + index, ex.toStatus(), errors);
+                populateError(opCtx, index, ex.toStatus(), errors);
             }
         }
 

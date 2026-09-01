@@ -4,30 +4,22 @@
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 #include <variant>
@@ -541,6 +533,47 @@ TEST_F(TimeseriesWriteOpsInternalTest, CommitSurvivesWriteConflictOnBucketInsert
     ASSERT(record);
     const auto control = record->data.toBson().getObjectField(timeseries::kBucketControlFieldName);
     EXPECT_EQ(1, control[timeseries::kBucketControlCountFieldName].numberInt());
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, CompressionFailureReportsUserBatchIndexForPartialBatch) {
+    const std::vector<BSONObj> userBatch{
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(1)),
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(2)),
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(3)),
+    };
+    auto request = _createInsertCommandRequest(_ns1, userBatch);
+
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        _opCtx, _ns1, request, /*expectedUUID=*/boost::none);
+
+    const auto initialTimesEntered =
+        write_ops_utils::timeseriesDataIntegrityCheckFailureInsert.setMode(FailPoint::Mode::nTimes,
+                                                                           1);
+
+    std::vector<mongo::write_ops::WriteError> errors;
+    boost::optional<repl::OpTime> opTime;
+    boost::optional<OID> electionId;
+    bool containsRetry = false;
+
+    // Write only the last measurement of the user batch, as the ordered path does when it falls
+    // back to writing each measurement individually.
+    performUnorderedTimeseriesWritesWithRetries(_opCtx,
+                                                request,
+                                                preConditions,
+                                                /*start=*/2,
+                                                /*numDocs=*/1,
+                                                bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                                &errors,
+                                                &opTime,
+                                                &electionId,
+                                                &containsRetry);
+
+    EXPECT_EQ(
+        write_ops_utils::timeseriesDataIntegrityCheckFailureInsert.setMode(FailPoint::Mode::off),
+        initialTimesEntered + 1);
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_EQ(errors.front().getStatus(), ErrorCodes::TimeseriesBucketCompressionFailed);
+    EXPECT_EQ(errors.front().getIndex(), 2);
 }
 
 }  // namespace
