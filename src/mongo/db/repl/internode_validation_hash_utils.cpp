@@ -32,6 +32,12 @@ int64_t computeUpdateValidationHash(const BSONObj& preImage, const BSONObj& post
 }
 
 namespace {
+/**
+ * The feature flags are checked in addition to the persistence provider, not as a temporary
+ * stand-in for it. They let the validation be exercised on a replica set whose provider does not
+ * ask for it, and they are the intended enablement mechanism for storage models that are FCV-gated
+ * rather than provider-gated.
+ */
 bool isPerDocumentFlagEnabled(const VersionContext& vCtx,
                               const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     return gFeatureFlagContinuousInternodeValidationPerDocument
@@ -72,7 +78,6 @@ bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) 
         return false;
     }
 
-    // TODO(SERVER-133384): Remove feature flag check.
     return providerUsesContinuousInternodeValidation(opCtx) ||
         isPerDocumentFlagEnabled(VersionContext::getDecoration(opCtx),
                                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
@@ -91,7 +96,6 @@ bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const auto& vCtx = VersionContext::getDecoration(opCtx);
 
-    // TODO(SERVER-133384): Remove feature flag check.
     // The collection hash is folded from the per-document hashes carried on the oplog entries, so
     // it requires per-document validation to be enabled as well.
     return isPerDocumentFlagEnabled(vCtx, fcvSnapshot) &&
