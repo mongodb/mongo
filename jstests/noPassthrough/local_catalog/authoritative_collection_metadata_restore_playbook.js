@@ -108,7 +108,12 @@ describe("Authoritative collection and chunk metadata restore playbook", functio
     }
 
     function getInconsistencies(db) {
-        const inconsistencies = db.checkMetadataConsistency().toArray();
+        // Since this test is introducing inconsistencies deliberately, secondaries must be checked at
+        // the primary's timestamp, otherwise they could be checked at a timestamp where the database
+        // was still inconsistent.
+        const inconsistencies = db
+            .checkMetadataConsistency({_checkSecondariesMode: "checkAtPrimaryTimestamp"})
+            .toArray();
         jsTest.log.info("checkMetadataConsistency result", {inconsistencies});
         return inconsistencies;
     }
@@ -157,7 +162,7 @@ describe("Authoritative collection and chunk metadata restore playbook", functio
     // After every scenario the whole cluster must be back to a consistent state across all three
     // metadata layers.
     afterEach(function () {
-        const inconsistencies = st.s.getDB("admin").checkMetadataConsistency().toArray();
+        const inconsistencies = getInconsistencies(st.s.getDB("admin"));
         assert.eq(
             0,
             inconsistencies.length,
