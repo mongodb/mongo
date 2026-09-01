@@ -22,7 +22,6 @@ const fullNs = dbName + "." + collName;
 
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
-const isTestOnlyCommand = "test-only command";
 const isDeprecated = "deprecated command";
 const requiresParallelShell = "requires parallel shell";
 const requiresMongoS = "command only allowed via mongoS";
@@ -742,6 +741,44 @@ const allCommands = {
         command: {getLog: "global"},
         shouldFail: false,
     },
+    getMetricsFilteringAllowlist: {
+        setUp: function (mongoS, withDirectConnections) {
+            // No built-in role grants manageMetricsFiltering, so grant it explicitly to the user
+            // in this test. Otherwise, the command would fail with Unauthorized regardless of
+            // whether the user is allowed to issue direct shard operations.
+            assert.commandWorked(
+                withDirectConnections.getDB("admin").runCommand({
+                    createRole: "metricsFilteringAdmin",
+                    privileges: [{resource: {cluster: true}, actions: ["manageMetricsFiltering"]}],
+                    roles: [],
+                }),
+            );
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({grantRolesToUser: "user", roles: ["metricsFilteringAdmin"]}),
+            );
+        },
+        command: {getMetricsFilteringAllowlist: 1, category: "serverStatus"},
+        isAdminCommand: true,
+        // With the 'manageMetricsFiltering' privilege, the user is authorized to run this command.
+        // However, the metrics filtering feature flags are not enabled in tests by default, so
+        // the command is expected to fail with IllegalOperation.
+        shouldFail: true,
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+        teardown: function (mongoS, withDirectConnections) {
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({revokeRolesFromUser: "user", roles: ["metricsFilteringAdmin"]}),
+            );
+            assert.commandWorked(
+                withDirectConnections
+                    .getDB("admin")
+                    .runCommand({dropRole: "metricsFilteringAdmin"}),
+            );
+        },
+    },
     getMore: {
         skip: "requires instantiating a cursor",
     },
@@ -920,9 +957,6 @@ const allCommands = {
         teardown: function (mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));
         },
-    },
-    listMetricsFilteringAllowlist: {
-        skip: isTestOnlyCommand,
     },
     listSearchIndexes: {
         // Skipping command as it requires additional Mongot mock setup (and is an enterprise
@@ -1489,9 +1523,8 @@ let runCommand = function (
 
     jsTestLog("Running command: " + tojson(cmdObj));
     if (test.shouldFail) {
-        assertCommandOrWriteFailed(cmdDb.runCommand(cmdObj), ErrorCodes.Unauthorized, () =>
-            tojson(cmdObj),
-        );
+        const expectedCode = test.expectedErrorCode ?? ErrorCodes.Unauthorized;
+        assertCommandOrWriteFailed(cmdDb.runCommand(cmdObj), expectedCode, () => tojson(cmdObj));
     } else {
         assert.commandWorked(cmdDb.runCommand(cmdObj), () => tojson(cmdObj));
     }

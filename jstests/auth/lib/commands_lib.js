@@ -6052,6 +6052,20 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "getMetricsFilteringAllowlist",
+            command: {getMetricsFilteringAllowlist: 1, category: "serverStatus"},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {__system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["manageMetricsFiltering"]}],
+                    // The metrics filtering feature flags are not enabled in tests by default, so this
+                    // command is expected to fail with IllegalOperation.
+                    expectFailWithErrorCodes: [ErrorCodes.IllegalOperation],
+                },
+            ],
+        },
+        {
             testname: "clusterGetMore",
             command: {clusterGetMore: NumberLong(1), collection: "foo"},
             skipSharded: true,

@@ -324,6 +324,7 @@ const allCommands = {
     getESECMKIdentifierListStatus: {skip: isNotAUserDataRead},
     getESERotateActiveKEKStatus: {skip: isNotAUserDataRead},
     getLog: {skip: isNotAUserDataRead},
+    getMetricsFilteringAllowlist: {skip: isNotAUserDataRead},
     getMore: {
         command: {getMore: NumberLong(123), collection: collName},
         expectFailure: true,
@@ -375,7 +376,6 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
-    listMetricsFilteringAllowlist: {skip: isNotAUserDataRead},
     listSearchIndexes: {skip: isNotAUserDataRead},
     lockInfo: {skip: isAnInternalCommand},
     logApplicationMessage: {skip: isNotAUserDataRead},

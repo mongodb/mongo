@@ -4,7 +4,6 @@ export const testOnlyCommands = [
     "_hashBSONElement",
     "replSetTest",
     "godinsert",
-    "listMetricsFilteringAllowlist",
     "sleep",
     "cpuload",
     "sysprofile",

@@ -34,6 +34,6 @@ export const commandsAddedToMongosSinceLastLTS = [
     "abortRewriteCollection",
     "recreateRangeDeletionTasks",
     "upgradeDowngradeViewlessTimeseries",
-    "listMetricsFilteringAllowlist",
+    "getMetricsFilteringAllowlist",
     "updateMetricsFilteringAllowlist",
 ];

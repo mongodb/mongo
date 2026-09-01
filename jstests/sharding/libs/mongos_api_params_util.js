@@ -1027,6 +1027,10 @@ export let MongosAPIParametersUtil = (function () {
         },
         {commandName: "getLog", skip: "executes locally on mongos (not sent to any remote node)"},
         {
+            commandName: "getMetricsFilteringAllowlist",
+            skip: "executes locally on mongos (not sent to any remote node)",
+        },
+        {
             commandName: "getMore",
             run: {
                 inAPIVersion1: true,
@@ -1323,10 +1327,6 @@ export let MongosAPIParametersUtil = (function () {
         },
         {
             commandName: "listDatabases",
-            skip: "executes locally on mongos (not sent to any remote node)",
-        },
-        {
-            commandName: "listMetricsFilteringAllowlist",
             skip: "executes locally on mongos (not sent to any remote node)",
         },
         {

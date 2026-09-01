@@ -466,6 +466,7 @@ let viewsCommandTests = {
     getESECMKIdentifierListStatus: {skip: isUnrelated},
     getESERotateActiveKEKStatus: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
+    getMetricsFilteringAllowlist: {skip: isUnrelated},
     getMore: {
         setup: function (conn) {
             assert.commandWorked(conn.collection.remove({}));
@@ -571,7 +572,6 @@ let viewsCommandTests = {
     listDatabases: {skip: isUnrelated},
     listDatabasesForAllTenants: {skip: isUnrelated},
     listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
-    listMetricsFilteringAllowlist: {skip: isUnrelated},
     listSearchIndexes: {skip: isUnrelated},
     listShards: {skip: isUnrelated},
     lockInfo: {skip: isUnrelated},

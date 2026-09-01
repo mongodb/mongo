@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/list_metrics_filtering_allowlist_command_gen.h"
+#include "mongo/db/commands/get_metrics_filtering_allowlist_command_gen.h"
 #include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -14,15 +15,13 @@
 
 namespace mongo {
 
-class CmdListMetricsFilteringAllowlist final
-    : public TypedCommand<CmdListMetricsFilteringAllowlist> {
+class CmdGetMetricsFilteringAllowlist final : public TypedCommand<CmdGetMetricsFilteringAllowlist> {
 public:
-    using Request = ListMetricsFilteringAllowlist;
-    using Response = ListMetricsFilteringAllowlistReply;
+    using Request = GetMetricsFilteringAllowlist;
+    using Response = GetMetricsFilteringAllowlistReply;
 
     std::string help() const override {
-        return "Internal test command that returns the metrics filtering allowlist for a given "
-               "category";
+        return "Command that returns the metrics filtering allowlist for a given category";
     }
 
     bool adminOnly() const override {
@@ -34,7 +33,7 @@ public:
     }
 
     bool requiresAuthzChecks() const override {
-        return false;
+        return true;
     }
 
     class Invocation final : public InvocationBase {
@@ -49,7 +48,14 @@ public:
             return false;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto* authSession = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    authSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                        ActionType::manageMetricsFiltering));
+        }
 
         Response typedRun(OperationContext* opCtx) {
             auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
@@ -59,6 +65,6 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(CmdListMetricsFilteringAllowlist).testOnly().forShard().forRouter();
+MONGO_REGISTER_COMMAND(CmdGetMetricsFilteringAllowlist).forShard().forRouter();
 
 }  // namespace mongo

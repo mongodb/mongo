@@ -23,7 +23,6 @@ const fullNs = dbName + "." + collName;
 
 // Skip reasons.
 const isAnInternalCommand = "internal command";
-const isTestOnlyCommand = "test-only command";
 const requiresParallelShell = "requires parallel shell";
 const requiresCursor = "requires a pre-existing cursor";
 
@@ -185,6 +184,14 @@ const allCommands = {
         standbyAllowed: true,
     },
     getLog: {command: {getLog: "global"}, isAdminCommand: true, standbyAllowed: true},
+    getMetricsFilteringAllowlist: {
+        command: {getMetricsFilteringAllowlist: 1, category: "serverStatus"},
+        isAdminCommand: true,
+        standbyAllowed: true,
+        // The metrics filtering feature flags are not enabled in tests by default, so this
+        // command is expected to fail with IllegalOperation.
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+    },
     getMore: {skip: requiresCursor},
     getParameter: {
         command: {getParameter: 1, logLevel: 1},
@@ -229,7 +236,6 @@ const allCommands = {
         standbyAllowed: true,
     },
     listIndexes: {command: {listIndexes: collName}},
-    listMetricsFilteringAllowlist: {skip: isTestOnlyCommand},
     listSearchIndexes: {skip: "requires mongot mock setup"},
     listShards: {command: {listShards: 1}, isAdminCommand: true},
     lockInfo: {command: {lockInfo: 1}, isAdminCommand: true},
@@ -525,11 +531,12 @@ function runStandbyAllCommandsTest({configShard}) {
 
         let ok;
         let detail;
+        let res;
         try {
             // maxTimeMS bounds commands that would otherwise wait the full server-selection
             // timeout looking for a primary; in standby clusters primary nodes are replaced
             // with injector nodes, so server selection never finds one.
-            const res = db.runCommand({...test.command, maxTimeMS: 2000});
+            res = db.runCommand({...test.command, maxTimeMS: 2000});
             ok = res.ok === 1;
             detail = ok ? "" : `[${res.code}] ${res.errmsg}`;
         } catch (e) {
@@ -537,11 +544,18 @@ function runStandbyAllCommandsTest({configShard}) {
             detail = `[exception] ${e.message}`;
         }
 
-        const expected = test.standbyAllowed === true;
-        if (ok && !expected) {
-            unexpectedlySucceeded.push(cmdName);
-        } else if (!ok && expected) {
+        const expectedSuccess = test.standbyAllowed && !test.expectedErrorCode;
+        if (ok && !expectedSuccess) {
+            unexpectedlySucceeded.push(`${cmdName}: ${detail}`);
+        } else if (!ok && expectedSuccess) {
             unexpectedlyFailed.push(`${cmdName}: ${detail}`);
+        } else if (!ok && test.expectedErrorCode !== undefined) {
+            // Check if it failed with the expected error code.
+            if (res && res.code !== test.expectedErrorCode) {
+                unexpectedlyFailed.push(
+                    `${cmdName}: expected error code ${test.expectedErrorCode} but got ${res.code} - ${detail}`,
+                );
+            }
         }
     }
 
