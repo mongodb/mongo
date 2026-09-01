@@ -191,10 +191,6 @@ selector:
     # compatible with them (they can't be sharded), but does not exclude the `requires_capped` tag.
     - jstests/core/catalog/list_catalog_stage_consistency.js
 
-    # This test assumes query settings representative queries are stored in the cluster parameter,
-    # which is not the case if featureFlagPQSBackfill is on.
-    - jstests/core/query/query_settings/query_settings_size_limits.js
-
     # These tests run resharding, which can fail due to FCV change.
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
 

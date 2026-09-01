@@ -67,7 +67,6 @@ selector:
     - jstests/core/administrative/profile/profile1.js
     - jstests/aggregation/sources/lookup/profile_lookup.js
     - jstests/core/shell/bench_test1.js
-    - jstests/core/query/query_settings/query_settings_size_limits.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js

@@ -82,10 +82,6 @@ selector:
     # Resharding is not permitted during fcv upgrade and downgrade.
     - jstests/core_sharding/resharding/*.js
 
-    # This test assumes query settings representative queries are stored in the cluster parameter,
-    # which is not the case if featureFlagPQSBackfill is on.
-    - jstests/core/query/query_settings/query_settings_size_limits.js
-
     # This test sends a maximum-size batch update. During FCV upgrade/downgrade,
     # auth-shard metadata work clears and recovers unsharded collection filtering metadata, which
     # can cause the batch to return NoProgressMade.
