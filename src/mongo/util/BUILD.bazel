@@ -1243,6 +1243,17 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "moving_average_metric_test",
+    srcs = [
+        "moving_average_metric_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "token_bucket_test",
     srcs = [
         "//src/third_party/folly:test/token_bucket_test.cpp",

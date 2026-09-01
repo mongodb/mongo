@@ -30,6 +30,7 @@
 #pragma once
 
 // This is a shim header to ease transition to new name. Prefer the new name in new code.
+// The new name is "Atomic." The old name is "AtomicWord."
 #include "mongo/platform/atomic.h"
 
 namespace mongo {

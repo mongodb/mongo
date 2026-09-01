@@ -1,8 +1,11 @@
 /**
  * Tests for the ingress handshake metrics.
  *
+ * These tests are tagged "multiversion_incompatible" because they assert the
+ * presence of some metrics that are not necessarily present on older servers.
+ *
  * @tags: [
- *   requires_fcv_70,
+ *   multiversion_incompatible,
  * ]
  */
 import {getFailPointName} from "jstests/libs/fail_point_util.js";
@@ -17,9 +20,6 @@ let runTest = (connectionHealthLoggingOn) => {
         connectionHealthLoggingOn: connectionHealthLoggingOn,
         preAuthDelayMillis: 50,
         postAuthDelayMillis: 100,
-        helloProcessingDelayMillis: 50,
-        helloResponseDelayMillis: 100,
-        helloFailPointName: getFailPointName("routerWaitInHello", conn.getMaxWireVersion()),
     });
 
     jsTestLog("Connecting to mongos and running the test.");
