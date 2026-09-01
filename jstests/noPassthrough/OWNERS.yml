@@ -39,3 +39,6 @@ filters:
   - "common.bzl":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "resharding_donor_pin_tassert_no_crash.js":
+    approvers:
+      - 10gen/server-cluster-scalability

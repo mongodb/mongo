@@ -19,6 +19,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -57,9 +58,10 @@ BSONObj makeCoordinatorDocBson(const CommonReshardingMetadata& metadata,
     return doc.toBSON();
 }
 
-BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata) {
+BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata,
+                         DonorStateEnum state = DonorStateEnum::kPreparingToDonate) {
     DonorShardContext donorCtx;
-    donorCtx.setState(DonorStateEnum::kPreparingToDonate);
+    donorCtx.setState(state);
     ReshardingDonorDocument doc(std::move(donorCtx), {ShardId{"recipient1"}});
     doc.setCommonReshardingMetadata(metadata);
     return doc.toBSON();
@@ -244,6 +246,46 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteRecipientDocUnregistersRecipientR
              makeRecipientDocBson(metadata));
 
     ASSERT_FALSE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, DeleteDonorDocLeavesRegistryUnchangedWhenPinTassertFires) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    // No MODE_X lock is held here, so onDelete's call into _doPin()/_calculatePin() hits the
+    // lock-mode tassert before ever reaching the registry mutation.
+    ASSERT_THROWS_CODE(doDelete(opCtx.get(),
+                                NamespaceString::kDonorReshardingOperationsNamespace,
+                                makeDonorDocBson(metadata)),
+                       DBException,
+                       13413201);
+    // tassert leaves a tripwire flag set; clear it so the process-exit check doesn't abort the
+    // test binary for an assertion this test triggered intentionally.
+    assertionCount.tripwire.subtractAndFetch(1);
+
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, UpdateDonorDocLeavesRegistryUnchangedWhenPinTassertFires) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    // kDone would otherwise cause onUpdate to unregister the donor role, but no MODE_X lock is
+    // held here, so the call into _doPin()/_calculatePin() hits the lock-mode tassert first.
+    ASSERT_THROWS_CODE(doUpdate(opCtx.get(),
+                                NamespaceString::kDonorReshardingOperationsNamespace,
+                                makeDonorDocBson(metadata, DonorStateEnum::kDone)),
+                       DBException,
+                       13413201);
+    assertionCount.tripwire.subtractAndFetch(1);
+
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteOneRoleLeavesOtherRoles) {

@@ -109,9 +109,12 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     // collection is held in exclusive mode to prevent this. However an exception to this is oplog
     // application, which already serializes these writes.
 
-    invariant(!opCtx->isEnforcingConstraints() ||
-              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-                  NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
+    tassert(13413201,
+            "ReshardingOpObserver observed a write to the donor namespace without holding the "
+            "expected MODE_X lock",
+            !opCtx->isEnforcingConstraints() ||
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
     // the snapshot when exitting the function.
@@ -323,14 +326,18 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
+    // Run pinning before unregistering from the LocalReshardingOperationsRegistry: the registry
+    // mutation is in-memory and immediate, whereas the pin's tassert can still abort this write
+    // before it commits. Doing the registry mutation second would leave it out of sync with the
+    // (rolled-back) on-disk state if the pin logic threw.
+    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+        _doPin(opCtx);
+    }
     if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
         auto commonMetadata = CommonReshardingMetadata::parse(
             doc, IDLParserContext("ReshardingOpObserver::onDelete"));
         LocalReshardingOperationsRegistry::get().unregisterOperation(_nssToRoleMap.at(nss),
                                                                      commonMetadata);
-    }
-    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
-        _doPin(opCtx);
     }
 }
 
