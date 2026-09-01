@@ -418,7 +418,16 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             sharding_ddl_util::checkAllowMigrationsOnConfigServer(
                                 opCtx, _collInfo->nsForTargeting);
                         if (_result.is_initialized() && allowMigrations) {
-                            // The command finished and we have the response. Return it.
+                            // The command finished and we have the response. Unblock migrations
+                            // again to ensure that we did so on all shards, then return the
+                            // response.
+                            const auto collUUID = _doc.getCollUUID();
+                            sharding_ddl_util::resumeMigrations(
+                                opCtx,
+                                _collInfo->nsForTargeting,
+                                collUUID,
+                                [&] { return getNewSession(opCtx); },
+                                _doc.getAuthoritativeMetadataAccessLevel());
                             return;
                         } else if (allowMigrations) {
                             // Previous run on a different node completed, but we lost the
