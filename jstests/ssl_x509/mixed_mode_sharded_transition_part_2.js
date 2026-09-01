@@ -14,6 +14,9 @@ import {mixedShardTest, preferTLS, requireTLS} from "jstests/ssl/libs/ssl_helper
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
+// Irrelevant to this test, and its extra mongos connection can stall.
+TestData.skipCheckMetadataConsistency = true;
+
 const transitionToX509preferTLS = Object.merge(preferTLS, {
     transitionToAuth: "",
     clusterAuthMode: "x509",
