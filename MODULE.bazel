@@ -229,6 +229,12 @@ single_version_override(
         # back to copying, like CPython's venv module does. Upstream-worthy;
         # see the patch header.
         "//bazel/rules_python:bootstrap_windows_venv_robustness.patch",
+        # Windows: direct PyInfo import roots can contain wheel resources
+        # beyond MAX_PATH even when LongPathsEnabled is unset. Force those
+        # roots through the extended-length path form so importlib.resources
+        # can access nested package data. Upstream-worthy; see the patch
+        # header.
+        "//bazel/rules_python:site_init_windows_long_paths.patch",
     ],
     version = "2.2.0",
 )
