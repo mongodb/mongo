@@ -1042,6 +1042,7 @@ replication.hello:
   files:
     - src/mongo/db/repl/hello/
     - src/mongo/db/repl/replication_info.cpp
+    - src/mongo/db/repl/replication_info_test.cpp
 
 replication.initial_sync:
   meta:

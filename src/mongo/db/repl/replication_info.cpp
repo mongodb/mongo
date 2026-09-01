@@ -235,7 +235,8 @@ public:
             auto reason = UserWritesBlockReasonEnum::kUnspecified;
             auto replicaSetState = ReplicaSetLevelWriteBlockState::kUnknown;
             boost::optional<int> replicaSetReason;
-            bool replicaSetAllowDeletions = true;
+            bool replicaSetAllowDeletions =
+                !ReplicaSetWriteBlockState::get(opCtx)->isReplicaSetDeletionsBlockingEnabled();
             // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
             Lock::GlobalLock lk(

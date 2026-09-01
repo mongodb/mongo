@@ -1918,6 +1918,22 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "replication_info_test",
+    srcs = [
+        "replication_info_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":replication_info",
+        ":replication_process",
+        ":replmocks",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "db_repl_misc_test",
     srcs = [
         "abstract_async_component_test.cpp",
