@@ -378,7 +378,15 @@ bool BatchSpanProcessor::InternalShutdown(std::chrono::microseconds timeout) noe
 
   if (worker_thread_.joinable())
   {
-    synchronization_data_->is_force_wakeup_background_worker.store(true, std::memory_order_release);
+    {
+      // Even though is_force_wakeup_background_worker is atomic, acquiring cv_m is necessary as
+      // otherwise both the change to is_force_wakeup_background_worker and the notify_all might
+      // occur after the worker has checked is_force_wakeup_background_worker but before it has
+      // blocked again on synchronization_data_->cv.
+      std::lock_guard<std::mutex> cv_guard{synchronization_data_->cv_m};
+      synchronization_data_->is_force_wakeup_background_worker.store(true,
+                                                                     std::memory_order_release);
+    }
     synchronization_data_->cv.notify_all();
     worker_thread_.join();
   }

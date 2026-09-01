@@ -11,6 +11,9 @@
 #include <cstdint>
 #include <utility>
 
+#include <opentelemetry/sdk/trace/tracer_provider.h>
+#include <opentelemetry/trace/noop.h>
+
 namespace mongo::otel::traces {
 namespace {
 
@@ -72,8 +75,14 @@ uint64_t TracerProviderService::_nextId() {
 
 void TracerProviderService::shutdown() {
     if (auto snapshot = _tracerProvider.makeSnapshot()) {
-        auto tracer = (*snapshot)->GetTracer("mongodb");
-        tracer->Close(std::chrono::seconds{1});
+        if (auto* sdkProvider =
+                dynamic_cast<opentelemetry::sdk::trace::TracerProvider*>(snapshot->get())) {
+            sdkProvider->Shutdown(std::chrono::seconds(1));
+        } else {
+            // The factory always builds an SDK TracerProvider; the API base type exposes no
+            // Shutdown(). If we don't shut it down, server shutdown will be unsafe.
+            invariant(dynamic_cast<opentelemetry::trace::NoopTracerProvider*>(snapshot->get()));
+        }
         _tracerProvider.update(nullptr);
     }
 }
