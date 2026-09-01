@@ -254,6 +254,8 @@ teams:
   - name: "Catalog and Routing"
     slack_tags:
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+      - "<@U01QVSEJZBM>" # antonio.fuschetto@mongodb.com - Manager
+      - "<@U5VNCT8UA>" # josef.ahmad@mongodb.com - Manager
   - name: "Cluster Scalability"
     slack_tags:
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
