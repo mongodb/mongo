@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -538,5 +539,117 @@ TEST(GeoParser, strictPolygonInGeometryCollectionReportsCRS) {
     GeometryContainer storedGeom;
     ASSERT_OK(storedGeom.parseFromStorage(BSON("geo" << storedDoc)["geo"]));
     ASSERT_EQ(storedGeom.getNativeCRS(), STRICT_SPHERE);
+}
+
+class GeoParserStrictWindingDeathTest : public unittest::Test {
+protected:
+    void setUp() override {
+        std::string strictCRS =
+            "crs:{ type: 'name', properties:{name:'" + std::string{CRS_STRICT_WINDING} + "'}}";
+        BSONObj strictGCDoc = fromjson(
+            "{'type':'GeometryCollection','geometries':["
+            "{'type':'Polygon','coordinates':[[[0,0],[5,0],[5,5],[0,5],[0,0]]]," +
+            strictCRS +
+            "}"
+            "]}");
+        ASSERT_OK(strictGC.parseFromStorage(BSON("geo" << strictGCDoc)["geo"]));
+
+        BSONObj mixedGCDoc = fromjson(
+            "{'type':'GeometryCollection','geometries':["
+            "{'type':'Polygon','coordinates':[[[0,0],[5,0],[5,5],[0,5],[0,0]]]},"
+            "{'type':'Point','coordinates':[1,1]},"
+            "{'type':'Polygon','coordinates':[[[0,0],[5,0],[5,5],[0,5],[0,0]]]," +
+            strictCRS +
+            "}"
+            "]}");
+        ASSERT_OK(mixedGC.parseFromStorage(BSON("geo" << mixedGCDoc)["geo"]));
+
+        ASSERT_OK(point.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'Point','coordinates':[1,1]}"))["geo"]));
+        ASSERT_OK(line.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'LineString','coordinates':[[1,1],[2,2]]}"))["geo"]));
+        ASSERT_OK(polygon.parseFromStorage(
+            BSON("geo" << fromjson("{'type':'Polygon','coordinates':[[[0,0],[2,0],[2,2],[0,2],"
+                                   "[0,0]]]}"))["geo"]));
+    }
+
+    GeometryContainer strictGC;
+    GeometryContainer mixedGC;
+    GeometryContainer point;
+    GeometryContainer line;
+    GeometryContainer polygon;
+};
+
+class GeoParserStrictWindingTest : public GeoParserStrictWindingDeathTest {};
+
+// A GeometryCollection containing a strict-winding polygon parses successfully; getNativeCRS()
+// resolves to STRICT_SPHERE, and hasS2Region() correctly reports false, so a correctly-behaving
+// caller that gates on either never reaches the tasserts exercised below.
+TEST_F(GeoParserStrictWindingTest, ReportsStrictSphereWithNoS2Region) {
+    ASSERT_EQ(strictGC.getNativeCRS(), STRICT_SPHERE);
+    ASSERT_FALSE(strictGC.hasS2Region());
+}
+
+// getS2Region() is separately guarded: reaching it despite hasS2Region() being false fails loudly
+// rather than dereferencing a null _s2Region.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, GetS2RegionTasserts, "12748600") {
+    strictGC.getS2Region();
+}
+
+// Reaching a GeometryCollection member loop fails loudly rather than crashing, regardless of which
+// contains()/intersects() overload is dispatched to. Every such branch validates the whole
+// collection up front via assertNoStrictWindingPolygon().
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsPointTasserts, "12748601") {
+    strictGC.contains(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsLineTasserts, "12748601") {
+    strictGC.contains(line);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsPolygonTasserts, "12748601") {
+    strictGC.contains(polygon);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsPointTasserts, "12748601") {
+    strictGC.intersects(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsLineTasserts, "12748601") {
+    strictGC.intersects(line);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsPolygonTasserts, "12748601") {
+    strictGC.intersects(polygon);
+}
+
+// intersects(const GeometryContainer&) also asserts while iterating a GeometryCollection passed in
+// as the *other* argument, independent of what 'this' is.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest,
+             IntersectsOtherGeometryCollectionTasserts,
+             "12748601") {
+    point.intersects(strictGC);
+}
+
+// contains(const GeometryContainer&) likewise asserts while iterating a GeometryCollection passed
+// in as the *other* argument.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsOtherGeometryCollectionTasserts, "12748601") {
+    polygon.contains(strictGC);
+}
+
+// A mixed collection asserts even though a member that precedes the strict-winding polygon would
+// otherwise have produced a result: the covering polygon member for contains(), and the point
+// member for intersects(), both of which are examined before the polygon loop reaches the strict
+// member.
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsMixedCollectionTasserts, "12748601") {
+    mixedGC.contains(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, IntersectsMixedCollectionTasserts, "12748601") {
+    mixedGC.intersects(point);
+}
+
+DEATH_TEST_F(GeoParserStrictWindingDeathTest, ContainsOtherMixedCollectionTasserts, "12748601") {
+    polygon.contains(mixedGC);
 }
 }  // namespace
