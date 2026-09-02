@@ -14,6 +14,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -72,7 +73,8 @@ public:
         LiteParsedPipeline* lpp,
         const NamespaceString& mainNss,
         const ResolvedNamespaceMap& resolvedNamespaces,
-        bool bindOnly = false);
+        bool bindOnly = false,
+        size_t bindOnlyStart = 0);
 
     /**
      * Inserts a ResolvedView into a ResolvedNamespaceMap.

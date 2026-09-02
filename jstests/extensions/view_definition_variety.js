@@ -22,7 +22,6 @@ import {
     getViewDefs,
 } from "jstests/extensions/libs/view_definition_matrix.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
 const localCollName = jsTestName() + "_local";
@@ -152,25 +151,6 @@ describe("view definition variety across join operators", function () {
                     const context =
                         `view def "${def.label}" via ${operator.label} with ` +
                         `${userPipe.label} user pipeline`;
-
-                    // Definitions marked 'lookupFailsWithCode' are unusable under $lookup on a
-                    // standalone or replica set: the prepended foreign source displaces the view's
-                    // source stage. On a sharded cluster the view resolves correctly for both
-                    // $lookup syntaxes.
-                    if (def.lookupFailsWithCode && operator.isLookup) {
-                        if (!FixtureHelpers.isMongos(db)) {
-                            const err = assert.throws(
-                                () => operator.run(localColl, viewName, userPipe.pipeline),
-                                [],
-                                `${context}: expected failure ${def.lookupFailsWithCode}`,
-                            );
-                            jsTest.log.info(`${context}: lookupGap error`, {
-                                code: err.code,
-                                message: String(err.message),
-                            });
-                            return;
-                        }
-                    }
 
                     const docs = operator.run(localColl, viewName, userPipe.pipeline);
 

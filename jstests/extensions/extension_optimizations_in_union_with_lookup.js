@@ -167,15 +167,7 @@ describe("extension optimizations in $unionWith/$lookup subpipelines", function 
 
     afterEach(dropViews);
 
-    // Each placement says where the extension is delivered and how the kFirst $readNDocuments
-    // family behaves there:
-    //   ok        - runs normally (the operator's `from` is a plain collection).
-    //   lookupGap - $produceIds is logically first, but $lookup-on-a-view prepends a foreign source
-    //               to feed its per-document subpipeline, displacing it and failing with 40602
-    //               regardless of user subpipeline size; $unionWith and $graphLookup run the view as
-    //               its own pipeline and are unaffected.
-    //   reject    - a non-extension view's pipeline precedes the kFirst source, so it is correctly
-    //               rejected with 40602 on both operators.
+    // Each placement describes where the extension is delivered and how the source stage behaves.
     // extInView: the view supplies the extension (so only the interacting stages form the
     // subpipeline). topDef: the outer view's definition, present when the query runs on a view.
     const PLACEMENTS = [
@@ -191,7 +183,7 @@ describe("extension optimizations in $unionWith/$lookup subpipelines", function 
         },
         {
             desc: "across sub-view boundary",
-            kFirst: "lookupGap",
+            kFirst: "ok",
             extInView: true,
             setup: (rule) => ({
                 outer: rule.coll.getName(),
@@ -214,7 +206,7 @@ describe("extension optimizations in $unionWith/$lookup subpipelines", function 
         },
         {
             desc: "with views at top level and sub-view",
-            kFirst: "lookupGap",
+            kFirst: "ok",
             extInView: true,
             setup: (rule) => {
                 const topDef = [{$addFields: {__t: 1}}];
@@ -255,10 +247,6 @@ describe("extension optimizations in $unionWith/$lookup subpipelines", function 
             for (const placement of PLACEMENTS) {
                 for (const rule of RULES) {
                     const kFirst = rule.coll === produceColl;
-                    // The kFirst source inside a $lookup-on-a-view is a known gap (see above); skip.
-                    if (kFirst && placement.kFirst === "lookupGap" && op.name === "$lookup") {
-                        continue;
-                    }
                     it(`${rule.name} ${placement.desc}`, function () {
                         const {outer, target, topDef} = placement.setup(rule);
                         const sub = placement.extInView ? rule.sub : [rule.ext, ...rule.sub];

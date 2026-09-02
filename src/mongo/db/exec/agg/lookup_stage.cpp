@@ -87,19 +87,22 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
 }
 
 // Returns a callback (for MakePipelineOptions::resolveInvolvedNamespacesFn) that binds foreign-view
-// info onto the (extension) stages of a $lookup subpipeline that targets a view.
-// Skipped when resolvedPipelineViewBinding is kAlreadyBound.
+// info onto the (extension) stages of a $lookup subpipeline that targets a view. The already-
+// materialized view prefix is skipped; user stages and nested pipelines are bound.
 std::function<void(LiteParsedPipeline&)> makeLookupViewBinder(
-    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx) {
-    return [fromExpCtx](LiteParsedPipeline& liteParsedPipeline) {
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, size_t viewPrefixLength) {
+    return [fromExpCtx, viewPrefixLength](LiteParsedPipeline& liteParsedPipeline) {
         const auto& resolvedNamespaces = fromExpCtx->getResolvedNamespaces();
         const auto& userNss = fromExpCtx->getUserNss();
         auto it = resolvedNamespaces.find(userNss);
         if (it == resolvedNamespaces.end() || !it->second.isInvolvedNamespaceAView()) {
             return;
         }
-        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-            &liteParsedPipeline, userNss, resolvedNamespaces, /*bindOnly*/ true);
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(&liteParsedPipeline,
+                                                                        userNss,
+                                                                        resolvedNamespaces,
+                                                                        /*bindOnly*/ true,
+                                                                        viewPrefixLength);
     };
 }
 }  // namespace
@@ -480,7 +483,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     pipelineOpts.validator = mongo::lookupPipeValidator;
     if (_sharedState->resolvedPipelineViewBinding ==
         LookupResolvedPipelineViewBinding::kNeedsBinding) {
-        pipelineOpts.resolveInvolvedNamespacesFn = makeLookupViewBinder(fromExpCtx);
+        pipelineOpts.resolveInvolvedNamespacesFn =
+            makeLookupViewBinder(fromExpCtx, _sharedState->viewBindingStart);
     }
 
     std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::pipeline_factory::makePipeline(

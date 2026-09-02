@@ -79,14 +79,7 @@ export function getViewDefs(sideCollName) {
         },
         {
             label: "source extension",
-            // $readNDocuments desugars to [$produceIds, $_internalSearchIdLookup], emitting _ids
-            // [0, numDocs) and fetching those that exist. numDocs:3 therefore yields "a" and "b".
-            //
-            // Known 'lookupGap': $lookup-on-a-view prepends a foreign source that displaces
-            // $produceIds from position 0, failing with 40602 for both $lookup syntaxes on a
-            // standalone or replica set. On a sharded cluster both syntaxes resolve the view
-            // correctly. $unionWith and $graphLookup always succeed.
-            lookupFailsWithCode: 40602,
+            // $readNDocuments desugars to [$produceIds, $_internalSearchIdLookup].
             pipeline: [{$readNDocuments: {numDocs: 3}}],
             expectedNames: ["a", "b"],
         },

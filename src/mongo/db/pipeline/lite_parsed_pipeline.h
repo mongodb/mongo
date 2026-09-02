@@ -550,7 +550,9 @@ public:
      * Calls bindResolvedNamespace() on each stage in the pipeline.
      */
     void bindResolvedNamespaceToStages(const ResolvedNamespace& view,
-                                       const ResolvedNamespaceMap& resolvedNamespaces);
+                                       const ResolvedNamespaceMap& resolvedNamespaces,
+                                       size_t start,
+                                       size_t end);
 
     /**
      * Returns the FirstStageViewApplicationPolicy of the first stage the *user* wrote, skipping

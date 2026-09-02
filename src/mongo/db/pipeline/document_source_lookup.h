@@ -52,8 +52,8 @@ using namespace std::literals::string_view_literals;
 // makeLookupViewBinder to bind view info onto extension stages at parse time. When
 // resolvedPipeline is serialized from an already-parsed pipeline (e.g. hybrid search
 // introspection), view binding is already applied.
-// Re-binding overwrites already-resolved stages with the user-facing view name.
-// kAlreadyBound skips makeLookupViewBinder to prevent this scenario.
+// Re-binding overwrites already-resolved stages with the user-facing view name. The binding start
+// offset skips only the already-resolved view prefix.
 enum class LookupResolvedPipelineViewBinding {
     kNeedsBinding,
     kAlreadyBound,
@@ -72,6 +72,10 @@ struct LookUpSharedState {
 
     LookupResolvedPipelineViewBinding resolvedPipelineViewBinding =
         LookupResolvedPipelineViewBinding::kNeedsBinding;
+
+    // Number of already-materialized foreign view stages at the front of resolvedPipeline. These
+    // stages must not be rebound, but user stages after them still need view binding.
+    size_t viewBindingStart = 0;
 
     // A pipeline parsed from _sharedState->resolvedPipeline at creation time, intended to support
     // introspective functions. If sub-$lookup stages are present, their pipelines are constructed

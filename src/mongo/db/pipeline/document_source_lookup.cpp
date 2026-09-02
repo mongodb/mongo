@@ -114,6 +114,9 @@ using namespace search_helper_bson_obj::mongot_lookup_prefix;
 
 namespace {
 
+size_t foreignViewSourceGeneratorPrefixLength(
+    const NamespaceString& fromNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 /**
  * Constructs a query of the following shape:
  *  {$or: [
@@ -342,6 +345,25 @@ bool shouldDiscardViewPrefix(bool fromNsIsAView,
     return isMongotLookupSubpipeline(expCtx->getIfrContext(), pipeline) ||
         subpipelineViewPolicy == FirstStageViewApplicationPolicy::kDoNothing;
 }
+
+// Returns the number of stages in the foreign view definition when it begins with a source
+// generating stage. These stages are already materialized in the resolved lookup pipeline.
+size_t foreignViewSourceGeneratorPrefixLength(
+    const NamespaceString& fromNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
+    auto it = resolvedNamespaces.find(fromNs);
+    if (it == resolvedNamespaces.end() || !it->second.isInvolvedNamespaceAView()) {
+        return 0;
+    }
+    ResolvedNamespace view = it->second;
+    view.liteParseViewPipeline();
+    view.desugarViewPipeline();
+    const auto* parsed = view.getParsedPipeline();
+    if (!parsed || parsed->getStages().empty() || !parsed->getStages().front()->isInitialSource()) {
+        return 0;
+    }
+    return parsed->getStages().size();
+}
 }  // namespace
 
 // Process and copy the given `pipeline` to the `_sharedState->resolvedPipeline` attribute and
@@ -354,6 +376,9 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     FirstStageViewApplicationPolicy subpipelineViewPolicy) {
     if (shouldDiscardViewPrefix(_fromNsIsAView, pipeline, subpipelineViewPolicy, expCtx)) {
+        // The materialized view prefix is discarded in this path, so execution-time binding starts
+        // at the beginning of the user pipeline.
+        _sharedState->viewBindingStart = 0;
         if (search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline)) {
             // The user pipeline is a legacy mongot pipeline so we assume the view is a
             // mongot-indexed view. Stash the view on the subpipeline's ExpressionContext so the
@@ -373,6 +398,10 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
             std::tie(_localField, _foreignField) = *localForeignFields;
         }
         return;
+    }
+
+    if (_fromNsIsAView) {
+        _sharedState->viewBindingStart = foreignViewSourceGeneratorPrefixLength(fromNs, expCtx);
     }
 
     if (localForeignFields != boost::none) {
@@ -822,6 +851,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
     _additionalFilter = original._additionalFilter;
     _sharedState->resolvedPipeline = original._sharedState->resolvedPipeline;
     _sharedState->resolvedPipelineViewBinding = original._sharedState->resolvedPipelineViewBinding;
+    _sharedState->viewBindingStart = original._sharedState->viewBindingStart;
     _sharedState->resolvedIntrospectionPipeline =
         original._sharedState->resolvedIntrospectionPipeline->clone(_fromExpCtx);
 

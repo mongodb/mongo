@@ -148,7 +148,8 @@ public:
                                  "source sub-pipeline, found "
                               << _pipelines.size(),
                 _pipelines.size() == 1);
-        _pipelines.front()->bindResolvedNamespaceToStages(view, resolvedNamespaces);
+        _pipelines.front()->bindResolvedNamespaceToStages(
+            view, resolvedNamespaces, 0, _pipelines.front()->getStages().size());
     }
 
 private:

@@ -297,7 +297,7 @@ const LiteParsedDocumentSource* LiteParsedPipeline::_getFirstUserStage() const {
 
 void LiteParsedPipeline::handleView(const ResolvedNamespace& view,
                                     const ResolvedNamespaceMap& resolvedNamespaces) {
-    bindResolvedNamespaceToStages(view, resolvedNamespaces);
+    bindResolvedNamespaceToStages(view, resolvedNamespaces, 0, _stageSpecs.size());
 
     if (view.getNamespace().isEmpty()) {
         // No top-level view to prepend; bindResolvedNamespace has already done all the work that's
@@ -327,9 +327,12 @@ void LiteParsedPipeline::handleView(const ResolvedNamespace& view,
 }
 
 void LiteParsedPipeline::bindResolvedNamespaceToStages(
-    const ResolvedNamespace& view, const ResolvedNamespaceMap& resolvedNamespaces) {
-    for (auto& stage : _stageSpecs) {
-        stage->bindResolvedNamespace(view, resolvedNamespaces);
+    const ResolvedNamespace& view,
+    const ResolvedNamespaceMap& resolvedNamespaces,
+    size_t start,
+    size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        _stageSpecs[i]->bindResolvedNamespace(view, resolvedNamespaces);
     }
 }
 

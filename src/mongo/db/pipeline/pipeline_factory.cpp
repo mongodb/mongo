@@ -62,7 +62,9 @@ std::unique_ptr<Pipeline> parseAndDesugarPipeline(
         // pipelines will use resolveInvolvedNamespacesFn and this legacy branch can be deleted.
         // Handle legacy mongot pipelines separately.
         liteParsedPipeline.bindResolvedNamespaceToStages(*expCtx->getView(),
-                                                         expCtx->getResolvedNamespaces());
+                                                         expCtx->getResolvedNamespaces(),
+                                                         0,
+                                                         liteParsedPipeline.getStages().size());
     } else if (opts.resolveInvolvedNamespacesFn) {
         opts.resolveInvolvedNamespacesFn(liteParsedPipeline);
     }

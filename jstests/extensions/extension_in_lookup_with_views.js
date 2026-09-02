@@ -216,6 +216,256 @@ describe("extension stages in $lookup with views", function () {
         }
     });
 
+    it("preserves view stages after a source-generating prefix before binding the suffix", function () {
+        const viewName = jsTestName() + "_source_view_suffix";
+        const sourceCollName = jsTestName() + "_source_view_suffix_coll";
+        const sourceColl = db[sourceCollName];
+        sourceColl.drop();
+        assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}, {_id: 2}]));
+        assert.commandWorked(
+            db.createView(viewName, sourceCollName, [
+                {$readNDocuments: {numDocs: 3}},
+                {$addFields: {fromView: true}},
+            ]),
+        );
+        try {
+            const results = localColl
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: viewName,
+                            pipeline: [{$testBar: {noop: true}}, {$addViewName: {}}],
+                            as: "named",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 2, {results});
+            assert.eq(results[0].named.length, 3, "view source should return all three documents", {
+                results,
+            });
+            for (const doc of results[0].named) {
+                assert.eq(doc.fromView, true, "view suffix should be applied", {doc});
+                assert.eq(doc.viewName, viewName, "lookup suffix should receive view binding", {
+                    doc,
+                });
+            }
+        } finally {
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, sourceCollName);
+        }
+    });
+
+    it("runs an equality lookup against a source-generating view", function () {
+        const viewName = jsTestName() + "_source_view_equality";
+        const sourceCollName = jsTestName() + "_source_view_equality_coll";
+        const equalityCollName = jsTestName() + "_source_view_equality_local";
+        const sourceColl = db[sourceCollName];
+        const equalityColl = db[equalityCollName];
+        sourceColl.drop();
+        equalityColl.drop();
+        assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}, {_id: 2}]));
+        assert.commandWorked(equalityColl.insertMany([{_id: 0}, {_id: 1}, {_id: 99}]));
+        assert.commandWorked(
+            db.createView(viewName, sourceCollName, [{$readNDocuments: {numDocs: 3}}]),
+        );
+        try {
+            const results = equalityColl
+                .aggregate([
+                    {$lookup: {from: viewName, localField: "_id", foreignField: "_id", as: "j"}},
+                    {$sort: {_id: 1}},
+                ])
+                .toArray();
+            assert.eq(results.length, 3, {results});
+            assert.eq(
+                results[0].j.map((doc) => doc._id),
+                [0],
+                {results},
+            );
+            assert.eq(
+                results[1].j.map((doc) => doc._id),
+                [1],
+                {results},
+            );
+            assert.eq(results[2].j, [], "nonmatching local document should have no join results", {
+                results,
+            });
+        } finally {
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, sourceCollName);
+            assertDropCollection(db, equalityCollName);
+        }
+    });
+
+    it("binds nested lookup pipelines after a source-generating view prefix", function () {
+        const viewName = jsTestName() + "_source_view_nested";
+        const nestedViewName = jsTestName() + "_source_view_nested_leaf";
+        const sourceCollName = jsTestName() + "_source_view_nested_coll";
+        const sourceColl = db[sourceCollName];
+        sourceColl.drop();
+        assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}, {_id: 2}]));
+        assert.commandWorked(
+            db.createView(viewName, sourceCollName, [{$readNDocuments: {numDocs: 3}}]),
+        );
+        assert.commandWorked(
+            db.createView(nestedViewName, foreignCollName, [{$addFields: {fromLeafView: true}}]),
+        );
+        try {
+            const results = localColl
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: viewName,
+                            pipeline: [
+                                {
+                                    $lookup: {
+                                        from: nestedViewName,
+                                        pipeline: [{$addViewName: {}}],
+                                        as: "leaf",
+                                    },
+                                },
+                                {$addViewName: {}},
+                            ],
+                            as: "joined",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 2, {results});
+            assert.eq(results[0].joined.length, 3, {results});
+            assert.eq(results[0].joined[0].viewName, viewName, {results});
+            assert.eq(results[0].joined[0].leaf.length, 2, {results});
+            for (const doc of results[0].joined[0].leaf) {
+                assert.eq(
+                    doc.viewName,
+                    nestedViewName,
+                    "nested lookup should receive its view binding",
+                    {
+                        doc,
+                    },
+                );
+            }
+        } finally {
+            assertDropCollection(db, nestedViewName);
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, sourceCollName);
+        }
+    });
+
+    describe("nested views inside a source-generating view prefix", function () {
+        let resources = [];
+
+        after(function () {
+            for (const resource of resources) {
+                assertDropCollection(db, resource);
+            }
+        });
+
+        it("resolves a nested lookup inside a source-generating view prefix", function () {
+            const viewName = jsTestName() + "_source_view_prefix_lookup";
+            const leafViewName = jsTestName() + "_source_view_prefix_lookup_leaf";
+            const sourceCollName = jsTestName() + "_source_view_prefix_lookup_coll";
+            const leafCollName = jsTestName() + "_source_view_prefix_lookup_leaf_coll";
+            resources.push(viewName, leafViewName, sourceCollName, leafCollName);
+            const sourceColl = db[sourceCollName];
+            const leafColl = db[leafCollName];
+            sourceColl.drop();
+            leafColl.drop();
+            assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}]));
+            assert.commandWorked(leafColl.insert({_id: 10}));
+            assert.commandWorked(
+                db.createView(leafViewName, leafCollName, [{$addFields: {fromLeafView: true}}]),
+            );
+            assert.commandWorked(
+                db.createView(viewName, sourceCollName, [
+                    {$readNDocuments: {numDocs: 2}},
+                    {$lookup: {from: leafViewName, pipeline: [], as: "leaf"}},
+                ]),
+            );
+            const results = localColl
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: viewName,
+                            pipeline: [],
+                            as: "joined",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 2, {results});
+            assert.eq(results[0].joined.length, 2, {results});
+            for (const doc of results[0].joined) {
+                assert.eq(doc.leaf.length, 1, {doc});
+                assert.eq(doc.leaf[0].fromLeafView, true, {doc});
+            }
+        });
+
+        it("resolves a nested unionWith inside a source-generating view prefix", function () {
+            const viewName = jsTestName() + "_source_view_prefix_union";
+            const leafViewName = jsTestName() + "_source_view_prefix_union_leaf";
+            const sourceCollName = jsTestName() + "_source_view_prefix_union_coll";
+            const leafCollName = jsTestName() + "_source_view_prefix_union_leaf_coll";
+            resources.push(viewName, leafViewName, sourceCollName, leafCollName);
+            const sourceColl = db[sourceCollName];
+            const leafColl = db[leafCollName];
+            sourceColl.drop();
+            leafColl.drop();
+            assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}]));
+            assert.commandWorked(leafColl.insert({_id: 10}));
+            assert.commandWorked(
+                db.createView(leafViewName, leafCollName, [{$addFields: {fromLeafView: true}}]),
+            );
+            assert.commandWorked(
+                db.createView(viewName, sourceCollName, [
+                    {$readNDocuments: {numDocs: 2}},
+                    {$unionWith: {coll: leafViewName, pipeline: [{$addViewName: {}}]}},
+                ]),
+            );
+            const results = localColl
+                .aggregate([{$lookup: {from: viewName, pipeline: [], as: "joined"}}])
+                .toArray();
+            assert.eq(results.length, 2, {results});
+            assert.eq(results[0].joined.length, 3, {results});
+            const leafDocs = results[0].joined.filter((doc) => doc.viewName === leafViewName);
+            assert.eq(leafDocs.length, 1, {results});
+            assert.eq(leafDocs[0]._id, 10, {results});
+        });
+    });
+
+    it("discards a source-generating view prefix for a kDoNothing lookup suffix", function () {
+        const viewName = jsTestName() + "_source_view_donothing";
+        const sourceCollName = jsTestName() + "_source_view_donothing_coll";
+        const sourceColl = db[sourceCollName];
+        sourceColl.drop();
+        assert.commandWorked(sourceColl.insertMany([{_id: 0}, {_id: 1}, {_id: 2}]));
+        assert.commandWorked(
+            db.createView(viewName, sourceCollName, [{$readNDocuments: {numDocs: 1}}]),
+        );
+        try {
+            const results = localColl
+                .aggregate([
+                    {$lookup: {from: viewName, pipeline: [{$addViewName: {}}], as: "named"}},
+                ])
+                .toArray();
+            assert.eq(results.length, 2, {results});
+            assert.eq(
+                results[0].named.length,
+                3,
+                "kDoNothing suffix applies to the backing collection",
+                {
+                    results,
+                },
+            );
+            for (const doc of results[0].named) {
+                assert.eq(doc.viewName, viewName, {doc});
+            }
+        } finally {
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, sourceCollName);
+        }
+    });
+
     it("$matchTopN desugar extension in view definition is allowed when $lookup targets the view", function () {
         const viewName = jsTestName() + "_matchTopN_view";
         assert.commandWorked(
