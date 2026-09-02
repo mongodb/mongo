@@ -1197,18 +1197,8 @@ private:
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-
-            // If we are declaring a base field and there is no existing definition because of the
-            // stage whose paths we are processing, this means we are in a case like:
-            // {$project: {a.b: 1}}.
-            // TODO SERVER-131449: The arrayness of 'a' should actually come from the prior
-            // documents' output in this case.
-            bool resolvedToOwnMissingField = existingBaseFieldType == FieldMatchType::kMissing &&
-                _fields[existingBaseField].declaringScope == scope;
-            if (!resolvedToOwnMissingField) {
-                populateBaseFieldMetadata(
-                    newBaseField, existingBaseField, collectionPathPrefix, basePath.front());
-            }
+            populateBaseFieldMetadata(
+                newBaseField, existingBaseField, collectionPathPrefix, basePath.front());
             if (prefixPolicy == ModifiedPrefixPolicy::kEnsureObjects) {
                 // The modification modifies 'a' to a plain object, so 'a' is no longer an array.
                 _fields[newBaseField].metadata.canFieldBeArray = false;

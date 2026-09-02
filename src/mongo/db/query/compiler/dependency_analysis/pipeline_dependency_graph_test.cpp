@@ -1565,63 +1565,6 @@ TEST_F(PipelineDependencyGraphTest, CanInclusionPreservePathDottedPrefixInheritA
     runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
 }
 
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixOfCollectionFieldBeArray) {
-    setPipeline("[{$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixOfIncludedFieldBeArray) {
-    setPipeline("[{$project: {a: 1}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixOfArrayLiteralBeArray) {
-    setPipeline("[{$project: {a: []}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixOfPreservedPathBeArray) {
-    setPipeline("[{$project: {'a.b': 1}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanRepeatedInclusionProjectionDottedPrefixBeArray) {
-    setPipeline("[{$project: {'a.b': {$literal: 1}}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixOfDeeperPriorPathBeArray) {
-    setPipeline("[{$project: {'a.b.c': {$literal: 1}}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixWithPriorArrayLeafBeArray) {
-    setPipeline("[{$project: {'a.b': []}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest,
-       CanInclusionProjectionDottedPrefixWithDeeperPriorArrayLeafBeArray) {
-    setPipeline("[{$project: {'a.b.c': []}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, InclusionProjectionDottedPrefixOfMissingFieldStaysNonArray) {
-    setPipeline("[{$project: {c: 1}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_FALSE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixAfterReplaceRootBeArray) {
-    setPipeline("[{$replaceRoot: {newRoot: '$x'}}, {$project: {'a.b': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a")); });
-}
-
-TEST_F(PipelineDependencyGraphTest,
-       CanInclusionProjectionNestedDottedPrefixAfterReplaceRootBeArray) {
-    setPipeline("[{$replaceRoot: {newRoot: '$x'}}, {$project: {'a.b.c': {$literal: 1}}}]");
-    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b")); });
-}
-
 TEST_F(PipelineDependencyGraphTest, GroupCompoundKeyDoesNotPreservePrefixArrayness) {
     // '_id' is itself a concrete array [1, 2] from the $set stage, so its prefix arrayness is true.
     // The $group compound key rewrites '_id' as a freshly constructed object '{a: "$x"}': the
