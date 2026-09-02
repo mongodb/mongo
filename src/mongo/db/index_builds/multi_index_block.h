@@ -22,7 +22,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/throttle_cursor.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
@@ -458,12 +457,6 @@ private:
     // writeConflictRetry the spiller performs.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
     BSONObj _objToIndex;
-
-    // Paces the container writes of the spills issued by the collection scan phase. Installed by
-    // _doCollectionScan for the duration of the scan and reset on the way out, so that the
-    // SpillCallbacks captured in init() only pace the scan phase's spills. Disengaged when the
-    // scan is not running or when container writes are not replicated.
-    boost::optional<DataThrottle> _scanContainerWriteThrottle;
 
     // The temporary record store used for persisting the resume state of a resumable index build.
     boost::optional<LazyRecordStore> _resumeStateTempRecordStore;

@@ -25,7 +25,6 @@
 
 #include <limits>
 #include <memory>
-#include <numeric>
 #include <ostream>
 #include <span>
 #include <string>
@@ -46,7 +45,6 @@ public:
     MOCK_METHOD(void, onSpill, (), (override));
     MOCK_METHOD(void, onSpillBatch, (), (override));
     MOCK_METHOD(void, postSpill, (), (override));
-    MOCK_METHOD(void, onChunkWritten, (int64_t bytesWritten), (override));
 };
 
 TEST(ContainerIteratorTest, Iterate) {
@@ -1891,60 +1889,6 @@ TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillerEntryPo
     EXPECT_EQ(postCount, 3);
 }
 
-TEST_F(ContainerBasedSpillerCallbackTest, OnChunkWrittenFiresPerChunkWithBytesWritten) {
-    std::vector<int64_t> chunks;
-    int preCount = 0;
-    // kBatchSize is 4, so a 10-entry spill is written as chunks of 4, 4 and 2.
-    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
-    EXPECT_CALL(*callbacks, preSpill).WillRepeatedly([&] { ++preCount; });
-    EXPECT_CALL(*callbacks, onChunkWritten).WillRepeatedly([&](int64_t bytes) {
-        chunks.push_back(bytes);
-    });
-    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
-
-    std::vector<std::pair<IntWrapper, NullValue>> data;
-    for (int i = 0; i < 10; ++i) {
-        data.emplace_back(IntWrapper{i}, NullValue{});
-    }
-    spiller.spill(SortOptions{}, Settings{}, std::span{data});
-
-    // Several chunks per spill, i.e. the callback is a finer-grained hook than preSpill/postSpill.
-    ASSERT_EQ(preCount, 1);
-    ASSERT_EQ(chunks.size(), 3);
-    for (auto bytes : chunks) {
-        ASSERT_GT(bytes, 0);
-    }
-    // The reported bytes account for exactly what was spilled, so a caller charging a rate limiter
-    // per chunk bills the same total as the container stats report.
-    ASSERT_EQ(std::accumulate(chunks.begin(), chunks.end(), int64_t{0}),
-              _containerStats.bytesSpilled());
-}
-
-TEST_F(ContainerBasedSpillerCallbackTest, OnChunkWrittenFiresWhileMergingSpills) {
-    std::vector<int64_t> chunks;
-    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
-    EXPECT_CALL(*callbacks, onChunkWritten).WillRepeatedly([&](int64_t bytes) {
-        chunks.push_back(bytes);
-    });
-    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
-
-    std::vector<std::pair<IntWrapper, NullValue>> data{
-        {10, {}}, {20, {}}, {30, {}}, {40, {}}, {50, {}}, {60, {}}};
-    std::span span{data};
-    spiller.spill(SortOptions{}, Settings{}, span.subspan(0, 3));
-    spiller.spill(SortOptions{}, Settings{}, span.subspan(3, 3));
-    const auto chunksFromSpills = chunks.size();
-    ASSERT_GT(chunksFromSpills, 0);
-
-    // Merges rewrite the merged ranges into the container, so they are paced too.
-    SorterStats sorterStats{nullptr};
-    spiller.mergeSpills(SortOptions{}, Settings{}, sorterStats, IWComparator(ASC), 1, 2);
-    ASSERT_GT(chunks.size(), chunksFromSpills);
-    for (auto bytes : chunks) {
-        ASSERT_GT(bytes, 0);
-    }
-}
-
 TEST_F(ContainerBasedSpillerCallbackTest, NoCallbacksLeavesSpillsAsNoOps) {
     // No callbacks passed: spill() must route through the no-op branch for each.
     auto spiller = makeContainerBasedSpiller();
@@ -2002,39 +1946,6 @@ TEST_F(ContainerBasedSpillerCallbackTest, OnSpillBatchDoesNotFireForSingleBatch)
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
     spiller.spill(SortOptions{}, Settings{}, std::span{data});
-}
-
-TEST_F(ContainerBasedSpillerCallbackTest, PostSpillThrowingWhileUnwindingDoesNotMaskOriginalError) {
-    // A postSpill that restores a plan executor throws when the operation was interrupted, which is
-    // exactly what happens when a throttled spill is killed mid-wait. The original error must still
-    // be what escapes, and a second exception must not escape the scope guard.
-    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
-    EXPECT_CALL(*callbacks, onSpill).WillRepeatedly([] {
-        uasserted(ErrorCodes::InternalError, "simulated post-spill failure");
-    });
-    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([] {
-        uasserted(ErrorCodes::Interrupted, "simulated interrupted cursor restore");
-    });
-    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
-
-    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
-    ASSERT_THROWS_CODE(spiller.spill(SortOptions{}, Settings{}, std::span{data}),
-                       DBException,
-                       ErrorCodes::InternalError);
-}
-
-TEST_F(ContainerBasedSpillerCallbackTest, PostSpillFailureOnSuccessPathPropagates) {
-    // With no exception in flight, a postSpill failure is a real error and must reach the caller.
-    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
-    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([] {
-        uasserted(ErrorCodes::Interrupted, "simulated cursor restore failure");
-    });
-    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
-
-    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
-    ASSERT_THROWS_CODE(spiller.spill(SortOptions{}, Settings{}, std::span{data}),
-                       DBException,
-                       ErrorCodes::Interrupted);
 }
 
 TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillWithHeap) {

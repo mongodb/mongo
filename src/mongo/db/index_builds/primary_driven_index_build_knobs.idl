@@ -16,23 +16,6 @@ server_parameters:
         default: true
         redact: false
 
-    primaryDrivenIndexBuildScanPhaseContainerWriteMBperSec:
-        description:
-            "Max MB per second that the collection scan phase of a primary-driven index build will
-            spill into the sorter's container. Those spills are replicated container writes, so on
-            disaggregated storage they compete with the foreground workload. Setting it to 0 turns
-            off throttling. The limit applies to the build as a whole, not to each index being
-            built. Spills are paced one container write at a time, so the longest run of
-            unthrottled writes is bounded by
-            'primaryDrivenIndexBuildSorterInsertionBatchBytes'."
-        set_at: [startup, runtime]
-        cpp_varname: scanPhaseContainerWriteMBperSec
-        cpp_vartype: Atomic<int>
-        default: 0
-        validator:
-            gte: 0
-        redact: false
-
     primaryDrivenIndexBuildIndexTableCleanupBatchBytes:
         description:
             "The maximum number of bytes per batch when cleaning up index entries before
