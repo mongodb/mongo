@@ -202,6 +202,13 @@ patch_aliases:
       to only select tests that use a real mongot.
     variant_tags: ["required", "mongot_e2e"]
     task: ".*"
+  - alias: mongot-extension
+    description: >
+      Runs only the with_mongot_extension_* and concurrency_with_mongot_extension_* tasks on the
+      variants that use a real mongot. Use this instead of `required-and-mongot-e2e-tests` when you
+      only want the extension suites and not the required variants.
+    variant_tags: ["mongot_e2e"]
+    task: "^(concurrency_)?with_mongot_extension_.*"
   - alias: codecoverage
     description: "Run the code coverage tasks"
     variant: ".*-coverage"

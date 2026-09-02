@@ -3592,6 +3592,50 @@ selects.config_setting_group(
     ],
 )
 
+# The externally-published extension artifacts come in an amazon2023 flavor (AL2023-only) and an
+# amazon2 flavor, which links against the older AL2 glibc and therefore runs on every other Linux
+# distro we support. These groups pick the amazon2 flavor for anything that is not AL2023; they are
+# deliberately mutually exclusive with al2023_{x86_64,aarch64} so a select over all four is
+# unambiguous.
+selects.config_setting_group(
+    name = "non_al2023_any",
+    match_any = [
+        "//bazel/platforms:linux",
+        "//bazel/platforms:ubuntu18",
+        "//bazel/platforms:ubuntu20",
+        "//bazel/platforms:ubuntu22",
+        "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:amazon_linux_2",
+        "//bazel/platforms:debian10",
+        "//bazel/platforms:debian12",
+        "//bazel/platforms:debian13",
+        "//bazel/platforms:rhel8",
+        "//bazel/platforms:rhel9",
+        "//bazel/platforms:rhel10",
+        "//bazel/platforms:suse12",
+        "//bazel/platforms:suse15",
+        "//bazel/platforms:suse16",
+    ],
+)
+
+selects.config_setting_group(
+    name = "non_al2023_linux_x86_64",
+    match_all = [
+        "@platforms//os:linux",
+        ":non_al2023_any",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "non_al2023_linux_aarch64",
+    match_all = [
+        "@platforms//os:linux",
+        ":non_al2023_any",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
 selects.config_setting_group(
     name = "al2_x86_64",
     match_all = [

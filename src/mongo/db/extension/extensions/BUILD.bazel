@@ -50,8 +50,12 @@ package(default_visibility = ["//visibility:public"])
         "mongot_extension",
         "rerank_extension",
     ]
+    # amazon2023 artifacts only load on AL2023 hosts; the amazon2 ones link against the older AL2
+    # glibc and are what the other Linux distros use (see include_files in //:BUILD.bazel).
     for variant in [
         "amazon2023-x86_64",
         "amazon2023-aarch64",
+        "amazon2-x86_64",
+        "amazon2-aarch64",
     ]
 ]

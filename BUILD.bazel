@@ -403,6 +403,12 @@ mongo_install(
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
         "//conditions:default": [],
     }),
+    # The externally-published mongot/rerank extensions are built for amazon2023 and amazon2. The
+    # amazon2023 artifacts only run on AL2023 hosts, but the amazon2 ones (older glibc) work on
+    # every other Linux flavor we support, so ship the matching pair per distro. This is what lets
+    # the with_mongot_extension_* suites run on the enterprise Linux nightly variants. Note the
+    # plain `dist` target above deliberately stays AL2023-only: what ships to customers is a
+    # separate decision.
     include_files = select({
         "//bazel/config:al2023_x86_64": {
             "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-x86_64.so": "lib/libmongot_extension.so",
@@ -415,6 +421,18 @@ mongo_install(
             "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-aarch64.so.sig": "lib/libmongot_extension.so.sig",
             "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-aarch64.so": "lib/librerank_extension.so",
             "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-aarch64.so.sig": "lib/librerank_extension.so.sig",
+        },
+        "//bazel/config:non_al2023_linux_x86_64": {
+            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so": "lib/libmongot_extension.so",
+            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so.sig": "lib/libmongot_extension.so.sig",
+            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-x86_64.so": "lib/librerank_extension.so",
+            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-x86_64.so.sig": "lib/librerank_extension.so.sig",
+        },
+        "//bazel/config:non_al2023_linux_aarch64": {
+            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so": "lib/libmongot_extension.so",
+            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so.sig": "lib/libmongot_extension.so.sig",
+            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-aarch64.so": "lib/librerank_extension.so",
+            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-aarch64.so.sig": "lib/librerank_extension.so.sig",
         },
         "//conditions:default": {},
     }),
