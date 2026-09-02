@@ -21,21 +21,6 @@ PACKAGE_MANAGER_COMMANDS: dict[str, dict[str, str]] = {
 }
 
 
-def build_python_setup_commands(python_command: str) -> list[str]:
-    """Build commands that validate and expose the Python interpreter to the test."""
-
-    validate_python_command = (
-        f"if ! {python_command} --version; then "
-        f"echo 'Required Python interpreter {python_command} is unavailable' >&2; "
-        "exit 1; "
-        "fi"
-    )
-    commands = [validate_python_command]
-    if python_command != "python3":
-        commands.append(f"ln -s {python_command} /usr/bin/python3")
-    return commands
-
-
 def build_package_test_internal_args(
     edition: str,
     platform: str,
