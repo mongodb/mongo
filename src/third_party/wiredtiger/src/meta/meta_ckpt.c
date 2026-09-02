@@ -108,13 +108,13 @@ __wt_meta_checkpoint_has_prepare(WT_SESSION_IMPL *session, const char *config, b
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
     __wt_config_subinit(session, &ckptconf, &cval);
-    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+    for (; (ret = __wt_config_next(&ckptconf, &key, &cval)) == 0;) {
         ret = __wt_config_subgets(session, &cval, "prepare", &value);
         if (ret == 0 && value.val)
             *has_prepp = true;
         WT_RET_NOTFOUND_OK(ret);
     }
-    return (0);
+    return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
@@ -271,7 +271,7 @@ __wt_meta_checkpoint_by_name(WT_SESSION_IMPL *session, const char *uri, const ch
     /*
      * Take the first match: there should never be more than a single checkpoint of any name.
      */
-    while (__wt_config_next(&ckptconf, &k, &v) == 0)
+    while ((ret = __wt_config_next(&ckptconf, &k, &v)) == 0)
         if (WT_CONFIG_MATCH(checkpoint, k)) {
 
             WT_ERR(__wt_config_subgets(session, &v, "order", &a));
@@ -381,6 +381,7 @@ __ckpt_named(WT_SESSION_IMPL *session, const char *checkpoint, const char *confi
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM k, v;
+    WT_DECL_RET;
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
     __wt_config_subinit(session, &ckptconf, &v);
@@ -388,11 +389,11 @@ __ckpt_named(WT_SESSION_IMPL *session, const char *checkpoint, const char *confi
     /*
      * Take the first match: there should never be more than a single checkpoint of any name.
      */
-    while (__wt_config_next(&ckptconf, &k, &v) == 0)
+    while ((ret = __wt_config_next(&ckptconf, &k, &v)) == 0)
         if (WT_CONFIG_MATCH(checkpoint, k))
             return (__ckpt_load(session, &k, &v, ckpt));
 
-    return (WT_NOTFOUND);
+    return (ret);
 }
 
 /*
@@ -404,11 +405,12 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM a, k, v;
+    WT_DECL_RET;
     int64_t found;
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
     __wt_config_subinit(session, &ckptconf, &v);
-    for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
+    for (found = 0; (ret = __wt_config_next(&ckptconf, &k, &v)) == 0;) {
         /* Ignore checkpoints before the ones we've already seen. */
         WT_RET(__wt_config_subgets(session, &v, "order", &a));
         if (found) {
@@ -419,6 +421,7 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
         found = a.val;
         WT_RET(__ckpt_load(session, &k, &v, ckpt));
     }
+    WT_RET_NOTFOUND_OK(ret);
 
     return (found ? 0 : WT_NOTFOUND);
 }
@@ -445,7 +448,7 @@ __wt_ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **n
 
     WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
     __wt_config_subinit(session, &ckptconf, &v);
-    for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
+    for (found = 0; (ret = __wt_config_next(&ckptconf, &k, &v)) == 0;) {
 
         /* Ignore checkpoints before (by the order numbering) the ones we've already seen. */
         WT_ERR(__wt_config_subgets(session, &v, "order", &a));
@@ -460,6 +463,7 @@ __wt_ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **n
         __wt_free(session, *namep);
         WT_ERR(__wt_strndup(session, k.str, k.len, namep));
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
     if (!found)
         ret = WT_NOTFOUND;
     else {
@@ -931,7 +935,7 @@ __wt_meta_ckptlist_get_from_config(WT_SESSION_IMPL *session, bool update, WT_CKP
     /* Load any existing checkpoints into the array. */
     if ((ret = __wt_config_getones(session, config, "checkpoint", &v)) == 0) {
         __wt_config_subinit(session, &ckptconf, &v);
-        for (; __wt_config_next(&ckptconf, &k, &v) == 0; ++slot) {
+        for (; (ret = __wt_config_next(&ckptconf, &k, &v)) == 0; ++slot) {
             /*
              * Allocate a slot for a new value, plus a slot to mark the end.
              */

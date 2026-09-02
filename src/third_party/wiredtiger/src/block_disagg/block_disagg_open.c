@@ -85,12 +85,19 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
       (uint64_t)S2BT(session)->id);
 
     conn = S2C(session);
+    tableid = S2BT(session)->id;
     hash = __wt_hash_city64(filename, strlen(filename));
     bucket = hash & (conn->hash_size - 1);
     __wt_spin_lock(session, &conn->block_lock);
     TAILQ_FOREACH (block, &conn->blockhash[bucket], hashq) {
-        /* TODO: Should check to make sure this is the right type of block */
-        if (strcmp(filename, block->name) == 0) {
+        /*
+         * Match the table as well as the name: a recreated table takes the name of the table it
+         * replaced but addresses a new table, so it must not adopt a handle that outlived the drop.
+         *
+         * FIXME-WT-18453: the list holds both block types and nothing here tells them apart, so a
+         * plain block reads its own fields as a table ID.
+         */
+        if (strcmp(filename, block->name) == 0 && ((WT_BLOCK_DISAGG *)block)->tableid == tableid) {
             ++block->ref;
             *blockp = block;
             __wt_spin_unlock(session, &conn->block_lock);
@@ -113,7 +120,6 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
     if (WT_STREQ(block_disagg->name, WT_HS_FILE_SHARED))
         F_SET(block_disagg, WT_BLOCK_DISAGG_HS);
 
-    tableid = S2BT(session)->id;
     block_disagg->tableid = tableid;
 
     WT_ERR(S2BT(session)->page_log->pl_open_handle(

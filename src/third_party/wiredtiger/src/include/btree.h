@@ -341,6 +341,7 @@ struct __wt_btree {
     uint64_t evict_priority;                   /* Relative priority of cached pages */
     uint32_t evict_walk_progress;              /* Eviction walk progress */
     uint32_t evict_walk_target;                /* Eviction walk target */
+    u_int evict_walk_ends;                     /* Walk end-of-tree count since the scan arrived */
     wt_shared u_int evict_walk_period;         /* Skip this many LRU walks */
     u_int evict_walk_saved;                    /* Saved walk skips for checkpoints */
     u_int evict_walk_skips;                    /* Number of walks skipped */

@@ -2244,6 +2244,7 @@ static const char *const __stats_connection_desc[] = {
   "timestamp",
   "cache: eviction server skips pages that previously failed eviction and likely will again",
   "cache: eviction server skips pages that we do not want to evict",
+  "cache: eviction server skips resuming trees whose walk already traversed the whole tree",
   "cache: eviction server skips stable btrees in disagg",
   "cache: eviction server skips tree that we do not want to evict",
   "cache: eviction server skips trees because there are too many active walks",
@@ -3395,6 +3396,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_server_skip_pages_prune_timestamp_not_move = 0;
     stats->eviction_server_skip_pages_retry = 0;
     stats->eviction_server_skip_unwanted_pages = 0;
+    stats->eviction_server_skip_trees_walk_complete = 0;
     stats->eviction_server_skip_stable_trees = 0;
     stats->eviction_server_skip_unwanted_tree = 0;
     stats->eviction_server_skip_trees_too_many_active_walks = 0;
@@ -4544,6 +4546,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, eviction_server_skip_pages_retry);
     to->eviction_server_skip_unwanted_pages +=
       WT_STAT_CONN_READ(from, eviction_server_skip_unwanted_pages);
+    to->eviction_server_skip_trees_walk_complete +=
+      WT_STAT_CONN_READ(from, eviction_server_skip_trees_walk_complete);
     to->eviction_server_skip_stable_trees +=
       WT_STAT_CONN_READ(from, eviction_server_skip_stable_trees);
     to->eviction_server_skip_unwanted_tree +=

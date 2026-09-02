@@ -1817,11 +1817,11 @@ variables:
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
-          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.timer=5:10
+          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.timer=5:10
           num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
-          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.timer=5:10
+          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.timer=5:10
           times: 5
 
   # FIXME-WT-16113: Consolidate this logic in test/format itself.
@@ -1833,12 +1833,12 @@ variables:
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
-          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          format_test_script_args: -t 120 -c ../../../test/format/CONFIG.disagg -- disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
           num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
           # Validate data with a non-layered table.
-          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
           times: 5
 
   # FIXME-WT-18228 Re-enable random cursor operations in the disaggregated asynchronous step-down format tests
@@ -1850,10 +1850,10 @@ variables:
       - func: "format test script"
         vars:
           # run for 10 minutes.
-          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.rows=10000 runs.timer=1
+          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.rows=10000 runs.timer=1
       - func: "format test disagg"
         vars:
-          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.timer=3
+          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.timer=3
           times: 1
 
   - &format-stress-test-disagg-multi
@@ -5456,11 +5456,11 @@ tasks:
       - func: "compile wiredtiger"
       - func: "format test disagg"
         vars:
-          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.rows=1000:3000 runs.tables=1:3 runs.timer=1
+          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.rows=1000:3000 runs.tables=1:3 runs.timer=1
           times: 2
       - func: "format test disagg"
         vars:
-          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.prepare=0 ops.truncate=0 ops.random_cursor=0 runs.rows=100000:300000 runs.tables=1:3 runs.timer=1
+          format_args: disagg.mode=switch disagg.stepdown_async=1 ops.random_cursor=0 runs.rows=100000:300000 runs.tables=1:3 runs.timer=1
           additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
           times: 2
 

@@ -70,6 +70,9 @@ bulk_rollback_transaction(WT_SESSION *session)
     testutil_check(session->rollback_transaction(session, NULL));
 }
 
+/* Give up on a mirror load after this many rolled-back reads, across the whole load. */
+#define BULK_MIRROR_ROLLBACK_RETRY_MAX 3
+
 /*
  * table_load --
  *     Load a single table.
@@ -81,9 +84,9 @@ table_load(TABLE *base, TABLE *table)
     WT_CONNECTION *conn;
     WT_CURSOR *base_cursor, *cursor;
     WT_DECL_RET;
-    WT_ITEM key, value;
+    WT_ITEM base_key, key, value;
     WT_SESSION *session;
-    uint32_t committed_keyno, keyno, rows_current, v;
+    uint32_t committed_keyno, keyno, mirror_retry, rows_current, v;
     char config[100], track_buf[128];
     bool is_bulk, report_progress;
 
@@ -110,6 +113,7 @@ table_load(TABLE *base, TABLE *table)
     wt_wrap_open_cursor(session, table->uri, is_bulk ? "bulk,append" : NULL, &cursor);
 
     /* Set up the key/value buffers. */
+    key_gen_init(&base_key);
     key_gen_init(&key);
     val_gen_init(&value);
 
@@ -119,6 +123,7 @@ table_load(TABLE *base, TABLE *table)
     /* The final number of rows in the table can change, get a local copy of the starting value. */
     rows_current = TV(RUNS_ROWS);
 
+    mirror_retry = 0;
     for (committed_keyno = keyno = 0; ++keyno <= rows_current;) {
         /* Build a key; build a value, or take the next value from the base mirror. */
         if (table->type == ROW)
@@ -126,7 +131,36 @@ table_load(TABLE *base, TABLE *table)
         if (base == NULL)
             val_gen(table, &g.data_rnd, &value, keyno);
         else {
-            testutil_check(read_op(base_cursor, NEXT, NULL));
+            /*
+             * The read can roll back once the transaction's operation timeout fires while eviction
+             * is stuck, even though this transaction has made no updates yet this iteration (mirror
+             * loads commit after every key). Roll back, restart the transaction, and reposition the
+             * base cursor on the key we were about to read, up to a bounded number of times; give
+             * up on the whole load rather than retrying forever.
+             */
+            ret = read_op(base_cursor, NEXT, NULL);
+            while (ret == WT_ROLLBACK && ++mirror_retry < BULK_MIRROR_ROLLBACK_RETRY_MAX) {
+                bulk_rollback_transaction(session);
+                bulk_begin_transaction(session);
+
+                if (base->type == ROW) {
+                    key_gen(base, &base_key, keyno);
+                    base_cursor->set_key(base_cursor, &base_key);
+                } else
+                    base_cursor->set_key(base_cursor, (uint64_t)keyno);
+                ret = read_op(base_cursor, SEARCH, NULL);
+            }
+            /*
+             * We cannot fail to load a mirrored table: a row count that falls short of the base
+             * mirror's is exactly the kind of mismatch mirroring exists to catch, and letting the
+             * run continue would just relocate that failure somewhere more confusing, later.
+             */
+            if (ret == WT_ROLLBACK)
+                testutil_die(WT_ROLLBACK,
+                  "table %u: mirror load read rolled back %d times, giving up with %" PRIu32
+                  " of %" PRIu32 " rows loaded",
+                  table->id, BULK_MIRROR_ROLLBACK_RETRY_MAX, committed_keyno, rows_current);
+            testutil_check(ret);
             testutil_check(base_cursor->get_value(base_cursor, &value));
         }
 
@@ -241,6 +275,7 @@ table_load(TABLE *base, TABLE *table)
     /* The number of rows in the table can change during normal ops, set the starting value. */
     table->rows_current = TV(RUNS_ROWS);
 
+    key_gen_teardown(&base_key);
     key_gen_teardown(&key);
     val_gen_teardown(&value);
 }

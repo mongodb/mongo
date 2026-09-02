@@ -621,7 +621,8 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
 
     /* This is the top of a retry loop. */
     do {
-        ret = 0;
+        /* All code paths below overwrite the return value, but clear it here to be defensive. */
+        WT_NOT_READ(ret, 0);
 
         /*
          * Save the checkpoint generation number and the checkpoint's state to detect races.
@@ -643,7 +644,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
 
         if (!is_unnamed_ckpt)
             /* Copy the checkpoint name first because we may need it to get the first wall time. */
-            WT_RET(__wt_strndup(session, cval.str, cval.len, &checkpoint));
+            WT_ERR(__wt_strndup(session, cval.str, cval.len, &checkpoint));
 
         if (ckpt_snapshot != NULL) {
             /* We're about to re-fetch this; discard the prior version. No effect the first time. */
@@ -653,32 +654,35 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
              * Now, as the first step of the retrieval process, get the wall-clock time of the
              * snapshot metadata (only). If we need the name, we'll have copied it already.
              */
-            WT_RET(__session_fetch_checkpoint_snapshot_wall_time(
+            WT_ERR(__session_fetch_checkpoint_snapshot_wall_time(
               session, is_unnamed_ckpt ? NULL : checkpoint, &first_snapshot_time));
         }
 
         if (is_unnamed_ckpt)
             /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
-            WT_RET(__wt_meta_checkpoint_last_name(session, uri, &checkpoint, &ds_order, &ds_time));
+            WT_ERR(__wt_meta_checkpoint_last_name(session, uri, &checkpoint, &ds_order, &ds_time));
         else
             /* Look up the checkpoint by name and get its time and order information. */
-            WT_RET(__wt_meta_checkpoint_by_name(session, uri, checkpoint, &ds_order, &ds_time));
+            WT_ERR(__wt_meta_checkpoint_by_name(session, uri, checkpoint, &ds_order, &ds_time));
 
         /* Look up the history store checkpoint. */
         if (hs_dhandlep != NULL) {
             if (is_unnamed_ckpt)
-                WT_RET_NOTFOUND_OK(__wt_meta_checkpoint_last_name(session,
-                  __wt_conn_is_disagg(session) ? WT_HS_URI_SHARED : WT_HS_URI, &hs_checkpoint,
-                  &hs_order, &hs_time));
+                /* Clear the return value; a missing history store checkpoint must not retry. */
+                WT_ERR_NOTFOUND_OK(__wt_meta_checkpoint_last_name(session,
+                                     __wt_conn_is_disagg(session) ? WT_HS_URI_SHARED : WT_HS_URI,
+                                     &hs_checkpoint, &hs_order, &hs_time),
+                  false);
             else {
                 ret = __wt_meta_checkpoint_by_name(session,
                   __wt_conn_is_disagg(session) ? WT_HS_URI_SHARED : WT_HS_URI, checkpoint,
                   &hs_order, &hs_time);
-                WT_RET_NOTFOUND_OK(ret);
+                /* Keep the return value; the test below distinguishes a missing checkpoint. */
+                WT_ERR_NOTFOUND_OK(ret, true);
                 if (ret == WT_NOTFOUND)
                     ret = 0;
                 else
-                    WT_RET(__wt_strdup(session, checkpoint, &hs_checkpoint));
+                    WT_ERR(__wt_strdup(session, checkpoint, &hs_checkpoint));
             }
         }
 
@@ -687,7 +691,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
          * checkpoint times) for each element.
          */
         if (ckpt_snapshot != NULL) {
-            WT_RET(__session_fetch_checkpoint_meta(session, is_unnamed_ckpt ? NULL : checkpoint,
+            WT_ERR(__session_fetch_checkpoint_meta(session, is_unnamed_ckpt ? NULL : checkpoint,
               ckpt_snapshot, &snapshot_time, &stable_time, &oldest_time));
 
             /*

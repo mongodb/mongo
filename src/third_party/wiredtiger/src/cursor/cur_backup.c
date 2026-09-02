@@ -127,7 +127,7 @@ __wt_backup_open(WT_SESSION_IMPL *session)
      */
     F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
     i = 0;
-    while (__wt_config_next(&blkconf, &k, &v) == 0) {
+    while ((ret = __wt_config_next(&blkconf, &k, &v)) == 0) {
         WT_ASSERT(session, i < WT_BLKINCR_MAX);
         /*
          * If we get here, we have at least one valid incremental backup. We want to set up its
@@ -136,6 +136,7 @@ __wt_backup_open(WT_SESSION_IMPL *session)
         WT_ERR(__wt_config_subgets(session, &v, "granularity", &b));
         WT_ERR(__wt_backup_set_blkincr(session, i++, (uint64_t)b.val, k.str, (uint32_t)k.len));
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     if (ret != 0 && ret != WT_NOTFOUND)

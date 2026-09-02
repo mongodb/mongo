@@ -563,7 +563,8 @@ __wti_size_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
     uint64_t ceiling = 0;
     if (session->dhandle != NULL && session->dhandle->stat_array != NULL &&
       session->dhandle->stats[0] != NULL)
-        ceiling = (uint64_t)session->dhandle->stats[0]->btree_size_leaf_hist_ceiling;
+        ceiling = (uint64_t)__wt_atomic_load_int64_relaxed(
+          &session->dhandle->stats[0]->btree_size_leaf_hist_ceiling);
     if (ceiling == 0) {
         ceiling = S2BT(session)->maxleafpage_precomp;
         if (ceiling == 0)

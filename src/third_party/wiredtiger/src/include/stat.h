@@ -110,7 +110,7 @@ __wt_stats_aggregate_internal(void *stats_arg, int slot, u_int num_slots)
 
     stats = (int64_t **)stats_arg;
     for (aggr_v = 0, i = 0; i < num_slots; i++)
-        aggr_v += stats[i][slot];
+        aggr_v += __wt_atomic_load_int64_relaxed(&stats[i][slot]);
 
     /*
      * This can race. However, any implementation with a single value can race as well, different
@@ -143,31 +143,39 @@ __wt_stats_aggregate_dsrc(void *stats_arg, int slot)
 }
 
 /*
- * Clear the values in all structures in the array for connection statistics.
+ * Set a connection statistic. The value is read back as the sum of the buckets, so it lives in the
+ * first bucket and the rest are emptied. Publish the value before emptying the others: aggregation
+ * is not synchronized against gathering, so a reader summing the buckets in between would otherwise
+ * total zero.
+ *
+ * Relaxed is the ordering we want throughout: a statistic guards no other state, so the accesses
+ * need to be free of tearing and of reloads the compiler invented, nothing more.
  */
 static WT_INLINE void
-__wt_stats_clear_conn(void *stats_arg, int slot)
+__wt_stats_set_conn(void *stats_arg, int slot, int64_t value)
 {
     int64_t **stats;
     int i;
 
     stats = (int64_t **)stats_arg;
-    for (i = 0; i < WT_STAT_CONN_COUNTER_SLOTS; i++)
-        stats[i][slot] = 0;
+    __wt_atomic_store_int64_relaxed(&stats[0][slot], value);
+    for (i = 1; i < WT_STAT_CONN_COUNTER_SLOTS; i++)
+        __wt_atomic_store_int64_relaxed(&stats[i][slot], 0);
 }
 
 /*
- * Clear the values in all structures in the array for data-source statistics.
+ * Set a data-source statistic, ordered as the connection version above.
  */
 static WT_INLINE void
-__wt_stats_clear_dsrc(void *stats_arg, int slot)
+__wt_stats_set_dsrc(void *stats_arg, int slot, int64_t value)
 {
     int64_t **stats;
     int i;
 
     stats = (int64_t **)stats_arg;
-    for (i = 0; i < WT_STAT_DSRC_COUNTER_SLOTS; i++)
-        stats[i][slot] = 0;
+    __wt_atomic_store_int64_relaxed(&stats[0][slot], value);
+    for (i = 1; i < WT_STAT_DSRC_COUNTER_SLOTS; i++)
+        __wt_atomic_store_int64_relaxed(&stats[i][slot], 0);
 }
 
 /*
@@ -247,12 +255,10 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
 #define WT_STAT_CONN_INCR(session, fld) WT_STAT_CONN_INCRV(session, fld, 1)
 
 /* FIXME-WT-15961 Introduce thread-safe stats interfaces. */
-#define WT_STATP_CONN_SET(session, stats, fld, value)                           \
-    do {                                                                        \
-        if (WT_STAT_ENABLED(session)) {                                         \
-            __wt_stats_clear_conn(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld)); \
-            WT_STAT_SET_BASE(session, (stats)[0], fld, value);                  \
-        }                                                                       \
+#define WT_STATP_CONN_SET(session, stats, fld, value)                                           \
+    do {                                                                                        \
+        if (WT_STAT_ENABLED(session))                                                           \
+            __wt_stats_set_conn(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld), (int64_t)(value)); \
     } while (0)
 #define WT_STAT_CONN_SET(session, fld, value) \
     WT_STATP_CONN_SET(session, S2C(session)->stats, fld, value)
@@ -288,12 +294,10 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
     } while (0)
 #define WT_STAT_DSRC_DECR(session, fld) WT_STAT_DSRC_DECRV(session, fld, 1)
 
-#define WT_STATP_DSRC_SET(session, stats, fld, value)                           \
-    do {                                                                        \
-        if (WT_STAT_ENABLED(session)) {                                         \
-            __wt_stats_clear_dsrc(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld)); \
-            WT_STAT_SET_BASE(session, (stats)[0], fld, value);                  \
-        }                                                                       \
+#define WT_STATP_DSRC_SET(session, stats, fld, value)                                           \
+    do {                                                                                        \
+        if (WT_STAT_ENABLED(session))                                                           \
+            __wt_stats_set_dsrc(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld), (int64_t)(value)); \
     } while (0)
 #define WT_STAT_DSRC_SET(session, fld, value)                                     \
     do {                                                                          \
@@ -598,6 +602,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_pages_prune_timestamp_not_move;
     int64_t eviction_server_skip_pages_retry;
     int64_t eviction_server_skip_unwanted_pages;
+    int64_t eviction_server_skip_trees_walk_complete;
     int64_t eviction_server_skip_stable_trees;
     int64_t eviction_server_skip_unwanted_tree;
     int64_t eviction_server_skip_trees_too_many_active_walks;
