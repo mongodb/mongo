@@ -1410,7 +1410,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
 
         output[getSourceName()]["pipeline"] = Value(serializedPipeline);
 
-        if (!opts.isSerializingForExplain() &&
+        if (!opts.isSerializingForExplain() && !opts.isShapifying() &&
             hybrid_scoring_util::isHybridSearchPipeline(
                 _userPipeline.value_or(std::vector<BSONObj>()))) {
             output[getSourceName()][hybrid_scoring_util::kIsHybridSearchFlagFieldName] =

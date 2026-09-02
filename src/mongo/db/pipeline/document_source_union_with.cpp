@@ -453,11 +453,11 @@ Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue, Value c
 
 void DocumentSourceUnionWith::appendIsHybridSearchFlag(
     MutableDocument& spec, const query_shape::SerializationOptions& opts) const {
-    // The isHybridSearch flag is only carried on the shard-dispatch path, never in the explain
-    // serialization: an explain-of-a-view spec can be re-parsed on the (non-internal) router,
+    // The isHybridSearch flag is only carried on the shard-dispatch path, never in explain or
+    // query-shape serialization. These serializations can be re-parsed by a non-internal client,
     // where the flag would fail validateIsHybridSearchNotSetByUser (error 5491300). Mirrors the
     // guard on $lookup's serialization.
-    if (_userPipelineIsHybridSearch && !opts.isSerializingForExplain()) {
+    if (_userPipelineIsHybridSearch && !opts.isSerializingForExplain() && !opts.isShapifying()) {
         spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(true);
     }
 }
