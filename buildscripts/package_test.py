@@ -103,6 +103,23 @@ PACKAGE_MANAGER_COMMANDS = {
     },
 }
 
+RHEL7_PYTHON_IMAGE = ("registry.access.redhat.com/ubi7/python-38@"
+                      "sha256:6d8cf22d54a80f6e1c9ef394ed155fe9fe12864aa3b5f25547c149bd87ff8a89")
+RHEL7_PYTHON_COMMAND = "/opt/rh/rh-python38/root/usr/bin/python3"
+RHEL7_DOCKER_CONFIG = (
+    RHEL7_PYTHON_IMAGE,
+    "yum",
+    frozenset([
+        "wget",
+        "pkgconfig",
+        "systemd",
+        "procps",
+        "file",
+    ]),
+    RHEL7_PYTHON_COMMAND,
+)
+RHEL7_OS_NAMES = frozenset(["rhel70", "rhel71", "rhel72"])
+
 # Lookup table used when building and running containers
 # os_name, Optional[(base_image, package_manager, frozenset(base_packages), python_command)]
 OS_DOCKER_LOOKUP = {
@@ -145,15 +162,9 @@ OS_DOCKER_LOOKUP = {
     'rhel55': None,
     'rhel57': None,
     'rhel62': None,
-    'rhel70': ('registry.access.redhat.com/ubi7/ubi', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel71': ('registry.access.redhat.com/ubi7/ubi', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel72': ('registry.access.redhat.com/ubi7/ubi', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
+    'rhel70': RHEL7_DOCKER_CONFIG,
+    'rhel71': RHEL7_DOCKER_CONFIG,
+    'rhel72': RHEL7_DOCKER_CONFIG,
     'rhel8': ('almalinux:8', "yum",
               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
     'rhel80': ('almalinux:8', "yum",
@@ -271,6 +282,18 @@ def join_commands(commands: List[str], sep: str = ' && ') -> str:
     return sep.join(commands)
 
 
+def build_python_setup_commands(python_command: str) -> List[str]:
+    """Validate the interpreter before exposing it as /usr/bin/python3."""
+
+    commands = [(f"if ! {python_command} --version; then "
+                 f"echo 'Required Python interpreter {python_command} is unavailable' >&2; "
+                 "exit 1; "
+                 "fi")]
+    if python_command != 'python3':
+        commands.append(f"ln -s {python_command} /usr/bin/python3")
+    return commands
+
+
 def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
 
@@ -295,8 +318,7 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
         test.install_command.format(" ".join(test.base_packages)),
     ]
 
-    if test.python_command != 'python3':
-        commands.append(f"ln -s {test.python_command} /usr/bin/python3")
+    commands += build_python_setup_commands(test.python_command)
 
     os.makedirs(log_external_path.parent, exist_ok=True)
 
@@ -335,7 +357,9 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
                 '/etc/rhsm:/run/secrets/rhsm',
                 '/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo',
                 '/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo'
-            ])
+            ],
+            user="root",
+        )
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode('UTF-8')
             # This is pretty verbose, lets run this way for a while and we can delete this if it ends up being too much
@@ -350,11 +374,12 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
         result["exit_code"] = 1
         return test, result
 
-    try:
-        with open(log_external_path, 'r') as log_raw:
-            result["log_raw"] += log_raw.read()
-    except OSError as oserror:
-        logging.error("Failed to open %s with error %s", log_external_path, oserror)
+    if exit_code['StatusCode'] == 0:
+        try:
+            with open(log_external_path, 'r') as log_raw:
+                result["log_raw"] += log_raw.read()
+        except OSError as oserror:
+            logging.error("Failed to open %s with error %s", log_external_path, oserror)
 
     if exit_code['StatusCode'] != 0:
         logging.error("Failed test %s with exit code %s", test, exit_code)
