@@ -179,6 +179,28 @@ bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collec
     return !isPrimary;
 }
 
+/**
+ * Returns a throttle that paces the container writes the collection scan phase of a primary-driven
+ * index build generates. When the sorter's in-memory batch fills up it spills the batch into the
+ * index build's container, and on disaggregated storage those writes are replicated, so they
+ * contend with the foreground workload. This does not pace how fast documents are read, only how
+ * fast their keys are written out.
+ *
+ * A spill is written as a sequence of chunks bounded by
+ * 'primaryDrivenIndexBuildSorterInsertionBatchBytes', and the throttle is charged once per chunk
+ * from the spiller's onChunkWritten callback. Charging per chunk rather than per spill is what
+ * makes this a rate limit rather than an average-throughput limit: a chunk is the largest run of
+ * container writes that can be issued back-to-back before the throttle gets to interpose a wait.
+ * Charging is against the build as a whole rather than against each index, since the container
+ * writes of all indexes being built land on the same storage.
+ */
+DataThrottle makeScanContainerWriteThrottle(OperationContext* opCtx) {
+    return DataThrottle{
+        opCtx->fastClockSource().now().toMillisSinceEpoch(), [] {
+            return index_builds::primary_driven::scanPhaseContainerWriteMBperSec.load();
+        }};
+}
+
 
 /**
  * Returns a throttle that paces the container writes in the bulk load phase of a primary-driven
@@ -231,6 +253,8 @@ makeSpiller(OperationContext* opCtx,
                   static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
 
+    // The file-based spiller takes no callbacks: it writes to local scratch space, so there is
+    // nothing for a caller to save/restore or to pace around.
     invariant(!callbacks);
     using FileBasedSpiller =
         sorter::FileBasedSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
@@ -601,6 +625,16 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
                     try {
                         hangDuringIndexBuildSpillYield.pauseWhileSet(opCtx);
+
+                        // Pay off the bytes written since the last batch boundary here, while the
+                        // transaction resources are yielded, so the throttle sleeps without
+                        // holding locks or pinning a storage snapshot. Any bytes left over when
+                        // the spill ends are carried into the next spill's first boundary.
+                        if (bytesSinceYield > 0 && block._scanContainerWriteThrottle) {
+                            block._scanContainerWriteThrottle->awaitIfNeeded(opCtx,
+                                                                             bytesSinceYield);
+                            bytesSinceYield = 0;
+                        }
                     } catch (...) {
                         resources.transitionTransactionResourcesToFailedState(opCtx);
                         throw;
@@ -610,11 +644,21 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     interrupted = false;
                 }
 
+                // Accumulates only; the throttle wait itself runs in 'onSpillBatch' so that it
+                // sleeps during the yield. The throttle is only engaged while the collection scan
+                // phase is running, so spills from any other phase are not paced.
+                void onChunkWritten(int64_t bytesWritten) override {
+                    if (block._scanContainerWriteThrottle) {
+                        bytesSinceYield += bytesWritten;
+                    }
+                }
+
                 OperationContext* opCtx;
                 MultiIndexBlock& block;
                 boost::optional<RecordId>& lastSpilledRecordId;
                 size_t i;
                 bool interrupted = false;
+                int64_t bytesSinceYield = 0;
             };
 
             std::unique_ptr<sorter::SpillCallbacks> spillCallbacks;
@@ -1003,6 +1047,16 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     };
     const auto onSuppressedError = makeOnSuppressedErrorFn(
         collection.getCollectionPtr(), saveCursorBeforeWrite, restoreCursorAfterWrite);
+
+    // Only spills that are replicated container writes are worth pacing; the file-based spiller
+    // writes to local scratch space and does not compete with the foreground workload. Engaging
+    // the throttle here rather than in init() is what scopes it to the scan phase. The spill
+    // callbacks wait on it from their batch-boundary yield, with locks released and the collection
+    // scan executor saved, so the throttle's sleep does not hold locks or pin a storage snapshot.
+    if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+        _scanContainerWriteThrottle = makeScanContainerWriteThrottle(opCtx);
+    }
+    ON_BLOCK_EXIT([&] { _scanContainerWriteThrottle = boost::none; });
 
     int64_t docsScanned{0};
     int64_t docsScannedSinceUpdate{0};

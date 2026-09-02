@@ -46,6 +46,10 @@ struct [[MONGO_MOD_OPEN]] SpillCallbacks {
     virtual void onSpill() {}
     // Run in between each batch boundary while spilling.
     virtual void onSpillBatch() {}
+    // Run once per committed chunk of a spill or a merge, with the serialized size of the entries
+    // that chunk wrote. This runs with locks still held, so implementations should only account
+    // for the bytes here and do any pacing wait from 'onSpillBatch', which runs while yielded.
+    virtual void onChunkWritten(int64_t bytesWritten) {}
 };
 
 template <typename Key, typename Value>
@@ -637,6 +641,12 @@ public:
     }
 
 private:
+    void _runOnChunkWritten(int64_t bytesWritten) {
+        if (_callbacks) {
+            _callbacks->onChunkWritten(bytesWritten);
+        }
+    }
+
     void _runOnSpill() {
         if (_callbacks) {
             _callbacks->onSpill();
@@ -649,17 +659,45 @@ private:
         }
     }
 
-    template <typename Fn>
-    auto _runWithSpillCallbacks(Fn&& fn) {
+    void _runPreSpill() {
         if (_callbacks) {
             _callbacks->preSpill();
         }
+    }
+
+    void _runPostSpill() {
+        if (_callbacks) {
+            _callbacks->postSpill();
+        }
+    }
+
+    template <typename Fn>
+    auto _runWithSpillCallbacks(Fn&& fn) {
+        _runPreSpill();
         ScopeGuard postGuard([this] {
-            if (_callbacks) {
-                _callbacks->postSpill();
+            // Only reached when an exception is propagating out of the spill, so restoring whatever
+            // state 'postSpill' owns is best-effort: the in-flight exception is what the caller
+            // needs to see, and ~ScopeGuard is noexcept, so letting a second exception escape here
+            // would terminate the process. A postSpill that restores a plan executor throws when
+            // the operation has been interrupted, which is exactly the case that unwinds a spill
+            // that is being paced by a throttle.
+            try {
+                _runPostSpill();
+            } catch (const DBException&) {
             }
         });
-        return fn();
+        if constexpr (std::is_void_v<std::invoke_result_t<Fn&>>) {
+            fn();
+            // On the success path a postSpill failure is a real error and must propagate.
+            postGuard.dismiss();
+            _runPostSpill();
+        } else {
+            auto result = fn();
+            // On the success path a postSpill failure is a real error and must propagate.
+            postGuard.dismiss();
+            _runPostSpill();
+            return result;
+        }
     }
 
     void _mergeSpills(const SortOptions& opts,
@@ -720,18 +758,26 @@ private:
                     for (size_t i = 0, written = 0; i < batch.size(); i += written) {
                         const std::span<const std::pair<Key, Value>> pairsToWrite =
                             std::span(batch).subspan(i);
+                        int64_t bytesWritten = 0;
                         writeConflictRetry(&_opCtx,
                                            _ru,
                                            "ContainerBasedSpiller::mergeSpills_insert"sv,
                                            NamespaceString::kEmpty,
                                            [&] {
                                                WriteUnitOfWork wuow{&_opCtx};
-                                               written = containerWriter
-                                                             .addAlreadySortedBatch(pairsToWrite,
-                                                                                    _batchBytes)
-                                                             .kvPairsWritten;
+                                               // A write conflict re-writes the whole chunk, so
+                                               // both counts are overwritten rather than
+                                               // accumulated.
+                                               const auto result =
+                                                   containerWriter.addAlreadySortedBatch(
+                                                       pairsToWrite, _batchBytes);
+                                               written = result.kvPairsWritten;
+                                               bytesWritten = result.bytesWritten;
                                                wuow.commit();
                                            });
+                        // Outside the write unit of work. This only reports the bytes written;
+                        // any pacing wait is done by the callback owner at a yield point.
+                        _runOnChunkWritten(bytesWritten);
                     }
                     numSpilled += batch.size();
                 }
@@ -785,15 +831,22 @@ private:
         for (size_t i = 0, lastBatchSize = 0; i < data.size(); i += lastBatchSize) {
             const auto batch =
                 data.subspan(i, i + _batchSize < data.size() ? _batchSize : std::dynamic_extent);
+            int64_t lastBatchBytes = 0;
             writeConflictRetry(
                 &_opCtx, _ru, "ContainerBasedSpiller::_spill", NamespaceString::kEmpty, [&] {
                     WriteUnitOfWork wuow{&_opCtx};
                     // Write spills as a batch, save the count of pairs written to increment the
-                    // counter for the next subspan.
-                    lastBatchSize =
-                        containerWriter.addAlreadySortedBatch(batch, _batchBytes).kvPairsWritten;
+                    // counter for the next subspan. A write conflict retries the whole chunk, so
+                    // both counts are overwritten rather than accumulated.
+                    const auto result = containerWriter.addAlreadySortedBatch(batch, _batchBytes);
+                    lastBatchSize = result.kvPairsWritten;
+                    lastBatchBytes = result.bytesWritten;
                     wuow.commit();
                 });
+            // Outside the write unit of work. This only reports the bytes written; any pacing
+            // wait is done by the callback owner in 'onSpillBatch', where it can sleep during the
+            // yield.
+            _runOnChunkWritten(lastBatchBytes);
 
             if (i + lastBatchSize < data.size()) {
                 _runOnSpillBatch();
