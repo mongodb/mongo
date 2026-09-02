@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 import tarfile
 import tempfile
 import types
@@ -240,6 +241,22 @@ class PackageTestProvenanceTest(unittest.TestCase):
         # A duplicate artifact is a configuration error, not secondary lag, so
         # it must fail fast without retrying or refetching.
         refetch_task.assert_not_called()
+
+    def test_compact_execution_log_file_uses_pyzstd(self):
+        if platform.machine() in {"s390x", "ppc64le"}:
+            self.skipTest("pyzstd is not available on IBM architectures")
+
+        from pyzstd import ZstdFile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            execution_log_path = Path(temp_dir) / "execution_log.binpb.zst"
+            with ZstdFile(execution_log_path, mode="wb") as stream:
+                stream.write(compact_log_with_spawns(("linux-sandbox", False)))
+
+            summary = under_test.validate_compact_execution_log_file(execution_log_path)
+
+        self.assertEqual(1, summary.spawn_count)
+        self.assertEqual({"linux-sandbox": 1}, summary.runner_counts)
 
     def test_compact_execution_log_with_local_runner_passes(self):
         summary = under_test.validate_compact_execution_log_bytes(

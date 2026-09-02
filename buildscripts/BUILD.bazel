@@ -308,5 +308,15 @@ py_library(
             "requests",
             group = "core",
         ),
-    ],
+    ] + select({
+        # pyzstd has no supported build path on IBM architectures. The provenance validator
+        # retains its zstd CLI fallback on those platforms.
+        "//bazel/config:ppc_or_s390x": [],
+        "//conditions:default": [
+            dependency(
+                "pyzstd",
+                group = "testing",
+            ),
+        ],
+    }),
 )
