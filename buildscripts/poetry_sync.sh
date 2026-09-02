@@ -16,7 +16,7 @@
 # Our workspace setup requires a specific version of poetry to be
 # installed, this script automates the pip install of that version.
 
-poetry_version='2.0.0'
+poetry_version='2.0'
 
 allow_no_venv=0
 python_optarg=""
@@ -75,11 +75,23 @@ fi
 pip_opts=()
 if [[ "${allow_no_venv}" != 1 ]]; then
     # Exploit pip's own enforcement of virtualenv.
-    pip_opts+=('--require-virtualenv')
+    pip_opts+=(--require-virtualenv)
 fi
-run "${py3}" -m pip install "${pip_opts[@]}" -r poetry_requirements.txt
+
+# Poetry 2.0 introduced `poetry sync`, and the requirements file constrains
+# Poetry to the 2.0.x release series.
+need_poetry_install=0              # 0 = no, 1 = yes
+installed_poetry_version=$("${py3}" -m poetry --version 2>/dev/null | sed -n 's/.*version //p')
+if [[ "${installed_poetry_version}" != "${poetry_version}".* ]]; then
+    echo "Poetry ${poetry_version}.x not found in this interpreter, installing via pip." >&2
+    need_poetry_install=1
+fi
+
+# we'll need to use pip this time around
+if (( need_poetry_install )); then
+    run "${py3}" -m pip install "${pip_opts[@]}" -r poetry_requirements.txt
+fi
 
 run env \
-    PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \
-
-"${py3}" -m poetry install --no-root --sync
+  PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \
+  "${py3}" -m poetry sync --no-root
