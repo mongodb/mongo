@@ -85,10 +85,16 @@ function testMultiDelete(testDB, coll, collName) {
             comment: "running multi delete!!",
         }),
     );
+
+    // Write-conflict retries can re-examine documents without a fixed upper bound. Pass the
+    // observed value to the remaining exact metric assertions.
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+    const docsExamined = getQueryExecMetrics(entry.metrics).docsExamined.sum;
+    assert.gte(docsExamined, 8, "docsExamined is smaller than expected", {entry});
     assertWriteCmdQueryStatsSingleExec(testDB, coll, {
         command: "delete",
         keysExamined: 0,
-        docsExamined: 8,
+        docsExamined,
         writes: {
             nMatched: 0,
             nUpserted: 0,
