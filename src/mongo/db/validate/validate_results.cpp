@@ -82,6 +82,44 @@ void ValidateResults::setRepairMode(collection_validation::RepairMode mode) {
     }
 }
 
+std::string_view toString(ValidateResults::HashComparison comparison) {
+    switch (comparison) {
+        case ValidateResults::HashComparison::kNotTracked:
+            return "notTracked";
+        case ValidateResults::HashComparison::kPinnedReadTimestamp:
+            return "pinnedReadTimestamp";
+        case ValidateResults::HashComparison::kNoPersistedEntry:
+            return "noPersistedEntry";
+        case ValidateResults::HashComparison::kNoPersistedHash:
+            return "noPersistedHash";
+        case ValidateResults::HashComparison::kIncompleteDelta:
+            return "incompleteDelta";
+        case ValidateResults::HashComparison::kComparisonFailed:
+            return "comparisonFailed";
+        case ValidateResults::HashComparison::kComparable:
+            return "comparable";
+        case ValidateResults::HashComparison::kMatched:
+            return "matched";
+        case ValidateResults::HashComparison::kMismatched:
+            return "mismatched";
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool ValidateResults::recordHashComparison(uint64_t accumulated, int64_t expected) {
+    const bool matches = static_cast<int64_t>(accumulated) == expected;
+    setExpectedXxh3CollectionHash(expected);
+    setHashComparison(matches ? HashComparison::kMatched : HashComparison::kMismatched);
+    // TODO SERVER-134248: Change this to an error after we get confidence in the persisted
+    // collection hashes.
+    if (!matches) {
+        addWarning(
+            "The collection hash does not match the hash accumulated by continuous internode "
+            "validation.");
+    }
+    return matches;
+}
+
 void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
                                         bool debugging,
                                         const SerializationContext& sc) const {
@@ -158,6 +196,15 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
 
     if (_xxh3CollectionHash.has_value()) {
         resultObj->append("xxh3All", static_cast<long long>(_xxh3CollectionHash.value()));
+    }
+
+    if (_expectedXxh3CollectionHash.has_value()) {
+        resultObj->append("expectedXxh3All",
+                          static_cast<long long>(_expectedXxh3CollectionHash.value()));
+    }
+
+    if (_hashComparison.has_value()) {
+        resultObj->append("hashComparison", toString(_hashComparison.value()));
     }
 
     if (_metadataHash.has_value()) {

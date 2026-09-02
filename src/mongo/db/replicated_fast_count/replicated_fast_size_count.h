@@ -24,8 +24,8 @@ inline constexpr int64_t kEmptyCollectionValidationHash = 0;
  * An absent operand makes the result absent, since a value that is missing one of its contributions
  * is indistinguishable from a wrong one.
  */
-inline boost::optional<int64_t> combineValidationHashes(const boost::optional<int64_t>& lhs,
-                                                        const boost::optional<int64_t>& rhs) {
+[[MONGO_MOD_PUBLIC]] inline boost::optional<int64_t> combineValidationHashes(
+    const boost::optional<int64_t>& lhs, const boost::optional<int64_t>& rhs) {
     if (!lhs || !rhs) {
         return boost::none;
     }
@@ -62,7 +62,7 @@ inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& coll
  * Stores a collection's size and count along with the validation hash accumulated over the same
  * operations.
  */
-struct CollectionReplicatedMetadata {
+struct [[MONGO_MOD_PUBLIC]] CollectionReplicatedMetadata {
     CollectionSizeCount sizeCount;
 
     boost::optional<int64_t> hash;
@@ -97,7 +97,7 @@ inline std::ostream& operator<<(std::ostream& s, const CollectionReplicatedMetad
 /**
  * Indicates whether a collection had been created or dropped since the last checkpoint.
  */
-enum class DDLState {
+enum class [[MONGO_MOD_PUBLIC]] DDLState {
     /**
      * Indicates the collection has been created for the first time.
      */
@@ -125,7 +125,7 @@ enum class DDLState {
  * Stores the size, count, and validation hash values for a collection along with state indicating
  * whether the collection had been created or dropped.
  */
-struct ReplicatedMetadataDelta {
+struct [[MONGO_MOD_PUBLIC]] ReplicatedMetadataDelta {
     CollectionReplicatedMetadata metadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
                                           .hash = boost::none};
     DDLState state{DDLState::kNone};

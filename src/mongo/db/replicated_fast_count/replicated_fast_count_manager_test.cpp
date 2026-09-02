@@ -84,7 +84,7 @@ protected:
         return *manager->getSizeCountStores_ForTest().second;
     }
 
-    boost::optional<std::pair<CollectionSizeCount, Timestamp>> findPersisted(UUID uuid) {
+    boost::optional<std::pair<CollectionReplicatedMetadata, Timestamp>> findPersisted(UUID uuid) {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
         return manager->findPersisted(operationContext(), uuid);
     }
@@ -293,7 +293,8 @@ TEST_F(ReplicatedFastCountManagerStartupTest, StartupSkipsOplogScanWhenOldestEnt
     // startup.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first, (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
+    EXPECT_EQ(persistedA->first.sizeCount,
+              (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
 
     // All of the writes to collB are skipped.
     EXPECT_FALSE(findPersisted(collB.uuid).has_value());
@@ -376,7 +377,7 @@ TEST_F(ReplicatedFastCountManagerStartupTest, StartupSkipScanSeedWithoutExactOpl
     // counted; the entries at (1) and (800) are not.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first, (CollectionSizeCount{.size = sizeDelta, .count = 1}));
+    EXPECT_EQ(persistedA->first.sizeCount, (CollectionSizeCount{.size = sizeDelta, .count = 1}));
 
     manager->shutdown(operationContext());
 }
@@ -411,7 +412,8 @@ TEST_F(ReplicatedFastCountManagerStartupTest, StartupScansFullOplogWhenWithinLag
     // All three writes are counted because the full oplog was scanned.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first, (CollectionSizeCount{.size = sizeDelta * 3, .count = 3}));
+    EXPECT_EQ(persistedA->first.sizeCount,
+              (CollectionSizeCount{.size = sizeDelta * 3, .count = 3}));
 
     manager->shutdown(operationContext());
 }
@@ -443,7 +445,8 @@ TEST_F(ReplicatedFastCountManagerStartupTest, StartupWithNoStableTimestampScansF
     // Both entries are counted because we scanned from the beginning of the oplog.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first, (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
+    EXPECT_EQ(persistedA->first.sizeCount,
+              (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
 
     manager->shutdown(operationContext());
 }
@@ -1032,8 +1035,35 @@ TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsPersistedSizeCountAnd
 
     const auto result = findPersisted(collA.uuid);
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->first, (CollectionSizeCount{.size = 5, .count = 1}));
+    EXPECT_EQ(result->first.sizeCount, (CollectionSizeCount{.size = 5, .count = 1}));
     EXPECT_EQ(result->second, Timestamp(7, 7));
+}
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsPersistedValidationHash) {
+    // A negative value, since the hash is the full 64-bit range reinterpreted as signed.
+    const int64_t hash = -4472309216717240578;
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore(),
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1, .hash = hash});
+
+    const auto result = findPersisted(collA.uuid);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->first.hash.has_value());
+    EXPECT_EQ(*result->first.hash, hash);
+}
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsNoHashWhenNoneWasPersisted) {
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore(),
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1});
+
+    const auto result = findPersisted(collA.uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->first.hash.has_value());
 }
 
 TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsEntryForRequestedUuidOnly) {
@@ -1365,14 +1395,14 @@ TEST_F(ReplicatedFastCountManagerPopulateFromInitialSyncTest,
 
     auto e1 = manager->findPersisted(operationContext(), u1);
     ASSERT_TRUE(e1.has_value());
-    EXPECT_EQ(e1->first.size, 1234);
-    EXPECT_EQ(e1->first.count, 7);
+    EXPECT_EQ(e1->first.sizeCount.size, 1234);
+    EXPECT_EQ(e1->first.sizeCount.count, 7);
     EXPECT_EQ(e1->second, (Timestamp{100, 1}));
 
     auto e2 = manager->findPersisted(operationContext(), u2);
     ASSERT_TRUE(e2.has_value());
-    EXPECT_EQ(e2->first.size, 9999);
-    EXPECT_EQ(e2->first.count, 42);
+    EXPECT_EQ(e2->first.sizeCount.size, 9999);
+    EXPECT_EQ(e2->first.sizeCount.count, 42);
     EXPECT_EQ(e2->second, (Timestamp{200, 1}));
 
     auto ts = manager->findPersistedTimestampStoreTs(operationContext());
@@ -1396,8 +1426,8 @@ TEST_F(ReplicatedFastCountManagerPopulateFromInitialSyncTest, OverwritesExisting
 
     auto e = manager->findPersisted(operationContext(), u);
     ASSERT_TRUE(e.has_value());
-    EXPECT_EQ(e->first.size, 2);
-    EXPECT_EQ(e->first.count, 2);
+    EXPECT_EQ(e->first.sizeCount.size, 2);
+    EXPECT_EQ(e->first.sizeCount.count, 2);
     EXPECT_EQ(e->second, (Timestamp{20, 1}));
     auto ts = manager->findPersistedTimestampStoreTs(operationContext());
     ASSERT_TRUE(ts.has_value());
@@ -1426,8 +1456,8 @@ TEST_F(ReplicatedFastCountManagerPopulateFromInitialSyncTest,
     EXPECT_FALSE(manager->findPersistedTimestampStoreTs(operationContext()).has_value());
     auto e = manager->findPersisted(operationContext(), u);
     ASSERT_TRUE(e.has_value());
-    EXPECT_EQ(e->first.size, 1);
-    EXPECT_EQ(e->first.count, 1);
+    EXPECT_EQ(e->first.sizeCount.size, 1);
+    EXPECT_EQ(e->first.sizeCount.count, 1);
 }
 
 }  // namespace

@@ -1061,7 +1061,7 @@ CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) 
             fmt::format("Expected the size/count store to contain an entry for UUID={}",
                         uuid().toString()),
             persisted.has_value());
-    return persisted->first;
+    return persisted->first.sizeCount;
 }
 
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,

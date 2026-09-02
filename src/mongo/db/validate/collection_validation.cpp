@@ -19,6 +19,10 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/rss/persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -530,6 +534,102 @@ boost::optional<std::string> getConfigOverrideOrThrow(const BSONElement& raw) {
             str::stream() << "Unrecognized configuration string " << chosenConfig,
             std::find(allowed, allowedEnd, chosenConfig) != allowedEnd);
     return {raw.str()};
+}
+
+
+struct ExpectedCollectionHash {
+    ValidateResults::HashComparison comparison;
+    // Set only when 'comparison' is kComparable, i.e. a value was actually derived.
+    boost::optional<int64_t> hash;
+};
+
+/**
+ * Returns the collection validation hash the replicated size and count system implies for 'uuid'
+ * right now: the hash it last persisted, brought forward by replaying the oplog from the point
+ * that hash is valid as of. The returned status says why no value could be derived, so callers can
+ * tell a skipped comparison apart from a successful one.
+ */
+ExpectedCollectionHash _expectedCollectionHash(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               const UUID& uuid) {
+    if (!isReplicatedFastCountEnabled(opCtx) || !isReplicatedFastCountEligible(nss)) {
+        return {ValidateResults::HashComparison::kNotTracked, boost::none};
+    }
+
+    auto& manager =
+        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
+
+    const auto entry = manager.findPersisted(opCtx, uuid);
+    if (!entry) {
+        return {ValidateResults::HashComparison::kNoPersistedEntry, boost::none};
+    }
+    if (!entry->first.hash) {
+        return {ValidateResults::HashComparison::kNoPersistedHash, boost::none};
+    }
+
+    // Seek from the store's global valid-as-of rather than the entry's own. Every persisted entry
+    // is valid as of that point.
+    const auto globalValidAsOf = manager.findPersistedTimestampStoreTs(opCtx);
+    const Timestamp seekAfterTimestamp = globalValidAsOf.value_or(entry->second);
+
+    // Oplog truncation is held back to the persisted valid-as-of, so the range the persisted hash
+    // does not cover is always still present.
+    const auto scanResult = [&]() -> replicated_fast_count::OplogScanResult {
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogColl = oplogRead.getCollection();
+        massert(13397001, "oplog collection not found", oplogColl);
+
+        auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        return replicated_fast_count::aggregateReplicatedMetadataDeltasInOplog(
+            *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
+    }();
+
+    // A collection with no entries in the replayed range contributes the XOR identity.
+    const auto it = scanResult.deltas.find(uuid);
+    const boost::optional<int64_t> delta =
+        it == scanResult.deltas.end() ? boost::make_optional(int64_t{0}) : it->second.metadata.hash;
+
+    const auto expected = combineValidationHashes(entry->first.hash, delta);
+    if (!expected) {
+        return {ValidateResults::HashComparison::kIncompleteDelta, boost::none};
+    }
+    return {ValidateResults::HashComparison::kComparable, expected};
+}
+
+/**
+ * Compares the collection hash this validation accumulated against the replicated metadata
+ * system's view of it, recording the outcome on 'results'.
+ */
+void _compareCollectionHash(OperationContext* opCtx,
+                            const ValidateState& validateState,
+                            ValidateResults* results) try {
+    auto [comparison, expected] =
+        _expectedCollectionHash(opCtx, validateState.nss(), validateState.uuid());
+    if (!expected) {
+        results->setHashComparison(comparison);
+        return;
+    }
+
+    const auto accumulated = *results->getXxh3CollectionHash();
+    if (!results->recordHashComparison(accumulated, *expected)) {
+        LOGV2_WARNING(13397000,
+                      "Collection hash does not match the replicated collection validation hash",
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()),
+                      "expectedHash"_attr = *expected,
+                      "accumulatedHash"_attr = accumulated);
+    }
+} catch (const DBException& e) {
+    if (!opCtx->checkForInterruptNoAssert().isOK() || e.code() == ErrorCodes::Interrupted) {
+        throw;
+    }
+    LOGV2_WARNING(13397002,
+                  "Could not compare the collection hash against the replicated metadata hash",
+                  logAttrs(validateState.nss()),
+                  logAttrs(validateState.uuid()),
+                  "error"_attr = e.toString());
+    results->setHashComparison(ValidateResults::HashComparison::kComparisonFailed);
 }
 
 void _validateFastCountState(OperationContext* opCtx,
@@ -1075,6 +1175,19 @@ Status validate(OperationContext* opCtx,
 
         if (validateState.isCollHashValidation()) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);
+        }
+
+        // Compare the accumulated hash against the replicated metadata system's view of the
+        // collection.
+        if (validateState.isCollHashValidation() &&
+            rss::ReplicatedStorageService::get(opCtx)
+                .getPersistenceProvider()
+                .shouldUseContinuousInternodeValidation()) {
+            if (validateState.getReadTimestamp()) {
+                results->setHashComparison(ValidateResults::HashComparison::kPinnedReadTimestamp);
+            } else {
+                _compareCollectionHash(opCtx, validateState, results);
+            }
         }
 
         // Pause collection validation while a lock is held and between collection and index data

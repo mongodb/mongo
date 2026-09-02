@@ -282,9 +282,9 @@ BSONObj buildInfoField(OperationContext* opCtx,
         if (entry || timestampStoreTs) {
             BSONObjBuilder fastCountBuilder(infoBuilder.subobjStart("fastCount"));
             if (entry) {
-                const auto& [sizeCount, validAsOf] = *entry;
-                fastCountBuilder.append("size", sizeCount.size);
-                fastCountBuilder.append("count", sizeCount.count);
+                const auto& [metadata, validAsOf] = *entry;
+                fastCountBuilder.append("size", metadata.sizeCount.size);
+                fastCountBuilder.append("count", metadata.sizeCount.count);
                 fastCountBuilder.append("validAsOf", validAsOf);
             }
             if (timestampStoreTs) {

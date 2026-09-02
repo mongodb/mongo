@@ -7,6 +7,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -40,7 +41,7 @@ struct TxnChainState {
  * from an internal fast count store collection, or boost::none if no such entries were scanned
  * (i.e. the seek landed past the end of the oplog).
  */
-struct OplogScanResult {
+struct [[MONGO_MOD_PUBLIC]] OplogScanResult {
     ReplicatedMetadataDeltas deltas;
     boost::optional<Timestamp> lastTimestamp;
 
@@ -182,9 +183,10 @@ private:
  * validation hashes. Pass 'isCheckpoint=true' only on the checkpoint scan path to increment
  * checkpoint scan counters; leave false (the default) on read paths.
  */
-OplogScanResult aggregateReplicatedMetadataDeltasInOplog(SeekableRecordCursor& oplogCursor,
-                                                         const Timestamp& seekAfterTS,
-                                                         UUID oplogUuid,
-                                                         bool isCheckpoint = false);
+[[MONGO_MOD_PUBLIC]] OplogScanResult aggregateReplicatedMetadataDeltasInOplog(
+    SeekableRecordCursor& oplogCursor,
+    const Timestamp& seekAfterTS,
+    UUID oplogUuid,
+    bool isCheckpoint = false);
 
 }  // namespace mongo::replicated_fast_count

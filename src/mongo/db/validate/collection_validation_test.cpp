@@ -20,6 +20,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -1649,6 +1651,407 @@ public:
     }
 };
 
+// Enables both the replicated metadata system and continuous internode validation, so validate
+// accumulates a collection hash and has a persisted one to compare it against.
+class ComparableHashProvider
+    : public replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider {
+public:
+    bool shouldUseContinuousInternodeValidation() const override {
+        return true;
+    }
+};
+
+class CollectionHashComparisonTest : public CollectionValidationTest {
+protected:
+    CollectionHashComparisonTest()
+        : CollectionValidationTest(
+              Options{}.setPersistenceProvider(std::make_unique<ComparableHashProvider>())) {}
+
+    // Creates the replicated metadata containers and points the manager's stores at them, the way
+    // startup does. Without the second step the manager keeps its default collection-backed
+    // stores, whose read path expects a collection that does not exist here.
+    void createFastCountContainers() {
+        ASSERT_OK(createInternalFastCountContainers(operationContext(),
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/false));
+
+        KVEngine* engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
+        replicated_fast_count::ReplicatedFastCountManager::get(getServiceContext())
+            .initializeContainerStores(
+                engine->getRecordStore(operationContext(),
+                                       NamespaceString::kAdminCommandNamespace,
+                                       ident::kFastCountMetadataStore,
+                                       RecordStore::Options{.keyFormat = KeyFormat::String},
+                                       /*uuid=*/boost::none),
+                engine->getRecordStore(operationContext(),
+                                       NamespaceString::kAdminCommandNamespace,
+                                       ident::kFastCountMetadataStoreTimestamps,
+                                       RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                       /*uuid=*/boost::none));
+
+        // validate() requires an inactive recovery unit when it sets its prepare conflict
+        // behavior, and the setup above leaves a snapshot open.
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    // The point a seeded hash is valid as of.
+    static inline const Timestamp kPersistedAt = Timestamp(1, 1);
+
+    // Seeds the replicated metadata system with a persisted hash for 'uuid', standing in for what
+    // a checkpoint flush would have written.
+    void seedPersistedHash(const UUID& uuid,
+                           boost::optional<int64_t> hash,
+                           bool writeBackingOplogEntry = true) {
+        auto& manager = replicated_fast_count::ReplicatedFastCountManager::get(getServiceContext());
+        auto [sizeCountStore, timestampStore] = manager.getSizeCountStores_ForTest();
+        replicated_fast_count::test_helpers::insertSizeCountEntry(
+            operationContext(),
+            *sizeCountStore,
+            uuid,
+            replicated_fast_count::SizeCountStore::Entry{
+                .timestamp = kPersistedAt, .size = 0, .count = 0, .hash = hash});
+
+        if (!writeBackingOplogEntry) {
+            shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+            return;
+        }
+
+        // A valid-as-of names the last oplog entry the accumulator consumed, so that record has to
+        // exist. The scan seeks past it exclusively, so it contributes nothing itself.
+        replicated_fast_count::test_helpers::writeToOplog(
+            operationContext(),
+            replicated_fast_count::test_helpers::makeOplogEntry(
+                kPersistedAt,
+                replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+                repl::OpTypeEnum::kInsert,
+                /*sizeDelta=*/0));
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    // Seeds the store's global valid-as-of, the point the accumulator has processed the oplog up
+    // to across all collections, along with the oplog record it names.
+    void seedGlobalValidAsOf(const UUID& uuid, Timestamp ts) {
+        auto& manager = replicated_fast_count::ReplicatedFastCountManager::get(getServiceContext());
+        auto [sizeCountStore, timestampStore] = manager.getSizeCountStores_ForTest();
+        replicated_fast_count::test_helpers::insertSizeCountTimestamp(
+            operationContext(), *timestampStore, ts);
+        replicated_fast_count::test_helpers::writeToOplog(
+            operationContext(),
+            replicated_fast_count::test_helpers::makeOplogEntry(
+                ts,
+                replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+                repl::OpTypeEnum::kInsert,
+                /*sizeDelta=*/0,
+                /*hash=*/0));
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    UUID collectionUuid() {
+        const AutoGetCollection coll(operationContext(), kNss, MODE_IS);
+        return coll->uuid();
+    }
+
+    void insertDocs(const std::vector<BSONObj>& docs) {
+        const AutoGetCollection coll(operationContext(), kNss, MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), *coll, docs));
+        wuow.commit();
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    static uint64_t xxh3Of(const std::vector<BSONObj>& docs) {
+        uint64_t hash = 0;
+        for (const auto& doc : docs) {
+            hash ^= static_cast<uint64_t>(repl::computeDocValidationHash(doc));
+        }
+        return hash;
+    }
+
+    ValidateResults hashValidate() {
+        ValidateResults results;
+        EXPECT_EQ(ErrorCodes::OK,
+                  collection_validation::validate(
+                      operationContext(),
+                      kNss,
+                      collection_validation::ValidationOptions{
+                          collection_validation::ValidateMode::kCollectionHash,
+                          collection_validation::RepairMode::kNone,
+                          /*logDiagnostics=*/false},
+                      &results));
+        return results;
+    }
+};
+
+// Probe: reports how far the comparison gets with the replicated metadata system enabled.
+TEST_F(CollectionHashComparisonTest, ReportsNoPersistedEntryBeforeAnythingIsFlushed) {
+    createFastCountContainers();
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedEntry");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+}
+
+TEST_F(CollectionHashComparisonTest, MatchesWhenThePersistedHashAgrees) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)));
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "matched");
+    EXPECT_TRUE(results.getWarnings().empty());
+    EXPECT_TRUE(results.isValid());
+}
+
+TEST_F(CollectionHashComparisonTest, FoldsInOplogEntriesWrittenSinceTheHashWasPersisted) {
+    createFastCountContainers();
+
+    // Stands in for a collection whose hash was persisted when it held 'flushed', after which
+    // 'sinceFlush' was written. The persisted hash is stale by exactly that document, so the
+    // comparison only holds if validate replays the oplog and folds it back in.
+    const std::vector<BSONObj> flushed = {BSON("_id" << 1), BSON("_id" << 2)};
+    const BSONObj sinceFlush = BSON("_id" << 3);
+    insertDocs(flushed);
+    insertDocs({sinceFlush});
+
+    const auto uuid = collectionUuid();
+    seedPersistedHash(uuid, static_cast<int64_t>(xxh3Of(flushed)));
+
+    // The entry is persisted as of Timestamp(1, 1), so this lands in the replayed range.
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(2, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/sinceFlush.objsize(),
+            repl::computeDocValidationHash(sinceFlush)));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "matched");
+    EXPECT_TRUE(results.getWarnings().empty());
+
+    // Without the replay the expected value would still be the stale persisted hash.
+    ASSERT_TRUE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_NE(static_cast<uint64_t>(*results.getExpectedXxh3CollectionHash()), xxh3Of(flushed));
+}
+
+TEST_F(CollectionHashComparisonTest, ReplaysFromTheGlobalValidAsOfNotTheEntrysOwn) {
+    createFastCountContainers();
+    const BSONObj doc = BSON("_id" << 1);
+    insertDocs({doc});
+
+    const auto uuid = collectionUuid();
+
+    // The entry's hash already accounts for 'doc', and its own valid-as-of is old. The global
+    // valid-as-of is later, which is the normal state for a collection that has not changed since
+    // an earlier checkpoint.
+    seedPersistedHash(uuid, static_cast<int64_t>(xxh3Of({doc})));
+    seedGlobalValidAsOf(uuid, Timestamp(5, 1));
+
+    // The write that produced that hash still sits in the oplog between the two timestamps.
+    // Seeking from the entry's own valid-as-of would replay it a second time, and XOR being its
+    // own inverse would cancel it out into a mismatch on a healthy collection.
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(2, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/doc.objsize(),
+            repl::computeDocValidationHash(doc)));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "matched");
+    ASSERT_TRUE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_EQ(static_cast<uint64_t>(*results.getExpectedXxh3CollectionHash()), xxh3Of({doc}));
+}
+
+TEST_F(CollectionHashComparisonTest, ReportsNoPersistedHashWhenTheEntryCarriesNone) {
+    createFastCountContainers();
+    insertDocs({BSON("_id" << 1)});
+
+    // An entry that predates hash validation, or whose contributions could not all be accounted
+    // for, holds size and count but no hash. Absence is sticky, so this is the permanent state for
+    // such a collection rather than a transient one.
+    seedPersistedHash(collectionUuid(), boost::none);
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedHash");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getWarnings().empty());
+}
+
+TEST_F(CollectionHashComparisonTest, SkipsWhenTheCallerPinsAReadTimestamp) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)));
+
+    // The scan would read an earlier instant than the replayed oplog describes, so the two sides
+    // would be measuring different moments and could disagree on a healthy collection.
+    ValidateResults results;
+    EXPECT_EQ(
+        ErrorCodes::OK,
+        collection_validation::validate(operationContext(),
+                                        kNss,
+                                        collection_validation::ValidationOptions{
+                                            collection_validation::ValidateMode::kCollectionHash,
+                                            collection_validation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false,
+                                            currentValidationVersion,
+                                            /*verifyConfigurationOverride=*/boost::none,
+                                            /*readTimestamp=*/
+                                            operationContext()
+                                                ->getServiceContext()
+                                                ->getStorageEngine()
+                                                ->getAllDurableTimestamp()},
+                                        &results));
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "pinnedReadTimestamp");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+}
+
+TEST_F(CollectionHashComparisonTest, SkipsACollectionCreatedSinceTheLastCheckpoint) {
+    createFastCountContainers();
+    const BSONObj doc = BSON("_id" << 1);
+    insertDocs({doc});
+
+    const auto uuid = collectionUuid();
+
+    // No per-collection entry, which is the state for a collection whose create is still in the
+    // unflushed oplog range: either it was created since the last checkpoint, or an earlier
+    // incarnation was dropped, that drop was flushed away (which removes the entry), and it was
+    // then recreated. Both land here as kCreated with nothing persisted.
+    //
+    // The replayed delta could answer for the collection on its own, since a create restarts the
+    // hash from zero. That is deliberately not done: it would compare the oplog against the data
+    // rather than the persisted hash against the data, and reporting a match would claim more than
+    // was checked.
+    seedGlobalValidAsOf(uuid, kPersistedAt);
+
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeCreateOplogEntry(
+            Timestamp(2, 1), replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid}));
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(3, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/doc.objsize(),
+            repl::computeDocValidationHash(doc)));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedEntry");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getWarnings().empty());
+}
+
+TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAReplayedEntryCarriesNoHash) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)));
+
+    // An entry with a size delta but no per-document hash, which is what a write records when the
+    // storage model was not accumulating hashes at the time. One such entry means not every write
+    // in the range can be accounted for, so the folded value is incomplete and must not be
+    // compared rather than compared while missing a contribution.
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(2, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, collectionUuid()},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/16));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getWarnings().empty());
+}
+
+TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAnImportedCollectionHasNoHash) {
+    createFastCountContainers();
+    const BSONObj doc = BSON("_id" << 1);
+    insertDocs({doc});
+
+    const auto uuid = collectionUuid();
+    seedPersistedHash(uuid, 0x1234);
+
+    // An import brings in a collection whose documents were never hashed, so its delta carries no
+    // hash and nothing folded over that range can be trusted.
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeImportCollectionOplogEntry(
+            Timestamp(2, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            /*numRecords=*/1,
+            /*dataSize=*/doc.objsize()));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getWarnings().empty());
+}
+
+TEST_F(CollectionHashComparisonTest, AFailedComparisonDoesNotCutValidationShort) {
+    createFastCountContainers();
+    insertDocs({BSON("_id" << 1), BSON("_id" << 2)});
+    seedPersistedHash(collectionUuid(), 0);
+
+    // Without an oplog the replay throws. That must be reported rather than propagated: validate's
+    // outer handler records a warning and skips everything after it, index validation included,
+    // while still calling the collection valid.
+    ASSERT_OK(
+        storageInterface()->dropCollection(operationContext(), NamespaceString::kRsOplogNamespace));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "comparisonFailed");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+
+    // The rest of validation still ran.
+    ASSERT_TRUE(results.getNumRecords().has_value());
+    EXPECT_EQ(*results.getNumRecords(), 2);
+    EXPECT_TRUE(results.isValid());
+}
+
+TEST_F(CollectionHashComparisonTest, WarnsButStaysValidWhenThePersistedHashDisagrees) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
+    insertDocs(docs);
+    // Stands in for the collection having diverged from what replication believes it holds.
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)) ^ 0xabcd);
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "mismatched");
+    EXPECT_EQ(results.getWarnings().size(), 1);
+    // A divergence is surfaced, but must not by itself declare the collection invalid.
+    EXPECT_TRUE(results.isValid());
+}
+
 class CollectionValidationXxh3Test : public CollectionValidationTest {
 protected:
     CollectionValidationXxh3Test()
@@ -1700,6 +2103,14 @@ protected:
         insertDocs(docs, secondNss());
     }
 };
+
+TEST_F(CollectionValidationXxh3Test, ReportsWhyNoComparisonHappened) {
+    // An untracked replicated hash doesn't get compared.
+    const auto results = collectionHashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "notTracked");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+}
 
 TEST_F(CollectionValidationXxh3Test, EmptyCollectionHashesToZero) {
     const auto results = collectionHashValidate();
@@ -1790,6 +2201,10 @@ TEST_F(CollectionValidationTest, NoXxh3HashWithoutContinuousInternodeValidation)
     // so there is nothing for this hash to be compared against.
     ASSERT_TRUE(results.getCollectionHash().has_value());
     EXPECT_FALSE(results.getXxh3CollectionHash().has_value());
+
+    // The comparison does not apply to a storage model that carries no per-document validation
+    // hashes, so no outcome is reported at all.
+    EXPECT_FALSE(results.getHashComparison().has_value());
 }
 
 }  // namespace

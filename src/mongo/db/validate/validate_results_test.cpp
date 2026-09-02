@@ -13,6 +13,7 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 namespace mongo {
@@ -362,6 +363,54 @@ TEST(ValidateResultsTest, MergeCombinesXxh3CollectionHashWithXor) {
     ValidateResults neither = make(boost::none);
     neither.merge(make(boost::none));
     EXPECT_FALSE(neither.getXxh3CollectionHash().has_value());
+}
+
+TEST(ValidateResultsTest, RecordHashComparisonReportsAMatch) {
+    ValidateResults vr;
+    EXPECT_TRUE(vr.recordHashComparison(/*accumulated=*/0x1234, /*expected=*/int64_t{0x1234}));
+
+    ASSERT_TRUE(vr.getHashComparison().has_value());
+    EXPECT_EQ(toString(*vr.getHashComparison()), "matched");
+    EXPECT_TRUE(vr.getWarnings().empty());
+}
+
+TEST(ValidateResultsTest, RecordHashComparisonWarnsOnMismatch) {
+    ValidateResults vr;
+    EXPECT_FALSE(vr.recordHashComparison(/*accumulated=*/0x1234, /*expected=*/int64_t{0x4321}));
+
+    ASSERT_TRUE(vr.getHashComparison().has_value());
+    EXPECT_EQ(toString(*vr.getHashComparison()), "mismatched");
+    EXPECT_EQ(vr.getWarnings().size(), 1);
+
+    // A divergence is surfaced, but the comparison has enough moving parts that it must not by
+    // itself declare the collection invalid.
+    EXPECT_TRUE(vr.isValid());
+
+    // Everything an operator acts on has to reach the reply, not just the results object.
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const BSONObj obj = bob.obj();
+    EXPECT_EQ(obj.getField("expectedXxh3All").Long(), 0x4321);
+    EXPECT_EQ(obj.getField("hashComparison").String(), "mismatched");
+    EXPECT_EQ(obj.getField("warnings").Array().size(), 1u);
+    EXPECT_TRUE(obj.getField("valid").Bool());
+}
+
+TEST(ValidateResultsTest, HighBitHashesMatchRatherThanFalselyDiverging) {
+    // Above INT64_MAX unsigned and negative signed. If the conversion between the accumulated and
+    // expected hashes ever clamped instead of preserving the bit pattern, two identical hashes
+    // would be reported as diverged and a healthy collection would look corrupt.
+    constexpr uint64_t kHighBitHash = 0x8000000000000001ULL;
+
+    ValidateResults vr;
+    EXPECT_TRUE(vr.recordHashComparison(kHighBitHash, static_cast<int64_t>(kHighBitHash)));
+    EXPECT_TRUE(vr.getWarnings().empty());
+
+    BSONObjBuilder bob;
+    vr.setXxh3CollectionHash(kHighBitHash);
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const BSONObj obj = bob.obj();
+    EXPECT_EQ(obj.getField("xxh3All").Long(), obj.getField("expectedXxh3All").Long());
 }
 
 TEST(ValidateResultsTest, Xxh3CollectionHashIsReportedAsALong) {

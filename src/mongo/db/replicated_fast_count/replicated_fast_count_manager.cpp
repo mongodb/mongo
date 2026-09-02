@@ -534,14 +534,17 @@ void ReplicatedFastCountManager::commit(OperationContext* opCtx,
     }
 }
 
-boost::optional<std::pair<CollectionSizeCount, Timestamp>>
+boost::optional<std::pair<CollectionReplicatedMetadata, Timestamp>>
 ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) const {
     const auto entry = _sizeCountStore->read(opCtx, uuid);
     if (!entry) {
         return boost::none;
     }
-    return std::pair{CollectionSizeCount{.size = entry->size, .count = entry->count},
-                     entry->timestamp};
+    return std::pair{
+        CollectionReplicatedMetadata{
+            .sizeCount = CollectionSizeCount{.size = entry->size, .count = entry->count},
+            .hash = entry->hash},
+        entry->timestamp};
 }
 
 boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(

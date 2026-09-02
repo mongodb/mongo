@@ -149,15 +149,16 @@ public:
     boost::optional<Timestamp> findPersistedTimestampStoreTs(OperationContext* opCtx) const;
 
     /**
-     * Returns the persisted size/count and its `validAsOf` timestamp for the collection with
-     * `uuid`, or boost::none if no entry exists for that UUID.
+     * Returns the persisted size/count and validation hash, along with its `validAsOf` timestamp,
+     * for the collection with `uuid`, or boost::none if no entry exists for that UUID.
      *
      * This returns an optional because it is possible that we try to find a uuid that is present in
      * the catalog but doesn't have a persisted fast count entry because it hasn't been flushed yet.
+     * The returned hash is absent for an entry persisted without one.
      *
      * The caller must hold a MODE_IS GlobalLock.
      */
-    boost::optional<std::pair<CollectionSizeCount, Timestamp>> findPersisted(
+    boost::optional<std::pair<CollectionReplicatedMetadata, Timestamp>> findPersisted(
         OperationContext* opCtx, UUID uuid) const;
 
     /**
