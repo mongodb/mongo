@@ -40,6 +40,23 @@ function configureFailPointAndWaitUntilHit() {
     return fp;
 }
 
+/**
+ * Returns the first FTDC sample satisfying 'predicate'.
+ */
+function waitForSample(predicate, msg) {
+    let data;
+    assert.soon(
+        () => {
+            data = getNextSample(adminDb);
+            return predicate(data);
+        },
+        msg,
+        30 * 1000,
+    );
+
+    return data;
+}
+
 function waitUntilNormalOperation() {
     // Since we are injecting delays into server status using the
     // injectFTDCServerStatusCollectionDelay failpoint, we define "normal" ftdc operation as having
@@ -107,9 +124,11 @@ function testMinThreads() {
     // blocking indefinitely. As a result, the next sample should contain data, but it will not
     // include serverStatus.
     let fp = configureFailPointAndWaitUntilHit();
-    let data = getNextSample(adminDb);
-    assert(data.hasOwnProperty("transportLayerStats"));
-    assert(!data.hasOwnProperty("serverStatus"));
+    waitForSample(
+        (data) =>
+            data.hasOwnProperty("transportLayerStats") && !data.hasOwnProperty("serverStatus"),
+        "Timed out waiting for a sample with transportLayerStats but without serverStatus",
+    );
 
     fp.off();
 }
@@ -129,9 +148,13 @@ function testMaxThreads() {
 
     let fp = configureFailPointAndWaitUntilHit();
 
-    // With the failpoint set, we expect that ftdc should completely block since only one thread is in use.
-    let data = getNextSample(adminDb);
-    assert(!data.hasOwnProperty("transportLayerStats"));
+    // With the failpoint set, we expect that ftdc should completely block since only one thread is
+    // in use. Once the collections that were in flight when the failpoint was hit have drained, no
+    // further collection can complete, so every subsequent sample lacks transportLayerStats.
+    waitForSample(
+        (data) => !data.hasOwnProperty("transportLayerStats"),
+        "Timed out waiting for a sample without transportLayerStats",
+    );
 
     // Updating max threads will drain all ftdc collection work so we have to temporarily disable fp.
     fp.off();
@@ -139,8 +162,10 @@ function testMaxThreads() {
     fp = configureFailPointAndWaitUntilHit();
 
     // Now with extra threads, ftdc collection can complete even with a blocking collection.
-    let moreData = getNextSample(adminDb);
-    assert(moreData.hasOwnProperty("transportLayerStats"));
+    waitForSample(
+        (data) => data.hasOwnProperty("transportLayerStats"),
+        "Timed out waiting for a sample with transportLayerStats",
+    );
 
     fp.off();
 }
