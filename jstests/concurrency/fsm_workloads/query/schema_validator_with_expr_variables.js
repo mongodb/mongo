@@ -15,10 +15,36 @@
  *  requires_standalone,
  * ]
  */
+const kObj = {
+    one: 1,
+    nested: {
+        s0: {deep: 0, pad: {}},
+        s1: {deep: 1, pad: [null, {}, []]},
+        s2: {deep: 2, pad: {a: {b: {c: [1, 2, 3]}}}},
+        s3: {deep: 3, pad: [{k: 1}, {k: 2}]},
+        s4: {deep: 4, pad: {"dotted.name": 1, empty: [], nil: null}},
+        unusedA: {deep: 99},
+        unusedB: {deep: 98, pad: {deep: 97}},
+    },
+    other: {z: null},
+    extra: "field",
+};
+
+const kSlots = 5;
+
 export const $config = (function () {
     function setup(db, collName) {
         for (let i = 0; i < 200; ++i) {
-            assert.commandWorked(db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}));
+            assert.commandWorked(
+                db[collName].insert({
+                    _id: i,
+                    a: i,
+                    one: 1,
+                    counter: 0,
+                    array: [0, i],
+                    obj: {slot: "s" + (i % kSlots), deep: i % kSlots},
+                }),
+            );
         }
 
         // Add a validator which checks that field 'a' has value 5 and sum of the elements in field
@@ -51,6 +77,32 @@ export const $config = (function () {
                                     },
                                 ],
                             },
+                            {
+                                $let: {
+                                    vars: {slot: "$obj.slot"},
+                                    in: {
+                                        $eq: [
+                                            "$obj.deep",
+                                            {
+                                                $getField: {
+                                                    field: "deep",
+                                                    input: {
+                                                        $getField: {
+                                                            field: "$$slot",
+                                                            input: {
+                                                                $getField: {
+                                                                    field: "nested",
+                                                                    input: {$literal: kObj},
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
                         ],
                     },
                 },
@@ -81,6 +133,13 @@ export const $config = (function () {
             // Validation fails when elements of 'array' doesn't add up to 5.
             assert.commandFailedWithCode(
                 db[collName].update({_id: 4}, {$set: {a: 5, array: [2, 2]}}),
+                ErrorCodes.DocumentValidationFailure,
+            );
+
+            const slot = this.tid % kSlots;
+            assert.commandWorked(db[collName].update({_id: 5}, {$set: {"obj.slot": "s" + slot, "obj.deep": slot}}));
+            assert.commandFailedWithCode(
+                db[collName].update({_id: 5}, {$set: {"obj.slot": "s" + slot, "obj.deep": (slot + 1) % kSlots}}),
                 ErrorCodes.DocumentValidationFailure,
             );
         },
