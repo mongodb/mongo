@@ -484,7 +484,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             } else if (auto nssField = oField.getField("create"sv); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
-                Document opDesc = copyDocExceptFields(oField, {"create"sv});
+                // 'recordIdsReplicated' is an internal, non-user-facing collection property that
+                // must not be exposed in the change stream event. Emitting it would make the
+                // 'operationDescription' unusable as a 'create' command on destinations that do
+                // not recognize the field.
+                Document opDesc =
+                    copyDocExceptFields(oField, {"create"sv, "recordIdsReplicated"sv});
                 operationDescription = Value(opDesc);
 
                 // Populate 'nsType' field with collection type.

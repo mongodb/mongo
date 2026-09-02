@@ -153,6 +153,39 @@ TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransform) {
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
 }
 
+TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransformStripsRecordIdsReplicated) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    // Namespace for the command, i.e. "testDB.$cmd".
+    const NamespaceString commandNss = NamespaceString::makeCommandNamespace(nss.dbName());
+    const auto opDescription = Value(fromjson("{idIndex: {v: 2, key: {_id: 1}, name: '_id_'}}"));
+    const auto idIndex = Value(fromjson("{v: 2, key: {_id: 1}, name: '_id_'}"));
+    auto oplogEntry = makeOplogEntry(
+        repl::OpTypeEnum::kCommand,  // op type
+        commandNss,                  // namespace
+        BSON("create" << nss.coll() << "idIndex" << idIndex << "recordIdsReplicated" << true),  // o
+        testUuid(),    // uuid
+        boost::none,   // fromMigrate
+        boost::none);  // o2
+
+    // 'recordIdsReplicated' is internal and must not show up in 'operationDescription'.
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), opDescription, DocumentSourceChangeStream::kCreateOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kCreateOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription},
+        {DocumentSourceChangeStream::kNsTypeField, "collection"sv}};
+
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
+}
+
 TEST(ChangeStreamEventTransformTest, TestCreateIndexTransform) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
