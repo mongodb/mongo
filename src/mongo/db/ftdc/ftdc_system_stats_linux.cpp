@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <set>
 #include <string>
@@ -27,6 +28,7 @@
 #include <linux/if.h>
 #include <linux/sockios.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
@@ -89,6 +91,117 @@ static const std::map<std::string_view, std::set<std::string_view>> kSockstatKey
 };
 
 /**
+ * Required to work around kernel CVE-2025-68795.
+ *
+ * On kernels that do not patch this vulnerability, a mismatch between the expected number of
+ * ethtool stats and the actual number can cause the kernel to overflow the provided userspace
+ * buffer. There is no mitigation in userspace to prevent this short of making it a hard error for
+ * the kernel to write past the provided buffer.
+ *
+ * Once we no longer support any kernels that have this vulnerability, this class can be removed and
+ * we can go back to allocating a buffer normally.
+ */
+class ProtectedEthToolBuf {
+public:
+    explicit ProtectedEthToolBuf(size_t len) : _buf(nullptr), _usableLen(0), _mapSize(0) {
+        if (len == 0) {
+            LOGV2_ERROR(13433904, "Length of zero is invalid", "len"_attr = len);
+            return;
+        }
+        const auto pageSize = static_cast<size_t>(ProcessInfo::getPageSize());
+        if (pageSize == 0) {
+            LOGV2_ERROR(13433905, "Couldn't read page size", "pageSize"_attr = pageSize);
+            return;
+        }
+
+        // Calculate the amount of memory we need to mmap.
+        // We need a whole number of pages that can contain the requested length, plus an
+        // additional guard page afterward, and these pages need to be aligned.
+        const size_t nPages = (len - 1) / pageSize + 1;
+        if (nPages > std::numeric_limits<size_t>::max() / pageSize) {
+            LOGV2_ERROR(
+                13433906, "Provided length is too large", "len"_attr = len, "nPages"_attr = nPages);
+            return;
+        }
+
+        size_t usable = nPages * pageSize;
+        if (usable > std::numeric_limits<size_t>::max() - pageSize) {
+            LOGV2_ERROR(13433907,
+                        "Usable length is too large to add a guard page",
+                        "len"_attr = len,
+                        "nPages"_attr = nPages,
+                        "usable"_attr = usable);
+            return;
+        }
+
+        const size_t mapSize = usable + pageSize;
+
+        // mmap + mprotect so we have control over the guard page landing on a page boundary.
+        void* mapping =
+            mmap(nullptr, mapSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (mapping == MAP_FAILED) {
+            // There are no reasonably transient failure cases for an mmap call like this.
+            auto ec = lastSystemError();
+            LOGV2_ERROR(13433908,
+                        "mmap failed",
+                        "len"_attr = len,
+                        "mapSize"_attr = mapSize,
+                        "error"_attr = errorMessage(ec));
+            return;
+        }
+
+        // Mark the page immediately after the usable region as inaccessible. Kernel
+        // copy_to_user() into it returns EFAULT instead of overflowing the heap.
+        if (mprotect(static_cast<char*>(mapping) + usable, pageSize, PROT_NONE) != 0) {
+            auto ec = lastSystemError();
+            LOGV2_ERROR(13433909,
+                        "mprotect failed",
+                        "len"_attr = len,
+                        "mapping"_attr = unsignedHex(reinterpret_cast<uintptr_t>(mapping)),
+                        "usable"_attr = usable,
+                        "mapSize"_attr = mapSize,
+                        "pageSize"_attr = pageSize,
+                        "error"_attr = errorMessage(ec));
+            munmap(mapping, mapSize);
+            return;
+        }
+
+        _buf = mapping;
+        _usableLen = usable;
+        _mapSize = mapSize;
+    }
+
+    ~ProtectedEthToolBuf() {
+        if (_buf) {
+            if (munmap(_buf, _mapSize) != 0) {
+                auto ec = lastSystemError();
+                LOGV2_ERROR(13433910,
+                            "munmap failed",
+                            "buf"_attr = unsignedHex(reinterpret_cast<uintptr_t>(_buf)),
+                            "mapSize"_attr = _mapSize,
+                            "error"_attr = errorMessage(ec));
+            }
+        }
+    }
+
+    ProtectedEthToolBuf(const ProtectedEthToolBuf&) = delete;
+    ProtectedEthToolBuf& operator=(const ProtectedEthToolBuf&) = delete;
+
+    void* get() {
+        return _buf;
+    }
+
+    size_t usableLen() const {
+        return _usableLen;
+    }
+
+private:
+    void* _buf;
+    size_t _usableLen;
+    size_t _mapSize;
+};
+
+/**
  * Class to gather NIC stats by emulating ethtool -S functionality by using the ioctl SIOCETHTOOL.
  */
 class EthTool {
@@ -118,8 +231,6 @@ public:
     }
 
     ~EthTool() {
-        free(_gstrings);
-
         close(_fd);
     }
 
@@ -152,7 +263,7 @@ public:
     }
 
     // Get a list of stats names for a given interface
-    std::vector<std::string_view>& get_strings() {
+    const std::vector<std::string>& get_strings() {
         if (!_names.has_value()) {
             auto drvinfo = get_info();
             _get_strings(drvinfo.has_value() ? drvinfo->n_stats : 0);
@@ -172,8 +283,7 @@ public:
 
     // Get a some basic information about the interface
     boost::optional<ethtool_drvinfo> get_info() {
-        ethtool_drvinfo drvinfo;
-        memset(&drvinfo, 0, sizeof(drvinfo));
+        ethtool_drvinfo drvinfo{};
         drvinfo.cmd = ETHTOOL_GDRVINFO;
 
         if (_ioctlNoThrow("drvinfo", &drvinfo)) {
@@ -193,34 +303,68 @@ private:
         : _fd(fd), _interface(std::string(interface)) {}
 
     void _get_strings(size_t count) {
-        _gstrings = static_cast<ethtool_gstrings*>(
-            calloc(1, sizeof(ethtool_gstrings) + count * ETH_GSTRING_LEN));
-
-        _gstrings->cmd = ETHTOOL_GSTRINGS;
-        _gstrings->string_set = ETH_SS_STATS;
-        _gstrings->len = count;
-
-        _names.emplace(std::vector<std::string_view>());
-
-        if (_ioctlNoThrow("get_strings", _gstrings)) {
+        if (!_names) {
+            _names.emplace();
+        } else {
+            _names->clear();
+        }
+        if (count == 0) {
+            LOGV2_WARNING(
+                13433900, "get_strings called with a count of 0", "interface"_attr = _interface);
             return;
         }
 
-        char* ptr = reinterpret_cast<char*>(_gstrings) + sizeof(ethtool_gstrings);
+        auto bufLen = sizeof(ethtool_gstrings) + (count * ETH_GSTRING_LEN);
+
+        if (!_ethToolBuf.has_value() || _ethToolBuf->usableLen() < bufLen) {
+            _ethToolBuf.emplace(bufLen);
+            invariant(_ethToolBuf->get());
+        }
+
+        auto gstrings = static_cast<ethtool_gstrings*>(_ethToolBuf->get());
+        gstrings->cmd = ETHTOOL_GSTRINGS;
+        gstrings->string_set = ETH_SS_STATS;
+        gstrings->len = count;
+
+        // "len" is an out-parameter only on older kernels, and is both an in and out parameter on
+        // newer kernels. If the value after the ioctl does not match the expected count, then the
+        // returned buffer is not guaranteed to have the names we expect.
+        if (_ioctlNoThrow("get_strings", gstrings)) {
+            return;
+        }
+
+        if (gstrings->len != count) {
+            LOGV2_WARNING(13433901,
+                          "get_strings returned a mismatched length",
+                          "interface"_attr = _interface,
+                          "expectedLen"_attr = count,
+                          "outputLen"_attr = gstrings->len);
+            return;
+        }
+
+        char* ptr = reinterpret_cast<char*>(gstrings) + sizeof(ethtool_gstrings);
         for (size_t i = 0; i < count; i++) {
-            auto s = std::string_view(ptr);
-
-            _names->push_back(s);
-
+            _names->push_back(std::string(ptr));
             ptr += ETH_GSTRING_LEN;
         }
     }
 
     std::vector<uint64_t> _get_stats(size_t count) {
-        std::vector<char> stats_buf(sizeof(ethtool_stats) + count * 8,
-                                    0); /* 8 is the number specfied in ethtool.h */
+        if (count == 0) {
+            LOGV2_WARNING(
+                13433902, "get_stats called with a count of 0", "interface"_attr = _interface);
+            return std::vector<uint64_t>();
+        }
 
-        ethtool_stats* stats = reinterpret_cast<ethtool_stats*>(stats_buf.data());
+        auto statsLen = count * sizeof(uint64_t);
+        auto bufLen = sizeof(ethtool_stats) + statsLen;
+
+        if (!_ethToolBuf.has_value() || _ethToolBuf->usableLen() < bufLen) {
+            _ethToolBuf.emplace(bufLen);
+            invariant(_ethToolBuf->get());
+        }
+
+        ethtool_stats* stats = reinterpret_cast<ethtool_stats*>(_ethToolBuf->get());
         stats->cmd = ETHTOOL_GSTATS;
         stats->n_stats = count;
 
@@ -228,11 +372,16 @@ private:
             return std::vector<uint64_t>();
         }
 
-        char* ptr = reinterpret_cast<char*>(stats) + sizeof(ethtool_stats);
+        if (stats->n_stats != count) {
+            LOGV2_WARNING(13433903,
+                          "get_stats returned a mismatched length",
+                          "interface"_attr = _interface,
+                          "expectedLen"_attr = count,
+                          "outputLen"_attr = stats->n_stats);
+            return std::vector<uint64_t>();
+        }
 
-        std::vector<uint64_t> stats_vec(ptr, ptr + count * 8);
-
-        return stats_vec;
+        return std::vector<uint64_t>(stats->data, stats->data + count);
     }
 
     // Returns non-zero on error
@@ -245,7 +394,7 @@ private:
         auto ret = ioctl(_fd, SIOCETHTOOL, &ifr);
 
         if (MONGO_unlikely(ret) && !_warningLogged) {
-            auto ec = lastPosixError();
+            auto ec = lastSystemError();
             _warningLogged = true;
 
             LOGV2_WARNING(10985553,
@@ -261,9 +410,9 @@ private:
 private:
     int _fd;
 
-    ethtool_gstrings* _gstrings{nullptr};
+    boost::optional<ProtectedEthToolBuf> _ethToolBuf;
 
-    boost::optional<std::vector<std::string_view>> _names;
+    boost::optional<std::vector<std::string>> _names;
 
     std::string _interface;
 
@@ -405,7 +554,7 @@ public:
             for (auto& tool : _ethtools) {
                 BSONObjBuilder subNICBuilder(subObjBuilder.subobjStart(tool->name()));
 
-                auto names = tool->get_strings();
+                auto& names = tool->get_strings();
                 if (names.empty()) {
                     continue;
                 }
@@ -414,7 +563,7 @@ public:
                 if (stats.empty()) {
                     continue;
                 }
-                invariant(stats.size() >= names.size());
+                invariant(stats.size() == names.size());
 
                 for (size_t i = 0; i < names.size(); i++) {
                     subNICBuilder.append(names[i], static_cast<long long>(stats[i]));
