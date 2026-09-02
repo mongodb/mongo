@@ -191,6 +191,9 @@ const allCommands = {
     streams_writeCheckpoint: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: isAnInternalCommand},
     streams_updateConnection: {skip: isAnInternalCommand},
+    streams_previewStream: {skip: isAnInternalCommand},
+    streams_getMorePreview: {skip: isAnInternalCommand},
+    streams_stopPreview: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     abortMoveCollection: {
         // Skipping command because it requires testing through a parallel shell.
