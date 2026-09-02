@@ -66,6 +66,8 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
+// TODO(SERVER-132808): remove this
+MONGO_FAIL_POINT_DEFINE(pauseCollModBeforeShardsUpdate);
 MONGO_FAIL_POINT_DEFINE(throwErrorDuringConfigUpdatePhase);
 MONGO_FAIL_POINT_DEFINE(throwErrorDuringUpdateShardsPhase);
 
@@ -409,6 +411,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kUpdateShards,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                // TODO(SERVER-132808): remove this
+                pauseCollModBeforeShardsUpdate.pauseWhileSet();
+
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
