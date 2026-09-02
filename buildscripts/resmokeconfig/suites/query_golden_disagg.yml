@@ -34,5 +34,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-    # TODO(SERVER-120518): change num_nodes to 2
-    num_nodes: 1
+    num_nodes: 2
