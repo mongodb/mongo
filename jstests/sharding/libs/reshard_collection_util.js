@@ -10,18 +10,10 @@ import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 /**
  * Returns whether resharding document verification is actually usable on this cluster.
  *
- * TODO(SERVER-131910): Remove the multiversion check when last LTS is 9.0 and the server parameter
- * is always set in test fixtures.
  * TODO(SERVER-94583): Remove this helper entirely when featureFlagReshardingVerification is removed.
  */
 export function isReshardingVerificationEnabled(db) {
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification")) {
-        return false;
-    }
-    const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-        Boolean(TestData.multiversionBinVersion);
-    return !isMultiversion;
+    return FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
 }
 
 export class ReshardCollectionCmdTest {

@@ -146,13 +146,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         )
 
         # 'reshardingDocumentVerification' defaults to false in production, so enable it in test
-        # suites to keep coverage for resharding document-count validation. Skip on multiversion
-        # runs: older binaries do not have this parameter and the FCV-gated feature flag is disabled
-        # there anyway.
-        #
-        # TODO(SERVER-131910): Re-enable for mixed binary versions when last lts is 9.0.
-        if not self.config.MIXED_BIN_VERSIONS:
-            self.mongod_options["set_parameters"].setdefault("reshardingDocumentVerification", True)
+        # suites to keep coverage for resharding document-count validation.
+        self.mongod_options["set_parameters"].setdefault("reshardingDocumentVerification", True)
 
         self.mongos_options["set_parameters"] = self.fixturelib.make_historic(
             self.mongos_options.get("set_parameters", {})

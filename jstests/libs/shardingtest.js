@@ -1332,12 +1332,9 @@ export class ShardingTest {
                 const clusterVersionInfo = this.getClusterVersionInfo();
                 maybeSetOtelTraceDirectory(startOptions, clusterVersionInfo);
                 // Enable resharding document-count validation (off by default) in test clusters.
-                // TODO(SERVER-131910): Re-enable for mixed binary versions when last lts is 9.0.
-                if (!clusterVersionInfo.isMixedVersion) {
-                    startOptions.setParameter = startOptions.setParameter ?? {};
-                    if (startOptions.setParameter.reshardingDocumentVerification === undefined) {
-                        startOptions.setParameter.reshardingDocumentVerification = true;
-                    }
+                startOptions.setParameter = startOptions.setParameter ?? {};
+                if (startOptions.setParameter.reshardingDocumentVerification === undefined) {
+                    startOptions.setParameter.reshardingDocumentVerification = true;
                 }
                 rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
@@ -1416,8 +1413,8 @@ export class ShardingTest {
                 const clusterVersionInfo = this.getClusterVersionInfo();
                 maybeSetOtelTraceDirectory(rsDefaults, clusterVersionInfo);
                 // Enable resharding document-count validation (off by default) in test clusters.
-                if (!clusterVersionInfo.isMixedVersion &&
-                    rsDefaults.setParameter.reshardingDocumentVerification === undefined) {
+                // See the equivalent config server option above.
+                if (rsDefaults.setParameter.reshardingDocumentVerification === undefined) {
                     rsDefaults.setParameter.reshardingDocumentVerification = true;
                 }
 

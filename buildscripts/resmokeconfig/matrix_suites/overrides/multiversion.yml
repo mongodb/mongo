@@ -493,11 +493,6 @@
 - name: sharding_last_lts_excluded_files
   value:
     exclude_files:
-      # TODO SERVER-132935: re-enable after SERVER-131910 enables
-      # reshardingDocumentVerification for mixed 9.0/9.1 fixtures now that 9.0 is last LTS.
-      - jstests/sharding/resharding_verification_timeout.js
-      - jstests/sharding/resharding_clone_count_uses_shard_key_index.js
-      - jstests/sharding/reshard_collection_validation_size_threshold.js
       # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
       # enabled at 9.0 last-LTS, so the v2 reader bypasses the v1 failpoint used by this test.
       - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
