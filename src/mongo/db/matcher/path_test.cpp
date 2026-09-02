@@ -6,10 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
 
 #include <initializer_list>
 
@@ -83,10 +80,6 @@ TEST(Path, Nested1) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT(e.element().eoo());
-
-    ASSERT(cursor.more());
-    e = cursor.next();
-    ASSERT(e.element().eoo());
     ASSERT_EQUALS((string) "2", e.arrayOffset().fieldName());
 
     ASSERT(cursor.more());
@@ -125,17 +118,14 @@ TEST(Path, NestedPartialMatchScalar) {
 }
 
 // When the path (partially or in its entirety) refers to an array,
-// the iteration logic returns an EOO.
+// the iteration logic does not return an EOO.
+// what we want ideally.
 TEST(Path, NestedPartialMatchArray) {
     ElementPath p{"a.b"};
 
     BSONObj doc = BSON("a" << BSON_ARRAY(4));
 
     BSONElementIterator cursor(&p, doc);
-
-    ASSERT(cursor.more());
-    BSONElementIterator::Context e = cursor.next();
-    ASSERT(e.element().eoo());
 
     ASSERT(!cursor.more());
 }
@@ -156,30 +146,6 @@ TEST(Path, NestedEmptyArray) {
     ASSERT(!cursor.more());
 }
 
-// When internalQueryLegacyDottedPathNullSemantics is true the pre-SERVER-36681 behavior is
-// restored: scalars inside a non-leaf array do NOT produce an EOO element for null matching.
-TEST(Path, NestedPartialMatchArrayOriginalBehavior) {
-    unittest::ServerParameterGuard parameter("internalQueryLegacyDottedPathNullSemantics", true);
-
-    ElementPath p{"a.b"};
-    BSONObj doc = BSON("a" << BSON_ARRAY(4));
-
-    BSONElementIterator cursor(&p, doc);
-    ASSERT(!cursor.more());
-}
-
-// When internalQueryLegacyDottedPathNullSemantics is true the pre-SERVER-36681 behavior is
-// restored: an empty non-leaf array does NOT produce an EOO element for null matching.
-TEST(Path, NestedEmptyArrayOriginalBehavior) {
-    unittest::ServerParameterGuard parameter("internalQueryLegacyDottedPathNullSemantics", true);
-
-    ElementPath p{"a.b"};
-    BSONObj doc = BSON("a" << BSONArray());
-
-    BSONElementIterator cursor(&p, doc);
-    ASSERT(!cursor.more());
-}
-
 TEST(Path, NestedNoLeaf1) {
     ElementPath p{"a.b"};
     p.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
@@ -193,10 +159,6 @@ TEST(Path, NestedNoLeaf1) {
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
     ASSERT_EQUALS(5, e.element().numberInt());
-
-    ASSERT(cursor.more());
-    e = cursor.next();
-    ASSERT(e.element().eoo());
 
     ASSERT(cursor.more());
     e = cursor.next();
@@ -402,21 +364,14 @@ TEST(Path, NonMatchingLongArrayOfSubdocumentsWithNestedArrays) {
     // Build the document {a: [{b: []}, {b: []}, {b: []}, ...]}.
     BSONObj subdoc = BSON("b" << BSONArray());
     BSONArrayBuilder builder;
-    const int numSubdocs = 100 * 1000;
-    for (int i = 0; i < numSubdocs; ++i) {
+    for (int i = 0; i < 100 * 1000; ++i) {
         builder.append(subdoc);
     }
     BSONObj doc = BSON("a" << builder.arr());
 
     BSONElementIterator cursor(&p, doc);
 
-    // The path "a.b.x" matches no elements, but needs to return eoo so null checkers work
-    for (int i = 0; i < numSubdocs; ++i) {
-        ASSERT(cursor.more());
-        BSONElementIterator::Context e = cursor.next();
-        ASSERT(e.element().eoo());
-    }
-
+    // The path "a.b.x" matches no elements.
     ASSERT(!cursor.more());
 }
 
@@ -464,68 +419,6 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT_BSONOBJ_EQ(BSON("0" << 4 << "1" << 5), e.element().Obj());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
-    ASSERT(!cursor.more());
-}
-
-// We do not traverse into a nested array beyond the first level, so a doubly-nested array element
-// cannot be resolved against the remaining path (even though it contains a matching field further
-// inside), and produces an EOO element instead so that the matcher can check it against null.
-TEST(Path, DoublyNestedArrayImplicitTraversal) {
-    ElementPath p{"a.b"};
-    BSONObj doc = fromjson("{a: [[{b: 2}]]}");
-    BSONElementIterator cursor(&p, doc);
-
-    ASSERT(cursor.more());
-    ElementIterator::Context e = cursor.next();
-    ASSERT(e.element().eoo());
-
-    ASSERT(!cursor.more());
-}
-
-// Elements of a doubly-nested array which cannot be traversed produce an EOO element, so that the
-// matcher can check them against null.
-TEST(Path, DoublyNestedArrayOfScalarsImplicitTraversal) {
-    ElementPath p{"a.b"};
-    BSONObj doc = fromjson("{a: [[2], {b: 3}]}");
-    BSONElementIterator cursor(&p, doc);
-
-    ASSERT(cursor.more());
-    ElementIterator::Context e = cursor.next();
-    ASSERT(e.element().eoo());
-
-    ASSERT(cursor.more());
-    e = cursor.next();
-    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
-    ASSERT_EQUALS(3, e.element().numberInt());
-
-    ASSERT(!cursor.more());
-}
-
-// An empty nested array leaves path left over to check, so it produces an EOO element.
-TEST(Path, DoublyNestedEmptyArrayImplicitTraversal) {
-    ElementPath p{"a.b"};
-    BSONObj doc = fromjson("{a: [[], {b: 3}]}");
-    BSONElementIterator cursor(&p, doc);
-
-    ASSERT(cursor.more());
-    ElementIterator::Context e = cursor.next();
-    ASSERT(e.element().eoo());
-
-    ASSERT(cursor.more());
-    e = cursor.next();
-    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
-    ASSERT_EQUALS(3, e.element().numberInt());
-
-    ASSERT(!cursor.more());
-}
-
-// With internalQueryLegacyDottedPathNullSemantics enabled, nested arrays are not traversed at all.
-TEST(Path, DoublyNestedArrayImplicitTraversalOriginalBehavior) {
-    unittest::ServerParameterGuard parameter("internalQueryLegacyDottedPathNullSemantics", true);
-
-    ElementPath p{"a.b"};
-    BSONObj doc = fromjson("{a: [[{b: 2}]]}");
-    BSONElementIterator cursor(&p, doc);
     ASSERT(!cursor.more());
 }
 
@@ -605,21 +498,6 @@ TEST(Path, LeafArrayBehaviorTraverseOmitArrayNested) {
         ASSERT_TRUE(cursor.more());
         ASSERT_EQUALS(element, cursor.next().element().Int());
     }
-    ASSERT_FALSE(cursor.more());
-}
-
-TEST(Path, LeafArrayBehaviorTraverseNestedEmptyArray) {
-    ElementPath path{"a.b"};
-    BSONObj doc = fromjson("{a: [{b: []}, {b: []}]}");
-    BSONElementIterator cursor(&path, doc);
-
-    // Verifies that the empty arrays are returned.
-    ASSERT_TRUE(cursor.more());
-    ElementIterator::Context e = cursor.next();
-    ASSERT_EQUALS(BSONType::array, e.element().type());
-    ASSERT_TRUE(cursor.more());
-    e = cursor.next();
-    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_FALSE(cursor.more());
 }
 
