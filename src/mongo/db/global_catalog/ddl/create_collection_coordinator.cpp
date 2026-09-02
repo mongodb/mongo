@@ -124,6 +124,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitOnShardingCatalog);
+MONGO_FAIL_POINT_DEFINE(createCollectionHangBeforeExitCriticalSection);
 
 namespace mongo {
 
@@ -2369,6 +2370,11 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
+
+    if (MONGO_unlikely(createCollectionHangBeforeExitCriticalSection.shouldFail())) {
+        createCollectionHangBeforeExitCriticalSection.pauseWhileSet();
+    }
+
     // Exit critical section on all shards other than the coordinator.
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is released on the data shard if the data shard is not the
