@@ -151,6 +151,12 @@ private:
     bool contains(const S2Polyline& otherLine) const;
     bool contains(const S2Polygon& otherPolygon) const;
 
+    // True if this holds a GeometryCollection with at least one strict-winding (STRICT_SPHERE)
+    // polygon member. Such members have a null s2Polygon (their region lives in bigPolygon), so
+    // the container cannot present a usable S2 region for them and callers must not index or match
+    // against them.
+    bool _geometryCollectionHasStrictWindingPolygon() const;
+
     // Only one of these clonable_ptrs should be non-NULL.  S2Region is a
     // superclass but it only supports testing against S2Cells.  We need
     // the most specific class we can get.
