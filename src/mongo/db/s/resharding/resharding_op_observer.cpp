@@ -205,7 +205,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator begin,
                                      std::vector<InsertStatement>::const_iterator end,
                                      const std::vector<RecordId>& recordIds,
-                                     std::vector<bool> fromMigrate,
+                                     const std::vector<bool>& fromMigrate,
                                      bool defaultFromMigrate,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();

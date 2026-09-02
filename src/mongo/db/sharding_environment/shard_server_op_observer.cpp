@@ -246,7 +246,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       const std::vector<RecordId>& recordIds,
-                                      std::vector<bool> fromMigrate,
+                                      const std::vector<bool>& fromMigrate,
                                       bool defaultFromMigrate,
                                       OpStateAccumulator* opAccumulator) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.

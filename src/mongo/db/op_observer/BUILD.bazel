@@ -332,6 +332,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/timeseries:timeseries_op_observer",

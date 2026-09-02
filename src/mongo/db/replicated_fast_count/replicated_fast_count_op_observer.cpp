@@ -34,7 +34,7 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    const std::vector<RecordId>& recordIds,
-                   std::vector<bool> fromMigrate,
+                   const std::vector<bool>& fromMigrate,
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) final;
 
@@ -104,7 +104,7 @@ void ReplicatedFastCountOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<InsertStatement>::const_iterator begin,
                                               std::vector<InsertStatement>::const_iterator end,
                                               const std::vector<RecordId>&,
-                                              std::vector<bool>,
+                                              const std::vector<bool>&,
                                               bool,
                                               OpStateAccumulator*) {
     if (begin == end || !isFastCountTimestampsNss(coll->ns())) {
