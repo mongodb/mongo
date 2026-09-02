@@ -246,6 +246,10 @@ assert.soon(
 // Let things settle after the rollback.
 rbt.awaitLastOpCommitted(60 * 1000);
 
+// RollbackTest leaves replication stopped on the tiebreaker; at this point replication can be
+// resumed on all nodes since we only wanted to test the behavior during rollback.
+restartReplSetReplication(st.configRS);
+
 // Assert the reset actually happened on the rolled-back node and confirm we log the reset.
 for (const id of kResetLogIds) {
     checkLog.containsJson(rollbackNode, id, {resetCollectionShardingRuntimes: true});
@@ -389,8 +393,4 @@ assert.gte(
     "no resumed read reflected the CSR-rebuild latency the customer would experience",
 );
 
-// RollbackTest leaves replication stopped on the tiebreaker; restart it so the config replica set
-// (owned by ShardingTest) can be torn down cleanly. Do not call rbt.stop() here: ShardingTest owns
-// this replica set and stops it itself.
-restartReplSetReplication(st.configRS);
 st.stop();
