@@ -9,6 +9,7 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 . "$DIR/bazel_evergreen_shutils.sh"
+. "$DIR/engflow_links_shutils.sh"
 
 if [[ "${resmoke_rbe_mirror_reenabled}" != "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
     echo "Skipping: the RBE mirror variant is disabled. Set the resmoke_rbe_mirror_reenabled project variable to true to enable it. Report to #ask-devprod-test-infrastructure if you have any issues."
@@ -256,7 +257,7 @@ run_build_and_test() {
     export build_timeout_seconds
 
     # Drop any BEP left by a previous execution of this task or by another bazel command.
-    rm -f build_events.json "$STREAMED_TASKS_FILE"
+    rm -f build_events.json engflow_links.json "$STREAMED_TASKS_FILE"
 
     bazel_evergreen_shutils::retry_bazel_cmd $test_attempts "$BAZEL_BINARY" \
         test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets} &
@@ -278,6 +279,21 @@ run_build_and_test() {
     elif [[ "$RET" != "0" ]]; then
         echo "Errors were found during bazel test, failing the execution"
     fi
+}
+
+write_engflow_links() {
+    if [[ "${resmoke_disable_rbe}" == "true" ]]; then
+        return # Local execution never reaches EngFlow.
+    fi
+    local invocation_id
+    invocation_id=$(engflow_links::invocation_id build_events.json)
+    if [[ -z "$invocation_id" ]]; then
+        echo "No invocation id in build_events.json; not attaching an EngFlow link."
+        return
+    fi
+    # Result tasks attach their own, per-target link from fetch_remote_test_results.sh.
+    engflow_links::entry "EngFlow invocation" "$(engflow_links::invocation_url "$invocation_id")" |
+        jq --slurp '.' >engflow_links.json
 }
 
 gather_failed_tests() {
@@ -356,7 +372,7 @@ main() {
 
     set +o errexit
     run_build_and_test
-    bazel_evergreen_shutils::write_last_engflow_link
+    write_engflow_links
     set -o errexit
 
     if [[ -n "$result_task" ]]; then

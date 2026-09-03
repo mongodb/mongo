@@ -50,7 +50,8 @@ NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 # relinked binaries staged by gather_failed_tests so one task never uploads another's.
 _RESULT_TASK_CLEANUP = (
     "rm -rf build/ results/ report.json src/dist-tests/ mongo-tests.tgz "
-    "src/.failed_unittest_repro.txt src/.bazel_build_invocation src/.engflow_link"
+    "src/.failed_unittest_repro.txt src/.bazel_build_invocation src/.engflow_link "
+    "src/engflow_links.json"
 )
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
@@ -303,6 +304,7 @@ def make_task_group(
         ]
         + _result_artifact_uploads()
         + [
+            FunctionCall("attach engflow links"),
             FunctionCall("save failed tests"),
             FunctionCall("generate result task hang analyzer"),
         ],

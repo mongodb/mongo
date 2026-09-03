@@ -3,8 +3,8 @@
 This watcher runs on the Evergreen host concurrently with `bazel test`. It tails
 the Build Event Protocol NDJSON file (--build_event_json_file) and, as each
 target's `testSummary` event arrives:
-  1. uploads a *filtered* snapshot of the BEP (only the testResult/testSummary
-     lines, which is all any downstream consumer reads) to S3.
+  1. uploads a *filtered* snapshot of the BEP (only the started/testResult/
+     testSummary lines, which is all any downstream consumer reads) to S3.
   2. activates the target's result task via the Evergreen API.
 """
 
@@ -45,7 +45,7 @@ def parse_test_summary_label(event: dict) -> Optional[str]:
 
 def is_filtered_event(event: dict) -> bool:
     """True for the BEP events downstream consumers read from build_events.json."""
-    return "testResult" in event or "testSummary" in event
+    return any(kind in event for kind in ("started", "testResult", "testSummary"))
 
 
 class BEPTail:

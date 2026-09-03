@@ -13,6 +13,7 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/bazel_test_results_shutils.sh"
+. "$DIR/engflow_links_shutils.sh"
 
 if [[ "${resmoke_rbe_mirror_reenabled}" != "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
     echo "Skipping: the RBE mirror variant is disabled. Set the resmoke_rbe_mirror_reenabled project variable to true to enable it. Report to #ask-devprod-test-infrastructure if you have any issues."
@@ -146,6 +147,19 @@ function write_bazel_invocation() {
     mkdir -p "${workdir}/src/"
     sed "s/\S*\$/${replacement_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
 }
+function write_engflow_links() {
+    local invocation_id link
+    invocation_id=$(engflow_links::invocation_id "$BEP_FILE")
+    if [[ -z "$invocation_id" ]]; then
+        echo "No invocation id in ${BEP_FILE}; not attaching EngFlow links."
+        return
+    fi
+
+    link=$(engflow_links::target_url "$invocation_id" "${test_label}")
+    engflow_links::entry "EngFlow remote execution details - this target" "$link" |
+        jq --slurp '.' >"${workdir}/src/engflow_links.json"
+    echo "Attaching EngFlow link: ${link}"
+}
 
 # Resolves a file path from a list of candidate locations. Returns the first existing file path found.
 function resolve_file() {
@@ -252,6 +266,8 @@ bazel_test_results::combine_metrics
 failures=$(bazel_test_results::combine_reports)
 
 write_bazel_invocation
+
+write_engflow_links
 
 # Check for system-level failures (TIMEOUT or NO_REPORT)
 for status in "${shard_statuses[@]}"; do

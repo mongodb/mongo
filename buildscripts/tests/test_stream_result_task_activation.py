@@ -60,6 +60,10 @@ def test_summary_line(label):
     )
 
 
+def started_line(uuid="10929faf-4aed-48ba-83bd-58d136dcf79c"):
+    return json.dumps({"id": {"started": {}}, "started": {"uuid": uuid}})
+
+
 def progress_line():
     return json.dumps({"id": {"progress": {"opaqueCount": 1}}, "progress": {"stderr": "noise"}})
 
@@ -75,6 +79,7 @@ class TestBEPParsing(unittest.TestCase):
     def test_is_filtered_event(self):
         self.assertTrue(is_filtered_event(json.loads(test_result_line("//a:b"))))
         self.assertTrue(is_filtered_event(json.loads(test_summary_line("//a:b"))))
+        self.assertTrue(is_filtered_event(json.loads(started_line())))
         self.assertFalse(is_filtered_event(json.loads(progress_line())))
 
 
@@ -134,14 +139,21 @@ class TestActivationRouter(unittest.TestCase):
             upload_snapshot=lambda lines: order.append(("upload", list(lines))),
             activate=lambda labels: (order.append(("activate", set(labels))), labels)[1],
         )
-        router.ingest([progress_line(), test_result_line("//a:a"), test_summary_line("//a:a")])
+        router.ingest(
+            [
+                started_line(),
+                progress_line(),
+                test_result_line("//a:a"),
+                test_summary_line("//a:a"),
+            ]
+        )
         router.flush()
         self.assertEqual(order[0][0], "upload")
         self.assertEqual(order[1], ("activate", {"//a:a"}))
         # Progress events are filtered out of the snapshot.
         uploaded = [json.loads(line) for line in order[0][1]]
         self.assertTrue(all(is_filtered_event(e) for e in uploaded))
-        self.assertEqual(len(uploaded), 2)
+        self.assertEqual(len(uploaded), 3)
 
     def test_upload_failure_blocks_activation_and_retries(self):
         upload_calls = []
