@@ -17,6 +17,8 @@
 #include <string_view>
 #include <utility>
 
+#include <absl/container/flat_hash_map.h>
+
 namespace mongo {
 namespace sbe {
 
@@ -25,7 +27,7 @@ namespace sbe {
  * all accumulators of that $group stage. The first MaterializedRow in SpilledRow and TableType
  * contains a key and the second contains the state values.
  */
-using TableType = stdx::unordered_map<value::MaterializedRow,
+using TableType = absl::flat_hash_map<value::MaterializedRow,
                                       value::MaterializedRow,
                                       value::MaterializedRowHasher,
                                       value::MaterializedRowEq>;
