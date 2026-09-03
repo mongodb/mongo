@@ -172,6 +172,89 @@ class RefreshModuleLockfileTest(unittest.TestCase):
             self.assertFalse(runner.fail)
             self.assertEqual(lockfile.read_text(encoding="utf-8"), "after\n")
 
+    def test_fix_mode_falls_back_to_update_for_extension_digest_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
+            lockfile.write_text("before\n", encoding="utf-8")
+            modes = []
+
+            def fake_run(args, **kwargs):
+                mode = args[-1]
+                modes.append(mode)
+                if mode == "--lockfile_mode=refresh":
+                    lockfile.write_text("partial\n", encoding="utf-8")
+                    return subprocess.CompletedProcess(args, 1)
+
+                self.assertEqual(mode, "--lockfile_mode=update")
+                self.assertEqual(lockfile.read_text(encoding="utf-8"), "before\n")
+                lockfile.write_text("after\n", encoding="utf-8")
+                return subprocess.CompletedProcess(args, 0)
+
+            runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
+            stdout = io.StringIO()
+            with mock.patch.object(lint.subprocess, "run", side_effect=fake_run):
+                with contextlib.redirect_stdout(stdout):
+                    runner.refresh_module_lockfile(
+                        fix=True,
+                        dry_run=False,
+                        lockfile_path=lockfile,
+                    )
+
+            self.assertFalse(runner.fail)
+            self.assertEqual(
+                modes,
+                ["--lockfile_mode=refresh", "--lockfile_mode=update"],
+            )
+            self.assertEqual(lockfile.read_text(encoding="utf-8"), "after\n")
+            self.assertIn("--lockfile_mode=update", stdout.getvalue())
+
+    def test_fix_dry_run_falls_back_to_update_and_restores(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
+            lockfile.write_text("before\n", encoding="utf-8")
+
+            def fake_run(args, **kwargs):
+                mode = args[-1]
+                if mode == "--lockfile_mode=refresh":
+                    return subprocess.CompletedProcess(args, 1)
+
+                lockfile.write_text("after\n", encoding="utf-8")
+                return subprocess.CompletedProcess(args, 0)
+
+            runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
+            with mock.patch.object(lint.subprocess, "run", side_effect=fake_run):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    runner.refresh_module_lockfile(
+                        fix=True,
+                        dry_run=True,
+                        lockfile_path=lockfile,
+                    )
+
+            self.assertFalse(runner.fail)
+            self.assertEqual(lockfile.read_text(encoding="utf-8"), "before\n")
+
+    def test_fix_mode_restores_lockfile_when_update_fallback_fails(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"
+            lockfile.write_text("before\n", encoding="utf-8")
+
+            def fake_run(args, **kwargs):
+                lockfile.write_text("partial\n", encoding="utf-8")
+                return subprocess.CompletedProcess(args, 1)
+
+            runner = lint.LintRunner(keep_going=False, bazel_bin="bazel")
+            with mock.patch.object(lint.subprocess, "run", side_effect=fake_run):
+                with self.assertRaises(lint.LinterFail):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        runner.refresh_module_lockfile(
+                            fix=True,
+                            dry_run=False,
+                            lockfile_path=lockfile,
+                        )
+
+            self.assertTrue(runner.fail)
+            self.assertEqual(lockfile.read_text(encoding="utf-8"), "before\n")
+
     def test_fix_dry_run_restores_lockfile_and_passes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             lockfile = pathlib.Path(temp_dir) / "MODULE.bazel.lock"

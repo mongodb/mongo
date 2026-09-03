@@ -570,6 +570,11 @@ class LintRunner:
 
         original_contents = _read_optional_bytes(lockfile_path)
 
+        # `refresh` is preferred because it avoids unrelated lockfile churn, but
+        # Bazel can report that it cannot regenerate a changed module-extension
+        # digest. Retry with `update`, which is the mode Bazel recommends for
+        # that failure.
+        lockfile_mode = "refresh"
         print(f"Refreshing {lockfile_display}...")
         result = subprocess.run(
             [
@@ -577,7 +582,7 @@ class LintRunner:
                 *self.bazel_startup_options,
                 "mod",
                 "deps",
-                "--lockfile_mode=refresh",
+                f"--lockfile_mode={lockfile_mode}",
             ],
             check=False,
             stdout=sys.stdout,
@@ -585,6 +590,27 @@ class LintRunner:
         )
 
         refreshed_contents = _read_optional_bytes(lockfile_path)
+
+        if result.returncode != 0:
+            if refreshed_contents != original_contents:
+                _restore_optional_bytes(lockfile_path, original_contents)
+
+            print(f"Retrying {lockfile_display} with `--lockfile_mode=update`...")
+            lockfile_mode = "update"
+            result = subprocess.run(
+                [
+                    self.bazel_bin,
+                    *self.bazel_startup_options,
+                    "mod",
+                    "deps",
+                    f"--lockfile_mode={lockfile_mode}",
+                ],
+                check=False,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            refreshed_contents = _read_optional_bytes(lockfile_path)
+
         changed = refreshed_contents != original_contents
 
         if result.returncode != 0:
@@ -600,7 +626,8 @@ class LintRunner:
                 print(f"{lockfile_display} is up to date.")
                 return
             print(
-                f"{lockfile_display} would be updated by `bazel mod deps --lockfile_mode=refresh`:"
+                f"{lockfile_display} would be updated by "
+                f"`bazel mod deps --lockfile_mode={lockfile_mode}`:"
             )
             _print_unified_diff(lockfile_path, original_contents, refreshed_contents)
             _restore_optional_bytes(lockfile_path, original_contents)
@@ -608,7 +635,10 @@ class LintRunner:
 
         if fix:
             if changed:
-                print(f"Updated {lockfile_display} via `bazel mod deps --lockfile_mode=refresh`.")
+                print(
+                    f"Updated {lockfile_display} via "
+                    f"`bazel mod deps --lockfile_mode={lockfile_mode}`."
+                )
             else:
                 print(f"{lockfile_display} is up to date.")
             return
