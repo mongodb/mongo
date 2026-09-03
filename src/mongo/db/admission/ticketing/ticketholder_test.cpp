@@ -232,7 +232,7 @@ struct TicketHolderTest::MockAdmission {
 
     // Block until this Admission attempt is queued waiting on a ticket.
     bool waitUntilQueued(Nanoseconds timeout) {
-        return admCtx.waitUntilQueued(timeout);
+        return admCtx.waitUntilQueued_forTest(timeout);
     }
 
     ServiceContext::UniqueClient client;
