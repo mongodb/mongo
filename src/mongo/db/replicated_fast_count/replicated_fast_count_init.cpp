@@ -8,11 +8,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -21,9 +18,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -94,52 +89,38 @@ void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
 }
 }  // namespace
 
-void setUpReplicatedFastCount(
-    OperationContext* opCtx, boost::optional<multiversion::FeatureCompatibilityVersion> targetFCV) {
+void setUpReplicatedFastCount(OperationContext* opCtx) {
     auto& manager =
         replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
 
-    // Containers and collections should be mutually exclusive. When a target FCV is provided
-    // (i.e. we are running inside an FCV upgrade, where the transitional FCV state makes
-    // fcv-gated flags evaluate as disabled), decide the store mode against that FCV so the
-    // stores created here match the mode the node will use once the transition completes.
-    const bool useContainers = targetFCV ? shouldUseReplicatedFastCountContainers(opCtx, *targetFCV)
-                                         : shouldUseReplicatedFastCountContainers(opCtx);
-    if (useContainers) {
-        auto status = createInternalFastCountContainers(opCtx,
-                                                        NamespaceString::kAdminCommandNamespace,
-                                                        ident::kFastCountMetadataStore,
-                                                        KeyFormat::String,
-                                                        ident::kFastCountMetadataStoreTimestamps,
-                                                        KeyFormat::Long,
-                                                        /*writeToOplog=*/true);
-        if (status == ErrorCodes::ObjectAlreadyExists) {
-            LOGV2(12309403,
-                  "Replicated fast count idents already exist",
-                  "metadataIdent"_attr = ident::kFastCountMetadataStore,
-                  "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
-        } else {
-            massertStatusOK(status);
-        }
-
-        auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
-        auto metadataRS =
-            engine->getRecordStore(opCtx,
-                                   NamespaceString::kAdminCommandNamespace,
-                                   ident::kFastCountMetadataStore,
-                                   RecordStore::Options{.keyFormat = KeyFormat::String},
-                                   /*uuid=*/boost::none);
-        auto timestampsRS =
-            engine->getRecordStore(opCtx,
-                                   NamespaceString::kAdminCommandNamespace,
-                                   ident::kFastCountMetadataStoreTimestamps,
-                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
-                                   /*uuid=*/boost::none);
-        manager.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
+    auto status = createInternalFastCountContainers(opCtx,
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/true);
+    if (status == ErrorCodes::ObjectAlreadyExists) {
+        LOGV2(12309403,
+              "Replicated fast count idents already exist",
+              "metadataIdent"_attr = ident::kFastCountMetadataStore,
+              "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
     } else {
-        _createInternalFastCountCollections(repl::StorageInterface::get(opCtx->getServiceContext()),
-                                            opCtx);
+        massertStatusOK(status);
     }
+
+    auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto metadataRS = engine->getRecordStore(opCtx,
+                                             NamespaceString::kAdminCommandNamespace,
+                                             ident::kFastCountMetadataStore,
+                                             RecordStore::Options{.keyFormat = KeyFormat::String},
+                                             /*uuid=*/boost::none);
+    auto timestampsRS = engine->getRecordStore(opCtx,
+                                               NamespaceString::kAdminCommandNamespace,
+                                               ident::kFastCountMetadataStoreTimestamps,
+                                               RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                               /*uuid=*/boost::none);
+    manager.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
 
     manager.startup(opCtx);
 

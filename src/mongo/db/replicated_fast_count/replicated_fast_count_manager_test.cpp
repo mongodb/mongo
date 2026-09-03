@@ -823,7 +823,6 @@ protected:
     }
 
     unittest::ServerParameterGuard _ffFastCount{"featureFlagReplicatedFastCount", true};
-    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
     test_helpers::NsAndUUID collA = {
         .nss = NamespaceString::createNamespaceString_forTest("finalize_container_test", "collA"),
         .uuid = UUID::gen()};
@@ -1140,7 +1139,6 @@ protected:
 TEST_F(ReplicatedFastCountManagerColdBootTest,
        InitializePopulatesMetadataFromExistingInternalContainer) {
     unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(createInternalFastCountContainers(_opCtx,
                                                 NamespaceString::kAdminCommandNamespace,
@@ -1224,7 +1222,6 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
 
 TEST_F(ReplicatedFastCountManagerColdBootTest, InitializeScansOplogWhenContainerIdentIsMissing) {
     unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     const Timestamp afterSetup = storageInterface()->getLatestOplogTimestamp(_opCtx);
     const Timestamp ts1(afterSetup.getSecs(), afterSetup.getInc() + 1);
@@ -1259,7 +1256,6 @@ TEST_F(ReplicatedFastCountManagerColdBootTest, InitializeScansOplogWhenContainer
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
        ContainerModeReadsTimestampFromIdentToFilterOplogScan) {
     unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -1371,7 +1367,6 @@ protected:
             std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
     }
 
-    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
     std::unique_ptr<ReplicatedFastCountManager> manager;
 };
 

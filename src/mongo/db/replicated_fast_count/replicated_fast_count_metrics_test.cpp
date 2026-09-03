@@ -519,6 +519,11 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
 // `ReplicatedFastCountOpObserver` hooks — container writes fire `onContainerInsert`/
 // `onContainerUpdate`.
 class TimestampStoreMetricsTest : public CatalogTestFixture {
+public:
+    TimestampStoreMetricsTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -526,18 +531,12 @@ protected:
         resetOplogLagState_ForTest();
         registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
 
-        _ffContainerWrites =
-            std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
-
         store = test_helpers::createContainerFastCountStores(opCtx).timestampStore;
     }
 
     OperationContext* opCtx;
     std::unique_ptr<SizeCountTimestampStore> store;
     OtelMetricsCapturer capturer;
-
-private:
-    std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 
 TEST_F(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
@@ -595,6 +594,11 @@ TEST_F(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
 // secondary apply path. The helper must filter on ident and only update the gauge when the op
 // targets the fast-count timestamps container.
 class ContainerApplyHookTest : public CatalogTestFixture {
+public:
+    ContainerApplyHookTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();

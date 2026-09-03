@@ -1644,32 +1644,30 @@ void InitialSyncer::_seedFastCountFromInitialSync(WithLock) {
         auto& mgr =
             replicated_fast_count::ReplicatedFastCountManager::get(getGlobalServiceContext());
 
-        if (shouldUseReplicatedFastCountContainers(opCtxPtr)) {
-            // The secondary's local backing stores will not be created otherwise since containers
-            // don't get picked up by regular collection cloning.
-            massertStatusOK(
-                createInternalFastCountContainers(opCtxPtr,
-                                                  NamespaceString::kAdminCommandNamespace,
-                                                  ident::kFastCountMetadataStore,
-                                                  KeyFormat::String,
-                                                  ident::kFastCountMetadataStoreTimestamps,
-                                                  KeyFormat::Long,
-                                                  /*writeToOplog=*/false));
-            auto* engine = opCtxPtr->getServiceContext()->getStorageEngine()->getEngine();
-            auto metadataRS =
-                engine->getRecordStore(opCtxPtr,
-                                       NamespaceString::kAdminCommandNamespace,
-                                       ident::kFastCountMetadataStore,
-                                       RecordStore::Options{.keyFormat = KeyFormat::String},
-                                       /*uuid=*/boost::none);
-            auto timestampsRS =
-                engine->getRecordStore(opCtxPtr,
-                                       NamespaceString::kAdminCommandNamespace,
-                                       ident::kFastCountMetadataStoreTimestamps,
-                                       RecordStore::Options{.keyFormat = KeyFormat::Long},
-                                       /*uuid=*/boost::none);
-            mgr.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
-        }
+        // The secondary's local backing stores will not be created otherwise since containers
+        // don't get picked up by regular collection cloning.
+        massertStatusOK(createInternalFastCountContainers(opCtxPtr,
+                                                          NamespaceString::kAdminCommandNamespace,
+                                                          ident::kFastCountMetadataStore,
+                                                          KeyFormat::String,
+                                                          ident::kFastCountMetadataStoreTimestamps,
+                                                          KeyFormat::Long,
+                                                          /*writeToOplog=*/false));
+        auto* engine = opCtxPtr->getServiceContext()->getStorageEngine()->getEngine();
+        auto metadataRS =
+            engine->getRecordStore(opCtxPtr,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none);
+        auto timestampsRS =
+            engine->getRecordStore(opCtxPtr,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none);
+        mgr.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
+
         // The secondary is in INITIAL_SYNC state and rejects regular Write intent. Take a
         // global IX lock with LocalWrite intent so populateFromInitialSync's writes don't
         // trip `canAcceptWritesFor()`.

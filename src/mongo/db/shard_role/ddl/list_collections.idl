@@ -75,8 +75,8 @@ structs:
                 type: ListCollectionsReplyInfoFastCount
                 description: >-
                     Replicated fast count metadata for this collection. Only emitted when
-                    listCollections is run with rawData and featureFlagReplicatedFastCount and
-                    featureFlagContainerWrites are enabled. For testing purposes only.
+                    listCollections is run with rawData and featureFlagReplicatedFastCount is
+                    enabled. For testing purposes only.
                 optional: true
                 stability: unstable
 

@@ -10,7 +10,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 
 namespace mongo {
@@ -63,34 +62,15 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
     return repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() && !nss.isOplog();
 }
 
-bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
-    return rss::ReplicatedStorageService::get(opCtx)
-               .getPersistenceProvider()
-               .mustUseContainerWrites() ||
-        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-}
-
-bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx,
-                                            multiversion::FeatureCompatibilityVersion fcv) {
-    return rss::ReplicatedStorageService::get(opCtx)
-               .getPersistenceProvider()
-               .mustUseContainerWrites() ||
-        feature_flags::gContainerWrites.isEnabledOnVersion(fcv);
-}
-
 bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
     if (!getTestCommandsEnabled()) {
         return false;
     }
-    const auto vCtx = VersionContext::getDecoration(opCtx);
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    // We don't consult the mustUseContainerWrites or shouldUseReplicatedFastCount persistence
-    // provider fields since this is test only functionality.
-    return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(vCtx,
-                                                                                  fcvSnapshot) &&
-        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
+    // We don't consult the shouldUseReplicatedFastCount persistence provider field since this is
+    // test only functionality.
+    return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx) {

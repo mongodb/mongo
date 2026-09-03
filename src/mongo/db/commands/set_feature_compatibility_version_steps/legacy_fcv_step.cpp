@@ -490,14 +490,10 @@ private:
         // Create the replicated size and count stores and start the background metadata checkpoint
         // thread when upgrading to an FCV that enables the feature. This handles the case where a
         // shard starts at lastLTS FCV and is upgraded by the config server during addShard.
-        // This hook runs while the FCV is still in the transitional upgrading state, where
-        // fcv-gated feature flags evaluate as disabled. Pass the requested FCV so the
-        // container-vs-collection store decision matches the mode the node will run in once the
-        // upgrade completes.
         if (gFeatureFlagReplicatedFastCount.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, originalVersion) &&
             repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
-            setUpReplicatedFastCount(opCtx, requestedVersion);
+            setUpReplicatedFastCount(opCtx);
         }
     }
 

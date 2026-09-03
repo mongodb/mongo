@@ -125,28 +125,16 @@ ValidateState::ValidateState(OperationContext* opCtx,
     }
 }
 
-Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
-    if (shouldUseReplicatedFastCountContainers(opCtx)) {
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        auto* engine = storageEngine->getEngine();
+Status ValidateState::_checkReplicatedFastCountContainer(OperationContext* opCtx) const {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
 
-        if (!engine->hasIdent(ru, ident::kFastCountMetadataStore)) {
-            return Status(
-                ErrorCodes::Error{12231705},
-                str::stream()
-                    << "Internal FastCount container ident '" << ident::kFastCountMetadataStore
-                    << "' does not exist to validate. Required for enforcing fast count.");
-        }
-        return Status::OK();
-    }
-    const NamespaceString fastCountNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto catalog = CollectionCatalog::get(opCtx);
-    if (!catalog->lookupCollectionByNamespace(opCtx, fastCountNss)) {
-        return Status(ErrorCodes::NamespaceNotFound,
+    if (!engine->hasIdent(ru, ident::kFastCountMetadataStore)) {
+        return Status(ErrorCodes::Error{12231705},
                       str::stream()
-                          << "Internal FastCount Collection '" << fastCountNss.toStringForErrorMsg()
+                          << "Internal FastCount container ident '"
+                          << ident::kFastCountMetadataStore
                           << "' does not exist to validate. Required for enforcing fast count.");
     }
     return Status::OK();
@@ -232,7 +220,7 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
 }
 
 FastCountType ValidateState::getDetectedFastCountType(OperationContext* opCtx) const {
-    const Status replicatedFastCountStatus = _checkReplicatedFastCountCollectionExists(opCtx);
+    const Status replicatedFastCountStatus = _checkReplicatedFastCountContainer(opCtx);
     const Status legacyFastCountStatus = _checkUnreplicatedFastCountCollectionExists(opCtx);
     if (replicatedFastCountStatus.isOK() && legacyFastCountStatus.isOK()) {
         return FastCountType::both;

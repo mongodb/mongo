@@ -160,12 +160,6 @@ public:
                   : Options().setPersistenceProvider(
                         std::make_unique<replicated_fast_count::test_helpers::
                                              ReplicatedFastCountTestPersistenceProvider>())) {}
-
-protected:
-    // The hasSizeStorer params use the default persistence provider, which would otherwise choose
-    // the collection branch in shouldUseReplicatedFastCountContainers().
-    // TODO SERVER-126250: Remove the guard once the collection branch is gone.
-    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {

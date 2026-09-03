@@ -14,7 +14,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count {
@@ -40,8 +39,6 @@ protected:
 };
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreIdents) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
 
@@ -63,8 +60,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreId
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -120,27 +115,7 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
     }
 }
 
-TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenFlagDisabled) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
-
-    auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
-
-    setUpReplicatedFastCount(_opCtx);
-
-    // Containers should not be created when the flag is disabled.
-    EXPECT_FALSE(
-        storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
-        *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
-
-    // Collections and manager should still be set up.
-    EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
-}
-
 TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     const int numIterations = 100;
     for (int i = 0; i < numIterations; ++i) {
         setUpReplicatedFastCount(_opCtx);
@@ -149,8 +124,6 @@ TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyMetadataExists) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -178,8 +151,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyM
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmptyMetadataExists) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -218,8 +189,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmpt
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyTimestampsExists) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -247,8 +216,6 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyT
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountFailsWhenOnlyNonEmptyTimestampsExists) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -378,8 +345,6 @@ TEST_F(ReplicatedFastCountInitTest, handleExistingFastCountIdentReusesEmptyLongI
 }
 
 TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersRemovesExistingIdents) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
     auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
@@ -435,8 +400,6 @@ TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersRemovesExisti
 }
 
 TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersIsNoOpWhenAbsent) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
 
@@ -451,8 +414,6 @@ TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersIsNoOpWhenAbs
 }
 
 TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersHandlesPartialState) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
     auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
@@ -484,8 +445,6 @@ TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersHandlesPartia
 }
 
 TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersAllowsCleanRecreate) {
-    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
-
     auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
     auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();

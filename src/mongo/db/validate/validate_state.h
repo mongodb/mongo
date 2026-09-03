@@ -190,10 +190,10 @@ private:
     ValidateState() = delete;
 
     /**
-     * Checks if the fast count replicated collection exists by looking up the collection in the
-     * catalog. Returns Status::OK() if the collection exists and an error otherwise.
+     * Checks whether the replicated fast count container ident exists in the storage engine.
+     * Returns Status::OK() if the container exists and an error otherwise.
      */
-    Status _checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const;
+    Status _checkReplicatedFastCountContainer(OperationContext* opCtx) const;
 
     /**
      * Checks if the underlying storage engine contains an internal size storer table. Returns
