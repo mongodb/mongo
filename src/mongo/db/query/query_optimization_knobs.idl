@@ -865,7 +865,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimizationUseIndexUniqueness"
         cpp_vartype: Atomic<bool>
-        default: false
+        default: true
         redact: false
         annotations:
             query_knob:
