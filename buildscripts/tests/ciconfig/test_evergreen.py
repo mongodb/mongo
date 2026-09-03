@@ -1,12 +1,95 @@
 """Unit tests for the buildscripts.ciconfig.evergreen module."""
 
+import contextlib
 import datetime
 import os
 import unittest
+from unittest import mock
 
 import buildscripts.ciconfig.evergreen as _evergreen
 
 TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "evergreen.yml")
+
+
+class TestFindEvergreenBinary(unittest.TestCase):
+    """Unit tests for find_evergreen_binary()."""
+
+    def test_no_binary_requested(self):
+        self.assertIsNone(_evergreen.find_evergreen_binary(None))
+
+    def test_binary_already_on_path(self):
+        with mock.patch.object(_evergreen.distutils.spawn, "find_executable",
+                               return_value="/usr/bin/evergreen"):
+            self.assertEqual("/usr/bin/evergreen", _evergreen.find_evergreen_binary("evergreen"))
+
+    def test_windows_cygwin_falls_back_to_home(self):
+        # Regression test for https://bugs.python.org/issue36264: on Windows, os.path.expanduser
+        # resolves '~' via USERPROFILE, but Cygwin sets HOME instead, which is where the
+        # Evergreen agent stages its own CLI binary. HOME and USERPROFILE point elsewhere.
+        home_dir = os.path.join("some", "cygwin", "home", "mci-exec")
+        original_environ = {
+            "HOME": home_dir,
+            "USERPROFILE": os.path.join("some", "Users", "mci-exec"),
+        }
+        expected_binary_path = os.path.join(home_dir, "evergreen")
+
+        def fake_exists(path):
+            return path == expected_binary_path
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(_evergreen.distutils.spawn, "find_executable", return_value=None))
+            stack.enter_context(mock.patch.object(_evergreen.sys, "platform", "win32"))
+            stack.enter_context(
+                mock.patch.dict(_evergreen.os.environ, original_environ, clear=True))
+            stack.enter_context(
+                mock.patch.object(_evergreen.os.path, "exists", side_effect=fake_exists))
+
+            result = _evergreen.find_evergreen_binary("evergreen")
+            # The USERPROFILE/HOME mirroring used to locate the binary must not leak.
+            environ_after_call = dict(_evergreen.os.environ)
+
+        self.assertEqual(expected_binary_path, result)
+        self.assertEqual(original_environ, environ_after_call)
+
+    def test_windows_cygwin_falls_back_to_home_exe(self):
+        home_dir = os.path.join("some", "cygwin", "home", "mci-exec")
+        original_environ = {
+            "HOME": home_dir,
+            "USERPROFILE": os.path.join("some", "Users", "mci-exec"),
+        }
+        expected_binary_path = os.path.join(home_dir, "evergreen") + ".exe"
+
+        def fake_exists(path):
+            return path == expected_binary_path
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(_evergreen.distutils.spawn, "find_executable", return_value=None))
+            stack.enter_context(mock.patch.object(_evergreen.sys, "platform", "cygwin"))
+            stack.enter_context(
+                mock.patch.dict(_evergreen.os.environ, original_environ, clear=True))
+            stack.enter_context(
+                mock.patch.object(_evergreen.os.path, "exists", side_effect=fake_exists))
+
+            result = _evergreen.find_evergreen_binary("evergreen")
+            environ_after_call = dict(_evergreen.os.environ)
+
+        self.assertEqual(expected_binary_path, result)
+        self.assertEqual(original_environ, environ_after_call)
+
+    def test_windows_raises_when_binary_not_found_anywhere(self):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(_evergreen.distutils.spawn, "find_executable", return_value=None))
+            stack.enter_context(mock.patch.object(_evergreen.sys, "platform", "win32"))
+            stack.enter_context(
+                mock.patch.dict(_evergreen.os.environ, {"HOME": r"C:\cygwin\home\mci-exec"},
+                                clear=True))
+            stack.enter_context(mock.patch.object(_evergreen.os.path, "exists", return_value=False))
+
+            with self.assertRaises(EnvironmentError):
+                _evergreen.find_evergreen_binary("evergreen")
 
 
 class TestEvergreenProjectConfig(unittest.TestCase):
