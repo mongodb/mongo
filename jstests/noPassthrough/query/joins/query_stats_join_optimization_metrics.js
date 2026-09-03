@@ -284,10 +284,6 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 }
 
 {
-    // The plan cache key ignores the pipeline suffix, so this variant could hit the cache and skip
-    // suffix pushdown (TODO SERVER-130469). Disable the cache to keep the metrics deterministic.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinPlanCache: false}));
-
     // Validate that we correctly count pushed down vs classic stages.
     const suffixPipeline = [
         ...pipeline,
@@ -347,6 +343,9 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 }
 
 {
+    // Disable plan cache so that we can assert on 'numPlanEnumerations' metric.
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinPlanCache: false}));
+
     // Validate that we count join edges served from persisted NDV statistics (analyze mode
     // "ndv"). The unique index from the previous block still covers the 'a' edge, so only the
     // 'b' edge requests an NDV estimate; persist statistics for both of its sides so the
