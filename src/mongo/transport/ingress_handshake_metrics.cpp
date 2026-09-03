@@ -66,7 +66,9 @@ IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
 void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
     invariant(_state == State::kWaitingForSessionStart);
     _tickSource = tickSource;
-    _sessionStartedTicks = _tickSource->getTicks();
+    // Ensure that we understand the session startpoint as the earliest known handshake.
+    _sessionStartedTicks = _mostRecentHandshakeCommandReceivedTicks =
+        _mostRecentHandshakeCommandProcessedTicks = _tickSource->getTicks();
     _state = State::kWaitingForFirstCommand;
 }
 
@@ -117,9 +119,12 @@ void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
             relativeStart = _sessionStartedTicks;
         } else {
             relativeStart = _mostRecentHandshakeCommandReceivedTicks;
-            const auto micros = _tickSource->ticksTo<Microseconds>(
-                _mostRecentHandshakeCommandProcessedTicks - _sessionStartedTicks);
-            averageTimeToCompletedAuthMicros.addSample(micros.count());
+
+            if (_mostRecentHandshakeCommandProcessedTicks > _sessionStartedTicks) {
+                const auto micros = _tickSource->ticksTo<Microseconds>(
+                    _mostRecentHandshakeCommandProcessedTicks - _sessionStartedTicks);
+                averageTimeToCompletedAuthMicros.addSample(micros.count());
+            }
         }
 
         if (connHealthMetricsLoggingEnabled()) {

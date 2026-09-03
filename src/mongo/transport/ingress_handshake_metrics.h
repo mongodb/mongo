@@ -99,11 +99,11 @@ private:
     };
     State _state = State::kWaitingForSessionStart;
     TickSource* _tickSource = nullptr;
-    TickSource::Tick _sessionStartedTicks;
     TickSource* _tlsHandshakeTickSource = nullptr;
-    TickSource::Tick _tlsHandshakeStartedTicks;
-    TickSource::Tick _mostRecentHandshakeCommandReceivedTicks;
-    TickSource::Tick _mostRecentHandshakeCommandProcessedTicks;
+    TickSource::Tick _tlsHandshakeStartedTicks = 0;
+    TickSource::Tick _sessionStartedTicks = 0;
+    TickSource::Tick _mostRecentHandshakeCommandReceivedTicks = 0;
+    TickSource::Tick _mostRecentHandshakeCommandProcessedTicks = 0;
 };
 
 /**
