@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+import requests
 import typer
 from typing_extensions import Annotated
 
@@ -69,9 +70,21 @@ def main(
             raise RuntimeError(
                 f"Could not determine the version for activation from build {variant_id}"
             )
-        evg_api.activate_version_tasks(
-            version_id, [{"name": resolved_build_variant, "tasks": [task_name]}]
-        )
+        try:
+            evg_api.activate_version_tasks(
+                version_id, [{"name": resolved_build_variant, "tasks": [task_name]}]
+            )
+        except requests.exceptions.HTTPError as err:
+            # Concurrent activation requests for the same version can race: another request
+            # may have already materialized and activated this task, and Evergreen returns a
+            # 400 for activation requests that have nothing left to activate. Only swallow the
+            # error once a fresh lookup confirms this task is actually activated.
+            if err.response is None or err.response.status_code != 400:
+                raise
+            for task in evg_api.build_by_id(variant_id).get_tasks():
+                if task.display_name == task_name and task.activated:
+                    return
+            raise
 
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
