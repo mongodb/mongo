@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -14,6 +15,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -314,5 +316,54 @@ inline OID predictNextBucketOID(const OID& oid) {
     next.setIncrement(newIncrement);
     return next;
 }
+
+namespace bucket_catalog {
+inline StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
+    OperationContext* opCtx,
+    BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const TimeseriesOptions& timeseriesOptions,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    bool earlyReturnOnError,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    AllowQueryBasedReopening allowQueryBasedReopening,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+    TimeseriesWriteBatches writeBatches;
+
+    try {
+        auto status = prepareInsertsToBuckets(opCtx,
+                                              bucketCatalog,
+                                              bucketsColl,
+                                              timeseriesOptions,
+                                              opId,
+                                              comparator,
+                                              storageCacheSizeBytes,
+                                              earlyReturnOnError,
+                                              compressAndWriteBucketFunc,
+                                              userMeasurementsBatch,
+                                              startIndex,
+                                              numDocsToStage,
+                                              indices,
+                                              allowQueryBasedReopening,
+                                              errorsAndIndices,
+                                              writeBatches);
+        if (!status.isOK()) {
+            // Nothing is staged when a non-OK status is returned, so there is nothing to abort.
+            return status;
+        }
+    } catch (...) {
+        abortWriteBatches(bucketCatalog, writeBatches, exceptionToStatus());
+        throw;
+    }
+
+    return std::move(writeBatches);
+}
+}  // namespace bucket_catalog
 
 }  // namespace mongo::timeseries

@@ -5,7 +5,6 @@
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -38,22 +37,17 @@
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <utility>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -146,30 +140,6 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
-/**
- * Prepares the final write batches needed for performing the writes to storage.
- */
-std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
-    stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
-    std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-        batchesToCommit;
-
-    for (auto& batch : batches) {
-        if (!processedBatches.contains(batch.get())) {
-            batchesToCommit.push_back(batch);
-            processedBatches.insert(batch.get());
-        }
-    }
-
-    // Sort by bucket so that preparing the commit for each batch cannot deadlock.
-    std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
-        return left.get()->bucketId.oid < right.get()->bucketId.oid;
-    });
-
-    return batchesToCommit;
-}
-
 void performAtomicWrites(
     OperationContext* opCtx,
     const CollectionPtr& coll,
@@ -242,6 +212,7 @@ void performAtomicWrites(
     lastOpFixer.finishedOpSuccessfully();
 }
 
+namespace {
 void commitTimeseriesBucketsAtomically(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& sideBucketCatalog,
@@ -249,63 +220,43 @@ void commitTimeseriesBucketsAtomically(
     const RecordId& recordId,
     const boost::optional<std::variant<write_ops::UpdateCommandRequest,
                                        write_ops::DeleteCommandRequest>>& modificationOp,
-    bucket_catalog::TimeseriesWriteBatches* batches,
+    bucket_catalog::TimeseriesWriteBatches& batches,
     const NamespaceString& bucketsNs,
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds) {
-    auto batchesToCommit = determineBatchesToCommit(*batches);
-    if (batchesToCommit.empty()) {
+
+    if (batches.empty()) {
         return;
     }
 
-    Status abortStatus = Status::OK();
-    ScopeGuard batchGuard{[&] {
-        for (auto batch : batchesToCommit) {
-            if (batch.get()) {
-                abort(sideBucketCatalog, batch, abortStatus);
-            }
+    bucket_catalog::sortBatchesForCommit(batches);
+
+    std::vector<write_ops::InsertCommandRequest> insertOps;
+    std::vector<write_ops::UpdateCommandRequest> updateOps;
+    auto& mainBucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    for (auto& batch : batches) {
+        uassertStatusOK(prepareCommit(sideBucketCatalog, batch, coll->getDefaultCollator()));
+
+        write_ops_utils::makeWriteRequestFromBatch(opCtx, batch, bucketsNs, &insertOps, &updateOps);
+
+        // Starts tracking the newly inserted bucket in the main bucket catalog as a direct
+        // write to prevent other writers from modifying it.
+        if (batch->numPreviouslyCommittedMeasurements == 0) {
+            directWriteStart(mainBucketCatalog.bucketStateRegistry, batch->bucketId);
+            bucketIds->insert(batch->bucketId);
         }
-    }};
-
-    try {
-        std::vector<write_ops::InsertCommandRequest> insertOps;
-        std::vector<write_ops::UpdateCommandRequest> updateOps;
-        auto& mainBucketCatalog =
-            bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-        for (auto batch : batchesToCommit) {
-            auto prepareCommitStatus =
-                prepareCommit(sideBucketCatalog, batch, coll->getDefaultCollator());
-            if (!prepareCommitStatus.isOK()) {
-                abortStatus = prepareCommitStatus;
-                return;
-            }
-
-            write_ops_utils::makeWriteRequestFromBatch(
-                opCtx, batch, bucketsNs, &insertOps, &updateOps);
-
-            // Starts tracking the newly inserted bucket in the main bucket catalog as a direct
-            // write to prevent other writers from modifying it.
-            if (batch.get()->numPreviouslyCommittedMeasurements == 0) {
-                directWriteStart(mainBucketCatalog.bucketStateRegistry, batch.get()->bucketId);
-                bucketIds->insert(batch.get()->bucketId);
-            }
-        }
-
-        performAtomicWrites(
-            opCtx, coll, recordId, modificationOp, insertOps, updateOps, fromMigrate, stmtId);
-
-        for (auto batch : batchesToCommit) {
-            finish(sideBucketCatalog, batch);
-            batch.get().reset();
-        }
-    } catch (...) {
-        abortStatus = exceptionToStatus();
-        throw;
     }
 
-    batchGuard.dismiss();
+    performAtomicWrites(
+        opCtx, coll, recordId, modificationOp, insertOps, updateOps, fromMigrate, stmtId);
+
+    for (auto& batch : batches) {
+        finish(sideBucketCatalog, batch);
+        batch.reset();
+    }
 }
+}  // namespace
 
 void performAtomicWritesForDelete(OperationContext* opCtx,
                                   const CollectionPtr& coll,
@@ -333,45 +284,51 @@ void performAtomicWritesForUpdate(
     const boost::optional<Date_t> currentMinTime) {
     auto timeseriesOptions = *coll->getTimeseriesOptions();
     auto storageCacheSizeBytes = getStorageCacheSizeBytes(opCtx);
-    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    auto swWriteBatches =
-        bucket_catalog::prepareInsertsToBuckets(opCtx,
-                                                sideBucketCatalog,
-                                                coll.get(),
-                                                timeseriesOptions,
-                                                opCtx->getOpID(),
-                                                coll->getDefaultCollator(),
-                                                storageCacheSizeBytes,
-                                                /*earlyReturnOnError=*/true,
-                                                /*compressAndWriteBucketFunc=*/nullptr,
-                                                modifiedMeasurements,
-                                                0,
-                                                modifiedMeasurements.size(),
-                                                {},
-                                                bucket_catalog::AllowQueryBasedReopening::kAllow,
-                                                errorsAndIndices);
-    uassertStatusOK(swWriteBatches);
+    bucket_catalog::TimeseriesWriteBatches batches;
+    try {
+        std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+        auto status = bucket_catalog::prepareInsertsToBuckets(
+            opCtx,
+            sideBucketCatalog,
+            coll.get(),
+            timeseriesOptions,
+            opCtx->getOpID(),
+            coll->getDefaultCollator(),
+            storageCacheSizeBytes,
+            /*earlyReturnOnError=*/true,
+            /*compressAndWriteBucketFunc=*/nullptr,
+            modifiedMeasurements,
+            0,
+            modifiedMeasurements.size(),
+            {},
+            bucket_catalog::AllowQueryBasedReopening::kAllow,
+            errorsAndIndices,
+            batches);
+        uassertStatusOK(status);
+        invariant(errorsAndIndices.empty());
 
-    auto& batches = swWriteBatches.getValue();
-
-    auto modificationRequest = unchangedMeasurements
-        ? boost::make_optional(write_ops_utils::makeModificationOp(
-              record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID(),
-              coll,
-              *unchangedMeasurements,
-              currentMinTime))
-        : boost::none;
-    commitTimeseriesBucketsAtomically(opCtx,
-                                      sideBucketCatalog,
-                                      coll,
-                                      recordId,
-                                      modificationRequest,
-                                      &batches,
-                                      coll->ns(),
-                                      fromMigrate,
-                                      stmtId,
-                                      bucketIds);
+        auto modificationRequest = unchangedMeasurements.map([&](auto&& unchangedMeasurements) {
+            return write_ops_utils::makeModificationOp(
+                record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID(),
+                coll,
+                unchangedMeasurements,
+                currentMinTime);
+        });
+        commitTimeseriesBucketsAtomically(opCtx,
+                                          sideBucketCatalog,
+                                          coll,
+                                          recordId,
+                                          modificationRequest,
+                                          batches,
+                                          coll->ns(),
+                                          fromMigrate,
+                                          stmtId,
+                                          bucketIds);
+    } catch (...) {
+        bucket_catalog::abortWriteBatches(sideBucketCatalog, batches, exceptionToStatus());
+        throw;
+    }
 }
 
 BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, std::string_view viewNss) {

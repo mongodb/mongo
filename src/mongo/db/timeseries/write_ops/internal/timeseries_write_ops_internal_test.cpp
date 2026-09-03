@@ -118,7 +118,8 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
     auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
         _opCtx, nss, request, /*expectedUUID=*/boost::none);
 
-    auto batches = write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
+    bucket_catalog::TimeseriesWriteBatches batches;
+    write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
         _opCtx,
         request,
         preConditions,
@@ -127,7 +128,8 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
         bucket_catalog::AllowQueryBasedReopening::kAllow,
         docsToRetry,
         optUuid,
-        &errors);
+        &errors,
+        batches);
     ASSERT_EQ(batches.size(), 1);
     auto batch = batches.front();
     EXPECT_EQ(batch->measurements.size(), expectedIndices.size());
@@ -488,15 +490,16 @@ TEST_F(TimeseriesWriteOpsInternalTest, CommitSurvivesWriteConflictOnBucketInsert
 
     boost::optional<UUID> optUuid;
     std::vector<mongo::write_ops::WriteError> stageErrors;
-    auto batches =
-        stageUnorderedWritesToBucketCatalog(_opCtx,
-                                            request,
-                                            preConditions,
-                                            /*startIndex=*/0,
-                                            request.getDocuments().size(),
-                                            bucket_catalog::AllowQueryBasedReopening::kAllow,
-                                            optUuid,
-                                            &stageErrors);
+    bucket_catalog::TimeseriesWriteBatches batches;
+    stageUnorderedWritesToBucketCatalog(_opCtx,
+                                        request,
+                                        preConditions,
+                                        /*startIndex=*/0,
+                                        request.getDocuments().size(),
+                                        bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                        optUuid,
+                                        &stageErrors,
+                                        batches);
     EXPECT_TRUE(stageErrors.empty());
     ASSERT_EQ(batches.size(), 1);
     auto batch = batches.front();

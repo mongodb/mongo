@@ -127,9 +127,10 @@ void processErrorsForSubsetOfBatch(
  *
  * Stages measurements in the range [startIndex, startIndex + numDocsToStage).
  *
- * On success, returns WriteBatches with the staged writes.
+ * Staged writes are pushed into writeBatches. If an exception is thrown, it is the caller's
+ * responsibility to abort any batches staged before the error.
  */
-bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
+void stageUnorderedWritesToBucketCatalog(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
     const CollectionPreConditions& preConditions,
@@ -137,13 +138,14 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     size_t numDocsToStage,
     bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     boost::optional<UUID>& optUuid,
-    std::vector<mongo::write_ops::WriteError>* errors);
+    std::vector<mongo::write_ops::WriteError>* errors,
+    bucket_catalog::TimeseriesWriteBatches& writeBatches);
 
 /**
  * Stages unordered writes. Same as above, but handles retryable writes that have already been
  * executed and also any documents that need to be retried due to continuable errors.
  */
-bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnoptimized(
+void stageUnorderedWritesToBucketCatalogUnoptimized(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
     const CollectionPreConditions& preConditions,
@@ -152,6 +154,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
     bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     const std::vector<size_t>& docsToRetry,
     boost::optional<UUID>& optUuid,
-    std::vector<mongo::write_ops::WriteError>* errors);
+    std::vector<mongo::write_ops::WriteError>* errors,
+    bucket_catalog::TimeseriesWriteBatches& writeBatches);
 
 }  // namespace mongo::timeseries::write_ops::internal

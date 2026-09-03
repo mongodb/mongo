@@ -74,6 +74,18 @@ protected:
         const UUID& uuid,
         const mongo::BSONObj& doc);
 
+    // Sets up the two buckets an interrupted-reopening test needs: an archived bucket at
+    // 'archivedTime' for archive-based reopening to target, and an open bucket two hours earlier
+    // for the first staged measurement to land in. Both are committed. Returns the open bucket's
+    // batch.
+    std::shared_ptr<WriteBatch> _makeArchivedAndOpenBuckets(Date_t archivedTime);
+
+    // Stages 'insertContext' on behalf of 'opCtx', which is killed and parked in archived-bucket
+    // reopening, and asserts that staging throws Interrupted.
+    void _stageInsertBatchExpectingInterrupt(const Collection* bucketsColl,
+                                             OperationContext* opCtx,
+                                             BatchedInsertContext& insertContext);
+
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
     void _testMeasurementSchema(
@@ -311,6 +323,24 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
     finish(*_bucketCatalog, batch);
 }
 
+BatchedInsertContext _buildSingleInsertContext(BucketCatalog& bucketCatalog,
+                                               const UUID& uuid,
+                                               const TimeseriesOptions& options,
+                                               const std::vector<BSONObj>& measurements) {
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
+                                                            uuid,
+                                                            options,
+                                                            measurements,
+                                                            /*startIndex=*/0,
+                                                            /*numDocsToStage=*/measurements.size(),
+                                                            /*docsToRetry=*/{},
+                                                            errorsAndIndices);
+    ASSERT_TRUE(errorsAndIndices.empty());
+    ASSERT_EQ(1, batchedInsertContexts.size());
+    return std::move(batchedInsertContexts[0]);
+}
+
 std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithoutReopening(
     OperationContext* opCtx,
     BucketCatalog& catalog,
@@ -318,17 +348,7 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     const UUID& uuid,
     const mongo::BSONObj& doc) {
     auto timeseriesOptions = _getTimeseriesOptions(nss);
-    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(catalog,
-                                                                            uuid,
-                                                                            timeseriesOptions,
-                                                                            {doc},
-                                                                            /*startIndex=*/0,
-                                                                            /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
-                                                                            errorsAndIndices);
-    ASSERT(errorsAndIndices.empty());
-    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto batchedInsertCtx = _buildSingleInsertContext(catalog, uuid, timeseriesOptions, {doc});
     auto measurementTimestamp = std::get<Date_t>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
     auto& stripe = *catalog.stripes[batchedInsertCtx.stripeNumber];
@@ -893,15 +913,17 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
     EXPECT_EQ(numMeasurements, batchOfMeasurements.size());
 
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
-        auto writeBatches = bucket_catalog::stageInsertBatch(_opCtx,
-                                                             *_bucketCatalog,
-                                                             bucketsColl.get(),
-                                                             _opCtx->getOpID(),
-                                                             _stringDataComparatorUnused,
-                                                             _storageCacheSizeBytes,
-                                                             _compressBucketFuncUnused,
-                                                             AllowQueryBasedReopening::kAllow,
-                                                             batchedInsertContexts[i]);
+        bucket_catalog::TimeseriesWriteBatches writeBatches;
+        bucket_catalog::stageInsertBatch(_opCtx,
+                                         *_bucketCatalog,
+                                         bucketsColl.get(),
+                                         _opCtx->getOpID(),
+                                         _stringDataComparatorUnused,
+                                         _storageCacheSizeBytes,
+                                         _compressBucketFuncUnused,
+                                         AllowQueryBasedReopening::kAllow,
+                                         batchedInsertContexts[i],
+                                         writeBatches);
         EXPECT_EQ(writeBatches.size(), numWriteBatches[i]);
     }
 }
@@ -5985,6 +6007,173 @@ TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsNonNegative) {
     globalStats.numActiveBuckets.swap(0);
 }
 
+// Asserts that 'bucketId' retains no write batch for 'opId'. A bucket that is gone entirely
+// trivially retains nothing.
+void _assertNoBatchRegistered(BucketCatalog& bucketCatalog,
+                              const BucketId& bucketId,
+                              OperationId opId) {
+    auto& stripe = *bucketCatalog.stripes[internal::getStripeNumber(bucketCatalog, bucketId)];
+    const Bucket* bucket = internal::findBucket(bucketCatalog.bucketStateRegistry,
+                                                stripe,
+                                                WithLock::withoutLock(),
+                                                bucketId,
+                                                internal::IgnoreBucketState::kYes);
+    if (bucket) {
+        EXPECT_EQ(0, bucket->batches.count(opId));
+    }
+}
+
+std::shared_ptr<WriteBatch> BucketCatalogTest::_makeArchivedAndOpenBuckets(Date_t archivedTime) {
+    auto archivedBatch =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << archivedTime << _metaField << _metaValue));
+    _commit(_ns1, archivedBatch, 0);
+
+    auto& stripe =
+        *_bucketCatalog
+             ->stripes[internal::getStripeNumber(*_bucketCatalog, archivedBatch->bucketId)];
+    Bucket* archivedBucket = internal::useBucket(_bucketCatalog->bucketStateRegistry,
+                                                 stripe,
+                                                 WithLock::withoutLock(),
+                                                 archivedBatch->bucketId,
+                                                 internal::IgnoreBucketState::kNo);
+    ASSERT(archivedBucket);
+    internal::rollover(*_bucketCatalog,
+                       stripe,
+                       WithLock::withoutLock(),
+                       *archivedBucket,
+                       RolloverReason::kTimeBackward);
+
+    auto openBatch = _insertOneWithoutReopening(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _uuid1,
+        BSON(_timeField << archivedTime - Hours(2) << _metaField << _metaValue));
+    _commit(_ns1, openBatch, 0);
+    return openBatch;
+}
+
+void BucketCatalogTest::_stageInsertBatchExpectingInterrupt(const Collection* bucketsColl,
+                                                            OperationContext* opCtx,
+                                                            BatchedInsertContext& insertContext) {
+    FailPointEnableBlock hangBeforeFetch("hangTimeseriesReopenArchivedBucketBeforeFetch");
+    // Mirror prepareInsertsToBuckets: the batches staged before the throw are still registered in
+    // their buckets, and the caller owns aborting them.
+    TimeseriesWriteBatches writeBatches;
+    ASSERT_THROWS_CODE(stageInsertBatch(opCtx,
+                                        *_bucketCatalog,
+                                        bucketsColl,
+                                        opCtx->getOpID(),
+                                        _stringDataComparatorUnused,
+                                        _storageCacheSizeBytes,
+                                        _compressBucketFuncUnused,
+                                        AllowQueryBasedReopening::kAllow,
+                                        insertContext,
+                                        writeBatches),
+                       DBException,
+                       ErrorCodes::Interrupted);
+    ASSERT_FALSE(writeBatches.empty());
+    abortWriteBatches(
+        *_bucketCatalog, writeBatches, Status{ErrorCodes::Interrupted, "interrupted"});
+}
+
+TEST_F(BucketCatalogTest, ExceptionDuringStagingAbortsRegisteredBatches) {
+    const Date_t archivedTime = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto openBatch = _makeArchivedAndOpenBuckets(archivedTime);
+    const Date_t openTime = archivedTime - Hours(2);
+
+    const auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    auto insertContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(1) << _metaField << _metaValue),
+         BSON(_timeField << archivedTime + Minutes(30) << _metaField << _metaValue)});
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const auto& bucketsColl = *autoColl;
+    auto [interruptedClient, interruptedOpCtx] = _makeOperationContext();
+    interruptedOpCtx->markKilled(ErrorCodes::Interrupted);
+
+    // The first measurement is staged into the open bucket, registering a write batch in it. The
+    // second measurement rolls that bucket over and attempts to reopen the archived bucket, where
+    // the interruptible failpoint throws because the operation is killed.
+    _stageInsertBatchExpectingInterrupt(bucketsColl.get(), interruptedOpCtx.get(), insertContext);
+
+    // The write batch registered for the first measurement must have been aborted rather than
+    // leaked; no bucket may retain a batch that no caller can ever commit or abort.
+    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, interruptedOpCtx->getOpID());
+    ASSERT(internal::findOpenBuckets(stripe, WithLock::withoutLock(), insertContext.key).empty());
+}
+
+TEST_F(BucketCatalogTest, ExceptionDuringStagingAbortsOtherOperationsBatches) {
+    const Date_t archivedTime = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto openBatch = _makeArchivedAndOpenBuckets(archivedTime);
+    const Date_t openTime = archivedTime - Hours(2);
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const auto& bucketsColl = *autoColl;
+
+    // A bystander operation stages a measurement into the open bucket and leaves it uncommitted,
+    // so its write batch is still registered in that bucket.
+    const auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    auto bystanderContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(1) << _metaField << _metaValue)});
+    auto [bystanderClient, bystanderOpCtx] = _makeOperationContext();
+    TimeseriesWriteBatches bystanderBatches;
+    stageInsertBatch(bystanderOpCtx.get(),
+                     *_bucketCatalog,
+                     bucketsColl.get(),
+                     bystanderOpCtx->getOpID(),
+                     _stringDataComparatorUnused,
+                     _storageCacheSizeBytes,
+                     _compressBucketFuncUnused,
+                     AllowQueryBasedReopening::kAllow,
+                     bystanderContext,
+                     bystanderBatches);
+    ASSERT_EQ(1, bystanderBatches.size());
+    auto bystanderBatch = bystanderBatches.front();
+    ASSERT_EQ(openBatch->bucketId, bystanderBatch->bucketId);
+    ASSERT(!isWriteBatchFinished(*bystanderBatch));
+
+    auto insertContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(2) << _metaField << _metaValue),
+         BSON(_timeField << archivedTime + Minutes(30) << _metaField << _metaValue)});
+
+    auto [interruptedClient, interruptedOpCtx] = _makeOperationContext();
+    interruptedOpCtx->markKilled(ErrorCodes::Interrupted);
+
+    _stageInsertBatchExpectingInterrupt(bucketsColl.get(), interruptedOpCtx.get(), insertContext);
+
+    // Aborting the interrupted operation's batch takes the whole bucket down, so the bystander's
+    // unprepared batch sharing that bucket is aborted with the same status.
+    ASSERT(isWriteBatchFinished(*bystanderBatch));
+    ASSERT_EQ(ErrorCodes::Interrupted, getWriteBatchStatus(*bystanderBatch));
+
+    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, interruptedOpCtx->getOpID());
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, bystanderOpCtx->getOpID());
+
+    // The bucket itself is removed from the catalog, since no prepared batch was outstanding.
+    ASSERT_FALSE(internal::useBucket(_bucketCatalog->bucketStateRegistry,
+                                     stripe,
+                                     WithLock::withoutLock(),
+                                     openBatch->bucketId,
+                                     internal::IgnoreBucketState::kYes));
+    ASSERT(internal::findOpenBuckets(stripe, WithLock::withoutLock(), insertContext.key).empty());
+}
+
 TEST_F(BucketCatalogTest, StagingRecheckRolloverDoesNotLeakBatch) {
     const Date_t time = Date_t::fromMillisSinceEpoch(1000000000000);
     auto committedBatch =
@@ -6010,16 +6199,7 @@ TEST_F(BucketCatalogTest, StagingRecheckRolloverDoesNotLeakBatch) {
     EXPECT_NE(secondBatch->bucketId, committedBatch->bucketId);
 
     // The second measurement must not have registered a write batch in the original bucket
-    for (auto& stripe : _bucketCatalog->stripes) {
-        const Bucket* bucket = internal::findBucket(_bucketCatalog->bucketStateRegistry,
-                                                    *stripe,
-                                                    WithLock::withoutLock(),
-                                                    committedBatch->bucketId,
-                                                    internal::IgnoreBucketState::kYes);
-        if (bucket) {
-            EXPECT_EQ(0, bucket->batches.count(_opCtx->getOpID()));
-        }
-    }
+    _assertNoBatchRegistered(*_bucketCatalog, committedBatch->bucketId, _opCtx->getOpID());
 
     _commit(_ns1, secondBatch, 0);
 }

@@ -525,42 +525,72 @@ std::vector<BatchedInsertContext> buildBatchedInsertContexts(
  * been staged into an eligible bucket. When there is any RolloverReason that isn't kNone when
  * attempting to stage a measurement into a bucket, the function will find another eligible
  * buckets until all measurements are inserted.
+ *
+ * Each write batch is appended to 'writeBatches' as soon as it has been staged into. If this
+ * throws, the batches appended so far are still registered in their buckets and it is the caller's
+ * responsibility to abort everything in 'writeBatches'; see abortWriteBatches().
  */
-TimeseriesWriteBatches stageInsertBatch(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const OperationId& opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    AllowQueryBasedReopening allowQueryBasedReopening,
-    BatchedInsertContext& batch);
+void stageInsertBatch(OperationContext* opCtx,
+                      BucketCatalog& bucketCatalog,
+                      const Collection* bucketsColl,
+                      const OperationId& opId,
+                      const StringDataComparator* comparator,
+                      uint64_t storageCacheSizeBytes,
+                      const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                      AllowQueryBasedReopening allowQueryBasedReopening,
+                      BatchedInsertContext& batch,
+                      TimeseriesWriteBatches& writeBatches);
 
 /**
- * Stages compatible measurements into appropriate bucket(s).
- * Returns a non-success status if any measurements are malformed, and further
- * returns the index into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'.
- * Returns a write batch per bucket that the measurements are staged to.
- * 'earlyReturnOnError' decides whether or not staging should happen in the case of any malformed
- * measurements.
+ * Aborts every batch in 'writeBatches' with 'status', taking each batch's stripe lock in turn.
+ * Null entries (batches whose ownership the caller has already handed off, e.g. by committing
+ * them) and batches that have already finished are skipped, so this is safe to run unconditionally
+ * over a partially-committed vector.
+ *
+ * All operations which have staged batches into a bucket with any batches to abort will be aborted,
+ * and the other operations will retry. Aborting staged write batches should be a sufficiently rare
+ * occurrence that it is not worth trying to unstage only the failed batches.
+ *
+ * Must not be called while holding a stripe lock, as this takes each batch's stripe lock itself.
  */
-StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const TimeseriesOptions& timeseriesOptions,
-    OperationId opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    bool earlyReturnOnError,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    const std::vector<BSONObj>& userMeasurementsBatch,
-    size_t startIndex,
-    size_t numDocsToStage,
-    const std::vector<size_t>& indices,
-    AllowQueryBasedReopening allowQueryBasedReopening,
-    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
+void abortWriteBatches(BucketCatalog& bucketCatalog,
+                       const TimeseriesWriteBatches& writeBatches,
+                       const Status& status);
+
+/**
+ * Sort `writeBatches` by bucket to ensure that concurrent committers acquire locks in the same
+ * order and cannot deadlock by trying to write to the same buckets but in different orders.
+ */
+void sortBatchesForCommit(TimeseriesWriteBatches& writeBatches);
+
+/**
+ * Stages compatible measurements into appropriate bucket(s), appending a write batch per bucket to
+ * the caller-owned 'writeBatches'.
+ *
+ * Returns a non-success status if any measurements are malformed, and further returns the index
+ * into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'. 'earlyReturnOnError' decides
+ * whether or not staging should happen in the case of any malformed measurements.
+ *
+ * A non-OK Status return indicates that nothing is staged and no cleanup is required,  but if this
+ * throws, the batches appended so far are registered in their buckets and the caller must abort
+ * them; see abortWriteBatches().
+ */
+Status prepareInsertsToBuckets(OperationContext* opCtx,
+                               BucketCatalog& bucketCatalog,
+                               const Collection* bucketsColl,
+                               const TimeseriesOptions& timeseriesOptions,
+                               OperationId opId,
+                               const StringDataComparator* comparator,
+                               uint64_t storageCacheSizeBytes,
+                               bool earlyReturnOnError,
+                               const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                               const std::vector<BSONObj>& userMeasurementsBatch,
+                               size_t startIndex,
+                               size_t numDocsToStage,
+                               const std::vector<size_t>& indices,
+                               AllowQueryBasedReopening allowQueryBasedReopening,
+                               std::vector<WriteStageErrorAndIndex>& errorsAndIndices,
+                               TimeseriesWriteBatches& writeBatches);
 
 /**
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.
