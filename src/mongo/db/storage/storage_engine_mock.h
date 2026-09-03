@@ -179,9 +179,7 @@ public:
     void dropIdentTimestamped(OperationContext* opCtx,
                               std::string_view ident,
                               Timestamp timestamp) final {}
-    void addDropPendingIdent(const DropTime& dropTime,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) final {}
+    void addDropPendingIdent(const DropTime& dropTime, std::shared_ptr<Ident> ident) final {}
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
                           std::string_view ident) final {}

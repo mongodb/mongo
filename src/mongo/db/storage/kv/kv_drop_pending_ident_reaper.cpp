@@ -77,8 +77,7 @@ bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine, Time
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
-                                                   std::shared_ptr<Ident> ident,
-                                                   StorageEngine::DropIdentCallback&& onDrop) {
+                                                   std::shared_ptr<Ident> ident) {
     std::lock_guard lock(_mutex);
 
     // Debug instrumentation, BF-42904 was caused by duplicate drops of the same ident, in
@@ -109,7 +108,6 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
     auto& info = _dropPendingIdents[identName];
     info.identName = identName;
     info.dropToken = ident;
-    info.onDrop = onDrop;
     info.dropTime = dropTime;
 
     std::visit(
@@ -539,7 +537,6 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                     auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                                 identInfo.identName,
                                                 ident::isCollectionIdent(identInfo.identName),
-                                                identInfo.onDrop,
                                                 schemaEpoch,
                                                 waitForLocks);
                     if (s.isOK()) {
@@ -565,14 +562,12 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                 return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                           identInfo.identName,
                                           ident::isCollectionIdent(identInfo.identName),
-                                          identInfo.onDrop,
                                           schemaEpoch);
             },
             [&](const DropUnreplicated&) -> Status {
                 return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                           identInfo.identName,
                                           ident::isCollectionIdent(identInfo.identName),
-                                          identInfo.onDrop,
                                           boost::none);
             }},
         dropExecution);

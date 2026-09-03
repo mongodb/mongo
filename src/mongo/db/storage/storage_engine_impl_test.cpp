@@ -201,7 +201,6 @@ public:
                 (RecoveryUnit & ru,
                  std::string_view ident,
                  bool identHasSizeInfo,
-                 const StorageEngine::DropIdentCallback& onDrop,
                  boost::optional<uint64_t> schemaEpoch,
                  bool),
                 (override));
@@ -265,12 +264,10 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
         .WillOnce([&](RecoveryUnit& calledRu,
                       std::string_view calledIdent,
                       bool identHasSizeInfo,
-                      const StorageEngine::DropIdentCallback& onDrop,
                       boost::optional<uint64_t> schemaEpoch,
                       bool waitForLocks) {
             ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
-            ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
             ASSERT_TRUE(waitForLocks);
             return Status::OK();
@@ -285,12 +282,10 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
         .WillOnce([&](RecoveryUnit& calledRu,
                       std::string_view calledIdent,
                       bool identHasSizeInfo,
-                      const StorageEngine::DropIdentCallback& onDrop,
                       boost::optional<uint64_t> schemaEpoch,
                       bool waitForLocks) {
             ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
-            ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
             ASSERT_TRUE(waitForLocks);
             return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIdent failed.");

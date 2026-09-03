@@ -496,7 +496,6 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      std::string_view ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop,
                      boost::optional<uint64_t> schemaEpoch,
                      bool waitForLocks) override;
 
@@ -819,11 +818,6 @@ public:
     }
 
 private:
-    struct IdentToDrop {
-        std::string uri;
-        StorageEngine::DropIdentCallback callback;
-    };
-
     Status _reconfigureAutoCompact(RecoveryUnit& ru, const AutoCompactOptions& options);
 
     Status _createRecordStore(const rss::PersistenceProvider& provider,

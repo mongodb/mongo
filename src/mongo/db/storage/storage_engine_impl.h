@@ -186,9 +186,7 @@ public:
     }
 
     void dropIdent(RecoveryUnit& ru, std::string_view ident) override;
-    void addDropPendingIdent(const DropTime& dropTime,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) override;
+    void addDropPendingIdent(const DropTime& dropTime, std::shared_ptr<Ident> ident) override;
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
                           std::string_view ident) override;

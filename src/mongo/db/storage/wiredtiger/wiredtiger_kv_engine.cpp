@@ -1977,7 +1977,6 @@ Status WiredTigerKVEngine::alterMetadata(std::string_view uri, std::string_view 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                      std::string_view ident,
                                      bool identHasSizeInfo,
-                                     const StorageEngine::DropIdentCallback& onDrop,
                                      boost::optional<uint64_t> schemaEpoch,
                                      bool waitForLocks) {
     string uri = WiredTigerUtil::buildTableUri(ident);
@@ -2015,10 +2014,6 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     }
 
     _removeIdentDirectoryIfEmpty(ident);
-
-    if (onDrop) {
-        onDrop();
-    }
 
     // schemaEpoch may be none even if schema epochs are in use if this is an unreplicated drop
     if (_usesSchemaEpochs && schemaEpoch) {

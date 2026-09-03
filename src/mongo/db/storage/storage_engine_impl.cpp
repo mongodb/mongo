@@ -696,10 +696,7 @@ void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, std::string_view ident)
     // Dropping the spill table may transiently return ObjectIsBusy if another spill engine user has
     // a storage snapshot from before an earlier write to this table. Retry until the drop succeeds.
     for (size_t retries = 0;; ++retries) {
-        auto status = _spillEngine->dropIdent(ru,
-                                              ident,
-                                              false, /* identHasSizeInfo */
-                                              nullptr /* onDrop */);
+        auto status = _spillEngine->dropIdent(ru, ident, false /* identHasSizeInfo */);
         if (status.isOK()) {
             return;
         }
@@ -922,14 +919,13 @@ void StorageEngineImpl::dropIdent(RecoveryUnit& ru, std::string_view ident) {
         // A concurrent operation, such as a checkpoint could be holding an open data
         // handle on the ident. Handoff the ident drop to the ident reaper to retry
         // later.
-        addDropPendingIdent(Immediate{}, std::make_shared<Ident>(ident), nullptr);
+        addDropPendingIdent(Immediate{}, std::make_shared<Ident>(ident));
     }
 }
 
 void StorageEngineImpl::addDropPendingIdent(const DropTime& dropTime,
-                                            std::shared_ptr<Ident> ident,
-                                            DropIdentCallback&& onDrop) {
-    _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident, std::move(onDrop));
+                                            std::shared_ptr<Ident> ident) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident);
 }
 
 void StorageEngineImpl::dropUnknownIdent(RecoveryUnit& ru,

@@ -75,8 +75,6 @@ public:
     using OldestActiveTransactionTimestampCallback =
         std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
 
-    using DropIdentCallback = std::function<void()>;
-
     /**
      * Information on last storage engine shutdown state that is relevant to the recovery process.
      * Determined by initializeStorageEngine() during mongod.lock initialization.
@@ -582,9 +580,7 @@ public:
      * - the 'dropTime' is sufficiently old to ensure no future data accesses
      * - and no holders of 'ident' remain (the index/collection is no longer in active use)
      */
-    virtual void addDropPendingIdent(const DropTime& dropTime,
-                                     std::shared_ptr<Ident> ident,
-                                     DropIdentCallback&& onDrop = nullptr) = 0;
+    virtual void addDropPendingIdent(const DropTime& dropTime, std::shared_ptr<Ident> ident) = 0;
 
     /**
      * Drops the data for the given ident which is not present in the catalog, but whose exact drop

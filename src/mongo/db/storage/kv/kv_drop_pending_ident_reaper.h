@@ -54,12 +54,8 @@ public:
      * A drop time is considered old enough when:
      * - (Timestamp) The op cannot be rolled back nor new users access the record store data.
      * - (CheckpointIteration) The catalog has made its changes durable.
-     *
-     * onDrop must not call dropIdentsOlderThan() or immediatelyCompletePendingDrop().
      */
-    void addDropPendingIdent(const StorageEngine::DropTime& dropTime,
-                             std::shared_ptr<Ident> ident,
-                             StorageEngine::DropIdentCallback&& onDrop = nullptr);
+    void addDropPendingIdent(const StorageEngine::DropTime& dropTime, std::shared_ptr<Ident> ident);
 
     /**
      * Adds an ident with an unknown drop time that is no later than `stableTimestamp`.
@@ -154,9 +150,6 @@ private:
         // untimestamped writes.
         StorageEngine::DropTime dropTime;
         std::weak_ptr<Ident> dropToken;
-
-        // Callback to run once the ident has been dropped.
-        StorageEngine::DropIdentCallback onDrop;
 
         // Set to false if the dropTime is an upper bound rather than the exact drop time
         bool dropTimeIsExact = true;

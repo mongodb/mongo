@@ -69,14 +69,10 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      std::string_view ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop,
                      boost::optional<uint64_t> schemaEpoch,
                      bool waitForLocks) override {
         auto status = dropIdentFn(ru, ident);
         if (status.isOK()) {
-            if (onDrop) {
-                onDrop();
-            }
             droppedIdents.emplace_back(std::string{ident}, schemaEpoch);
         }
         return status;
@@ -826,21 +822,6 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropOnlyDropsTheRequestedIdent) 
     EXPECT_EQ(reaper.getAllIdentNames(), std::set{otherIdentName});
 }
 
-TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropCallsOnDropCallback) {
-    const std::string identName = "ident";
-    auto engine = getEngine();
-    KVDropPendingIdentReaper reaper(engine);
-    bool onDropCalled = false;
-    reaper.addDropPendingIdent(StorageEngine::Immediate{}, std::make_shared<Ident>(identName), [&] {
-        onDropCalled = true;
-    });
-
-    auto opCtx = makeOpCtx();
-    ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    EXPECT_EQ(engine->getDroppedIdentNames(), std::vector{identName});
-    ASSERT(onDropCalled);
-}
-
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropReportsDropErrors) {
     const std::string identName = "ident";
     auto engine = getEngine();
@@ -1037,10 +1018,8 @@ TEST_F(KVDropPendingIdentReaperTest,
     const uint64_t firstSchemaEpoch = 42;
     const uint64_t secondSchemaEpoch = 43;
 
-    int onDropCount = 0;
     reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{Timestamp(10, 0)},
-                               std::make_shared<Ident>(identName),
-                               [&] { ++onDropCount; });
+                               std::make_shared<Ident>(identName));
 
     EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
         .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
@@ -1081,8 +1060,6 @@ TEST_F(KVDropPendingIdentReaperTest,
     // than the stale epoch from the attempt that failed to commit.
     EXPECT_EQ(secondSchemaEpoch, engine->droppedIdents.back().schemaEpoch.value());
     EXPECT_EQ(0U, reaper.getNumIdents());
-    // onDrop runs once per storage-level drop, so it can fire more than once for a single ident.
-    EXPECT_EQ(2, onDropCount);
 }
 
 TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryOnlyReplicatesTimestampedDrops) {

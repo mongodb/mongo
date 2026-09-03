@@ -2204,7 +2204,6 @@ TEST_F(WiredTigerKVEngineTest, DropIdentReturnsLockBusyWhenSchemaLockHeld) {
         return engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtxPtr.get()),
                                  ident,
                                  /*identHasSizeInfo=*/true,
-                                 /*onDrop=*/nullptr,
                                  /*schemaEpoch=*/boost::none,
                                  /*waitForLocks=*/false);
     }();
