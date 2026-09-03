@@ -2,7 +2,8 @@
  * Verifies the query latency OTel histograms per plan selection strategy. Published under
  * serverStatus "metrics.queryLatencies.<strategy>" for strategy in {multiPlanner, costBased,
  * singlePlan, cachedPlan}. Each is a bucket-count histogram exposing per-bucket "count" fields and a
- * "totalCount" (the number of queries observed for that strategy).
+ * "totalCount" (the number of queries observed for that strategy). Zero-count buckets are omitted,
+ * so the set of per-bucket fields varies with the latencies actually observed.
  *
  * Each plan ranker exercises the strategies it can produce:
  *   - multiPlanning: singlePlan, multiPlanner, cachedPlan

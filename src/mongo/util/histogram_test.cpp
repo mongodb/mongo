@@ -147,5 +147,68 @@ TEST_F(HistogramTest, SizeTCountsIncrementedAndStored) {
     ASSERT_THAT(snapshot(hist), Eq(expected));
 }
 
+TEST(AppendHistogramTest, MakeBucketKeysMatchesLegacyKeys) {
+    Histogram<int> h{{2, 4}};
+    auto keys = makeHistogramBucketKeys(h);
+    ASSERT_EQ(keys.size(), 3u);
+    ASSERT_EQ(keys[0], "(-inf, 2)");
+    ASSERT_EQ(keys[1], "[2, 4)");
+    ASSERT_EQ(keys[2], "[4, inf)");
+}
+
+TEST(AppendHistogramTest, PrecomputedKeysProduceIdenticalOutputToLegacy) {
+    Histogram<int> h{{2, 4}};
+    h.increment(1);
+    h.increment(3);
+    h.increment(3);
+
+    BSONObjBuilder legacyBob;
+    appendHistogram(legacyBob, h, "hist");
+
+    BSONObjBuilder cachedBob;
+    appendHistogram(cachedBob, h, "hist", makeHistogramBucketKeys(h));
+
+    ASSERT_BSONOBJ_EQ(legacyBob.obj(), cachedBob.obj());
+}
+
+TEST(AppendHistogramTest, IncludeEmptyBucketsByDefaultEmitsEveryBucket) {
+    Histogram<int> h{{2, 4}};
+    h.increment(3);
+
+    BSONObjBuilder bob;
+    appendHistogram(bob, h, "hist");
+    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
+
+    ASSERT_EQ(hist.getObjectField("(-inf, 2)").getIntField("count"), 0);
+    ASSERT_EQ(hist.getObjectField("[2, 4)").getIntField("count"), 1);
+    ASSERT_EQ(hist.getObjectField("[4, inf)").getIntField("count"), 0);
+    ASSERT_EQ(hist.getIntField("totalCount"), 1);
+}
+
+TEST(AppendHistogramTest, SkippingEmptyBucketsOmitsThemButKeepsTotalCount) {
+    Histogram<int> h{{2, 4}};
+    h.increment(3);
+
+    BSONObjBuilder bob;
+    appendHistogram(bob, h, "hist", makeHistogramBucketKeys(h), {.includeEmptyBuckets = false});
+    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
+
+    ASSERT_FALSE(hist.hasField("(-inf, 2)"));
+    ASSERT_EQ(hist.getObjectField("[2, 4)").getIntField("count"), 1);
+    ASSERT_FALSE(hist.hasField("[4, inf)"));
+    ASSERT_EQ(hist.getIntField("totalCount"), 1);
+}
+
+TEST(AppendHistogramTest, SkippingEmptyBucketsOnAnEmptyHistogramStillEmitsTotalCount) {
+    Histogram<int> h{{2, 4}};
+
+    BSONObjBuilder bob;
+    appendHistogram(bob, h, "hist", makeHistogramBucketKeys(h), {.includeEmptyBuckets = false});
+    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
+
+    ASSERT_EQ(hist.nFields(), 1);
+    ASSERT_EQ(hist.getIntField("totalCount"), 0);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -180,6 +180,7 @@ public:
      * - If the histogram is configured to use the kBucketCounts serialization format, outputs
      *   per-bucket counts with range-string keys plus a `totalCount` field. Uses
      *   explicitBucketBoundaries when it is set, otherwise kDefaultBucketBoundaries.
+     * - kNonEmptyBucketCounts is as kBucketCounts, but omits zero-count buckets.
      * - If it is configured to use the kAverage serialization format, outputs an "average"
      *   field (exponential moving average) and a "totalCount" field.
      */
@@ -197,6 +198,11 @@ private:
     // The smoothing factor for the exponential moving average. See moving_average.h.
     static constexpr double kAlpha = 0.2;
 
+    static bool tracksBucketCounts(HistogramSerializationFormat format) {
+        return format == HistogramSerializationFormat::kBucketCounts ||
+            format == HistogramSerializationFormat::kNonEmptyBucketCounts;
+    }
+
     static mongo::Histogram<double> makeBucketCountsHistogram(
         const boost::optional<std::vector<double>>& explicitBoundaries) {
         return mongo::Histogram<double>(explicitBoundaries.value_or(
@@ -210,6 +216,14 @@ private:
     // serialization format. Uses explicitBucketBoundaries when it is set, otherwise
     // kDefaultBucketBoundaries.
     boost::optional<mongo::Histogram<double>> _bucketCounts;
+
+    // BSON field names for each bucket of `_bucketCounts`, built once at construction. Empty when
+    // `_bucketCounts` is disengaged. Bucket boundaries never change after construction, so these
+    // stay valid across `reset()`.
+    std::vector<std::string> _bucketKeys;
+
+    // Serialization options derived from the format passed at construction.
+    mongo::AppendHistogramOptions _appendOptions;
 
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
 
@@ -268,10 +282,14 @@ HistogramImpl<T, AttributeTs...>::HistogramImpl(
     const AttributeDefinition<AttributeTs>&... defs)
     : Histogram<T, AttributeTs...>(std::move(explicitBucketBoundaries)),
       _avg(kAlpha),
-      _bucketCounts(serializationFormat == HistogramSerializationFormat::kBucketCounts
+      _bucketCounts(tracksBucketCounts(serializationFormat)
                         ? boost::optional<mongo::Histogram<double>>(
                               makeBucketCountsHistogram(this->explicitBucketBoundaries))
                         : boost::none),
+      _bucketKeys(_bucketCounts ? mongo::makeHistogramBucketKeys(*_bucketCounts)
+                                : std::vector<std::string>{}),
+      _appendOptions{.includeEmptyBuckets = serializationFormat !=
+                         HistogramSerializationFormat::kNonEmptyBucketCounts},
       _attributeNames{defs.name...},
       _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
       _validCombinations([this] {
@@ -298,10 +316,14 @@ HistogramImpl<T, AttributeTs...>::HistogramImpl(
     const AttributeDefinition<AttributeTs>&... defs)
     : Histogram<T, AttributeTs...>(std::move(explicitBucketBoundaries)),
       _avg(kAlpha),
-      _bucketCounts(serializationFormat == HistogramSerializationFormat::kBucketCounts
+      _bucketCounts(tracksBucketCounts(serializationFormat)
                         ? boost::optional<mongo::Histogram<double>>(
                               makeBucketCountsHistogram(this->explicitBucketBoundaries))
                         : boost::none),
+      _bucketKeys(_bucketCounts ? mongo::makeHistogramBucketKeys(*_bucketCounts)
+                                : std::vector<std::string>{}),
+      _appendOptions{.includeEmptyBuckets = serializationFormat !=
+                         HistogramSerializationFormat::kNonEmptyBucketCounts},
       _attributeNames{defs.name...},
       _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
       _validCombinations([this] {
@@ -371,7 +393,7 @@ BSONObj HistogramImpl<T, AttributeTs...>::serializeToBson(const std::string& key
 #ifdef MONGO_CONFIG_OTEL
         auto readLock = _rwMutex.readLock();
 #endif
-        mongo::appendHistogram(builder, *_bucketCounts, key);
+        mongo::appendHistogram(builder, *_bucketCounts, key, _bucketKeys, _appendOptions);
     }
     return builder.obj();
 }

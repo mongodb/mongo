@@ -34,7 +34,9 @@ otel::metrics::Histogram<int64_t>& makeQueryLatencyHistogram(otel::metrics::Metr
                                                 .role = ClusterRole::ShardServer},
          .explicitBucketBoundaries =
              operation_latency_histogram_details::makeOperationLatencyBucketBoundaries(),
-         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
+         // Serialize only non-empty buckets.
+         .serializationFormat =
+             otel::metrics::HistogramSerializationFormat::kNonEmptyBucketCounts});
 }
 
 // Register histograms for all four plan-selection strategies.

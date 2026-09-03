@@ -150,28 +150,73 @@ protected:
 };
 
 /**
+ * Builds the BSON field name ("[lower, upper)") for each bucket of `hist`, in bucket order.
+ *
+ * The keys depend only on the histogram's partitions, which are fixed at construction. Callers that
+ * serialize the same histogram repeatedly should build this once and pass it to the overload of
+ * `appendHistogram` below rather than paying the formatting cost on every call.
+ */
+template <typename... Ts>
+std::vector<std::string> makeHistogramBucketKeys(const Histogram<Ts...>& hist) {
+    std::vector<std::string> keys;
+    keys.reserve(hist.getPartitions().size() + 1);
+    for (auto&& bucket : hist) {
+        keys.push_back(
+            fmt::format("{}{}, {})",
+                        bucket.lower ? '[' : '(',
+                        bucket.lower ? fmt::to_string(*bucket.lower) : std::string{"-inf"},
+                        bucket.upper ? fmt::to_string(*bucket.upper) : std::string{"inf"}));
+    }
+    return keys;
+}
+
+struct AppendHistogramOptions {
+    /**
+     * When false, buckets with a zero count are omitted. This makes the set of emitted fields vary
+     * over time, so only use it for metrics whose consumers tolerate a sparse shape.
+     */
+    bool includeEmptyBuckets = true;
+};
+
+/**
  * Appends data (i.e. count and lower/upper bounds of all buckets) of a histogram to the provided
- * BSON object builder. `histKey` is used as the field name for the appended BSON object containing
- * the data.
+ * BSON object builder, using bucket keys previously built by `makeHistogramBucketKeys(hist)`.
+ * `histKey` is used as the field name for the appended BSON object containing the data.
+ *
+ * `bucketKeys` must contain exactly one entry per bucket, in bucket order.
+ */
+template <typename... Ts>
+void appendHistogram(BSONObjBuilder& bob,
+                     const Histogram<Ts...>& hist,
+                     const std::string_view histKey,
+                     const std::vector<std::string>& bucketKeys,
+                     AppendHistogramOptions options = {}) {
+    BSONObjBuilder histBob(bob.subobjStart(histKey));
+    long long totalCount = 0;
+    size_t i = 0;
+
+    invariant(bucketKeys.size() == hist.getPartitions().size() + 1,
+              "bucketKeys must have one entry per histogram bucket");
+    for (auto&& bucket : hist) {
+        if (bucket.count != 0 || options.includeEmptyBuckets) {
+            BSONObjBuilder(histBob.subobjStart(bucketKeys[i]))
+                .append("count", static_cast<long long>(bucket.count));
+        }
+        totalCount += bucket.count;
+        ++i;
+    }
+    histBob.append("totalCount", totalCount);
+}
+
+/**
+ * As above, but builds the bucket keys on each call. Prefer the overload taking precomputed keys on
+ * any path that serializes the same histogram more than once.
  */
 template <typename... Ts>
 void appendHistogram(BSONObjBuilder& bob,
                      const Histogram<Ts...>& hist,
                      const std::string_view histKey) {
-    BSONObjBuilder histBob(bob.subobjStart(histKey));
-    long long totalCount = 0;
-
-    for (auto&& [count, lower, upper] : hist) {
-        std::string bucketKey = fmt::format("{}{}, {})",
-                                            lower ? "[" : "(",
-                                            lower ? fmt::format("{}", *lower) : "-inf",
-                                            upper ? fmt::format("{}", *upper) : "inf");
-
-        BSONObjBuilder(histBob.subobjStart(bucketKey))
-            .append("count", static_cast<long long>(count));
-        totalCount += count;
-    }
-    histBob.append("totalCount", totalCount);
+    appendHistogram(bob, hist, histKey, makeHistogramBucketKeys(hist));
 }
 
 }  // namespace mongo
