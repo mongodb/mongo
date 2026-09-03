@@ -1033,18 +1033,44 @@ def find_test_task_with_binaries(evg_api, results_task_id: str):
         return None
 
 
+def _find_binary_artifacts(root_logger: Logger, evg_api, task_id: str) -> list:
+    """
+    Find the archive of symbolized binaries to analyze cores against.
+
+    The runner (resmoke_tests) task relinks and uploads binaries for the targets that failed in its
+    own execution. A result task restarted on its own by stepback or the autoreverter re-runs the
+    test itself, and uploads its own binaries, so prefer the result task's archive.
+
+    :return: List of matching artifacts, empty if none were found on either task.
+    """
+    candidates = []
+
+    try:
+        candidates.append(evg_api.task_by_id(task_id))
+    except Exception as ex:
+        root_logger.error(f"Failed to query Evergreen for result task {task_id}: {ex}")
+
+    runner_task = find_test_task_with_binaries(evg_api, task_id)
+    if runner_task is not None:
+        candidates.append(runner_task)
+
+    for task in candidates:
+        artifacts = [a for a in task.artifacts if "Test binaries and libraries" in a.name]
+        if artifacts:
+            root_logger.info(f"Downloading binaries from task {task.display_name} ({task.task_id})")
+            return artifacts
+        root_logger.info(f"No binary archive found on task {task.display_name} ({task.task_id})")
+
+    return []
+
+
 @TRACER.start_as_current_span("core_analyzer.download_bazel_test_task_binaries")
 def download_bazel_test_task_binaries(root_logger: Logger, task_id: str, download_dir: str) -> bool:
     evg_api = evergreen_conn.get_evergreen_api()
-    resmoke_task = find_test_task_with_binaries(evg_api, task_id)
 
-    root_logger.info(f"Downloading binaries from task {resmoke_task.task_id}")
-
-    dist_tests_artifacts = [
-        a for a in resmoke_task.artifacts if "Test binaries and libraries" in a.name
-    ]
+    dist_tests_artifacts = _find_binary_artifacts(root_logger, evg_api, task_id)
     if not dist_tests_artifacts:
-        root_logger.error("No binary archive found in the resmoke_test task")
+        root_logger.error("No binary archive found in the result task or the resmoke_tests task")
         return False
 
     install_dir = os.path.join(download_dir, "install")
