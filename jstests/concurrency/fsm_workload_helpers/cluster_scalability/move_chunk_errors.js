@@ -55,6 +55,9 @@ function isErrorAcceptableWithMoveChunk(error) {
         // by-design rejection; the move can succeed later, once the stale entry ages past the
         // snapshot-history window.
         "point-in-time reachable ownership history",
+        // A migration recipient aborts a ongoing migration when another migration starts on the
+        // same recipient shard.
+        "Destination shard aborted migration because a new one is running",
     ];
     return (
         isCommonChunkOpContentionError(error) ||
