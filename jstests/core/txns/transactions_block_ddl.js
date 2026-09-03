@@ -73,7 +73,7 @@ function testSuccessOnTxnCommit(cmdDBName, ddlCmd, currentOpFilter) {
     jsTestLog("Transaction started, running ddl operation " + ddlCmd);
     let thread = new Thread(
         function (cmdDBName, ddlCmd) {
-            return db.getSiblingDB(cmdDBName).runCommand(ddlCmd);
+            return assert.commandWorked(db.getSiblingDB(cmdDBName).runCommand(ddlCmd));
         },
         cmdDBName,
         ddlCmd,
@@ -82,6 +82,12 @@ function testSuccessOnTxnCommit(cmdDBName, ddlCmd, currentOpFilter) {
     // Wait for the DDL operation to have pending locks.
     assert.soon(
         function () {
+            // The DDL command is expected to block until the transaction commits. If it failed
+            // outright, report that error now instead of polling for an operation that will never
+            // show up: join() rethrows whatever the thread failed with.
+            if (thread.hasFailed()) {
+                thread.join();
+            }
             // Note that we cannot use the $currentOp agg stage because it acquires locks
             // (SERVER-35289).
             let currOpResult = FixtureHelpers.mapOnEachShardNode({
@@ -137,6 +143,28 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
 
 {
     jsTestLog("Testing that 'renameCollection' within databases blocks on transactions");
+
+    /**
+     * Returns true once no sharding DDL coordinator is operating on any of 'namespaces'.
+     * Coordinators delete their state document from config.system.sharding_ddl_coordinators on
+     * their shard as soon as they complete, so the absence of such a document means that no DDL
+     * operation on those namespaces may still take effect.
+     */
+    function areNoDDLCoordinatorsInProgress(namespaces) {
+        // Note that we cannot look at $currentOp: coordinators run on clientless threads, which
+        // are not reported there.
+        const perShard = FixtureHelpers.mapOnEachShardNode({
+            db: testDB.getSiblingDB("config"),
+            func: (configDB) =>
+                configDB
+                    .getCollection("system.sharding_ddl_coordinators")
+                    .find({"_id.namespace": {$in: namespaces}})
+                    .itcount(),
+            primaryNodeOnly: true,
+        });
+        return perShard.every((count) => count === 0);
+    }
+
     function undoTimedOutRenameIfNeeded(originalFrom, originalTo) {
         // In sharded clusters, the deadline expiration of a DDL command causes the user request to
         // be aborted, but the event won't be propagated to the shard that is currently processing
@@ -144,21 +172,40 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         // once the conflicting transaction gets committed.
         // This behavior can cause unexpected failures when running subsequent commands: to remove
         // them, we restore the initial state through a specular request.
-        if (FixtureHelpers.isMongos(db)) {
-            assert.commandWorkedOrFailedWithCode(
-                testDB.adminCommand({
-                    renameCollection: originalTo,
-                    to: originalFrom,
-                    writeConcern: {w: "majority"},
-                }),
-                [ErrorCodes.NamespaceNotFound],
-            );
+        //
+        // The specular request must not be issued while the abandoned coordinator is still
+        // running, otherwise it fails with NamespaceNotFound (which is indistinguishable from
+        // "the rename never took effect"). If the original request completes after the specular
+        // attempt, the collection is left in an unexpected state, causing failures for the
+        // testSuccessOnTxnCommit test below. So wait for the coordinator to complete first.
+        if (!FixtureHelpers.isMongos(db)) {
+            return;
         }
+        assert.commandWorkedOrFailedWithCode(
+            testDB.adminCommand({
+                renameCollection: originalTo,
+                to: originalFrom,
+                writeConcern: {w: "majority"},
+            }),
+            // NamespaceNotFound means that the abandoned rename never took effect, which is
+            // already the state we want to restore.
+            [ErrorCodes.NamespaceNotFound],
+        );
+        const namespaces = [originalFrom, originalTo];
+        assert.soon(
+            () => areNoDDLCoordinatorsInProgress(namespaces),
+            "Timed out waiting for the abandoned renameCollection coordinator to complete",
+            60 * 1000,
+            undefined,
+            {runHangAnalyzer: false},
+            {namespaces},
+        );
     }
     assert.commandWorked(testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
     const renameCollectionCmdSameDB = {
         renameCollection: sessionColl.getFullName(),
         to: dbName + "." + otherCollName,
+        dropTarget: true,
         writeConcern: {w: "majority"},
     };
     testTimeout("admin", renameCollectionCmdSameDB);
@@ -184,12 +231,10 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
         // Ensure that the two databases are assigned to the same primary shard to ensure that
         // renameCollection will succeed.
         assert.commandWorked(testDB.getSiblingDB(otherDBName).dropDatabase());
-        assert.commandWorked(
-            db.adminCommand({
-                enableSharding: sessionDB.getName(),
-                primaryShard: sessionDB.getDatabasePrimaryShardId(),
-            }),
-        );
+        const primaryShard = sessionDB.getDatabasePrimaryShardId();
+        assert.commandWorked(db.adminCommand({enableSharding: sessionDB.getName(), primaryShard}));
+        // Create the destination database explicitly.
+        assert.commandWorked(db.adminCommand({enableSharding: otherDBName, primaryShard}));
     } else {
         assert.commandWorked(
             testDB
@@ -201,6 +246,7 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
     const renameCollectionCmdDifferentDB = {
         renameCollection: sessionColl.getFullName(),
         to: otherDBName + "." + otherCollName,
+        dropTarget: true,
         writeConcern: {w: "majority"},
     };
     testTimeout("admin", renameCollectionCmdDifferentDB);
