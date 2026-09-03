@@ -442,13 +442,16 @@ void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {
 }
 
 void SingleServerDiscoveryMonitor::_onHelloFailure(const Status& status, const BSONObj bson) {
-    LOGV2_DEBUG(4333222,
-                kLogLevel,
-                "RSM received error response",
-                "host"_attr = _host,
-                "error"_attr = status.toString(),
-                "replicaSet"_attr = _setUri.getSetName(),
-                "response"_attr = bson);
+    if (auto severity = _rsmErrorLogSeverity();
+        shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, severity)) {
+        LOGV2_DEBUG(4333222,
+                    severity.toInt(),
+                    "RSM received error response",
+                    "host"_attr = _host,
+                    "error"_attr = status.toString(),
+                    "replicaSet"_attr = _setUri.getSetName(),
+                    "response"_attr = bson);
+    }
 
     _eventListener->onServerHeartbeatFailureEvent(status, _host, bson);
 }

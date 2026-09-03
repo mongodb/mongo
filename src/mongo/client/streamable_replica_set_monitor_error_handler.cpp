@@ -28,12 +28,16 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
         if (result.helloOutcome)
             _clearConsecutiveErrorsWithoutHelloOutcome(host);
 
-        LOGV2(4712102,
-              "Host failed in replica set",
-              "replicaSet"_attr = _setName,
-              "host"_attr = host,
-              "error"_attr = status,
-              "action"_attr = result);
+        if (auto severity = _hostFailedLogSeverity(host);
+            shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, severity)) {
+            LOGV2_DEBUG(4712102,
+                        severity.toInt(),
+                        "Host failed in replica set",
+                        "replicaSet"_attr = _setName,
+                        "host"_attr = host,
+                        "error"_attr = status,
+                        "action"_attr = result);
+        }
     });
 
     bool isApplicationOperation = isApplicationEvent(triggerEvent);

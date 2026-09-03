@@ -6,7 +6,10 @@
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <mutex>
@@ -106,5 +109,10 @@ private:
     const std::string _setName;
     mutable std::mutex _mutex;
     stdx::unordered_map<HostAndPort, int> _consecutiveErrorsWithoutHelloOutcome;
+
+    // Rate-limits the "Host failed in replica set" log to once per second per host at Info level,
+    // falling back to Debug(2) within the same period.
+    logv2::KeyedSeveritySuppressor<HostAndPort> _hostFailedLogSeverity{
+        Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 }  // namespace mongo

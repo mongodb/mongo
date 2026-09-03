@@ -14,6 +14,8 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -98,7 +100,12 @@ private:
 
     boost::optional<Milliseconds> _timeSinceLastCheck() const;
 
-    static constexpr auto kLogLevel = 0;
+    static constexpr auto kLogLevel = logv2::LogSeverity::Log().toInt();
+
+    // Rate-limits the "RSM received error response" log to once per second, falling back to
+    // Debug(2) within the same period.
+    logv2::SeveritySuppressor _rsmErrorLogSeverity{
+        Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2)};
 
     const HostAndPort _host;
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
@@ -152,7 +159,7 @@ private:
         const std::shared_ptr<executor::TaskExecutor>& executor);
     void _disableExpeditedChecking(WithLock);
 
-    static constexpr auto kLogLevel = 0;
+    static constexpr auto kLogLevel = logv2::LogSeverity::Log().toInt();
 
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
