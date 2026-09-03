@@ -49,7 +49,9 @@ private:
 /**
  * This class contains some static methods common to ordinary oplog application.
  */
-class [[MONGO_MOD_PARENT_PRIVATE]] OplogApplierUtils {
+// TODO SERVER-134375: Restore MONGO_MOD_PARENT_PRIVATE once the pipelined oplog applier moves into
+// the replication module.
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] OplogApplierUtils {
 public:
     /*
      * Returns the hash of the oplog entry based on the namespace string (and document
