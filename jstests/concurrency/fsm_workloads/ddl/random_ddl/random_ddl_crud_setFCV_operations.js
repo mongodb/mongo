@@ -35,7 +35,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.setFCV = function (db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];
-        jsTestLog("setFCV to " + targetFCV);
+        jsTest.log.info("setFCV state", {tid: this.tid, targetFCV});
         try {
             assert.commandWorked(
                 db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
@@ -43,8 +43,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         } catch (e) {
             if (handleRandomSetFCVErrors(e, targetFCV)) return;
             throw e;
+        } finally {
+            jsTest.log.info("setFCV state finished", {tid: this.tid, targetFCV});
         }
-        jsTestLog("setFCV state finished");
     };
 
     $config.states.untrackUnshardedCollection = function (db, collName, connCache) {
@@ -53,34 +54,39 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         const targetThreadColl = this.threadCollectionName(collName, tid);
         const namespace = `${db}.${targetThreadColl}`;
-        jsTest.log.info(`Started to untrack collection ${namespace}`);
+        const threadInfo = {tid, namespace};
+        jsTest.log.info(`Started to untrack collection`, threadInfo);
         // Attempt to unshard the collection first
-        jsTest.log.info(`1. Attempting to unshard collection ${namespace}`);
-        const res = assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({unshardCollection: namespace}),
-            this.kReshardingAcceptableErrors,
-        );
-        if (!res.ok && kReshardingSetFcvErrors.includes(res.code)) {
-            jsTest.log.info(
-                `Unsharding failed due to concurrent setFCV, performing an early exit since the operation cannot safely continue`,
+        jsTest.log.info(`1. Attempting to unshard collection`, threadInfo);
+
+        try {
+            const res = assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({unshardCollection: namespace}),
+                this.kReshardingAcceptableErrors,
             );
-            return;
+            if (!res.ok && kReshardingSetFcvErrors.includes(res.code)) {
+                jsTest.log.info(
+                    `Unsharding failed due to concurrent setFCV, performing an early exit since the operation cannot safely continue`,
+                );
+                return;
+            }
+            jsTest.log.info(`Unsharding completed`, threadInfo);
+            jsTest.log.info(`2. Untracking collection`, threadInfo);
+            // Note this command will behave as no-op in case the collection is not tracked.
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}),
+                [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                ],
+            );
+        } finally {
+            jsTest.log.info(`Untrack collection completed`, threadInfo);
         }
-        jsTest.log.info(`Unsharding completed ${namespace}`);
-        jsTest.log.info(`2. Untracking collection ${namespace}`);
-        // Note this command will behave as no-op in case the collection is not tracked.
-        assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({untrackUnshardedCollection: namespace}),
-            [
-                // Handles the case where the collection is not located on its primary
-                ErrorCodes.OperationFailed,
-                // Handles the case where the collection is sharded
-                ErrorCodes.InvalidNamespace,
-                // Handles the case where the collection/db does not exist
-                ErrorCodes.NamespaceNotFound,
-            ],
-        );
-        jsTest.log.info(`Untrack collection completed`);
     };
 
     $config.transitions = uniformDistTransitions($config.states);

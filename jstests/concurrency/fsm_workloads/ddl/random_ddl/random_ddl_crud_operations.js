@@ -17,6 +17,7 @@
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 
 export const $config = (function () {
     function countDocuments(coll, query) {
@@ -37,32 +38,6 @@ export const $config = (function () {
         return count;
     }
 
-    /**
-     * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
-     * operation. Uses a different session to avoid having issues with multi-document transaction
-     * snapshots.
-     */
-    function mutexLock(mutexSession, db, tid, collName) {
-        jsTest.log.info("Trying to acquire mutexLock for resource", {
-            tid,
-        });
-        const sessionDb = mutexSession.getDatabase(db.getName());
-        assert.soon(() => {
-            let doc = sessionDb[data.CRUDMutex].findAndModify({
-                query: {tid: tid},
-                update: {$set: {mutex: 1}},
-            });
-            return doc.mutex === 0;
-        });
-        jsTest.log.info("Acquired mutexLock", {tid, collection: collName});
-    }
-
-    function mutexUnlock(mutexSession, db, tid, collName) {
-        const sessionDb = mutexSession.getDatabase(db.getName());
-        sessionDb[data.CRUDMutex].update({tid: tid}, {$set: {mutex: 0}});
-        jsTest.log.info("Unlocked lock", {tid, collection: collName});
-    }
-
     // Keep data less then 64 (internalInsertMaxBatchSize) to avoid insertMany to yield while
     // inserting. This might cause an rename to execute during the insertMany and post-assertions
     // checks to fail.
@@ -71,6 +46,7 @@ export const $config = (function () {
         numChunks: 20,
         documentsPerChunk: 3,
         CRUDMutex: "CRUDMutex",
+        CRUDMutexDb: `${jsTest.name()}_Mutex`,
         kReshardingAcceptableErrors: [
             // Concurrent resharding with the same collection is ongoing
             ErrorCodes.ConflictingOperationInProgress,
@@ -81,6 +57,130 @@ export const $config = (function () {
         ],
         threadCollectionName: function (prefix, tid) {
             return prefix + tid;
+        },
+        // Transitions between dedicated and embedded config shards can sometimes yield a ConflictingOperationInProgress during checkMetadataConsistency. Ignore errors in those cases as it's a transient issue.
+        kCheckMetadataAcceptableErrors: TestData.shardsAddedRemoved
+            ? [ErrorCodes.ConflictingOperationInProgress]
+            : [],
+
+        assertWriteWorked: function (
+            cmd,
+            retryableErrorCodes,
+            ignorableErrorCodes = [],
+            retryableErrorCodesInTransaction = [],
+        ) {
+            if (!Array.isArray(retryableErrorCodes)) {
+                retryableErrorCodes = [retryableErrorCodes];
+            }
+            if (!Array.isArray(ignorableErrorCodes)) {
+                ignorableErrorCodes = [ignorableErrorCodes];
+            }
+
+            let res = undefined;
+            assert.soon(() => {
+                try {
+                    res = cmd();
+                    assert.commandWorked(res);
+                    return true;
+                } catch (err) {
+                    // Bulk write executions throw an exception unlike all the other writes.
+                    if (err instanceof BulkWriteError && err.hasWriteErrors()) {
+                        const writeErrors = err.getWriteErrors();
+                        if (
+                            writeErrors.some(
+                                (writeErr) =>
+                                    !retryableErrorCodes.includes(writeErr.code) &&
+                                    !ignorableErrorCodes.includes(writeErr.code),
+                            )
+                        ) {
+                            throw err;
+                        }
+                        const retryableWriteErrors = writeErrors.filter((writeErr) =>
+                            retryableErrorCodes.includes(writeErr.code),
+                        );
+                        if (retryableWriteErrors.length > 0) {
+                            if (
+                                fsm.isInvocationRunningInsideTransaction(this) &&
+                                retryableWriteErrors.some(
+                                    (writeErr) =>
+                                        !retryableErrorCodesInTransaction.includes(writeErr.code),
+                                )
+                            ) {
+                                fsm.forceRunningOutsideTransaction(this);
+                            }
+                            res = undefined;
+                            return false;
+                        }
+                        return true;
+                    }
+                    // We expect that the errors that follow are the result of simple write errors. Any other error
+                    // cannot be treated and must be bubbled upwards. An example of this could be simple transaction
+                    // failures.
+                    if (res === undefined) {
+                        throw err;
+                    }
+                    if (!(res instanceof WriteResult)) {
+                        throw res;
+                    }
+                    const writeErr = res.getWriteError();
+                    if (retryableErrorCodes.includes(writeErr.code)) {
+                        if (
+                            fsm.isInvocationRunningInsideTransaction(this) &&
+                            !retryableErrorCodesInTransaction.includes(writeErr.code)
+                        ) {
+                            // TODO SERVER-132267: movePrimary has poor interactions with transactions and can
+                            // deadlock during testing due to transaction not having a timeout set. In this case
+                            // we cause the operation to fail and the entire state to be retried outside of the
+                            // transaction. This will unblock movePrimary and let it finish.
+                            fsm.forceRunningOutsideTransaction(this);
+                        }
+                        res = undefined;
+                        return false;
+                    }
+                    if (ignorableErrorCodes.includes(writeErr.code)) {
+                        return true;
+                    }
+                    // At this point the error received seems to be a real issue, bubble it upwards
+                    throw err;
+                }
+            });
+            return res;
+        },
+        /**
+         * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
+         * operation. Uses a different session to avoid having issues with multi-document transaction
+         * snapshots.
+         */
+        mutexLock: function (mutexSession, tid, collName) {
+            jsTest.log.info("Trying to acquire mutexLock for resource", {
+                tid,
+                collection: collName,
+            });
+            const sessionDb = mutexSession.getDatabase(this.CRUDMutexDb);
+            try {
+                assert.soon(() => {
+                    const res = this.assertWriteWorked(() =>
+                        sessionDb[data.CRUDMutex].update({tid: tid, mutex: 0}, {$set: {mutex: 1}}),
+                    );
+                    return res.nModified === 1;
+                });
+            } catch (e) {
+                jsTest.log.info("Failed to acquire lock", {tid, collection: collName, e});
+                throw e;
+            }
+            jsTest.log.info("Acquired mutexLock", {tid, collection: collName});
+        },
+        mutexUnlock: function (mutexSession, tid, collName) {
+            const sessionDb = mutexSession.getDatabase(this.CRUDMutexDb);
+            try {
+                this.assertWriteWorked(() =>
+                    sessionDb[data.CRUDMutex].update({tid: tid}, {$set: {mutex: 0}}),
+                );
+            } catch (e) {
+                jsTest.log.info("Failed to unlock lock", {tid, collection: collName, e});
+                throw e;
+            }
+            jsTest.log.info("Unlocked lock", {tid, collection: collName});
         },
     };
 
@@ -101,28 +201,34 @@ export const $config = (function () {
                 currentTid: this.tid,
                 collection: targetThreadColl,
             });
-            const res = assert.commandWorkedOrFailedWithCode(
-                db.runCommand({
-                    createUnsplittableCollection: targetThreadColl,
-                }),
-                [
-                    ErrorCodes.ConflictingOperationInProgress,
-                    ErrorCodes.AlreadyInitialized,
-                    ErrorCodes.InvalidOptions,
-                    ErrorCodes.NamespaceExists,
-                    ErrorCodes.CannotCreateCollection,
-                ],
-            );
-
-            if (!res.ok) {
-                // If we're running with transactions and an acceptable error occurred then the transaction will
-                // fail due to an implicit abort. If the returned error is sticky then that would cause the
-                // operation to be retried indefinitely. To prevent this we force this command to be executed
-                // again outside of the transaction where it will see the acceptable error and succeed.
-                fsm.forceRunningOutsideTransaction(this);
+            try {
+                const res = assert.commandWorkedOrFailedWithCode(
+                    db.runCommand({
+                        createUnsplittableCollection: targetThreadColl,
+                    }),
+                    [
+                        ErrorCodes.ConflictingOperationInProgress,
+                        ErrorCodes.AlreadyInitialized,
+                        ErrorCodes.InvalidOptions,
+                        ErrorCodes.NamespaceExists,
+                        ErrorCodes.CannotCreateCollection,
+                        ErrorCodes.MovePrimaryInProgress,
+                    ],
+                );
+                if (!res.ok) {
+                    // If we encounter a failure and we're inside a multi-document transaction then the state succeeding
+                    // will trigger the commit to fail since the transaction will get aborted. This in turn would cause
+                    // the transaction to be retried indefinitely. To prevent this we force the state to be retried outside
+                    // of the transaction in order to let it make forward progress.
+                    fsm.forceRunningOutsideTransaction(this);
+                }
+            } finally {
+                jsTest.log.info("createUnsplittable finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
             }
-
-            jsTest.log.info("createUnsplittable finished");
         },
         create: function (db, collName, connCache) {
             let tid = this.tid;
@@ -132,14 +238,11 @@ export const $config = (function () {
             const targetThreadColl = this.threadCollectionName(collName, tid);
             const coll = db[targetThreadColl];
             const fullNs = coll.getFullName();
-            jsTestLog(
-                "create state tid:" +
-                    tid +
-                    " currentTid:" +
-                    this.tid +
-                    " collection:" +
-                    targetThreadColl,
-            );
+            jsTest.log.info("create state", {
+                tid,
+                currentTid: this.tid,
+                collection: targetThreadColl,
+            });
             try {
                 assert.commandWorked(
                     db.adminCommand({
@@ -166,7 +269,11 @@ export const $config = (function () {
                 }
                 throw e;
             } finally {
-                jsTestLog("create state finished");
+                jsTest.log.info("create state finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
             }
         },
         drop: function (db, collName, connCache) {
@@ -176,21 +283,22 @@ export const $config = (function () {
 
             const targetThreadColl = this.threadCollectionName(collName, tid);
 
-            jsTestLog(
-                "drop state tid:" +
-                    tid +
-                    " currentTid:" +
-                    this.tid +
-                    " collection:" +
-                    targetThreadColl,
-            );
-            mutexLock(this.mutexSession, db, tid, targetThreadColl);
+            jsTest.log.info("drop state", {
+                tid,
+                currentTid: this.tid,
+                collection: targetThreadColl,
+            });
+            this.mutexLock(this.mutexSession, tid, targetThreadColl);
             try {
                 assert.eq(db[targetThreadColl].drop(), true);
             } finally {
-                mutexUnlock(this.mutexSession, db, tid, targetThreadColl);
+                this.mutexUnlock(this.mutexSession, tid, targetThreadColl);
+                jsTest.log.info("drop state finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
             }
-            jsTestLog("drop state finished");
         },
         rename: function (db, collName, connCache) {
             let tid = this.tid;
@@ -204,16 +312,12 @@ export const $config = (function () {
                 tid + "_" + extractUUIDFromObject(UUID()),
             );
             try {
-                jsTestLog(
-                    "rename state tid:" +
-                        tid +
-                        " currentTid:" +
-                        this.tid +
-                        " collection:" +
-                        srcCollName +
-                        " dst:" +
-                        destCollName,
-                );
+                jsTest.log.info("rename state", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: srcCollName,
+                    dst: destCollName,
+                });
                 assert.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 const exceptionCode = e.code;
@@ -253,7 +357,12 @@ export const $config = (function () {
                 }
                 throw e;
             } finally {
-                jsTestLog("rename state finished");
+                jsTest.log.info("rename state finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: srcCollName,
+                    dst: destCollName,
+                });
             }
         },
         resharding: function (db, collName, connCache) {
@@ -284,28 +393,51 @@ export const $config = (function () {
                 this.kReshardingAcceptableErrors,
             );
 
-            jsTest.log.info("resharding state finished");
+            jsTest.log.info("resharding state finished", {
+                tid,
+                currentTid: this.tid,
+                collection: fullNs,
+                newKey,
+                isHashed,
+            });
         },
         checkDatabaseMetadataConsistency: function (db, collName, connCache) {
-            jsTestLog("Check database metadata state");
-            const inconsistencies = db.checkMetadataConsistency().toArray();
-            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+            jsTest.log.info("Check database metadata state", {tid: this.tid});
+            try {
+                const inconsistencies = db.checkMetadataConsistency().toArray();
+                assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+            } catch (e) {
+                if (!this.kCheckMetadataAcceptableErrors.includes(e.code)) {
+                    throw e;
+                }
+            } finally {
+                jsTest.log.info("Check database metadata state finished", {tid: this.tid});
+            }
         },
         checkCollectionMetadataConsistency: function (db, collName, connCache) {
             let tid = this.tid;
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
             const targetThreadColl = this.threadCollectionName(collName, tid);
-            jsTestLog(
-                "Check collection metadata state tid:" +
-                    tid +
-                    " currentTid:" +
-                    this.tid +
-                    " collection:" +
-                    targetThreadColl,
-            );
-            const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
-            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+            jsTest.log.info("Check collection metadata state", {
+                tid,
+                currentTid: this.tid,
+                collection: targetThreadColl,
+            });
+            try {
+                const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
+                assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+            } catch (e) {
+                if (!this.kCheckMetadataAcceptableErrors.includes(e.code)) {
+                    throw e;
+                }
+            } finally {
+                jsTest.log.info("Check collection metadata state finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
+            }
         },
         unshardCollection: function unshardCollection(db, collName, connCache) {
             let tid = this.tid;
@@ -313,12 +445,15 @@ export const $config = (function () {
 
             const targetThreadColl = this.threadCollectionName(collName, tid);
             const namespace = `${db}.${targetThreadColl}`;
-            jsTest.log.info(`Started to unshard collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({unshardCollection: namespace}),
-                this.kReshardingAcceptableErrors,
-            );
-            jsTest.log.info(`Unsharding completed ${namespace}`);
+            jsTest.log.info("Started to unshard collection", {tid, namespace});
+            try {
+                assert.commandWorkedOrFailedWithCode(
+                    db.adminCommand({unshardCollection: namespace}),
+                    this.kReshardingAcceptableErrors,
+                );
+            } finally {
+                jsTest.log.info("Unsharding completed", {tid, namespace});
+            }
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             let tid = this.tid;
@@ -326,28 +461,63 @@ export const $config = (function () {
 
             const targetThreadColl = this.threadCollectionName(collName, tid);
             const namespace = `${db}.${targetThreadColl}`;
-            jsTestLog(`Started to untrack collection ${namespace}`);
-            // Attempt to unshard the collection first
-            jsTestLog(`1. Attempting to unshard collection ${namespace}`);
-            const res = assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({unshardCollection: namespace}),
-                this.kReshardingAcceptableErrors,
-            );
-            jsTestLog(`Unsharding completed ${namespace}`);
-            jsTestLog(`2. Untracking collection ${namespace}`);
-            // Note this command will behave as no-op in case the collection is not tracked.
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({untrackUnshardedCollection: namespace}),
-                [
-                    // Handles the case where the collection is not located on its primary
-                    ErrorCodes.OperationFailed,
-                    // Handles the case where the collection is sharded
-                    ErrorCodes.InvalidNamespace,
-                    // Handles the case where the collection/db does not exist
-                    ErrorCodes.NamespaceNotFound,
-                ],
-            );
-            jsTestLog(`Untrack collection completed`);
+            try {
+                jsTest.log.info("Started to untrack collection", {tid, namespace});
+                // Attempt to unshard the collection first
+                jsTest.log.info("1. Attempting to unshard collection", {tid, namespace});
+                const res = assert.commandWorkedOrFailedWithCode(
+                    db.adminCommand({unshardCollection: namespace}),
+                    this.kReshardingAcceptableErrors,
+                );
+                jsTest.log.info(`Unsharding completed`, {tid, namespace});
+                jsTest.log.info(`2. Untracking collection`, {tid, namespace});
+                // Note this command will behave as no-op in case the collection is not tracked.
+                assert.commandWorkedOrFailedWithCode(
+                    db.adminCommand({untrackUnshardedCollection: namespace}),
+                    [
+                        // Handles the case where the collection is not located on its primary
+                        ErrorCodes.OperationFailed,
+                        // Handles the case where the collection is sharded
+                        ErrorCodes.InvalidNamespace,
+                        // Handles the case where the collection/db does not exist
+                        ErrorCodes.NamespaceNotFound,
+                    ],
+                );
+            } finally {
+                jsTest.log.info(`Untrack collection completed`, {tid, namespace});
+            }
+        },
+        movePrimary: function (db, collName, connCache) {
+            // Move the primary shard of the database to a random shard (which could coincide with
+            // the starting one).
+            const shards = ShardingTopologyHelpers.getShardNames(db);
+            const toShard = shards[Random.randInt(shards.length)];
+            jsTest.log.info("Running movePrimary", {tid: this.tid, db, toShard});
+
+            const expectedErrorCodes = [
+                // Caused by a concurrent movePrimary operation on the same database but a
+                // different destination shard.
+                ErrorCodes.ConflictingOperationInProgress,
+                // Due to a stepdown of the donor during the cloning phase, the movePrimary
+                // operation failed. It is not automatically recovered, but any orphaned data on
+                // the recipient has been deleted.
+                7120202,
+                // In the FSM tests, there is a chance that there are still some User
+                // collections left to clone. This occurs when a MovePrimary joins an already
+                // existing MovePrimary command that has purposefully triggered a failpoint.
+                9046501,
+            ];
+            if (TestData.hasRandomShardsAddedRemoved) {
+                expectedErrorCodes.push(ErrorCodes.ShardNotFound);
+            }
+            try {
+                assert.commandWorkedOrFailedWithCode(
+                    db.adminCommand({movePrimary: db.getName(), to: toShard}),
+                    expectedErrorCodes,
+                );
+            } finally {
+                jsTest.log.info("Finished movePrimary", {tid: this.tid, db, toShard});
+            }
         },
         CRUD: function (db, collName, connCache) {
             let tid = this.tid;
@@ -355,62 +525,109 @@ export const $config = (function () {
             while (tid === this.tid) tid = Random.randInt(this.threadCount);
 
             const targetThreadColl = this.threadCollectionName(collName, tid);
-            const threadInfos =
-                "tid:" + tid + " currentTid:" + this.tid + " collection:" + targetThreadColl;
-            jsTestLog("CRUD state " + threadInfos);
-            const coll = db[targetThreadColl];
+            jsTest.log.info("CRUD state", {
+                tid,
+                currentTid: this.tid,
+                collection: targetThreadColl,
+            });
 
-            mutexLock(this.mutexSession, db, tid, targetThreadColl);
-
-            const generation = new Date().getTime();
-            // Insert Data
-            const numDocs = data.documentsPerChunk * data.numChunks;
-
-            let insertBulkOp = coll.initializeUnorderedBulkOp();
-            for (let i = 0; i < numDocs; ++i) {
-                insertBulkOp.insert({
-                    generation: generation,
-                    count: i,
-                    [`tid_${tid}_0`]: i,
-                    [`tid_${tid}_1`]: i,
-                });
-            }
+            this.mutexLock(this.mutexSession, tid, targetThreadColl);
 
             try {
-                jsTestLog("CRUD - Insert " + threadInfos);
-                // Check if insert succeeded
-                let res = insertBulkOp.execute();
-                assert.commandWorked(res);
+                const coll = db[targetThreadColl];
+
+                const generation = new Date().getTime();
+                // Insert Data
+                const numDocs = data.documentsPerChunk * data.numChunks;
+
+                jsTest.log.info("CRUD - Insert", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
+                this.assertWriteWorked(
+                    () => {
+                        let insertBulkOp = coll.initializeUnorderedBulkOp();
+                        for (let i = 0; i < numDocs; ++i) {
+                            insertBulkOp.insert({
+                                _id: `${generation}_${i}`,
+                                generation: generation,
+                                count: i,
+                                [`tid_${tid}_0`]: i,
+                                [`tid_${tid}_1`]: i,
+                            });
+                        }
+                        return insertBulkOp.execute();
+                    },
+                    ErrorCodes.MovePrimaryInProgress,
+                    // TODO (SERVER-32113): Retryable writes may cause double inserts if performed on a
+                    // shard involved as the originator of a movePrimary operation.
+                    ErrorCodes.DuplicateKey,
+                );
 
                 let currentDocs = countDocuments(coll, {generation: generation});
 
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 // If a concurrent rename came in, then either the full operation succeded (meaning
                 // there will be 0 documents left) or the insert came in first.
-                assert.contains(currentDocs, [0, numDocs], threadInfos);
+                assert.contains(currentDocs, [0, numDocs], {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
 
-                jsTestLog("CRUD - Update " + threadInfos);
-                res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
+                jsTest.log.info("CRUD - Update", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
+                const res = this.assertWriteWorked(
+                    () =>
+                        coll.update(
+                            {generation: generation},
+                            {$set: {updated: true}},
+                            {multi: true},
+                        ),
+                    ErrorCodes.MovePrimaryInProgress,
+                    ErrorCodes.QueryPlanKilled,
+                );
                 if (res instanceof WriteResult && res.hasWriteError()) {
                     // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
                     // concurrently with a rename (SERVER-31695).
                     assert.writeErrorWithCode(res, ErrorCodes.QueryPlanKilled);
-                    jsTest.log.info("CRUD state finished earlier because query plan was killed");
+                    jsTest.log.info("CRUD state finished earlier because query plan was killed", {
+                        tid,
+                        currentTid: this.tid,
+                        collection: targetThreadColl,
+                    });
                     return;
                 }
-                assert.commandWorked(res, threadInfos);
 
                 // Delete Data
-                jsTestLog("CRUD - Remove " + threadInfos);
+                jsTest.log.info("CRUD - Remove", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
                 // Check if delete succeeded
-                res = coll.remove({generation: generation}, {multi: true});
-                assert.commandWorked(res, threadInfos);
+                this.assertWriteWorked(
+                    () => coll.remove({generation: generation}, {multi: true}),
+                    ErrorCodes.MovePrimaryInProgress,
+                );
                 // Check guarantees IF NO CONCURRENT DROP is running.
-                assert.eq(countDocuments(coll, {generation: generation}), 0, threadInfos);
+                assert.eq(countDocuments(coll, {generation: generation}), 0, {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
             } finally {
-                mutexUnlock(this.mutexSession, db, tid, targetThreadColl);
+                this.mutexUnlock(this.mutexSession, tid, targetThreadColl);
+                jsTest.log.info("CRUD state finished", {
+                    tid,
+                    currentTid: this.tid,
+                    collection: targetThreadColl,
+                });
             }
-            jsTestLog("CRUD state finished");
         },
     };
 
@@ -420,9 +637,12 @@ export const $config = (function () {
         this.originalImplicitRetryDdlOnConflictWithMigration =
             TestData.implicitRetryDdlOnConflictWithMigration;
         TestData.implicitRetryDdlOnConflictWithMigration = false;
+        const mutexDb = db.getSiblingDB(data.CRUDMutexDb);
         for (let tid = 0; tid < this.threadCount; ++tid) {
-            db[data.CRUDMutex].insert({tid: tid, mutex: 0});
+            assert.commandWorked(mutexDb[data.CRUDMutex].insert({tid: tid, mutex: 0}));
         }
+        // Forcefully create a collection in the FSM provided database in order to never encounter a database not found error.
+        assert.commandWorked(db[collName].createIndex({x: 1}));
     };
 
     let teardown = function (db, collName, cluster) {
