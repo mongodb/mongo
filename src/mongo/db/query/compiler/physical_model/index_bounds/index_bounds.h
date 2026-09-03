@@ -10,6 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -315,9 +316,34 @@ public:
                                          int expectedDirection,
                                          size_t* newIntervalIndex);
 
-private:
+    const IndexBounds* bounds() const {
+        return _bounds;
+    }
+
+    std::vector<size_t>& curInterval() {
+        return _curInterval;
+    }
+
+    const std::vector<int>& expectedDirection() const {
+        return _expectedDirection;
+    }
+
     /**
-     * Find the first field in the key that isn't within the interval we think it is.  Returns
+     * A key decomposed into its per-field values. 'values' points into storage owned by the
+     * checker and is invalidated by the next parseKey() call.
+     */
+    struct KeyComponents {
+        BSONObj obj;
+        std::span<const BSONElement> values;
+    };
+
+    /**
+     * Decomposes 'key' into its per-field values for the helpers below to operate on.
+     */
+    KeyComponents parseKey(const BSONObj& key);
+
+    /**
+     * Find the first field of 'key' that isn't within the interval we think it is.  Returns
      * false if every field is in the interval we think it is.  Returns true and populates out
      * parameters if a field isn't in the interval we think it is.
      *
@@ -325,18 +351,31 @@ private:
      * 'where' is the leftmost field that isn't in the interval we think it is.
      * 'what' is the orientation of the field with respect to that interval.
      */
-    bool findLeftmostProblem(const std::vector<BSONElement>& keyValues,
-                             size_t* where,
-                             Location* what);
+    bool findLeftmostProblem(const KeyComponents& key, size_t* where, Location* what) const;
 
     /**
-     * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of the
-     * index key and still be within valid index bounds.
-     *
-     * keyValues are the elements of the index key in order.
+     * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of 'key'
+     * and still be within valid index bounds.
      */
-    bool spaceLeftToAdvance(size_t fieldsToCheck, const std::vector<BSONElement>& keyValues);
+    bool spaceLeftToAdvance(const KeyComponents& key, size_t fieldsToCheck) const;
 
+    /**
+     * Used when checkKey() has determined a component of the current `key` is ahead or behind
+     * its interval. Sets `out` to the next seek point depending on if where=ahead or behind.
+     * `prefixLen` is the position of the component that is before or after its interval.
+     *
+     * where=BEHIND: The field is before its interval, so we keep the first `prefixLen` fields
+     * as-is and set the remaining fields to the start point of their intervals.
+     *
+     * where=AHEAD: The field is past the interval, so we set the first exclusive seek point to
+     * `prefixLen`-1, to seek to the next key past the first `prefixLen` fields.
+     */
+    void buildSeekPoint(const KeyComponents& key,
+                        size_t prefixLen,
+                        Location where,
+                        IndexSeekPoint* out) const;
+
+private:
     // The actual bounds.  Must outlive this object.  Not owned by us.
     const IndexBounds* _bounds;
 
