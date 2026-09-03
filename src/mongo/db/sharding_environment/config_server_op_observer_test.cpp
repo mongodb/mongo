@@ -43,8 +43,7 @@ TEST_F(ConfigServerOpObserverTest, NodeClearsCatalogManagerOnConfigVersionRollBa
 
     _opObserver.onReplicationRollback(operationContext(), rbInfo);
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
 }
 
 TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearCatalogManagerWhenConfigVersionNotRolledBack) {
@@ -53,9 +52,7 @@ TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearCatalogManagerWhenConfigVersi
 
     _opObserver.onReplicationRollback(operationContext(), rbInfo);
 
-    ASSERT_EQ(ErrorCodes::AlreadyInitialized,
-              ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    ASSERT_EQ(ErrorCodes::AlreadyInitialized, initializeConfigDatabaseIfNeededAtStepUp());
 }
 
 using ConfigServerOpObserverTestDeathTest = ConfigServerOpObserverTest;

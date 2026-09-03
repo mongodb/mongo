@@ -324,3 +324,15 @@ server_parameters:
         cpp_varname: gClearCollectionShardingRuntimesOnRecovery
         default: true
         redact: false
+
+    allowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp:
+        description: >-
+            TEST-ONLY. When enabled, suppresses the tassert in createIndexesOnCollectionAtStepUp for
+            missing indexes on non-empty collections during step-up. This allows step up to succeed
+            without building those indexes.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: gAllowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp
+        default: false
+        redact: false
+        test_only: true

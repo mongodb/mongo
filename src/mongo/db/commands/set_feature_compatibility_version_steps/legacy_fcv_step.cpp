@@ -15,6 +15,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -754,7 +755,14 @@ private:
             // Create the shard catalog collections and their indexes before transitioning to
             // kUpgrading, since authoritative metadata writes can begin as soon as this shard
             // enters kUpgrading and those writes do not create the required indexes themselves.
-            uassertStatusOK(ensureShardLocalCatalogIndexes(opCtx));
+            uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+                opCtx,
+                NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                {IndexSpec_ForCatalog{BSON("_id" << 1), true}}));
+            uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+                opCtx,
+                NamespaceString::kConfigShardCatalogChunksNamespace,
+                getChunkCollectionIndexSpecs()));
         }
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.

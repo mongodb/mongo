@@ -1066,6 +1066,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/global_catalog/ddl:sharding_coordinator_service_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_recovery_service_test.cpp",
+        "//src/mongo/db/global_catalog/ddl:sharding_util_test.cpp",
         "//src/mongo/db/global_catalog/ddl:split_chunk_request_test.cpp",
         "//src/mongo/db/global_catalog/ddl:test_chunk_operation_sharding_coordinator_document_gen",
         "//src/mongo/db/sharding_environment:sharding_initialization_mongod_test.cpp",
@@ -1078,6 +1079,7 @@ mongo_cc_unit_test(
     deps = [
         ":db_s_shard_server_test_deps",
         ":sharding_test_helpers",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -1243,7 +1245,6 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_s_config_server_test",
     srcs = [
-        "//src/mongo/db/global_catalog:index_on_config_test.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_coordinator_service_test.cpp",
         "//src/mongo/db/global_catalog/ddl:create_database_util_test.cpp",
         "//src/mongo/db/global_catalog/ddl:placement_history_cleaner_test.cpp",

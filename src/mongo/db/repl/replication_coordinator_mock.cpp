@@ -150,6 +150,11 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
     _awaitReplicationReturnValueFunction = std::move(returnValueFunction);
 }
 
+void ReplicationCoordinatorMock::setRunCmdOnPrimaryAndAwaitResponseFunction(
+    RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction) {
+    _runCmdOnPrimaryAndAwaitResponseFn = std::move(runCmdFunction);
+}
+
 SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     auto opCtx = cc().makeOperationContext();

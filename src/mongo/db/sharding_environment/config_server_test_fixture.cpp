@@ -27,6 +27,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_impl.h"
@@ -80,8 +81,22 @@ ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
     ConfigServerTestFixture::setUp();
     // Initialize the config database while we have exclusive access.
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
+}
+
+Status ConfigServerTestFixture::initializeConfigDatabaseIfNeededAtStepUp() {
+    auto* opCtx = operationContext();
+    const auto canAcceptNonLocalWrites = replicationCoordinator()->canAcceptNonLocalWrites();
+    replicationCoordinator()->setCanAcceptNonLocalWrites(false);
+
+    Status status = Status::OK();
+    {
+        repl::AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
+        status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
+    }
+
+    replicationCoordinator()->setCanAcceptNonLocalWrites(canAcceptNonLocalWrites);
+    return status;
 }
 
 void ConfigServerTestFixture::setUp() {

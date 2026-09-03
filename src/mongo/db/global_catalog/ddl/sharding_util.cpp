@@ -5,17 +5,23 @@
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/shard_role/ddl/create_indexes_gen.h"
 #include "mongo/db/shard_role/ddl/list_databases_gen.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -148,70 +154,125 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
 }
 
-Status createIndexOnCollection(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const BSONObj& keys,
-                               bool unique) {
+Status createIndexesOnCollectionForWritablePrimary(OperationContext* opCtx,
+                                                   const NamespaceString& ns,
+                                                   const std::vector<IndexSpec_ForCatalog>& specs) {
+    // We use an AlternativeClientRegion to avoid any possible side effects on the original opCtx.
+    auto alternativeClient = opCtx->getServiceContext()->getService()->makeClient(
+        "CreateIndexesOnCollectionForWritablePrimary");
+    AlternativeClientRegion acr(alternativeClient);
+    auto alternativeOpCtx = CancelableOperationContext(
+        cc().makeOperationContext(),
+        opCtx->getCancellationToken(),
+        Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
+    alternativeOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    alternativeOpCtx->setWriteConcern(opCtx->getWriteConcern());
+    auto opMetadata = ForwardableOperationMetadata(opCtx);
+    opMetadata.setOn(alternativeOpCtx.get());
+    DBDirectClient dbClient(alternativeOpCtx.get());
+
+    // Convert the IndexSpec_ForCatalog to BSONObj.
+    std::vector<BSONObj> indexSpecs;
+    for (const auto& spec : specs) {
+        IndexSpec index;
+        index.addKeys(spec.keys);
+        index.unique(spec.unique);
+        index.version(int(IndexConfig::kLatestIndexVersion));
+        indexSpecs.emplace_back(index.toBSON());
+    }
+
+    // Issue all index creations in a single command. Either all indexes are created or none are.
+    BSONObj response;
+    CreateIndexesCommand createIndexesCmd(ns);
+    createIndexesCmd.setIndexes(indexSpecs);
+    dbClient.runCommand(ns.dbName(), createIndexesCmd.toBSON(), response);
+    auto status = getStatusFromCommandResult(response);
+    if (!status.isOK()) {
+        return status;
+    }
+    auto wcStatus = getWriteConcernStatusFromCommandResult(response);
+    if (!wcStatus.isOK()) {
+        return wcStatus;
+    }
+    return Status::OK();
+}
+
+Status createIndexesOnCollectionAtStepUp(OperationContext* opCtx,
+                                         const NamespaceString& ns,
+                                         const std::vector<IndexSpec_ForCatalog>& specs) {
+    // This check validates that we are in onStepUpComplete (we are not yet primary, so
+    // canAcceptNonLocalWrites is false but onStepUpComplete is run under an
+    // AllowNonLocalWritesBlock).
+    dassert(!repl::ReplicationCoordinator::get(opCtx)->canAcceptNonLocalWrites() &&
+            repl::alwaysAllowNonLocalWrites(opCtx));
     try {
         auto acquisition = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
             MODE_X);
+        // Create the collection if it doesn't exist.
         if (!acquisition.exists()) {
             CollectionOptions options;
             options.uuid = UUID::gen();
-            writeConflictRetry(opCtx, "createIndexOnCollection", ns, [&] {
+            writeConflictRetry(opCtx, "createIndexesOnCollectionAtStepUp", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 AutoGetDb autodb(opCtx, ns.dbName(), MODE_IX);
                 ScopedLocalCatalogWriteFence fence(opCtx, &acquisition);
                 auto db = autodb.ensureDbExists(opCtx);
                 auto collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
-                          str::stream() << "Failed to create collection "
-                                        << ns.toStringForErrorMsg() << " for indexes: " << keys);
+                          str::stream()
+                              << "Failed to create collection " << ns.toStringForErrorMsg()
+                              << " for index build at step up.");
                 wunit.commit();
             });
         }
+        // Remove any existing indexes.
+        std::vector<BSONObj> indexSpecs;
+        for (const auto& spec : specs) {
+            IndexSpec index;
+            index.addKeys(spec.keys);
+            index.unique(spec.unique);
+            index.version(int(IndexConfig::kLatestIndexVersion));
+            indexSpecs.push_back(index.toBSON());
+        }
         auto indexCatalog = acquisition.getCollectionPtr()->getIndexCatalog();
-        IndexSpec index;
-        index.addKeys(keys);
-        index.unique(unique);
-        index.version(int(IndexConfig::kLatestIndexVersion));
         auto removeIndexBuildsToo = false;
-        auto indexSpecs = indexCatalog->removeExistingIndexes(
+        auto remainingIndexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
             acquisition.getCollectionPtr(),
             uassertStatusOK(
                 acquisition.getCollectionPtr()->addCollationDefaultsToIndexSpecsForCreate(
-                    opCtx, std::vector<BSONObj>{index.toBSON()})),
+                    opCtx, indexSpecs)),
             removeIndexBuildsToo);
 
-        if (indexSpecs.empty()) {
+        if (remainingIndexSpecs.empty()) {
             return Status::OK();
         }
 
-        auto fromMigrate = false;
-        if (!acquisition.getCollectionPtr()->isEmpty(opCtx)) {
-            // We typically create indexes on config/admin collections for sharding while setting up
-            // a sharded cluster, so we do not expect to see data in the collection.
-            // Therefore, it is ok to log this index build.
-            const auto& indexSpec = indexSpecs[0];
-            LOGV2(5173300,
-                  "Creating index on sharding collection with existing data",
-                  logAttrs(ns),
-                  "uuid"_attr = acquisition.uuid(),
-                  "index"_attr = indexSpec);
-            auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
-            IndexBuildsCoordinator::get(opCtx)->createIndex(
-                opCtx, acquisition.uuid(), indexSpec, indexConstraints, fromMigrate);
-        } else {
-            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns, [&] {
+        // Check if the collection is empty. If so, build the indexes. Otherwise, tripwire unless
+        // allowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp is enabled.
+        if (acquisition.getCollectionPtr()->isEmpty(opCtx)) {
+            auto fromMigrate = false;
+            writeConflictRetry(opCtx, "createIndexesOnEmptyCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 CollectionWriter collWriter(opCtx, &acquisition);
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                    opCtx, collWriter, indexSpecs, fromMigrate);
+                    opCtx, collWriter, remainingIndexSpecs, fromMigrate);
                 wunit.commit();
             });
+        } else {
+            BSONArrayBuilder specsForLogging;
+            for (const auto& spec : remainingIndexSpecs) {
+                specsForLogging.append(spec);
+            }
+            tassert(12352501,
+                    str::stream() << "Illegal attempt to create an index on a non-empty collection "
+                                  << "during step-up. This requires the shard to be restarted as a "
+                                  << "plain replica set and the index to be created manually. "
+                                  << "Collection: '" << ns.toStringForErrorMsg() << "' Indexes: '"
+                                  << specsForLogging.arr().toString() << "'.",
+                    gAllowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp.load());
         }
     } catch (const DBException& e) {
         return e.toStatus();

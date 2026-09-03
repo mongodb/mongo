@@ -11,7 +11,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -112,7 +111,7 @@ PhaseTransitionFn createPreparingToDonateDaoUpdate(
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
-        ConfigServerTestFixture::setUp();
+        ConfigServerTestFixture::setUpAndInitializeConfigDb();
 
         ShardType shard0;
         shard0.setName("shard0000");
@@ -133,7 +132,6 @@ protected:
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
         client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
-        client.createIndex(TagsType::ConfigNS, BSON("ns" << 1 << "min" << 1));
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->initializeIfNeeded(operationContext(), /* term */ 1);
@@ -664,15 +662,6 @@ protected:
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
                       originalNssCatalogEntry.toBSON());
-
-        client.createCollection(NamespaceString::kConfigsvrChunksNamespace);
-        client.createCollection(TagsType::ConfigNS);
-
-        ASSERT_OK(createIndexOnConfigCollection(
-            opCtx,
-            NamespaceString::kConfigsvrChunksNamespace,
-            BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
-            true));
     }
 
     void writeInitialStateAndCatalogUpdatesExpectSuccess(

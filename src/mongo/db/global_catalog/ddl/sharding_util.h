@@ -5,6 +5,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -63,12 +64,26 @@ namespace sharding_util {
     bool throwOnError = true);
 
 /**
- * Helper function to create an index on a collection locally.
+ * Creates a list of indexes via DBDirectClient under an alternative client region.
  */
-[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexOnCollection(OperationContext* opCtx,
-                                                               const NamespaceString& ns,
-                                                               const BSONObj& keys,
-                                                               bool unique);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexesOnCollectionForWritablePrimary(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const std::vector<IndexSpec_ForCatalog>& specs);
+
+/**
+ * Creates a list of indexes on a local collection during step-up, creating the collection first if
+ * it does not exist. This must only be called during onStepUpComplete, otherwise
+ * createIndexesOnCollectionForWritablePrimary must be used instead.
+ *
+ * Empty collections get indexes built synchronously under the collection lock. On non-empty
+ * collections, missing indexes trigger a tripwire assertion that fails step-up and causes a fatal
+ * assertion.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexesOnCollectionAtStepUp(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const std::vector<IndexSpec_ForCatalog>& specs);
 /**
  * Helper function to send a command to one shard
  */

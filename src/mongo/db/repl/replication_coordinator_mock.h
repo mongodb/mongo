@@ -382,6 +382,13 @@ public:
                               OnRemoteCmdCompleteFn onRemoteCmdComplete)>;
 
     /**
+     * Injects a custom 'runCmdOnPrimaryAndAwaitResponse' functor. Unless one is set, commands
+     * are silently discarded and answered with a successful {"ok": 1} response.
+     */
+    void setRunCmdOnPrimaryAndAwaitResponseFunction(
+        RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction);
+
+    /**
      * Always allow writes even if this node is a writable primary. Used by sharding unit tests.
      */
     void alwaysAllowWrites(bool allowWrites);

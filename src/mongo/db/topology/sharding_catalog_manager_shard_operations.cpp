@@ -262,11 +262,10 @@ Status ShardingCatalogManager::createIndexOnUuidForConfigShards(OperationContext
 
     if (performCreation) {
         const bool unique = true;
-        const auto result =
-            createIndexOnConfigCollection(opCtx,
-                                          NamespaceString::kConfigsvrShardsNamespace,
-                                          BSON(ShardType::uuid() << 1),
-                                          unique);
+        const auto result = sharding_util::createIndexesOnCollectionAtStepUp(
+            opCtx,
+            NamespaceString::kConfigsvrShardsNamespace,
+            {IndexSpec_ForCatalog{BSON(ShardType::uuid() << 1), unique}});
         if (!result.isOK()) {
             return result.withContext("couldn't create uuid_1 index on config.shards");
         }

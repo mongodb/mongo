@@ -65,8 +65,7 @@ public:
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         ShardingCatalogManager::get(operationContext())->startup();
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
+        ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
     }
 
     ~BenchmarkConfigServerTestFixture() override {

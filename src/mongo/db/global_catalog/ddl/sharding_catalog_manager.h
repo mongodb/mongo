@@ -730,12 +730,6 @@ public:
     const std::shared_ptr<Shard>& localConfigShard();
 
     /**
-     * Creates the indexes on config.placementHistory supporting the getHistoricalPlacement()
-     * method.
-     */
-    Status createIndexesForConfigPlacementHistory(OperationContext* opCtx);
-
-    /**
      * Creates a secondary index on the uuid field of config.shards.
      * When checkFCVState is true, the method additionally verifies if the
      * gFeatureFlagAssignUUIDToShard is enabled (and skips the request if not).

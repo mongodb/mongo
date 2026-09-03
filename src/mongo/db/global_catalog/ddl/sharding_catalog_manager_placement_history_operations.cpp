@@ -4,6 +4,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -1140,33 +1141,6 @@ private:
 };
 
 }  // namespace
-
-Status ShardingCatalogManager::createIndexesForConfigPlacementHistory(OperationContext* opCtx) {
-    // Create a combined index on 'nss' (sorted ascending) and 'timestamp' (sorted descending).
-    // This is an idempotent operation and it won't fail if the index already exists.
-    Status status = createIndexOnConfigCollection(
-        opCtx,
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON(NamespacePlacementType::kNssFieldName
-             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
-        true /*unique*/);
-    if (status.isOK()) {
-        // Create another index with 'timestamp' first (sorted descending), then 'nss' (sorted
-        // ascending). This is necessary to cover queries to the placement history that are querying
-        // by time range. Note that this index does not need to be unique, as the uniqueness of
-        // every {timestamp, nss} combination is already ensured by the first index.
-        // If the creation of the second index fails, we leave the first index in place, as it is
-        // required for uniqueness and thus correctness of the placement history. The index creation
-        // failure will still be reported to the caller, who can retry index creation.
-        status =
-            createIndexOnConfigCollection(opCtx,
-                                          NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                          BSON(NamespacePlacementType::kTimestampFieldName
-                                               << -1 << NamespacePlacementType::kNssFieldName << 1),
-                                          false /*unique*/);
-    }
-    return status;
-}
 
 write_ops::InsertCommandRequest
 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(

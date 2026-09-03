@@ -133,9 +133,9 @@ private:
     BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 /**
- * Ensures that the shard-local catalog collections exist with the correct indexes.
+ * Ensures that the shard server indexes exist. Creates the collections and the indexes if they do
+ * not already exist.
  */
-// TODO (SERVER-98118): remove [[MONGO_MOD_NEEDS_REPLACEMENT]] once 9.0 becomes last LTS.
-[[MONGO_MOD_NEEDS_REPLACEMENT]] Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
+[[MONGO_MOD_PRIVATE]] Status ensureShardServerIndexes(OperationContext* opCtx);
 
 }  // namespace mongo

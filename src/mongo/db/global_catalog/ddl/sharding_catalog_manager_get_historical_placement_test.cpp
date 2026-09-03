@@ -111,7 +111,7 @@ public:
     };
 
     void setUp() override {
-        ConfigServerTestFixture::setUp();
+        ConfigServerTestFixture::setUpAndInitializeConfigDb();
         operationContext()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         DDLLockManager::get(getServiceContext())->setRecoverable(_recoverable.get());
 
@@ -198,8 +198,6 @@ public:
             ASSERT_OK(insertToConfigCollection(
                 opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, initialDoc.toBSON()));
         }
-
-        ASSERT_OK(shardingCatalogManager().createIndexesForConfigPlacementHistory(opCtx));
     }
 
     ShardingCatalogManager& shardingCatalogManager() {
@@ -294,7 +292,8 @@ private:
         for (int i = 1; i <= nShards; i++) {
             const std::string shardName = "shard" + std::to_string(i);
             const std::string shardHost = "localhost:" + std::to_string(30000 + i);
-            const auto& doc = BSON("_id" << shardName << "host" << shardHost << "state" << 1);
+            const auto& doc = BSON("_id" << shardName << "host" << shardHost << "state" << 1
+                                         << "uuid" << UUID::gen());
 
             configShardData.push_back(doc);
         }

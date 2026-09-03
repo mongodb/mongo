@@ -5,10 +5,10 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_role/ddl/create_indexes_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/ddl/drop_indexes_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -108,17 +108,10 @@ void generateShardUUIDMetadata(OperationContext* opCtx) {
     }
 
     // 2. Create the 'uuid' index on 'config.shards'.
-    DBDirectClient directClient(opCtx);
-    CreateIndexesCommand createIndexesCmd(NamespaceString::kConfigsvrShardsNamespace);
-    createIndexesCmd.setCommitQuorum(CommitQuorumOptions(CommitQuorumOptions::kMajority));
-    createIndexesCmd.setIndexes({BSON("key" << BSON(ShardType::uuid() << 1) << "name"
-                                            << "uuid_1"
-                                            << "unique" << true)});
-
-    BSONObj res;
-    directClient.runCommand(
-        NamespaceString::kConfigsvrShardsNamespace.dbName(), createIndexesCmd.toBSON(), res);
-    uassertStatusOK(getStatusFromCommandResult(res));
+    uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+        opCtx,
+        NamespaceString::kConfigsvrShardsNamespace,
+        {IndexSpec_ForCatalog{BSON(ShardType::uuid() << 1), true /* unique */}}));
 
     // 3. Persist 'uuid' values into each shard's shard identity document.
     const auto opTimeWithShards =
@@ -166,6 +159,7 @@ void generateShardUUIDMetadata(OperationContext* opCtx) {
     // Dedicated Config servers require special treatment, since they do not have a config.shards
     // document to read the 'uuid' value from.
     if (isConfigServerDedicated) {
+        DBDirectClient directClient(opCtx);
         write_ops::UpdateCommandRequest configIdentityUpdateOp(
             NamespaceString::kServerConfigurationNamespace);
         write_ops::UpdateOpEntry configIdentityEntry;

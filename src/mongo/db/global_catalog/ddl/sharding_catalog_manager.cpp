@@ -17,6 +17,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -228,11 +229,6 @@ void abortTransaction(OperationContext* opCtx,
     }
 }
 
-Status createIndexesForConfigChunks(OperationContext* opCtx) {
-    return ensureCollectionIndexes(
-        opCtx, NamespaceString::kConfigsvrChunksNamespace, getChunkCollectionIndexSpecs());
-}
-
 // creates a vector of a vector of BSONObj (one for each batch) from the docs vector
 // each batch can only be as big as the maximum BSON Object size and be below the maximum
 // document count
@@ -413,57 +409,63 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
 Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
 
-    Status result = createIndexesForConfigChunks(opCtx);
-    if (result != Status::OK()) {
-        return result;
-    }
+    // Continue attempting every required index build so every missing index is reported.
+    Status returnStatus = Status::OK();
+    auto recordFailure = [&](const Status& result) {
+        if (returnStatus.isOK() && !result.isOK()) {
+            returnStatus = result;
+        }
+    };
 
-    result = createIndexOnConfigCollection(
-        opCtx, NamespaceString::kConfigDatabasesNamespace, BSON("_id" << 1), unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create _id_ index on config db");
-    }
+    Status result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx, NamespaceString::kConfigsvrChunksNamespace, getChunkCollectionIndexSpecs());
+    recordFailure(result);
 
-    result = createIndexOnConfigCollection(
-        opCtx, NamespaceString::kConfigsvrShardsNamespace, BSON(ShardType::host() << 1), unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create host_1 index on config db");
-    }
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx,
+        NamespaceString::kConfigDatabasesNamespace,
+        {IndexSpec_ForCatalog{BSON("_id" << 1), unique}});
+    recordFailure(result.withContext("couldn't create _id_ index on config db"));
 
-    result = createIndexOnConfigCollection(
-        opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_min_1 index on config db");
-    }
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx,
+        NamespaceString::kConfigsvrShardsNamespace,
+        {IndexSpec_ForCatalog{BSON(ShardType::host() << 1), unique}});
+    recordFailure(result.withContext("couldn't create host_1 index on config db"));
 
-    result = createIndexOnConfigCollection(
-        opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_tag_1 index on config db");
-    }
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx,
+        TagsType::ConfigNS,
+        {IndexSpec_ForCatalog{BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique}});
+    recordFailure(result.withContext("couldn't create ns_1_min_1 index on config db"));
 
-    result = createIndexOnConfigCollection(
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx,
+        TagsType::ConfigNS,
+        {IndexSpec_ForCatalog{BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique}});
+    recordFailure(result.withContext("couldn't create ns_1_tag_1 index on config db"));
+
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
         opCtx,
         NamespaceString::kConfigQueryAnalyzersNamespace,
-        BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName << 1),
-        unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create collUuid_1 index on config.queryAnalyzers");
-    }
+        {IndexSpec_ForCatalog{
+            BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName << 1),
+            unique}});
+    recordFailure(result.withContext("couldn't create collUuid_1 index on config.queryAnalyzers"));
 
-    result = createIndexesForConfigPlacementHistory(opCtx);
+    result = sharding_util::createIndexesOnCollectionAtStepUp(
+        opCtx,
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        getPlacementHistoryCollectionIndexSpecs());
 
-    if (!result.isOK()) {
-        return result.withContext("couldn't create required indexes on config.placementHistory");
-    }
+    recordFailure(
+        result.withContext("couldn't create required indexes on config.placementHistory"));
 
     result = createIndexOnUuidForConfigShards(opCtx);
 
-    if (!result.isOK()) {
-        return result.withContext("couldn't create required indexes on config.shards");
-    }
+    recordFailure(result.withContext("couldn't create required indexes on config.shards"));
 
-    return Status::OK();
+    return returnStatus;
 }
 
 /**

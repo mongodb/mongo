@@ -5,6 +5,8 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
+#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/type_namespace_placement_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -21,7 +23,10 @@ HistoricalPlacement initializePlacementHistoryAndRetry(
     auto configShard = catalogManager->localConfigShard();
 
     // 1. Create the supporting indexes if needed.
-    uassertStatusOK(catalogManager->createIndexesForConfigPlacementHistory(opCtx));
+    uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+        opCtx,
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        getPlacementHistoryCollectionIndexSpecs()));
 
     // 2. Re-generate its content.
     ConfigsvrResetPlacementHistory configsvrRequest;

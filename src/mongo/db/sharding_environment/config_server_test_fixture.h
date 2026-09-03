@@ -213,6 +213,11 @@ protected:
      */
     void setUpAndInitializeConfigDb();
 
+    /**
+     * Initializes the config database while emulating the onStepUpComplete state.
+     */
+    Status initializeConfigDatabaseIfNeededAtStepUp();
+
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
     std::unique_ptr<ClusterCursorManager> makeClusterCursorManager() override;

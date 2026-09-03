@@ -82,8 +82,7 @@ public:
                                     ShardId("config")});
 
         // Create indexes for config.placementHistory and other config collections.
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
+        ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
 
         // The DDL lock manager must be "recovered" so that getHistoricalPlacement() can acquire
         // its shared lock on config.placementHistory.
