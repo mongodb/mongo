@@ -39,10 +39,7 @@ RUN retry_apt.sh "Python 3.13 installation" sh -c "\
 RUN ln -f $(which python3.13) /usr/bin/python
 RUN ln -f $(which python3.13) /usr/bin/python3
 
-RUN python -m pip install --upgrade pip wheel
-
-# Clean up retry script after use
-RUN rm /usr/local/bin/retry_apt.sh
+RUN retry_apt.sh "pip/wheel upgrade" python -m pip install --upgrade pip wheel
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions
@@ -95,12 +92,16 @@ WORKDIR /mongo
 COPY src/pyproject.toml src/uv.lock src/buildscripts/uv_version.txt ./
 
 # Install mongodb python deps with uv, pinned via uv_version.txt.
-RUN python -m pip install "uv==$(cat uv_version.txt)"
+RUN retry_apt.sh "uv installation" sh -c 'python -m pip install "uv==$(cat uv_version.txt)"'
 # UV_PROJECT_ENVIRONMENT points uv at /opt/venv as the install target so the
 # resulting venv has a stable, well-known path independent of uv's default
 # `.venv` layout.
-RUN python -m venv /opt/venv && \
-    UV_PROJECT_ENVIRONMENT=/opt/venv python -m uv sync --locked --all-groups --no-install-project
+RUN retry_apt.sh "python dependency sync" sh -c "\
+    python -m venv /opt/venv && \
+    UV_PROJECT_ENVIRONMENT=/opt/venv python -m uv sync --locked --all-groups --no-install-project"
+
+# Clean up retry script after use
+RUN rm /usr/local/bin/retry_apt.sh
 ENV PATH="/opt/venv/bin:$PATH"
 
 # copy mongo
