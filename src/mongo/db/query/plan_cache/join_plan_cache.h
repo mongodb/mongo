@@ -294,6 +294,16 @@ public:
     void remove(const JoinPlanCacheKey& key);
 
     /*
+     * Removes the entry for 'key' only if it is still the entry 'expected' refers to, and
+     * returns whether it was removed.
+     *
+     * This function should be used when discarding a stale entry since another operation
+     * may have concurrently replaced it under the same key during the entry's revalidation.
+     */
+    bool removeIfMatches(const JoinPlanCacheKey& key,
+                         const std::shared_ptr<JoinPlanCacheEntry>& expected);
+
+    /*
      * Resets the total memory budget, evicting least-recently-used entries as needed to fit.
      * Returns the number of entries evicted.
      */

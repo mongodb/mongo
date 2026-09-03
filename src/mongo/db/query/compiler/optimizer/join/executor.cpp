@@ -66,6 +66,13 @@ auto& joinPlanCacheHits = *MetricBuilder<Counter64>{"query.planCache.join.hits"}
  */
 auto& joinPlanCacheMisses = *MetricBuilder<Counter64>{"query.planCache.join.misses"};
 
+/**
+ * Number of times a cached plan was found but had gone stale and was evicted, a subset of
+ * 'joinPlanCacheMisses'. Exposed in serverStatus as
+ * 'metrics.query.planCache.join.invalidations'.
+ */
+auto& joinPlanCacheInvalidations = *MetricBuilder<Counter64>{"query.planCache.join.invalidations"};
+
 PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
     switch (shape) {
         case JoinPlanTreeShapeEnum::kLeftDeep:
@@ -495,57 +502,60 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
         return nullptr;
     }
 
-    // TODO (SERVER-129268): Evict stale entries.
-    if (validateCacheEntry(*hit, mca, model, perCollIdxs)) {
-        LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
-        auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
-        auto winnerSoln = std::make_unique<QuerySolution>();
-        winnerSoln->setRoot(std::move(qsn));
-
-        pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
-
-        // Merge join-field non-array path learnings into the chosen base node's expCtx so the
-        // PathArraynessChecker monitors them during execution yields.
-        model.getGraph()
-            .accessPathAt(hit->baseNode)
-            ->getExpCtx()
-            ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
-
-        auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
-                                                                           model.getGraph(),
-                                                                           yieldPolicy,
-                                                                           mca,
-                                                                           hit->baseNode,
-                                                                           *winnerSoln,
-                                                                           nullptr /*estimates*/,
-                                                                           true /*prepare*/,
-                                                                           metrics);
-
-        size_t plannerOptions = QueryPlannerParams::DEFAULT;
-        if (model.getSuffix() && model.getSuffix()->peekFront()) {
-            plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
+    if (!validateCacheEntry(*hit, mca, model, perCollIdxs)) {
+        if (cache.removeIfMatches(cacheKey, hit)) {
+            joinPlanCacheInvalidations.increment(1);
         }
-        cost_based_ranker::EstimateMap emptyEstimates;
-        auto exec = plan_executor_factory::make(opCtx,
-                                                nullptr /* cq */,
-                                                std::move(winnerSoln),
-                                                std::move(planStagesAndData),
-                                                mca,
-                                                plannerOptions,
-                                                mca.getMainCollection()->ns(),
-                                                std::move(sbeYieldPolicy),
-                                                true /* isFromPlanCache */,
-                                                false /* cachedPlanHash */,
-                                                true /*usedJoinOpt*/,
-                                                std::move(emptyEstimates),
-                                                {} /* rejectedPlans */,
-                                                nullptr /* remoteCursors */,
-                                                nullptr /* remoteExplains */,
-                                                nullptr /* classicRuntimePlannerStage */,
-                                                boost::none /* maybeExplainData */);
-        return exec;
+        return nullptr;
     }
-    return nullptr;
+
+    LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
+    auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
+    auto winnerSoln = std::make_unique<QuerySolution>();
+    winnerSoln->setRoot(std::move(qsn));
+
+    pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
+
+    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+    // PathArraynessChecker monitors them during execution yields.
+    model.getGraph()
+        .accessPathAt(hit->baseNode)
+        ->getExpCtx()
+        ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
+
+    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
+                                                                       model.getGraph(),
+                                                                       yieldPolicy,
+                                                                       mca,
+                                                                       hit->baseNode,
+                                                                       *winnerSoln,
+                                                                       nullptr /*estimates*/,
+                                                                       true /*prepare*/,
+                                                                       metrics);
+
+    size_t plannerOptions = QueryPlannerParams::DEFAULT;
+    if (model.getSuffix() && model.getSuffix()->peekFront()) {
+        plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
+    }
+    cost_based_ranker::EstimateMap emptyEstimates;
+    auto exec = plan_executor_factory::make(opCtx,
+                                            nullptr /* cq */,
+                                            std::move(winnerSoln),
+                                            std::move(planStagesAndData),
+                                            mca,
+                                            plannerOptions,
+                                            mca.getMainCollection()->ns(),
+                                            std::move(sbeYieldPolicy),
+                                            true /* isFromPlanCache */,
+                                            false /* cachedPlanHash */,
+                                            true /*usedJoinOpt*/,
+                                            std::move(emptyEstimates),
+                                            {} /* rejectedPlans */,
+                                            nullptr /* remoteCursors */,
+                                            nullptr /* remoteExplains */,
+                                            nullptr /* classicRuntimePlannerStage */,
+                                            boost::none /* maybeExplainData */);
+    return exec;
 }
 
 }  // namespace

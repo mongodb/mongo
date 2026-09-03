@@ -86,6 +86,53 @@ TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
     ASSERT_EQ(rawPtr, cache.lookup("key").get());
 }
 
+TEST(JoinPlanCacheTest, RemoveIfMatchesRemovesTheEntryItWasGiven) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.put("key", makeEntry());
+
+    auto held = cache.lookup("key");
+    ASSERT_TRUE(cache.removeIfMatches("key", held));
+    ASSERT_EQ(nullptr, cache.lookup("key"));
+}
+
+TEST(JoinPlanCacheTest, RemoveIfMatchesLeavesAnEntryReplacedSinceTheLookup) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.put("key", makeEntry());
+
+    // Store pointer to the current entry.
+    auto held = cache.lookup("key");
+
+    // Replace entry in the cache.
+    auto replacement = makeEntry();
+    const JoinPlanCacheEntry* replacementRawPtr = replacement.get();
+    cache.put("key", std::move(replacement));
+
+    // Removal of entry should not occur since 'held' is stale.
+    ASSERT_FALSE(cache.removeIfMatches("key", held));
+    ASSERT_EQ(replacementRawPtr, cache.lookup("key").get());
+}
+
+TEST(JoinPlanCacheTest, RemoveIfMatchesOnNonExistingKey) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.put("key", makeEntry());
+    auto held = cache.lookup("key");
+
+    ASSERT_FALSE(cache.removeIfMatches("nonexistent", held));
+    ASSERT_EQ(held.get(), cache.lookup("key").get());
+}
+
+TEST(JoinPlanCacheTest, RemoveIfMatchesComparesIdentityNotContents) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    auto entry = makeEntry();
+    const JoinPlanCacheEntry* rawPtr = entry.get();
+    cache.put("key", std::move(entry));
+
+    // A distinct entry that has the same contents as the original entry.
+    std::shared_ptr<JoinPlanCacheEntry> lookalike = makeEntry();
+    ASSERT_FALSE(cache.removeIfMatches("key", lookalike));
+    ASSERT_EQ(rawPtr, cache.lookup("key").get());
+}
+
 TEST(JoinPlanCacheTest, GetComplexEntry) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
 
@@ -340,6 +387,21 @@ TEST(JoinPlanCacheEvictionTest, SizeReflectsRunningByteTotal) {
     ASSERT_EQ(2 * perEntryCost, cache.size());
     cache.remove("a");
     ASSERT_EQ(perEntryCost, cache.size());
+}
+
+TEST(JoinPlanCacheEvictionTest, RemoveIfMatchesReleasesTheEntryBudget) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    JoinPlanCache cache{kLargeBudget, 1};
+
+    cache.put("a", makeEntry());
+    ASSERT_EQ(perEntryCost, cache.size());
+
+    // A no-op removal must not disturb the accounting either.
+    ASSERT_FALSE(cache.removeIfMatches("a", makeEntry()));
+    ASSERT_EQ(perEntryCost, cache.size());
+
+    ASSERT_TRUE(cache.removeIfMatches("a", cache.lookup("a")));
+    ASSERT_EQ(0, cache.size());
 }
 
 TEST(JoinPlanCacheStatsTest, EmptyCacheProducesNoStats) {

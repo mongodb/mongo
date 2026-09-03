@@ -7,22 +7,29 @@
  * ]
  */
 
+import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 describe("join plan cache serverStatus metrics", function () {
-    // Returns {hits, misses} from serverStatus.metrics.query.planCache.join.
+    // Returns {hits, misses, invalidations} from serverStatus.metrics.query.planCache.join.
     function joinPlanCacheStats(db) {
         const planCache = db.serverStatus().metrics.query.planCache;
         assert(planCache.hasOwnProperty("join"), "missing metrics.query.planCache.join", {
             planCache,
         });
         const join = planCache.join;
-        return {hits: join.hits, misses: join.misses};
+        return {hits: join.hits, misses: join.misses, invalidations: join.invalidations};
     }
 
     // Helper function to assert that the join plan cache stats have changed by
     // the expected amounts during the execution of the given function.
-    function assertJoinPlanCacheStats({db, fn, expectedHits, expectedMisses}) {
+    function assertJoinPlanCacheStats({
+        db,
+        fn,
+        expectedHits,
+        expectedMisses,
+        expectedInvalidations = 0,
+    }) {
         const beforeStats = joinPlanCacheStats(db);
         fn();
         const afterStats = joinPlanCacheStats(db);
@@ -42,6 +49,16 @@ describe("join plan cache serverStatus metrics", function () {
             "unexpected join plan cache misses",
             {
                 expectedMisses: expectedMisses,
+                before: beforeStats,
+                after: afterStats,
+            },
+        );
+        assert.eq(
+            afterStats.invalidations - beforeStats.invalidations,
+            expectedInvalidations,
+            "unexpected join plan cache invalidations",
+            {
+                expectedInvalidations: expectedInvalidations,
                 before: beforeStats,
                 after: afterStats,
             },
@@ -166,5 +183,72 @@ describe("join plan cache serverStatus metrics", function () {
             expectedHits: 0,
             expectedMisses: 0,
         });
+    });
+
+    it("increments invalidations when a new index the plan may use is added", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        // Prime the cache: miss, then hit.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // Add an index on the join field that could enable an INLJ plan.
+        assert.commandWorked(this.foreignColl.createIndex({a: 1}));
+
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: run,
+            expectedHits: 0,
+            expectedMisses: 1,
+            expectedInvalidations: 1,
+        });
+
+        // The replan re-cached the shape, so the next run hits and invalidates nothing.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+    });
+
+    it("increments invalidations when an index the plan uses is removed", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        // Add an index on the join field to enable INLJ plan.
+        assert.commandWorked(this.foreignColl.createIndex({a: 1}));
+
+        // Force INLJ plan with {a: 1}.
+        assert.commandWorked(this.db.adminCommand({setParameter: 1, internalJoinMethod: "INLJ"}));
+
+        // Prime the cache: miss, then hit.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // Ensure INLJ was used.
+        assertAllJoinsUseMethod(this.baseColl.explain().aggregate(this.pipeline), "INLJ");
+        assert.commandWorked(this.db.adminCommand({setParameter: 1, internalJoinMethod: "any"}));
+
+        // Drop index {a: 1} to force invalidation.
+        assert.commandWorked(this.foreignColl.dropIndex({a: 1}));
+
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: run,
+            expectedHits: 0,
+            expectedMisses: 1,
+            expectedInvalidations: 1,
+        });
+
+        // The replan re-cached the shape, so the next run hits and invalidates nothing.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+    });
+
+    it("does not increment invalidations when a collection version bump is revalidated", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // An index on a field no node references bumps the collection version but leaves every
+        // node's relevant-index fingerprint intact, so the entry is revalidated.
+        assert.commandWorked(this.foreignColl.createIndex({e: 1}));
+
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
     });
 });

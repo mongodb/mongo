@@ -202,6 +202,24 @@ void JoinPlanCache::remove(const JoinPlanCacheKey& key) {
     _cache.remove(key);
 }
 
+bool JoinPlanCache::removeIfMatches(const JoinPlanCacheKey& key,
+                                    const std::shared_ptr<JoinPlanCacheEntry>& expected) {
+    auto [swEntry, partitionLock] = _cache.getWithPartitionLock(key);
+    if (!swEntry.isOK()) {
+        return false;
+    }
+
+    const std::shared_ptr<JoinPlanCacheEntry>& cached = *swEntry.getValue();
+    // Pointer comparison to see if the cache still has the exact entry 'expected' refers to.
+    if (cached.get() != expected.get()) {
+        return false;
+    }
+
+    // Cannot use JoinPlanCache::remove since that would also take the partitionLock acquired above
+    // and deadlock.
+    return partitionLock->erase(key);
+}
+
 size_t JoinPlanCache::reset(size_t cacheSizeBytes) {
     return _cache.reset(cacheSizeBytes);
 }
