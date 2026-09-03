@@ -28,6 +28,10 @@ public:
 private:
     GetNextResult doGetNext() override;
 
+    // Owns the oplog update description. Declared before '_updateDriver' so that it outlives the
+    // driver (and the unowned diff the driver references) during destruction.
+    BSONObj _oplogUpdate;
+
     UpdateDriver _updateDriver;
 };
 
