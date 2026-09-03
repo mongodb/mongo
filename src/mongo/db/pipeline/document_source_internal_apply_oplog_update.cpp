@@ -67,8 +67,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::cre
 
 DocumentSourceInternalApplyOplogUpdate::DocumentSourceInternalApplyOplogUpdate(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& oplogUpdate)
-    : DocumentSource(kStageName, pExpCtx), _oplogUpdate(oplogUpdate), _updateDriver(pExpCtx) {
-    // Parse the raw oplog update description.
+    : DocumentSource(kStageName, pExpCtx),
+      _oplogUpdate(oplogUpdate.getOwned()),
+      _updateDriver(pExpCtx) {
+    // Parse the raw oplog update description. The parsed update driver retains an unowned reference
+    // to the diff inside '_oplogUpdate', so we own the buffer for the lifetime of this stage.
     const auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
         _oplogUpdate, {true /* mustCheckExistenceForInsertOperations */});
 
