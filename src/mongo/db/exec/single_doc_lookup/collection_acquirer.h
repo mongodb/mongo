@@ -145,14 +145,14 @@ public:
                               << _collection.nss().toStringForErrorMsg() << "'",
                 _collection.nss() == nss);
 
-        // The upfront-acquired collection's identity has moved on (DDL churn) since this
-        // acquirer was built.
-        checkCollectionUUIDMismatch(opCtx, nss, _collection.getCollectionPtr(), collectionUuid);
-
-        // Swap the stashed TransactionResources onto opCtx for the duration of the returned Handle.
-        // On scope exit, the handle's destructor re-stashes them.
+        // Restore stashed TransactionResources before using CollectionPtr. While the cursor is
+        // parked the acquisition is yielded; CollectionPtr is only valid again after restore.
+        // On scope exit, the handle's destructor re-stashes the resources.
         auto handle =
             std::make_unique<HandleTransactionResourcesFromStasher>(opCtx, _stasher.get());
+
+        // After restore, reject a caller UUID that does not match the live collection.
+        checkCollectionUUIDMismatch(opCtx, nss, _collection.getCollectionPtr(), collectionUuid);
         return Handle(_collection, std::move(handle));
     }
 

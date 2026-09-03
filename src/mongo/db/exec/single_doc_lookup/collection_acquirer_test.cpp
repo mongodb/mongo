@@ -4,6 +4,7 @@
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -149,6 +150,29 @@ TEST_F(CollectionAcquirerTest, PreAcquiredThrowsOnUuidMismatch) {
     ASSERT_THROWS_CODE(acquirer.acquireCollection(operationContext(), kTestNss, UUID::gen()),
                        DBException,
                        ErrorCodes::CollectionUUIDMismatch);
+}
+
+// While the cursor is parked, TransactionResources are stashed and CollectionPtr is not valid
+// to use. acquireCollection() must restore those resources before checkCollectionUUIDMismatch.
+// After a drop/recreate, restore throws QueryPlanKilled because the original collection is gone.
+TEST_F(CollectionAcquirerTest, PreAcquiredRestoresBeforeUuidCheckAcrossDropRecreate) {
+    auto [stasher, acquisition] = stashTestCollection();
+    const auto originalUuid = acquisition.uuid();
+    PreAcquiredCollectionAcquirer acquirer(std::move(stasher), std::move(acquisition));
+
+    // storageInterface()->dropCollection() leaves 'dropOpTime' null and expects the registered
+    // OpObserver to allocate one by writing an oplog entry, which the test OpObserver does not do.
+    // UnreplicatedWritesBlock takes the "oplog disabled for this write" path instead.
+    {
+        repl::UnreplicatedWritesBlock noRepl(operationContext());
+        ASSERT_OK(storageInterface()->dropCollection(operationContext(), kTestNss));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), kTestNss, CollectionOptions()));
+    }
+
+    ASSERT_THROWS_CODE(acquirer.acquireCollection(operationContext(), kTestNss, originalUuid),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 }
 
 }  // namespace
