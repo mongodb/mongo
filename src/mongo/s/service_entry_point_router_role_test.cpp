@@ -131,9 +131,8 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionInterrupted) {
     // Interrupted.
     auto msg = constructMessage(BSON(TestCmdRouterIngressSubject::kCommandName << 1), opCtx.get());
     stdx::thread interrupter([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
+        auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
+        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
         opCtx->markKilled(ErrorCodes::Interrupted);
     });
     auto swDbResponse = handleRequest(msg, opCtx.get());
