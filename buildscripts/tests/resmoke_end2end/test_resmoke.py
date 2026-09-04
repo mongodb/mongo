@@ -1,6 +1,7 @@
 """Test resmoke's handling of test/task timeouts and archival."""
 
 import datetime
+import glob
 import io
 import json
 import logging
@@ -56,6 +57,19 @@ class _ResmokeSelftest(unittest.TestCase):
         self.logger.info("Cleaning temp directory %s", self.test_dir)
         rmtree(self.test_dir, ignore_errors=True)
         os.makedirs(self.test_dir, mode=0o755, exist_ok=True)
+
+    def tearDown(self):
+        # The timeout tests intentionally trigger the hang analyzer, which writes core
+        # dumps into the current working directory. Remove them on teardown.
+        self._cleanup_core_dumps()
+
+    def _cleanup_core_dumps(self):
+        for pattern in ("dump_*.core", "dump_*.mdmp"):
+            for path in glob.glob(pattern):
+                try:
+                    os.remove(path)
+                except OSError as err:
+                    self.logger.warning("Could not remove core dump %s: %s", path, err)
 
     def execute_resmoke(self, resmoke_args, **kwargs):
         resmoke_process = core.programs.make_process(
