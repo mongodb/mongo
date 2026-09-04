@@ -20,12 +20,6 @@ if [ "${is_patch}" = "true" ]; then
   MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
 fi
 
-# For commit builds, append the first 8 characters of the git revision to the version string.
-if [ "${requester}" = "commit" ]; then
-  GIT_REV=$(git rev-parse HEAD)
-  MONGO_VERSION="${MONGO_VERSION}-${GIT_REV:0:8}"
-fi
-
 # Forcefully override the version for purposes of testing against a different version than the
 # branch is targeting (used by custom builds, see
 # etc/evergreen_yml_components/custom_builds/README.md).
@@ -67,12 +61,12 @@ if [ ! -z ${scons_cache_scope} ]; then
     set -o errexit
   fi
   echo "Shared Cache with setting: ${scons_cache_scope}"
-  MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+  MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_RELEASE=${is_release:-} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 # Legacy Expansion generation
 else
   echo "Using legacy expansion generation"
   # Proceed with regular expansions generated
   # This script converts the generated version string into a sanitized version string for
   # use by scons and uploading artifacts as well as information about for the scons cache.
-  MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode} USE_SCONS_CACHE=${use_scons_cache} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+  MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode} USE_SCONS_CACHE=${use_scons_cache} IS_RELEASE=${is_release:-} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 fi
