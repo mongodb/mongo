@@ -5260,6 +5260,115 @@ TEST_F(BatchedWriteOutputsTest, RetryableSessionAtomicBatchWithoutStatementIdsIs
     EXPECT_EQ(0, innerEntries[1].getStatementIds().size());
 }
 
+TEST_F(BatchedWriteOutputsTest, NonRetryableSingleOpAtomicBatchDoesNotWriteTxnRecord) {
+    // The fast path is selected purely by operation count, so every grouping mode reaches it.
+    // Which mode a plain WUOW is promoted to depends on whether the enclosing operation carries a
+    // txnNumber, so cover all of them.
+    for (auto groupType : {WriteUnitOfWork::kGroupForTransaction,
+                           WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+                           WriteUnitOfWork::kGroupForPossiblyRetryableOperations}) {
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        resetOplogAndTransactions(opCtx);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+        beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+        const auto sessionId = *opCtx->getLogicalSessionId();
+
+        const auto doc = BSON("_id" << 0);
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, groupType);
+            const auto& documentKey = getDocumentKey(*autoColl, doc);
+            OplogDeleteEntryArgs args;
+            opCtx->getServiceContext()->getOpObserver()->onDelete(
+                opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+            wuow.commit();
+        }
+
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+        auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+        ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kDelete);
+
+        // setInitializedStatementIds() dropped kUninitializedStmtId, so the entry reaches
+        // onBatchedWriteCommit with an empty statement id list.
+        EXPECT_EQ(0, entry.getStatementIds().size());
+
+        // Carrying no transaction chain info is correct for a non-retryable write.
+        EXPECT_FALSE(entry.getPrevWriteOpTimeInTransaction().has_value());
+        EXPECT_FALSE(entry.getSessionId().has_value());
+        EXPECT_FALSE(entry.getTxnNumber().has_value());
+
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto txnRecord = Helpers::findOneForTesting(opCtx,
+                                                    configTransactions,
+                                                    BSON("_id" << sessionId.toBSON()),
+                                                    /*invariantOnError=*/false);
+        EXPECT_TRUE(txnRecord.isEmpty())
+            << "a non-retryable grouped write recorded a session lastWriteOpTime referencing an "
+               "oplog entry with no prevOpTime (groupType "
+            << static_cast<int>(groupType) << "): " << txnRecord;
+    }
+}
+
+TEST_F(BatchedWriteOutputsTest, NonRetryableMultiOpBatchDoesNotWriteTxnRecord) {
+    for (auto groupType : {WriteUnitOfWork::kGroupForTransaction,
+                           WriteUnitOfWork::kGroupForRetryableAtomicWrite,
+                           WriteUnitOfWork::kGroupForPossiblyRetryableOperations}) {
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        resetOplogAndTransactions(opCtx);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+        beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+        const auto sessionId = *opCtx->getLogicalSessionId();
+
+        std::vector<InsertStatement> toInsert;
+        toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+        toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, groupType);
+            opCtx->getServiceContext()->getOpObserver()->onInserts(
+                opCtx,
+                *autoColl,
+                toInsert.begin(),
+                toInsert.end(),
+                /*recordIds=*/{},
+                /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+                /*defaultFromMigrate=*/false);
+            wuow.commit();
+        }
+
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+        auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+        ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+        EXPECT_FALSE(entry.getPrevWriteOpTimeInTransaction().has_value());
+
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto txnRecord = Helpers::findOneForTesting(opCtx,
+                                                    configTransactions,
+                                                    BSON("_id" << sessionId.toBSON()),
+                                                    /*invariantOnError=*/false);
+        EXPECT_TRUE(txnRecord.isEmpty())
+            << "multi-op groupType " << static_cast<int>(groupType) << ": " << txnRecord;
+    }
+}
+
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
 // should never happen except in tests which specifically set the batching parameters, but it makes
 // the code simpler to assume it does happen, and testing that it works is simpler and more reliable

@@ -2551,11 +2551,15 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                     opAccumulator->opTime.wallClockTime = wallClockTime;
                 }
 
-                SessionTxnRecord sessionTxnRecord;
-                sessionTxnRecord.setLastWriteOpTime(opTime);
-                sessionTxnRecord.setLastWriteDate(wallClockTime);
-                onWriteOpCompleted(
-                    opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
+                // Only a write carrying a retryable statement may be recorded as the session's
+                // last write.
+                if (!oplogEntry.getStatementIds().empty()) {
+                    SessionTxnRecord sessionTxnRecord;
+                    sessionTxnRecord.setLastWriteOpTime(opTime);
+                    sessionTxnRecord.setLastWriteDate(wallClockTime);
+                    onWriteOpCompleted(
+                        opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
+                }
 
                 return;
             }
@@ -2675,8 +2679,11 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                 oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
             }
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
+            // A kGroupForPossiblyRetryableOperations batch is only actually retryable when it
+            // carries statement ids.
             const bool updateTxnTable =
-                (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) ||
+                (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
+                 !stmtIdsWritten.empty()) ||
                 (isRetryableAtomicBatch && lastOp);
             return logApplyOps(opCtx,
                                oplogEntry,
