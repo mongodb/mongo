@@ -1855,13 +1855,6 @@ functions:
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
-          # For commit builds, append the first 8 characters of the git revision to the version string.
-          # cut is used rather than bash substring syntax because Evergreen would consume the ${...}.
-          if [ "${requester}" = "commit" ]; then
-            GIT_REV=$(git rev-parse HEAD)
-            MONGO_VERSION="$MONGO_VERSION-$(echo $GIT_REV | cut -c 1-8)"
-          fi
-
           # Forcefully override the version for purposes of testing against a different version than
           # the branch is targeting.
           #
@@ -1908,7 +1901,7 @@ functions:
             fi
 
             echo "Shared Cache with setting: ${scons_cache_scope}"
-            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_RELEASE=${is_release|} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 
           # Legacy Expansion generation
           else
@@ -1916,7 +1909,7 @@ functions:
             # Proceed with regular expansions generated
             # This script converts the generated version string into a sanitized version string for
             # use by scons and uploading artifacts as well as information about for the scons cache.
-            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+            MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} IS_RELEASE=${is_release|} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
           fi
 
   "apply compile expansions":
