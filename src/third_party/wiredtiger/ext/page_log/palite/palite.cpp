@@ -1199,17 +1199,15 @@ struct Checkpoints : public Table<Checkpoints> {
 
         /*
          * Get the latest checkpoint (i.e., checkpoint with the highest lsn) if query lsn equals to
-         * WT_PAGE_LOG_LSN_MAX ( passed as parameter: ?2); otherwise get the checkpoint with the
-         * given lsn.
+         * 0; otherwise get the checkpoint with the given lsn. If no checkpoint exists with the
+         * given lsn, the next closest checkpoint is returned.
          */
         stmt[GET_CHECKPOINT] =
           R"(SELECT lsn, timestamp, checkpoint_metadata
              FROM checkpoints
-             WHERE (?1 = ?2 OR lsn = ?1)
-             ORDER BY
-                 lsn DESC,
-                 timestamp DESC
-             LIMIT 1;)";
+             WHERE lsn = (SELECT CASE WHEN ?1 = 0 THEN MAX(lsn) ELSE MIN(lsn) END
+                          FROM checkpoints
+                          WHERE lsn >= ?1);)";
 
         /*
          * Delete all checkpoints with lsn greater than the given lsn.
@@ -1230,7 +1228,7 @@ struct Checkpoints : public Table<Checkpoints> {
             lsn INTEGER NOT NULL,
             timestamp INTEGER NOT NULL,
             checkpoint_metadata BLOB,
-         PRIMARY KEY (lsn, timestamp));)"};
+         PRIMARY KEY (lsn));)"};
 
     ~Checkpoints() = default;
     Checkpoints(Config &cfg, std::shared_mutex &store_access, const std::filesystem::path &home)
@@ -1263,7 +1261,7 @@ struct Checkpoints : public Table<Checkpoints> {
     }
 
     int
-    get(uint64_t &lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata,
+    get(uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata,
       AccessMode mode = AccessMode::READ)
     {
         auto acc = request(mode);
@@ -1271,11 +1269,12 @@ struct Checkpoints : public Table<Checkpoints> {
 
         Connection::StatementPtr stmt = conn.db_statement(Statement::GET_CHECKPOINT);
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(lsn));
-        SQ_CHECK(
-          sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(WT_PAGE_LOG_LSN_MAX));
         int ret = SQ_CHECK(sqlite3_step, stmt.get());
         if (ret == SQLITE_DONE) {
             /* No checkpoint found */
+            if (checkpoint_lsn)
+                *checkpoint_lsn = 0;
+
             if (timestamp)
                 *timestamp = 0;
 
@@ -1287,7 +1286,9 @@ struct Checkpoints : public Table<Checkpoints> {
             return WT_NOTFOUND;
         }
 
-        lsn = sqlite3_column_int64(stmt.get(), 0);
+        if (checkpoint_lsn)
+            *checkpoint_lsn = sqlite3_column_int64(stmt.get(), 0);
+
         if (timestamp)
             *timestamp = sqlite3_column_int64(stmt.get(), 1);
 
@@ -2127,9 +2128,10 @@ public:
     }
 
     int
-    get_checkpoint(uint64_t &lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
+    get_checkpoint(
+      uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
     {
-        return checkpoints.get(lsn, timestamp, checkpoint_metadata);
+        return checkpoints.get(lsn, checkpoint_lsn, timestamp, checkpoint_metadata);
     }
 
     void
@@ -2169,13 +2171,14 @@ public:
     void
     abandon_checkpoint()
     {
-        uint64_t checkpoint_lsn = WT_PAGE_LOG_LSN_MAX;
+        uint64_t checkpoint_lsn = 0;
 
         /* Ensure exclusive access to storage since we update multiple tables. */
         std::unique_lock write_lock(store_access);
 
+        /* Request LSN = 0: get the most recent checkpoint. */
         int ret =
-          checkpoints.get(checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
+          checkpoints.get(0u, &checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
         if (ret == WT_NOTFOUND) {
             LOG_DEBUG("No checkpoint found to abandon; lsn = {}", checkpoint_lsn);
             return;
@@ -2415,7 +2418,7 @@ public:
     }
 
     int
-    get_complete_checkpoint(uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
+    get_complete_checkpoint(uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
       uint64_t *checkpoint_timestamp, WT_ITEM *checkpoint_metadata)
     {
         if (checkpoint_lsn)
@@ -2425,17 +2428,17 @@ public:
         if (checkpoint_timestamp)
             *checkpoint_timestamp = 0;
 
-        uint64_t last_ckpt_lsn = WT_PAGE_LOG_LSN_MAX; /* most recent checkpoint */
-        int ret = storage.get_checkpoint(last_ckpt_lsn, checkpoint_timestamp, checkpoint_metadata);
+        uint64_t ckpt_lsn = 0; /* found checkpoint */
+        int ret = storage.get_checkpoint(lsn, &ckpt_lsn, checkpoint_timestamp, checkpoint_metadata);
 
-        LOG_DEBUG("checkpoint_lsn={}, timestamp={}", last_ckpt_lsn,
+        LOG_DEBUG("request_lsn={}, checkpoint_lsn={}, timestamp={}", lsn, ckpt_lsn,
           checkpoint_timestamp ? *checkpoint_timestamp : 0);
         LOG_TRACE("checkpoint_metadata (size={}) =====\n{}",
           checkpoint_metadata ? checkpoint_metadata->size : 0,
           checkpoint_metadata ? verbose_item(checkpoint_metadata) : "<none>");
 
         if (checkpoint_lsn)
-            *checkpoint_lsn = last_ckpt_lsn;
+            *checkpoint_lsn = ckpt_lsn;
 
         return ret;
     }
@@ -2533,7 +2536,7 @@ static int
 palite_get_complete_checkpoint(
   WT_PAGE_LOG *page_log, WT_SESSION *sess, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args)
 {
-    return safe_call<Palite>(sess, page_log, &Palite::get_complete_checkpoint,
+    return safe_call<Palite>(sess, page_log, &Palite::get_complete_checkpoint, args->lsn,
       &args->checkpoint_lsn, &args->checkpoint_id, &args->checkpoint_timestamp,
       &args->checkpoint_metadata);
 }

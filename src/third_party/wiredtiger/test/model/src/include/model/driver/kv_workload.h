@@ -301,6 +301,79 @@ operator<<(std::ostream &out, const checkpoint &op)
 }
 
 /*
+ * checkpoint_crash_phase --
+ *     A phase of the checkpoint that WiredTiger can be asked to crash in by name, in the order the
+ *     phases are reached. Only before_metadata_sync follows the checkpoint transaction commit and
+ *     the log flush, so it is the only one whose checkpoint can survive the crash, and then only
+ *     with logging enabled.
+ *
+ * These are the phases the model has to tell apart, not every crash point WiredTiger has. The
+ *     per-tree phase is reached with checkpoint_crash instead, and the key rotation points are left
+ *     out: they are taken wherever the disaggregated key provider runs, so they hold no fixed
+ *     position relative to the commit.
+ */
+enum class checkpoint_crash_phase {
+    before_checkpoint_commit,
+    before_metadata_sync,
+};
+
+/*
+ * checkpoint_committed_at --
+ *     Return whether the checkpoint transaction has committed and its log records been flushed by
+ *     the time this phase is reached. Such a checkpoint survives a crash whenever connection
+ *     logging is enabled, because recovery replays the metadata updates. The static assertions in
+ *     kv_workload.cpp pin this ordering to the WiredTiger crash point enumeration.
+ */
+inline bool
+checkpoint_committed_at(checkpoint_crash_phase phase)
+{
+    /* Decide per phase rather than by comparison, so that a new phase has to answer this. */
+    switch (phase) {
+    case checkpoint_crash_phase::before_metadata_sync:
+        return true;
+    case checkpoint_crash_phase::before_checkpoint_commit:
+        return false;
+    }
+
+    throw model_exception("Unknown checkpoint crash phase");
+}
+
+/*
+ * to_string --
+ *     Get the WiredTiger name of the crash phase.
+ */
+inline const char *
+to_string(checkpoint_crash_phase phase)
+{
+    /*
+     * Listing every phase rather than falling back on a default keeps the compiler checking this
+     * switch when a phase is added.
+     */
+    switch (phase) {
+    case checkpoint_crash_phase::before_checkpoint_commit:
+        return "before_checkpoint_commit";
+    case checkpoint_crash_phase::before_metadata_sync:
+        return "before_metadata_sync";
+    }
+
+    throw model_exception("Unknown checkpoint crash phase");
+}
+
+/*
+ * checkpoint_crash_phase_from_string --
+ *     Parse the WiredTiger name of the crash phase.
+ */
+inline checkpoint_crash_phase
+checkpoint_crash_phase_from_string(const std::string &name)
+{
+    if (name == "before_checkpoint_commit")
+        return checkpoint_crash_phase::before_checkpoint_commit;
+    if (name == "before_metadata_sync")
+        return checkpoint_crash_phase::before_metadata_sync;
+    throw model_exception("Invalid checkpoint crash phase: " + name);
+}
+
+/*
  * checkpoint_crash --
  *     A representation of this workload operation.
  */
@@ -342,6 +415,53 @@ inline std::ostream &
 operator<<(std::ostream &out, const checkpoint_crash &op)
 {
     out << "checkpoint_crash(" << op.crash_step << ")";
+    return out;
+}
+
+/*
+ * checkpoint_crash_trigger --
+ *     A representation of this workload operation. Unlike checkpoint_crash, which stops on one of
+ *     the trees, this names a phase of the checkpoint, including the one whose checkpoint recovery
+ *     can roll forward.
+ */
+struct checkpoint_crash_trigger : public without_txn_id, public without_table_id {
+    checkpoint_crash_phase phase;
+
+    /*
+     * checkpoint_crash_trigger::checkpoint_crash_trigger --
+     *     Create the operation.
+     */
+    inline checkpoint_crash_trigger(const checkpoint_crash_phase phase) : phase(phase) {}
+
+    /*
+     * checkpoint_crash_trigger::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const checkpoint_crash_trigger &other) const noexcept
+    {
+        return phase == other.phase;
+    }
+
+    /*
+     * checkpoint_crash_trigger::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const checkpoint_crash_trigger &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const checkpoint_crash_trigger &op)
+{
+    out << "checkpoint_crash_trigger(" << quote(to_string(op.phase)) << ")";
     return out;
 }
 
@@ -1215,9 +1335,9 @@ operator<<(std::ostream &out, const wt_config &op)
  *     Any workload operation.
  */
 using any = std::variant<begin_transaction, breakpoint, checkpoint, checkpoint_crash,
-  commit_transaction, config, crash, create_table, evict, get, insert, nop, prepare_transaction,
-  remove, restart, rollback_to_stable, rollback_transaction, set_commit_timestamp,
-  set_oldest_timestamp, set_stable_timestamp, truncate, wt_config>;
+  checkpoint_crash_trigger, commit_transaction, config, crash, create_table, evict, get, insert,
+  nop, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
+  set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate, wt_config>;
 
 /*
  * operator<< --

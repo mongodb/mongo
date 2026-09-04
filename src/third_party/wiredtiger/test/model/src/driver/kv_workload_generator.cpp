@@ -86,6 +86,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 
     checkpoint = 0.02;
     checkpoint_crash = 0.002;
+    checkpoint_crash_trigger = 0.001;
     crash = 0.002;
     evict = 0.1;
     restart = 0.002;
@@ -373,21 +374,6 @@ kv_workload_generator::generate_connection_stress_config()
 }
 
 /*
- * kv_workload_generator::generate_connection_log_config --
- *     Generate random WiredTiger log configurations.
- */
-std::string
-kv_workload_generator::generate_connection_log_config()
-{
-    std::string wt_env_config;
-
-    if (_spec.conn_logging > _random.next_float())
-        wt_env_config = model::join(wt_env_config, "log=(enabled=true)");
-
-    return wt_env_config;
-}
-
-/*
  * kv_workload_generator::create_table --
  *     Create a table.
  */
@@ -524,18 +510,37 @@ kv_workload_generator::generate_transaction(size_t seq_no)
 void
 kv_workload_generator::run()
 {
-    /* Top-level configuration. */
+    /*
+     * Top-level configuration. The model applies one database configuration wholesale, so collect
+     * the keys and emit them together.
+     */
+    std::string database_config;
     if (_random.next_float() < _spec.disaggregated) {
         _database_config.disaggregated = true;
-        _workload << operation::config("database", "disaggregated=true");
+        database_config = join(database_config, "disaggregated=true");
 
         /* Adjust the specs based on what's not supported. */
         _spec.column_var = 0;
         _spec.rollback_to_stable = 0;
 
+        /*
+         * A layered table is created with logging disabled whatever the connection is configured
+         * with, so connection logging says nothing about the workload's data. That also settles the
+         * phase-named crash: the checkpoint is published to the page log after the point where
+         * those crashes are taken, so there is no phase here that keeps it.
+         */
+        _spec.conn_logging = 0;
+        _spec.checkpoint_crash_trigger = 0;
+
         /* FIXME-WT-15040 Prepared transactions are not yet supported. */
         _spec.prepared_transaction = 0;
     }
+    if (_random.next_float() < _spec.conn_logging) {
+        _database_config.logging = true;
+        database_config = join(database_config, "logging=true");
+    }
+    if (!database_config.empty())
+        _workload << operation::config("database", database_config);
 
     /* Create tables. */
     uint64_t num_tables = _random.next_uint64(_spec.min_tables, _spec.max_tables);
@@ -596,8 +601,20 @@ kv_workload_generator::run()
 
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
-                uint64_t random_number = _random.next_uint64(1, 1000);
-                *p << operation::checkpoint_crash(random_number);
+                *p << operation::checkpoint_crash(_random.next_uint64(1, 1000));
+                _sequences.push_back(std::move(p));
+
+                if (!has_checkpoint)
+                    has_stable_timestamp = false;
+            }
+            probability_case(_spec.checkpoint_crash_trigger)
+            {
+                kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
+                  _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
+                operation::checkpoint_crash_phase phase = _random.next_uint64(0, 1) == 0 ?
+                  operation::checkpoint_crash_phase::before_checkpoint_commit :
+                  operation::checkpoint_crash_phase::before_metadata_sync;
+                *p << operation::checkpoint_crash_trigger(phase);
                 _sequences.push_back(std::move(p));
 
                 if (!has_checkpoint)
@@ -735,10 +752,25 @@ kv_workload_generator::run()
     for (sequence_traversal t(_sequences, barrier_fn); t.has_more(); t.complete_all()) {
         for (sequence_state *s : t.runnable()) {
 
+            /*
+             * A checkpoint crash that WiredTiger can recover from behaves as a checkpoint followed
+             * by a crash, which leaves the timestamps where they were.
+             */
+            bool recoverable_checkpoint_crash = false;
+            if (s->sequence->type() == kv_workload_sequence_type::checkpoint_crash &&
+              _database_config.logging) {
+                const operation::any &crash_op = (*s->sequence)[0];
+                recoverable_checkpoint_crash =
+                  std::holds_alternative<operation::checkpoint_crash_trigger>(crash_op) &&
+                  operation::checkpoint_committed_at(
+                    std::get<operation::checkpoint_crash_trigger>(crash_op).phase);
+            }
+
             /* Simulate how checkpoints, crashes, and restarts manipulate the timestamps. */
             if (s->sequence->type() == kv_workload_sequence_type::checkpoint ||
               s->sequence->type() == kv_workload_sequence_type::restart ||
-              s->sequence->type() == kv_workload_sequence_type::rollback_to_stable) {
+              s->sequence->type() == kv_workload_sequence_type::rollback_to_stable ||
+              recoverable_checkpoint_crash) {
                 ckpt_oldest = oldest;
                 ckpt_stable = stable;
                 if (ckpt_stable == k_timestamp_none)
@@ -789,6 +821,7 @@ kv_workload_generator::run()
         /* If the operation resulted in a database crash or restart, stop all started sequences. */
         if (std::holds_alternative<operation::crash>(op) ||
           std::holds_alternative<operation::checkpoint_crash>(op) ||
+          std::holds_alternative<operation::checkpoint_crash_trigger>(op) ||
           std::holds_alternative<operation::restart>(op)) {
             t.complete_all();
             continue;

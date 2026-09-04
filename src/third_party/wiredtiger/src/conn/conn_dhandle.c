@@ -124,6 +124,9 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     case WT_DHANDLE_TYPE_TIERED_TREE:
         WT_ERR(__wt_strdup(session, WT_CONFIG_BASE(session, tier_meta), &dhandle->cfg[0]));
         break;
+    case WT_DHANDLE_TYPE_NUM:
+        WT_ERR(__wt_illegal_value(session, __wt_atomic_load_enum_relaxed(&dhandle->type)));
+        break;
     }
     dhandle->cfg[1] = metaconf;
     dhandle->meta_base = base;
@@ -171,6 +174,9 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, bool f
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         ret = __wt_tiered_tree_close(session, (WT_TIERED_TREE *)dhandle);
+        break;
+    case WT_DHANDLE_TYPE_NUM:
+        ret = __wt_illegal_value(session, __wt_atomic_load_enum_relaxed(&dhandle->type));
         break;
     }
 
@@ -514,6 +520,9 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
     case WT_DHANDLE_TYPE_TIERED_TREE:
         WT_TRET(__wt_tiered_tree_close(session, (WT_TIERED_TREE *)dhandle));
         break;
+    case WT_DHANDLE_TYPE_NUM:
+        WT_TRET(__wt_illegal_value(session, __wt_atomic_load_enum_relaxed(&dhandle->type)));
+        break;
     }
 
     /*
@@ -680,6 +689,9 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         WT_ERR(__wt_tiered_tree_open(session, cfg));
+        break;
+    case WT_DHANDLE_TYPE_NUM:
+        WT_ERR(__wt_illegal_value(session, __wt_atomic_load_enum_relaxed(&dhandle->type)));
         break;
     }
 

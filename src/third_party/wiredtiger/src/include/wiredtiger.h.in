@@ -5788,11 +5788,18 @@ struct __wt_page_log {
     /*!
      * Get information about the most recently completed checkpoint.
      *
+     * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS::lsn specifies the LSN of the checkpoint to
+     * retrieve:
+     *     - 0: the most recently completed checkpoint,
+     *     - non-zero: the checkpoint at that LSN if exists, otherwise the next one above it.
+     * A caller that needs a specific checkpoint must check returned checkpoint_lsn.
+     * If no satisfying checkpoint exists, the call returns WT_NOTFOUND.
+     *
      * @errors
      *
      * @param page_log the WT_PAGE_LOG
      * @param session the current WiredTiger session
-     * @param args the most recently completed checkpoint and its metadata, returned by the call
+     * @param args the completed checkpoint and its metadata, returned by the call
      */
     int (*pl_get_complete_checkpoint)(WT_PAGE_LOG *page_log, WT_SESSION *session,
         WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args);
@@ -6027,6 +6034,11 @@ struct __wt_page_log_complete_checkpoint_args {
  * WT_PAGE_LOG::pl_get_complete_checkpoint interface.
  */
 struct __wt_page_log_get_complete_checkpoint_args {
+        /*
+         * Input arguments
+         */
+        uint64_t lsn;                   /* LSN of the checkpoint or 0 for the latest checkpoint. */
+
         /*
          * Output arguments, returned by the call.
          */

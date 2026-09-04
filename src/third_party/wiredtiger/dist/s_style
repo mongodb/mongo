@@ -120,8 +120,8 @@ for f in "$@"; do
     fi
 
     if [[ "$f" != src/include/queue.h ]] &&
-        grep -E 'STAILQ_|SLIST_|\bLIST_' $f ; then
-        echo "$f: use TAILQ for all lists"
+        grep -E 'STAILQ_|SLIST_' $f ; then
+        echo "$f: use TAILQ or LIST, not a singly-linked list"
     fi
 
     if [[ "$f" != src/include/extern.h ]] &&

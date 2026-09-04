@@ -22,16 +22,6 @@
  */
 
 /*
- * __wt_tsan_suppress_store_uint8_v --
- *     TSAN warnings suppression for volatile uint8 store.
- */
-static WT_INLINE void
-__wt_tsan_suppress_store_uint8_v(volatile uint8_t *vp, uint8_t v)
-{
-    __wt_atomic_store_uint8_v_relaxed(vp, v);
-}
-
-/*
  * __wt_tsan_suppress_store_uint8 --
  *     TSAN warnings suppression for uint8 store.
  */
@@ -142,16 +132,6 @@ __wt_tsan_suppress_add_uint64_v(volatile uint64_t *var, uint64_t value)
 }
 
 /*
- * __wt_tsan_suppress_load_size --
- *     TSAN warnings suppression for size_t load.
- */
-static WT_INLINE size_t
-__wt_tsan_suppress_load_size(size_t *vp)
-{
-    return (__wt_atomic_load_size_relaxed(vp));
-}
-
-/*
  * __wt_tsan_suppress_store_int64 --
  *     TSAN warnings suppression for int64 store.
  */
@@ -169,16 +149,6 @@ static WT_INLINE void
 __wt_tsan_suppress_add_int64(int64_t *var, int64_t value)
 {
     *var += value;
-}
-
-/*
- * __wt_tsan_suppress_sub_int64 --
- *     TSAN warnings suppression for int64 subtract.
- */
-static WT_INLINE void
-__wt_tsan_suppress_sub_int64(int64_t *var, int64_t value)
-{
-    *var -= value;
 }
 
 /*
@@ -219,16 +189,6 @@ static WT_INLINE void
 __wt_tsan_suppress_store_bool_v(volatile bool *vp, bool v)
 {
     __wt_atomic_store_bool_v_relaxed(vp, v);
-}
-
-/*
- * __wt_tsan_suppress_load_pointer --
- *     TSAN warnings suppression for pointer load.
- */
-static WT_INLINE void *
-__wt_tsan_suppress_load_pointer(void **vp)
-{
-    return (__wt_atomic_load_ptr_relaxed(vp));
 }
 
 /*
@@ -312,16 +272,6 @@ __wt_tsan_suppress_store_wt_insert_ptr(WT_INSERT **vp, WT_INSERT *v)
 }
 
 /*
- * __wt_tsan_suppress_load_wt_insert_ptr --
- *     TSAN warnings suppression for WT_INSERT pointer load.
- */
-static WT_INLINE WT_INSERT *
-__wt_tsan_suppress_load_wt_insert_ptr(WT_INSERT **vp)
-{
-    return (WT_INSERT *)(__wt_atomic_load_ptr_relaxed(vp));
-}
-
-/*
  * __wt_tsan_suppress_load_wt_session_impl_ptr --
  *     TSAN warnings suppression for WT_SESSION_IMPL pointer load.
  */
@@ -349,16 +299,6 @@ static WT_INLINE WT_ADDR *
 __wt_tsan_suppress_load_wt_addr_ptr(void **vp)
 {
     return (WT_ADDR *)(__wt_atomic_load_ptr_relaxed(vp));
-}
-
-/*
- * __wt_tsan_suppress_store_wt_addr_ptr --
- *     TSAN warnings suppression for WT_ADDR pointer store.
- */
-static WT_INLINE void
-__wt_tsan_suppress_store_wt_addr_ptr(void **vp, WT_ADDR *v)
-{
-    __wt_atomic_store_ptr_relaxed(vp, v);
 }
 
 /*

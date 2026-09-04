@@ -117,6 +117,7 @@ struct kv_workload_generator_spec {
     /* Probabilities of special operations. */
     float checkpoint;
     float checkpoint_crash;
+    float checkpoint_crash_trigger;
     float crash;
     float evict;
     float restart;
@@ -480,13 +481,6 @@ public:
         return generator.generate_connection_stress_config();
     }
 
-    static std::string
-    generate_log_configurations(const kv_workload_generator_spec &spec, uint64_t seed = 0)
-    {
-        kv_workload_generator generator(spec, seed);
-        return generator.generate_connection_log_config();
-    }
-
 protected:
     /*
      * kv_workload_generator::kv_workload_generator --
@@ -534,12 +528,6 @@ protected:
      *     Generate random time stress configurations.
      */
     std::string generate_connection_stress_config();
-
-    /*
-     * kv_workload_generator::generate_connection_log_config --
-     *     Generate random WiredTiger log configurations.
-     */
-    std::string generate_connection_log_config();
 
     /*
      * kv_workload_generator::generate_key --

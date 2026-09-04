@@ -252,9 +252,9 @@ class test_layered_async_stepdown11(
         self.complete_step_down(20, epoch=15)
         self.assertFalse(self.uri_in_shared_metadata(self.conn, uri))
 
-    # A create and drop pair left unpublished before the boundary is published together below it,
-    # so the whole history resolves inside this era and the table never surfaces.
-    def test_pre_boundary_create_drop_pair_publishes_below_boundary(self):
+    # Dropping a table whose create was never published cancels the create, so no pair is left to
+    # publish and the whole history resolves inside this era without the table ever surfacing.
+    def test_pre_boundary_create_drop_pair_cancels(self):
         self.set_stable_epoch(10)
         self.set_global_ts(1, 1)
         uri = self.uri('pair')
@@ -262,7 +262,9 @@ class test_layered_async_stepdown11(
         self.dropUntilSuccess(self.session, uri)
 
         self.set_step_down_ts(20, 15)
-        self.publish(uri, 12)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.publish(uri, 12),
+            '/No pending schema operations to publish/')
 
         self.complete_step_down(20, epoch=15)
         self.assertFalse(self.uri_in_shared_metadata(self.conn, uri))

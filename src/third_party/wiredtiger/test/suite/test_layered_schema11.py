@@ -219,7 +219,7 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.publish(self.uri, 10)
         self.set_stable_epoch(10)
         self.leader_checkpoint(1)
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
         self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
         return conn_follow, session_follow
 
@@ -278,7 +278,6 @@ class test_layered_schema11(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
         # The remove is still unpublished: publishing it with a real epoch succeeds.
-        self.set_stable_epoch(1, conn_follow)
         self.publish(self.uri, 25, session_follow)
 
         session_follow.close()

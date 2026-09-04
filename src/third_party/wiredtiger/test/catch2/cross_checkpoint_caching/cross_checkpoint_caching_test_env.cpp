@@ -59,7 +59,7 @@ cross_checkpoint_caching_test_env::~cross_checkpoint_caching_test_env()
     if (shared_dsk_cache->hash != nullptr)
         for (u_int i = 0; i < shared_dsk_cache->hash_size; i++) {
             WT_SHARED_DSK_ITEM *item;
-            while ((item = TAILQ_FIRST(&shared_dsk_cache->hash[i])) != nullptr) {
+            while ((item = LIST_FIRST(&shared_dsk_cache->hash[i])) != nullptr) {
                 int32_t refs = item->ref_count;
                 for (int32_t r = 0; r < refs; r++)
                     __wt_shared_dsk_cache_release(_session, item);
@@ -128,7 +128,7 @@ cross_checkpoint_caching_test_env::bucket_size(u_int bucket)
 
     int count = 0;
     WT_SHARED_DSK_ITEM *item;
-    TAILQ_FOREACH (item, &cache->hash[bucket], hashq)
+    LIST_FOREACH (item, &cache->hash[bucket], hashq)
         count++;
     return count;
 }

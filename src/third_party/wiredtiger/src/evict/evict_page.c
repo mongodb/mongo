@@ -1017,6 +1017,15 @@ __evict_review_obsolete_time_window(WT_SESSION_IMPL *session, WT_REF *ref)
     if (WT_PAGE_IS_INTERNAL(ref->page))
         return (0);
 
+    /*
+     * Dirtying a disaggregated leaf just to strip its obsolete time window doesn't add any new
+     * update, so reconciliation finds nothing newer than what's already durable and skips writing
+     * the page, leaving the obsolete time window on disk regardless. Leave that content in place;
+     * page-level cleanup still reclaims whole pages.
+     */
+    if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+        return (0);
+
     /* We are only interested in clean pages. */
     if (__wt_page_is_modified(ref->page))
         return (0);

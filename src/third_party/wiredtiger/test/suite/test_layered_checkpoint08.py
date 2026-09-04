@@ -73,7 +73,7 @@ class test_layered_checkpoint08(checkpoint_util):
         # wait to fail fast with a clear error rather than spin until the task timeout if the sweep
         # never makes progress.
         self.assertStatGreaterSoon(wiredtiger.stat.conn.dh_sweep_expired_close, sweep_closes_before,
-            timeout=60, msg='sweep server did not close the idle table handle within 60 seconds')
+            timeout=120, msg='sweep server did not close the idle table handle within 120 seconds')
         self.pr(f"Dhandles closed by sweep: "
             f"{self.get_stat(wiredtiger.stat.conn.dh_sweep_expired_close) - sweep_closes_before}")
 

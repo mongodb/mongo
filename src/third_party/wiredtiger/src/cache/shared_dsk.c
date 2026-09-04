@@ -55,7 +55,7 @@ __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t 
         WT_STAT_CONN_INCR(session, cache_shared_dsk_lock_contention);
         __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
     }
-    TAILQ_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
+    LIST_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
         if (shared_dsk_item->addr_size == addr_size && shared_dsk_item->fid == S2BT(session)->id &&
           memcmp(shared_dsk_item->addr, addr, addr_size) == 0) {
             ++shared_dsk_item->ref_count;
@@ -138,7 +138,7 @@ __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size
         WT_STAT_CONN_INCR(session, cache_shared_dsk_lock_contention);
         __wt_spin_lock(session, &shared_dsk_cache->hash_locks[lock_idx]);
     }
-    TAILQ_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
+    LIST_FOREACH (shared_dsk_item, &shared_dsk_cache->hash[bucket], hashq) {
 #ifdef HAVE_DIAGNOSTIC
         ++bucket_walk;
 #endif
@@ -166,7 +166,7 @@ __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size
     }
 #endif
 
-    TAILQ_INSERT_HEAD(&shared_dsk_cache->hash[bucket], shared_dsk_store, hashq);
+    LIST_INSERT_HEAD(&shared_dsk_cache->hash[bucket], shared_dsk_store, hashq);
 
     __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
 
@@ -222,7 +222,7 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
     WT_ASSERT(session, shared_dsk_item->ref_count > 0);
     /* Remove the shared dsk item when ref count is reduced to 0. */
     if (--shared_dsk_item->ref_count == 0) {
-        TAILQ_REMOVE(&shared_dsk_cache->hash[bucket], shared_dsk_item, hashq);
+        LIST_REMOVE(shared_dsk_item, hashq);
         __wt_spin_unlock(session, &shared_dsk_cache->hash_locks[lock_idx]);
 
         /* Symmetrically drain the cache on last release. */
@@ -268,7 +268,7 @@ __wt_shared_dsk_cache_init(WT_SESSION_IMPL *session, u_int hash_size)
       __wt_calloc_def(session, shared_dsk_cache->hash_lock_size, &shared_dsk_cache->hash_locks));
 
     for (i = 0; i < shared_dsk_cache->hash_size; i++)
-        TAILQ_INIT(&shared_dsk_cache->hash[i]);
+        LIST_INIT(&shared_dsk_cache->hash[i]);
     for (i = 0; i < shared_dsk_cache->hash_lock_size; i++)
         WT_ERR(__wt_spin_init(
           session, &shared_dsk_cache->hash_locks[i], "shared disk cache bucket locks"));
@@ -324,9 +324,9 @@ __wti_shared_dsk_cache_destroy(WT_SESSION_IMPL *session)
     }
 
     for (i = 0; i < shared_dsk_cache->hash_size; i++) {
-        while (!TAILQ_EMPTY(&shared_dsk_cache->hash[i])) {
-            shared_dsk_item = TAILQ_FIRST(&shared_dsk_cache->hash[i]);
-            TAILQ_REMOVE(&shared_dsk_cache->hash[i], shared_dsk_item, hashq);
+        while (!LIST_EMPTY(&shared_dsk_cache->hash[i])) {
+            shared_dsk_item = LIST_FIRST(&shared_dsk_cache->hash[i]);
+            LIST_REMOVE(shared_dsk_item, hashq);
 
             if (check_leaks) {
                 ++leaked_entries;

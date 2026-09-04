@@ -33,7 +33,7 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
      * There is no way to check when the non-blocking sync-file-range is complete, but we track the
      * time taken in the call for completeness.
      */
-    WT_STAT_CONN_INCR_ATOMIC(session, thread_fsync_active);
+    WT_STAT_CONN_INCR(session, thread_fsync_active);
     WT_STAT_CONN_INCR(session, fsync_io);
     if (block)
         ret = (handle->fh_sync == NULL ? 0 : handle->fh_sync(handle, (WT_SESSION *)session));
@@ -41,7 +41,7 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
         ret =
           (handle->fh_sync_nowait == NULL ? 0 :
                                             handle->fh_sync_nowait(handle, (WT_SESSION *)session));
-    WT_STAT_CONN_DECR_ATOMIC(session, thread_fsync_active);
+    WT_STAT_CONN_DECR(session, thread_fsync_active);
     return (ret);
 }
 
@@ -112,7 +112,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
     __wt_verbose_debug2(session, WT_VERB_HANDLEOPS,
       "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX, fh->handle->name, len, (uintmax_t)offset);
 
-    WT_STAT_CONN_INCR_ATOMIC(session, thread_read_active);
+    WT_STAT_CONN_INCR(session, thread_read_active);
     WT_STAT_CONN_INCR(session, read_io);
     time_start = __wt_clock(session);
 
@@ -124,7 +124,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
 
     time_stop = __wt_clock(session);
     __wt_stat_msecs_hist_incr_fsread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
-    WT_STAT_CONN_DECR_ATOMIC(session, thread_read_active);
+    WT_STAT_CONN_DECR(session, thread_read_active);
     return (ret);
 }
 
@@ -200,7 +200,7 @@ __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, con
     WT_RET(WT_SESSION_CHECK_PANIC(session));
 
     WT_STAT_CONN_INCR(session, write_io);
-    WT_STAT_CONN_INCR_ATOMIC(session, thread_write_active);
+    WT_STAT_CONN_INCR(session, thread_write_active);
     time_start = __wt_clock(session);
 
     ret = fh->handle->fh_write(fh->handle, (WT_SESSION *)session, offset, len, buf);
@@ -208,6 +208,6 @@ __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, con
     time_stop = __wt_clock(session);
     __wt_stat_msecs_hist_incr_fswrite(session, WT_CLOCKDIFF_MS(time_stop, time_start));
     (void)__wt_atomic_add_uint64_v(&fh->written, len);
-    WT_STAT_CONN_DECR_ATOMIC(session, thread_write_active);
+    WT_STAT_CONN_DECR(session, thread_write_active);
     return (ret);
 }

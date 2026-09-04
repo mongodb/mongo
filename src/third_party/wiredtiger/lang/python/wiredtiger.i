@@ -252,8 +252,37 @@ from packing import pack, unpack
 }
 
 /*
+ * This typemap removes the two last arguments for plh_get_page_ids, and uses local variables for
+ * them instead. The local variables will be used in the matching argout typemap.
+ * Code in this typemap appears before the call to the API function.
+ */
+%typemap(in,numinputs=0) (WT_ITEM *item, size_t *size) (WT_ITEM ids, size_t count) {
+    memset(&ids, 0, sizeof(ids));
+    count = 0;
+    $1 = &ids;
+    $2 = &count;
+}
+
+/*
+ * This typemap is for plh_get_page_ids, and is used in conjunction with the previous typemap.
+ * Code in this typemap appears after the call to the API function.
+ * The packed array of page ids is converted to a python list of integers.
+ */
+%typemap(argout) (WT_ITEM *item, size_t *size) {
+    const uint64_t *ids;
+    size_t n;
+
+    ids = (const uint64_t *)$1->data;
+    $result = PyList_New((Py_ssize_t)*$2);
+    for (n = 0; n < *$2; n++)
+        PyList_SetItem($result, (Py_ssize_t)n, PyLong_FromUnsignedLongLong(ids[n]));
+    free($1->mem);
+}
+
+/*
  * This typemap removes the argument for pl_get_complete_checkpoint and allocates a local
- * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS struct instead.
+ * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS struct instead. Zeroing it selects the most recently
+ * completed checkpoint; the wrapper below overwrites the selector when the caller supplies one.
  * Code in this typemap appears before the call to the API function.
  */
 %typemap(in,numinputs=0) WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *
@@ -1221,13 +1250,27 @@ typedef int int_void;
 };
 %enddef
 
+SIDESTEP_METHOD(__wt_page_log, pl_abandon_checkpoint,
+  (WT_SESSION *session),
+  ($self, session))
+
 SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint,
   (WT_SESSION *session, WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args),
   ($self, session, args))
 
-SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint,
-  (WT_SESSION *session, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args),
-  ($self, session, args))
+/*
+ * Optionally ask for specific checkpoint LSN. If omitted, it defaults to zero, which asks for the
+ * most recently completed checkpoint.
+ */
+%ignore __wt_page_log::pl_get_complete_checkpoint;
+%rename (pl_get_complete_checkpoint) __wt_page_log::_pl_get_complete_checkpoint;
+%extend __wt_page_log {
+    int _pl_get_complete_checkpoint(WT_SESSION *session,
+      WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args, uint64_t lsn = 0) {
+        args->lsn = lsn;
+        return ($self->pl_get_complete_checkpoint($self, session, args));
+     }
+};
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_last_lsn,
   (WT_SESSION *session, uint64_t *lsn),

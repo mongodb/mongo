@@ -259,7 +259,8 @@ __wti_disagg_load_crypt_key(WT_SESSION_IMPL *session, WT_DISAGG_METADATA *metada
      * key provider decide about the appropriate key.
      */
     if (metadata->key_provider == NULL) {
-        WT_ERR(key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt));
+        WT_ERR_MSG_CHK(session, key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt),
+          "key provider: load-key: no persisted key in checkpoint");
         return (0);
     }
 
@@ -268,7 +269,8 @@ __wti_disagg_load_crypt_key(WT_SESSION_IMPL *session, WT_DISAGG_METADATA *metada
     WT_ERR(__wti_disagg_parse_crypt_meta(session, metadata, &page_id, &lsn));
 
     /* Read the encryption key data from disaggregated storage. */
-    WT_ERR(__disagg_get_crypt_key(session, page_id, lsn, &key_item));
+    WT_ERR_MSG_CHK(session, __disagg_get_crypt_key(session, page_id, lsn, &key_item),
+      "key provider: page-read: page_id=%" PRIu64 ", lsn=%" PRIu64, page_id, lsn);
 
     /* Validate the crypt data. */
     WT_ERR(__disagg_validate_crypt(session, &key_item, &crypt_header));
@@ -283,7 +285,8 @@ __wti_disagg_load_crypt_key(WT_SESSION_IMPL *session, WT_DISAGG_METADATA *metada
       "Loading persisted crypt key: lsn=%" PRIu64 ", timestamp=%" PRIu64, lsn, crypt.timestamp);
 
     /* Callback to load the encryption key data into the key provider. */
-    WT_ERR(key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt));
+    WT_ERR_MSG_CHK(session, key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt),
+      "key provider: load-key: lsn=%" PRIu64 ", timestamp=%" PRIu64, lsn, crypt.timestamp);
 
     /* Prune the in-memory list on every checkpoint pickup. */
     __disagg_prune_pending_crypt_keys(session, crypt_header->timestamp);

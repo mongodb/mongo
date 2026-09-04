@@ -547,6 +547,23 @@ __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
         100);
 }
 
+/*
+ * __wti_evict_threshold_pct --
+ *     Return the cache-full percentage used by the eviction trigger check: one hundred minus the
+ *     smallest margin between a usage percentage and its trigger, floored at zero. Exceeding any
+ *     trigger therefore yields a percentage of at least one hundred. Kept separate from
+ *     __wt_evict_needed, as pure arithmetic, so it can be unit tested without live cache state.
+ */
+static WT_INLINE double
+__wti_evict_threshold_pct(double pct_clean, double pct_dirty, double pct_updates,
+  double clean_trigger, double dirty_trigger, double updates_trigger)
+{
+    return (WT_MAX(0.0,
+      100.0 -
+        WT_MIN(WT_MIN(clean_trigger - pct_clean, dirty_trigger - pct_dirty),
+          updates_trigger - pct_updates)));
+}
+
 /* !!!
  * __wt_evict_needed --
  *     Check whether the configured clean/dirty/update eviction trigger thresholds for the cache
@@ -642,10 +659,9 @@ __wt_evict_needed(
      */
     dirty_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger);
     if (pct_fullp != NULL)
-        *pct_fullp = WT_MAX(0.0,
-          100.0 -
-            WT_MIN(WT_MIN(evict->eviction_trigger - pct_full, dirty_trigger - pct_dirty),
-              __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger) - pct_updates));
+        *pct_fullp =
+          __wti_evict_threshold_pct(pct_full, pct_dirty, pct_updates, evict->eviction_trigger,
+            dirty_trigger, __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger));
 
     /*
      * Only check the dirty trigger when the session is not busy.

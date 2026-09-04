@@ -123,7 +123,7 @@ track_ops(TINFO *tinfo)
           track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
           track_ts_dots(cur_dot_cnt));
     }
-    WT_ACQUIRE_READ_WITH_BARRIER(disagg_leader, g.disagg_leader);
+    disagg_leader = __wt_atomic_load_bool_v_acquire(&g.disagg_leader);
     testutil_snprintf_len_set(msg, sizeof(msg), &len,
       "ops%s: "
       "S %" PRIu64

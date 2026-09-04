@@ -26,11 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import wttest
 from eviction_util import eviction_util
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
 # Verify evicting a clean page removes any obsolete time window information present on the page.
+@wttest.skip_for_hook("disagg", "eviction does not remove obsolete time windows for disaggregated tables")
 class test_eviction02(eviction_util):
     conn_config_common = 'cache_size=10MB,statistics=(all),statistics_log=(json,wait=1,on_close=true)'
 

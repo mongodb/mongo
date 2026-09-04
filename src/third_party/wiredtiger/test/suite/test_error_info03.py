@@ -153,6 +153,23 @@ class test_error_info03(error_info_util):
         self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
         self.assert_error_equal(errno.EBUSY, wiredtiger.WT_UNCOMMITTED_DATA, "the table has uncommitted data and cannot be closed yet")
 
+    def test_uncommitted_data_partial_drop(self):
+        """
+        Try to drop a table with two column groups while only the second one has uncommitted data.
+        The first column group is dropped and then restored when the second one fails.
+        """
+        self.session.create(self.uri, 'key_format=S,value_format=SS,columns=(k,a,b),colgroups=(c1,c2)')
+        colgroup_uri = self.uri.replace('table:', 'colgroup:')
+        self.session.create(colgroup_uri + ':c1', 'columns=(a)')
+        self.session.create(colgroup_uri + ':c2', 'columns=(b)')
+        with open_cursor(self.session, colgroup_uri + ':c2') as cursor:
+            self.session.begin_transaction()
+            cursor.set_key('key')
+            cursor.set_value('value')
+            self.assertEqual(cursor.update(), 0)
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_UNCOMMITTED_DATA, "the table has uncommitted data and cannot be closed yet")
+
     def test_dirty_data(self):
         """
         Try to drop a table without first performing a checkpoint.

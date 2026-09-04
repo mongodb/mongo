@@ -186,9 +186,6 @@ __wt_stats_set_dsrc(void *stats_arg, int slot, int64_t value)
  * The read statistics are separated into data-source or connection statistics as the counter slots
  * for the statistics are separate. The write statistics do not rely on counter slots in this way so
  * they do not need to be split.
- *
- * FIXME-WT-15752: Remove __wt_tsan_suppress_* wrappers and implement proper atomics synchronization
- * where needed.
  */
 #define WT_STAT_ENABLED(session) (S2C(session)->stat_flags != 0)
 
@@ -197,37 +194,26 @@ __wt_stats_set_dsrc(void *stats_arg, int slot, int64_t value)
 #define WT_STAT_DSRC_READ(stats, fld) \
     __wt_stats_aggregate_dsrc(stats, WT_STATS_FIELD_TO_OFFSET(stats, fld))
 #define WT_STAT_SESSION_READ(stats, fld) ((stats)->fld)
-#define WT_STAT_WRITE(session, stats, fld, v)                            \
-    do {                                                                 \
-        if (WT_STAT_ENABLED(session))                                    \
-            __wt_tsan_suppress_store_int64(&(stats)->fld, (int64_t)(v)); \
-    } while (0)
-
-#define WT_STAT_SET_BASE(session, stat, fld, value)                         \
-    do {                                                                    \
-        if (WT_STAT_ENABLED(session))                                       \
-            __wt_tsan_suppress_store_int64(&(stat)->fld, (int64_t)(value)); \
-    } while (0)
-#define WT_STAT_DECRV_BASE(session, stat, fld, value)                     \
+/* The block manager writes these into a shared data-source bucket. */
+#define WT_STAT_WRITE(session, stats, fld, v)                             \
     do {                                                                  \
         if (WT_STAT_ENABLED(session))                                     \
-            __wt_tsan_suppress_sub_int64(&(stat)->fld, (int64_t)(value)); \
+            __wt_atomic_store_int64_relaxed(&(stats)->fld, (int64_t)(v)); \
     } while (0)
-/* FIXME-WT-15754: Consider using relaxed memory order for all statistic operations. */
-#define WT_STAT_DECRV_ATOMIC_BASE(session, stat, fld, value)             \
-    do {                                                                 \
-        if (WT_STAT_ENABLED(session))                                    \
-            (void)__wt_atomic_sub_int64(&(stat)->fld, (int64_t)(value)); \
+/*
+ * Connection and data-source statistics live in a bucket shared with every other session whose id
+ * hashes to the same slot, so these updates collide and have to be atomic or increments are lost.
+ * Relaxed is the ordering we want: a statistic guards no other state.
+ */
+#define WT_STAT_DECRV_BASE(session, stat, fld, value)                            \
+    do {                                                                         \
+        if (WT_STAT_ENABLED(session))                                            \
+            (void)__wt_atomic_sub_int64_relaxed(&(stat)->fld, (int64_t)(value)); \
     } while (0)
-#define WT_STAT_INCRV_BASE(session, stat, fld, value)                     \
-    do {                                                                  \
-        if (WT_STAT_ENABLED(session))                                     \
-            __wt_tsan_suppress_add_int64(&(stat)->fld, (int64_t)(value)); \
-    } while (0)
-#define WT_STAT_INCRV_ATOMIC_BASE(session, stat, fld, value)             \
-    do {                                                                 \
-        if (WT_STAT_ENABLED(session))                                    \
-            (void)__wt_atomic_add_int64(&(stat)->fld, (int64_t)(value)); \
+#define WT_STAT_INCRV_BASE(session, stat, fld, value)                            \
+    do {                                                                         \
+        if (WT_STAT_ENABLED(session))                                            \
+            (void)__wt_atomic_add_int64_relaxed(&(stat)->fld, (int64_t)(value)); \
     } while (0)
 
 /*
@@ -240,18 +226,10 @@ __wt_stats_set_dsrc(void *stats_arg, int slot, int64_t value)
  */
 #define WT_STAT_CONN_DECRV(session, fld, value) \
     WT_STAT_DECRV_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
-#define WT_STAT_CONN_DECR_ATOMIC(session, fld) \
-    WT_STAT_DECRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, 1)
-#define WT_STAT_CONN_DECRV_ATOMIC(session, fld, value) \
-    WT_STAT_DECRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_DECR(session, fld) WT_STAT_CONN_DECRV(session, fld, 1)
 
 #define WT_STAT_CONN_INCRV(session, fld, value) \
     WT_STAT_INCRV_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
-#define WT_STAT_CONN_INCR_ATOMIC(session, fld) \
-    WT_STAT_INCRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, 1)
-#define WT_STAT_CONN_INCRV_ATOMIC(session, fld, value) \
-    WT_STAT_INCRV_ATOMIC_BASE(session, S2C(session)->stats[(session)->stat_conn_bucket], fld, value)
 #define WT_STAT_CONN_INCR(session, fld) WT_STAT_CONN_INCRV(session, fld, 1)
 
 /* FIXME-WT-15961 Introduce thread-safe stats interfaces. */
@@ -325,11 +303,20 @@ __wt_stats_set_dsrc(void *stats_arg, int slot, int64_t value)
 #define WT_STAT_CONN_DSRC_INCR(session, fld) WT_STAT_CONN_DSRC_INCRV(session, fld, 1)
 /*
  * Update per session statistics.
+ *
+ * Unlike the connection and data-source buckets, a session's statistics are reached only through
+ * that session, so these updates are uncontended and need no atomic.
  */
-#define WT_STAT_SESSION_INCRV(session, fld, value) \
-    WT_STAT_INCRV_BASE(session, &(session)->stats, fld, value)
-#define WT_STAT_SESSION_SET(session, fld, value) \
-    WT_STAT_SET_BASE(session, &(session)->stats, fld, value)
+#define WT_STAT_SESSION_INCRV(session, fld, value)    \
+    do {                                              \
+        if (WT_STAT_ENABLED(session))                 \
+            (session)->stats.fld += (int64_t)(value); \
+    } while (0)
+#define WT_STAT_SESSION_SET(session, fld, value)     \
+    do {                                             \
+        if (WT_STAT_ENABLED(session))                \
+            (session)->stats.fld = (int64_t)(value); \
+    } while (0)
 
 /*
  * Construct histogram increment functions to put the passed value into the right bucket. Bucket

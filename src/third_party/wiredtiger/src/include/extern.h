@@ -10,6 +10,8 @@ extern WT_EXT *__wt_block_off_srch_inclusive(WT_EXTLIST *el, wt_off_t off)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern WT_HAZARD *__wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref,
   WT_SESSION_IMPL **sessionp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern WT_SHARED_METADATA_OP __wt_disagg_table_last_unpublished_op(WT_SESSION_IMPL *session,
+  const char *table_name) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_block_disagg_manager_owns_object(WT_SESSION_IMPL *session, const char *uri)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_block_extlist_can_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block,
@@ -1841,6 +1843,8 @@ extern void __wt_debug_crash(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_dhandle_clear_add(
   WT_DHANDLE_CLEAR_LOG *log, const char *file, const char *func, int line);
+extern void __wt_disagg_cancel_unpublished_op(
+  WT_SESSION_IMPL *session, const char *table_name, WT_SHARED_METADATA_OP op);
 extern void __wt_disagg_deferred_pickup_signal(WT_SESSION_IMPL *session, uint64_t released_gen);
 extern void __wt_disagg_set_database_size(WT_SESSION_IMPL *session, uint64_t database_size);
 extern void __wt_encrypt_size(
@@ -2359,8 +2363,9 @@ static WT_INLINE int __wt_pending_prepared_next_op(
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len,
   void *buf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE int __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref,
-  bool disagg_free_block) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE int __wt_ref_block_free(
+  WT_SESSION_IMPL *session, WT_REF *ref, bool disagg_free_block, bool disagg_delta_chain_end)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_row_leaf_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip,
   WT_ITEM *key, bool instantiate) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_row_leaf_key_instantiate(WT_SESSION_IMPL *session, WT_PAGE *page)

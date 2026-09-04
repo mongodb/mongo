@@ -24,26 +24,28 @@
     --(s)->api_call_counter
 
 /* Standard entry points to the API: declares/initializes local variables. */
-#define API_SESSION_INIT(s, struct_name, func_name, dh)                                  \
-    WT_TRACK_OP_DECL;                                                                    \
-    API_SESSION_PUSH(s, struct_name, func_name, dh);                                     \
-    /*                                                                                   \
-     * No code before this line, otherwise error handling won't be                       \
-     * correct.                                                                          \
-     */                                                                                  \
-    WT_ERR(WT_SESSION_CHECK_PANIC(s));                                                   \
-    __wt_single_thread_check_start(s);                                                   \
-    WT_TRACK_OP_INIT(s);                                                                 \
-    if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                  \
-        __wt_op_timer_start(s);                                                          \
-    /* Reset wait time if this isn't an API reentry. */                                  \
-    if ((s)->api_call_counter == 1)                                                      \
-        (s)->cache_wait_us = 0;                                                          \
-    /*                                                                                   \
-     * Reset the err_info struct back to default only if the prior API call had an error \
-     */                                                                                  \
-    if ((s)->api_call_counter == 1 && (s)->err_info.err != 0)                            \
-        __wt_session_reset_last_error((s));                                              \
+#define API_SESSION_INIT(s, struct_name, func_name, dh)                             \
+    WT_TRACK_OP_DECL;                                                               \
+    API_SESSION_PUSH(s, struct_name, func_name, dh);                                \
+    /*                                                                              \
+     * No code before this line, otherwise error handling won't be                  \
+     * correct.                                                                     \
+     */                                                                             \
+    WT_ERR(WT_SESSION_CHECK_PANIC(s));                                              \
+    __wt_single_thread_check_start(s);                                              \
+    WT_TRACK_OP_INIT(s);                                                            \
+    /*                                                                              \
+     * Internal sessions save errors only on behalf of the application session that \
+     * spawned them; leave error information to that session.                       \
+     */                                                                             \
+    if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) {           \
+        __wt_op_timer_start(s);                                                     \
+        if ((s)->err_info.err != 0)                                                 \
+            __wt_session_reset_last_error((s));                                     \
+    }                                                                               \
+    /* Reset wait time if this isn't an API reentry. */                             \
+    if ((s)->api_call_counter == 1)                                                 \
+        (s)->cache_wait_us = 0;                                                     \
     __wt_verbose((s), WT_VERB_API, "%s", "CALL: " #struct_name ":" #func_name)
 
 #define API_CALL_NOCONF_NOERRCLEAR(s, struct_name, func_name, dh, set_err) \
@@ -83,7 +85,7 @@
         __wt_single_thread_check_stop(s);                                                          \
         if ((ret) != 0 && __set_err)                                                               \
             __wt_txn_err_set(s, (ret));                                                            \
-        if ((s)->api_call_counter == 1) {                                                          \
+        if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) {                      \
             /*                                                                                     \
              * Check that the API return value matches what is stored in the err_info struct.      \
              *                                                                                     \
@@ -103,8 +105,7 @@
                 else                                                                               \
                     (s)->err_info.err = (ret);                                                     \
             };                                                                                     \
-            if (!F_ISSET(s, WT_SESSION_INTERNAL))                                                  \
-                __wt_op_timer_stop(s);                                                             \
+            __wt_op_timer_stop(s);                                                                 \
         }                                                                                          \
         /*                                                                                         \
          * FIXME-WT-7247 Ideally we would not leave any history store cursors open when we         \

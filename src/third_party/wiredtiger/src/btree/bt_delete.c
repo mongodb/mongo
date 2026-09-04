@@ -161,6 +161,11 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * store (that should have been cleared) from appearing again. Technically we don't need to
      * check the newest stop durable timestamp, but for consistency, we check for the maximum of
      * both the start and stop timestamps.
+     *
+     * This check does not depend on whether the table currently requires timestamps: a table's
+     * timestamp policy can be relaxed after the fact without rewriting its existing content, which
+     * would otherwise let a fast truncate discard real, timestamped history-store entries as if
+     * they belonged to a table that had never used timestamps.
      */
     if (F_ISSET(session->txn, WT_TXN_TS_NOT_SET) &&
       !__wt_txn_visible_all(session, addr.ta.newest_txn,
@@ -230,8 +235,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
          * These pages are dirty content the transaction has not resolved, tracked separately from
          * update content: a truncate creates no updates.
          */
-        WT_STAT_CONN_INCRV_ATOMIC(
-          session, cache_truncate_txn_uncommitted_bytes, (int64_t)footprint);
+        WT_STAT_CONN_INCRV(session, cache_truncate_txn_uncommitted_bytes, (int64_t)footprint);
         WT_STAT_SESSION_INCRV(session, txn_truncate_bytes_dirty, (int64_t)footprint);
         WT_STAT_SESSION_INCRV(session, txn_bytes_dirty, (int64_t)footprint);
 

@@ -146,6 +146,8 @@ DataSet
 Decrementing
 Decrypt
 DeleteFileW
+Dequeue
+Dequeued
 Deterministically
 Dhandle
 DisAgg
@@ -481,11 +483,13 @@ SIGKILLs
 SIGPIPE
 SIGSEGV
 SIMD
+SLIST
 SLS
 SLVG
 SMT
 SPINLOCK
 SSq
+STAILQ
 STATP
 STR
 STRUCT
@@ -967,6 +971,7 @@ demuxes
 demuxing
 dequeue
 dequeued
+dequeues
 der
 deref
 dereference

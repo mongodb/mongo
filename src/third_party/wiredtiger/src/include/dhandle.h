@@ -106,10 +106,9 @@ enum wt_dhandle_type {
     WT_DHANDLE_TYPE_LAYERED,
     WT_DHANDLE_TYPE_TABLE,
     WT_DHANDLE_TYPE_TIERED,
-    WT_DHANDLE_TYPE_TIERED_TREE
+    WT_DHANDLE_TYPE_TIERED_TREE,
+    WT_DHANDLE_TYPE_NUM /* Number of types, must be last. */
 };
-/* Number of values above. */
-#define WT_DHANDLE_TYPE_NUM (1 + WT_DHANDLE_TYPE_TIERED_TREE)
 
 /*
  * WT_DATA_HANDLE --

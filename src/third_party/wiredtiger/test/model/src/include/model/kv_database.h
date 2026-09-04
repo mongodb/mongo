@@ -51,6 +51,12 @@ struct kv_database_config {
     bool leader;
 
     /*
+     * Whether the connection runs with logging. It belongs here because it decides whether a
+     * checkpoint whose transaction already committed survives a crash.
+     */
+    bool logging;
+
+    /*
      * kv_database_config::kv_database_config --
      *     Create the default database configuration.
      */

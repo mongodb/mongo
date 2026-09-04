@@ -347,7 +347,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"runs.mirror", "mirror tables", C_BOOL | C_IGNORE | C_TABLE, 0, 0, 0, V_TABLE_RUNS_MIRROR},
 
-  {"runs.ops", "operations per run", 0x0, 0, M(2), M(100), V_GLOBAL_RUNS_OPS},
+  {"runs.ops", "operations per run", 0x0, 0, M(2), UINT_MAX, V_GLOBAL_RUNS_OPS},
 
   {"runs.predictable_replay", "configure predictable replay", C_BOOL, 0, 0, 0,
     V_GLOBAL_RUNS_PREDICTABLE_REPLAY},

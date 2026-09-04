@@ -30,14 +30,16 @@ import time
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from test_cc01 import test_cc_base
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 
 @disagg_test_class
-class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
+class test_disagg_fast_truncate03(test_cc_base):
     """
-    Check that cursor traversal skips an emptied internal page in disaggregated storage.
+    Check that cursor traversal skips an emptied internal page in disaggregated storage
+    and checkpoint cleanup later reclaims it.
 
     Fast-truncating every child of an internal page while the deletions are not yet
     globally visible can trap the page in a loop:
@@ -54,6 +56,8 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
 
     The parent address aggregate records that the subtree is deleted. Once the internal
     page is on disk, cursor traversal can use that aggregate to skip the whole subtree.
+    Checkpoint cleanup eventually reads the internal page, removes its obsolete leaf
+    references, and lets checkpoint reconciliation propagate the removal up the tree.
     """
 
     uri = "table:test_disagg_fast_truncate03"
@@ -71,7 +75,7 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
 
     def conn_config(self):
         return ('cache_size=50MB,statistics=(all),precise_checkpoint=true,'
-                'disaggregated=(role="leader"),')
+                'checkpoint_cleanup=(wait=100000),disaggregated=(role="leader"),')
 
     def read_stat(self, stat_key):
         # Read with statistics=(fast): the default (all) does a full tree walk that
@@ -98,12 +102,16 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
         """Snapshot the counters that witness each step of the scenario."""
         return {
             "fast_deleted": self.read_stat(stat.dsrc.rec_page_delete_fast),
+            "real_deleted": self.read_stat(stat.dsrc.rec_page_delete),
             "evict_blocked": self.read_stat(
                 stat.dsrc.cache_eviction_blocked_disagg_dirty_internal_page
             ),
             "internal_evicted": self.read_stat(stat.dsrc.cache_eviction_internal),
             "internal_read": self.read_stat(stat.dsrc.cache_read_internal),
+            "leaf_read": self.read_stat(stat.dsrc.cache_read_leaf),
             "internal_skip": self.read_stat(stat.dsrc.cursor_tree_walk_del_internal_page_skip),
+            "cleanup_removed": self.read_stat(stat.dsrc.checkpoint_cleanup_pages_removed),
+            "block_discard": self.get_stat(stat.conn.disagg_block_page_discard),
         }
 
     def evict_keys(self, keys):
@@ -181,11 +189,11 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
         before = self.snapshot_stats()
         self.fast_truncate()
         after = self.snapshot_stats()
+        fast_deleted = after["fast_deleted"] - before["fast_deleted"]
         self.assertGreater(
-            after["fast_deleted"], before["fast_deleted"],
+            fast_deleted, 0,
             "step 1: fast truncate did not delete any pages",
         )
-        self.prout("step 1: fast truncate deleted pages")
 
         # Step 2 -- the page is dirty, so the walk-triggered eviction is refused by the
         # disaggregated-storage guard. (The truncate walk itself may already have been
@@ -201,7 +209,6 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
             after["internal_evicted"], before["internal_evicted"],
             "step 2: an internal page was evicted while dirty",
         )
-        self.prout("step 2: eviction of the dirty emptied internal page was refused")
 
         # Step 3 -- checkpoint reconciles the page: proxy cells for the deleted children,
         # no removal, and the page is left clean. Snapshot before the checkpoint: the page
@@ -210,7 +217,6 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
         before = self.snapshot_stats()
         self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(self.truncate_ts))
         self.session.checkpoint()
-        self.prout("step 3: checkpointed")
 
         # Step 4 -- the page is clean and still marked for eviction, so the walk queues it for
         # urgent eviction. An attempt the walk's own hazard pointer blocks drops the queue entry
@@ -221,7 +227,6 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
             stat.dsrc.cache_eviction_internal, before["internal_evicted"],
             "step 4: the clean emptied internal page was not evicted",
         )
-        self.prout("step 4: the clean emptied internal page was evicted")
 
         # Step 5 -- the reference survives, but its address aggregate shows that the subtree is
         # deleted. A subsequent walk skips the subtree without reading and re-dirtying the page.
@@ -234,6 +239,7 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
         before = self.snapshot_stats()
         self.assertEqual(self.scan_table(), surviving + 1)
         after = self.snapshot_stats()
+        skipped_internal = after["internal_skip"] - before["internal_skip"]
         self.assertEqual(
             after["internal_read"], before["internal_read"],
             "step 5: the evicted internal page was read back",
@@ -243,27 +249,61 @@ class test_disagg_fast_truncate03(wttest.WiredTigerTestCase):
             "step 5: the evicted internal page was re-dirtied",
         )
         self.assertGreater(
-            after["internal_skip"], before["internal_skip"],
+            skipped_internal, 0,
             "step 5: no deleted internal page was skipped",
         )
-        self.prout("step 5: the evicted internal page was skipped")
 
-        # Exit -- make the deletions globally visible and checkpoint: reconciliation
-        # removes the children for real and the loop stops. Scans no longer trip the
-        # eviction guard on this subtree.
+        # Step 6 -- make the deletions globally visible and trigger checkpoint cleanup.
+        # Its custom walk reads the skipped internal page and marks its obsolete leaf
+        # references deleted, dirtying the internal page for reconciliation.
+        before = self.snapshot_stats()
         ts = self.timestamp_str(self.visible_ts)
         self.conn.set_timestamp(f"oldest_timestamp={ts},stable_timestamp={ts}")
-        self.session.checkpoint()
+        self.wait_for_cc_to_run()
+        after = self.snapshot_stats()
+        self.assertGreater(
+            after["internal_read"], before["internal_read"],
+            "step 6: checkpoint cleanup did not read the skipped internal page",
+        )
+        self.assertEqual(
+            after["leaf_read"], before["leaf_read"],
+            "step 6: checkpoint cleanup read a fast-deleted leaf page",
+        )
+        self.assertEqual(
+            after["cleanup_removed"] - before["cleanup_removed"], fast_deleted,
+            "step 6: checkpoint cleanup did not process every fast-deleted leaf reference",
+        )
 
+        # Step 7 -- checkpoint reconciles the dirty internal page. The deleted leaves
+        # are discarded and an empty internal page is omitted from its parent.
+        #
+        # The counters are measured against the step 6 baseline, taken before the deletions
+        # became globally visible: once cleanup has dirtied an internal page, eviction can
+        # reconcile it ahead of this checkpoint, so the reclamation is not confined to the
+        # checkpoint's own window. Nothing before that baseline can reclaim a deleted leaf,
+        # its truncation is not yet globally visible.
+        self.session.checkpoint()
+        after = self.snapshot_stats()
+        # An emptied internal page still in cache reconciles to empty as well, so the
+        # count covers at least the pages the walk skipped.
+        self.assertGreaterEqual(
+            after["real_deleted"] - before["real_deleted"], skipped_internal,
+            "step 7: a skipped internal page did not reconcile to empty",
+        )
+        self.assertGreaterEqual(
+            after["block_discard"] - before["block_discard"],
+            fast_deleted,
+            "step 7: reconciliation did not discard every fast-deleted leaf page",
+        )
+
+        # Exit -- scans no longer trip the dirty-internal-page eviction guard.
         before = self.snapshot_stats()
         self.assertEqual(self.scan_table(read_ts=self.visible_ts), surviving + 1)
         after = self.snapshot_stats()
         self.assertEqual(
             after["evict_blocked"], before["evict_blocked"],
-            "exit: the loop should stop once the deletions are globally visible",
+            "exit: the loop should stop once checkpoint cleanup reclaims the subtree",
         )
-        self.prout("exit: the loop stopped once the deletions are globally visible")
-
 
 if __name__ == "__main__":
     wttest.run()

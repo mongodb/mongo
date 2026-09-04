@@ -49,8 +49,8 @@ class test_layered_config07(wttest.WiredTigerTestCase, DisaggConfigMixin):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
     def test_disagg_basic(self):
-        # Test some basic functionality of the page log API, calling
-        # each supported method in the API at least once.
+        # Test some basic functionality of the page log API. The methods left out are either
+        # deprecated, or exercised extensively by other tests.
         session = self.session
         page_log = self.conn.get_page_log('palite')
 
@@ -61,6 +61,11 @@ class test_layered_config07(wttest.WiredTigerTestCase, DisaggConfigMixin):
         ckpt_complete_args.lsn = 0
         ckpt_complete_args.checkpoint_oldest_timestamp = 0
         page_log.pl_complete_checkpoint(session, ckpt_complete_args)
+        ckpt1_lsn = ckpt_complete_args.lsn
+
+        # The checkpoint just written is the only one, so it is also the most recent.
+        (lsn, _, ts, meta) = page_log.pl_get_complete_checkpoint(session)
+        self.assertEqual((lsn, ts, meta), (ckpt1_lsn, 0, 'Checkpoint'))
 
         handle = page_log.pl_open_handle(session, 1)
 
@@ -115,5 +120,47 @@ class test_layered_config07(wttest.WiredTigerTestCase, DisaggConfigMixin):
         handle.plh_discard(session, 20, 2, discard_args)
 
         self.assertGreater(discard_args.lsn, put_args_delta.lsn)
+
+        # The last LSN is the one the discard just took.
+        (_, last_lsn) = page_log.pl_get_last_lsn(session)
+        self.assertEqual(last_lsn, discard_args.lsn)
+
+        # The page ids live for this table at a given LSN. Both pages are live before the
+        # discard; at the discard's own LSN page 20 is gone and only page 21 remains.
+        self.assertEqual(sorted(handle.plh_get_page_ids(session, page21_delta1_lsn)), [20, 21])
+        self.assertEqual(sorted(handle.plh_get_page_ids(session, discard_args.lsn)), [21])
+
+        # A second checkpoint, so the selector below has more than one to choose between.
+        ckpt_complete_args.checkpoint_id = 2
+        ckpt_complete_args.checkpoint_timestamp = 5
+        ckpt_complete_args.checkpoint_metadata = 'Checkpoint2'
+        ckpt_complete_args.lsn = 0
+        page_log.pl_complete_checkpoint(session, ckpt_complete_args)
+        ckpt2_lsn = ckpt_complete_args.lsn
+        self.assertGreater(ckpt2_lsn, ckpt1_lsn)
+
+        # No selector and an explicit zero both ask for the most recent checkpoint.
+        for selector in ((), (0,)):
+            (lsn, _, ts, meta) = page_log.pl_get_complete_checkpoint(session, *selector)
+            self.assertEqual((lsn, ts, meta), (ckpt2_lsn, 5, 'Checkpoint2'))
+
+        # A selector naming a checkpoint returns that one; a selector between two checkpoints
+        # returns the next one above it; one above the newest finds nothing.
+        self.assertEqual(page_log.pl_get_complete_checkpoint(session, ckpt1_lsn)[3], 'Checkpoint')
+        self.assertEqual(page_log.pl_get_complete_checkpoint(session, ckpt1_lsn + 1)[0], ckpt2_lsn)
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+            lambda: page_log.pl_get_complete_checkpoint(session, ckpt2_lsn + 1), '/WT_NOTFOUND/')
+
+        # Abandoning drops everything written above the newest complete checkpoint: the page
+        # written after it goes, the checkpoint itself and the pages below it stay.
+        put_args_main.backlink_lsn = 0
+        put_args_main.base_lsn = 0
+        handle.plh_put(session, 22, 2, put_args_main, encode_bytes('Hello22'))
+        page22_lsn = put_args_main.lsn
+        self.assertEqual(sorted(handle.plh_get_page_ids(session, page22_lsn)), [21, 22])
+
+        page_log.pl_abandon_checkpoint(session)
+        self.assertEqual(sorted(handle.plh_get_page_ids(session, page22_lsn)), [21])
+        self.assertEqual(page_log.pl_get_complete_checkpoint(session)[0], ckpt2_lsn)
 
         page_log.terminate(session) # dereference

@@ -48,7 +48,7 @@ struct __wt_cache_eviction_controls {
 };
 
 struct __wt_shared_dsk_item {
-    TAILQ_ENTRY(__wt_shared_dsk_item) hashq;
+    LIST_ENTRY(__wt_shared_dsk_item) hashq;
 
     void *data;
     uint32_t data_size;
@@ -97,7 +97,7 @@ struct __wt_shared_dsk_cache {
     wt_shared uint8_t state;
     wt_shared uint64_t readonly_since; /* Seconds when the cache went read-only on step-up. */
 
-    TAILQ_HEAD(__wt_shared_dsk_hash, __wt_shared_dsk_item) * hash;
+    LIST_HEAD(__wt_shared_dsk_hash, __wt_shared_dsk_item) * hash;
     WT_SPINLOCK *hash_locks;
     u_int hash_size;
     u_int hash_lock_size;

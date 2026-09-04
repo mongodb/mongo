@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
+import time
 from wiredtiger import stat
 
 # test_size_stats01.py
@@ -64,6 +65,8 @@ class test_size_stats01(wttest.WiredTigerTestCase):
         if uri is None:
             uri = self.uri
         self.reopen_conn(config='statistics=(fast)')
+        # Make sure obsolete keys are physically removed.
+        self.checkpoint_cleanup()
         session = self.session
 
         config = 'debug=(size_stats)' if enable else None
@@ -107,6 +110,15 @@ class test_size_stats01(wttest.WiredTigerTestCase):
         s['total'] = s['leaf_bytes'] + s['internal_bytes'] + s['overflow_bytes']
         s['overhead'] = s['total'] - (s['key'] + s['value'])
         return s
+
+    def checkpoint_cleanup(self):
+        # Mark the pages with obsolete keys dirty for cleanup.
+        prev = self.get_stat(stat.conn.checkpoint_cleanup_success)
+        self.session.checkpoint('debug=(checkpoint_cleanup=true)')
+        while self.get_stat(stat.conn.checkpoint_cleanup_success) == prev:
+            time.sleep(0.1)
+        # Reconcile dirty pages.
+        self.session.checkpoint()
 
     # Build a tree spanning many leaf pages, then delete most of the keys so the pages are left
     # underfull (WiredTiger does not merge pages back together). Every keep_mod-th key survives, so

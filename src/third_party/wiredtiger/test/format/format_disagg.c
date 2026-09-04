@@ -253,7 +253,7 @@ stepdown_writers_paused(void)
     if (tinfo_list == NULL)
         return (true);
     for (tlp = tinfo_list; *tlp != NULL; ++tlp) {
-        WT_ACQUIRE_READ_WITH_BARRIER(ack, (*tlp)->pause_ack);
+        ack = __wt_atomic_load_bool_v_acquire(&(*tlp)->pause_ack);
         if (!ack)
             return (false);
     }
@@ -273,8 +273,8 @@ stepdown_pause_worker_writes(void)
 
     if (tinfo_list != NULL)
         for (tlp = tinfo_list; *tlp != NULL; ++tlp)
-            WT_RELEASE_WRITE_WITH_BARRIER((*tlp)->pause_ack, false);
-    WT_RELEASE_WRITE_WITH_BARRIER(g.stepdown_pause_writes, true);
+            __wt_atomic_store_bool_v_release(&(*tlp)->pause_ack, false);
+    __wt_atomic_store_bool_v_release(&g.stepdown_pause_writes, true);
 }
 
 /* !!!
@@ -419,7 +419,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
 
     /* Complete the role transition while the workers are read-only. */
     track_msg("[role change] leader -> follower (async)");
-    WT_RELEASE_WRITE_WITH_BARRIER(g.disagg_leader, false);
+    __wt_atomic_store_bool_v_release(&g.disagg_leader, false);
     testutil_check(g.wts_conn->reconfigure(g.wts_conn, "disaggregated=(role=follower)"));
 
     /*
@@ -428,7 +428,7 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
     follower_read_latest_checkpoint();
 
     /* Re-enable worker writes; they now run as follower writes into ingest. */
-    WT_RELEASE_WRITE_WITH_BARRIER(g.stepdown_pause_writes, false);
+    __wt_atomic_store_bool_v_release(&g.stepdown_pause_writes, false);
 
     /* Reset the quit flags now that the threads are joined. */
     __wt_atomic_store_bool_v_relaxed(&g.checkpoint_quit, false);
@@ -450,7 +450,7 @@ disagg_stepdown_thread(void *arg)
 
     args = (STEPDOWN_ARGS *)arg;
     disagg_async_stepdown(args->checkpoint_tid, args->timestamp_tid);
-    WT_RELEASE_WRITE_WITH_BARRIER(args->done, true);
+    __wt_atomic_store_bool_v_release(&args->done, true);
     return (WT_THREAD_RET_VALUE);
 }
 
@@ -469,7 +469,7 @@ disagg_switch_roles(void)
     wt_wrap_open_session(g.wts_conn, &sap, NULL, NULL, &session);
 
     /* Perform step-up or step-down. */
-    WT_RELEASE_WRITE_WITH_BARRIER(g.disagg_leader, !g.disagg_leader);
+    __wt_atomic_store_bool_v_release(&g.disagg_leader, !g.disagg_leader);
 
     if (!g.disagg_leader) {
         /* Stepping down: [leader -> follower]. */

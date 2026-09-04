@@ -408,11 +408,13 @@ retry:
         btree = dhandle != NULL && WT_DHANDLE_BTREE(dhandle) ? dhandle->handle : NULL;
 
         /*
-         * Stop resuming once the walk has reached the end of the tree twice as the tree must have
-         * been fully traversed.
+         * Stop resuming and clear the walk point once the walk has reached the end of the tree
+         * twice as the tree must have been fully traversed.
          */
         if (resume && btree != NULL && btree->evict_walk_ends >= WTI_EVICT_WALK_MAX_ENDS) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_walk_complete);
+            WT_WITH_DHANDLE(session, dhandle, ret = __evict_clear_walk(session, true));
+            WT_ERR(ret);
             resume = false;
         }
         if (!resume) {

@@ -15,6 +15,8 @@ static int __disagg_check_meta_fields(
 
 static int __disagg_adopt_deferred_checkpoint_meta(WT_SESSION_IMPL *, const char *, size_t);
 
+#define WT_DISAGG_URI_IS_SYSTEM(uri) (WT_IS_URI_METADATA(uri) || WT_IS_URI_HS(uri))
+
 /*
  * __layered_create_missing_ingest_table --
  *     Create a missing ingest table from an existing layered table configuration.
@@ -576,30 +578,6 @@ err:
     __wt_free(session, sh_merge);
     return (ret);
 }
-#else
-/*
- * __disagg_check_meta_id --
- *     Compare the btree id of a file entry between the local and the shared metadata, panicking
- *     when they differ.
- */
-static int
-__disagg_check_meta_id(
-  WT_SESSION_IMPL *session, const char *uri, const char *md_value, const char *sh_value)
-{
-    WT_CONFIG_ITEM md_cval, sh_cval;
-
-    WT_RET(__wt_config_getones(session, sh_value, "id", &sh_cval));
-    WT_RET(__wt_config_getones(session, md_value, "id", &md_cval));
-
-    /* An id mismatch means the checkpoint would be read under the wrong btree identity. */
-    if (sh_cval.val != md_cval.val)
-        WT_RET_PANIC(session, EINVAL,
-          "checkpoint pickup metadata mismatch for \"%s\": the value of \"id\" differs between "
-          "the local (\"%.*s\") and the shared (\"%.*s\") metadata",
-          uri, (int)md_cval.len, md_cval.str, (int)sh_cval.len, sh_cval.str);
-    return (0);
-}
-#endif /* HAVE_DIAGNOSTIC */
 
 /*
  * __disagg_check_meta_match --
@@ -620,17 +598,8 @@ __disagg_check_meta_match(WT_SESSION_IMPL *session, WT_CURSOR *sh_cursor, WT_CUR
      * Skip system tables with fixed identities: their local entries are created on each node rather
      * than copied from the shared metadata, so their fields can legitimately differ.
      */
-    if (WT_IS_URI_METADATA(sh_key) || WT_IS_URI_HS(sh_key))
+    if (WT_DISAGG_URI_IS_SYSTEM(sh_key))
         return (0);
-
-    /*
-     * Non-diagnostic builds validate only the btree id of file entries; diagnostic builds compare
-     * every field of every entry.
-     */
-#ifndef HAVE_DIAGNOSTIC
-    if (!WT_PREFIX_MATCH(sh_key, "file:"))
-        return (0);
-#endif
 
     WT_RET(sh_cursor->get_value(sh_cursor, &sh_value));
     WT_RET(md_cursor->get_value(md_cursor, &md_value));
@@ -639,12 +608,9 @@ __disagg_check_meta_match(WT_SESSION_IMPL *session, WT_CURSOR *sh_cursor, WT_CUR
     if (strcmp(sh_value, md_value) == 0)
         return (0);
 
-#ifdef HAVE_DIAGNOSTIC
     return (__disagg_check_meta_all_fields(session, sh_key, md_value, sh_value));
-#else
-    return (__disagg_check_meta_id(session, sh_key, md_value, sh_value));
-#endif
 }
+#endif /* HAVE_DIAGNOSTIC */
 
 /*
  * The btree IDs of every stable file the local metadata will hold once this pickup has applied the
@@ -706,15 +672,51 @@ err:
 }
 
 /*
+ * __disagg_file_meta_fields --
+ *     Extract the checkpoint and id fields from a file's configuration in a single pass, stopping
+ *     as soon as both are found: stored metadata is collapsed, so keys are unique.
+ */
+static int
+__disagg_file_meta_fields(
+  WT_SESSION_IMPL *session, const char *value, WT_CONFIG_ITEM *ckpt, WT_CONFIG_ITEM *id)
+{
+    WT_CONFIG parser;
+    WT_CONFIG_ITEM ckey, cval;
+    WT_DECL_RET;
+    bool ckpt_found, id_found;
+
+    WT_CLEAR(*ckpt);
+    WT_CLEAR(*id);
+    ckpt_found = id_found = false;
+
+    __wt_config_init(session, &parser, value);
+    while ((ret = __wt_config_next(&parser, &ckey, &cval)) == 0) {
+        if (WT_CONFIG_LIT_MATCH("checkpoint", ckey)) {
+            *ckpt = cval;
+            ckpt_found = true;
+        } else if (WT_CONFIG_LIT_MATCH("id", ckey)) {
+            *id = cval;
+            id_found = true;
+        }
+        if (ckpt_found && id_found)
+            break;
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    return (ckpt_found && id_found ? 0 : WT_NOTFOUND);
+}
+
+/*
  * __disagg_update_file_meta --
  *     Update an existing file: entry in the local metadata table with checkpoint information from
- *     the shared metadata, then mark stale data handles as outdated.
+ *     the shared metadata, then mark stale data handles as outdated. Panics when the btree id
+ *     differs between the local and the shared entry.
  */
 static int
 __disagg_update_file_meta(
   WT_SESSION_IMPL *session, WT_CURSOR *sh_file_cursor, WT_CURSOR *md_file_cursor)
 {
-    WT_CONFIG_ITEM cval, cval_cur;
+    WT_CONFIG_ITEM cval, cval_cur, md_id, sh_id;
     WT_DECL_ITEM(old_uri_buf);
     WT_DECL_RET;
     char *cfg_ret, *current_value_copy;
@@ -729,7 +731,7 @@ __disagg_update_file_meta(
     WT_ERR(__wt_scr_alloc(session, 0, &old_uri_buf));
     WT_ERR(sh_file_cursor->get_key(sh_file_cursor, &sh_file_key));
     WT_ERR(sh_file_cursor->get_value(sh_file_cursor, &metadata_value));
-    WT_ERR(__wt_config_getones(session, metadata_value, "checkpoint", &cval));
+    WT_ERR(__disagg_file_meta_fields(session, metadata_value, &cval, &sh_id));
 
     /* Check that the local metadata cursor is positioned at the same key. */
     WT_ERR(md_file_cursor->get_key(md_file_cursor, &md_file_key));
@@ -738,7 +740,18 @@ __disagg_update_file_meta(
     WT_ERR(md_file_cursor->get_value(md_file_cursor, &current_value));
     /* Copy before further cursor ops; also used as discard-check input. */
     WT_ERR(__wt_strdup(session, current_value, &current_value_copy));
-    WT_ERR(__wt_config_getones(session, current_value_copy, "checkpoint", &cval_cur));
+    WT_ERR(__disagg_file_meta_fields(session, current_value_copy, &cval_cur, &md_id));
+
+    /*
+     * An id mismatch means the checkpoint would be read under the wrong btree identity, except for
+     * system tables whose ids can legitimately differ between nodes.
+     */
+    if (sh_id.val != md_id.val && !WT_DISAGG_URI_IS_SYSTEM(sh_file_key))
+        WT_ERR_PANIC(session, EINVAL,
+          "checkpoint pickup metadata mismatch for \"%s\": the value of \"id\" differs between "
+          "the local (\"%.*s\") and the shared (\"%.*s\") metadata",
+          sh_file_key, (int)md_id.len, md_id.str, (int)sh_id.len, sh_id.str);
+
     /* Nothing to do if the local checkpoint already matches the shared one. */
     if (__wt_string_slice_cmp(cval_cur.str, cval_cur.len, cval.str, cval.len) == 0)
         goto err;
@@ -982,10 +995,11 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
             }
         }
 
-        /* Verify that the immutable metadata fields agree before adopting the new checkpoint. */
+#ifdef HAVE_DIAGNOSTIC
         for (i = 0; i < WT_DISAGG_CURSOR_COUNT; i++)
             if (md_has[i] && sh_has[i])
                 WT_ERR(__disagg_check_meta_match(session, sh_cursors[i], md_cursors[i]));
+#endif
 
         /*
          * Reconcile entries for this URI scheme and table.
@@ -1773,7 +1787,8 @@ __disagg_pick_up_checkpoint(
      */
 
     WT_ERR(__wti_disagg_fetch_shared_meta(session, ckpt_meta, &metadata_buf));
-    WT_ERR(__wt_disagg_parse_meta(session, &metadata_buf, &metadata));
+    WT_ERR_MSG_CHK(session, __wt_disagg_parse_meta(session, &metadata_buf, &metadata),
+      "Failed to parse shared metadata for checkpoint %" PRIu64, ckpt_meta->metadata_lsn);
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Picking up disaggregated storage checkpoint: metadata_lsn=%" PRIu64 ", timestamp=%" PRIu64
@@ -1813,7 +1828,8 @@ __disagg_pick_up_checkpoint(
         conn->disaggregated_storage.base_write_gen_missing = true;
 
     /* Load crypt key data with the key provider extension, if any. */
-    WT_ERR(__wti_disagg_load_crypt_key(session, &metadata));
+    WT_ERR_MSG_CHK(session, __wti_disagg_load_crypt_key(session, &metadata),
+      "Failed to load encryption keys for checkpoint %" PRIu64, ckpt_meta->metadata_lsn);
 
     /*
      * Part 2: Merge the checkpoint's metadata into the local metadata. The merge runs under
@@ -1824,7 +1840,8 @@ __disagg_pick_up_checkpoint(
      */
     WT_WITH_SCHEMA_LOCK(
       session, ret = __disagg_adopt_checkpoint_meta(session, ckpt_meta, &metadata, is_startup));
-    WT_ERR(ret);
+    WT_ERR_MSG_CHK(session, ret, "Failed to merge checkpoint %" PRIu64 " into local metadata",
+      ckpt_meta->metadata_lsn);
 
     /*
      * A no-epoch checkpoint clears the whole queue. An epoch-world node never picks up a no-epoch
@@ -1877,8 +1894,7 @@ err:
     } else {
         WT_STAT_CONN_INCR(session, layered_table_manager_checkpoints_disagg_pick_up_failed);
         __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_ERROR,
-          "Failed to pick up disaggregated storage checkpoint for metadata_lsn=%" PRIu64 ": ret=%d",
-          ckpt_meta->metadata_lsn, ret);
+          "Failed to pick up checkpoint %" PRIu64, ckpt_meta->metadata_lsn);
     }
 
     __wt_buf_free(session, &metadata_buf);

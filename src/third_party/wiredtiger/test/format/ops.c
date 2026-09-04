@@ -446,7 +446,7 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
          */
         if (stepdown_running) {
             bool stepdown_complete;
-            WT_ACQUIRE_READ_WITH_BARRIER(stepdown_complete, stepdown_args.done);
+            stepdown_complete = __wt_atomic_load_bool_v_acquire(&stepdown_args.done);
             if (stepdown_complete) {
                 stepdown_running = false;
                 fourths = DISAGG_SWITCH_FOLLOWER_OPS_SEC * 4;
@@ -738,7 +738,7 @@ commit_transaction(TINFO *tinfo, bool prepared)
      * Remember our oldest commit timestamp. Updating the thread's commit timestamp allows read,
      * oldest and stable timestamps to advance, ensure we don't race.
      */
-    WT_RELEASE_WRITE_WITH_BARRIER(tinfo->commit_ts, ts);
+    __wt_atomic_store_uint64_release(&tinfo->commit_ts, ts);
 
     trace_uri_op(tinfo, NULL, "commit read-ts=%" PRIu64 ", commit-ts=%" PRIu64, tinfo->read_ts,
       tinfo->commit_ts);
@@ -1178,7 +1178,7 @@ ops(void *arg)
          * without a throttle, can monopolize the page log's reader-writer locks and starve the
          * step-down checkpoint's writes.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(pause_writes, g.stepdown_pause_writes);
+        pause_writes = __wt_atomic_load_bool_v_acquire(&g.stepdown_pause_writes);
         if (GV(OPS_THROTTLE) || pause_writes) {
             /* Sleep first to avoid burst when all threads start. */
             throttle_delay = mmrand(&tinfo->extra_rnd, 0, throttle_delay_max);
@@ -1258,11 +1258,11 @@ rollback_retry:
          * acknowledgment guarantees this thread has no unresolved writes and, because the operation
          * selection below sees the pause, that it will not write again until the pause is lifted.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(pause_writes, g.stepdown_pause_writes);
+        pause_writes = __wt_atomic_load_bool_v_acquire(&g.stepdown_pause_writes);
         if (!pause_writes)
-            WT_RELEASE_WRITE_WITH_BARRIER(tinfo->pause_ack, false);
+            __wt_atomic_store_bool_v_release(&tinfo->pause_ack, false);
         else if (!intxn)
-            WT_RELEASE_WRITE_WITH_BARRIER(tinfo->pause_ack, true);
+            __wt_atomic_store_bool_v_release(&tinfo->pause_ack, true);
 
         /*
          * If not in a transaction and in a timestamp world, start a transaction (which is always at
@@ -1345,7 +1345,7 @@ rollback_retry:
          */
         max_rows = TV(RUNS_ROWS);
         if (table->type != ROW && !table->mirror)
-            WT_ACQUIRE_READ_WITH_BARRIER(max_rows, table->rows_current);
+            max_rows = __wt_atomic_load_uint32_acquire(&table->rows_current);
         tinfo->keyno = mmrand(&tinfo->data_rnd, 1, (u_int)max_rows);
         if (TV(OPS_PARETO)) {
             tinfo->keyno = testutil_pareto(tinfo->keyno, (u_int)max_rows, TV(OPS_PARETO_SKEW));
@@ -1717,7 +1717,7 @@ apply_bounds(WT_CURSOR *cursor, TABLE *table, WT_RAND_STATE *rnd)
 
     /* Set up the default key buffer. */
     key_gen_init(&key);
-    WT_ACQUIRE_READ_WITH_BARRIER(max_rows, table->rows_current);
+    max_rows = __wt_atomic_load_uint32_acquire(&table->rows_current);
 
     /*
      * Generate a random lower key and apply to the lower bound or upper bound depending on the
@@ -1811,7 +1811,7 @@ wts_read_scan(TABLE *table, void *args)
     wt_wrap_open_cursor(session, table->uri, NULL, &cursor);
 
     /* Scan the first 50 rows for tiny, debugging runs, then scan a random subset of records. */
-    WT_ACQUIRE_READ_WITH_BARRIER(max_rows, table->rows_current);
+    max_rows = __wt_atomic_load_uint32_acquire(&table->rows_current);
     for (keyno = 0; keyno < max_rows;) {
         if (++keyno > 50)
             keyno += mmrand(rnd, 1, WT_THOUSAND);
@@ -2230,7 +2230,7 @@ col_insert_resolve(TABLE *table, void *arg)
      * Process the existing records and advance the last row count until we can't go further.
      */
     do {
-        WT_ACQUIRE_READ_WITH_BARRIER(max_rows, table->rows_current);
+        max_rows = __wt_atomic_load_uint32_acquire(&table->rows_current);
         for (i = 0, p = cip->insert_list; i < WT_ELEMENTS(cip->insert_list); ++i, ++p) {
             /*
              * A thread may have allocated a record number that is now less than or equal to the

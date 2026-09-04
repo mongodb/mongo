@@ -325,7 +325,7 @@ CONFIG configuration_list[] = {
 
 {"runs.mirror", "mirror tables", C_BOOL | C_IGNORE | C_TABLE, 0, 0, 0}
 
-{"runs.ops", "operations per run", 0x0, 0, M(2), M(100)}
+{"runs.ops", "operations per run", 0x0, 0, M(2), UINT_MAX}
 
 {"runs.predictable_replay", "configure predictable replay", C_BOOL, 0, 0, 0}
 

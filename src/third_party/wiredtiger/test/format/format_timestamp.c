@@ -42,7 +42,7 @@ timestamp_minimum_committed(void)
         return replay_maximum_committed();
 
     /* A barrier additionally prevents using cache values here. */
-    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    ts = __wt_atomic_load_uint64_acquire(&g.timestamp);
     if (tinfo_list != NULL)
         for (tlp = tinfo_list; *tlp != NULL; ++tlp) {
             commit_ts = (*tlp)->commit_ts;
@@ -84,9 +84,9 @@ timestamp_sync_threads_commit_ts(void)
     if (tinfo_list == NULL)
         return;
 
-    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    ts = __wt_atomic_load_uint64_acquire(&g.timestamp);
     for (tlp = tinfo_list; *tlp != NULL; ++tlp)
-        WT_RELEASE_WRITE_WITH_BARRIER((*tlp)->commit_ts, ts);
+        __wt_atomic_store_uint64_release(&(*tlp)->commit_ts, ts);
 }
 
 /*
@@ -153,7 +153,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          * For predictable replay, our end state is to have the stable timestamp represent a precise
          * number of operations.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(stop_timestamp, g.stop_timestamp);
+        stop_timestamp = __wt_atomic_load_uint64_acquire(&g.stop_timestamp);
         if (stable_timestamp > stop_timestamp && stop_timestamp != WT_TS_NONE)
             stable_timestamp = stop_timestamp;
 

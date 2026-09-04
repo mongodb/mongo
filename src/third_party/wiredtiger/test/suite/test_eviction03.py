@@ -31,8 +31,10 @@ from eviction_util import eviction_util
 from statistics import mean
 from suite_subprocess import suite_subprocess
 import wiredtiger
+import wttest
 
 # Verify the disk footprint is reduced after eviction has removed obsolete time window information.
+@wttest.skip_for_hook("disagg", "eviction does not remove obsolete time windows for disaggregated tables")
 class test_eviction03(eviction_util, suite_subprocess):
 
     def verify_dump_pages(self, uri):

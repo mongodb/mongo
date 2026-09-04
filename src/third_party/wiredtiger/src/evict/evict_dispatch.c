@@ -295,7 +295,6 @@ __wti_evict_app_assist_worker(
     WT_CONNECTION_IMPL *conn = S2C(session);
     WT_EVICT *evict = conn->evict;
     uint64_t time_start = 0;
-    uint64_t initial_progress;
     WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
 
@@ -330,7 +329,6 @@ __wti_evict_app_assist_worker(
      * namely, the busy return and empty eviction queue. We do not need the calling functions to
      * have to deal with internal eviction return codes.
      */
-    initial_progress = __wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress);
     while (true) {
         /*
          * Check if this thread is likely causing problems and should be rolled back. Recovery and
@@ -365,25 +363,17 @@ __wti_evict_app_assist_worker(
         }
 
         /*
-         * Check if we have become busy.
-         *
-         * If we're busy (because of the transaction check we just did or because our caller is
-         * waiting on a longer-than-usual event such as a page read), and the cache level drops
-         * below 100%, limit the work to 5 evictions and return. If that's not the case, we can do
-         * more.
+         * Check if we have become busy, either because of the transaction check we just did or
+         * because our caller is waiting on a longer-than-usual event such as a page read. A busy
+         * caller ignores the dirty trigger and stops after a single successful eviction.
          */
         if (!busy && __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) != WT_TXN_NONE &&
           __wt_atomic_load_uint64_v_relaxed(&txn_global->current) !=
             __wt_atomic_load_uint64_v_relaxed(&txn_global->oldest_id))
             busy = true;
-        uint64_t max_progress = busy ? 5 : 20;
 
         /* See if eviction is still needed. */
-        double pct_full;
-        if (!__wt_evict_needed(session, busy, readonly, true, &pct_full) ||
-          (pct_full < 100.0 &&
-            (__wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress) >
-              initial_progress + max_progress)))
+        if (!__wt_evict_needed(session, busy, readonly, true, NULL))
             break;
 
         if (!__evict_check_user_ok_with_eviction(session, interruptible))

@@ -1228,7 +1228,7 @@ err:
     }
 
     if (ret == 0 && bulk)
-        WT_STAT_CONN_INCR_ATOMIC(session, cursor_bulk_count);
+        WT_STAT_CONN_INCR(session, cursor_bulk_count);
 
     return (ret);
 }

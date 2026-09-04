@@ -35,11 +35,13 @@
 /*
  * This is a stripped-down version of the FreeBSD sys/queue.h include file.
  *
- * WiredTiger only uses the TAILQ macros (we've gotten into trouble in the past
- * by trying to use simpler queues and subsequently discovering a list we didn't
- * think would ever get to be large could, under some workloads, become large,
- * and the linear performance for removal of elements from simpler macros proved
- * to be more trouble than the memory savings were worth.
+ * WiredTiger avoids the singly-linked SLIST/STAILQ macros (we've gotten into trouble in the
+ * past by trying to use simpler queues and subsequently discovering a list we didn't think
+ * would ever get to be large could, under some workloads, become large, and the linear
+ * performance for removal of elements from those macros proved to be more trouble than the
+ * memory savings were worth). LIST is doubly-linked like TAILQ and removal is the same O(1)
+ * operation; it only gives up O(1) insertion at the tail and reverse traversal, so it is fine
+ * for callers that only ever insert at the head.
  *
  * We #undef all of the macros because there are incompatible versions of this
  * file and these macros on various systems.  What makes the problem worse is
@@ -50,6 +52,20 @@
  * same macros in Vc7\PlatformSDK\Include\WinNT.h.  Make sure we use ours.
  */
 #undef QMD_SAVELINK
+#undef LIST_EMPTY
+#undef LIST_ENTRY
+#undef LIST_FIRST
+#undef LIST_FOREACH
+#undef LIST_FOREACH_SAFE
+#undef LIST_HEAD
+#undef LIST_HEAD_INITIALIZER
+#undef LIST_INIT
+#undef LIST_INSERT_AFTER
+#undef LIST_INSERT_BEFORE
+#undef LIST_INSERT_HEAD
+#undef LIST_NEXT
+#undef LIST_REMOVE
+#undef LIST_SWAP
 #undef QMD_TAILQ_CHECK_HEAD
 #undef QMD_TAILQ_CHECK_NEXT
 #undef QMD_TAILQ_CHECK_PREV
@@ -102,6 +118,86 @@
 #else
 #define	QUEUE_TYPEOF(type) struct type
 #endif
+
+/*
+ * List declarations.
+ */
+#define	LIST_HEAD(name, type)						\
+struct name {								\
+	struct type *lh_first;	/* first element */			\
+}
+
+#define	LIST_HEAD_INITIALIZER(head)					\
+	{ NULL }
+
+#define	LIST_ENTRY(type)						\
+struct {								\
+	struct type *le_next;	/* next element */			\
+	struct type **le_prev;	/* address of previous next element */	\
+}
+
+/*
+ * List functions.
+ */
+#define	LIST_EMPTY(head)	((head)->lh_first == NULL)
+
+#define	LIST_FIRST(head)	((head)->lh_first)
+
+#define	LIST_FOREACH(var, head, field)					\
+	for ((var) = LIST_FIRST((head));				\
+	    (var);							\
+	    (var) = LIST_NEXT((var), field))
+
+#define	LIST_FOREACH_SAFE(var, head, field, tvar)			\
+	for ((var) = LIST_FIRST((head));				\
+	    (var) && ((tvar) = LIST_NEXT((var), field), 1);		\
+	    (var) = (tvar))
+
+#define	LIST_INIT(head) do {						\
+	LIST_FIRST((head)) = NULL;					\
+} while (0)
+
+#define	LIST_INSERT_AFTER(listelm, elm, field) do {			\
+	if ((LIST_NEXT((elm), field) = LIST_NEXT((listelm), field)) != NULL)\
+		LIST_NEXT((listelm), field)->field.le_prev =		\
+		    &LIST_NEXT((elm), field);				\
+	LIST_NEXT((listelm), field) = (elm);				\
+	(elm)->field.le_prev = &LIST_NEXT((listelm), field);		\
+} while (0)
+
+#define	LIST_INSERT_BEFORE(listelm, elm, field) do {			\
+	(elm)->field.le_prev = (listelm)->field.le_prev;		\
+	LIST_NEXT((elm), field) = (listelm);				\
+	*(listelm)->field.le_prev = (elm);				\
+	(listelm)->field.le_prev = &LIST_NEXT((elm), field);		\
+} while (0)
+
+#define	LIST_INSERT_HEAD(head, elm, field) do {			\
+	if ((LIST_NEXT((elm), field) = LIST_FIRST((head))) != NULL)	\
+		LIST_FIRST((head))->field.le_prev =			\
+		    &LIST_NEXT((elm), field);				\
+	LIST_FIRST((head)) = (elm);					\
+	(elm)->field.le_prev = &LIST_FIRST((head));			\
+} while (0)
+
+#define	LIST_NEXT(elm, field)	((elm)->field.le_next)
+
+#define	LIST_REMOVE(elm, field) do {					\
+	if (LIST_NEXT((elm), field) != NULL)				\
+		LIST_NEXT((elm), field)->field.le_prev =		\
+		    (elm)->field.le_prev;				\
+	*(elm)->field.le_prev = LIST_NEXT((elm), field);		\
+} while (0)
+
+#define	LIST_SWAP(head1, head2, type, field) do {			\
+	QUEUE_TYPEOF(type) *swap_tmp = (head1)->lh_first;		\
+	(head1)->lh_first = (head2)->lh_first;				\
+	(head2)->lh_first = swap_tmp;					\
+	if ((swap_tmp = (head1)->lh_first) != NULL)			\
+		swap_tmp->field.le_prev = &(head1)->lh_first;		\
+	if ((swap_tmp = (head2)->lh_first) != NULL)			\
+		swap_tmp->field.le_prev = &(head2)->lh_first;		\
+} while (0)
 
 /*
  * Tail queue declarations.

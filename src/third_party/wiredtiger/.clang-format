@@ -65,6 +65,7 @@ FixNamespaceComments: true
 ForEachMacros:
   - Q_FOREACH
   - BOOST_FOREACH
+  - LIST_FOREACH
   - TAILQ_FOREACH
   - WT_CELL_FOREACH
   - WT_CELL_FOREACH_ADDR
