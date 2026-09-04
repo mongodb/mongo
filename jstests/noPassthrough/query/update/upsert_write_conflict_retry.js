@@ -150,14 +150,10 @@ describe("upsert insert write-conflict retry", function () {
         const session = primary.startSession();
         const sessionDb = session.getDatabase("test");
 
-        // Inject more than one conflict for margin against any other modifying op consuming a
-        // firing; in a transaction the op surfaces the first conflict without retrying.
-        const fp = configureFailPoint(
-            primary,
-            "WTWriteConflictException",
-            {},
-            {times: kWriteConflictCount},
-        );
+        // Use alwaysOn so a background writer cannot drain a counted budget before the
+        // transaction's update observes a conflict; in a transaction the op surfaces the first
+        // conflict without retrying, and fp.off() below ends the storm immediately after.
+        const fp = configureFailPoint(primary, "WTWriteConflictException");
         session.startTransaction();
         const res = sessionDb.runCommand({
             update: collName,
