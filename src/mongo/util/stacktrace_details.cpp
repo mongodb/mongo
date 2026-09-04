@@ -6,14 +6,16 @@
 #ifdef __linux__
 
 #include "mongo/base/parse_number.h"
+#include "mongo/logv2/log.h"
 
 #include <unistd.h>
 
-#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+#include <boost/optional.hpp>
 #include <sys/syscall.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo::stacktrace_details {
 namespace {
@@ -34,11 +36,15 @@ int terminateThread(int pid, int tid, int sig) {
 
 void iterateTids(const std::function<void(int)>& f) {
     int selfTid = getThreadId();
-    auto iter = boost::filesystem::directory_iterator{taskDir()};
+    boost::filesystem::directory_iterator iter{taskDir()};
     for (const auto& entry : iter) {
         int tid;
-        if (!NumberParser{}(entry.path().filename().string(), &tid).isOK())
-            continue;  // Ignore non-integer names (e.g. "." or "..").
+        if (!NumberParser{}(entry.path().filename().string(), &tid).isOK()) {
+            LOGV2_WARNING(13424300,
+                          "Failed to parse thread id from procfs entry, skipping",
+                          "entry"_attr = entry.path().string());
+            continue;
+        }
         if (tid == selfTid)
             continue;  // skip the current thread
         f(tid);
