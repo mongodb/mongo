@@ -5,6 +5,7 @@
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -147,6 +148,34 @@ TEST(DiscretePercentileTest, Basic) {
     ASSERT_EQ(90.0, pctls[4]);
     ASSERT_EQ(99.0, pctls[5]);
     ASSERT_EQ(100.0, pctls[6]);
+}
+
+/**
+ * Direct tests for the shared discrete rank computation, which DiscretePercentile and TDigest both
+ * delegate to.
+ */
+TEST(DiscretePercentileTest, ComputeDiscreteRank) {
+    // p >= 1 maps to the maximum rank.
+    ASSERT_EQ(99, computeDiscreteRank(100, 1.0));
+    ASSERT_EQ(99, computeDiscreteRank(100, 1.5));
+
+    // Otherwise the rank is ceil(n * p) - 1, floored at 0.
+    ASSERT_EQ(0, computeDiscreteRank(100, 0.0));
+    ASSERT_EQ(0, computeDiscreteRank(100, 0.01));
+    ASSERT_EQ(9, computeDiscreteRank(100, 0.1));
+    ASSERT_EQ(49, computeDiscreteRank(100, 0.5));
+    ASSERT_EQ(89, computeDiscreteRank(100, 0.9));
+    ASSERT_EQ(98, computeDiscreteRank(100, 0.99));
+    ASSERT_EQ(99, computeDiscreteRank(100, 0.999));
+
+    // Small dataset edge cases.
+    ASSERT_EQ(0, computeDiscreteRank(1, 1.0));
+    ASSERT_EQ(0, computeDiscreteRank(1, 0.5));
+}
+
+TEST(DiscretePercentileTest, ComputeDiscreteRankRejectsNonFiniteP) {
+    ASSERT_TASSERT_CODE(computeDiscreteRank(100, std::numeric_limits<double>::quiet_NaN()),
+                        13448900);
 }
 
 TEST(DiscretePercentileTest, ComputeMultiplePercentilesAtOnce) {

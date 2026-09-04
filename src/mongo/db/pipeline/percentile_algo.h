@@ -4,8 +4,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/util/represent_as_util.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cmath>
@@ -26,7 +26,14 @@ inline int computeDiscreteRank(int n, double p) {
     if (p >= 1.0) {
         return n - 1;
     }
-    return std::max(0, representAsChecked<int>(std::ceil(n * p)) - 1);
+    const auto ceilRank = std::ceil(n * p);
+    // 'p' is validated finite and within [0, 1] in parseP(), so 'ceilRank' is an exact
+    // non-negative int. Keep the impossible non-finite case loud (as representAsChecked did)
+    // instead of silently returning 0, but without its optional round-trip on this hot path.
+    tassert(13448900,
+            "non-finite percentile rank computed; 'p' must be validated to [0, 1] upstream",
+            std::isfinite(ceilRank));
+    return std::max(0, static_cast<int>(ceilRank) - 1);
 }
 
 /**
