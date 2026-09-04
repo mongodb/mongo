@@ -382,29 +382,6 @@ class _TransitionThread(threading.Thread):
         # We are doing a rolling restart of the replica set members. This implies to restart
         # first all the secondaries, then choose randomly a secondary for stepping up, and
         # finally restart the old primary.
-        def step_up_secondary():
-            while secondaries:
-                chosen = random.choice(secondaries)
-                self.logger.info(
-                    "Chose secondary on port %d of replica set '%s' for step up attempt.",
-                    chosen.port,
-                    rs_fixture.replset_name,
-                )
-                if not rs_fixture.stepup_node(chosen, self._auth_options):
-                    self.logger.info(
-                        "Attempt to step up secondary on port %d of replica set '%s' failed.",
-                        chosen.port,
-                        rs_fixture.replset_name,
-                    )
-                    secondaries.remove(chosen)
-                else:
-                    self.logger.info(
-                        "Successfully stepped up the secondary on port %d of replica set '%s'.",
-                        chosen.port,
-                        rs_fixture.replset_name,
-                    )
-                    return chosen
-            return None
 
         rs_name = rs_fixture.replset_name
         self.logger.info(
@@ -420,11 +397,18 @@ class _TransitionThread(threading.Thread):
             for node in secondaries:
                 self._restart_node(node, rs_fixture, enable_maintenance_mode, is_config_server)
             self.logger.info("Finished restarting secondaries of replica set '%s'.", rs_name)
-            new_primary = step_up_secondary()
-            if new_primary is None:
-                raise errors.ServerFailure(
-                    "Failed to step up a secondary in replica set '{}'.".format(rs_name)
-                )
+            chosen_secondary = random.choice(secondaries)
+            self.logger.info(
+                "Chose secondary on port %d of replica set '%s' for step up attempt.",
+                chosen_secondary.port,
+                rs_fixture.replset_name,
+            )
+            self._stepup_node_with_timeout(chosen_secondary, rs_fixture)
+            self.logger.info(
+                "Successfully stepped up the secondary on port %d of replica set '%s'.",
+                chosen_secondary.port,
+                rs_fixture.replset_name,
+            )
         self._restart_node(old_primary, rs_fixture, enable_maintenance_mode, is_config_server)
         self.logger.info("Finished rolling restart of replica set '%s'.", rs_name)
 
