@@ -44,8 +44,11 @@ namespace {
 using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
 
-// The log emitted for a mismatch when 'continuousInternodeValidationFatalOnMismatch' is disabled.
+// The log emitted for every mismatch, whether the node goes on to abort or to continue.
 constexpr int32_t kMismatchLogId = 12882800;
+// The log emitted when a mismatch that would have been fatal is survived because the node is still
+// starting up.
+constexpr int32_t kContinuingStartupLogId = 13445800;
 // The 'fieldLevelDiff' logged when the two documents the diff is taken over are identical.
 constexpr std::string_view kEmptyFieldLevelDiff = "{}";
 // The 'fieldLevelDiff' logged for deletes, where no diff can be derived.
@@ -198,6 +201,14 @@ protected:
                 actualHash,
                 "u",
                 doc_diff::computeInlineDiff(preImage, postImage)->toString()};
+    }
+
+    /**
+     * Moves this node into 'state', which the mismatch handling reads to tell a node that is still
+     * starting up from one that has reached steady state.
+     */
+    void setMemberState(MemberState::MS state) {
+        ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState(state)));
     }
 
     /**
@@ -495,6 +506,116 @@ DEATH_TEST_F(VerifyValidationHashDeathTest, MismatchedHashFasserts, "12851600") 
 
 TEST_F(VerifyValidationHashTest, FatalOnMismatchDefaultsToEnabled) {
     EXPECT_TRUE(continuousInternodeValidationFatalOnMismatch.load());
+}
+
+using VerifyValidationHashStartupTest = FatalOnMismatchTest<VerifyValidationHashTest>;
+
+// A mismatch that reproduces from the last checkpoint is hit again on every restart, so making it
+// fatal during startup would be a crash loop the node can never start out of. Startup logs it and
+// carries on instead, even though the fatal behaviour is enabled.
+TEST_F(VerifyValidationHashStartupTest, MismatchDuringStartupOnlyLogs) {
+    int64_t nextId = 1;
+    for (const auto state : {MemberState::RS_STARTUP, MemberState::RS_STARTUP2}) {
+        setMemberState(state);
+
+        // Each iteration uses its own '_id' and record id so it applies to an untouched slot.
+        const RecordId rid(nextId);
+        const BSONObj doc = BSON("_id" << nextId << "x" << 100);
+        ++nextId;
+        const int64_t actualHash = computeDocValidationHash(doc);
+        OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+            nextOpTime(), _nss, _uuid, doc, rid, corrupt(actualHash));
+
+        unittest::LogCaptureGuard logs;
+        ASSERT_OK(runOpSteadyState(op));
+        logs.stop();
+
+        assertDocumentIs(rid, doc);
+        // The same log a fatal mismatch emits.
+        EXPECT_EQ(logs.countBSONContainingSubset(
+                      BSON("id" << kMismatchLogId << "attr"
+                                << BSON("expectedHash" << corrupt(actualHash) << "actualHash"
+                                                       << actualHash << "opType" << "i"))),
+                  1)
+            << "memberState: " << MemberState(state).toString();
+        // The decision to survive it is recorded on its own line.
+        EXPECT_EQ(logs.countBSONContainingSubset(
+                      BSON("id" << kContinuingStartupLogId << "attr"
+                                << BSON("memberState" << MemberState(state).toString()))),
+                  1)
+            << "memberState: " << MemberState(state).toString();
+    }
+}
+
+// The startup exemption only covers startup. Once the node reaches steady state the same mismatch
+// is fatal again, and the shared mismatch log is emitted on the way out: the death pattern matches
+// that log rather than the fassert, which 'MismatchedHashFasserts' already covers.
+DEATH_TEST_F(VerifyValidationHashDeathTest, MismatchAfterStartupFasserts, "12882800") {
+    setMemberState(MemberState::RS_SECONDARY);
+
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
+    std::ignore = runOpSteadyState(op);
+}
+
+// The outcome is chosen per entry from the member state at the time, not latched by the first
+// mismatch. The same node survives a mismatch while it is starting up and then aborts on the next
+// one once it has left startup, with each entry logged the way its own state calls for.
+DEATH_TEST_F(VerifyValidationHashDeathTest,
+             MemberStateChangeBetweenMismatchesIsHonoured,
+             "12851600") {
+    setMemberState(MemberState::RS_STARTUP2);
+
+    const RecordId startupRid(1);
+    const BSONObj startupDoc = BSON("_id" << 1 << "x" << 100);
+    OplogEntry startupOp =
+        makeInsertOplogEntryWithRecordIdAndHash(nextOpTime(),
+                                                _nss,
+                                                _uuid,
+                                                startupDoc,
+                                                startupRid,
+                                                corrupt(computeDocValidationHash(startupDoc)));
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(runOpSteadyState(startupOp));
+    logs.stop();
+
+    // Survived, and said so.
+    assertDocumentIs(startupRid, startupDoc);
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMismatchLogId)), 1);
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kContinuingStartupLogId)), 1);
+
+    setMemberState(MemberState::RS_SECONDARY);
+
+    // The same kind of mismatch, on a node that is no longer starting up, is fatal.
+    const RecordId steadyRid(2);
+    const BSONObj steadyDoc = BSON("_id" << 2 << "x" << 200);
+    OplogEntry steadyOp =
+        makeInsertOplogEntryWithRecordIdAndHash(nextOpTime(),
+                                                _nss,
+                                                _uuid,
+                                                steadyDoc,
+                                                steadyRid,
+                                                corrupt(computeDocValidationHash(steadyDoc)));
+    std::ignore = runOpSteadyState(steadyOp);
+}
+
+// With the fatal behaviour disabled, startup reports the mismatch itself exactly once, the same way
+// every other state does. The startup exemption only adds the separate line recording that startup
+// continued, it does not report the mismatch a second time.
+TEST_F(VerifyValidationHashLogOnlyTest, StartupMismatchWithFatalDisabledLogsOnce) {
+    setMemberState(MemberState::RS_STARTUP2);
+
+    const RecordId rid(1);
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    OplogEntry op = makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, doc, rid, corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {insertMismatch(doc)});
+
+    assertDocumentIs(rid, doc);
 }
 
 // With 'continuousInternodeValidationFatalOnMismatch' disabled the mismatch is only logged, and

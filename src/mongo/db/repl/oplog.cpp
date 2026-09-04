@@ -1642,10 +1642,17 @@ boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
 }
 
 // Compares 'actualHash', recomputed by this non-primary, against the hash the primary recorded on
-// 'op'. On mismatch this fasserts, or only logs when
-// 'continuousInternodeValidationFatalOnMismatch' is disabled. 'diagnosticDoc' is used only to
-// compute the field-level diff. It is the post-image for inserts, and the pre-image for deletes and
-// updates.
+// 'op'. Every mismatch is logged. It is then fatal, unless
+// 'continuousInternodeValidationFatalOnMismatch' is disabled or the node is still starting up.
+// 'diagnosticDoc' is only used to compute the field-level diff. It is the post-image for inserts,
+// and the pre-image for deletes and updates.
+//
+// A mismatch that reproduces from the last checkpoint would otherwise be hit again on every
+// restart. Making it fatal during startup turns it into a crash loop that no restart can clear,
+// and with the primary down that leaves the set hard down with no node able to complete startup
+// and take over. Startup therefore logs and continues, accepting that the node may serve or make
+// durable the diverged data, and keeps the fatal behaviour for mismatches seen once the node is
+// past startup and the set has a healthy source of truth to fall back on.
 void verifyValidationHash(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const RecordId& recordId,
@@ -1658,13 +1665,12 @@ void verifyValidationHash(OperationContext* opCtx,
         return;
     }
 
-    // Count the divergence before gathering diagnostics. The counter is only observable when
-    // 'continuousInternodeValidationFatalOnMismatch' is disabled: in fatal mode this node aborts
-    // below, before the counter is ever exported.
+    // Count the divergence before gathering diagnostics. The counter is only observable on the
+    // paths that continue below: when this node aborts it does so before the counter is ever
+    // exported.
     incrementDocumentHashMismatchCount(op.getOpType());
 
     // Read back the document we just persisted to compare against what this node actually stored.
-    const BSONObj& oplogObject = op.getObject();
     const BSONObj storedDocument = collection->docFor(opCtx, recordId).value().getOwned();
     // For deletes the document has not been removed yet, so 'diagnosticDoc' is the stored document
     // and a diff would always be empty.
@@ -1672,39 +1678,42 @@ void verifyValidationHash(OperationContext* opCtx,
         ? boost::none
         : doc_diff::computeInlineDiff(diagnosticDoc, storedDocument);
 
-    const HostAndPort nodeId = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const HostAndPort nodeId = replCoord->getMyHostAndPort();
+    const MemberState memberState = replCoord->getMemberState();
 
-    if (!continuousInternodeValidationFatalOnMismatch.load()) {
-        LOGV2_ERROR(12882800,
-                    "Document validation hash mismatch",
-                    "expectedHash"_attr = *expectedHash,
-                    "actualHash"_attr = actualHash,
-                    logAttrs(op.getNss()),
-                    "id"_attr = redact(op.getIdElement().wrap()),
-                    "recordId"_attr = recordId,
-                    "timestamp"_attr = op.getTimestamp().toString(),
-                    "opType"_attr = idl::serialize(op.getOpType()),
-                    "nodeId"_attr = nodeId,
-                    "fieldLevelDiff"_attr = (fieldLevelDiff ? redact(*fieldLevelDiff).toString()
-                                                            : std::string("<not derivable>")));
-        return;
-    }
+    const bool inStartup = memberState.startup() || memberState.startup2();
+    const bool isFatal = continuousInternodeValidationFatalOnMismatch.load() && !inStartup;
 
-    LOGV2_FATAL(12851600,
+    // Reported the same way whether this node is about to abort or about to carry on, so that a
+    // mismatch is found by the same search either way.
+    LOGV2_ERROR(12882800,
                 "Document validation hash mismatch",
                 "expectedHash"_attr = *expectedHash,
                 "actualHash"_attr = actualHash,
-                "ns"_attr = op.getNss().toStringForErrorMsg(),
+                logAttrs(op.getNss()),
                 "id"_attr = redact(op.getIdElement().wrap()),
                 "recordId"_attr = recordId,
                 "timestamp"_attr = op.getTimestamp().toString(),
                 "opType"_attr = idl::serialize(op.getOpType()),
                 "nodeId"_attr = nodeId,
                 "oplogEntry"_attr = redact(op.toBSONForLogging()),
-                "oplogObject"_attr = redact(oplogObject),
                 "storedDocument"_attr = redact(storedDocument),
                 "fieldLevelDiff"_attr = (fieldLevelDiff ? redact(*fieldLevelDiff).toString()
                                                         : std::string("<not derivable>")));
+
+    // The mismatch and its diagnostics are reported above, on either path. What follows only
+    // records which of the two outcomes was taken, so it repeats nothing from that line.
+    if (inStartup) {
+        LOGV2_ERROR(13445800,
+                    "Continuing startup after a document validation hash mismatch. This node may "
+                    "serve or make durable data that has not passed validation",
+                    "memberState"_attr = memberState.toString());
+    }
+
+    if (isFatal) {
+        LOGV2_FATAL(12851600, "Aborting after a document validation hash mismatch");
+    }
 }
 }  // namespace
 

@@ -756,7 +756,9 @@ server_parameters:
     continuousInternodeValidationFatalOnMismatch:
         description: >-
             When true, a hash mismatch detected by continuous internode validation crashes the
-            node. When false, the mismatch is only logged.
+            node, unless the node is still in STARTUP or STARTUP2, where the mismatch is only
+            logged so that a mismatch reproducing from the last checkpoint cannot turn into a
+            startup crash loop. When false, the mismatch is only logged in every state.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: continuousInternodeValidationFatalOnMismatch
