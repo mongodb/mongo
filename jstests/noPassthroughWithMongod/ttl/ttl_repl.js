@@ -9,7 +9,6 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
 
@@ -81,10 +80,7 @@ let secondary2col = secondary.getDB("d")["c"];
 print("New Secondary stats:");
 printjson(secondary2col.stats());
 
-// TODO(SERVER-122560): Remove this check.
-if (!FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicatedFastCount")) {
-    assert.eq(6, secondary2col.count(), "wrong number of docs on new secondary");
-}
+assert.eq(secondary2col.count(), 6, "wrong number of docs on new secondary");
 
 /******* Part 3 *****************/
 // Check that the collMod command successfully updates the expireAfterSeconds field
