@@ -169,7 +169,11 @@ AggregateCommandRequest asAggregateCommandRequest(const CountCommandRequest& cou
         pipeline.push_back(BSON("$skip" << skip.value()));
     }
     if (auto limit = countCommand.getLimit()) {
-        pipeline.push_back(BSON("$limit" << limit.value()));
+        // The count command treats {limit: 0} as unlimited, but pipelines treat it
+        // as invalid, so don't add a $limit stage if the limit value is 0.
+        if (limit.value() != 0) {
+            pipeline.push_back(BSON("$limit" << limit.value()));
+        }
     }
     pipeline.push_back(BSON("$count" << "count"));
     result.setPipeline(std::move(pipeline));

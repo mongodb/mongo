@@ -165,6 +165,29 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getPipeline().begin(),
+                      ar.getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountCommandTest, ConvertToAggregationWithLimit0) {
+    // corner case where the converted pipeline shouldn't have a limit, because the count
+    // command treats {limit: 0} as unlimited but pipelines don't allow {$limit: 0}.
+    auto commandObj = BSON("count" << "TestColl"
+                                   << "$db"
+                                   << "TestDB"
+                                   << "limit" << 0);
+    auto countCmd = CountCommandRequest::parse(commandObj, ctxt);
+    auto ar = query_request_conversion::asAggregateCommandRequest(countCmd);
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count" << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getPipeline().begin(),
+                      ar.getPipeline().end(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 

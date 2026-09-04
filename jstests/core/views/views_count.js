@@ -11,6 +11,10 @@
 
 import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
 const viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());
 
@@ -61,6 +65,23 @@ assert.eq(0, lessThanSevenView.count({x: 9}));
 assert.eq(7, identityView.count({x: {$exists: true}}, {skip: 3}));
 assert.eq(3, greaterThanThreeView.count({x: {$lt: 100}}, {limit: 3}));
 assert.eq(1, lessThanSevenView.count({}, {skip: 1, limit: 1}));
+assert.eq(10, identityView.count({}, {skip: 0}));
+
+// Limit of 0 means unlimited on a collection and on a view.
+assert.eq(10, coll.count({}, {limit: 0}));
+if (!isMultiversion) {
+    // A count with {limit: 0} on a view is only translated into a limitless pipeline on binaries
+    // containing the fix for SERVER-132638. Older binaries in a mixed version cluster reject the
+    // translated pipeline with "the limit must be positive".
+    assert.eq(10, identityView.count({}, {limit: 0}));
+    assert.eq(3, greaterThanThreeView.count({}, {limit: 0, skip: 3}));
+    assert.eq(2, lessThanSevenView.count({}, {limit: 0, skip: 1}));
+    assert.commandWorked(identityView.explain().count({}, {limit: 0}));
+}
+
+// Negative limit uses absolute value.
+assert.eq(5, coll.count({}, {limit: -5}));
+assert.eq(3, identityView.count({}, {limit: -3}));
 
 // Count with explain works on a view.
 assert.commandWorked(lessThanSevenView.explain().count());
