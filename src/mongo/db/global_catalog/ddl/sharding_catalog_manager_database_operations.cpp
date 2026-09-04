@@ -210,11 +210,6 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             fmt::format("Requested primary shard {} does not exist", toShardId.toString()),
             !toShardDoc.isEmpty());
 
-    const auto toShardEntry = uassertStatusOK(ShardType::fromBSON(toShardDoc));
-    uassert(ErrorCodes::ShardNotFound,
-            fmt::format("Requested primary shard {} is draining", toShardId.toString()),
-            !toShardEntry.getDraining());
-
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
