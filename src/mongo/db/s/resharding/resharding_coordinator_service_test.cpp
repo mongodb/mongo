@@ -510,7 +510,8 @@ public:
     }
 
     void checkDonorDocumentsFinalMetrics(const ReshardingCoordinatorDocument& coordinatorDoc) {
-        if (coordinatorDoc.getState() < CoordinatorStateEnum::kBlockingWrites) {
+        // Final metrics don't get written until after recipients transition to strict consistency.
+        if (coordinatorDoc.getState() <= CoordinatorStateEnum::kBlockingWrites) {
             return;
         }
         if (!coordinatorDoc.getCommonReshardingMetadata().getPerformVerification()) {
