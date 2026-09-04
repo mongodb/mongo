@@ -18,6 +18,14 @@ mv all_feature_flags.txt patch_all_feature_flags.txt
 # get the list of feature flags from the base commit
 git --no-pager diff "$(git merge-base origin/${branch_name} HEAD)" --output="$diff_file_name" --binary
 if [ -s "$diff_file_name" ]; then
+    # Reverting the patch leaves the whole checkout at the base commit, which everything
+    # running after this -- including the project-wide post block -- would otherwise execute
+    # against. Restore it on exit, including when the check below fails under errexit.
+    restore_patched_tree() {
+        git apply "$diff_file_name" || echo "WARNING: could not restore the patched working tree" >&2
+    }
+    trap restore_patched_tree EXIT
+
     git apply -R "$diff_file_name"
 fi
 

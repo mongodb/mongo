@@ -93,11 +93,15 @@ class CoreAnalysisTaskGenerator(ABC):
                     "the evergreen function 'configure evergreen api credentials' is called before this task",
                     file=sys.stderr,
                 )
-                return None
+                self.evg_api = None
 
     def generate(self) -> Optional[dict]:
         if not sys.platform.startswith("linux"):
             print("This platform is not supported, skipping core analysis task generation.")
+            return None
+
+        if self.evg_api is None:
+            print("No Evergreen API connection, skipping core analysis task generation.")
             return None
 
         # gather information from the current task being run

@@ -598,5 +598,29 @@ class TestBazelCoreAnalysisTaskGenerator(unittest.TestCase):
         self.assertIn("--is-bazel-task", args)
 
 
+class TestMissingEvergreenApiCredentials(unittest.TestCase):
+    """Generation must be skipped, not crash, when the Evergreen API config is absent.
+
+    Tasks that never call the 'configure evergreen api credentials' function reach this path
+    routinely, so it has to degrade to a no-op.
+    """
+
+    @patch("buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.read_config_file")
+    @patch(
+        "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.evergreen_conn.get_evergreen_api"
+    )
+    def test_generate_returns_none_without_credentials(self, mock_get_api, mock_read_config):
+        mock_read_config.return_value = {"task_name": "resmoke_test", "task_id": "test_task_123"}
+        mock_get_api.side_effect = RuntimeError("evergreen api config not found")
+
+        # The guard lives on the shared base class, so both generators must degrade alike.
+        for generator_cls in (ResmokeCoreAnalysisTaskGenerator, BazelCoreAnalysisTaskGenerator):
+            with self.subTest(generator=generator_cls.__name__):
+                generator = generator_cls("test_expansions.yml")
+
+                self.assertIsNone(generator.evg_api)
+                self.assertIsNone(generator.generate())
+
+
 if __name__ == "__main__":
     unittest.main()
