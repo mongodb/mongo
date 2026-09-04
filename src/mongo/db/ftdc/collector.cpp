@@ -27,6 +27,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
@@ -213,6 +214,14 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
         builder->append(name, result);
         collector.updatedValue = boost::none;
         collector.timesSkipped = 0;
+    }
+}
+
+void SampleCollectorCache::waitForCollectorToFinish_forTest(const std::string& name) {
+    auto it = _sampleCollectors.find(name);
+    invariant(it != _sampleCollectors.end());
+    if (auto& updatedValue = it->second.updatedValue) {
+        updatedValue->wait(Interruptible::notInterruptible());
     }
 }
 

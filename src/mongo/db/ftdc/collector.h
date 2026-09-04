@@ -171,6 +171,16 @@ public:
      */
     void refresh(OperationContext* opCtx, BSONObjBuilder* builder);
 
+    /**
+     * Blocks, until the named collector's currently in-flight collection completes. A no-op if the
+     * collector has no collection outstanding.
+     *
+     * This must only be called from the single thread that drives this `SampleCollectorCache`
+     * (never concurrently with `refresh()`), since reading `SampleCollector::updatedValue` is not
+     * otherwise synchronized.
+     */
+    void waitForCollectorToFinish_forTest(const std::string& name);
+
     void updateSampleTimeout(Milliseconds newValue) {
         _maxSampleWaitMS.store(newValue);
     }

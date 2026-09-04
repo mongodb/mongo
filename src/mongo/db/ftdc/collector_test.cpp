@@ -164,6 +164,8 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutDuringCollectionShouldFinishInThe
 
     stall.set();
 
+    collector.waitForCollectorToFinish_forTest(kCollectorName);
+
     // After the stall, we should be able to get the data.
     auto sample2 = collect(collector);
     ASSERT_TRUE(sample2.hasField(kCollectorName));
@@ -201,6 +203,8 @@ TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
     using unittest::match::Eq;
     ASSERT_THAT(**collections,
                 Eq(std::vector<std::string_view>{kCollectorName, kAnotherCollectorName}));
+
+    collector.waitForCollectorToFinish_forTest(kCollectorName);
 
     auto sample2 = collect(collector);
     ASSERT_TRUE(sample2.hasField(kCollectorName));
