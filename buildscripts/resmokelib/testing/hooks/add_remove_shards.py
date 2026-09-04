@@ -649,13 +649,6 @@ class _AddRemoveShardThread(threading.Thread):
                 step_name="decommissioning of removed shard",
             )
 
-            for db_name in direct_shard_conn.list_database_names():
-                if db_name in ["admin", "config", "local"]:
-                    continue
-                self.logger.info(f"Dropping database before decommissioning: {db_name}")
-                direct_shard_conn.drop_database(db_name)
-                self.logger.info(f"Successfully dropped database: {db_name}")
-
             teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
             shard_obj.removeshard_teardown_marker = True
             teardown_handler.teardown(shard_obj, "shard")
