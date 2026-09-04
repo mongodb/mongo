@@ -160,8 +160,6 @@ public:
                  sbe::value::Value expectedVal,
                  std::string_view test);
 
-    void reinitState();
-
 protected:
     stage_builder::Environment _env;
     boost::intrusive_ptr<ExpressionContext> _expCtx;

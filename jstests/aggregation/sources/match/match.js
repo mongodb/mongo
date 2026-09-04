@@ -4,9 +4,7 @@
  * - $where and geo operators are not allowed
  *
  * @tags: [
- *   # SERVER-101260 changed the behavior for SBE engine
- *   # SERVER-36681 changed the behavior of SBE and classic engines
- *   requires_fcv_90,
+ *   requires_fcv_91,
  * ]
  */
 
@@ -167,28 +165,8 @@ function checkMatchResults(indexed) {
         ],
         {x: null},
     );
-    assertResults(
-        [
-            {_id: 0},
-            {_id: 1, a: null},
-            {_id: 2, a: []},
-            {_id: 3, a: 0},
-            {_id: 4, a: [[]]},
-            {_id: 5, a: [2, 2, 2]},
-        ],
-        {"a.y": null},
-    );
-    assertResults(
-        [
-            {_id: 0},
-            {_id: 1, a: null},
-            {_id: 2, a: []},
-            {_id: 3, a: 0},
-            {_id: 4, a: [[]]},
-            {_id: 5, a: [2, 2, 2]},
-        ],
-        {"a.y.z": null},
-    );
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y": null});
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y.z": null});
 
     // $elemMatch
     coll.remove({});

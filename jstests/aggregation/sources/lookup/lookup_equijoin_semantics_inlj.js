@@ -1,8 +1,7 @@
 /**
  * Tests for $lookup with localField/foreignField syntax using indexed nested loop join algorithm.
  * @tags: [
- *   # SERVER-36681 changed the behavior of SBE and classic engines
- *   requires_fcv_90,
+ *   requires_fcv_91,
  * ]
  */
 import {

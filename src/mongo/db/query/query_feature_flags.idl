@@ -412,23 +412,23 @@ feature_flags:
     featureFlagSbeEqLookupUnwindIndexedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the indexed loop join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindIndexedLoopJoin
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindNestedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the nested loop join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindNestedLoopJoin
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the dynamic indexed loop join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindLocalCollscan:
         description: "Enables executing $lookup-$unwind in SBE with a collection scan local-side access plan."

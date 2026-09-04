@@ -1335,12 +1335,15 @@ server_parameters:
     internalQueryLegacyDottedPathNullSemantics:
         mod_visibility: needs_replacement
         description: >-
-            If true, disables the SERVER-36681 fix for null equality semantics on nonexistent
-            dotted paths and reverts to the pre-fix behavior.
+            If true (the default), uses the legacy semantics for null equality on nonexistent
+            dotted paths. If false, enables the SERVER-36681 fix, under which a nonexistent
+            dotted path is treated as null when a non-leaf component of the path is an array.
+            The fix is disabled by default because it changes the set of documents matched by
+            a partial filter expression, and index contents are not rebuilt on upgrade.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryLegacyDottedPathNullSemantics"
         cpp_vartype: Atomic<bool>
-        default: false
+        default: true
         redact: false
 
     internalSearchIdLookupMaxBatchSize:
