@@ -25,12 +25,6 @@ if [ "${is_patch}" = "true" ]; then
   MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
 fi
 
-# For commit builds, append the first 8 characters of the git revision to the version string.
-if [[ "${requester}" == "commit" ]]; then
-  GIT_REV=$(git rev-parse HEAD)
-  MONGO_VERSION="${MONGO_VERSION}-${GIT_REV:0:8}"
-fi
-
 # Forcefully override the version for purposes of testing against a different version than the
 # branch is targeting (used by custom builds, see
 # etc/evergreen_yml_components/custom_builds/README.md).
@@ -44,4 +38,4 @@ fi
 echo "MONGO_VERSION = ${MONGO_VERSION}"
 
 activate_venv
-MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_version_expansions.py --out version_expansions.yml
+MONGO_VERSION=${MONGO_VERSION} IS_PATCH=${is_patch} IS_RELEASE=${is_release:-} IS_COMMIT_QUEUE=${is_commit_queue} $python buildscripts/generate_version_expansions.py --out version_expansions.yml
