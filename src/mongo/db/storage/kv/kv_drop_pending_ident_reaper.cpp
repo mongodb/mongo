@@ -214,6 +214,14 @@ size_t KVDropPendingIdentReaper::getNumIdents() const {
 
 void KVDropPendingIdentReaper::dropIdentsOlderThan(
     OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamps) {
+    {
+        std::lock_guard lock(_mutex);
+        if (_dropPendingIdents.empty()) {
+            LOGV2_DEBUG(13442900, 1, "No drop-pending idents are registered");
+            return;
+        }
+    }
+
     const bool usesSchemaEpochs =
         rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().usesSchemaEpochs();
 
@@ -233,12 +241,14 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
     }
 
     boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
+    boost::optional<Lock::GlobalLock> globalLock;
     if (usesSchemaEpochs && !storageGlobalParams.magicRestore) {
         // Replicated drop mode: only primary can proceed. During magic restore, even though
         // we're technically a primary, we're operating in a standby-like mode in that we're
         // not supposed to perform any writes. So we avoid taking the Intent::Write here.
         try {
             writeIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            globalLock.emplace(opCtx, MODE_IX);
         } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
             LOGV2_DEBUG(11873700, 1, "Not primary, will skip replicated ident drops");
         }
@@ -522,7 +532,6 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                                   "skipCompletingReplicatedPrimaryIdentDrop failpoint enabled");
                 }
                 try {
-                    Lock::GlobalLock gl(opCtx, MODE_IX);
                     WriteUnitOfWork wuow(opCtx);
                     repl::OpTime reservedIdentDropTimestamp;
 
