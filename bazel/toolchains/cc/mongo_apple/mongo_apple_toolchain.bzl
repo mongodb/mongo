@@ -3,6 +3,10 @@ load("@build_bazel_apple_support//configs:platforms.bzl", "APPLE_PLATFORMS_CONST
 def _get_llvm_info(repository_ctx, build_file):
     llvm_version = repository_ctx.os.environ.get("LLVM_VERSION") or ""
 
+    llvm_path = repository_ctx.os.environ.get("LLVM_PATH") or ""
+    if llvm_path != "":
+        return True, llvm_path, llvm_version, ""
+
     if llvm_version == "":
         error_message = """
 The Apple LLVM Clang toolchain has not been defined. Please make sure
@@ -41,6 +45,10 @@ sure that you have installed the LLVM toolchain using Homebrew:
     return True, llvm_path, llvm_version, ""
 
 def _get_lld_info(repository_ctx, llvm_version):
+    lld_path = repository_ctx.os.environ.get("LLD_PATH") or ""
+    if lld_path != "":
+        return True, lld_path, ""
+
     error_message = """
 Unable to find the lld path. Please make sure that you have installed the lld using Homebrew: 
     `brew install lld@{}`.""".format(llvm_version)
@@ -129,6 +137,7 @@ def _apple_llvm_clang_cc_autoconf_impl(repository_ctx):
 mongo_apple_brew_llvm_toolchain_config = repository_rule(
     environ = [
         "LLVM_PATH",  # Force re-compute if the user changed the location of the LLVM toolchain
+        "LLD_PATH",  # Force re-compute if the user changed the location of the lld toolchain
         "LLVM_VERSION",  # Force re-compute if the user changed the version of the LLVM toolchain
     ],
     implementation = _apple_llvm_clang_cc_autoconf_impl,

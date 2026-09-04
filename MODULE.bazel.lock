@@ -572,7 +572,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%setup_mongo_apple_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "prC/JJsAXBG1G496p5kkWHsc/N9DlmJkOn0sluvxsWQ=",
+        "bzlTransitiveDigest": "6nIHDL0SgQKewG95rzSAFm5yZ2i74HpCsU7/TfREsts=",
         "usagesDigest": "5jcfs/9THcpOV6/hUDotupzJpZQonmplpSQs1TbLgaU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
