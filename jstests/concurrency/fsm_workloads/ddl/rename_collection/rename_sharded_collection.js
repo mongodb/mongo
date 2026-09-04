@@ -22,12 +22,8 @@ import {
 } from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/random_ddl_utils.js";
 
 const numDocs = 100;
-const dbNames = ["db0", "db1"];
-const collNames = [
-    "rename_sharded_collectionA",
-    "rename_sharded_collectionB",
-    "rename_sharded_collectionC",
-];
+const dbNames = ["rename_sharded_collection_0", "rename_sharded_collection_1"];
+const collNames = ["collA", "collB", "collC"];
 
 /*
  * Initialize a collection with expected number of chunks/documents and randomly distribute chunks

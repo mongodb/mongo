@@ -12,7 +12,7 @@ import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {runWithManualRetries} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-const dbNames = ["db0", "db1", "db2"];
+const dbNames = ["random_moveChunk_0", "random_moveChunk_1", "random_moveChunk_2"];
 const collNames = ["collA", "collB", "collC"];
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
