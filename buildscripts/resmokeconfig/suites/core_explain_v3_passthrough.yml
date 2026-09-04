@@ -49,7 +49,7 @@ selector:
     - jstests/core/index/wildcard/wildcard_and_text_indexes.js
     - jstests/core/index/index_for_sort.js
     - jstests/core/index/wildcard/compound_wildcard_index_or.js
-    - jstests/core/query/explain/explain6.js
+    - jstests/core/query/explain/explain_execution_stats_counters.js
 
     # Asserts the legacy display data model of the mixed CBR/multi-planning path, where the same
     # logical plan appears twice among the rejected plans (the multi-planner's trial tree and the
