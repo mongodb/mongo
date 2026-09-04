@@ -278,8 +278,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
  * must hold:
  *   - 'mode' is steady-state secondary application (excludes initial sync, recovery, applyOps),
  *   - the continuous internode per-document validation feature is enabled,
- *   - 'collection' is a supported (recordIdsReplicated) collection, and
+ *   - 'collection' is a supported collection: one with replicated record ids, or one clustered on
+ *     _id, whose record ids follow from its documents,
+ *   - the namespace is not implicitly replicated, since those replicate only a subset of their
+ *     writes and each node derives the rest for itself, and
  *   - 'h' is present on the entry.
+ *
+ * For a clustered collection this is only reached for updates and deletes when the by-record-id
+ * apply fast path is on.
  */
 bool shouldVerifyValidationHash(OperationContext* opCtx,
                                 const CollectionPtr& collection,

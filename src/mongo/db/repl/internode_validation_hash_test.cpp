@@ -5,6 +5,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/internode_validation_metrics.h"
@@ -17,9 +18,12 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/idl_parser.h"
@@ -70,6 +74,44 @@ otel::metrics::MetricName mismatchCounterName(OpTypeEnum opType) {
     }
 }
 
+/**
+ * Returns 'entry' with the per-document validation hash 'hash' attached. Used for the entries a
+ * primary would log for a clustered collection, which carry no 'rid' field.
+ */
+OplogEntry withValidationHash(const OplogEntry& entry, int64_t hash) {
+    BSONObjBuilder builder;
+    builder.appendElements(entry.getEntry().toBSON());
+    builder.append("m", BSON("h" << hash));
+    return {DurableOplogEntry(builder.obj())};
+}
+
+constexpr std::string_view kBucketTimeField = "t";
+const Date_t kBucketTime = Date_t::fromMillisSinceEpoch(1000);
+
+/**
+ * Returns a time-series bucket document holding one measurement per entry of 'values', in the shape
+ * the bucket catalog writes: an OID '_id', a 'control' summary and a column-per-field 'data'
+ * subobject.
+ */
+BSONObj makeBucketDoc(const OID& id, const std::vector<int>& values) {
+    invariant(!values.empty());
+    BSONObjBuilder timeColumn;
+    BSONObjBuilder valueColumn;
+    for (size_t i = 0; i < values.size(); i++) {
+        const std::string index = std::to_string(i);
+        timeColumn.append(index, kBucketTime);
+        valueColumn.append(index, values[i]);
+    }
+    const auto [minValue, maxValue] = std::minmax_element(values.begin(), values.end());
+    return BSON("_id" << id << "control"
+                      << BSON("version"
+                              << 1 << "min"
+                              << BSON(kBucketTimeField << kBucketTime << "x" << *minValue) << "max"
+                              << BSON(kBucketTimeField << kBucketTime << "x" << *maxValue))
+                      << "data"
+                      << BSON(kBucketTimeField << timeColumn.obj() << "x" << valueColumn.obj()));
+}
+
 TEST(InternodeValidationMetricsTest, MismatchCountersStartAtZero) {
     OtelMetricsCapturer capturer;
     if (!OtelMetricsCapturer::canReadMetrics()) {
@@ -118,6 +160,36 @@ protected:
             FailPointEnableBlock overrideRecordIds("overrideRecordIdsReplicatedFalse");
             createCollection(_opCtx.get(), _plainNss, {});
         }
+
+        // A supported collection that does not have replicated record IDs: a clustered
+        // collection's record id is derived from its document instead.
+        _clusteredNss = NamespaceString::createNamespaceString_forTest("test.clusteredCollection");
+        {
+            CollectionOptions options;
+            options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+            createCollection(_opCtx.get(), _clusteredNss, options);
+        }
+        _clusteredUuid = getCollectionUUID(_opCtx.get(), _clusteredNss);
+
+        // A clustered collection with a default collator. Deriving a record id from a string _id
+        // has to apply the collation, so this is the case where a derivation that ignored it would
+        // land on the wrong record.
+        _collatedNss = NamespaceString::createNamespaceString_forTest("test.collatedClustered");
+        {
+            CollectionOptions options;
+            options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+            options.collation = BSON("locale" << "en" << "strength" << 2);
+            createCollection(_opCtx.get(), _collatedNss, options);
+        }
+
+        _timeseriesNss = NamespaceString::createNamespaceString_forTest("test.ts");
+        {
+            CollectionOptions options;
+            options.timeseries = TimeseriesOptions(std::string{kBucketTimeField});
+            options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+            createCollection(_opCtx.get(), _timeseriesNss, options);
+        }
+        _timeseriesUuid = getCollectionUUID(_opCtx.get(), _timeseriesNss);
     }
 
     /**
@@ -136,6 +208,18 @@ protected:
             ? makeInsertOplogEntryWithRecordIdAndHash(nextOpTime(), nss, _uuid, doc, rid, *h)
             : makeInsertOplogEntryWithRecordId(nextOpTime(), nss, _uuid, doc, rid);
 
+        return shouldVerifyFor(opCtx, nss, mode, op);
+    }
+
+    /**
+     * Calls shouldVerifyValidationHash for 'op', passing a CollectionPtr acquired from the catalog
+     * so its collection predicates are evaluated against the acquired collection's actual
+     * metadata.
+     */
+    bool shouldVerifyFor(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         OplogApplication::Mode mode,
+                         const OplogEntry& op) {
         auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
@@ -268,9 +352,64 @@ protected:
         assertMismatchCounters(capturer, expected);
     }
 
+    /**
+     * Inserts 'doc' into '_clusteredNss' through the applier. The entry carries no hash, so nothing
+     * is verified.
+     */
+    void insertClusteredDocument(const BSONObj& doc) {
+        ASSERT_OK(runOpSteadyState(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc)));
+    }
+
+    /**
+     * Returns what '_clusteredNss' holds at the record id derived from 'idObj'.
+     */
+    boost::optional<BSONObj> clusteredDocumentFor(const BSONObj& idObj) {
+        return documentAtRecordId(
+            _opCtx.get(), _clusteredNss, record_id_helpers::keyForElem(idObj.firstElement()));
+    }
+
+    /**
+     * Asserts that '_clusteredNss' holds exactly 'expected' for 'idObj'.
+     */
+    void assertClusteredDocumentIs(const BSONObj& idObj, const BSONObj& expected) {
+        const auto stored = clusteredDocumentFor(idObj);
+        ASSERT_TRUE(stored.has_value());
+        ASSERT_BSONOBJ_EQ(expected, *stored);
+    }
+
+    /**
+     * Inserts 'bucket' into '_timeseriesNss' through the applier. The entry carries no hash, so
+     * nothing is verified.
+     */
+    void insertBucketDocument(const BSONObj& bucket) {
+        ASSERT_OK(
+            runOpSteadyState(makeInsertDocumentOplogEntry(nextOpTime(), _timeseriesNss, bucket)));
+    }
+
+    /**
+     * Returns what '_timeseriesNss' holds at the record id derived from the bucket id 'id'.
+     */
+    boost::optional<BSONObj> bucketDocumentFor(const OID& id) {
+        return documentAtRecordId(_opCtx.get(), _timeseriesNss, record_id_helpers::keyForOID(id));
+    }
+
+    /**
+     * Asserts that '_timeseriesNss' holds exactly 'expected' for the bucket id 'id'.
+     */
+    void assertBucketDocumentIs(const OID& id, const BSONObj& expected) {
+        const auto stored = bucketDocumentFor(id);
+        ASSERT_TRUE(stored.has_value());
+        ASSERT_BSONOBJ_EQ(expected, *stored);
+    }
+
     NamespaceString _nss;
     NamespaceString _plainNss;
+    NamespaceString _clusteredNss;
+    NamespaceString _timeseriesNss;
+    NamespaceString _collatedNss;
     UUID _uuid = UUID::gen();
+    UUID _clusteredUuid = UUID::gen();
+    UUID _timeseriesUuid = UUID::gen();
 
     unittest::ServerParameterGuard _recordIdsReplicatedFlag{"featureFlagRecordIdsReplicated", true};
     unittest::ServerParameterGuard _validationFlag{
@@ -1111,6 +1250,453 @@ TEST_F(VerifyValidationHashTest, UpdateGrowingArrayWithDeltaMatchingHashAppliesC
     ASSERT_BSONOBJ_EQ(expectedPostImage, *documentAtRecordId(_opCtx.get(), _nss, rid));
 }
 
+// A clustered collection carries no replicated record ids, but its record ids are derived from its
+// documents, so the hash on its entries is still verified.
+TEST_F(VerifyValidationHashTest, TrueForClusteredCollection) {
+    const BSONObj doc = BSON("_id" << 1);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           computeDocValidationHash(doc));
+
+    auto coll = acquireCollection(_opCtx.get(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      _opCtx.get(), _clusteredNss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+    // Otherwise this would be passing on the replicated record id predicate instead.
+    ASSERT_FALSE(coll.getCollectionPtr()->areRecordIdsReplicated());
+
+    EXPECT_TRUE(
+        shouldVerifyFor(_opCtx.get(), _clusteredNss, OplogApplication::Mode::kSecondary, op));
+}
+
+TEST_F(VerifyValidationHashTest, ClusteredInsertMatchingHashAppliesCleanly) {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           computeDocValidationHash(doc));
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertClusteredDocumentIs(BSON("_id" << 1), doc);
+}
+
+DEATH_TEST_F(VerifyValidationHashDeathTest, ClusteredInsertMismatchedHashFasserts, "12851600") {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           corrupt(computeDocValidationHash(doc)));
+    std::ignore = runOpSteadyState(op);
+}
+
+// The insert appliers have no record id to hand the mismatch diagnostics for a clustered
+// collection, so it is derived from the document. The empty field-level diff is what proves the
+// derivation found the document this node stored: without it there would be nothing to diff
+// against and the diff would report the whole document as missing.
+TEST_F(VerifyValidationHashLogOnlyTest, ClusteredInsertMismatchedHashOnlyLogs) {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {insertMismatch(doc)});
+
+    assertClusteredDocumentIs(BSON("_id" << 1), doc);
+}
+
+// The grouped inserts path decides the collection is supported once for the whole batch.
+TEST_F(VerifyValidationHashLogOnlyTest, ClusteredGroupedInsertsMismatchOnEveryEntryOnlyLogs) {
+    const BSONObj doc1 = BSON("_id" << 1 << "x" << 100);
+    const BSONObj doc2 = BSON("_id" << 2 << "x" << 200);
+
+    OplogEntry op1 =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc1),
+                           corrupt(computeDocValidationHash(doc1)));
+    OplogEntry op2 =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc2),
+                           corrupt(computeDocValidationHash(doc2)));
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+
+    assertOnlyLogsMismatches([&] { return applyGroupedInsertsSteadyState(ops); },
+                             {insertMismatch(doc1), insertMismatch(doc2)});
+
+    assertClusteredDocumentIs(BSON("_id" << 1), doc1);
+    assertClusteredDocumentIs(BSON("_id" << 2), doc2);
+}
+
+// Updates and deletes on a clustered collection reach the hash check only through the by-record-id
+// apply fast path, which derives the record id from the entry's _id. Without it they are routed
+// through the query system, which has no hash check. Inserts do not depend on the fast path.
+class ClusteredFastPathValidationHashTest : public VerifyValidationHashTest {
+protected:
+    unittest::ServerParameterGuard _clusteredFastPathFlag{
+        "featureFlagClusteredCollectionOplogApplyFastPath", true};
+};
+using ClusteredFastPathValidationHashDeathTest =
+    FatalOnMismatchTest<ClusteredFastPathValidationHashTest>;
+
+TEST_F(ClusteredFastPathValidationHashTest, ClusteredUpdateMatchingHashAppliesCleanly) {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    const OplogEntry op = withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1), postImage),
+        computeUpdateValidationHash(preImage, postImage));
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertClusteredDocumentIs(BSON("_id" << 1), postImage);
+}
+
+DEATH_TEST_F(ClusteredFastPathValidationHashDeathTest,
+             ClusteredUpdateMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    const OplogEntry op = withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1), postImage),
+        corrupt(computeUpdateValidationHash(preImage, postImage)));
+    std::ignore = runOpSteadyState(op);
+}
+
+TEST_F(ClusteredFastPathValidationHashTest, ClusteredDeleteMatchingHashAppliesCleanly) {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(doc);
+
+    const OplogEntry op = withValidationHash(
+        makeDeleteDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1)),
+        computeDocValidationHash(doc));
+    ASSERT_OK(runOpSteadyState(op));
+
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 1)).has_value());
+}
+
+DEATH_TEST_F(ClusteredFastPathValidationHashDeathTest,
+             ClusteredDeleteMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(doc);
+
+    const OplogEntry op = withValidationHash(
+        makeDeleteDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1)),
+        corrupt(computeDocValidationHash(doc)));
+    std::ignore = runOpSteadyState(op);
+}
+
+// A time-series collection is clustered on its bucket documents' OID '_id', so those buckets are
+// hashed and verified like any other clustered collection's documents.
+TEST_F(VerifyValidationHashTest, TimeseriesBucketInsertMatchingHashAppliesCleanly) {
+    const OID bucketId = OID::gen();
+    const BSONObj bucket = makeBucketDoc(bucketId, {10});
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _timeseriesNss, bucket),
+                           computeDocValidationHash(bucket));
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertBucketDocumentIs(bucketId, bucket);
+}
+
+DEATH_TEST_F(VerifyValidationHashDeathTest,
+             TimeseriesBucketInsertMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj bucket = makeBucketDoc(OID::gen(), {10});
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _timeseriesNss, bucket),
+                           corrupt(computeDocValidationHash(bucket)));
+    std::ignore = runOpSteadyState(op);
+}
+
+// The record id of a bucket is derived from its OID '_id', which is a different key type from the
+// integer _ids the other clustered tests use. An empty field-level diff is what proves the
+// derivation found the bucket this node stored.
+TEST_F(VerifyValidationHashLogOnlyTest, TimeseriesBucketInsertMismatchedHashOnlyLogs) {
+    const OID bucketId = OID::gen();
+    const BSONObj bucket = makeBucketDoc(bucketId, {10});
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _timeseriesNss, bucket),
+                           corrupt(computeDocValidationHash(bucket)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {insertMismatch(bucket)});
+
+    assertBucketDocumentIs(bucketId, bucket);
+}
+
+// Appending a measurement to an open bucket is logged as a $v:2 delta, so the applier derives the
+// post-image itself and the hash covers both images.
+TEST_F(ClusteredFastPathValidationHashTest, TimeseriesBucketAppendMatchingHashAppliesCleanly) {
+    const OID bucketId = OID::gen();
+    const BSONObj preImage = makeBucketDoc(bucketId, {10});
+    insertBucketDocument(preImage);
+
+    const BSONObj postImage = makeBucketDoc(bucketId, {10, 20});
+    const OplogEntry op = withValidationHash(
+        makeUpdateDocumentOplogEntry(
+            nextOpTime(), _timeseriesNss, BSON("_id" << bucketId), makeDelta(preImage, postImage)),
+        computeUpdateValidationHash(preImage, postImage));
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertBucketDocumentIs(bucketId, postImage);
+}
+
+// Two nodes whose buckets hold different measurements converge on the same post-image once the
+// delta is applied, so only the pre-image's contribution to the hash catches the divergence.
+DEATH_TEST_F(ClusteredFastPathValidationHashDeathTest,
+             TimeseriesBucketAppendDivergentPreImageFasserts,
+             "12851600") {
+    const OID bucketId = OID::gen();
+    const BSONObj localPreImage = makeBucketDoc(bucketId, {10});
+    insertBucketDocument(localPreImage);
+
+    const BSONObj primaryPreImage = makeBucketDoc(bucketId, {11});
+    const BSONObj sharedPostImage = makeBucketDoc(bucketId, {10, 20});
+    const OplogEntry op = withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(),
+                                     _timeseriesNss,
+                                     BSON("_id" << bucketId),
+                                     makeDelta(primaryPreImage, sharedPostImage)),
+        computeUpdateValidationHash(primaryPreImage, sharedPostImage));
+    std::ignore = runOpSteadyState(op);
+}
+
+TEST_F(ClusteredFastPathValidationHashTest, TimeseriesBucketDeleteMatchingHashAppliesCleanly) {
+    const OID bucketId = OID::gen();
+    const BSONObj bucket = makeBucketDoc(bucketId, {10, 20});
+    insertBucketDocument(bucket);
+
+    const OplogEntry op = withValidationHash(
+        makeDeleteDocumentOplogEntry(nextOpTime(), _timeseriesNss, BSON("_id" << bucketId)),
+        computeDocValidationHash(bucket));
+    ASSERT_OK(runOpSteadyState(op));
+
+    EXPECT_FALSE(bucketDocumentFor(bucketId).has_value());
+}
+
+// Deriving the record id for the mismatch diagnostics has to apply the collection's default
+// collation, exactly as the insert did. An empty field-level diff is what proves it landed on the
+// document this node stored rather than on nothing.
+TEST_F(VerifyValidationHashLogOnlyTest, CollatedClusteredInsertMismatchedHashOnlyLogs) {
+    const BSONObj doc = BSON("_id" << "Alpha" << "x" << 100);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _collatedNss, doc),
+                           corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {insertMismatch(doc)});
+}
+
+// A string _id takes a different KeyString path from the integer and OID _ids the other tests use.
+TEST_F(VerifyValidationHashTest, ClusteredStringIdInsertMatchingHashAppliesCleanly) {
+    const BSONObj doc = BSON("_id" << "some-string-id" << "x" << 100);
+    const OplogEntry op =
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           computeDocValidationHash(doc));
+    ASSERT_OK(runOpSteadyState(op));
+
+    assertClusteredDocumentIs(BSON("_id" << "some-string-id"), doc);
+}
+
+DEATH_TEST_F(VerifyValidationHashDeathTest,
+             ClusteredStringIdInsertMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj doc = BSON("_id" << "some-string-id" << "x" << 100);
+    std::ignore = runOpSteadyState(
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           corrupt(computeDocValidationHash(doc))));
+}
+
+// config.transactions is clustered on _id, but it is implicitly replicated: the primary's own
+// record is written unreplicated and each node derives its own, so the two nodes' documents are
+// allowed to differ and a hash comparison over them is meaningless. Its replicated writes must
+// carry no hash, or the reaping deletes would fassert a secondary over a by-design divergence.
+TEST_F(VerifyValidationHashTest, FalseForImplicitlyReplicatedClusteredCollection) {
+    const NamespaceString nss = NamespaceString::kSessionTransactionsTableNamespace;
+    {
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        createCollection(_opCtx.get(), nss, options);
+    }
+
+    const BSONObj doc = BSON("_id" << BSON("id" << UUID::gen()));
+    const OplogEntry op = withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), nss, doc),
+                                             computeDocValidationHash(doc));
+
+    auto coll = acquireCollection(
+        _opCtx.get(),
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx.get(), nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    // Otherwise the exclusion under test would be doing nothing.
+    ASSERT_TRUE(clustered_util::isClusteredOnId(coll.getCollectionPtr()->getClusteredInfo()));
+    ASSERT_TRUE(nss.isImplicitlyReplicated());
+
+    EXPECT_FALSE(shouldVerifyFor(_opCtx.get(), nss, OplogApplication::Mode::kSecondary, op));
+}
+
+// Resharding materializes its temporary collection at-least-once, committing transiently invalid
+// documents that self-heal, so the applier does not verify it. Emission is deliberately not
+// excluded: the collection is renamed onto the source namespace keeping its UUID, and the fast
+// count store is keyed by UUID, so suppressing its hashes would leave the resharded collection
+// permanently without one.
+TEST_F(VerifyValidationHashTest, FalseForTemporaryReshardingCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "test.system.resharding.deadbeef-dead-beef-dead-beefdeadbeef");
+    {
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        createCollection(_opCtx.get(), nss, options);
+    }
+
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    const OplogEntry op = withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), nss, doc),
+                                             computeDocValidationHash(doc));
+
+    // Otherwise the exclusion under test would be doing nothing.
+    ASSERT_TRUE(nss.isTemporaryReshardingCollection());
+    ASSERT_TRUE(isReplicatedFastCountEligible(nss));
+
+    EXPECT_FALSE(shouldVerifyFor(_opCtx.get(), nss, OplogApplication::Mode::kSecondary, op));
+}
+
+// With the by-record-id fast path off, a clustered update is routed through the query system, which
+// has no hash check, so a hash this node disagrees with is skipped. This pins the behaviour
+// documented on shouldVerifyValidationHash(): if the query path ever grows a check of its own, this
+// test should be replaced rather than quietly changing shape.
+TEST_F(VerifyValidationHashTest, ClusteredUpdateNotVerifiedWithoutFastPath) {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    const OplogEntry op = withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1), postImage),
+        corrupt(computeUpdateValidationHash(preImage, postImage)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {});
+
+    assertClusteredDocumentIs(BSON("_id" << 1), postImage);
+}
+
+TEST_F(VerifyValidationHashTest, ClusteredDeleteNotVerifiedWithoutFastPath) {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(doc);
+
+    const OplogEntry op = withValidationHash(
+        makeDeleteDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1)),
+        corrupt(computeDocValidationHash(doc)));
+
+    assertOnlyLogsMismatches([&] { return runOpSteadyState(op); }, {});
+
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 1)).has_value());
+}
+
+// A clustered insert is verified whether or not the fast path is on, since the insert appliers do
+// not go through the query system in the first place.
+DEATH_TEST_F(VerifyValidationHashDeathTest, ClusteredInsertVerifiedWithoutFastPath, "12851600") {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    std::ignore = runOpSteadyState(
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           corrupt(computeDocValidationHash(doc))));
+}
+
+// A provider that mandates both continuous internode validation and the clustered-collection apply
+// fast path, with neither feature flag set. Both gates are an OR of the provider and a flag, and
+// every other test here drives the flag side; this drives the provider side end to end. Clustered
+// collections are where the two meet, since the fast path is what routes their updates and deletes
+// past the query system and into the hash check.
+class StubProviderRequiringValidationAndClusteredFastPath
+    : public StubProviderRequiringContinuousInternodeValidation {
+public:
+    std::string name() const override {
+        return "StubProviderRequiringValidationAndClusteredFastPath";
+    }
+    bool shouldUseClusteredCollectionOplogFastPath() const override {
+        return true;
+    }
+    bool shouldDisableTransactionUpdateCoalescing() const override {
+        return true;
+    }
+    bool shouldUseReplicatedFastCount() const override {
+        return true;
+    }
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+};
+
+class ProviderGatedValidationHashTest : public VerifyValidationHashTest {
+protected:
+    void setUp() override {
+        VerifyValidationHashTest::setUp();
+        rss::ReplicatedStorageService::get(_opCtx->getServiceContext())
+            .setPersistenceProvider(
+                std::make_unique<StubProviderRequiringValidationAndClusteredFastPath>());
+    }
+
+    unittest::ServerParameterGuard _perDocumentFlag{
+        "featureFlagContinuousInternodeValidationPerDocument", false};
+    unittest::ServerParameterGuard _clusteredFastPathFlag{
+        "featureFlagClusteredCollectionOplogApplyFastPath", false};
+};
+using ProviderGatedValidationHashDeathTest = FatalOnMismatchTest<ProviderGatedValidationHashTest>;
+
+TEST_F(ProviderGatedValidationHashTest, ClusteredWritesVerifiedOnProviderAlone) {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    ASSERT_OK(runOpSteadyState(
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _clusteredNss, doc),
+                           computeDocValidationHash(doc))));
+    assertClusteredDocumentIs(BSON("_id" << 1), doc);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    ASSERT_OK(runOpSteadyState(withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1), postImage),
+        computeUpdateValidationHash(doc, postImage))));
+    assertClusteredDocumentIs(BSON("_id" << 1), postImage);
+
+    ASSERT_OK(runOpSteadyState(withValidationHash(
+        makeDeleteDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1)),
+        computeDocValidationHash(postImage))));
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 1)).has_value());
+}
+
+DEATH_TEST_F(ProviderGatedValidationHashDeathTest,
+             ClusteredUpdateMismatchFassertsOnProviderAlone,
+             "12851600") {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    std::ignore = runOpSteadyState(withValidationHash(
+        makeUpdateDocumentOplogEntry(nextOpTime(), _clusteredNss, BSON("_id" << 1), postImage),
+        corrupt(computeUpdateValidationHash(preImage, postImage))));
+}
+
+TEST_F(ProviderGatedValidationHashTest, TimeseriesBucketWritesVerifiedOnProviderAlone) {
+    const OID bucketId = OID::gen();
+    const BSONObj preImage = makeBucketDoc(bucketId, {10});
+    ASSERT_OK(runOpSteadyState(
+        withValidationHash(makeInsertDocumentOplogEntry(nextOpTime(), _timeseriesNss, preImage),
+                           computeDocValidationHash(preImage))));
+    assertBucketDocumentIs(bucketId, preImage);
+
+    const BSONObj postImage = makeBucketDoc(bucketId, {10, 20});
+    ASSERT_OK(runOpSteadyState(withValidationHash(
+        makeUpdateDocumentOplogEntry(
+            nextOpTime(), _timeseriesNss, BSON("_id" << bucketId), makeDelta(preImage, postImage)),
+        computeUpdateValidationHash(preImage, postImage))));
+    assertBucketDocumentIs(bucketId, postImage);
+}
+
+DEATH_TEST_F(ProviderGatedValidationHashDeathTest,
+             TimeseriesBucketAppendMismatchFassertsOnProviderAlone,
+             "12851600") {
+    const OID bucketId = OID::gen();
+    const BSONObj preImage = makeBucketDoc(bucketId, {10});
+    insertBucketDocument(preImage);
+
+    const BSONObj postImage = makeBucketDoc(bucketId, {10, 20});
+    std::ignore = runOpSteadyState(withValidationHash(
+        makeUpdateDocumentOplogEntry(
+            nextOpTime(), _timeseriesNss, BSON("_id" << bucketId), makeDelta(preImage, postImage)),
+        corrupt(computeUpdateValidationHash(preImage, postImage))));
+}
+
 /**
  * Tests that drive CRUD ops through a transaction's applyOps entry rather than as standalone oplog
  * entries.
@@ -1151,6 +1737,32 @@ protected:
             op.setObject2(*object2);
         }
         op.setRecordId(rid);
+
+        SingleOpSizeMetadata sizeMetadata;
+        sizeMetadata.setH(hash);
+        op.setSizeMetadata(OplogEntrySizeMetadata{sizeMetadata});
+        return op;
+    }
+
+    /**
+     * Builds an inner transaction operation on the clustered collection 'nss', carrying a document
+     * validation hash and no record id, which is how a clustered collection's operations are
+     * logged. 'object2' is the update's _id query and is left unset for inserts and deletes.
+     */
+    ReplOperation makeClusteredInnerOp(const NamespaceString& nss,
+                                       const UUID& uuid,
+                                       OpTypeEnum opType,
+                                       const BSONObj& object,
+                                       boost::optional<BSONObj> object2,
+                                       int64_t hash) {
+        ReplOperation op;
+        op.setOpType(opType);
+        op.setNss(nss);
+        op.setUuid(uuid);
+        op.setObject(object);
+        if (object2) {
+            op.setObject2(*object2);
+        }
 
         SingleOpSizeMetadata sizeMetadata;
         sizeMetadata.setH(hash);
@@ -1633,6 +2245,293 @@ TEST_F(DocValidationHashKnownAnswerTest, UpdateHashIsXorOfDocHashes) {
     EXPECT_EQ(computeUpdateValidationHash(preImage, postImage),
               computeUpdateValidationHash(postImage, preImage));
     EXPECT_EQ(computeUpdateValidationHash(preImage, preImage), 0);
+}
+
+// Transactions and prepared transactions over clustered and time-series collections. Their
+// inner ops carry no record id, so the applier derives it from the document, and their updates and
+// deletes need the by-record-id apply fast path to reach the hash check at all.
+class ClusteredTransactionValidationHashTest : public TransactionValidationHashTest {
+protected:
+    unittest::ServerParameterGuard _clusteredFastPathFlag{
+        "featureFlagClusteredCollectionOplogApplyFastPath", true};
+};
+using ClusteredTransactionValidationHashDeathTest =
+    FatalOnMismatchTest<ClusteredTransactionValidationHashTest>;
+using ClusteredTransactionValidationHashLogOnlyTest =
+    LogOnlyMismatchTest<ClusteredTransactionValidationHashTest>;
+
+TEST_F(ClusteredTransactionValidationHashTest, ClusteredMixedCrudMatchingHashesApplyCleanly) {
+    const BSONObj updatePreImage = BSON("_id" << 1 << "x" << 100);
+    const BSONObj deleteDoc = BSON("_id" << 2 << "x" << 200);
+    insertClusteredDocument(updatePreImage);
+    insertClusteredDocument(deleteDoc);
+
+    const BSONObj updatePostImage = BSON("_id" << 1 << "x" << 150);
+    const BSONObj insertDoc = BSON("_id" << 3 << "arr" << BSON_ARRAY(1 << 2));
+
+    ASSERT_OK(runTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kInsert,
+                              insertDoc,
+                              boost::none,
+                              computeDocValidationHash(insertDoc)),
+         makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kUpdate,
+                              updatePostImage,
+                              BSON("_id" << 1),
+                              computeUpdateValidationHash(updatePreImage, updatePostImage)),
+         makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kDelete,
+                              BSON("_id" << 2),
+                              boost::none,
+                              computeDocValidationHash(deleteDoc))}));
+
+    assertClusteredDocumentIs(BSON("_id" << 1), updatePostImage);
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 2)).has_value());
+    assertClusteredDocumentIs(BSON("_id" << 3), insertDoc);
+}
+
+DEATH_TEST_F(ClusteredTransactionValidationHashDeathTest,
+             ClusteredTransactionInsertMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj insertDoc = BSON("_id" << 1 << "x" << 100);
+    std::ignore = runTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kInsert,
+                              insertDoc,
+                              boost::none,
+                              corrupt(computeDocValidationHash(insertDoc)))});
+}
+
+DEATH_TEST_F(ClusteredTransactionValidationHashDeathTest,
+             ClusteredTransactionUpdateMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    std::ignore = runTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kUpdate,
+                              postImage,
+                              BSON("_id" << 1),
+                              corrupt(computeUpdateValidationHash(preImage, postImage)))});
+}
+
+DEATH_TEST_F(ClusteredTransactionValidationHashDeathTest,
+             ClusteredTransactionDeleteMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(doc);
+
+    std::ignore =
+        runTransactionSteadyState({makeClusteredInnerOp(_clusteredNss,
+                                                        _clusteredUuid,
+                                                        OpTypeEnum::kDelete,
+                                                        BSON("_id" << 1),
+                                                        boost::none,
+                                                        corrupt(computeDocValidationHash(doc)))});
+}
+
+// Every mismatch in a clustered transaction is reported separately, and every op still commits.
+TEST_F(ClusteredTransactionValidationHashLogOnlyTest,
+       ClusteredTransactionMixedCrudMismatchedHashesOnlyLog) {
+    const BSONObj updatePreImage = BSON("_id" << 1 << "x" << 100);
+    const BSONObj deleteDoc = BSON("_id" << 2 << "x" << 200);
+    insertClusteredDocument(updatePreImage);
+    insertClusteredDocument(deleteDoc);
+
+    const BSONObj updatePostImage = BSON("_id" << 1 << "x" << 150);
+    const BSONObj insertDoc = BSON("_id" << 3 << "arr" << BSON_ARRAY(1 << 2));
+
+    const std::vector<ReplOperation> ops = {
+        makeClusteredInnerOp(_clusteredNss,
+                             _clusteredUuid,
+                             OpTypeEnum::kInsert,
+                             insertDoc,
+                             boost::none,
+                             corrupt(computeDocValidationHash(insertDoc))),
+        makeClusteredInnerOp(_clusteredNss,
+                             _clusteredUuid,
+                             OpTypeEnum::kUpdate,
+                             updatePostImage,
+                             BSON("_id" << 1),
+                             corrupt(computeUpdateValidationHash(updatePreImage, updatePostImage))),
+        makeClusteredInnerOp(_clusteredNss,
+                             _clusteredUuid,
+                             OpTypeEnum::kDelete,
+                             BSON("_id" << 2),
+                             boost::none,
+                             corrupt(computeDocValidationHash(deleteDoc)))};
+
+    assertOnlyLogsMismatches([&] { return runTransactionSteadyState(ops); },
+                             {insertMismatch(insertDoc),
+                              updateMismatch(updatePreImage, updatePostImage),
+                              deleteMismatch(deleteDoc)});
+
+    assertClusteredDocumentIs(BSON("_id" << 1), updatePostImage);
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 2)).has_value());
+    assertClusteredDocumentIs(BSON("_id" << 3), insertDoc);
+}
+
+// A batched write over a clustered collection, tagged kApplyOpsAppliedSeparately.
+TEST_F(ClusteredTransactionValidationHashTest, ClusteredBatchedWriteMatchingHashesApplyCleanly) {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    const BSONObj insertDoc = BSON("_id" << 2 << "x" << 300);
+
+    ASSERT_OK(runTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kUpdate,
+                              postImage,
+                              BSON("_id" << 1),
+                              computeUpdateValidationHash(preImage, postImage)),
+         makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kInsert,
+                              insertDoc,
+                              boost::none,
+                              computeDocValidationHash(insertDoc))},
+        MultiOplogEntryType::kApplyOpsAppliedSeparately));
+
+    assertClusteredDocumentIs(BSON("_id" << 1), postImage);
+    assertClusteredDocumentIs(BSON("_id" << 2), insertDoc);
+}
+
+TEST_F(ClusteredTransactionValidationHashTest,
+       TimeseriesBucketTransactionMatchingHashesApplyCleanly) {
+    const OID appendedId = OID::gen();
+    const OID deletedId = OID::gen();
+    const BSONObj appendPreImage = makeBucketDoc(appendedId, {10});
+    const BSONObj deletedBucket = makeBucketDoc(deletedId, {30});
+    insertBucketDocument(appendPreImage);
+    insertBucketDocument(deletedBucket);
+
+    const OID insertedId = OID::gen();
+    const BSONObj insertedBucket = makeBucketDoc(insertedId, {40});
+    const BSONObj appendPostImage = makeBucketDoc(appendedId, {10, 20});
+
+    ASSERT_OK(runTransactionSteadyState(
+        {makeClusteredInnerOp(_timeseriesNss,
+                              _timeseriesUuid,
+                              OpTypeEnum::kInsert,
+                              insertedBucket,
+                              boost::none,
+                              computeDocValidationHash(insertedBucket)),
+         makeClusteredInnerOp(_timeseriesNss,
+                              _timeseriesUuid,
+                              OpTypeEnum::kUpdate,
+                              makeDelta(appendPreImage, appendPostImage),
+                              BSON("_id" << appendedId),
+                              computeUpdateValidationHash(appendPreImage, appendPostImage)),
+         makeClusteredInnerOp(_timeseriesNss,
+                              _timeseriesUuid,
+                              OpTypeEnum::kDelete,
+                              BSON("_id" << deletedId),
+                              boost::none,
+                              computeDocValidationHash(deletedBucket))}));
+
+    assertBucketDocumentIs(insertedId, insertedBucket);
+    assertBucketDocumentIs(appendedId, appendPostImage);
+    EXPECT_FALSE(bucketDocumentFor(deletedId).has_value());
+}
+
+DEATH_TEST_F(ClusteredTransactionValidationHashDeathTest,
+             TimeseriesBucketTransactionAppendMismatchedHashFasserts,
+             "12851600") {
+    const OID bucketId = OID::gen();
+    const BSONObj preImage = makeBucketDoc(bucketId, {10});
+    insertBucketDocument(preImage);
+
+    const BSONObj postImage = makeBucketDoc(bucketId, {10, 20});
+    std::ignore = runTransactionSteadyState(
+        {makeClusteredInnerOp(_timeseriesNss,
+                              _timeseriesUuid,
+                              OpTypeEnum::kUpdate,
+                              makeDelta(preImage, postImage),
+                              BSON("_id" << bucketId),
+                              corrupt(computeUpdateValidationHash(preImage, postImage)))});
+}
+
+class ClusteredPreparedTransactionValidationHashTest
+    : public PreparedTransactionValidationHashTest {
+protected:
+    unittest::ServerParameterGuard _clusteredFastPathFlag{
+        "featureFlagClusteredCollectionOplogApplyFastPath", true};
+};
+using ClusteredPreparedTransactionValidationHashDeathTest =
+    FatalOnMismatchTest<ClusteredPreparedTransactionValidationHashTest>;
+
+TEST_F(ClusteredPreparedTransactionValidationHashTest,
+       ClusteredMixedCrudMatchingHashesApplyCleanly) {
+    const BSONObj updatePreImage = BSON("_id" << 1 << "x" << 100);
+    const BSONObj deleteDoc = BSON("_id" << 2 << "x" << 200);
+    insertClusteredDocument(updatePreImage);
+    insertClusteredDocument(deleteDoc);
+
+    const BSONObj updatePostImage = BSON("_id" << 1 << "x" << 200);
+    const BSONObj insertDoc = BSON("_id" << 3 << "y" << 5);
+
+    ASSERT_OK(runPreparedTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kUpdate,
+                              updatePostImage,
+                              BSON("_id" << 1),
+                              computeUpdateValidationHash(updatePreImage, updatePostImage)),
+         makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kInsert,
+                              insertDoc,
+                              boost::none,
+                              computeDocValidationHash(insertDoc)),
+         makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kDelete,
+                              BSON("_id" << 2),
+                              boost::none,
+                              computeDocValidationHash(deleteDoc))}));
+
+    assertClusteredDocumentIs(BSON("_id" << 1), updatePostImage);
+    EXPECT_FALSE(clusteredDocumentFor(BSON("_id" << 2)).has_value());
+    assertClusteredDocumentIs(BSON("_id" << 3), insertDoc);
+}
+
+DEATH_TEST_F(ClusteredPreparedTransactionValidationHashDeathTest,
+             ClusteredPreparedTransactionUpdateMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj preImage = BSON("_id" << 1 << "x" << 100);
+    insertClusteredDocument(preImage);
+
+    const BSONObj postImage = BSON("_id" << 1 << "x" << 200);
+    std::ignore = runPreparedTransactionSteadyState(
+        {makeClusteredInnerOp(_clusteredNss,
+                              _clusteredUuid,
+                              OpTypeEnum::kUpdate,
+                              postImage,
+                              BSON("_id" << 1),
+                              corrupt(computeUpdateValidationHash(preImage, postImage)))});
+}
+
+DEATH_TEST_F(ClusteredPreparedTransactionValidationHashDeathTest,
+             TimeseriesBucketPreparedTransactionInsertMismatchedHashFasserts,
+             "12851600") {
+    const BSONObj bucket = makeBucketDoc(OID::gen(), {10});
+    std::ignore = runPreparedTransactionSteadyState(
+        {makeClusteredInnerOp(_timeseriesNss,
+                              _timeseriesUuid,
+                              OpTypeEnum::kInsert,
+                              bucket,
+                              boost::none,
+                              corrupt(computeDocValidationHash(bucket)))});
 }
 
 }  // namespace

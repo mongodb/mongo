@@ -23,6 +23,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagClusteredCollectionOplogApplyFastPath: true
         featureFlagContinuousInternodeValidationPerDocument: true
         featureFlagRecordIdsReplicated: true
         internalQueryStatsErrorsAreCommandFatal: true

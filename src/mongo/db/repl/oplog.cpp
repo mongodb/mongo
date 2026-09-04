@@ -1641,6 +1641,19 @@ boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
     return singleOpMeta->getH();
 }
 
+// A clustered collection's record id is derived from its document rather than carried on the oplog
+// entry, so the insert appliers have no record id to hand to verifyValidationHash().
+RecordId resolveRecordIdForDiagnostics(const CollectionPtr& collection,
+                                       const RecordId& recordId,
+                                       const BSONObj& doc) {
+    if (!recordId.isNull() || !clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+        return recordId;
+    }
+    auto swRecordId = record_id_helpers::keyForDoc(
+        doc, collection->getClusteredInfo()->getIndexSpec(), collection->getDefaultCollator());
+    return swRecordId.isOK() ? swRecordId.getValue() : RecordId();
+}
+
 // Compares 'actualHash', recomputed by this non-primary, against the hash the primary recorded on
 // 'op'. Every mismatch is logged. It is then fatal, unless
 // 'continuousInternodeValidationFatalOnMismatch' is disabled or the node is still starting up.
@@ -1671,10 +1684,17 @@ void verifyValidationHash(OperationContext* opCtx,
     incrementDocumentHashMismatchCount(op.getOpType());
 
     // Read back the document we just persisted to compare against what this node actually stored.
-    const BSONObj storedDocument = collection->docFor(opCtx, recordId).value().getOwned();
+    const RecordId resolvedRecordId =
+        resolveRecordIdForDiagnostics(collection, recordId, diagnosticDoc);
+    Snapshotted<BSONObj> readBack;
+    const bool foundStoredDocument =
+        !resolvedRecordId.isNull() && collection->findDoc(opCtx, resolvedRecordId, &readBack);
+    const BSONObj storedDocument = foundStoredDocument ? readBack.value().getOwned() : BSONObj();
     // For deletes the document has not been removed yet, so 'diagnosticDoc' is the stored document
-    // and a diff would always be empty.
-    boost::optional<BSONObj> fieldLevelDiff = op.getOpType() == OpTypeEnum::kDelete
+    // and a diff would always be empty. With no stored document there is nothing to diff against,
+    // and an all-fields-deleted diff would read as though this node held nothing.
+    boost::optional<BSONObj> fieldLevelDiff =
+        (op.getOpType() == OpTypeEnum::kDelete || !foundStoredDocument)
         ? boost::none
         : doc_diff::computeInlineDiff(diagnosticDoc, storedDocument);
 
@@ -1693,12 +1713,13 @@ void verifyValidationHash(OperationContext* opCtx,
                 "actualHash"_attr = actualHash,
                 logAttrs(op.getNss()),
                 "id"_attr = redact(op.getIdElement().wrap()),
-                "recordId"_attr = recordId,
+                "recordId"_attr = resolvedRecordId,
                 "timestamp"_attr = op.getTimestamp().toString(),
                 "opType"_attr = idl::serialize(op.getOpType()),
                 "nodeId"_attr = nodeId,
                 "oplogEntry"_attr = redact(op.toBSONForLogging()),
-                "storedDocument"_attr = redact(storedDocument),
+                "storedDocument"_attr = (foundStoredDocument ? redact(storedDocument).toString()
+                                                             : std::string("<not found>")),
                 "fieldLevelDiff"_attr = (fieldLevelDiff ? redact(*fieldLevelDiff).toString()
                                                         : std::string("<not derivable>")));
 
@@ -1715,15 +1736,37 @@ void verifyValidationHash(OperationContext* opCtx,
         LOGV2_FATAL(12851600, "Aborting after a document validation hash mismatch");
     }
 }
+
+// Everything shouldVerifyValidationHash() requires except the presence of a hash on the individual
+// entry. Split out because it depends only on the collection and the application mode, so a grouped
+// insert can evaluate it once for the whole batch and then check only the per-entry hash.
+bool isValidationHashVerifiableFor(OperationContext* opCtx,
+                                   const CollectionPtr& collection,
+                                   OplogApplication::Mode mode) {
+    if (mode != OplogApplication::Mode::kSecondary) {
+        return false;
+    }
+    if (!collection->areRecordIdsReplicated() &&
+        !(collection->isClustered() &&
+          clustered_util::isClusteredOnId(collection->getClusteredInfo()))) {
+        return false;
+    }
+    if (!isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
+        return false;
+    }
+    // Resharding's collections may carry a hash, but are materialized at-least-once and commit
+    // transiently invalid documents that self-heal, so they are not verified.
+    const auto& nss = collection->ns();
+    return isReplicatedFastCountEligible(nss) && !isReshardingInternalCollection(nss);
+}
 }  // namespace
 
 bool shouldVerifyValidationHash(OperationContext* opCtx,
                                 const CollectionPtr& collection,
                                 OplogApplication::Mode mode,
                                 const OplogEntry& op) {
-    return mode == OplogApplication::Mode::kSecondary && collection->areRecordIdsReplicated() &&
-        getValidationHash(op).has_value() &&
-        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+    return getValidationHash(op).has_value() &&
+        isValidationHashVerifiableFor(opCtx, collection, mode);
 }
 
 constexpr std::string_view OplogApplication::kInitialSyncOplogApplicationMode;
@@ -2586,13 +2629,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     return status;
                 }
 
-                // These conditions mirror shouldVerifyValidationHash() but are hoisted out of the
-                // loop because mode, collection, and the feature flag are stay the same across a
-                // grouped insert. We evaluate them once here and perform only the per-entry hash
-                // check inside the loop.
-                if (mode == OplogApplication::Mode::kSecondary &&
-                    collection->areRecordIdsReplicated() &&
-                    isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
+                // Everything but the per-entry hash stays the same across a grouped insert, so it
+                // is evaluated once here and only the hash is checked inside the loop.
+                if (isValidationHashVerifiableFor(opCtx, collection, mode)) {
                     for (size_t i = 0; i < insertObjs.size(); i++) {
                         if (getValidationHash(*insertOps[i]).has_value()) {
                             const BSONObj& doc = insertObjs[i].doc;

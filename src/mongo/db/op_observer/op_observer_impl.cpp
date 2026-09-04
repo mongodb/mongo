@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
@@ -135,6 +136,27 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(boost::optional<int32_t> 
     m.setSz(replicatedSizeDelta);
     m.setH(docHash);
     return m;
+}
+
+// Returns true if a per-document validation hash should be recorded for a write to 'coll'. The
+// rolling collection hash is the hash's only consumer, so a namespace the replicated fast count
+// does not track gains nothing from one.
+//
+// Resharding's temporary collections are deliberately NOT excluded here even though the applier
+// skips verifying them: they are renamed onto the source namespace keeping their UUID, and the
+// fast count store is keyed by UUID, so suppressing their hashes would leave every resharded
+// collection permanently without one.
+bool shouldRecordValidationHash(OperationContext* opCtx,
+                                const CollectionPtr& coll,
+                                bool hasReplicatedRecordId) {
+    if (!repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
+        return false;
+    }
+    if (!hasReplicatedRecordId &&
+        !(coll->isClustered() && clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
+        return false;
+    }
+    return isReplicatedFastCountEligible(coll->ns());
 }
 
 // Attaches size metadata to the given oplog entry if there is a size delta or a validation hash to
@@ -765,7 +787,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     // reserved by an uncommitted write holds back the oplog visibility point, so work done between
     // the reservation and wuow.commit() delays oplog visibility for all concurrent writers.
     const bool useValidationHash =
-        repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+        shouldRecordValidationHash(opCtx, collectionPtr, !recordIds.empty());
     std::vector<int64_t> docHashes;
     if (useValidationHash) {
         docHashes.reserve(count);
@@ -929,8 +951,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
     if (inBatchedWrite) {
-        const bool useValidationHash =
-            repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll, !recordIds.empty());
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -976,8 +997,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
-        const bool useValidationHash =
-            repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) && !recordIds.empty();
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll, !recordIds.empty());
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -1098,8 +1118,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
 
-    const bool useValidationHash = repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
-        !args.updateArgs->replicatedRecordId.isNull();
+    const bool useValidationHash =
+        shouldRecordValidationHash(opCtx, args.coll, !args.updateArgs->replicatedRecordId.isNull());
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
@@ -1304,8 +1324,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         return;
     }
 
-    const bool useValidationHash = repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx) &&
-        !args.replicatedRecordId.isNull();
+    const bool useValidationHash =
+        shouldRecordValidationHash(opCtx, coll, !args.replicatedRecordId.isNull());
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {

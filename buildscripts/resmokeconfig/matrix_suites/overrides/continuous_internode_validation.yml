@@ -7,6 +7,9 @@
           set_parameters:
             featureFlagContinuousInternodeValidationPerDocument: true
             featureFlagRecordIdsReplicated: true
+            # Clustered collections have no replicated record ids, so their updates and deletes
+            # only reach the hash check through the by-record-id apply fast path.
+            featureFlagClusteredCollectionOplogApplyFastPath: true
 - name: three_node_replica_set
   value:
     executor:
