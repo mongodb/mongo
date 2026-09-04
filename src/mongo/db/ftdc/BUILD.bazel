@@ -153,6 +153,8 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/rss:replicated_storage_service",
     ],
 )
 

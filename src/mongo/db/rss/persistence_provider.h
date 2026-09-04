@@ -318,6 +318,11 @@ public:
     virtual bool supportsApplyOpsCommand() const = 0;
 
     /**
+     * If true, the provider supports external usage of the getDiagnosticData command.
+     */
+    virtual bool supportsGetDiagnosticDataExternalCall() const = 0;
+
+    /**
      * Reports the current number of active layered data handles to any provider-specific metrics
      * sink. Default is a no-op; only providers that expose a metric derived from this count
      * override it.

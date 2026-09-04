@@ -11,11 +11,13 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 
 #include <string>
@@ -72,6 +74,12 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream() << "getDiagnosticData command is not supported in this storage mode: "
+                              << provider.name(),
+                (provider.supportsGetDiagnosticDataExternalCall() || getTestCommandsEnabled()));
 
         result.append(
             "data",

@@ -298,6 +298,12 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsApplyOpsCommand() method not implemented");
     }
+
+    bool supportsGetDiagnosticDataExternalCall() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsGetDiagnosticDataExternalCall() method not "
+                  "implemented");
+    }
 };
 
 }  // namespace mongo::rss

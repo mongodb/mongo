@@ -263,6 +263,11 @@ public:
      * Attached storage supports the apply ops user-facing command.
      */
     bool supportsApplyOpsCommand() const override;
+
+    /**
+     * Attached storage supports external usage of getDiagnosticData.
+     */
+    bool supportsGetDiagnosticDataExternalCall() const override;
 };
 
 }  // namespace mongo::rss

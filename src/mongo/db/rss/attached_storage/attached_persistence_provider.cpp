@@ -251,4 +251,8 @@ bool AttachedPersistenceProvider::supportsApplyOpsCommand() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsGetDiagnosticDataExternalCall() const {
+    return true;
+}
+
 }  // namespace mongo::rss
