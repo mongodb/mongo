@@ -17,10 +17,6 @@ selector:
     # Hashed indexes.
     - jstests/core/query/internal_hash_eq/**/*.js
 
-    # Explain will return different plan than expected when a collection becomes a time-series
-    # collection. Also, query shape will be different.
-    - jstests/core/query/explain/**/*.js
-
     - jstests/core/query/elemmatch/**/*.js # $elemMatch
 
     # Time-series collections are views which don't support map-reduce
@@ -33,6 +29,10 @@ selector:
     - requires_capped
     - assumes_standalone_mongod
     - exclude_from_timeseries_crud_passthrough
+    # Explain will return different plan than expected when a collection becomes a time-series
+    # collection. Also, query shape will be different.
+    - uses_explain
+
 executor:
   archive:
     hooks:
