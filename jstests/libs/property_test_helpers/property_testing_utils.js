@@ -310,6 +310,7 @@ function unoptimize(q) {
  * - execution framework set to classic engine
  * - plan cache disabled
  * - pipeline optimizations disabled
+ * - boolean expressions simplifier disabled
  * Returns a map from the position of the query in the list to the result documents.
  */
 export function runDeoptimized(controlColl, queries) {
@@ -323,17 +324,17 @@ export function runDeoptimized(controlColl, queries) {
             getParameter: 1,
             internalQueryFrameworkControl: 1,
             internalQueryDisablePlanCache: 1,
+            internalQueryEnableBooleanExpressionsSimplifier: 1,
         }),
     );
-
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             internalQueryFrameworkControl: "forceClassicEngine",
             internalQueryDisablePlanCache: true,
+            internalQueryEnableBooleanExpressionsSimplifier: false,
         }),
     );
-
     try {
         return queries.map((query) => {
             assert(Array.isArray(query.pipeline) && typeof query.options === "object");
@@ -348,6 +349,8 @@ export function runDeoptimized(controlColl, queries) {
                 setParameter: 1,
                 internalQueryFrameworkControl: priorSettings.internalQueryFrameworkControl,
                 internalQueryDisablePlanCache: priorSettings.internalQueryDisablePlanCache,
+                internalQueryEnableBooleanExpressionsSimplifier:
+                    priorSettings.internalQueryEnableBooleanExpressionsSimplifier,
             }),
         );
     }
