@@ -70,6 +70,7 @@ constraint_setting(name = "distro")
         "amazon_linux_2",
         "amazon_linux_2023",
         "amazon_linux_2023_3",
+        "debian10",
         "debian12",
         "rhel8",
         "rhel9",
@@ -287,7 +288,6 @@ platform(
     ],
 )
 
-load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 py_binary(
@@ -300,24 +300,6 @@ py_test(
     name = "remote_execution_containers_generator_test",
     srcs = ["remote_execution_containers_generator_test.py"],
     data = ["remote_execution_containers_generator.py"],
-)
-
-py_binary(
-    name = "remote_execution_containers_pr",
-    srcs = ["remote_execution_containers_pr.py"],
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "pygithub",
-            group = "testing",
-        ),
-    ],
-)
-
-py_test(
-    name = "remote_execution_containers_pr_test",
-    srcs = ["remote_execution_containers_pr_test.py"],
-    data = ["remote_execution_containers_pr.py"],
 )
 
 exports_files([

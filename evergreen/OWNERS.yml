@@ -69,6 +69,3 @@ filters:
   - "fetch_mongodb_database_tools.sh":
     approvers:
       - 10gen/query-optimization-correctness
-  - "remote_execution_containers_generate.sh":
-    approvers:
-      - 10gen/devprod-build
