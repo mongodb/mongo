@@ -1,3 +1,4 @@
+import logging
 import os
 import stat
 import sys
@@ -7,8 +8,12 @@ from unittest import mock
 
 from buildscripts.resmokelib.core.programs import (
     _format_shell_vars,
+    get_binary_version,
     get_binary_version_output,
+    get_version_suffix,
+    mongod_program,
 )
+from buildscripts.resmokelib.utils.history import make_historic
 
 
 class GetBinaryVersionOutputTestCase(unittest.TestCase):
@@ -46,6 +51,48 @@ class GetBinaryVersionOutputTestCase(unittest.TestCase):
             self.assertEqual(len(called_args), 2)
             self.assertEqual(os.path.normcase(called_args[0]), os.path.normcase(binary_path))
             self.assertEqual(called_args[1], "--version")
+
+
+class GetVersionSuffixTestCase(unittest.TestCase):
+    def test_suffixed_binary(self):
+        self.assertEqual(get_version_suffix("mongod-9.0"), "9.0")
+        self.assertEqual(get_version_suffix("/data/multiversion/mongod-8.2"), "8.2")
+
+    def test_latest_binary(self):
+        self.assertIsNone(get_version_suffix("mongod"))
+        self.assertIsNone(get_version_suffix("/data/mci/abc/src/dist-test/bin/mongod"))
+
+
+class GetBinaryVersionTestCase(unittest.TestCase):
+    def test_suffixed_binary(self):
+        self.assertEqual(get_binary_version("mongod-8.2"), "8.2")
+
+    def test_latest_binary(self):
+        from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
+
+        self.assertEqual(get_binary_version("mongod"), LATEST_FCV)
+
+
+class MongodProgramSetParametersTestCase(unittest.TestCase):
+    PARAM = "migrationRecipientPITHistoryToPreserveInSecs"
+
+    def _final_set_parameters(self, executable):
+        mongod_options = make_historic({"set_parameters": {self.PARAM: 1}, "port": 12345})
+        _, final_options = mongod_program(
+            logging.getLogger(__name__), 0, executable, {}, mongod_options
+        )
+        return final_options["set_parameters"]
+
+    def test_strips_the_parameter_only_for_multiversion_binaries_that_predate_it(self):
+        # The 9.0 branch reports the same version as master (9.0), so the suffix is what
+        # identifies a downloaded binary that does not have the parameter.
+        self.assertNotIn(self.PARAM, self._final_set_parameters("mongod-9.0"))
+        self.assertNotIn(self.PARAM, self._final_set_parameters("/data/multiversion/mongod-8.2"))
+        self.assertIn(self.PARAM, self._final_set_parameters("mongod-9.1"))
+        self.assertIn(self.PARAM, self._final_set_parameters("mongod"))
+        self.assertIn(
+            self.PARAM, self._final_set_parameters("/data/mci/abc/src/dist-test/bin/mongod")
+        )
 
 
 class ResmokeProgramsTestCase(unittest.TestCase):

@@ -66,16 +66,22 @@ def get_binary_version_output(binary_path):
     return check_output([binary, "--version"], env=env_vars).decode("utf-8")
 
 
-def get_binary_version(executable):
-    """Return the string for the binary version of the given executable."""
-
-    from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
+def get_version_suffix(executable):
+    """Return the version suffix of the given executable (e.g. '9.0' for 'mongod-9.0'), or None."""
 
     split_executable = os.path.basename(executable).split("-")
     version_regex = re.compile(version.VERSION_PATTERN, re.VERBOSE | re.IGNORECASE)
     if len(split_executable) > 1 and version_regex.match(split_executable[-1]):
         return split_executable[-1]
-    return LATEST_FCV
+    return None
+
+
+def get_binary_version(executable):
+    """Return the string for the binary version of the given executable."""
+
+    from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
+
+    return get_version_suffix(executable) or LATEST_FCV
 
 
 def remove_set_parameter_if_before_version(
@@ -180,9 +186,16 @@ def mongod_program(
     remove_set_parameter_if_before_version(
         suite_set_parameters, "findShardsOnConfigTimeoutMS", bin_version, "8.3.0"
     )
-    remove_set_parameter_if_before_version(
-        suite_set_parameters, "migrationRecipientPITHistoryToPreserveInSecs", bin_version, "9.0.0"
-    )
+    # The v9.0 branch predates this parameter but its binaries report the same version (9.0) as
+    # the latest binary, so gate on the version suffix of downloaded multiversion binaries instead.
+    bin_version_suffix = get_version_suffix(executable)
+    if bin_version_suffix:
+        remove_set_parameter_if_before_version(
+            suite_set_parameters,
+            "migrationRecipientPITHistoryToPreserveInSecs",
+            bin_version_suffix,
+            "9.1.0",
+        )
 
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
         mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
