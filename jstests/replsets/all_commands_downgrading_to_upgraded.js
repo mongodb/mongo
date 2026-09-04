@@ -438,16 +438,28 @@ const allCommands = {
         command: {checkMetadataConsistency: 1},
     },
     checkShardingIndex: {
-        setUp: function (conn, fixture) {
-            assert.commandWorked(fixture.shard0.getDB(dbName).runCommand({create: collName}));
-            const f = fixture.shard0.getCollection(fullNs);
-            f.createIndex({x: 1, y: 1});
-        },
-        command: {checkShardingIndex: fullNs, keyPattern: {x: 1, y: 1}},
         isShardedOnly: true,
-        isShardSvrOnly: true,
-        teardown: function (conn) {
-            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        fullScenario: function (conn, fixture) {
+            const testDb = "testDB";
+            // Manually specify the primary shard since the command can only run against the shard node.
+            assert.commandWorked(
+                conn.adminCommand({
+                    enableSharding: testDb,
+                    primaryShard: fixture.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(conn.getDB(testDb).runCommand({create: collName}));
+            const fullNamespace = testDb + "." + collName;
+            conn.getCollection(fullNamespace).createIndex({x: 1, y: 1});
+
+            assert.commandWorked(
+                fixture.shard0
+                    .getDB(testDb)
+                    .runCommand({checkShardingIndex: fullNamespace, keyPattern: {x: 1, y: 1}}),
+            );
+
+            // Drop testDB to leave the status clean
+            assert.commandWorked(conn.getDB(testDb).dropDatabase());
         },
     },
     cleanupOrphaned: {
