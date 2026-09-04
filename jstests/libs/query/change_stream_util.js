@@ -1149,6 +1149,54 @@ export function advanceClusterTime(db) {
 }
 
 /**
+ * Advance the cluster time on every primary of the test fixture, including the config server
+ * primary, then ensure every router has observed the advanced cluster time. This covers a
+ * dedicated (non-config-shard) config server as well as multi-router fixtures, where a mongos
+ * that served none of the preceding traffic may still hold an older cluster time.
+ */
+export function advanceClusterTimeIncludingConfigServer(db) {
+    const msg =
+        "Advancing oplog time before waiting for changestream. See SERVER-131399 for motivation";
+    // In transaction passthroughs the override may have left a transaction open on the test's
+    // session. Commit it now via a non-transactional command on that session: the commands below
+    // run on other sessions, and the override would otherwise try to commit the open transaction
+    // with the wrong lsid and fail with "transaction that was not started".
+    assert.commandWorked(db.adminCommand({ping: 1}));
+
+    // The cluster appendOplogNote below only targets shards; write directly to every replica set
+    // first so a dedicated config server is covered too. In config-shard mode the config server
+    // is also listed in config.shards, so it may receive a second (harmless) no-op write.
+    // getAllReplicas() constructs fresh connections that have not observed the cluster time
+    // gossiped to 'db', so propagate it explicitly: otherwise the no-op below could be
+    // timestamped below that time, which would defeat the purpose of this helper.
+    const signedClusterTime = db.getMongo().getClusterTime();
+    for (const replSet of FixtureHelpers.getAllReplicas(db, true /* includeConfigServers */)) {
+        const primary = replSet.getPrimary();
+        if (signedClusterTime) {
+            primary.advanceClusterTime(signedClusterTime);
+        }
+        assert.commandWorked(primary.getDB("admin").runCommand({appendOplogNote: 1, data: {msg}}));
+    }
+
+    // Run appendOplogNote through every router: it writes a no-op on all shards, and the shard
+    // responses advance the issuing router's cluster time before the command returns.
+    // Temporarily disable mongos pinning so the individual router connections behind the
+    // multi-router proxy are reachable; with pinning active the proxy only exposes the pinned
+    // router.
+    const conn = db.getMongo();
+    const pinnedBefore = TestData.pinToSingleMongos;
+    TestData.pinToSingleMongos = false;
+    try {
+        const routers = conn.isMultiRouter ? conn._mongoConnections : [conn];
+        for (const router of routers) {
+            assert.commandWorked(router.adminCommand({appendOplogNote: 1, data: {msg}}));
+        }
+    } finally {
+        TestData.pinToSingleMongos = pinnedBefore;
+    }
+}
+
+/**
  * Returns the current cluster time by issuing a 'hello' command to the server and extracting
  * the cluster time from it.
  */

@@ -17,7 +17,11 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    advanceClusterTimeIncludingConfigServer,
+    CursorList,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
 import {TestDataModifyGuard} from "jstests/libs/query/change_stream_metrics_util.js";
 
@@ -317,9 +321,12 @@ describe("change stream cursor metrics in currentOp", function () {
     it("optime initialized to cluster time with no start option", function () {
         const comment = "optime initialized to cluster time with no start option";
 
-        // TODO SERVER-128391: Investigate why using 'getClusterTime()' from change_stream_util.js
-        // does not work in disagg test suites.
         const currentClusterTime = getClusterTimeFromInsert(testDB);
+        // The cluster time gossiped above can outpace the oplog's visible timestamp (e.g. when the
+        // periodic no-op writer hasn't caught up yet), which is what a fresh change stream's
+        // initial optime is derived from. Force the oplog to catch up to currentClusterTime before
+        // opening the cursor so the assertion below isn't racy. See SERVER-128391/SERVER-131399.
+        advanceClusterTimeIncludingConfigServer(testDB);
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         const idleCursor = getIdleCursor(comment, cursor);
