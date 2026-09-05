@@ -34,6 +34,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
@@ -2017,7 +2018,20 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
     // schemaEpoch may be none even if schema epochs are in use if this is an unreplicated drop
     if (_usesSchemaEpochs && schemaEpoch) {
-        publishIdent(wtRu, uri, *schemaEpoch);
+        int ret = _publishIdent(wtRu, uri, *schemaEpoch);
+        // If the stepdown epoch was set in between when we acquire a timestamp/schema epoch and
+        // when we call drop(), we cannot publish using the reserved schema epoch and WT will return
+        // EINVAL. When this happens, we need to retry the drop with a new schema epoch. The drop
+        // retry will succeed because we consider ENOENT success, and then the publish will succeed
+        // with a post-stepdown epoch. If we get EINVAL for any other reason it's a fatal error.
+        // Note that this check works because boost::none is less than any non-none value.
+        if (ret == EINVAL && getStepDownEpoch() > *schemaEpoch) {
+            return Status(ErrorCodes::WriteConflict,
+                          "Stepdown started after the drop timestamp was reserved but before "
+                          "the drop happened. This drop timestamp cannot be used for a drop "
+                          "performed after a stepdown timestamp is set.");
+        }
+        invariantWTOK(ret, *wtRu.getSessionNoTxn());
     }
 
     return status;
@@ -2342,7 +2356,7 @@ void WiredTigerKVEngine::demoteToFollower() {
     invariantWTOK(_conn->reconfigure(_conn, followerConfig), nullptr);
     // Stepping down to follower clears WiredTiger's own step-down timestamp; keep our cached copy
     // (returned by getStepDownTimestamp()) in sync so a later leader term starts with none set.
-    _stepDownTimestamp.store(0);
+    _stepDownTimestamp = Timestamp{};
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
@@ -2434,9 +2448,12 @@ void WiredTigerKVEngine::setStepDownTimestamp(Timestamp stepDownTimestamp) {
                        ",step_down_disaggregated_schema_epoch={:x}",
                        _provider.getSchemaEpochForTimestamp(stepDownTimestamp));
     }
-    invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
 
-    _stepDownTimestamp.store(stepDownTimestamp.asULL());
+    {
+        auto guard = _stepDownTimestamp.synchronize();
+        invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
+        *guard = stepDownTimestamp;
+    }
 
     LOGV2(13113700,
           "Set step-down (cutover) timestamp",
@@ -2694,20 +2711,24 @@ void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
                                   : *_pinnedAllDurableTimestamps.begin());
 }
 
-void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
+int WiredTigerKVEngine::_publishIdent(WiredTigerRecoveryUnit& ru,
                                       const std::string& uri,
                                       uint64_t schemaEpoch) {
     LOGV2_DEBUG(11928700, 1, "publishIdent", "uri"_attr = uri, "schemaEpoch"_attr = schemaEpoch);
     if (!gFeatureFlagEnableSchemaEpochs.isEnabled()) {
-        return;
+        return 0;
     }
 
     auto* session = ru.getSessionNoTxn();
     invariant(session);
-    invariantWTOK(
-        session->publish(uri.c_str(),
-                         fmt::format("disaggregated=(schema_epoch={:x})", schemaEpoch).c_str()),
-        *session);
+    return session->publish(uri.c_str(),
+                            fmt::format("disaggregated=(schema_epoch={:x})", schemaEpoch).c_str());
+}
+
+void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
+                                      const std::string& uri,
+                                      uint64_t schemaEpoch) {
+    invariantWTOK(_publishIdent(ru, uri, schemaEpoch), *ru.getSessionNoTxn());
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
@@ -3103,7 +3124,15 @@ Timestamp WiredTigerKVEngine::getStableTimestamp() const {
 }
 
 Timestamp WiredTigerKVEngine::getStepDownTimestamp() const {
-    return Timestamp(_stepDownTimestamp.load());
+    return _stepDownTimestamp.get();
+}
+
+boost::optional<uint64_t> WiredTigerKVEngine::getStepDownEpoch() const {
+    auto ts = getStepDownTimestamp();
+    if (ts.isNull()) {
+        return boost::none;
+    }
+    return _provider.getSchemaEpochForTimestamp(ts);
 }
 
 Timestamp WiredTigerKVEngine::getOldestTimestamp() const {

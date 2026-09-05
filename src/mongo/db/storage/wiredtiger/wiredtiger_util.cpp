@@ -16,6 +16,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
@@ -1617,12 +1618,28 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
             !ru.readOnly());
 
     invariant(ru.inUnitOfWork());
+    auto* kvEngine = ru.getConnection()->getKVEngine();
     auto& session = *ru.getSession();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
+
+    const bool checkStepdown =
+        kvEngine && kvEngine->usesSchemaEpochs() && gFeatureFlagEnableSchemaEpochs.isEnabled();
+    const Timestamp stepdownBefore = checkStepdown ? kvEngine->getStepDownTimestamp() : Timestamp();
     const auto status = wtRCToStatus(session.create(uri, config), session);
-    if (status.isOK()) {
-        ru.onCreateTable(uri);
+    if (!status.isOK()) {
+        return status;
     }
+
+    using StepdownState = WiredTigerRecoveryUnit::StepdownState;
+    auto state = StepdownState::before;
+    if (checkStepdown) {
+        if (kvEngine->getStepDownTimestamp() != stepdownBefore) {
+            state = StepdownState::invalid;
+        } else if (!stepdownBefore.isNull()) {
+            state = StepdownState::after;
+        }
+    }
+    ru.onCreateTable(uri, state);
     return status;
 }
 

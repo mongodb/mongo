@@ -7,6 +7,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
@@ -117,6 +118,42 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     }
 }
 
+void WiredTigerRecoveryUnit::_validateTableTimestamps(WiredTigerKVEngineBase* kvEngineBase) {
+    if (_createdTables.empty())
+        return;
+    auto kvEngine = dynamic_cast<const WiredTigerKVEngine*>(kvEngineBase);
+    if (!kvEngine || !kvEngine->usesSchemaEpochs() || !gFeatureFlagEnableSchemaEpochs.isEnabled())
+        return;
+    auto stepdownEpoch = kvEngine->getStepDownEpoch();
+    if (!stepdownEpoch)
+        return;
+
+    auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
+    for (const auto& [_, ts, state] : _createdTables) {
+        // If no timestamp is present then we're using a schema epoch set via setSchemaEpoch() in
+        // the startup path and the caller is responsible for ensuring it's valid.
+        if (ts.isNull())
+            continue;
+        auto epoch = provider.getSchemaEpochForTimestamp(ts);
+        switch (state) {
+            case StepdownState::before:
+                if (epoch > stepdownEpoch)
+                    throwWriteConflictException(
+                        "table created before the stepdown epoch was set cannot "
+                        "publish with an epoch above it.");
+                break;
+            case StepdownState::after:
+                if (epoch <= stepdownEpoch)
+                    throwWriteConflictException(
+                        "table created after the stepdown epoch was set cannot "
+                        "publish at or below it");
+                break;
+            case StepdownState::invalid:
+                throwWriteConflictException("stepdown timestamp changed while creating a table");
+        }
+    }
+}
+
 void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
                                                      bool needsAllDurablePin) {
     // _txnClose() resets per-transaction state including _schemaEpoch; snapshot it for publishing
@@ -135,6 +172,8 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
                 kvEngine->unpinAllDurableTimestamp(pinnedTs);
         });
 
+        _validateTableTimestamps(kvEngine);
+
         _txnClose(true);
 
         if (schemaEpoch) {
@@ -144,6 +183,7 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
             invariant(_createdTables.size() == 1);
             kvEngine->publishIdent(*this, _createdTables[0].uri, *schemaEpoch);
         } else {
+            auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
             // Publish each table at the epoch of the write that introduced it, so any checkpoint
             // whose epoch covers a table's catalog entry also covers the table.
             for (const auto& table : _createdTables) {
@@ -151,9 +191,7 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
                 // that never called setSchemaEpoch().
                 invariant(!table.timestamp.isNull());
                 invariant(_opCtx);
-                uint64_t epoch = rss::ReplicatedStorageService::get(_opCtx)
-                                     .getPersistenceProvider()
-                                     .getSchemaEpochForTimestamp(table.timestamp);
+                uint64_t epoch = provider.getSchemaEpochForTimestamp(table.timestamp);
                 kvEngine->publishIdent(*this, table.uri, epoch);
             }
         }
@@ -1241,7 +1279,7 @@ void WiredTigerRecoveryUnit::setOperationContext(OperationContext* opCtx) {
     }
 }
 
-void WiredTigerRecoveryUnit::onCreateTable(const char* uri) {
+void WiredTigerRecoveryUnit::onCreateTable(const char* uri, StepdownState state) {
     // Two timestamping modes:
     //   1. _commitTimestamp (one timestamp for the whole transaction, set before it begins, e.g.
     //      oplog application).
@@ -1250,7 +1288,7 @@ void WiredTigerRecoveryUnit::onCreateTable(const char* uri) {
     // matching what the table's untimestamped catalog writes are assigned.
     Timestamp ts =
         !_commitTimestamp.isNull() ? _commitTimestamp : _lastTimestampSet.value_or(Timestamp());
-    _createdTables.push_back({uri, ts});
+    _createdTables.push_back({uri, ts, state});
 }
 
 void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {

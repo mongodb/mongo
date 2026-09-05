@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+using StepdownState = WiredTigerRecoveryUnit::StepdownState;
+
 template <typename EngineT = WiredTigerKVEngine>
 class WiredTigerRecoveryUnitHarnessHelperT final : public RecoveryUnitHarnessHelper {
 public:
@@ -1341,7 +1343,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, PrimaryPathPublishesWithP
 
         StorageWriteTransaction txn(*ru1);
         ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
-        ru1->onCreateTable("my-table");
+        ru1->onCreateTable("my-table", StepdownState::before);
         txn.commit();
     }
 
@@ -1362,7 +1364,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, AbortDoesNotCallPublish) 
 
     {
         StorageWriteTransaction txn(*ru1);
-        ru1->onCreateTable("my-table");
+        ru1->onCreateTable("my-table", StepdownState::before);
         // txn goes out of scope without commit, triggering abort.
     }
 
@@ -1382,7 +1384,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
 
     StorageWriteTransaction txn(*ru1);
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
-    ru1->onCreateTable("my-table");
+    ru1->onCreateTable("my-table", StepdownState::before);
     txn.commit();
 }
 
@@ -1404,7 +1406,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     StorageWriteTransaction txn(*ru1);
     // Activate the WT session (simulates actual writes during oplog application).
     ru1->getSession();
-    ru1->onCreateTable("my-table");
+    ru1->onCreateTable("my-table", StepdownState::before);
     txn.commit();
     ru1->clearCommitTimestamp();
 }
@@ -1426,8 +1428,8 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     ru1->setCommitTimestamp(Timestamp(5, 0));
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
-    ru1->onCreateTable("table-a");
-    ru1->onCreateTable("table-b");
+    ru1->onCreateTable("table-a", StepdownState::before);
+    ru1->onCreateTable("table-b", StepdownState::before);
     txn.commit();
     ru1->clearCommitTimestamp();
 }
@@ -1447,9 +1449,9 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
 
     StorageWriteTransaction txn(*ru1);
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
-    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-a", StepdownState::before);
     ASSERT_OK(ru1->setTimestamp(Timestamp(3, 0)));
-    ru1->onCreateTable("table-b");
+    ru1->onCreateTable("table-b", StepdownState::before);
     txn.commit();
 }
 
@@ -1467,7 +1469,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
 
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
-    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-a", StepdownState::before);
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
     ASSERT_OK(ru1->setTimestamp(Timestamp(3, 0)));
     txn.commit();
@@ -1487,7 +1489,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, SchemaEpochPathPublishesA
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
     ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
-    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-a", StepdownState::before);
     txn.commit();
 }
 
@@ -1506,9 +1508,9 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
 
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
-    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-a", StepdownState::before);
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
-    ru1->onCreateTable("table-b");
+    ru1->onCreateTable("table-b", StepdownState::before);
     txn.commit();
 }
 
@@ -1566,7 +1568,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
 
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
-    ru1->onCreateTable("my-table");
+    ru1->onCreateTable("my-table", StepdownState::before);
     // Committing without a timestamp or schema epoch when schema epochs are in use must fail
     txn.commit();
 }
@@ -1579,7 +1581,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
     ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
-    ru1->onCreateTable("table-a");
+    ru1->onCreateTable("table-a", StepdownState::before);
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
     // setSchemaEpoch() is only valid for a transaction that never becomes timestamped.
     txn.commit();
@@ -1593,8 +1595,8 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitPublishTableCreationTestDeathTest,
     StorageWriteTransaction txn(*ru1);
     ru1->getSession();
     ru1->setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
-    ru1->onCreateTable("table-a");
-    ru1->onCreateTable("table-b");
+    ru1->onCreateTable("table-a", StepdownState::before);
+    ru1->onCreateTable("table-b", StepdownState::before);
     // An explicit schema epoch only covers a transaction creating a single table.
     txn.commit();
 }

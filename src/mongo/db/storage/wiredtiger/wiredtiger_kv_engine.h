@@ -629,6 +629,7 @@ public:
     Timestamp getStepDownTimestamp() const override;
     Timestamp getOldestTimestamp() const override;
     Timestamp getCheckpointTimestamp() const override;
+    boost::optional<uint64_t> getStepDownEpoch() const;
 
     void syncSizeInfo(bool sync) const;
 
@@ -899,6 +900,8 @@ private:
     // Wrapped method call to WT_SESSION::drop that handles sub-level error codes if applicable.
     Status _drop(WiredTigerSession& session, const char* uri, const char* config);
 
+    int _publishIdent(WiredTigerRecoveryUnit& ru, const std::string& uri, uint64_t schemaEpoch);
+
     mutable std::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;
@@ -934,7 +937,7 @@ private:
     Atomic<std::uint64_t> _stableTimestamp;
 
     // The last stepdown timestamp we've set for the storage engine, if any.
-    Atomic<std::uint64_t> _stepDownTimestamp;
+    synchronized_value<Timestamp> _stepDownTimestamp;
 
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.

@@ -219,9 +219,34 @@ public:
     void setOperationContext(OperationContext* opCtx) override;
 
     /**
+     * Graceful stepdown requires that table creations be published with an epoch less than the
+     * stepdown epoch if the call to create() happened before the stepdown epoch was set, and
+     * greater than the stepdown epoch if the call to create() happened after the stepdown epoch was
+     * set. Failing to do this makes publish() fail, which is a fatal error, so we need to be able
+     * to detect if a stepdown epoch was set in between create() and when we allocate a schema
+     * epoch, and roll back the operation if that happens.
+     *
+     * IF the stepdown epoch is set concurrently with a table creation then WiredTiger doesn't tell
+     * us which side of the boundary the create landed on, so we have to always roll back the
+     * operation.
+     */
+    enum class StepdownState {
+        // The table was created before a stepdown epoch was set. This includes the case where no
+        // stepdown ever happens (i.e. the common case). If there is a stepdown epoch at commit
+        // time, the table's schema epoch must be less than the stepdown epoch.
+        before,
+        // The table was created after a stepdown epoch was set. At commit time the table's
+        // schema epoch must be greater than the stepdown epoch.
+        after,
+        // The table was created concurrently with a stepdown epoch being set, and so we cannot
+        // validate its schema epoch and must assume it is invalid.
+        invalid,
+    };
+
+    /**
      * Annotates that this RecoveryUnit has created a table.
      */
-    void onCreateTable(const char* uri);
+    void onCreateTable(const char* uri, StepdownState state);
 
 protected:
     boost::optional<Timestamp> _determineCommitTimestamp() const override;
@@ -238,6 +263,7 @@ private:
     void _abort();
     void _commit(boost::optional<Timestamp> commitTime);
     void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, bool needsAllDurablePin);
+    void _validateTableTimestamps(WiredTigerKVEngineBase* kvEngine);
 
     void _ensureSession();
     void _resetPerTransactionState();
@@ -355,6 +381,7 @@ private:
     struct CreatedTable {
         std::string uri;
         Timestamp timestamp;
+        StepdownState stepdownState;
     };
     std::vector<CreatedTable> _createdTables;
 };
