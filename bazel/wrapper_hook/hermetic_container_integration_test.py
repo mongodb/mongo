@@ -1180,7 +1180,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     hermetic_container_integration.IntegrationMode.DIRECT,
                 )
 
-    def test_missing_docker_still_selects_fail_closed_container_mode(self):
+    def test_missing_docker_still_selects_container_mode_for_runtime_fallback(self):
         self.assertEqual(
             self._mode(
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -2348,12 +2348,29 @@ class LinuxHostContainerTest(unittest.TestCase):
             "background to execute hermetic build actions.",
             stderr.getvalue(),
         )
+        self.assertIn(
+            "--bes_keywords=MONGO_BUILD_CONTAINERIZED=true",
+            run_direct.call_args.args[1],
+        )
 
-    def test_container_start_failure_fails_before_bazel(self):
+    def test_container_start_failure_falls_back_to_native_build(self):
         container_config = {
             "image": "quay.io/mongodb/rbe@sha256:abc123",
             "container_name": "mongo_linux_action_rhel9_x86_64_example",
         }
+        lock_events = []
+
+        class RecordingLock:
+            def __enter__(self):
+                lock_events.append("lock_enter")
+                return self
+
+            def __exit__(self, *_args):
+                lock_events.append("lock_exit")
+
+        def record_lock(_output_base):
+            return RecordingLock()
+
         stderr = StringIO()
         with (
             mock.patch.object(
@@ -2385,14 +2402,18 @@ class LinuxHostContainerTest(unittest.TestCase):
             mock.patch.object(
                 hermetic_container_integration,
                 "_linux_container_actions_lock",
-                return_value=mock.MagicMock(),
+                side_effect=record_lock,
             ),
             mock.patch.object(
                 hermetic_container_integration,
                 "_ensure_linux_action_container",
                 return_value=(False, "newuidmap: Operation not permitted"),
             ),
-            mock.patch.object(hermetic_container_integration, "_run_direct") as run_direct,
+            mock.patch.object(
+                hermetic_container_integration,
+                "_run_direct",
+                side_effect=lambda *_args: lock_events.append("run") or 0,
+            ) as run_direct,
             redirect_stderr(stderr),
         ):
             rc = hermetic_container_integration.run_hermetic_container(
@@ -2401,12 +2422,23 @@ class LinuxHostContainerTest(unittest.TestCase):
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
             )
 
-        self.assertEqual(rc, 1)
-        self.assertIn("could not start or reuse build container", stderr.getvalue())
+        self.assertEqual(rc, 0)
+        self.assertEqual(lock_events, ["lock_enter", "lock_exit", "run"])
+        self.assertIn("could not be started or reused", stderr.getvalue())
         self.assertIn("newuidmap: Operation not permitted", stderr.getvalue())
-        run_direct.assert_not_called()
+        self.assertIn("running Bazel natively", stderr.getvalue())
+        run_direct.assert_called_once_with(
+            "/usr/bin/bazel",
+            [
+                "build",
+                "--bes_keywords=MONGO_BUILD_CONTAINERIZED=false",
+                "--strategy=MongoInstallRule=local",
+                "--symlink_prefix=bazel-",
+                "install-dist-test",
+            ],
+        )
 
-    def test_missing_docker_fails_closed(self):
+    def test_missing_docker_falls_back_to_native_build(self):
         stderr = StringIO()
         with (
             mock.patch.object(
@@ -2420,7 +2452,9 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "_docker_daemon_status",
                 return_value=(False, "Docker command not found: docker"),
             ),
-            mock.patch.object(hermetic_container_integration, "_run_direct") as run_direct,
+            mock.patch.object(
+                hermetic_container_integration, "_run_direct", return_value=0
+            ) as run_direct,
             redirect_stderr(stderr),
         ):
             rc = hermetic_container_integration.run_hermetic_container(
@@ -2429,18 +2463,22 @@ class LinuxHostContainerTest(unittest.TestCase):
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
             )
 
-        self.assertEqual(rc, 1)
-        self.assertIn("No usable Linux container runtime", stderr.getvalue())
-        self.assertIn("Install Docker Engine (recommended) or Podman", stderr.getvalue())
-        self.assertIn("current user", stderr.getvalue())
-        self.assertIn("docker info", stderr.getvalue())
-        self.assertIn("podman info", stderr.getvalue())
-        self.assertIn("refusing to run build tools natively", stderr.getvalue())
-        self.assertIn("MONGO_BAZEL_USE_HERMETIC_CONTAINER environment variable", stderr.getvalue())
-        self.assertIn("MONGO_BAZEL_USE_HERMETIC_CONTAINER=0", stderr.getvalue())
-        run_direct.assert_not_called()
+        self.assertEqual(rc, 0)
+        self.assertIn("no usable Linux container runtime was found", stderr.getvalue())
+        self.assertIn("Docker command not found: docker", stderr.getvalue())
+        self.assertIn("running Bazel natively", stderr.getvalue())
+        run_direct.assert_called_once_with(
+            "/usr/bin/bazel",
+            [
+                "build",
+                "--bes_keywords=MONGO_BUILD_CONTAINERIZED=false",
+                "--strategy=MongoInstallRule=local",
+                "--symlink_prefix=bazel-",
+                "install-dist-test",
+            ],
+        )
 
-    def test_image_pull_failure_fails_closed(self):
+    def test_image_pull_failure_falls_back_to_native_build(self):
         stderr = StringIO()
         with (
             mock.patch.object(
@@ -2459,7 +2497,9 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "_ensure_linux_container_image",
                 return_value=False,
             ),
-            mock.patch.object(hermetic_container_integration, "_run_direct") as run_direct,
+            mock.patch.object(
+                hermetic_container_integration, "_run_direct", return_value=0
+            ) as run_direct,
             redirect_stderr(stderr),
         ):
             rc = hermetic_container_integration.run_hermetic_container(
@@ -2468,10 +2508,19 @@ class LinuxHostContainerTest(unittest.TestCase):
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
             )
 
-        self.assertEqual(rc, 1)
-        self.assertIn("could not pull build container image", stderr.getvalue())
-        self.assertIn("refusing to run build tools natively", stderr.getvalue())
-        run_direct.assert_not_called()
+        self.assertEqual(rc, 0)
+        self.assertIn("could not be pulled", stderr.getvalue())
+        self.assertIn("running Bazel natively", stderr.getvalue())
+        run_direct.assert_called_once_with(
+            "/usr/bin/bazel",
+            [
+                "build",
+                "--bes_keywords=MONGO_BUILD_CONTAINERIZED=false",
+                "--strategy=MongoInstallRule=local",
+                "--symlink_prefix=bazel-",
+                "install-dist-test",
+            ],
+        )
 
     def test_explicit_native_opt_out_does_not_check_docker(self):
         with (

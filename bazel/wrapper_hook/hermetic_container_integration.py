@@ -49,6 +49,7 @@ LINUX_CONTAINER_ACTIONS_ENV = "MONGO_LINUX_CONTAINER_ACTIONS"
 LINUX_DYNAMIC_SCHEDULING_ENV = "MONGO_LINUX_DYNAMIC_SCHEDULING"
 NATIVE_TOOLCHAIN_CONFIG = "native_toolchain"
 LINUX_DYNAMIC_LOCAL_LOAD_FACTOR = "0.125"
+CONTAINERIZED_BES_KEYWORD = "MONGO_BUILD_CONTAINERIZED"
 LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME = "mongo_linux_container_actions.json"
 LINUX_CONTAINER_ACTIONS_LOCK_FILENAME = "mongo_linux_container_actions.lock"
 LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME = "mongo_linux_output_base_generation"
@@ -644,9 +645,10 @@ def select_integration_mode(
         _warn_native_fallback(reason)
         return IntegrationMode.DIRECT
 
-    # Missing Docker is handled after mode selection so supported Linux hosts fail
-    # closed. The explicit MONGO_LINUX_CONTAINER_ACTIONS=0 opt-out above is the only
-    # supported way to request native build-tool execution.
+    # Missing Docker is handled after mode selection. Supported Linux hosts enter
+    # container mode and fall back to native, non-containerized build-tool execution
+    # when the container services turn out to be unusable at runtime. The explicit
+    # MONGO_LINUX_CONTAINER_ACTIONS=0 opt-out above skips container mode entirely.
     return IntegrationMode.LINUX_HOST_CONTAINER
 
 
@@ -5427,6 +5429,37 @@ def _bazel_args_with_hermetic_container_env(
     return [*args[: command_index + 1], *injected_options, *args[command_index + 1 :]]
 
 
+def _bazel_args_with_container_bes_keyword(args: Sequence[str], containerized: bool) -> list[str]:
+    """Publish a build event service keyword recording how local build tools execute.
+
+    Telemetry aggregates this keyword to measure how often builds fall back to native,
+    non-containerized execution.
+    """
+    value = "true" if containerized else "false"
+    return _append_bazel_command_options(
+        args,
+        [f"--bes_keywords={CONTAINERIZED_BES_KEYWORD}={value}"],
+    )
+
+
+def _run_linux_native_fallback(bazel_real: str, args: Sequence[str], env: Mapping[str, str]) -> int:
+    """Run Bazel natively after the Linux build container services were unusable."""
+    native_args = _bazel_args_with_container_bes_keyword(
+        _bazel_args_with_native_install_strategy(args),
+        containerized=False,
+    )
+    rc = _run_direct(bazel_real, native_args)
+    if _bazel_command(args) in {"build", "coverage", "run", "test"}:
+        _publish_linux_shared_install_symlink(
+            {
+                "shared_install_dir": str(
+                    _linux_native_shared_install_dir(_bazel_output_base(args, env))
+                )
+            }
+        )
+    return rc
+
+
 def run_hermetic_container(
     bazel_real: str, args: Sequence[str], env: Mapping[str, str] = os.environ
 ) -> int:
@@ -5512,26 +5545,18 @@ def run_hermetic_container(
         container_command, runtime_detail = _select_linux_container_runtime(env)
         if container_command is None:
             detail = f" ({runtime_detail})" if runtime_detail else ""
-            _info(
-                f"No usable Linux container runtime is available{detail}. Install Docker Engine "
-                "(recommended) or Podman and ensure the current user can access it. Verify with "
-                "`docker info` or `podman info`; refusing to run build tools natively. To "
-                "intentionally build natively, set the MONGO_BAZEL_USE_HERMETIC_CONTAINER "
-                "environment variable to 0 (`MONGO_BAZEL_USE_HERMETIC_CONTAINER=0`)."
-            )
-            return 1
+            _warn_native_fallback(f"no usable Linux container runtime was found{detail}")
+            return _run_linux_native_fallback(bazel_real, args, env)
 
         container_config = _linux_host_container_config(
             env,
             container_command=container_command,
         )
         if not _ensure_linux_container_image(container_command, container_config["image"]):
-            _info(
-                f"could not pull build container image {container_config['image']}; "
-                "refusing to run build tools natively. Set "
-                f"{LINUX_CONTAINER_ACTIONS_ENV}=0 to explicitly opt out."
+            _warn_native_fallback(
+                f"the build container image {container_config['image']} could not be pulled"
             )
-            return 1
+            return _run_linux_native_fallback(bazel_real, args, env)
 
         host_args = _linux_host_container_action_args(args, env)
         output_base = _bazel_output_base(args, env)
@@ -5551,12 +5576,14 @@ def run_hermetic_container(
             container_ready, container_detail = _ensure_linux_action_container(config_path)
             if not container_ready:
                 detail_suffix = f" ({container_detail})" if container_detail else ""
-                _info(
-                    f"could not start or reuse build container "
-                    f"{container_config['container_name']}{detail_suffix}; "
-                    "refusing to run build tools natively"
+                _warn_native_fallback(
+                    f"the build container {container_config['container_name']} could not "
+                    f"be started or reused{detail_suffix}"
                 )
-                return 1
+        if not container_ready:
+            # Run the fallback after the output-base lock is released so nested Bazel
+            # invocations during the native build cannot deadlock on the lock.
+            return _run_linux_native_fallback(bazel_real, args, env)
         image_identifier = container_config["image"].rsplit("@", 1)[-1]
         _info(
             f"Container image {image_identifier} is running in the background "
@@ -5573,7 +5600,9 @@ def run_hermetic_container(
             _info(
                 "Local link/archive actions use this container; " "compiler actions execute on RBE."
             )
-        rc = _run_direct(bazel_real, host_args)
+        rc = _run_direct(
+            bazel_real, _bazel_args_with_container_bes_keyword(host_args, containerized=True)
+        )
         _publish_linux_shared_install_symlink(container_config)
         if f"--symlink_prefix={HERMETIC_CONTAINER_SYMLINK_PREFIX}" in host_args:
             _publish_linux_host_convenience_symlinks(env)
