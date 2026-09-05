@@ -13,6 +13,13 @@ class SessionCatalogTest : public ServiceContextTest {
 protected:
     SessionCatalog* catalog();
     void assertCanCheckoutSession(const LogicalSessionId& lsid);
+
+    /**
+     * Like 'assertCanCheckoutSession', but fails instead of hanging forever if the session is not
+     * available for check-out (e.g. because a kill was requested on it and never returned).
+     */
+    void assertCanCheckoutSessionWithinDeadline(const LogicalSessionId& lsid);
+
     void assertSessionCheckoutTimesOut(const LogicalSessionId& lsid);
     void assertConcurrentCheckoutTimesOut(const LogicalSessionId& lsid);
 

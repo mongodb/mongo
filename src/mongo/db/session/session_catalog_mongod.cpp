@@ -644,25 +644,28 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
 
     const auto lsid =
         LogicalSessionId::parse(singleSessionDoc["_id"].Obj(), IDLParserContext("lsid"));
-    catalog->scanSession(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
-        uassert(ErrorCodes::PreparedTransactionInProgress,
-                str::stream() << "Cannot modify the entry for session " << lsid.getId()
-                              << " because it is in the prepared state",
-                !ti->isTransactionPrepared(session));
+    // 'killSessionIf' hands the token back with the session's partition released, so registering
+    // the change below cannot deadlock against returning the kill if it throws.
+    auto killToken =
+        catalog->killSessionIf(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
+            uassert(ErrorCodes::PreparedTransactionInProgress,
+                    str::stream() << "Cannot modify the entry for session " << lsid.getId()
+                                  << " because it is in the prepared state",
+                    !ti->isTransactionPrepared(session));
 
-        // Internal sessions for an old retryable write are marked as reapable as soon as a
-        // retryable write or transaction with a newer txnNumber starts. Therefore, when deleting
-        // the config.transactions doc for such internal sessions, the corresponding transaction
-        // sessions should not be interrupted since they are guaranteed to be performing a
-        // transaction or retryable write for newer txnNumber.
-        bool shouldRegisterKill = !isInternalSessionForRetryableWrite(lsid) ||
-            *lsid.getTxnNumber() >= session.getLastClientTxnNumberStarted();
-        if (shouldRegisterKill) {
-            shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-                std::make_unique<KillSessionTokenOnCommit>(ti,
-                                                           session.kill(ErrorCodes::Interrupted)));
-        }
-    });
+            // Internal sessions for an old retryable write are marked as reapable as soon as a
+            // retryable write or transaction with a newer txnNumber starts. Therefore, when
+            // deleting the config.transactions doc for such internal sessions, the corresponding
+            // transaction sessions should not be interrupted since they are guaranteed to be
+            // performing a transaction or retryable write for newer txnNumber.
+            return !isInternalSessionForRetryableWrite(lsid) ||
+                *lsid.getTxnNumber() >= session.getLastClientTxnNumberStarted();
+        });
+
+    if (killToken) {
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+            std::make_unique<KillSessionTokenOnCommit>(_ti.get(), std::move(*killToken)));
+    }
 }
 
 void MongoDSessionCatalog::invalidateAllSessions(OperationContext* opCtx) {
