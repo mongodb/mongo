@@ -2116,6 +2116,9 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server slept, because we did not make progress with eviction",
   "cache: eviction server unable to reach eviction goal",
   "cache: eviction server waiting for a leaf page",
+  "cache: eviction server walks trees within their walk period because they dominate the cache",
+  "cache: eviction server walks trees within their walk period because they dominate the cache but "
+  "queues no pages",
   "cache: eviction state",
   "cache: eviction threshold cache full target multiplied by 100 for precision",
   "cache: eviction threshold cache full trigger multiplied by 100 for precision",
@@ -3225,6 +3228,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_server_slept = 0;
     stats->eviction_slow = 0;
     stats->eviction_walk_leaf_notfound = 0;
+    stats->eviction_server_walk_dominating_cache = 0;
+    stats->eviction_server_walk_dominating_cache_unproductive = 0;
     /* not clearing eviction_state */
     stats->eviction_threshold_cache_full_target = 0;
     stats->eviction_threshold_cache_full_trigger = 0;
@@ -4341,6 +4346,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_server_slept += WT_STAT_CONN_READ(from, eviction_server_slept);
     to->eviction_slow += WT_STAT_CONN_READ(from, eviction_slow);
     to->eviction_walk_leaf_notfound += WT_STAT_CONN_READ(from, eviction_walk_leaf_notfound);
+    to->eviction_server_walk_dominating_cache +=
+      WT_STAT_CONN_READ(from, eviction_server_walk_dominating_cache);
+    to->eviction_server_walk_dominating_cache_unproductive +=
+      WT_STAT_CONN_READ(from, eviction_server_walk_dominating_cache_unproductive);
     to->eviction_state += WT_STAT_CONN_READ(from, eviction_state);
     to->eviction_threshold_cache_full_target +=
       WT_STAT_CONN_READ(from, eviction_threshold_cache_full_target);

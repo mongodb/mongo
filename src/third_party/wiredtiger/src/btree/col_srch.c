@@ -42,7 +42,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, W
      * do that latter check before looking at the indx slot of the array
      * for a match to leaf (in other words, our page hint might be wrong).
      */
-    WT_INTL_INDEX_GET(session, leaf->home, pindex);
+    WT_INTL_INDEX_GET(session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&leaf->home), pindex);
     indx = leaf->pindex_hint;
     if (indx + 1 < pindex->entries && pindex->index[indx] == leaf)
         if (recno >= pindex->index[indx + 1]->ref_recno) {

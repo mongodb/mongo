@@ -462,7 +462,7 @@ __rec_row_merge(
          */
         if (i == 0) {
             if (*build_deltap) {
-                __wt_ref_key(ref->home, ref, &old_key, &old_key_size);
+                __wt_ref_key_home(ref, &old_key, &old_key_size);
                 WT_RET(
                   __rec_cell_build_int_key(session, r, old_key, r->cell_zero ? 1 : old_key_size));
             } else
