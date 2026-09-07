@@ -128,7 +128,9 @@ public:
         _nextRecoveryCheckpointMetadataStatus = std::move(status);
     }
 
-    void promoteToLeader() final {}
+    void promoteToLeader() final {
+        _operations.push_back("promoteToLeader");
+    }
 
     void demoteToFollower() final {}
 
