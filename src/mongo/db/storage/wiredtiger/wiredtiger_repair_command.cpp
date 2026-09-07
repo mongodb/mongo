@@ -81,17 +81,26 @@ std::string quoteConfigValue(std::string_view value) {
     return quoted;
 }
 
-// Builds the wiredtiger_repair() config for whichever read-only sub-command is present. The caller
-// (typedRun) has already enforced that exactly one of the fetch sub-commands is set.
+// Builds the wiredtiger_repair() config for whichever sub-command is present. The caller
+// (typedRun) has already enforced that exactly one sub-command is set.
 std::string buildRepairConfig(const WiredTigerRepairCommandRequest& request) {
     const auto& fetchDatabaseSize = request.getFetchDatabaseSize();
     const auto& fetchMetadata = request.getFetchMetadata();
+    const auto& fixBtreeSize = request.getFixBtreeSize();
 
     WtConfigBuilder config;
     if (fetchDatabaseSize) {
         WtConfigBuilder sub;
         sub.append("local", fetchDatabaseSize->getLocal() ? "true" : "false");
         config.append("fetch_database_size", sub);
+    } else if (fixBtreeSize) {
+        WtConfigBuilder sub;
+        if (auto uri = fixBtreeSize->getUri()) {
+            // An omitted uri means "repair every stable file", an explicitly empty one is rejected.
+            uassert(ErrorCodes::BadValue, "fixBtreeSize uri must not be empty", !uri->empty());
+            sub.append("uri", quoteConfigValue(*uri));
+        }
+        config.append("fix_btree_size", sub);
     } else {
         WtConfigBuilder sub;
         sub.append("local", fetchMetadata->getLocal() ? "true" : "false");
@@ -121,8 +130,9 @@ public:
         return "WiredTiger maintenance command. Requires the 'wiredtiger' action privilege "
                "(ActionType::wiredtiger), which is not held by any built-in role by default. "
                "Provide exactly one of fetchDatabaseSize / fetchMetadata (read-only, via "
-               "wiredtiger_repair) or fixDatabaseSize (recomputes the disaggregated database size "
-               "via a checkpoint).";
+               "wiredtiger_repair), fixBtreeSize (repairs a btree's size metadata via "
+               "wiredtiger_repair; omit uri to repair every stable file), or fixDatabaseSize "
+               "(recomputes the disaggregated database size via a checkpoint).";
     }
 
     bool adminOnly() const override {
@@ -147,27 +157,31 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto& req = request();
             const bool fixDatabaseSize = req.getFixDatabaseSize().value_or(false);
+            const bool fixBtreeSize = req.getFixBtreeSize().has_value();
             const int subCommands = req.getFetchDatabaseSize().has_value() +
-                req.getFetchMetadata().has_value() + (fixDatabaseSize ? 1 : 0);
+                req.getFetchMetadata().has_value() + (fixDatabaseSize ? 1 : 0) +
+                (fixBtreeSize ? 1 : 0);
             uassert(ErrorCodes::InvalidOptions,
                     "wiredTigerRepair requires exactly one sub-command (fetchDatabaseSize, "
-                    "fetchMetadata, or fixDatabaseSize)",
+                    "fetchMetadata, fixBtreeSize, or fixDatabaseSize)",
                     subCommands == 1);
 
             auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
             // Global lock keeps the storage engine from shutting down mid-operation.
-            // fixDatabaseSize (a checkpoint) needs MODE_IX with an explicit LocalWrite intent --
+            // The fixing sub-commands (fixDatabaseSize and fixBtreeSize both persist corrected
+            // metadata via a checkpoint) need MODE_IX with an explicit LocalWrite intent --
             // otherwise the IntentRegistry treats it as a replicated write and rejects it on
             // secondaries.
+            const bool writes = fixDatabaseSize || fixBtreeSize;
             Lock::GlobalLock globalLock{
                 opCtx,
-                fixDatabaseSize ? MODE_IX : MODE_IS,
+                writes ? MODE_IX : MODE_IS,
                 Date_t::max(),
                 Lock::InterruptBehavior::kThrow,
                 Lock::GlobalLockOptions{.skipFlowControlTicket = true,
                                         .skipRSTLLock = true,
-                                        .explicitIntent = fixDatabaseSize
+                                        .explicitIntent = writes
                                             ? rss::consensus::IntentRegistry::Intent::LocalWrite
                                             : rss::consensus::IntentRegistry::Intent::Read}};
 

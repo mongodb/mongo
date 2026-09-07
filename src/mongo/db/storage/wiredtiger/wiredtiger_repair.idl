@@ -27,9 +27,10 @@
 #
 
 # The wiredTigerRepair command exposes WiredTiger's runtime maintenance operations. Each invocation
-# carries exactly one sub-command. Two mirror wiredtiger_repair() config keys (fetchDatabaseSize ->
-# fetch_database_size, fetchMetadata -> fetch_metadata); fixDatabaseSize instead triggers a
-# checkpoint with debug=(database_size_fix=true) rather than a wiredtiger_repair() call.
+# carries exactly one sub-command. Three mirror wiredtiger_repair() config keys (fetchDatabaseSize
+# -> fetch_database_size, fetchMetadata -> fetch_metadata, fixBtreeSize -> fix_btree_size);
+# fixDatabaseSize instead triggers a checkpoint with debug=(database_size_fix=true) rather than a
+# wiredtiger_repair() call.
 
 global:
     cpp_namespace: "mongo"
@@ -66,6 +67,17 @@ structs:
                 optional: true
             key:
                 description: "Restrict the metadata fetch to this key; absent means the whole value."
+                type: string
+                optional: true
+
+    FixBtreeSizeOptions:
+        description: "Options for the fix_btree_size WiredTiger repair sub-command."
+        strict: true
+        fields:
+            uri:
+                description: >-
+                    Target URI to verify and repair the btree size of; omit to repair every
+                    stable file in the database. An explicitly empty uri is rejected.
                 type: string
                 optional: true
 
@@ -110,4 +122,11 @@ commands:
                     When true, recompute and persist the disaggregated database size via a
                     checkpoint with debug=(database_size_fix=true) (not a wiredtiger_repair call).
                 type: bool
+                optional: true
+            fixBtreeSize:
+                description: >-
+                    Run verify with fix_btree_size=true on the given URI, then checkpoint to
+                    persist the corrected metadata. If uri is omitted, repair every stable
+                    file in the database; an empty uri is rejected. Mirrors fix_btree_size.
+                type: FixBtreeSizeOptions
                 optional: true
