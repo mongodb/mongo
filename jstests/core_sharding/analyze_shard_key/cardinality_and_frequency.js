@@ -4,6 +4,9 @@
  *
  * @tags: [
  *   assumes_balancer_off,
+ *   # The test shards collections using its own keys, so it is incompatible with suites that
+ *   # implicitly auto-shard empty collections.
+ *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
  * ]
