@@ -240,10 +240,11 @@ public:
 
                 auto cursorWithStatus = CursorResponse::parseFromBSON(response->data);
 
-                if (cursorWithStatus.getStatus().code() == ErrorCodes::NotYetInitialized) {
-                    // The secondary has not completed replica set initialization yet.
+                if (cursorWithStatus.getStatus().code() == ErrorCodes::NotYetInitialized ||
+                    cursorWithStatus.getStatus().code() ==
+                        ErrorCodes::ShardingStateNotInitialized) {
                     LOGV2_WARNING(12922003,
-                                  "Secondary node hasn't completed replica set initialization",
+                                  "Secondary node hasn't completed initialization",
                                   "hostAndPort"_attr = hostAndPort,
                                   "error"_attr = cursorWithStatus.getStatus());
                     continue;

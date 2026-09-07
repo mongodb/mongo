@@ -72,7 +72,6 @@ public:
                     fmt::format("Cannot run {} on a node started without --shardsvr",
                                 Request::kCommandName),
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
-            ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
 
             const auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
             uassert(ErrorCodes::NotYetInitialized,
