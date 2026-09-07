@@ -11,6 +11,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -146,6 +147,16 @@ void ReplicaSetWriteBlockOpObserver::onDelete(OperationContext* opCtx,
                 replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
                 replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
             });
+    }
+}
+
+void ReplicaSetWriteBlockOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                           const RollbackObserverInfo& rbInfo) {
+    if (rbInfo.rollbackNamespaces.find(
+            NamespaceString::kReplicaSetWritesCriticalSectionsNamespace) !=
+        rbInfo.rollbackNamespaces.end()) {
+        UserWritesRecoverableCriticalSectionService::get(opCtx)
+            ->recoverReplicaSetWritesCriticalSection(opCtx);
     }
 }
 

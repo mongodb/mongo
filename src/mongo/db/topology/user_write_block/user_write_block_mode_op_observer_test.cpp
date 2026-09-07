@@ -26,6 +26,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -388,6 +389,53 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
+}
+
+TEST_F(UserWriteBlockModeOpObserverTest, RollbackDoesNotRecoverReplicaSetWriteBlocking) {
+    auto opCtx = cc().makeOperationContext();
+
+    auto* userWriteBlockState = GlobalUserWriteBlockState::get(opCtx.get());
+    auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        userWriteBlockState->enableUserWriteBlocking(opCtx.get(),
+                                                     UserWritesBlockReasonEnum::kUnspecified);
+        rsBlock->enableReplicaSetWriteBlocking(
+            ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+        rsBlock->enableReplicaSetDeletionsBlocking();
+    }
+
+    BSONObjBuilder beforeBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(beforeBuilder);
+    const auto before =
+        beforeBuilder.obj()
+            .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+            .safeNumberLong();
+
+    OpObserver::RollbackObserverInfo rbInfo{
+        .numberOfEntriesObserved = 1,
+        .rollbackNamespaces =
+            {
+                NamespaceString::kUserWritesCriticalSectionsNamespace,
+            },
+    };
+    UserWriteBlockModeOpObserver opObserver;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+
+    BSONObjBuilder afterBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(afterBuilder);
+    const auto after = afterBuilder.obj()
+                           .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+                           .safeNumberLong();
+    ASSERT_EQ(after, before);
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(rsBlock->isReplicaSetDeletionsBlockingEnabled());
+        // No user-writes critical section document exists, so rollback clears that mechanism only.
+        ASSERT_FALSE(userWriteBlockState->isUserWriteBlockingEnabled(opCtx.get()));
+    }
 }
 
 }  // namespace

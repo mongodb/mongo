@@ -73,8 +73,12 @@ import {waitForState} from "jstests/replsets/rslib.js";
  * @param {Object} [optional] replSet the ReplSetTest instance to adopt
  * @param {Object} [optional] nodeOptions command-line options to apply to all nodes in the replica
  *     set. Ignored if 'replSet' is provided.
+ * @param {Object} [optional] options additional RollbackTest options:
+ *     - ensureRollbackDbName: database used for the fixture insert that forces a divergent
+ *       oplog entry before rollback. Defaults to a user DB. Tests that run under replica set
+ *       write blocking can pass an internal DB (admin/local/config) so that insert is allowed.
  */
-export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
+export function RollbackTest(name = "RollbackTest", replSet, nodeOptions, options = {}) {
     TestData.isRunningInitialSync = true;
 
     const State = {
@@ -101,7 +105,8 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
     const kElectableNodes = 2;
     const kRetryIntervalMS = 25;
 
-    const kEnsureRollbackDbName = "EnsureThereIsAtLeastOneOpToRollback";
+    const kEnsureRollbackDbName =
+        options.ensureRollbackDbName || "EnsureThereIsAtLeastOneOpToRollback";
     const kEnsureRollbackCollName = "ensureRollback";
 
     let awaitSecondaryNodesForRollbackTimeout;
