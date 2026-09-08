@@ -6,7 +6,7 @@
  * (SERVER-131307); flag off must still succeed via the IFR kickback. In the mongot_e2e_* suites
  * both stages run as legacy stages.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_90, assumes_stable_shard_list]
+ * @tags: [requires_fcv_90, assumes_stable_shard_list]
  */
 
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";

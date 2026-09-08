@@ -14,7 +14,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -254,41 +253,6 @@ boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
 }
 
 /**
- * Adds a field called "score" set to the value of the sum of all the added scores. This is used
- instead of setting the score metadata when the rankFusionFeatureFlag is off.
- * Ex:
- *  {
-        "$addFields": {
-            "score": {
-                "$add": [
-                    "$<INTERNAL_FIELDS>.<inputPipelineName1>_score",
-                    "$<INTERNAL_FIELDS>.<inputPipelineName2>_score"
-                ]
-            }
-        }
-    },
- */
-BSONObj calculateFinalScore(const std::vector<std::string>& pipelineNames) {
-    // Generate a $add object with an array of all the fields containing a score for a given
-    // pipeline.
-    const auto& allInputs = [&] {
-        BSONObjBuilder addBob;
-        {
-            BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"sv));
-            for (const auto& pipelineName : pipelineNames) {
-                StringBuilder sb;
-                sb << "$" << RankFusionPipelineBuilder::kRankFusionInternalFieldsName << "."
-                   << pipelineName << "_score";
-                addArrBuilder.append(sb.str());
-            }
-            addArrBuilder.done();
-        }
-        return addBob.obj();
-    };
-    return BSON("$addFields" << BSON("score" << allInputs()));
-}
-
-/**
  * Constuct the scoreDetails metadata object. Looks like the following:
  * { "$setMetadata": { "scoreDetails": { "value": { $meta: "score" }, "description":
  * { "scoreDetailsDescription..." }, "details": "$calculatedScoreDetails" } } },
@@ -411,42 +375,28 @@ std::list<boost::intrusive_ptr<DocumentSource>> RankFusionPipelineBuilder::build
     auto removeInternalFieldsProject = DocumentSourceProject::createFromBson(
         projectRemoveInternalFieldsObject().firstElement(), expCtx);
 
-    // TODO SERVER-85426: Remove this check once all feature flags have been removed.
-    if (isRankFusionFullEnabled()) {
-        // Set the final score.
-        auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
-        const SortPattern sortingPatternScoreMetadata{
-            BSON("score" << BSON("$meta" << "score") << "_id" << 1), expCtx};
-        boost::intrusive_ptr<DocumentSourceSort> sortScoreMetadata =
-            DocumentSourceSort::create(expCtx, sortingPatternScoreMetadata);
-        if (shouldIncludeScoreDetails()) {
-            boost::intrusive_ptr<DocumentSource> addFieldsScoreDetails =
-                constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
-            auto setScoreDetails =
-                constructScoreDetailsMetadata(getScoreDetailsDescription(), expCtx);
-            scoreAndMergeStages.splice(scoreAndMergeStages.end(),
-                                       {std::move(setScore),
-                                        std::move(addFieldsScoreDetails),
-                                        std::move(setScoreDetails),
-                                        std::move(sortScoreMetadata),
-                                        std::move(removeInternalFieldsProject)});
-            return scoreAndMergeStages;
-        }
+    // Set the final score.
+    auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
+    const SortPattern sortingPatternScoreMetadata{
+        BSON("score" << BSON("$meta" << "score") << "_id" << 1), expCtx};
+    boost::intrusive_ptr<DocumentSourceSort> sortScoreMetadata =
+        DocumentSourceSort::create(expCtx, sortingPatternScoreMetadata);
+    if (shouldIncludeScoreDetails()) {
+        boost::intrusive_ptr<DocumentSource> addFieldsScoreDetails =
+            constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
+        auto setScoreDetails = constructScoreDetailsMetadata(getScoreDetailsDescription(), expCtx);
         scoreAndMergeStages.splice(scoreAndMergeStages.end(),
                                    {std::move(setScore),
+                                    std::move(addFieldsScoreDetails),
+                                    std::move(setScoreDetails),
                                     std::move(sortScoreMetadata),
                                     std::move(removeInternalFieldsProject)});
         return scoreAndMergeStages;
     }
-
-    auto addFields = DocumentSourceAddFields::createFromBson(
-        calculateFinalScore(pipelineNames).firstElement(), expCtx);
-    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
-    boost::intrusive_ptr<DocumentSourceSort> sort =
-        DocumentSourceSort::create(expCtx, sortingPattern);
-    scoreAndMergeStages.splice(
-        scoreAndMergeStages.end(),
-        {std::move(addFields), std::move(sort), std::move(removeInternalFieldsProject)});
+    scoreAndMergeStages.splice(scoreAndMergeStages.end(),
+                               {std::move(setScore),
+                                std::move(sortScoreMetadata),
+                                std::move(removeInternalFieldsProject)});
     return scoreAndMergeStages;
 }
 

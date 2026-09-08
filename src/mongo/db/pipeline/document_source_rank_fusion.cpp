@@ -15,7 +15,6 @@
 #include "mongo/db/pipeline/rank_fusion_pipeline_builder.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/util/string_map.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -78,10 +77,6 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseSelectionPipelines(
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromStageParams(
     const RankFusionStageParams& params, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "'featureFlagRankFusionBasic' must be enabled to use rankFusion",
-            bypassRankFusionFCVGate || pExpCtx->isBasicRankFusionFeatureFlagEnabled());
-
     const auto& spec = params.getSpec();
     const auto& inputPipelines = params.buildInputPipelines(pExpCtx);
 
@@ -100,10 +95,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "'featureFlagRankFusionBasic' must be enabled to use rankFusion",
-            bypassRankFusionFCVGate || pExpCtx->isBasicRankFusionFeatureFlagEnabled());
-
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -120,13 +111,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     if (combinationSpec.has_value()) {
         weights = hybrid_scoring_util::validateWeights(
             combinationSpec->getWeights(), inputPipelines, kStageName);
-    }
-
-    // TODO SERVER-85426: Remove this check once all feature flags have been removed.
-    if (spec.getScoreDetails()) {
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                "'featureFlagRankFusionFull' must be enabled to use scoreDetails",
-                isRankFusionFullEnabled());
     }
 
     RankFusionPipelineBuilder builder(spec, weights);

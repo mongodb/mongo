@@ -2,7 +2,7 @@
  * Provides utilities to test that hybrid search stages on a view namespace, defined with a
  * search pipeline, is allowed and works correctly.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

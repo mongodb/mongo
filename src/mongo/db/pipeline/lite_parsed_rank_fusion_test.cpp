@@ -29,8 +29,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
-    unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
     unittest::ServerParameterGuard _ifrFlagController{"featureFlagExtensionsInsideHybridSearch",
                                                       true};
 };
@@ -170,26 +168,6 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfRankFusionNotFirstStage) {
 
     LiteParsedPipeline lpp(nss, pipeline);
     ASSERT_THROWS_CODE(lpp.validate(nullptr, false), AssertionException, 10170100);
-}
-
-TEST_F(LiteParsedRankFusionTest, ErrorsIfScoreDetailsWithoutRankFusionFullFF) {
-    unittest::ServerParameterGuard rankFusionFullController{"featureFlagRankFusionFull", false};
-    std::vector<BSONObj> pipeline = {fromjson(R"({
-        $rankFusion: {
-            input: {
-                pipelines: {
-                    agatha: [
-                        { $match: { author: "Agatha Christie" } },
-                        { $sort: { author: 1 } }
-                    ]
-                }
-            },
-            scoreDetails: true
-        }
-    })")};
-
-    ASSERT_THROWS_CODE(
-        makePipelineFromStages(pipeline), AssertionException, ErrorCodes::QueryFeatureNotAllowed);
 }
 
 TEST_F(LiteParsedRankFusionTest, SucceedsWithValidRankedSelectionPipeline) {

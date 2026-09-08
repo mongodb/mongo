@@ -44,11 +44,6 @@ protected:
         liteParsed->validate(ctx->getOperationContext());
         return DocumentSourceScoreFusion::createFromBson(spec.firstElement(), ctx);
     }
-
-private:
-    unittest::ServerParameterGuard scoreFusionFlag{"featureFlagSearchHybridScoringFull", true};
-    // Feature flag needed to use 'score' meta field
-    unittest::ServerParameterGuard rankFusionFlag{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputField) {

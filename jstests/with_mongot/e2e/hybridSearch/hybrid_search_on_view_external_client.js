@@ -10,7 +10,7 @@
  * Default mongot_e2e_* connections authenticate as __system, which bypasses the external-client
  * check; this test creates a non-privileged user and runs every case through that connection.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

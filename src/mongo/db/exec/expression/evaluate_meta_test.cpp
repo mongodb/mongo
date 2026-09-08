@@ -153,8 +153,6 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaScore) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"score\"}");
     auto expressionMeta =
@@ -166,8 +164,6 @@ TEST(ExpressionMetaTest, ExpressionMetaScore) {
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaScoreDetails) {
-    // Used to set 'scoreDetails' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
     auto expressionMeta =

@@ -222,7 +222,6 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "searchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldSearchScore << 10.3)));
@@ -230,7 +229,6 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForVectorSearchScoreSort) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "vectorSearchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldVectorSearchScore << 10.3)));

@@ -3,7 +3,7 @@
  * and that the "vector search score" metadata (previously known as 'vectorSearchScore') in
  * $vectorSearch pipelines are both accessible by the 'score' metadata field.
  *
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

@@ -3,7 +3,7 @@
  * careful. For example, when $search produces a sorted order, or when a sub-pipeline specifies a
  * $sort. We manually observe returned results and see that they clearly relate to the input
  * pipeline criteria specified, then codify the results as an ordered list of document ids.
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

@@ -5,8 +5,6 @@
  * needed (uses $score inputs).
  *
  * @tags: [
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_90,
  * ]
  */

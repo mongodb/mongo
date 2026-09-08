@@ -2,8 +2,6 @@
  * Tests that excessively long input pipeline names don't OOM the server.
  *
  * @tags: [
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_82,
  * ]
  */

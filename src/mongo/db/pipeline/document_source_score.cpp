@@ -393,13 +393,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(
-        ErrorCodes::QueryFeatureNotAllowed,
-        "$score is not allowed in the current configuration. You may need to enable the "
-        "corresponding feature flag",
-        feature_flags::gFeatureFlagSearchHybridScoringFull.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(pExpCtx->getOperationContext()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "

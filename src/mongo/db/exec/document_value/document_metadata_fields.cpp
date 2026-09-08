@@ -7,7 +7,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 
@@ -253,33 +252,26 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
     }
 }
 
-void DocumentMetadataFields::setScore(double score, bool featureFlagAlreadyValidated) {
-    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
-        _setCommon(MetaType::kScore);
-        _holder->score = score;
-    }
+void DocumentMetadataFields::setScore(double score) {
+    _setCommon(MetaType::kScore);
+    _holder->score = score;
 }
 
-void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated) {
-    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
-        _setCommon(MetaType::kScoreDetails);
-        _holder->scoreDetails = scoreDetails;
-    }
+void DocumentMetadataFields::setScoreDetails(Value scoreDetails) {
+    _setCommon(MetaType::kScoreDetails);
+    _holder->scoreDetails = scoreDetails;
 }
 
 void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
-    if (isRankFusionFullEnabled()) {
-        auto score = scoreDetails.getDocument().getField(kScoreDetailsScoreField);
-        tassert(9679300,
-                str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
-                                 "set the score too, but got "
-                              << scoreDetails.toString(),
-                score.numeric());
+    auto score = scoreDetails.getDocument().getField(kScoreDetailsScoreField);
+    tassert(9679300,
+            str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
+                             "set the score too, but got "
+                          << scoreDetails.toString(),
+            score.numeric());
 
-        const bool featureFlagAlreadyValidated = true;
-        setScore(score.getDouble(), featureFlagAlreadyValidated);
-        setScoreDetails(std::move(scoreDetails), featureFlagAlreadyValidated);
-    }
+    setScore(score.getDouble());
+    setScoreDetails(std::move(scoreDetails));
 }
 
 void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {

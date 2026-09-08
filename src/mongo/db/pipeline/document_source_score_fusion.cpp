@@ -20,11 +20,9 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
-    scoreFusion,
-    LiteParsedScoreFusion::parse,
-    AllowedWithApiStrict::kNeverInVersion1,
-    &feature_flags::gFeatureFlagSearchHybridScoringFull);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(scoreFusion,
+                                     LiteParsedScoreFusion::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
 DocumentSourceContainer scoreFusionStageParamsToDocumentSourceFn(

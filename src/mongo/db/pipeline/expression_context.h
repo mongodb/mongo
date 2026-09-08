@@ -1029,10 +1029,6 @@ public:
         return _params.canBeRejected;
     }
 
-    bool isBasicRankFusionFeatureFlagEnabled() const {
-        return _featureFlagRankFusionBasic.get(versionContextForFeatureFlagCheck());
-    }
-
     bool shouldParserAllowStreams() const {
         return shouldParserIgnoreFeatureFlagCheck() || _featureFlagStreams.get(_params.vCtx);
     }
@@ -1448,13 +1444,6 @@ private:
     Deferred<bool (*)(const VersionContext&)> _featureFlagShardFilteringDistinctScan{
         [](const VersionContext& vCtx) {
             return feature_flags::gFeatureFlagShardFilteringDistinctScan
-                .isEnabledUseLastLTSFCVWhenUninitialized(
-                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        }};
-
-    Deferred<bool (*)(const VersionContext&)> _featureFlagRankFusionBasic{
-        [](const VersionContext& vCtx) {
-            return feature_flags::gFeatureFlagRankFusionBasic
                 .isEnabledUseLastLTSFCVWhenUninitialized(
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};

@@ -2,7 +2,7 @@
  * Tests that $rankFusion on a view namespace, defined with a search pipeline, is allowed and works
  * correctly.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 import {

@@ -7,7 +7,6 @@
  *
  * @tags: [
  *   assumes_stable_shard_list,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_82,
  * ]
  */

@@ -911,20 +911,12 @@ void setupViewContext(const AggExState& aggExState,
         return;
     }
 
-    auto* opCtx = expCtx->getOperationContext();
     search_helpers::checkAndSetViewOnExpCtx(expCtx,
                                             aggExState.getOriginalLiteParsedPipeline(),
                                             aggExState.getResolvedNamespace(),
                                             aggExState.getOriginalNss());
 
     if (aggExState.isHybridSearchPipeline()) {
-        uassert(ErrorCodes::OptionNotSupportedOnView,
-                "$rankFusion and $scoreFusion are currently unsupported on views",
-                feature_flags::gFeatureFlagSearchHybridScoringFull
-                    .isEnabledUseLatestFCVWhenUninitialized(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
         // This insertion into the ExpressionContext ResolvedNamespaceMap is to handle cases
         // where the original query desugars into a $unionWith that runs on a view (like
         // $rankFusion and $scoreFusion). After view resolution (here), we treat the query as if

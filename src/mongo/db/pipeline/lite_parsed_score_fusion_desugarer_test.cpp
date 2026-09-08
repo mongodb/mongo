@@ -63,10 +63,6 @@ protected:
             lite_parsed_hybrid_search_desugarer::desugarScoreFusion(*lpsf, nss, "pipeline_test"sv);
         return toExpectedStagesBson(desugared);
     }
-
-private:
-    unittest::ServerParameterGuard featureFlagController1{"featureFlagSearchHybridScoringFull",
-                                                          true};
 };
 
 TEST_F(LiteParsedScoreFusionDesugarerTest, SinglePipelineDefault) {

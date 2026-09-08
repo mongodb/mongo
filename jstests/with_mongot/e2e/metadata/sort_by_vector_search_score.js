@@ -2,7 +2,7 @@
  * Tests using "vectorSearchScore" (and its equivalent alias metadata field "score") in a sort
  * expression. This isn't expected to be very common, but one anticipated use case is to compute
  * rank or other window fields, where a sort expression is required.
- * @tags: [featureFlagRankFusionFull, requires_fcv_81]
+ * @tags: [requires_fcv_81]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {

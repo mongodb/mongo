@@ -468,7 +468,6 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnMergeWith) {
 TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     // Tests that for certain types of metadata fields, related to a score,
     // the 'score' metadata is also set.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     // 'searchScore'
     {
@@ -498,32 +497,7 @@ TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     }
 }
 
-// TODO SERVER-85426 Remove this test when the feature flag is removed.
-TEST(DocumentMetadataFieldsTest, FFGatedFieldsNotSetWithoutFlag) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
-
-    DocumentMetadataFields metadata;
-    metadata.setScore(10);
-    metadata.setScoreDetails(Value(BSON("foo" << "bar")));
-    metadata.setScoreAndScoreDetails(Value(BSON("value" << 2)));
-    metadata.setVectorSearchScore(15);
-    metadata.setSearchScore(7);
-    metadata.setTextScore(5);
-    metadata.setSearchScoreDetails(BSON("search" << "details"));
-
-    ASSERT_TRUE(metadata.hasSearchScore());
-    ASSERT_TRUE(metadata.hasVectorSearchScore());
-    ASSERT_TRUE(metadata.hasTextScore());
-    ASSERT_TRUE(metadata.hasSearchScoreDetails());
-
-    // 'score' and 'scoreDetails' are flag-gated so should not be set.
-    ASSERT_FALSE(metadata.hasScoreDetails());
-    ASSERT_FALSE(metadata.hasScore());
-}
-
 TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
-
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
     ASSERT_FALSE(metadata.hasScore());
@@ -545,7 +519,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
 TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasSearchScoreDetails());
@@ -563,7 +536,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
 }
 
 TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     {
         DocumentMetadataFields metadata;
         metadata.setScoreDetails(Value(BSON("value" << 5 << "otherDetails" << 10)));
@@ -641,7 +613,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
 TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
@@ -659,7 +630,6 @@ TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsNonNumeric,
                  "Tripwire assertion.*9679300") {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("value" << "string")));
 }
@@ -667,7 +637,6 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsMissing,
                  "Tripwire assertion.*9679300") {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("non-value" << "string")));
 }

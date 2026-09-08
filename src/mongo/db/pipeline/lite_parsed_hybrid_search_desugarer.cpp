@@ -14,7 +14,6 @@
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 #include "mongo/db/pipeline/lite_parsed_score_fusion_desugarer_utils.h"
 #include "mongo/db/pipeline/stage_params.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
@@ -128,24 +127,15 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
     out.push_back(common_utils::parseOwnedStage(
         nss, rank_fusion_utils::buildRankAddFieldsBson(pipelineNames)));
 
-    // TODO SERVER-85426: Remove this branch once all feature flags have been removed.
-    if (isRankFusionFullEnabled()) {
+    out.push_back(common_utils::parseOwnedStage(
+        nss, rank_fusion_utils::buildSetMetadataScoreBson(pipelineNames)));
+    if (includeScoreDetails) {
         out.push_back(common_utils::parseOwnedStage(
-            nss, rank_fusion_utils::buildSetMetadataScoreBson(pipelineNames)));
-        if (includeScoreDetails) {
-            out.push_back(common_utils::parseOwnedStage(
-                nss,
-                rank_fusion_utils::buildCalculatedFinalScoreDetailsBson(pipelineNames, weights)));
-            out.push_back(common_utils::parseOwnedStage(
-                nss, rank_fusion_utils::buildSetMetadataScoreDetailsBson()));
-        }
-        out.push_back(common_utils::parseOwnedStage(nss, common_utils::buildSortByScoreMetaBson()));
-    } else {
+            nss, rank_fusion_utils::buildCalculatedFinalScoreDetailsBson(pipelineNames, weights)));
         out.push_back(common_utils::parseOwnedStage(
-            nss, rank_fusion_utils::buildAddFieldsScoreBson(pipelineNames)));
-        out.push_back(
-            common_utils::parseOwnedStage(nss, rank_fusion_utils::buildSortByScoreScalarBson()));
+            nss, rank_fusion_utils::buildSetMetadataScoreDetailsBson()));
     }
+    out.push_back(common_utils::parseOwnedStage(nss, common_utils::buildSortByScoreMetaBson()));
     out.push_back(common_utils::parseOwnedStage(nss,
                                                 common_utils::buildProjectRemoveInternalFieldsBson(
                                                     rank_fusion_utils::kInternalFieldsName)));

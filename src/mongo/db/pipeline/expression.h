@@ -2917,12 +2917,6 @@ private:
      */
     static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
                                                         DocumentMetadataFields::MetaType type);
-    /**
-     * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
-     * requested metadata field requires it.
-     */
-    static void _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
-        ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
 
     /**
      * Asserts that the 'featureFlagStreams' is enabled, depending on the parsed meta type and

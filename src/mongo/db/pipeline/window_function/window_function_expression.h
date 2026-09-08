@@ -407,30 +407,6 @@ public:
 template <typename RankType>
 class ExpressionFromRankAccumulator : public Expression {
 public:
-    static auto createLegacyRankWF(ExpressionContext* expCtx,
-                                   std::string_view accumulatorName,
-                                   const SortPattern& sortBy,
-                                   WindowBounds bounds) {
-        auto sortPatternPart = sortBy[0];
-        if (sortPatternPart.fieldPath) {
-            auto sortExpression = ExpressionFieldPath::createPathFromString(
-                expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                std::string{accumulatorName},
-                std::move(sortExpression),
-                sortPatternPart.isAscending,
-                std::move(bounds));
-        } else {
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                std::string{accumulatorName},
-                sortPatternPart.expression,
-                sortPatternPart.isAscending,
-                std::move(bounds));
-        }
-    }
-
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
@@ -460,24 +436,9 @@ public:
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
 
-        // Use the new $rank implementation that depends on sort key metadata if
-        // 1) we are the context of a $rankFusion query, or
-        // 2) the feature flag is enabled
-        // #1 is because $rankFusion was backported to 8.0, and we don't want $rankFusion queries to
-        // fail during an FCV-gated upgrade.
-        // #2 is because we still need to preserve FCV-gating for generic $setWindowFields queries
-        // in order to avoid failures during upgrade (this $setWindowFields feature is *only*
-        // enabled for $rankFusion on 8.0, so it is new behavior on this version).
-        // TODO SERVER-85426 Always use the new $rank implementation.
-        if (expCtx->isHybridSearch() || expCtx->isBasicRankFusionFeatureFlagEnabled()) {
-            // The 'modern' way to do $rank is to just use the sort key. But we only support this on
-            // newer versions, since we need to make sure that the $sort stage is giving us the sort
-            // key.
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx, std::string{*accumulatorName}, std::move(bounds));
-        }
-        // TODO SERVER-85426 This whole branch/helper can be deleted.
-        return createLegacyRankWF(expCtx, *accumulatorName, *sortBy, std::move(bounds));
+        // The 'modern' way to do $rank is to just use the sort key.
+        return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+            expCtx, std::string{*accumulatorName}, std::move(bounds));
     }
 
     ExpressionFromRankAccumulator(ExpressionContext* expCtx,

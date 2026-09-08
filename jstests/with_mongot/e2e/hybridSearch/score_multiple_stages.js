@@ -4,7 +4,7 @@
  * producing stage of each $scoreFusion input pipeline is the one that determines said input
  * pipeline's score and scoreDetails.
  *
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 import {
     createMoviesCollWithSearchAndVectorIndex,

@@ -47,13 +47,6 @@ boost::intrusive_ptr<ExpressionMeta> parseMetaExpression(
 
     const auto metaName = metaElem.valueStringDataSafe();
 
-    if (metaName == "searchScore"sv || metaName == "vectorSearchScore"sv || metaName == "score"sv) {
-        if (!bypassRankFusionFCVGate) {
-            expCtx->ignoreFeatureInParserOrRejectAndThrow(
-                "Sorting by searchScore, vectorSearchScore, or score",
-                feature_flags::gFeatureFlagRankFusionFull);
-        }
-    }
     uassert(31138,
             str::stream() << "Illegal $meta sort: " << metaElem,
             kValidMetaSorts.contains(metaName));

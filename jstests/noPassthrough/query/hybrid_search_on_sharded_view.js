@@ -2,8 +2,6 @@
  * $scoreFusion on a view on a sharded cluster (no mongot).
  *
  * @tags: [
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_90,
  * ]
  */

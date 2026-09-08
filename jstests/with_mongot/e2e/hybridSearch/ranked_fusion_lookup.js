@@ -1,6 +1,6 @@
 /*
  * Tests hybrid search with $rankFusion inside of a $lookup subpipeline.
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

@@ -45,11 +45,8 @@ BSONObj buildAddInputPipelineScoreDetailsBson(std::string_view inputPipelineName
 // {$addFields: {<INTERNAL_FIELDS>.<p>_rank: {$cond: [{$eq:[<path>,0]},"NA",<path>]}, ...}}
 BSONObj buildRankAddFieldsBson(const std::vector<std::string>& pipelineNames);
 
-// {$setMetadata: {score: {$add: ["$<INTERNAL_FIELDS>.<p>_score", ...]}}} (Full branch)
+// {$setMetadata: {score: {$add: ["$<INTERNAL_FIELDS>.<p>_score", ...]}}}
 BSONObj buildSetMetadataScoreBson(const std::vector<std::string>& pipelineNames);
-
-// {$addFields: {score: {$add: ["$<INTERNAL_FIELDS>.<p>_score", ...]}}} (Basic branch)
-BSONObj buildAddFieldsScoreBson(const std::vector<std::string>& pipelineNames);
 
 // {$addFields: {<INTERNAL_FIELDS>: {calculatedScoreDetails: [
 //      {$mergeObjects: [{inputPipelineName: <p>, rank: "$<p>_rank",
@@ -62,9 +59,6 @@ BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pip
 // {$setMetadata: {scoreDetails: {value: {$meta: "score"}, description: "...",
 //                                details: "$<INTERNAL_FIELDS>.calculatedScoreDetails"}}}
 BSONObj buildSetMetadataScoreDetailsBson();
-
-// {$sort: {score: -1, _id: 1}} (Basic branch)
-BSONObj buildSortByScoreScalarBson();
 
 // Builds the per-input-pipeline preamble for $rankFusion: a clone of the input subpipeline's
 // LPDSs (with the rightmost $sort mutated to output sort key metadata) followed by:

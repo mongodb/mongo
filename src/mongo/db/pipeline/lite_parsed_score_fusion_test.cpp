@@ -29,8 +29,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard featureFlagController{"featureFlagSearchHybridScoringFull",
-                                                         true};
     unittest::ServerParameterGuard _ifrFlagController{"featureFlagExtensionsInsideHybridSearch",
                                                       true};
 };

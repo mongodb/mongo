@@ -13,13 +13,7 @@
  * TODO SERVER-100443 Expand on this test by adding more complex pipeline shapes with at least 3
  * stages.
  *
- * featureFlagRankFusionFull is required to enable use of "score".
- * featureFlagSearchHybridScoringFull is required to enable use of $score.
- * The $rankFusion feature flag is required to enable use of "score" and "searchScore".
  * @tags: [
- *   featureFlagRankFusionBasic,
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_82
  * ]
  */

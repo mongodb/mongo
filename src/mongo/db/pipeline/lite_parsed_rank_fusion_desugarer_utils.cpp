@@ -99,22 +99,6 @@ BSONObj buildSetMetadataScoreBson(const std::vector<std::string>& pipelineNames)
     return bob.obj();
 }
 
-BSONObj buildAddFieldsScoreBson(const std::vector<std::string>& pipelineNames) {
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder afBob(bob.subobjStart("$addFields"sv));
-        BSONObjBuilder scoreBob(afBob.subobjStart("score"sv));
-        BSONArrayBuilder addArr(scoreBob.subarrayStart("$add"sv));
-        for (const auto& pipelineName : pipelineNames) {
-            addArr.append(
-                fmt::format("${}",
-                            hybrid_scoring_util::applyInternalFieldPrefixToFieldName(
-                                kInternalFieldsName, fmt::format("{}_score", pipelineName))));
-        }
-    }
-    return bob.obj();
-}
-
 BSONObj buildCalculatedFinalScoreDetailsBson(const std::vector<std::string>& pipelineNames,
                                              const StringMap<double>& weights) {
     BSONObjBuilder bob;
@@ -159,10 +143,6 @@ BSONObj buildSetMetadataScoreDetailsBson() {
                                      kInternalFieldsName, "calculatedScoreDetails")));
     }
     return bob.obj();
-}
-
-BSONObj buildSortByScoreScalarBson() {
-    return BSON("$sort" << BSON("score" << -1 << "_id" << 1));
 }
 
 StageSpecs buildRankFusionInputPipelinePreamble(const NamespaceString& nss,

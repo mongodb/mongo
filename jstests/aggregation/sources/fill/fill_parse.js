@@ -6,7 +6,6 @@
  *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
  *   # $sort stage.
  *   requires_fcv_81,
- *   featureFlagRankFusionBasic,
  * ]
  */
 

@@ -9,7 +9,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
@@ -140,40 +139,38 @@ testCases.forEach((testCase) => {
     runTest(testCase);
 });
 
-if (FeatureFlagUtil.isPresentAndEnabled(dbConn, "RankFusionFull")) {
-    // Run tests referencing 'textScore' with 'score'.
-    setUpCollection();
-    [
-        {
-            logMessage: "Running findAndModify update with score sort and projection.",
-            projectTextScore: true,
-            opType: "update",
-            cmdObj: {
-                findAndModify: collName,
-                query: {$text: {$search: "two"}},
-                sort: {score: {$meta: "score"}},
-                fields: {score: {$meta: "score"}},
-                update: [{$set: {a: 1}}],
-            },
-            expectedResult: {numbers: "two"},
+// Run tests referencing 'textScore' with 'score'.
+setUpCollection();
+[
+    {
+        logMessage: "Running findAndModify update with score sort and projection.",
+        projectTextScore: true,
+        opType: "update",
+        cmdObj: {
+            findAndModify: collName,
+            query: {$text: {$search: "two"}},
+            sort: {score: {$meta: "score"}},
+            fields: {score: {$meta: "score"}},
+            update: [{$set: {a: 1}}],
         },
-        {
-            logMessage: "Running findAndModify remove with score sort and projection.",
-            projectTextScore: true,
-            opType: "delete",
-            cmdObj: {
-                findAndModify: collName,
-                query: {$text: {$search: "two"}},
-                fields: {score: {$meta: "score"}},
-                sort: {score: {$meta: "score"}},
-                remove: true,
-            },
-            expectedResult: {numbers: "two"},
+        expectedResult: {numbers: "two"},
+    },
+    {
+        logMessage: "Running findAndModify remove with score sort and projection.",
+        projectTextScore: true,
+        opType: "delete",
+        cmdObj: {
+            findAndModify: collName,
+            query: {$text: {$search: "two"}},
+            fields: {score: {$meta: "score"}},
+            sort: {score: {$meta: "score"}},
+            remove: true,
         },
-    ].forEach((testCase) => {
-        jsTestLog(testCase.logMessage);
-        runTest(testCase);
-    });
-}
+        expectedResult: {numbers: "two"},
+    },
+].forEach((testCase) => {
+    jsTestLog(testCase.logMessage);
+    runTest(testCase);
+});
 
 st.stop();

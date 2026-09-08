@@ -332,8 +332,6 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -423,8 +421,6 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddSingleMetaExpressionDependency) 
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

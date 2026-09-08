@@ -839,8 +839,6 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
 
 TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddMetaExpressionsToDependencies) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -878,8 +876,6 @@ TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
 }
 
 TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

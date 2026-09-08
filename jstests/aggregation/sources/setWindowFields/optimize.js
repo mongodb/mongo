@@ -7,7 +7,6 @@
  *   requires_pipeline_optimization,
  *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
  *   # $sort stage.
- *   featureFlagRankFusionBasic,
  *   requires_fcv_81,
  * ]
  */

@@ -4,7 +4,6 @@
  * results, including when $rankFusion has multiple input pipelines (which desugar to $unionWith).
  *
  * @tags: [
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_90,
  * ]
  */

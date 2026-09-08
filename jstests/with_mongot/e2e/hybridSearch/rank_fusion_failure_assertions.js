@@ -5,9 +5,7 @@
  * These will be picked up/ran by the js fuzzer suite.
  *
  * @tags: [
- *   featureFlagRankFusionFull,
  *   # Needed for the nested $scoreFusion.
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_82
  * ]
  */

@@ -2,7 +2,7 @@
  * Tests hybrid search with both $scoreFusion and $rankFusion get rejected when inside of $unionWith
  * or $lookup subpipelines on timeseries collections.
  *
- * @tags: [ requires_timeseries, featureFlagSearchHybridScoringFull, requires_fcv_82, requires_getmore ]
+ * @tags: [requires_timeseries, requires_fcv_82, requires_getmore]
  */
 
 const timeseriesCollName = jsTestName() + "_timeseries";

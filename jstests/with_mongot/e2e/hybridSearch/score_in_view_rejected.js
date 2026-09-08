@@ -1,7 +1,7 @@
 /**
  * Tests that $rankFusion in a view definition is always rejected.
  *
- * @tags: [featureFlagRankFusionBasic, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 const collName = jsTestName();

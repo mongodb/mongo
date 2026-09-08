@@ -4,7 +4,7 @@
  *
  * This includes when the view is at the top-level of the query, and/or in the $unionWith/$lookup.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

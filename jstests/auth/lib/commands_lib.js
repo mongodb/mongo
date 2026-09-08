@@ -10544,7 +10544,6 @@ export const authCommandsLib = {
             },
             skipSharded: false,
             disableSearch: true,
-            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagRankFusionBasic"),
             // Expect this to fail since there's no mongot set up to execute the $search/vectorSearch.
             testcases: testcases_transformationOnlyExpectFail,
         },
@@ -10559,7 +10558,6 @@ export const authCommandsLib = {
                 db.createCollection("foo");
             },
             disableSearch: true,
-            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagSearchHybridScoringFull"),
             testcases: testcases_transformationOnly,
         },
         {
@@ -10640,7 +10638,6 @@ export const authCommandsLib = {
             },
             skipSharded: false,
             disableSearch: true,
-            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagSearchHybridScoringFull"),
             testcases: testcases_transformationOnlyExpectFail,
         },
         {

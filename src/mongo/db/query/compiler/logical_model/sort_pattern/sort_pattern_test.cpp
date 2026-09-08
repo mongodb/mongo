@@ -102,8 +102,6 @@ TEST(SortStageDefaultTest, WrongSortKeyDefinition) {
 
 // Testing expected behavior of 'isSortOnSingleMetaField()' stateless function.
 TEST(IsSortOnSingleMetaFieldTest, TestingIsSortOnSingleMetaFieldFn) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
-
     auto expCtx = getExpCtx();
 
     // SortPattern must have a field.

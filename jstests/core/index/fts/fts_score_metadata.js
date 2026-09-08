@@ -2,7 +2,6 @@
  * Test that $textScore is accessible as $score in find and findAndModify queries.
  *
  * @tags: [
- *   featureFlagRankFusionFull,
  *   requires_fcv_81,
  *   # Ban in any configurations that require retryable writes. Although findAndModify is a
  *   # retryable write command, the 'fields' option does not currently work with retryable writes.

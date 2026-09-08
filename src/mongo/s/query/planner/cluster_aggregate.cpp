@@ -524,15 +524,6 @@ ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
                 LiteParserOptions{.ifrContext = expCtx->getIfrContext(), .opCtx = opCtx}),
             *resolvedView,
             viewName);
-
-        if (request.getIsHybridSearch()) {
-            uassert(ErrorCodes::OptionNotSupportedOnView,
-                    "$rankFusion and $scoreFusion are currently unsupported on views",
-                    feature_flags::gFeatureFlagSearchHybridScoringFull
-                        .isEnabledUseLatestFCVWhenUninitialized(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-        }
     }
 
     // Clone and desugar the pipeline if it wasn't already desugared earlier during view handling.

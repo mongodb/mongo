@@ -1,6 +1,6 @@
 /*
  * Tests hybrid search with $scoreFusion inside of a $lookup subpipeline.
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

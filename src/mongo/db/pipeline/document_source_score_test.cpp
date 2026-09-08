@@ -29,12 +29,7 @@ namespace {
  * OperationContext, etc.) and configure the common feature flags that we need.
  */
 class DocumentSourceScoreTest : service_context_test::WithSetupTransportLayer,
-                                public AggregationContextFixture {
-private:
-    unittest::ServerParameterGuard scoreFusionFlag{"featureFlagSearchHybridScoringFull", true};
-    // Feature flag needed to use 'score' meta field
-    unittest::ServerParameterGuard rankFusionFlag{"featureFlagRankFusionFull", true};
-};
+                                public AggregationContextFixture {};
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
     auto spec = fromjson(R"({

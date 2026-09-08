@@ -16,7 +16,6 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 
 #include <string_view>
 
@@ -37,12 +36,6 @@ std::unique_ptr<LiteParsedRankFusion> LiteParsedRankFusion::parse(
 
     auto parsedSpec = RankFusionSpec::parse(spec.embeddedObject(),
                                             IDLParserContext(DocumentSourceRankFusion::kStageName));
-
-    if (parsedSpec.getScoreDetails()) {
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                "'featureFlagRankFusionFull' must be enabled to use scoreDetails",
-                isRankFusionFullEnabled());
-    }
 
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 

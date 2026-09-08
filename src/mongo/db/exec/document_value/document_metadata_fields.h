@@ -423,8 +423,7 @@ public:
         return _holder->score;
     }
 
-    // TODO SERVER-85426 Remove all feature flag logic.
-    void setScore(double score, bool featureFlagAlreadyValidated = false);
+    void setScore(double score);
 
     bool hasScoreDetails() const {
         return _holder && _holder->metaFields.test(MetaType::kScoreDetails);
@@ -435,8 +434,7 @@ public:
         return _holder->scoreDetails;
     }
 
-    // TODO SERVER-85426 Remove all feature flag logic.
-    void setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated = false);
+    void setScoreDetails(Value scoreDetails);
 
     /**
      * This sets 'scoreDetails' and retrieves the "value" field from 'scoreDetails' to set the

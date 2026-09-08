@@ -40,8 +40,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
-    unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
@@ -113,168 +111,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::IDLFailedToParse);
-}
-
-TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            input: {
-                pipelines: {
-                    agatha: [
-                        { $match : { author : "Agatha Christie" } },
-                        { $sort: {author: 1} }
-                    ]
-                }
-            }
-        }
-    })");
-
-    const auto desugaredList =
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
-                {
-                    "$match": {
-                        "author": "Agatha Christie"
-                    }
-                },
-                {
-                    "$sort": {
-                        "author": 1,
-                        "$_internalOutputSortKeyMetadata": true
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "_internal_rankFusion_docs": "$$ROOT"
-                        }
-                    }
-                },
-                {
-                    "$_internalSetWindowFields": {
-                        "sortBy": {
-                            "order": 1
-                        },
-                        "output": {
-                            "_internal_rankFusion_internal_fields.agatha_rank": {
-                                "$rank": {}
-                            }
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "_internal_rankFusion_internal_fields": {
-                            "agatha_score": {
-                                "$multiply": [
-                                    {
-                                        "$divide": [
-                                            {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$_internal_rankFusion_internal_fields.agatha_rank",
-                                                    {
-                                                        "$const": 60
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": 1
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$_internal_rankFusion_docs._id",
-                        "_internal_rankFusion_docs": {
-                            "$first": "$_internal_rankFusion_docs"
-                        },
-                        "__hs_agatha_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$_internal_rankFusion_internal_fields.agatha_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "$mergeObjects": [
-                                "$_internal_rankFusion_docs",
-                                {
-                                    "_internal_rankFusion_internal_fields": {
-                                        "agatha_score": "$__hs_agatha_score"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "_internal_rankFusion_internal_fields": {
-                            "agatha_rank": {
-                                "$cond": [
-                                    {
-                                        "$eq": [
-                                            "$_internal_rankFusion_internal_fields.agatha_rank",
-                                            {
-                                                "$const": 0
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": "NA"
-                                    },
-                                    "$_internal_rankFusion_internal_fields.agatha_rank"
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$_internal_rankFusion_internal_fields.agatha_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$sort": {
-                        "score": -1,
-                        "_id": 1
-                    }
-                },
-                {
-                    "$project": {
-                        "_internal_rankFusion_internal_fields": false,
-                        "_id": true
-                    }
-                }
-            ]
-        })",
-        asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineIsNotArray) {
@@ -418,385 +254,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
     })");
 
     ASSERT_THROWS_CODE(parseRankFusionStage(spec), AssertionException, 12108700);
-}
-
-TEST_F(DocumentSourceRankFusionTest,
-       CheckMultiplePipelinesAndOptionalArgumentsAllowedBasicRankFusion) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
-
-    auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
-
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            input: {
-                pipelines: {
-                    matchAuthor: [
-                        { $match : { author : "Agatha Christie" } },
-                        { $sort: {author: 1} }
-                    ],
-                    matchGenres: [
-                        {
-                            $search: {
-                                index: "search_index",
-                                text: {
-                                    query: "mystery",
-                                    path: "genres"
-                                }
-                            }
-                        }
-                    ],
-                    matchPlot: [
-                        {
-                            $vectorSearch: {
-                                queryVector: [1.0, 2.0, 3.0],
-                                path: "plot_embedding",
-                                numCandidates: 300,
-                                index: "vector_index",
-                                limit: 10
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-    })");
-
-    const auto desugaredList =
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
-                {
-                    "$match": {
-                        "author": "Agatha Christie"
-                    }
-                },
-                {
-                    "$sort": {
-                        "author": 1,
-                        "$_internalOutputSortKeyMetadata": true
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "_internal_rankFusion_docs": "$$ROOT"
-                        }
-                    }
-                },
-                {
-                    "$_internalSetWindowFields": {
-                        "sortBy": {
-                            "order": 1
-                        },
-                        "output": {
-                            "_internal_rankFusion_internal_fields.matchAuthor_rank": {
-                                "$rank": {}
-                            }
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "_internal_rankFusion_internal_fields": {
-                            "matchAuthor_score": {
-                                "$multiply": [
-                                    {
-                                        "$divide": [
-                                            {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank",
-                                                    {
-                                                        "$const": 60
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": 1
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$unionWith": {
-                        "coll": "pipeline_test",
-                        "pipeline": [
-                            {
-                                "$search": {
-                                    "mongotQuery": {
-                                        "index": "search_index",
-                                        "text": {
-                                            "query": "mystery",
-                                            "path": "genres"
-                                        }
-                                    },
-                                    "requiresSearchSequenceToken": false,
-                                    "requiresSearchMetaCursor": true
-                                }
-                            },
-                            {
-                                "$replaceRoot": {
-                                    "newRoot": {
-                                        "_internal_rankFusion_docs": "$$ROOT"
-                                    }
-                                }
-                            },
-                            {
-                                "$_internalSetWindowFields": {
-                                    "sortBy": {
-                                        "order": 1
-                                    },
-                                    "output": {
-                                        "_internal_rankFusion_internal_fields.matchGenres_rank": {
-                                            "$rank": {}
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                "$addFields": {
-                                    "_internal_rankFusion_internal_fields": {
-                                        "matchGenres_score": {
-                                            "$multiply": [
-                                                {
-                                                    "$divide": [
-                                                        {
-                                                            "$const": 1
-                                                        },
-                                                        {
-                                                            "$add": [
-                                                                "$_internal_rankFusion_internal_fields.matchGenres_rank",
-                                                                {
-                                                                    "$const": 60
-                                                                }
-                                                            ]
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "$const": 1
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$unionWith": {
-                        "coll": "pipeline_test",
-                        "pipeline": [
-                            {
-                                "$vectorSearch": {
-                                    "queryVector": [
-                                        1,
-                                        2,
-                                        3
-                                    ],
-                                    "path": "plot_embedding",
-                                    "numCandidates": 300,
-                                    "index": "vector_index",
-                                    "limit": 10
-                                }
-                            },
-                            {
-                                "$replaceRoot": {
-                                    "newRoot": {
-                                        "_internal_rankFusion_docs": "$$ROOT"
-                                    }
-                                }
-                            },
-                            {
-                                "$_internalSetWindowFields": {
-                                    "sortBy": {
-                                        "order": 1
-                                    },
-                                    "output": {
-                                        "_internal_rankFusion_internal_fields.matchPlot_rank": {
-                                            "$rank": {}
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                "$addFields": {
-                                    "_internal_rankFusion_internal_fields": {
-                                        "matchPlot_score": {
-                                            "$multiply": [
-                                                {
-                                                    "$divide": [
-                                                        {
-                                                            "$const": 1
-                                                        },
-                                                        {
-                                                            "$add": [
-                                                                "$_internal_rankFusion_internal_fields.matchPlot_rank",
-                                                                {
-                                                                    "$const": 60
-                                                                }
-                                                            ]
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "$const": 1
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$_internal_rankFusion_docs._id",
-                        "_internal_rankFusion_docs": {
-                            "$first": "$_internal_rankFusion_docs"
-                        },
-                        "__hs_matchAuthor_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$_internal_rankFusion_internal_fields.matchAuthor_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "__hs_matchGenres_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$_internal_rankFusion_internal_fields.matchGenres_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "__hs_matchPlot_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$_internal_rankFusion_internal_fields.matchPlot_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "$mergeObjects": [
-                                "$_internal_rankFusion_docs",
-                                {
-                                    "_internal_rankFusion_internal_fields": {
-                                        "matchAuthor_score": "$__hs_matchAuthor_score",
-                                        "matchGenres_score": "$__hs_matchGenres_score",
-                                        "matchPlot_score": "$__hs_matchPlot_score"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "_internal_rankFusion_internal_fields": {
-                            "matchAuthor_rank": {
-                                "$cond": [
-                                    {
-                                        "$eq": [
-                                            "$_internal_rankFusion_internal_fields.matchAuthor_rank",
-                                            {
-                                                "$const": 0
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": "NA"
-                                    },
-                                    "$_internal_rankFusion_internal_fields.matchAuthor_rank"
-                                ]
-                            },
-                            "matchGenres_rank": {
-                                "$cond": [
-                                    {
-                                        "$eq": [
-                                            "$_internal_rankFusion_internal_fields.matchGenres_rank",
-                                            {
-                                                "$const": 0
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": "NA"
-                                    },
-                                    "$_internal_rankFusion_internal_fields.matchGenres_rank"
-                                ]
-                            },
-                            "matchPlot_rank": {
-                                "$cond": [
-                                    {
-                                        "$eq": [
-                                            "$_internal_rankFusion_internal_fields.matchPlot_rank",
-                                            {
-                                                "$const": 0
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "$const": "NA"
-                                    },
-                                    "$_internal_rankFusion_internal_fields.matchPlot_rank"
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {
-                            "$add": [
-                                "$_internal_rankFusion_internal_fields.matchAuthor_score",
-                                "$_internal_rankFusion_internal_fields.matchGenres_score",
-                                "$_internal_rankFusion_internal_fields.matchPlot_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$sort": {
-                        "score": -1,
-                        "_id": 1
-                    }
-                },
-                {
-                    "$project": {
-                        "_internal_rankFusion_internal_fields": false,
-                        "_id": true
-                    }
-                }
-            ]
-        })",
-        asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
@@ -2715,33 +2172,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
     ASSERT_BSONOBJ_EQ(fromjson(expected), asOneObj);
 }
 
-TEST_F(DocumentSourceRankFusionTest, ScoreDetailsIsRejectedWithoutRankFusionFullFF) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            input: {
-                pipelines: {
-                    agatha: [
-                        { $match : { author : "Agatha Christie" } },
-                        { $sort: {author: 1} }
-                    ]
-                }
-            },
-            combination: {
-                weights: {
-                    agatha: 5
-                }
-            },
-            scoreDetails: true
-        }
-    })");
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       ErrorCodes::QueryFeatureNotAllowed);
-}
-
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -2982,7 +2413,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -3235,7 +2665,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
@@ -4274,7 +3703,6 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -4442,7 +3870,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
@@ -4719,7 +4146,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});

@@ -1,10 +1,5 @@
 /**
  * Test that references to "scoreDetails" are correctly validated.
- *
- * featureFlagRankFusionFull is required to enable use of "scoreDetails".
- * @tags: [
- *   featureFlagRankFusionFull,
- *  ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

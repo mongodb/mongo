@@ -32,10 +32,9 @@ REGISTER_STABLE_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(first, ExpressionFirst::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(last, ExpressionLast::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(linearFill, ExpressionLinearFill::parse);
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(minMaxScaler,
-                                           ExpressionMinMaxScaler::parse,
-                                           &feature_flags::gFeatureFlagSearchHybridScoringFull,
-                                           AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_WINDOW_FUNCTION(minMaxScaler,
+                         ExpressionMinMaxScaler::parse,
+                         AllowedWithApiStrict::kNeverInVersion1);
 REGISTER_STABLE_WINDOW_FUNCTION(minN, (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse));
 REGISTER_STABLE_WINDOW_FUNCTION(maxN, (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse));
 REGISTER_STABLE_WINDOW_FUNCTION(firstN,

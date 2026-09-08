@@ -229,9 +229,6 @@ selector:
     - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
-    - featureFlagRankFusionBasic
-    - featureFlagRankFusionFull
-    - featureFlagSearchHybridScoringFull
     - uses_transactions
     - requires_fcv_81
     - requires_fcv_82

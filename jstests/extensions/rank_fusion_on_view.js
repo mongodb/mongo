@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagRankFusionFull,
  *   requires_fcv_90,
  * ]
  */
