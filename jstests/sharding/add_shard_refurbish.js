@@ -10,12 +10,19 @@
  * ]
  */
 
-import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {afterEach, after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 describe("add shard with refurbished replicaset", function () {
     before(() => {
+        // This suite intentionally stops/restarts replica sets and leaves the cluster metadata in
+        // inconsistent states. ShardingTest.stop() calls checkMetadataConsistency() even when
+        // skipValidation is set, so that check isn't meaningful here and can run after a shard
+        // replica set has already been torn down.
+        this.originalSkipCheckMetadataConsistency = TestData.skipCheckMetadataConsistency;
+        TestData.skipCheckMetadataConsistency = true;
+
         this.removeShardIdentity = (rs) => {
             const serverConfigurationCollection = rs.getPrimary().getDB("admin")["system.version"];
             assert.commandWorked(serverConfigurationCollection.deleteOne({_id: "shardIdentity"}));
@@ -91,6 +98,10 @@ describe("add shard with refurbished replicaset", function () {
 
         this.rs.startSet({replSet: "data", remember: false}, true);
         this.rs.waitForPrimary();
+    });
+
+    after(() => {
+        TestData.skipCheckMetadataConsistency = this.originalSkipCheckMetadataConsistency;
     });
 
     afterEach(() => {
