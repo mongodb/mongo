@@ -16,8 +16,9 @@ the durable state against per-operation record files.
   publish event. Inserts are generated only after the create is complete.
 - A published drop parks the slot in REMOVED until the stable schema epoch passes the drop's epoch;
   recreating the name earlier is an API violation WiredTiger panics on.
-- Leaders write checkpoints to the shared page log; followers adopt them. Role changes are events in
-  the same stream, so all earlier work is drained before the connection is reconfigured.
+- Leaders write checkpoints to the shared metadata; followers pick them up.
+- Role changes are events in the event stream, so all earlier work is drained before the connection
+  is reconfigured.
 
 ## Directory layout
 
@@ -77,7 +78,7 @@ Threads are created for each leader or follower phase.
 | reader | 1 | Read the self-pipe or peer pipe, demultiplex events and drain work at transition markers. |
 | worker | `-T N` | Apply events, relay leader events, append records and report completed timestamps. |
 | timestamp | 1 | Advance oldest and stable timestamps, plus the stable schema epoch in epoch mode, to the completed frontier. |
-| checkpoint | 1 | Write leader checkpoints to PALite or adopt the latest checkpoint as follower. |
+| checkpoint | 1 | Take leader checkpoint, or pick up checkpoints as follower. |
 
 Shutdown is ordered generator, reader, workers, checkpoint, timestamp. The last two remain available
 while workers drain because a schema operation can be waiting for a checkpoint.

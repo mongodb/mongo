@@ -45,10 +45,11 @@
 #      and on activates it regardless of precise checkpoint.
 
 import wttest
+from eviction_util import eviction_util
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-class test_checkpoint_scrub_evict(wttest.WiredTigerTestCase):
+class test_checkpoint_scrub_evict(eviction_util):
     """
     Verify checkpoint based clean scrub-eviction behaviour.
 
@@ -322,10 +323,6 @@ class test_checkpoint_scrub_evict(wttest.WiredTigerTestCase):
         pages = self.get_stat(stat.conn.cache_scrub_image_pages)
         nbytes = self.get_stat(stat.conn.cache_scrub_image_bytes)
 
-        # The gauges are unsigned counts; underflow would surface as a huge value.
-        self.assertGreaterEqual(pages, 0, 'scrub image page gauge must not be negative')
-        self.assertGreaterEqual(nbytes, 0, 'scrub image byte gauge must not be negative')
-
         if self.precise:
             self.assertGreater(pages, 0,
                 msg='scrub image page gauge should rise after a precise checkpoint')
@@ -336,25 +333,23 @@ class test_checkpoint_scrub_evict(wttest.WiredTigerTestCase):
             self.assertGreaterEqual(nbytes, pages,
                 msg='retained bytes should be at least one per retained page')
 
-            # Dropping the table discards its pages through the image-discard
-            # path. The gauge is a live connection-wide count and a checkpoint
-            # retains fresh images, so its absolute value after the drop is not
-            # predictable; all we require is that the decrement runs cleanly and
-            # the two gauges stay consistent with each other.
-
             # Eviction restores the scrubbed pages as dirty in-memory images,
             # so the table can hold dirty data by the time we drop it.
             # Under precise_checkpoint the drop's close-checkpoint refuses dirty
             # data (WT_DIRTY_DATA). Checkpoint first so the drop closes cleanly.
             self.session.checkpoint()
+
+            # Dropping the table discards its pages through the image-discard path. This table is
+            # the only thing holding retained images, so the accounting must end up empty. Speed up
+            # the sweep scan so the wait resolves promptly instead of on the default interval.
+            #
+            # Nothing here needs to inspect the gauge for an underflow: the accounting clamps a
+            # decrement that would go negative back to zero and reports it, which aborts a
+            # diagnostic build and otherwise fails the test through the unexpected-stderr check.
+            self.conn.reconfigure('file_manager=(close_scan_interval=1)')
             self.session.drop(self.uri)
-            pages = self.get_stat(stat.conn.cache_scrub_image_pages)
-            nbytes = self.get_stat(stat.conn.cache_scrub_image_bytes)
-            self.assertGreaterEqual(pages, 0, 'scrub image page gauge underflowed')
-            self.assertGreaterEqual(nbytes, 0, 'scrub image byte gauge underflowed')
-            self.assertEqual(pages == 0, nbytes == 0,
-                msg='scrub image page and byte gauges must drain together: '
-                    'pages={}, bytes={}'.format(pages, nbytes))
+
+            self.wait_for_scrub_images_released()
         else:
             # Fuzzy checkpoint never retains a scrub image.
             self.assertEqual(pages, 0, 'fuzzy checkpoint must not retain scrub images')
@@ -576,11 +571,6 @@ class test_checkpoint_scrub_image_gauge(wttest.WiredTigerTestCase):
 
         pages = self.get_stat(stat.conn.cache_scrub_image_pages)
         nbytes = self.get_stat(stat.conn.cache_scrub_image_bytes)
-
-        # Whatever the mode, the gauge is an unsigned count; an underflow from an
-        # unbalanced decr would surface here as a huge value.
-        self.assertGreaterEqual(pages, 0, 'scrub image page gauge underflowed')
-        self.assertGreaterEqual(nbytes, 0, 'scrub image byte gauge underflowed')
 
         if self.expect_tracked:
             # Scrub ran, so at least one image is retained and its bytes tracked.

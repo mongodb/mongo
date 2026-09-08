@@ -266,6 +266,7 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->handover_received = false;
     state->emitted = state->applied = 0;
     state->stepdown_ts = state->stepdown_ckpt_lsn = 0;
+    state->stepdown_ckpt_due = false;
 
     /* The frontier continues from the previous phase; nothing above it is completed yet. */
     state->frontier_ts = state->current_ts;
@@ -275,6 +276,7 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     for (uint32_t i = 0; i < cfg->thread_count; i++) {
         state->workers[i].busy = false;
         state->workers[i].evq.head = state->workers[i].evq.tail = 0;
+        testutil_random_from_random(&state->workers[i].rnd, &cfg->opts->data_rnd);
         /*
          * A leading phase checkpoints every slot, including inherited ingest data; a follower phase
          * covers nothing, so the slots it inherits stay blocked.
@@ -285,10 +287,8 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
         /* State and slot generation survive role transitioning. */
     }
 
-    /* Re-seed the phase's worker and auxiliary streams. */
-    for (uint32_t i = 0; i <= cfg->thread_count; i++)
-        testutil_random_from_random(
-          &state->gen_rnd[i], i < cfg->thread_count ? &cfg->opts->data_rnd : &cfg->opts->extra_rnd);
+    /* Re-seed the auxiliary stream. */
+    testutil_random_from_random(&state->ext_rnd, &cfg->opts->extra_rnd);
 
     node_aux_start(state, STAGE_TS, thread_ts_run);
     node_workers_start(state);
@@ -339,10 +339,15 @@ node_step_down(WORKLOAD_STATE *state, uint64_t final_ts)
         println("Node %" PRIu32 ": no peer to hand over to; continuing alone", state->cfg->node_id);
     }
 
-    /* Reset adopted checkpoint and transition tracking. */
-    state->adopted_ckpt_lsn = 0;
+    /* The pick-up resumes from the step-down checkpoint. */
+    const uint64_t stepdown_lsn = __wt_atomic_load_uint64(&state->stepdown_ckpt_lsn);
+    if (state->adopted_ckpt_lsn < stepdown_lsn)
+        state->adopted_ckpt_lsn = stepdown_lsn;
+
+    /* Reset transition tracking. */
     __wt_atomic_store_uint64(&state->stepdown_ts, 0);
     __wt_atomic_store_uint64(&state->stepdown_ckpt_lsn, 0);
+    __wt_atomic_store_bool(&state->stepdown_ckpt_due, false);
 }
 
 /*

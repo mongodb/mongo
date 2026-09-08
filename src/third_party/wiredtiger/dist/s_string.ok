@@ -1665,6 +1665,7 @@ psp
 pthread
 ptr
 ptrdiff
+publishedp
 pv
 pval
 pwrite
@@ -1765,6 +1766,7 @@ sanitizer
 sanitizers
 scalable
 scen
+scheckpoint
 schemas
 sclose
 scr

@@ -8,6 +8,131 @@
 
 #include "wt_internal.h"
 
+/*
+ * The binary-search cache-warming pipeline below is built on __builtin_prefetch, which GCC and
+ * Clang support (Clang defines the same GNU compatibility macro this file checks for) and other
+ * compilers, notably MSVC, do not. The two functions the search loops further down this file call
+ * are only defined here, and only called there, on a supported compiler.
+ */
+#if defined(__GNUC__)
+
+/*
+ * Minimum remaining candidates (the binary search loops' "limit") below which warming ahead isn't
+ * worth it: with this few candidates left, the "ahead" slots are too close to the one the loop is
+ * about to examine to matter.
+ */
+#define WT_ROW_SEARCH_WARM_MIN_1_AHEAD 2
+#define WT_ROW_SEARCH_WARM_MIN_2_AHEAD 6
+
+/*
+ * __row_search_warm_ref --
+ *     Warm the cache line for a WT_REF entry on an internal page.
+ */
+static WT_INLINE void
+__row_search_warm_ref(WT_PAGE_INDEX *pindex, uint32_t slot)
+{
+    if (slot < pindex->entries)
+        __builtin_prefetch(pindex->index[slot], WT_WARM_READ, WT_WARM_LOCALITY_HIGH);
+}
+
+/*
+ * __row_search_warm_row_entry --
+ *     Warm the cache line for a pg_row struct entry on a leaf page.
+ */
+static WT_INLINE void
+__row_search_warm_row_entry(WT_PAGE *page, uint32_t slot)
+{
+    if (slot < page->entries)
+        __builtin_prefetch(&page->pg_row[slot], WT_WARM_READ, WT_WARM_LOCALITY_HIGH);
+}
+
+/*
+ * __row_search_warm_key --
+ *     Warm the cache line for an encoded key's data for a leaf page's pg_row entry.
+ */
+static WT_INLINE void
+__row_search_warm_key(WT_PAGE *page, uint32_t slot)
+{
+    WT_ROW *rip;
+    uintptr_t v;
+
+    if (slot >= page->entries)
+        return;
+
+    rip = page->pg_row + slot;
+    v = (uintptr_t)WT_ROW_KEY_COPY(rip);
+    switch (v & WT_KEY_FLAG_BITS) {
+    case WT_K_FLAG:
+        __builtin_prefetch(
+          WT_PAGE_REF_OFFSET(page, WT_K_DECODE_KEY_CELL_OFFSET(v) + WT_K_DECODE_KEY_OFFSET(v)),
+          WT_WARM_READ, WT_WARM_LOCALITY_HIGH);
+        break;
+    case WT_KV_FLAG:
+        __builtin_prefetch(
+          WT_PAGE_REF_OFFSET(page, WT_KV_DECODE_KEY_CELL_OFFSET(v) + WT_KV_DECODE_KEY_OFFSET(v)),
+          WT_WARM_READ, WT_WARM_LOCALITY_HIGH);
+        break;
+    default:
+        /* On-page cells and instantiated keys need unpacking; not worth warming. */
+        break;
+    }
+}
+
+/*
+ * __row_search_warm_int_candidates --
+ *     Warm the WT_REF entries a binary search on an internal page is likely to visit one iteration
+ *     ahead.
+ */
+static WT_INLINE void
+__row_search_warm_int_candidates(
+  WT_PAGE_INDEX *pindex, uint32_t base, uint32_t indx, uint32_t limit)
+{
+    if (limit > WT_ROW_SEARCH_WARM_MIN_1_AHEAD) {
+        __row_search_warm_ref(pindex, base + (limit >> 2));
+        __row_search_warm_ref(pindex, indx + 1 + ((limit - 1) >> 2));
+    }
+}
+
+/*
+ * __row_search_warm_leaf_candidates --
+ *     Warm the pg_row entries and key data a binary search on a leaf page is likely to visit one
+ *     and two iterations ahead: warming the pg_row entries two iterations ahead gives the key-data
+ *     warm below, one iteration ahead, time to land before it's needed.
+ */
+static WT_INLINE void
+__row_search_warm_leaf_candidates(WT_PAGE *page, uint32_t base, uint32_t indx, uint32_t limit)
+{
+    if (limit > WT_ROW_SEARCH_WARM_MIN_2_AHEAD) {
+        uint32_t indx_left_far, indx_left_near, indx_right_far, indx_right_near;
+        uint32_t half, quarter, right_base, right_limit;
+
+        /*
+         * Two iterations ahead, the search will have narrowed to the left half of the current range
+         * or the right half; refine each half the same way this iteration narrowed the whole range,
+         * to get two exact candidate slots on each side.
+         */
+        half = limit >> 1;
+        quarter = limit >> 2;
+        right_base = indx + 1;
+        right_limit = (limit - 1) >> 1;
+        indx_left_far = base + (quarter >> 1);
+        indx_left_near = base + quarter + 1 + ((half - 1) >> 2);
+        indx_right_near = right_base + (right_limit >> 2);
+        indx_right_far = right_base + (right_limit >> 1) + 1 + ((right_limit - 1) >> 2);
+
+        __row_search_warm_row_entry(page, indx_left_far);
+        __row_search_warm_row_entry(page, indx_left_near);
+        __row_search_warm_row_entry(page, indx_right_near);
+        __row_search_warm_row_entry(page, indx_right_far);
+    }
+    if (limit > WT_ROW_SEARCH_WARM_MIN_1_AHEAD) {
+        __row_search_warm_key(page, base + (limit >> 2));
+        __row_search_warm_key(page, indx + 1 + ((limit - 1) >> 2));
+    }
+}
+
+#endif
+
 static WT_INLINE int __validate_next_stack(
   WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key);
 
@@ -475,6 +600,11 @@ restart:
         if (collator == NULL && srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
             for (; limit != 0; limit >>= 1) {
                 indx = base + (limit >> 1);
+
+#if defined(__GNUC__)
+                __row_search_warm_int_candidates(pindex, base, indx, limit);
+#endif
+
                 descent = pindex->index[indx];
                 __wt_ref_key(page, descent, &item->data, &item->size);
 
@@ -506,6 +636,11 @@ restart:
 
             for (; limit != 0; limit >>= 1) {
                 indx = base + (limit >> 1);
+
+#if defined(__GNUC__)
+                __row_search_warm_int_candidates(pindex, base, indx, limit);
+#endif
+
                 descent = pindex->index[indx];
                 __wt_ref_key(page, descent, &item->data, &item->size);
 
@@ -523,6 +658,11 @@ restart:
         } else
             for (; limit != 0; limit >>= 1) {
                 indx = base + (limit >> 1);
+
+#if defined(__GNUC__)
+                __row_search_warm_int_candidates(pindex, base, indx, limit);
+#endif
+
                 descent = pindex->index[indx];
                 __wt_ref_key(page, descent, &item->data, &item->size);
 
@@ -638,6 +778,11 @@ leaf_only:
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
             rip = page->pg_row + indx;
+
+#if defined(__GNUC__)
+            __row_search_warm_leaf_candidates(page, base, indx, limit);
+#endif
+
             WT_ERR(__wt_row_leaf_key(session, page, rip, item, true));
 
             cmp = __wt_lex_compare_short(srch_key, item);
@@ -669,6 +814,11 @@ leaf_only:
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
             rip = page->pg_row + indx;
+
+#if defined(__GNUC__)
+            __row_search_warm_leaf_candidates(page, base, indx, limit);
+#endif
+
             WT_ERR(__wt_row_leaf_key(session, page, rip, item, true));
 
             match = WT_MIN(skiplow, skiphigh);
@@ -686,6 +836,11 @@ leaf_only:
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
             rip = page->pg_row + indx;
+
+#if defined(__GNUC__)
+            __row_search_warm_leaf_candidates(page, base, indx, limit);
+#endif
+
             WT_ERR(__wt_row_leaf_key(session, page, rip, item, true));
 
             WT_ERR(__wt_compare(session, collator, srch_key, item, &cmp));

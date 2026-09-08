@@ -35,7 +35,8 @@ frontier_assert(WORKLOAD_STATE *state, uint64_t timestamp)
 static void
 reader_step_down(WORKLOAD_STATE *state, uint64_t ts)
 {
-    WT_CONNECTION *conn = state->conn;
+    testutil_assert(__wt_atomic_load_uint64(&state->stepdown_ts) == 0);
+    testutil_assert(__wt_atomic_load_bool(&state->stepdown_ckpt_due) == false);
 
     /* Signal the timestamp and checkpoint threads to pause. */
     __wt_atomic_store_uint64(&state->stepdown_ts, ts);
@@ -43,25 +44,13 @@ reader_step_down(WORKLOAD_STATE *state, uint64_t ts)
         __wt_sleep(0, WT_THOUSAND);
 
     /*
-     * FIXME-WT-18314: Reject step down timestamp without the epoch. The `-e` mode with role
-     * switches becomes illegal.
+     * FIXME-WT-18314: Once the ticket is fixed, the `-e` mode with role switches becomes illegal.
      */
-    set_ts(state->cfg, conn, TS_STEPDOWN, ts);
+    set_ts(state->cfg, state->conn, TS_STEPDOWN, ts);
     workload_set_frontier(state, ts);
 
-    WT_SESSION *session;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(session->checkpoint(session, "use_timestamp=true"));
-    testutil_check(session->close(session, NULL));
-
-    /* Keep the step-down checkpoint's LSN; the next leader should adopt it. */
-    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS ckpt_args = {0};
-    testutil_assert(ckpt_latest(state, &ckpt_args));
-    free(ckpt_args.checkpoint_metadata.mem);
-
-    __wt_atomic_store_uint64(&state->stepdown_ckpt_lsn, ckpt_args.checkpoint_lsn);
-    println("Node %" PRIu32 ": step-down checkpoint at %" PRIu64 " (lsn %" PRIu64 ")",
-      state->cfg->node_id, ts, ckpt_args.checkpoint_lsn);
+    /* Signal the checkpoint thread to resume and run the step-down checkpoint. */
+    __wt_atomic_store_bool(&state->stepdown_ckpt_due, true);
 }
 
 /*

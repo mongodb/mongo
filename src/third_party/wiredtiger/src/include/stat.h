@@ -552,6 +552,7 @@ struct __wt_connection_stats {
     int64_t cache_write_restore_scrub_skipped_dirty;
     int64_t cache_bytes_hs_dirty;
     int64_t cache_eviction_blocked_disagg_dirty_internal_page;
+    int64_t eviction_disagg_publish_cleared;
     int64_t eviction_server_evict_attempt;
     int64_t eviction_worker_evict_attempt;
     int64_t eviction_server_evict_fail;

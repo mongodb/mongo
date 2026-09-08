@@ -355,19 +355,6 @@ kv_workload_runner_wt::do_operation(const operation::checkpoint_crash_trigger &o
         return ret;
     wiredtiger_session_guard session_guard(session);
 
-    /*
-     * Whether this crash keeps the checkpoint turns on connection logging, which the model reads
-     * from the database configuration. The connection configuration recorded in the workload and
-     * the caller's override are both appended after it, so either can contradict it; catch that
-     * here rather than let the two run out of step.
-     */
-    kv_database_config database_config = kv_database_config::from_string(_state->database_config);
-    bool logging = FLD_ISSET(S2C((WT_SESSION_IMPL *)session)->log_mgr.flags, WT_LOG_ENABLED);
-    if (logging != database_config.logging)
-        throw model_exception(
-          "Connection logging does not match the database configuration; set it there rather than "
-          "through the connection configuration");
-
     std::ostringstream config;
     config << "debug=(checkpoint_crash_trigger_point=" << operation::to_string(op.phase) << ")";
     std::string config_str = config.str();
@@ -730,6 +717,15 @@ kv_workload_runner_wt::wiredtiger_open_nolock()
     int ret = ::wiredtiger_open(_home.c_str(), nullptr, config_str.c_str(), &_connection);
     if (ret != 0)
         throw wiredtiger_exception("Cannot open WiredTiger", ret);
+
+    /*
+     * The database configuration is the only place the model records logging state. The connection
+     * configuration and any override can turn it on or off behind the model's back, so reconcile
+     * the resolved state with the model's belief at every open.
+     */
+    bool logging = FLD_ISSET(((WT_CONNECTION_IMPL *)_connection)->log_mgr.flags, WT_LOG_ENABLED);
+    if (logging != database_config.logging)
+        throw model_exception("Connection logging does not match the database configuration");
 
     /*
      * If we're using disaggregated storage, pick up the latest checkpoint, and step up, and set the

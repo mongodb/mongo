@@ -1706,6 +1706,11 @@ __conn_startup_cleanup_and_verify(WT_CONNECTION_IMPL *conn, bool verify_meta)
         /* Database verification must happen as the first step before any potential changes. */
         WT_ERR(__wt_verify_disagg_database_size(session));
 
+        if (__wt_conn_is_disagg(session)) {
+            WT_SESSION *wt_session = &session->iface;
+            WT_ERR(wt_session->verify(wt_session, WT_DISAGG_METADATA_URI, NULL));
+        }
+
         /*
          * If the user wants to verify WiredTiger metadata, verify the history store now that the
          * metadata table may have been salvaged and eviction has been started and recovery run.
@@ -3783,8 +3788,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     if (verify_meta) {
         __wt_verbose_info(session, WT_VERB_RECOVERY, "%s", "performing metadata verify");
         wt_session = &session->iface;
-        ret = wt_session->verify(wt_session, WT_METAFILE_URI, NULL);
-        WT_ERR(ret);
+        WT_ERR(wt_session->verify(wt_session, WT_METAFILE_URI, NULL));
     }
 
     /*

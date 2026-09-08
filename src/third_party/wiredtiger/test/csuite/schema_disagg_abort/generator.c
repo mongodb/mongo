@@ -17,7 +17,7 @@
 /* The generator's state machine. */
 typedef enum {
     GEN_NORMAL,          /* the term's workload */
-    GEN_FLUSH_PUBLISHES, /* one-shot: emit the publishes a term must not end holding */
+    GEN_PUBLISH_PENDING, /* publish what the preceding workload left unpublished */
     GEN_BEGIN_STEPDOWN,  /* one-shot: emit the step-down timestamp */
     GEN_STEPDOWN,        /* the step-down: limited workload */
     GEN_SWITCH,          /* one-shot: emit the switch event that ends the stream */
@@ -48,14 +48,14 @@ generator_emit(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
 static bool
 generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
 {
-    const bool stepping_down = phase == GEN_STEPDOWN;
-    WT_RAND_STATE *rnd = &state->gen_rnd[t];
+    WT_RAND_STATE *rnd = &state->workers[t].rnd;
     const uint32_t slot = __wt_random(rnd) % state->cfg->pool_size;
     TABLE_STATE *slot_state = &state->workers[t].table[slot].state;
     uint64_t *drop_epoch = &state->workers[t].table[slot].drop_epoch;
     /* Set when no checkpoint of this phase can cover the insert; such a slot is not droppable. */
     bool *uncovered_insert = &state->workers[t].table[slot].uncovered_insert;
 
+    const bool stepping_down = phase == GEN_STEPDOWN;
     SCHEMA_EVENT ev = {0}; /* EVENT_NONE until a move is taken */
     switch (*slot_state) {
     case TABLE_NONE:
@@ -192,13 +192,14 @@ generator_switch_requested(GENERATOR_PACING *pacing)
 }
 
 /*
- * generator_flush_publishes --
- *     Emit the pending publish for every slot in an unpublished state, before the role transition.
- *     FIXME-WT-18272 FIXME-WT-18284: Remove this function once these tickets are resolved.
- *     Corresponding generator state GEN_FLUSH_PUBLISHES won't be needed anymore, as well.
+ * generator_publish_pending --
+ *     Emit the pending publish for every slot in an unpublished state.
+ *
+ * FIXME-WT-18272 FIXME-WT-18284: Consider removing this function and GEN_PUBLISH_PENDING once these
+ *     are fixed.
  */
 static void
-generator_flush_publishes(WORKLOAD_STATE *state)
+generator_publish_pending(WORKLOAD_STATE *state)
 {
     if (state->cfg->epoch_less)
         return;
@@ -252,20 +253,20 @@ generator_stepdown_ended(WORKLOAD_STATE *state, GENERATOR_PACING *pacing)
         return (true);
 
     /* Report which part of the step-down stalled. */
-    if (WT_TIMEDIFF_SEC(now, pacing->stepdown_start) > MAX_OP_WAIT) {
+    if (WT_TIMEDIFF_SEC(now, pacing->stepdown_start) > MAX_STEPDOWN_WAIT) {
         if (ckpt_lsn == 0)
             testutil_die(ETIMEDOUT,
               "Node %" PRIu32 ": the step-down checkpoint did not complete in %d seconds",
-              state->cfg->node_id, MAX_OP_WAIT);
+              state->cfg->node_id, MAX_STEPDOWN_WAIT);
         else if (lone)
             testutil_die(ETIMEDOUT,
               "Node %" PRIu32 ": the step-down emitted %" PRIu64 " of %d events in %d seconds",
-              state->cfg->node_id, stepdown_events, GEN_STEPDOWN_MIN_EVENTS, MAX_OP_WAIT);
+              state->cfg->node_id, stepdown_events, GEN_STEPDOWN_MIN_EVENTS, MAX_STEPDOWN_WAIT);
         else
             testutil_die(ETIMEDOUT,
               "Node %" PRIu32 ": peer did not adopt the step-down checkpoint (lsn %" PRIu64
               ") in %d seconds",
-              state->cfg->node_id, ckpt_lsn, MAX_OP_WAIT);
+              state->cfg->node_id, ckpt_lsn, MAX_STEPDOWN_WAIT);
     }
 
     return (false);
@@ -307,11 +308,18 @@ thread_generator_run(void *arg)
         switch (phase) {
         case GEN_NORMAL:
             progressed = generator_round(state, pacing.lead_max, GEN_NORMAL);
-            phase = generator_switch_requested(&pacing) ? GEN_FLUSH_PUBLISHES : GEN_NORMAL;
+            phase = generator_switch_requested(&pacing) ? GEN_PUBLISH_PENDING : GEN_NORMAL;
             break;
-        case GEN_FLUSH_PUBLISHES:
-            generator_flush_publishes(state);
-            phase = state->leads ? GEN_BEGIN_STEPDOWN : GEN_SWITCH;
+        case GEN_PUBLISH_PENDING:
+            /*
+             * Generator enters this state twice: before the step-down begins and after the
+             * step-down ends.
+             */
+            generator_publish_pending(state);
+            if (state->leads && __wt_atomic_load_uint64(&state->stepdown_ts) == 0)
+                phase = GEN_BEGIN_STEPDOWN;
+            else
+                phase = GEN_SWITCH;
             break;
         case GEN_BEGIN_STEPDOWN:
             /*
@@ -327,9 +335,13 @@ thread_generator_run(void *arg)
             progressed = (node_is_lone(state->cfg) || state->cfg->peer_alive) &&
               generator_round(state, pacing.lead_max, GEN_STEPDOWN);
             if (generator_stepdown_ended(state, &pacing)) {
-                println("Node %" PRIu32 ": step-down emitted %" PRIu64 " events",
-                  state->cfg->node_id, state->emitted - pacing.stepdown_emitted);
-                phase = GEN_SWITCH;
+                struct timespec now;
+                __wt_epoch(NULL, &now);
+                println("Node %" PRIu32 ": step-down emitted %" PRIu64 " events in %" PRIu64
+                        " ms (budget %d s)",
+                  state->cfg->node_id, state->emitted - pacing.stepdown_emitted,
+                  (uint64_t)WT_TIMEDIFF_MS(now, pacing.stepdown_start), MAX_STEPDOWN_WAIT);
+                phase = GEN_PUBLISH_PENDING;
             }
             break;
         case GEN_SWITCH:

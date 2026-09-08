@@ -812,6 +812,17 @@ __curfile_reopen(WT_CURSOR *cursor, bool sweep_check_only)
         return (can_sweep ? WT_NOTFOUND : 0);
     }
 
+#if defined(__GNUC__)
+    /*
+     * Warm the dhandle's rwlock and btree handle: the reopen below is about to lock the former and
+     * dereference the latter, and both are commonly cold after a cursor has sat in the cache. No
+     * cache-prefetch intrinsic is available outside GCC/Clang, so this is skipped elsewhere; the
+     * warm is purely advisory.
+     */
+    __builtin_prefetch(&dhandle->rwlock, WT_WARM_WRITE, WT_WARM_LOCALITY_HIGH);
+    __builtin_prefetch(dhandle->handle, WT_WARM_READ, WT_WARM_LOCALITY_HIGH);
+#endif
+
     /*
      * Temporarily set the session's data handle to the data handle in the cursor. Reopen may be
      * called either as part of an open API call, or during cursor sweep as part of a different API

@@ -140,21 +140,20 @@ schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT
         if (ret != EBUSY)
             break;
 
-        struct timespec now;
-        __wt_epoch(NULL, &now);
-        const bool timed_out = WT_TIMEDIFF_SEC(now, start) > MAX_OP_WAIT;
-        /* Leader is gone, so no one produces checkpoints to unblock this operation. */
-        const bool abandoned = !state->generates && (!state->cfg->peer_alive || timed_out);
         int err, sub_err;
         const char *err_msg;
-        if (abandoned) {
+
+        /* Leader is gone, so no one produces checkpoints to unblock this operation. */
+        if (!state->generates && !state->cfg->peer_alive) {
             session->get_last_error(session, &err, &sub_err, &err_msg);
-            println("Node %" PRIu32 ": abandoning follower %s %s (%s): %s", state->cfg->node_id,
-              is_create ? "CREATE" : "DROP", ev->uri,
-              timed_out ? "no checkpoint arrived" : "peer left", err_msg);
+            println("Node %" PRIu32 ": abandoning follower %s %s (peer left): %s",
+              state->cfg->node_id, is_create ? "CREATE" : "DROP", ev->uri, err_msg);
             return (ECANCELED);
         }
-        if (timed_out) {
+
+        struct timespec now;
+        __wt_epoch(NULL, &now);
+        if (WT_TIMEDIFF_SEC(now, start) > MAX_OP_WAIT) {
             session->get_last_error(session, &err, &sub_err, &err_msg);
             schema_op_stall_report(state);
             testutil_die(ETIMEDOUT, "node%" PRIu32 " %s %s %s: EBUSY for %d seconds: %s",

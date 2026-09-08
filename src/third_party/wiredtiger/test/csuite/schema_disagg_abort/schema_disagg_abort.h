@@ -45,15 +45,12 @@
 #define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
 #define TS_BOOTSTRAP 1  /* the timestamp sequence starts here, on either mode */
 #define MAX_NODES 2
-/*
- * In-node: a retried op gives up, before the parent stops waiting. A blocked drop waits for the
- * checkpoint thread's next checkpoint, so this has to stay well above MAX_CKPT_INVL.
- */
-#define MAX_OP_WAIT 30
+#define MAX_OP_WAIT 30 /* maximum time to wait for an in-node operation */
 #define MAX_POOL_SIZE 64
 #define MAX_TIME 40
 #define MIN_TIME 10
 #define MAX_WAIT 60 /* parent: a child starting, stopping, or posting a sentinel */
+#define MAX_STEPDOWN_WAIT (2 * MAX_WAIT) /* maximum time to wait for a step-down to complete */
 #define MIN_POOL_SIZE 2
 #define MAX_TH 12
 #define MIN_TH 2
@@ -234,6 +231,7 @@ typedef struct {
 
     /* Step-down state, zero outside a transition; atomic access. */
     uint64_t stepdown_ts;       /* while set, the timestamp and checkpoint threads hold */
+    bool stepdown_ckpt_due;     /* the timestamps are set: the checkpoint thread may take it */
     uint64_t stepdown_ckpt_lsn; /* the step-down checkpoint, once taken */
     bool ts_busy;               /* the timestamp thread is mid-advance; atomic access */
 
@@ -249,9 +247,10 @@ typedef struct {
 
     /* Per-worker-thread state; the reader fills the queue, the slot model is the generator's. */
     struct {
-        wt_thread_t thr; /* this worker's handle */
-        EVENT_QUEUE evq; /* this worker's inbound events */
-        bool busy;       /* the worker is mid-apply; atomic access */
+        wt_thread_t thr;   /* this worker's handle */
+        EVENT_QUEUE evq;   /* this worker's inbound events */
+        bool busy;         /* the worker is mid-apply; atomic access */
+        WT_RAND_STATE rnd; /* this worker's random stream */
         struct {
             /* Table state is carried across leader-follower transitions. */
             TABLE_STATE state;
@@ -267,16 +266,22 @@ typedef struct {
     /* The single-threaded stages, indexed by stage: generator, reader, checkpoint, timestamp. */
     wt_thread_t aux_thr[AUX_THR_COUNT];
 
-    /* Random streams: one per worker, plus one for the checkpoint thread's cadence. */
-    WT_RAND_STATE gen_rnd[MAX_TH + 1];
+    /* Auxiliary random stream */
+    WT_RAND_STATE ext_rnd;
+
 } WORKLOAD_STATE;
 
 /*
  * The checkpoint thread's bookkeeping for one phase.
  */
 typedef struct {
-    uint32_t produced;           /* checkpoints produced so far */
     struct timespec phase_start; /* when the phase began, used for checkpoint timeouts */
+
+    /* Leading only: the cadence. */
+    uint32_t produced;    /* checkpoints produced so far */
+    struct timespec last; /* when the previous checkpoint completed */
+    uint64_t wait;        /* seconds to the next one, redrawn after each */
+    WT_RAND_STATE *rnd;   /* the cadence's random stream */
 } CKPT_CTX;
 
 /*
@@ -337,7 +342,8 @@ WT_THREAD_RET thread_reader_run(void *arg);
 WT_THREAD_RET thread_ckpt_run(void *arg);
 WT_THREAD_RET thread_ts_run(void *arg);
 void ckpt_adopt_latest(WORKLOAD_STATE *state);
-bool ckpt_latest(WORKLOAD_STATE *state, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args);
+bool ckpt_get(
+  WORKLOAD_STATE *state, WT_SESSION *session, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args);
 void leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
 void follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
 

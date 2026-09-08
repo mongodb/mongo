@@ -94,7 +94,8 @@ static void
 test_workload_basic(void)
 {
     model::kv_workload workload;
-    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+    workload << model::operation::config("database", "logging=true")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
              << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
              << model::operation::insert(k_table1_id, 1, key1, value1)
              << model::operation::insert(k_table1_id, 2, key2, value2)
@@ -132,7 +133,8 @@ static void
 test_workload_txn(void)
 {
     model::kv_workload workload;
-    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+    workload << model::operation::config("database", "logging=true")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
              << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
              << model::operation::insert(k_table1_id, 1, key1, value1)
              << model::operation::insert(k_table1_id, 2, key2, value2)
@@ -180,7 +182,8 @@ static void
 test_workload_prepared(void)
 {
     model::kv_workload workload;
-    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+    workload << model::operation::config("database", "logging=true")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
              << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
              << model::operation::insert(k_table1_id, 1, key1, value1)
              << model::operation::insert(k_table1_id, 2, key2, value2)
@@ -215,7 +218,8 @@ static void
 test_workload_restart(void)
 {
     model::kv_workload workload;
-    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+    workload << model::operation::config("database", "logging=true")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
              << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
              << model::operation::insert(k_table1_id, 1, key1, value1)
              << model::operation::insert(k_table1_id, 2, key2, value2)
@@ -255,7 +259,8 @@ static void
 test_workload_crash(void)
 {
     model::kv_workload workload;
-    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+    workload << model::operation::config("database", "logging=true")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
              << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
              << model::operation::insert(k_table1_id, 1, key1, value1)
              << model::operation::insert(k_table1_id, 2, key2, value2)
@@ -329,6 +334,36 @@ test_workload_checkpoint_crash_phase(void)
                   std::string(home) + DIR_DELIM_STR + "checkpoint_crash_" + std::to_string(run++);
                 verify_workload(workload, opts, test_home, nullptr);
             }
+}
+
+/*
+ * test_workload_logging_mismatch --
+ *     Check that a workload whose database configuration disagrees with the connection
+ *     configuration fails at open time rather than running a mismatched comparison.
+ */
+static void
+test_workload_logging_mismatch(void)
+{
+    model::kv_workload workload;
+    workload << model::operation::config("database", "logging=false")
+             << model::operation::create_table(k_table1_id, "table1", "S", "S")
+             << model::operation::begin_transaction(1)
+             << model::operation::insert(k_table1_id, 1, key1, value1)
+             << model::operation::commit_transaction(1);
+
+    /* Run the workload in the model. */
+    model::kv_database database;
+    workload.run(database);
+
+    /* The connection configuration enables logging, which contradicts the database config. */
+    bool caught = false;
+    try {
+        std::string test_home = std::string(home) + DIR_DELIM_STR + "logging_mismatch";
+        verify_workload(workload, opts, test_home, ENV_CONFIG);
+    } catch (model::model_exception &e) {
+        caught = true;
+    }
+    testutil_assert(caught);
 }
 
 /*
@@ -515,6 +550,7 @@ main(int argc, char *argv[])
         test_workload_restart();
         test_workload_crash();
         test_workload_checkpoint_crash_phase();
+        test_workload_logging_mismatch();
         test_workload_generator();
         test_workload_parse();
     } catch (std::exception &e) {

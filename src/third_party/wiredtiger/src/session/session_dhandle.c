@@ -217,6 +217,20 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
     }
 
     /*
+     * Fast path: try a single non-blocking read lock when shared access is enough. This skips the
+     * loop below entirely for the common case of an already-open, uncontended handle; if the
+     * trylock fails or the handle can no longer be reopened, fall through to the general loop.
+     */
+    if (!want_exclusive && WT_DHANDLE_CAN_REOPEN(dhandle) &&
+      (btree == NULL || !F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) &&
+      __wt_try_readlock(session, &dhandle->rwlock) == 0) {
+        if (WT_DHANDLE_CAN_REOPEN(dhandle))
+            return (0);
+        /* Lost the race with a state change under the lock; fall back to the general path. */
+        __wt_readunlock(session, &dhandle->rwlock);
+    }
+
+    /*
      * Check that the handle is open. We've already incremented the reference count, so once the
      * handle is open it won't be closed by another thread.
      *

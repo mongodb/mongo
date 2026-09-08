@@ -38,12 +38,12 @@
 
 import threading
 
-import wttest
+from eviction_util import eviction_util
 from wiredtiger import stat, WiredTigerError, wiredtiger_strerror, WT_ROLLBACK
 from wtscenario import make_scenarios
 from wtthread import Thread
 
-class test_checkpoint_scrub_evict02(wttest.WiredTigerTestCase):
+class test_checkpoint_scrub_evict02(eviction_util):
     uri = 'table:scrub_evict02'
     nrows = 5000
 
@@ -62,16 +62,6 @@ class test_checkpoint_scrub_evict02(wttest.WiredTigerTestCase):
                 'checkpoint_threads=%d,'
                 'eviction_dirty_target=80,eviction_dirty_trigger=90,'
                 'eviction=(checkpoint_scrub_eviction=on)' % self.ckpt_threads)
-
-    def get_stat(self, statistic, uri=None):
-        cursor = self.session.open_cursor('statistics:' if uri is None else 'statistics:' + uri)
-        value = cursor[statistic][2]
-        cursor.close()
-        return value
-
-    def scrub_images(self):
-        return (self.get_stat(stat.conn.cache_scrub_image_pages),
-          self.get_stat(stat.conn.cache_scrub_image_bytes))
 
     def create(self, config=''):
         self.session.create(self.uri, 'key_format=i,value_format=S' + config)
@@ -136,14 +126,19 @@ class test_checkpoint_scrub_evict02(wttest.WiredTigerTestCase):
         self.check_values('y' * 100)
 
     def test_images_released_when_page_discarded(self):
-        """Dropping the table frees pages that still hold a retained image."""
+        """Dropping the table frees pages that still hold a retained image.
+
+        Speed up the sweep scan so the wait resolves quickly instead of waiting on the default
+        interval."""
         self.settle()
         self.write('y' * 100)
         self.session.checkpoint()
         self.assertGreater(self.scrub_images()[0], 0)
 
+        self.conn.reconfigure('file_manager=(close_scan_interval=1)')
         self.session.drop(self.uri)
-        self.assertEqual(self.scrub_images(), (0, 0))
+
+        self.wait_for_scrub_images_released()
 
     def test_images_released_by_later_reconciliation(self):
         """A page dirtied and reconciled again releases the image its last checkpoint retained.

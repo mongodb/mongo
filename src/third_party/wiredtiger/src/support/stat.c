@@ -2212,6 +2212,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: checkpoint scrub skipped because the page will be left dirty",
   "cache: dirty bytes belonging to the history store table in the cache",
   "cache: dirty internal page cannot be evicted in disaggregated storage",
+  "cache: disaggregated tables the eviction server published",
   "cache: evict page attempts by eviction server",
   "cache: evict page attempts by eviction worker threads",
   "cache: evict page failures by eviction server",
@@ -3379,6 +3380,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_write_restore_scrub_skipped_dirty = 0;
     /* not clearing cache_bytes_hs_dirty */
     stats->cache_eviction_blocked_disagg_dirty_internal_page = 0;
+    stats->eviction_disagg_publish_cleared = 0;
     stats->eviction_server_evict_attempt = 0;
     stats->eviction_worker_evict_attempt = 0;
     stats->eviction_server_evict_fail = 0;
@@ -4507,6 +4509,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_bytes_hs_dirty += WT_STAT_CONN_READ(from, cache_bytes_hs_dirty);
     to->cache_eviction_blocked_disagg_dirty_internal_page +=
       WT_STAT_CONN_READ(from, cache_eviction_blocked_disagg_dirty_internal_page);
+    to->eviction_disagg_publish_cleared += WT_STAT_CONN_READ(from, eviction_disagg_publish_cleared);
     to->eviction_server_evict_attempt += WT_STAT_CONN_READ(from, eviction_server_evict_attempt);
     to->eviction_worker_evict_attempt += WT_STAT_CONN_READ(from, eviction_worker_evict_attempt);
     to->eviction_server_evict_fail += WT_STAT_CONN_READ(from, eviction_server_evict_fail);

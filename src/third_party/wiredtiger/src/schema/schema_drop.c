@@ -172,14 +172,10 @@ __drop_issue_trim(WT_SESSION_IMPL *session, const char *uri)
         WT_ASSERT(session, btree_id == btree->id && page_log == btree->page_log);
 
         /*
-         * A table awaiting publication has never been checkpointed, so closing its handle loses any
-         * committed data it holds. Refuse the drop until a checkpoint has persisted the data, so
-         * this table behaves like a regular table, which returns EBUSY when it holds uncheckpointed
-         * data. Only an open handle can be awaiting publication: uncheckpointed data keeps sweep
-         * from closing it and does not survive a restart.
+         * Closing the handle of a table that was never checkpointed loses the data it holds, so
+         * refuse the drop as a regular table holding uncheckpointed data would.
          */
-        if (F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH) &&
-          __wt_atomic_load_uint64_relaxed(&btree->min_unpublished_durable_ts) != WT_TS_NONE)
+        if (__wt_atomic_load_uint64_relaxed(&btree->min_unpublished_durable_ts) != WT_TS_NONE)
             WT_ERR_SUB(session, EBUSY, WT_DIRTY_DATA,
               "the table has unpublished data and must be checkpointed before it can be dropped");
     }

@@ -507,9 +507,16 @@ __verify_one_checkpoint(
         if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
             /*
              * The page discard verification routine depends on get_page_ids being implemented.
+             *
+             * FIXME-WT-18567: We opt shared metadata out of the page count check. When we create a
+             * new shared metadata root page during checkpoint, we remove the old one after the
+             * checkpoint metadata is written. But we verify at the LSN where we wrote the
+             * checkpoint metadata, so PALI doesn't "see" that discard, reports the page as live,
+             * and gives us one more page than the btree thinks it has.
              */
             WT_BLOCK_DISAGG *block_disagg = (WT_BLOCK_DISAGG *)bm->block;
-            if (block_disagg->plhandle->plh_get_page_ids != NULL && ckpt->raw.data != NULL)
+            if (block_disagg->plhandle->plh_get_page_ids != NULL && ckpt->raw.data != NULL &&
+              !F_ISSET(session->dhandle, WT_DHANDLE_DISAGG_META))
                 WT_ERR(__verify_page_discard(session, bm));
         }
 
