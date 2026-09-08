@@ -70,7 +70,7 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str, include_terminatin
             root_logger.info(
                 "ASAN_OPTIONS or TSAN_OPTIONS is set. Will send SIGABRT rather than attaching with a debugger to avoid high memory usage and bloated core dump size."
             )
-            dbg = SigabrtDumper(root_logger, dbg_output)
+            dbg = SigabrtDumper(root_logger, dbg_output, fallback_dumper=dbg)
 
     return Dumpers(dbg=dbg, jstack=jstack)
 
@@ -132,6 +132,19 @@ class Dumper(metaclass=ABCMeta):
         """
         raise NotImplementedError("_dump_impl must be implemented in OS-specific subclasses")
 
+    def dump_live_backtraces(self, pinfo: Pinfo):
+        """
+        Log native backtraces of running processes without taking a core dump.
+
+        :param pinfo: A Pinfo describing the process
+        """
+        self._root_logger.warning(
+            "Capturing backtraces from a live process is not implemented for this debugger, so no "
+            "stacks will be collected for %s processes with PIDs %s",
+            pinfo.name,
+            str(pinfo.pidv),
+        )
+
     @abstractmethod
     def find_debugger(self):
         """Find the installed debugger."""
@@ -145,6 +158,22 @@ class SigabrtDumper(Dumper):
     terminate the process.
     """
 
+    # A process that is blocked inside its own signal handling path never services SIGABRT,
+    # so waiting out the whole time limit produces no diagnostics at all. Give up early and
+    # let the debugger collect stacks instead.
+    SIGABRT_GRACE = timedelta(minutes=2)
+
+    def __init__(self, root_logger: logging.Logger, dbg_output: str, fallback_dumper=None):
+        """
+        Initialize dumper.
+
+        :param root_logger: Top-level logger
+        :param dbg_output: 'stdout' or 'file'
+        :param fallback_dumper: Dumper used to collect stacks from processes that survive SIGABRT
+        """
+        super().__init__(root_logger, dbg_output)
+        self._fallback_dumper = fallback_dumper
+
     def _dump_impl(self, pinfo: Pinfo, take_dump: bool):
         """
         Perform dump for a process.
@@ -153,22 +182,41 @@ class SigabrtDumper(Dumper):
         :param take_dump: Whether to take a core dump
         """
 
-        if take_dump:
-            processes = []
-            for pid in pinfo.pidv:
-                processes.append(psutil.Process(pid))
-                self._root_logger.info(f"Sending SIGABRT to {pid}")
-                signal_process(self._root_logger, pid, signal.SIGABRT)
-                resume_process(self._root_logger, pinfo.name, pid)
+        if not take_dump:
+            return
 
-            self.wait_for_processes(processes)
+        processes = []
+        for pid in pinfo.pidv:
+            processes.append(psutil.Process(pid))
+            self._root_logger.info(f"Sending SIGABRT to {pid}")
+            signal_process(self._root_logger, pid, signal.SIGABRT)
+            resume_process(self._root_logger, pinfo.name, pid)
+
+        survivors = self.wait_for_processes(processes)
+        if not survivors:
+            return
+
+        survivor_pids = [p.pid for p in survivors]
+        self._root_logger.warning(
+            "PIDs %s did not end after SIGABRT, so they are likely blocked in their own signal "
+            "handling path.",
+            survivor_pids,
+        )
+        if self._fallback_dumper is not None:
+            self._root_logger.info("Falling back to the debugger to capture stacks.")
+            # Backtraces only. Deliberately no core dump, which is the cost that the sanitizer
+            # exemption in get_dumpers() exists to avoid.
+            self._fallback_dumper.dump_live_backtraces(Pinfo(name=pinfo.name, pidv=survivor_pids))
 
     def wait_for_processes(self, processes):
+        """Wait for processes to end after SIGABRT and return the ones still alive."""
         self._root_logger.info("Waiting for processes to end after SIGABRT")
 
         start_time = datetime.now()
-        alive = []
-        while datetime.now() - start_time < self._time_limit:
+        deadline = min(self.SIGABRT_GRACE, self._time_limit)
+        # Liveness is always checked at least once, so that a short deadline cannot report a
+        # process as a survivor before we have looked at it.
+        while True:
             alive = []
             # This loop filters out processes that have ended or become a zombie
             for p in processes:
@@ -180,13 +228,17 @@ class SigabrtDumper(Dumper):
 
             # All the processes have ended
             if not alive:
-                return
+                return []
+
+            if datetime.now() - start_time >= deadline:
+                break
 
             time.sleep(1)
 
         self._root_logger.warning(
-            f"The following processes took too long to end after SIGABRT: {alive}"
+            f"The following processes took too long to end after SIGABRT: {processes}"
         )
+        return processes
 
     def find_debugger(self):
         return None
@@ -498,6 +550,11 @@ class LLDBDumper(Dumper):
 class GDBDumper(Dumper):
     """GDBDumper class."""
 
+    # Upper bound on backtracing live processes, so a slow attach cannot consume the entire
+    # hang-analyzer budget and leave no time to upload artifacts. This is the budget for the whole
+    # set of processes, not for each one.
+    BACKTRACE_TIMEOUT_SECONDS = 360
+
     def find_debugger(self):
         """Find the installed debugger."""
         debugger = "gdb"
@@ -749,6 +806,70 @@ class GDBDumper(Dumper):
         self._root_logger.info(
             "Done analyzing %s processes with PIDs %s", pinfo.name, str(pinfo.pidv)
         )
+
+    def dump_live_backtraces(self, pinfo: Pinfo):
+        """
+        Log native backtraces of running processes without taking a core dump.
+
+        :param pinfo: A Pinfo describing the process
+        """
+        dbg = self.find_debugger()
+
+        if dbg is None:
+            self._root_logger.warning(
+                "Debugger not found, skipping backtraces of %s processes with PIDs %s",
+                pinfo.name,
+                str(pinfo.pidv),
+            )
+            return
+
+        # Reading debug symbols for a large sanitizer build is slow, so bound the whole set of
+        # processes rather than each one: this runs post-task, and overrunning eats into the time
+        # the task needs to upload core dumps. Output is streamed to the log as gdb produces it, so
+        # a timeout still leaves partial stacks behind.
+        deadline = datetime.now() + timedelta(
+            seconds=min(self._time_limit.total_seconds(), self.BACKTRACE_TIMEOUT_SECONDS)
+        )
+
+        for index, pid in enumerate(pinfo.pidv):
+            timeout_seconds = (deadline - datetime.now()).total_seconds()
+            if timeout_seconds <= 0:
+                self._root_logger.warning(
+                    "Backtrace budget exhausted, skipping the remaining %s processes with PIDs %s",
+                    pinfo.name,
+                    str(pinfo.pidv[index:]),
+                )
+                break
+
+            # Backtraces go to gdb's stdout, which call() pipes into the log. Nothing is written
+            # to disk, so this stays cheap even for a sanitizer build with a large address space.
+            # '--nx' skips .gdbinit so this does not depend on the mongo GDB extensions loading.
+            cmds = [
+                "set interactive-mode off",
+                "set confirm off",
+                "set print thread-events off",
+                "set width 0",
+                "attach %d" % pid,
+                "thread apply all bt",
+                "detach",
+            ]
+            self._root_logger.info(
+                "Dumping backtraces of %s process %d without taking a core dump", pinfo.name, pid
+            )
+            exit_code = call(
+                [dbg, "--quiet", "--nx", "--batch"]
+                + list(itertools.chain.from_iterable([["-ex", cmd] for cmd in cmds])),
+                self._root_logger,
+                timeout_seconds,
+                pinfo,
+                check=False,
+            )
+            self._root_logger.info(
+                "gdb exited with code %d while backtracing %s process %d",
+                exit_code,
+                pinfo.name,
+                pid,
+            )
 
     @TRACER.start_as_current_span("core_analyzer.analyze_cores")
     def analyze_cores(
