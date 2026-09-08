@@ -8,6 +8,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/clang_checked/checked_mutex.h"
+#include "mongo/db/repl/clang_checked/thread_safety_annotations.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
@@ -171,7 +173,8 @@ private:
     /**
      * Logs the diagnostic string for a commit coordination.
      */
-    void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision);
+    void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision,
+                                size_t numParticipants);
 
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
@@ -189,14 +192,14 @@ private:
     std::unique_ptr<txn::AsyncWorkScheduler> _sendPrepareScheduler;
 
     // Protects the state below
-    mutable std::mutex _mutex;
+    mutable clang_checked::CheckedMutex<std::mutex> _mutex;
 
     // Tracks which step of the 2PC coordination is currently (or was most recently) executing
-    Step _step{Step::kInactive};
+    Step _step MONGO_LOCKING_GUARDED_BY(_mutex) = Step::kInactive;
 
     // Promise/future pair which will be signaled when the coordinator has completed
-    bool _kickOffCommitPromiseSet{false};
-    Promise<void> _kickOffCommitPromise;
+    bool _kickOffCommitPromiseSet MONGO_LOCKING_GUARDED_BY(_mutex) = false;
+    Promise<void> _kickOffCommitPromise MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // The state below gets populated sequentially as the coordinator advances through the 2 phase
     // commit stages. Each of these fields is set only once for the lifetime of a coordinator and
@@ -205,20 +208,20 @@ private:
     // If the coordinator is canceled before commit is requested, none of these fiends will be set
 
     // Set when the coordinator has been asked to coordinate commit
-    boost::optional<txn::ParticipantsList> _participants;
-    bool _participantsDurable{false};
+    boost::optional<txn::ParticipantsList> _participants MONGO_LOCKING_GUARDED_BY(_mutex);
+    bool _participantsDurable MONGO_LOCKING_GUARDED_BY(_mutex) = false;
 
     // Set when the coordinator has heard back from all the participants and reached a decision, but
     // hasn't yet persisted it
-    boost::optional<txn::CoordinatorCommitDecision> _decision;
+    boost::optional<txn::CoordinatorCommitDecision> _decision MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // Set when the coordinator has heard back from all the participants and reached a commit
     // decision.
-    std::vector<NamespaceString> _affectedNamespaces;
+    std::vector<NamespaceString> _affectedNamespaces MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // Set when the coordinator has durably persisted `_decision` to the `config.coordinators`
     // collection
-    bool _decisionDurable{false};
+    bool _decisionDurable MONGO_LOCKING_GUARDED_BY(_mutex) = false;
     SharedPromise<txn::CommitDecision> _decisionPromise;
 
     // Set when the coordinator has received acks from all participants that they have successfully

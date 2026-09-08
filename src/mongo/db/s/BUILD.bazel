@@ -264,6 +264,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:change_stream_oplog_notification",
         "//src/mongo/db/repl:wait_for_majority_service",
+        "//src/mongo/db/repl/clang_checked",
         "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
         "//src/mongo/db/transaction",
         "//src/mongo/executor:task_executor_pool",
