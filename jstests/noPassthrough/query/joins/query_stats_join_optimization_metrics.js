@@ -19,7 +19,7 @@ const params = getQueryStatsServerParameters();
 params.setParameter.internalEnableJoinPlanCache = false;
 params.setParameter.internalEnableJoinOptimization = false;
 // Needed to materialize and consume a persistent sample below.
-// TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+// TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
 params.setParameter.featureFlagPersistentStats = true;
 // A persisted sample is keyed by the requested sample size, so join optimization only reuses one if
 // it asks for exactly the size that was persisted.

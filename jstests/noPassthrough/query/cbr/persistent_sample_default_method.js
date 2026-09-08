@@ -28,7 +28,7 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(jsTestName());
 const kCollName = jsTestName();
 
-// TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+// TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
 if (!FeatureFlagUtil.isEnabled(db, "PersistentStats")) {
     jsTest.log.info(`Skipping ${jsTestName()}: featureFlagPersistentStats is not enabled`);
     MongoRunner.stopMongod(conn);

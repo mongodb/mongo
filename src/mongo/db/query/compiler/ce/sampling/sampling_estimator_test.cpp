@@ -2278,7 +2278,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
 }
 
 TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Source collection has docs that must NOT appear in the returned sample — hitting the
     // persistent sample means we never read from them.
@@ -2337,7 +2337,7 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
 }
 
 TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     const UUID uuid = UUID::gen();
     // 3 docs across 2 pages, so a `pagesRead` taken from the doc count would report 3, not 2.
@@ -2382,7 +2382,7 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Source collection has docs that must NOT appear in the returned sample — hitting the
     // persistent sample means we never read from them.
@@ -2425,7 +2425,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(kTestNss,
                     {BSON("_id" << 1 << "tag" << "not_persisted"),
@@ -2460,7 +2460,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
 }
 
 TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // A matching persistent sample exists, but the estimator is constructed with kOnTheFlySample so
     // it must ignore it and sample fresh from the source collection.
@@ -2511,7 +2511,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
 }
 
 TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Source collection has docs that must NOT appear in the returned sample — hitting the
     // persistent sample means we never read from them.
@@ -2559,7 +2559,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
 }
 
 TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSamplingStyle) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Persisted-sample method (kRandom) is independent of samplingStyle (kChunk).
     insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
@@ -2606,7 +2606,7 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
 }
 
 TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle) {
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Persisted-sample method is kRandom, so the persisted kChunk sample below is a miss.
     std::vector<BSONObj> sourceDocs;
@@ -2772,7 +2772,7 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
     // A doc with the correct _id key exists in system.stats.samples but is malformed (sampleSize
     // field disagrees with the docs array length). tryLoadPersistentSample must log the error and
     // fall back to on-the-fly sampling rather than crashing or returning a corrupt sample.
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(kTestNss,
                     {BSON("_id" << 1 << "tag" << "not_persisted"),

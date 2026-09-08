@@ -1243,7 +1243,7 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
 TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
     // Verifies that the page count shows up in 'ceSamplingMetadata' when read back
     // from persisted samples collection.
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag("featureFlagPersistentStats", true);
     unittest::ServerParameterGuard planRankerController("internalQueryPlanRanker", "costBased");
     unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");

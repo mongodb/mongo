@@ -614,7 +614,7 @@ MongoRunner.stopMongod(conn);
 // MongoRunner.runMongod() inherits such settings from TestData.setParameters, so the flag cannot
 // be made to appear off.
 
-// TODO SERVER-112627: Need to explicitly disable once the feature flag is enabled by default
+// TODO SERVER-124372: Need to explicitly disable once the feature flag is enabled by default
 const conn2 = MongoRunner.runMongod({}); // flag off by default
 const db2 = conn2.getDB(jsTestName());
 if (!FeatureFlagUtil.isEnabled(db2, "PersistentStats")) {

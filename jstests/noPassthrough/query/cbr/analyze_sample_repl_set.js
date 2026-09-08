@@ -42,7 +42,7 @@ const secondary = rst.getSecondary();
 const primaryDB = primary.getDB(kDbName);
 const secondaryDB = secondary.getDB(kDbName);
 
-// TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+// TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
 if (!FeatureFlagUtil.isEnabled(primaryDB, "PersistentStats")) {
     jsTest.log.info(`Skipping ${jsTestName()}: featureFlagPersistentStats is not enabled`);
     rst.stopSet();
