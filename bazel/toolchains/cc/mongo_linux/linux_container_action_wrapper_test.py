@@ -18,7 +18,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
     @staticmethod
     def _valid_config(**overrides: str) -> dict:
         config = {
-            "container_layout_version": "v5",
+            "container_layout_version": "v6",
             "docker_command": "/usr/bin/docker",
             "sandbox_base": "/action-sandbox",
             "shared_install_dir": "/shared-install",
@@ -147,7 +147,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
         output_base = pathlib.Path("/output-base")
         config = {
             "container_name": "mongo_linux_action_configured",
-            "container_layout_version": "v5",
+            "container_layout_version": "v6",
             "docker_command": "/usr/bin/docker",
             "home": "/repo/.tmp/home",
             "image": "image@sha256:digest",
@@ -162,7 +162,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
         original = wrapper._container_name(config, output_base)
 
         replacements = {
-            "container_layout_version": "v6",
+            "container_layout_version": "v7",
             "docker_command": "/usr/bin/podman",
             "home": "/other/home",
             "image": "image@sha256:other",
@@ -341,6 +341,12 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             self.assertEqual(str(runtime_dir), runtime_env["TMPDIR"])
             self.assertEqual(str(runtime_dir), runtime_env["TMP"])
             self.assertEqual(str(runtime_dir), runtime_env["TEMP"])
+            containers_config = pathlib.Path(runtime_env["CONTAINERS_CONF"])
+            self.assertEqual(containers_config, runtime_dir / "containers.conf")
+            self.assertEqual(
+                '[engine]\ncgroup_manager = "cgroupfs"\n',
+                containers_config.read_text(encoding="utf-8"),
+            )
             storage_config = pathlib.Path(runtime_env["CONTAINERS_STORAGE_CONF"])
             self.assertEqual(
                 storage_config,
@@ -359,7 +365,10 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             config_path = output_base / wrapper._CONFIG_FILENAME
             trusted_dir = root / "trusted"
             trusted_dir.mkdir()
-            config = self._valid_config(podman_task_id="current-task-123")
+            config = self._valid_config(
+                podman_task_id="current-task-123",
+                podman_auth_file="/home/cloud-user/.config/containers/auth.json",
+            )
             config_path.write_text(json.dumps(config) + "\n", encoding="utf-8")
 
             with (
@@ -374,9 +383,11 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
                 wrapper._publish_trusted_config(config_path, config)
                 result = wrapper.main(["wrapper", str(config_path), "/real/tool"])
                 task_id = wrapper.os.environ.get(wrapper._PODMAN_TASK_ID_ENV)
+                auth_file = wrapper.os.environ.get(wrapper._PODMAN_AUTH_FILE_ENV)
 
         self.assertEqual(0, result)
         self.assertEqual("current-task-123", task_id)
+        self.assertEqual("/home/cloud-user/.config/containers/auth.json", auth_file)
 
     def test_action_uses_host_only_snapshot_after_source_config_is_mutated(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -468,7 +479,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
 
         self.assertEqual(destination, reused)
 
-    def test_read_config_rejects_non_v5_layout(self) -> None:
+    def test_read_config_rejects_non_v6_layout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = pathlib.Path(temp_dir) / "config.json"
             config_path.write_text(
@@ -481,7 +492,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "expected v5"):
+            with self.assertRaisesRegex(ValueError, "expected v6"):
                 wrapper._read_config(config_path)
 
     def test_start_container_reuses_running_container(self) -> None:
@@ -566,6 +577,32 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "125"):
                 wrapper._preflight_container(["/usr/bin/podman"], "boundary")
 
+    def test_podman_recovery_detects_abort_and_stale_runtime_failures(self) -> None:
+        self.assertTrue(
+            wrapper._podman_failure_needs_recovery(
+                subprocess.CompletedProcess([], -6, stdout="", stderr="")
+            )
+        )
+        self.assertTrue(
+            wrapper._podman_failure_needs_recovery(
+                subprocess.CompletedProcess([], 125, stdout="", stderr="conmon exited prematurely")
+            )
+        )
+        self.assertFalse(
+            wrapper._podman_failure_needs_recovery(
+                subprocess.CompletedProcess([], 125, stdout="", stderr="image not found")
+            )
+        )
+
+    def test_action_temp_root_is_a_sibling_of_the_read_only_output_base(self) -> None:
+        output_base = pathlib.Path("/cache/bazel-output")
+
+        self.assertEqual(
+            pathlib.Path("/cache/bazel-output-mongo-action-tmp"),
+            wrapper._action_temp_root(output_base),
+        )
+        self.assertNotIn(output_base, wrapper._action_temp_root(output_base).parents)
+
     def test_mount_probe_checks_output_base_action_temp_and_sandbox_mounts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)
@@ -581,9 +618,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             def check_probe(command, **_):
                 output_probe = pathlib.Path(command[-7])
                 container_temp_probe = pathlib.PurePosixPath(command[-6])
-                host_temp_probe = (
-                    output_base / wrapper._ACTION_TEMP_DIRNAME / container_temp_probe.name
-                )
+                host_temp_probe = wrapper._action_temp_root(output_base) / container_temp_probe.name
                 sandbox_probe = pathlib.Path(command[-5])
                 container_temp_write = pathlib.PurePosixPath(command[-4])
                 sandbox_write = pathlib.Path(command[-3])
@@ -602,6 +637,8 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
                 self.assertIn(': > "$4"', command[-9])
                 self.assertIn(': > "$5"', command[-9])
                 self.assertIn(': > "$7"', command[-9])
+                self.assertIn("output-base-writable", command[-9])
+                self.assertNotIn('test ! -w "$1"', command[-9])
                 return subprocess.CompletedProcess(command, 0)
 
             with mock.patch.object(wrapper, "_run", side_effect=check_probe):
@@ -735,7 +772,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
         config_path = output_base / wrapper._CONFIG_FILENAME
         self.assertIn(f"{config_path}:{config_path}:ro", command)
         self.assertIn(
-            f"{output_base / wrapper._ACTION_TEMP_DIRNAME}:{wrapper._CONTAINER_ACTION_TEMP_ROOT}",
+            f"{wrapper._action_temp_root(output_base)}:{wrapper._CONTAINER_ACTION_TEMP_ROOT}",
             command,
         )
         self.assertIn(f"{wrapper._ACTION_CONTAINER_ENV}=1", command)
@@ -1051,6 +1088,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
         self.assertEqual(str(runtime_dir), runtime_env["XDG_RUNTIME_DIR"])
         self.assertEqual(str(runtime_dir), runtime_env["TMPDIR"])
         self.assertIn("CONTAINERS_STORAGE_CONF", runtime_env)
+        self.assertEqual(str(runtime_dir / "containers.conf"), runtime_env["CONTAINERS_CONF"])
 
     def test_forwarded_cancellation_changes_successful_exit_status(self) -> None:
         handlers: dict[signal.Signals, object] = {}

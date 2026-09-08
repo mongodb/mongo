@@ -1420,6 +1420,28 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertTrue(config["container_prefix"].startswith("mongo_linux_action_rhel9_x86_64_"))
         self.assertEqual(config["network"], "host")
 
+    def test_container_config_preserves_registry_auth_file_for_task_podman(self):
+        containers = {
+            "rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"},
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            auth_file = root / "runtime" / "containers" / "auth.json"
+            auth_file.parent.mkdir(parents=True)
+            auth_file.write_text("{}\n", encoding="utf-8")
+            config = hermetic_container_integration._linux_host_container_config(
+                env={
+                    "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
+                    "MONGO_PODMAN_TASK_ID": "task/123",
+                    "XDG_RUNTIME_DIR": str(root / "runtime"),
+                },
+                machine="x86_64",
+                containers=containers,
+                repo_root=root,
+            )
+
+        self.assertEqual(config["podman_auth_file"], str(auth_file))
+
     def test_container_config_rejects_mutable_image_override(self):
         containers = {
             "rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"},
@@ -1546,6 +1568,12 @@ class LinuxHostContainerTest(unittest.TestCase):
             self.assertEqual(str(runtime_dir), runtime_env["TMP"])
             self.assertEqual(str(runtime_dir), runtime_env["TEMP"])
             self.assertIn("CONTAINERS_STORAGE_CONF", runtime_env)
+            containers_config = pathlib.Path(runtime_env["CONTAINERS_CONF"])
+            self.assertEqual(containers_config, runtime_dir / "containers.conf")
+            self.assertEqual(
+                containers_config.read_text(encoding="utf-8"),
+                '[engine]\ncgroup_manager = "cgroupfs"\n',
+            )
             storage_config = pathlib.Path(runtime_env["CONTAINERS_STORAGE_CONF"])
             self.assertIn(
                 'rootless_storage_path = "',
@@ -1737,6 +1765,11 @@ class LinuxHostContainerTest(unittest.TestCase):
             stderr=stale_error,
         )
         with tempfile.TemporaryDirectory() as temp_dir:
+            task_root = (
+                pathlib.Path(temp_dir) / "mongo-linux-podman-task-mongodb_mongo_master_task-0"
+            )
+            runtime_dir = task_root / "mongo-linux-podman-runtime-1000"
+            runtime_dir.mkdir(parents=True)
             with (
                 mock.patch.dict(
                     hermetic_container_integration.os.environ,
@@ -1748,8 +1781,13 @@ class LinuxHostContainerTest(unittest.TestCase):
                 ),
                 mock.patch.object(
                     hermetic_container_integration,
+                    "_podman_task_root",
+                    return_value=task_root,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
                     "_podman_runtime_dir",
-                    return_value=pathlib.Path(temp_dir),
+                    return_value=runtime_dir,
                 ),
                 mock.patch.object(
                     hermetic_container_integration.subprocess,
@@ -1990,6 +2028,104 @@ class LinuxHostContainerTest(unittest.TestCase):
             [call.args[0] for call in run.call_args_list],
         )
 
+    def test_task_scoped_podman_panic_is_recovered_with_reset(self):
+        stale_error = "invalid internal status"
+        stale_result = subprocess.CompletedProcess(
+            args=["/usr/bin/podman", "info"],
+            returncode=125,
+            stdout="",
+            stderr=stale_error,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            task_root = pathlib.Path(temp_dir) / "mongo-linux-podman-task-task_123"
+            runtime_dir = task_root / "mongo-linux-podman-runtime-1000"
+            runtime_dir.mkdir(parents=True)
+            with (
+                mock.patch.dict(
+                    hermetic_container_integration.os.environ,
+                    {"MONGO_PODMAN_TASK_ID": "task/123"},
+                    clear=True,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_task_root",
+                    return_value=task_root,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=runtime_dir,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        stale_result,
+                        stale_result,
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "ps", "--quiet"],
+                            returncode=125,
+                            stdout="",
+                            stderr=stale_error,
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "system", "migrate"],
+                            returncode=-6,
+                            stdout="",
+                            stderr="",
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "unshare", "umount"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "system", "reset"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                        subprocess.CompletedProcess(
+                            args=["/usr/bin/podman", "info"],
+                            returncode=0,
+                            stdout="",
+                            stderr="",
+                        ),
+                    ],
+                ) as run,
+            ):
+                ready, detail = hermetic_container_integration._docker_daemon_status(
+                    "/usr/bin/podman"
+                )
+
+        self.assertTrue(ready)
+        self.assertEqual("", detail)
+        self.assertEqual(
+            [
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "info"],
+                ["/usr/bin/podman", "ps", "--quiet"],
+                ["/usr/bin/podman", "system", "migrate"],
+                [
+                    "/usr/bin/podman",
+                    "unshare",
+                    "umount",
+                    "-R",
+                    "-l",
+                    str(
+                        task_root
+                        / "mongo-linux-podman-storage-1000"
+                        / "graphroot"
+                        / "overlay-containers"
+                    ),
+                ],
+                ["/usr/bin/podman", "system", "reset", "--force"],
+                ["/usr/bin/podman", "info"],
+            ],
+            [call.args[0] for call in run.call_args_list],
+        )
+
     def test_podman_daemon_status_respects_migration_opt_out(self):
         stale_error = (
             "invalid internal status, try resetting the pause process with "
@@ -2137,6 +2273,160 @@ class LinuxHostContainerTest(unittest.TestCase):
         sleep.assert_called_once_with(
             hermetic_container_integration.CONTAINER_NETWORK_RETRY_DELAY_SECONDS
         )
+
+    def test_image_pull_retries_without_rejected_podman_credentials(self):
+        image = "quay.io/mongodb/rbe@sha256:abc123"
+        rejected = subprocess.CompletedProcess(
+            ["/usr/bin/podman", "pull", image],
+            125,
+            stderr="invalid username/password: unauthorized",
+        )
+        pulled = subprocess.CompletedProcess(["/usr/bin/podman", "pull", image], 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_dir = pathlib.Path(temp_dir) / "runtime"
+            auth_file = pathlib.Path(temp_dir) / "auth.json"
+            auth_file.write_text('{"auths": {"quay.io": {"auth": "expired"}}}')
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "task-123",
+                        "REGISTRY_AUTH_FILE": str(auth_file),
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=runtime_dir,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess([], 1),
+                        subprocess.CompletedProcess([], 0),
+                    ],
+                ) as run,
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_run_container_network_command",
+                    side_effect=[rejected, pulled],
+                ) as network_command,
+            ):
+                self.assertTrue(
+                    hermetic_container_integration._ensure_linux_container_image(
+                        "/usr/bin/podman", image
+                    )
+                )
+
+        self.assertEqual(2, network_command.call_count)
+        first_env = network_command.call_args_list[0].kwargs["env"]
+        second_env = network_command.call_args_list[1].kwargs["env"]
+        self.assertEqual(str(auth_file), first_env["REGISTRY_AUTH_FILE"])
+        self.assertNotIn("REGISTRY_AUTH_FILE", second_env)
+        self.assertNotEqual(first_env["HOME"], second_env["HOME"])
+        self.assertEqual(2, run.call_count)
+
+    def test_image_pull_retries_when_shim_writes_auth_failure_to_stdout(self):
+        image = "quay.io/mongodb/rbe@sha256:abc123"
+        rejected = subprocess.CompletedProcess(
+            ["/usr/bin/podman", "pull", image],
+            125,
+            stdout="invalid username/password: unauthorized",
+        )
+        pulled = subprocess.CompletedProcess(["/usr/bin/podman", "pull", image], 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_dir = pathlib.Path(temp_dir) / "runtime"
+            auth_file = pathlib.Path(temp_dir) / "auth.json"
+            auth_file.write_text('{"auths": {"quay.io": {"auth": "expired"}}}')
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "task-stdout-auth",
+                        "REGISTRY_AUTH_FILE": str(auth_file),
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=runtime_dir,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess([], 1),
+                        subprocess.CompletedProcess([], 0),
+                    ],
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_run_container_network_command",
+                    side_effect=[rejected, pulled],
+                ) as network_command,
+            ):
+                self.assertTrue(
+                    hermetic_container_integration._ensure_linux_container_image(
+                        "/usr/bin/podman", image
+                    )
+                )
+
+        self.assertEqual(2, network_command.call_count)
+
+    def test_image_pull_detects_auth_failure_split_across_streams(self):
+        image = "quay.io/mongodb/rbe@sha256:abc123"
+        rejected = subprocess.CompletedProcess(
+            ["/usr/bin/podman", "pull", image],
+            125,
+            stdout="invalid username/password: unauthorized",
+            stderr="Error: unable to copy from source",
+        )
+        pulled = subprocess.CompletedProcess(["/usr/bin/podman", "pull", image], 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_dir = pathlib.Path(temp_dir) / "runtime"
+            auth_file = pathlib.Path(temp_dir) / "auth.json"
+            auth_file.write_text('{"auths": {"quay.io": {"auth": "expired"}}}')
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "MONGO_PODMAN_TASK_ID": "task-split-auth",
+                        "REGISTRY_AUTH_FILE": str(auth_file),
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_podman_runtime_dir",
+                    return_value=runtime_dir,
+                ),
+                mock.patch.object(
+                    hermetic_container_integration.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess([], 1),
+                        subprocess.CompletedProcess([], 0),
+                    ],
+                ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_run_container_network_command",
+                    side_effect=[rejected, pulled],
+                ) as network_command,
+            ):
+                self.assertTrue(
+                    hermetic_container_integration._ensure_linux_container_image(
+                        "/usr/bin/podman", image
+                    )
+                )
+
+        self.assertEqual(2, network_command.call_count)
 
     def test_explicit_container_command_does_not_fall_back(self):
         with mock.patch.object(

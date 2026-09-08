@@ -58,17 +58,29 @@ def _safe_name(value: str) -> str:
 
 _WORKSPACE_LABEL = "com.mongodb.linux-container-actions.workspace"
 _CONFIG_FILENAME = "mongo_linux_container_actions.json"
-_ACTION_TEMP_DIRNAME = "mongo_linux_action_tmp"
+_ACTION_TEMP_DIRNAME = "mongo-action-tmp"
 _CONTAINER_ACTION_TEMP_ROOT = pathlib.PurePosixPath("/mongo-tmp")
 _ACTION_CONTAINER_ENV = "MONGO_LINUX_ACTION_CONTAINER"
 _SHARED_INSTALL_ENV = "MONGO_BAZEL_SHARED_INSTALL_DIR"
 _PODMAN_RUNTIME_DIR_PREFIX = "mongo-linux-podman-runtime-"
 _PODMAN_STORAGE_DIR_PREFIX = "mongo-linux-podman-storage-"
 _PODMAN_TASK_ID_ENV = "MONGO_PODMAN_TASK_ID"
+_PODMAN_AUTH_FILE_ENV = "REGISTRY_AUTH_FILE"
+_PODMAN_CONFIG_ENV = "CONTAINERS_CONF"
 _TRUSTED_CONFIG_ROOT = pathlib.Path("/var/tmp")
 _TRUSTED_CONFIG_DIR_PREFIX = "mongo-linux-action-config-"
 _MOUNT_PROBE_PREFIX = ".mongo-linux-action-mount-"
-_CONTAINER_LAYOUT_VERSION = "v5"
+# Bump this whenever the bind-mount layout changes.  The version is part of the
+# deterministic container identity, so old containers (including containers that
+# still bind the output base's child temp directory read-only) cannot be reused.
+_CONTAINER_LAYOUT_VERSION = "v6"
+_PODMAN_RECOVERY_MARKERS = (
+    "invalid internal status",
+    "conmon exited prematurely",
+    "overlay",
+    "mount",
+    "permission denied",
+)
 
 
 def _is_podman_command(command: Sequence[str]) -> bool:
@@ -143,12 +155,67 @@ def _podman_storage_config(runtime_dir: pathlib.Path) -> pathlib.Path:
     return config_path
 
 
+def _podman_containers_config(runtime_dir: pathlib.Path) -> pathlib.Path:
+    """Select cgroupfs for task-scoped rootless Podman without a systemd session."""
+    uid = os.getuid()
+    _ensure_owned_directory(runtime_dir, uid)
+    config_path = runtime_dir / "containers.conf"
+    content = '[engine]\ncgroup_manager = "cgroupfs"\n'
+    try:
+        metadata = config_path.lstat()
+    except FileNotFoundError:
+        metadata = None
+    if metadata is not None:
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != uid:
+            raise OSError(
+                "Podman configuration is not a file owned by " f"uid {uid}: {config_path}"
+            )
+        if config_path.read_text(encoding="utf-8") == content:
+            config_path.chmod(0o600)
+            return config_path
+
+    temporary_path = config_path.with_name(f".{config_path.name}.{os.getpid()}.{uuid.uuid4().hex}")
+    try:
+        temporary_path.write_text(content, encoding="utf-8")
+        temporary_path.chmod(0o600)
+        temporary_path.replace(config_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return config_path
+
+
 def _podman_runtime_dir() -> pathlib.Path:
     """Return a private, task-scoped runtime directory outside the action workspace."""
     uid = os.getuid()
     path = _podman_task_root(os.environ) / f"{_PODMAN_RUNTIME_DIR_PREFIX}{uid}"
     _ensure_owned_directory(path, uid)
     return path
+
+
+def _podman_auth_file(env: Mapping[str, str]) -> pathlib.Path | None:
+    """Locate host registry credentials before task-scoping ``XDG_RUNTIME_DIR``."""
+
+    explicit = env.get(_PODMAN_AUTH_FILE_ENV)
+    if explicit:
+        return pathlib.Path(explicit) if pathlib.Path(explicit).is_file() else None
+
+    candidates: list[pathlib.Path] = []
+    if env.get("XDG_RUNTIME_DIR"):
+        candidates.append(pathlib.Path(env["XDG_RUNTIME_DIR"]) / "containers" / "auth.json")
+    if env.get("XDG_CONFIG_HOME"):
+        candidates.append(pathlib.Path(env["XDG_CONFIG_HOME"]) / "containers" / "auth.json")
+    if env.get("DOCKER_CONFIG"):
+        candidates.append(pathlib.Path(env["DOCKER_CONFIG"]) / "config.json")
+    if env.get("HOME"):
+        home = pathlib.Path(env["HOME"])
+        candidates.extend(
+            [home / ".config" / "containers" / "auth.json", home / ".docker" / "config.json"]
+        )
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def _trusted_config_dir() -> pathlib.Path:
@@ -228,6 +295,9 @@ def _container_runtime_env(command: Sequence[str]) -> dict[str, str] | None:
 
     runtime_dir = _podman_runtime_dir()
     storage_config = _podman_storage_config(runtime_dir)
+    containers_config = os.environ.get(_PODMAN_CONFIG_ENV) or str(
+        _podman_containers_config(runtime_dir)
+    )
     runtime_env = dict(os.environ)
     runtime_env.update(
         {
@@ -236,9 +306,92 @@ def _container_runtime_env(command: Sequence[str]) -> dict[str, str] | None:
             "TMPDIR": str(runtime_dir),
             "TMP": str(runtime_dir),
             "TEMP": str(runtime_dir),
+            _PODMAN_CONFIG_ENV: containers_config,
         }
     )
+    auth_file = _podman_auth_file(os.environ)
+    if auth_file is not None:
+        runtime_env[_PODMAN_AUTH_FILE_ENV] = str(auth_file)
     return runtime_env
+
+
+def _podman_failure_detail(result: subprocess.CompletedProcess) -> str:
+    return (result.stderr or result.stdout or "").strip()
+
+
+def _podman_failure_needs_recovery(result: subprocess.CompletedProcess) -> bool:
+    """Identify failures caused by stale pause/conmon or task overlay state."""
+
+    if result.returncode < 0:
+        # Podman/conmon aborts (notably SIGABRT/-6) often produce no stderr.
+        return True
+    detail = _podman_failure_detail(result).casefold()
+    return any(marker in detail for marker in _PODMAN_RECOVERY_MARKERS)
+
+
+def _recover_task_scoped_podman(docker: Sequence[str], *, reason: str = "runtime failure") -> bool:
+    """Unmount and reset only the current task's Podman storage.
+
+    The action wrapper runs on hosts shared by many Evergreen tasks.  A reset is
+    safe only after the wrapper has been given a task id and points Podman at the
+    corresponding private storage configuration.  We deliberately avoid a
+    second ``system migrate`` here: that command is the operation that panics on
+    the invalid-pause/overlay state seen in the failed tasks.
+    """
+
+    task_id = os.environ.get(_PODMAN_TASK_ID_ENV)
+    if not task_id or not _is_podman_command(docker):
+        return False
+
+    try:
+        runtime_env = _container_runtime_env(docker)
+    except OSError as exc:
+        print(f"WARNING: could not prepare Podman recovery environment: {exc}", file=sys.stderr)
+        return False
+    if runtime_env is None:
+        return False
+
+    task_root = _podman_task_root(runtime_env)
+    overlay = (
+        task_root
+        / f"{_PODMAN_STORAGE_DIR_PREFIX}{os.getuid()}"
+        / "graphroot"
+        / "overlay-containers"
+    )
+    # Preserve the configured executable and any global Podman arguments (for
+    # example an absolute path or a remote connection selector) when running
+    # recovery commands.  Falling back to a bare `podman` could reset a
+    # different runtime than the one that failed.
+    unmount = [*docker, "unshare", "umount", "-R", "-l", str(overlay)]
+    reset = [*docker, "system", "reset", "--force"]
+    print(
+        f"WARNING: recovering task-scoped Podman state after {reason}; "
+        "unmounting overlay and resetting the private runtime",
+        file=sys.stderr,
+    )
+    _run(
+        unmount,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        env=runtime_env,
+    )
+    result = _run(
+        reset,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=runtime_env,
+    )
+    if result.returncode != 0:
+        detail = _podman_failure_detail(result)
+        suffix = f": {detail}" if detail else ""
+        print(
+            f"WARNING: task-scoped Podman reset exited with {result.returncode}{suffix}",
+            file=sys.stderr,
+        )
+        return False
+    return True
 
 
 def _workspace_digest(config: dict, output_base: pathlib.Path) -> str:
@@ -272,6 +425,18 @@ def _container_name(config: dict, output_base: pathlib.Path) -> str:
         return f"{configured_name[: 120 - len(suffix)]}{suffix}"
     prefix = config.get("container_prefix", "mongo_linux_action")
     return _safe_name(f"{prefix}{suffix}")[:120]
+
+
+def _action_temp_root(output_base: pathlib.Path) -> pathlib.Path:
+    """Return the writable action-temp tree outside Bazel's read-only output bind.
+
+    The output base is deliberately mounted read-only in the action container.  Keeping
+    the temporary tree as a sibling (rather than a child of that mount) avoids runtimes
+    such as rootless Podman inheriting the parent's read-only flag for a nested bind.
+    """
+    if not output_base.name:
+        raise ValueError("Bazel output base cannot be the filesystem root")
+    return output_base.with_name(f"{output_base.name}-{_ACTION_TEMP_DIRNAME}")
 
 
 def _container_running(docker: Sequence[str], name: str) -> bool:
@@ -421,7 +586,7 @@ def _start_container(
 
     repo_root = pathlib.Path(config["repo_root"])
     config_path = config_path or output_base / _CONFIG_FILENAME
-    action_temp_root = output_base / _ACTION_TEMP_DIRNAME
+    action_temp_root = _action_temp_root(output_base)
     action_sandbox_root = _configured_path(config, "sandbox_base")
     shared_install_dir = _configured_path(config, "shared_install_dir")
     action_temp_root.mkdir(parents=True, exist_ok=True)
@@ -489,7 +654,26 @@ def _start_container(
             "trap 'exit 0' TERM INT; while true; do sleep 3600; done",
         ]
     )
-    result = _run(command, stdout=subprocess.DEVNULL)
+    result = _run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE if _is_podman_command(docker) else None,
+        text=True,
+    )
+    if result.returncode and _is_podman_command(docker) and _podman_failure_needs_recovery(result):
+        _recover_task_scoped_podman(
+            docker,
+            reason=_podman_failure_detail(result) or f"podman run exited with {result.returncode}",
+        )
+        # Retry the exact deterministic container command after resetting the
+        # private runtime.  A single retry avoids an infinite loop when the
+        # host's rootless setup (rather than stale state) is genuinely broken.
+        result = _run(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     if result.returncode:
         # A cancelled `docker run -d`/`podman run -d` can create and start the
         # deterministic container before its client reports success. Reuse that exact
@@ -554,7 +738,7 @@ def _container_mounts_current(
     config: dict,
 ) -> bool:
     """Return whether the container sees and enforces the current host bind mounts."""
-    action_temp_root = output_base / _ACTION_TEMP_DIRNAME
+    action_temp_root = _action_temp_root(output_base)
     action_sandbox_root = _configured_path(config, "sandbox_base")
     shared_install_dir = _configured_path(config, "shared_install_dir")
     action_temp_root.mkdir(parents=True, exist_ok=True)
@@ -582,9 +766,19 @@ def _container_mounts_current(
                 "/bin/bash",
                 "-c",
                 (
-                    'set -e; test -f "$1"; test -f "$2"; test -f "$3"; '
-                    'test ! -w "$1"; : > "$4"; : > "$5"; rm -f "$4" "$5"; '
-                    'test -f "$6"; : > "$7"; rm -f "$6" "$7"'
+                    "set -e; "
+                    'fail_probe() { printf "mount-probe: %s\\n" "$1" >&2; exit 1; }; '
+                    'test -f "$1" || fail_probe output-base-missing; '
+                    'test -f "$2" || fail_probe action-temp-missing; '
+                    'test -f "$3" || fail_probe sandbox-missing; '
+                    'if : > "$1" 2>/dev/null; then '
+                    'rm -f "$1"; fail_probe output-base-writable; fi; '
+                    ': > "$4" || fail_probe action-temp-write; '
+                    ': > "$5" || fail_probe sandbox-write; '
+                    'rm -f "$4" "$5"; '
+                    'test -f "$6" || fail_probe shared-install-missing; '
+                    ': > "$7" || fail_probe shared-install-write; '
+                    'rm -f "$7"'
                 ),
                 "mount-probe",
                 str(output_probe),
@@ -595,9 +789,19 @@ def _container_mounts_current(
                 str(shared_install_probe),
                 str(shared_install_write),
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()
+            if len(detail) > 1000:
+                detail = detail[:1000] + "..."
+            detail_suffix = f": {detail}" if detail else ""
+            print(
+                f"WARNING: action container {name} mount probe failed{detail_suffix}",
+                file=sys.stderr,
+            )
         return result.returncode == 0
     finally:
         output_probe.unlink(missing_ok=True)
@@ -611,7 +815,49 @@ def _container_mounts_current(
 
 def _remove_container(docker: Sequence[str], name: str) -> None:
     """Remove a dedicated action container whose runtime state failed validation."""
-    _check([*docker, "rm", "-f", name])
+    result = _run(
+        [*docker, "rm", "-f", name],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE if _is_podman_command(docker) else None,
+        text=True,
+    )
+    if result.returncode == 0:
+        return
+
+    recoverable = _is_podman_command(docker) and _podman_failure_needs_recovery(result)
+    if recoverable:
+        # `inspect` can fail with the same stale pause-process error as `rm`.
+        # Recover before using inspect to decide whether the container still
+        # exists; otherwise an unreadable-but-present container can be left
+        # behind and make the next deterministic `run` fail with a name clash.
+        _recover_task_scoped_podman(
+            docker,
+            reason=_podman_failure_detail(result) or f"podman rm exited with {result.returncode}",
+        )
+
+    # A recovery reset may already have removed the container. Treat that as a
+    # successful cleanup; it is the desired state before the next preflight try.
+    if not _container_exists(docker, name):
+        return
+
+    if recoverable:
+        retry = _run(
+            [*docker, "rm", "-f", name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if retry.returncode == 0 or not _container_exists(docker, name):
+            return
+        result = retry
+
+    detail = _podman_failure_detail(result)
+    suffix = f": {detail}" if detail else ""
+    print(
+        f"ERROR: could not remove action container {name} (exit {result.returncode}){suffix}",
+        file=sys.stderr,
+    )
+    raise SystemExit(result.returncode)
 
 
 def _ensure_preflight_container(config: dict, config_path: pathlib.Path) -> str:
@@ -952,7 +1198,7 @@ def _run_in_container(
     }
     temp_dir: pathlib.Path | None = None
     try:
-        action_temp_root = output_base / _ACTION_TEMP_DIRNAME
+        action_temp_root = _action_temp_root(output_base)
         action_temp_root.mkdir(parents=True, exist_ok=True)
         temp_dir = pathlib.Path(tempfile.mkdtemp(prefix="action-", dir=action_temp_root))
         (temp_dir / "home").mkdir(mode=0o700)
@@ -1064,6 +1310,12 @@ def main(argv: Sequence[str]) -> int:
             os.environ[_PODMAN_TASK_ID_ENV] = task_id
         else:
             os.environ.pop(_PODMAN_TASK_ID_ENV, None)
+    if "podman_auth_file" in config:
+        auth_file = config["podman_auth_file"]
+        if auth_file:
+            os.environ[_PODMAN_AUTH_FILE_ENV] = auth_file
+        else:
+            os.environ.pop(_PODMAN_AUTH_FILE_ENV, None)
 
     if ensure_only:
         _ensure_preflight_container(config, config_path)

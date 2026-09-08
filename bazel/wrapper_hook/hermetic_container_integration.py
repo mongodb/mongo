@@ -53,7 +53,10 @@ CONTAINERIZED_BES_KEYWORD = "MONGO_BUILD_CONTAINERIZED"
 LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME = "mongo_linux_container_actions.json"
 LINUX_CONTAINER_ACTIONS_LOCK_FILENAME = "mongo_linux_container_actions.lock"
 LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME = "mongo_linux_output_base_generation"
-LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION = "v5"
+# Keep this in lockstep with the action wrapper.  The layout version is included
+# in the container identity and invalidates containers created with an older mount
+# topology when the wrapper changes its bind mounts.
+LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION = "v6"
 LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT = (
     REPO_ROOT / "bazel" / "toolchains" / "cc" / "mongo_linux" / "linux_container_action_wrapper.py"
 )
@@ -202,6 +205,8 @@ PODMAN_RUNTIME_DIR_PREFIX = "mongo-linux-podman-runtime-"
 PODMAN_STORAGE_DIR_PREFIX = "mongo-linux-podman-storage-"
 PODMAN_TASK_ID_ENV = "MONGO_PODMAN_TASK_ID"
 PODMAN_STALE_RUNTIME_MARKER = "invalid internal status"
+PODMAN_AUTH_FILE_ENV = "REGISTRY_AUTH_FILE"
+PODMAN_CONFIG_ENV = "CONTAINERS_CONF"
 CROSS_HOST_ACTION_CONFIG_FILENAME = "mongo_cross_host_action.json"
 RESMOKE_DEPS_PATH_SUFFIX = "_resmoke_deps_path.txt"
 RESMOKE_DEPS_PATH_MAP_ENV = "DEPS_PATH_MAP_FILE"
@@ -2654,6 +2659,115 @@ def _podman_storage_config(runtime_dir: pathlib.Path) -> pathlib.Path:
     return config_path
 
 
+def _podman_containers_config(runtime_dir: pathlib.Path) -> pathlib.Path:
+    """Configure task-scoped rootless Podman for hosts without user systemd."""
+    _ensure_owned_podman_directory(runtime_dir, os.getuid())
+    config_path = runtime_dir / "containers.conf"
+    content = '[engine]\ncgroup_manager = "cgroupfs"\n'
+    uid = os.getuid()
+    try:
+        metadata = config_path.lstat()
+    except FileNotFoundError:
+        metadata = None
+    if metadata is not None:
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != uid:
+            raise OSError(
+                "Podman configuration is not a file owned by " f"uid {uid}: {config_path}"
+            )
+        if config_path.read_text(encoding="utf-8") == content:
+            config_path.chmod(0o600)
+            return config_path
+
+    temporary_path = config_path.with_name(f".{config_path.name}.{os.getpid()}.{uuid.uuid4().hex}")
+    try:
+        temporary_path.write_text(content, encoding="utf-8")
+        temporary_path.chmod(0o600)
+        temporary_path.replace(config_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return config_path
+
+
+def _podman_auth_file(env: Mapping[str, str]) -> pathlib.Path | None:
+    """Find the host registry credentials before replacing Podman's runtime directory.
+
+    Rootless Podman normally searches ``$XDG_RUNTIME_DIR/containers/auth.json``.
+    Task-scoped runtimes intentionally replace that directory, so the default
+    lookup would hide the credentials prepared on the Evergreen host.
+    Keep an explicit auth file when supplied, then inspect the standard Docker
+    and Podman locations without copying credential contents into the task
+    workspace.
+    """
+
+    explicit = env.get(PODMAN_AUTH_FILE_ENV)
+    if explicit:
+        return pathlib.Path(explicit) if pathlib.Path(explicit).is_file() else None
+
+    candidates: list[pathlib.Path] = []
+    xdg_runtime = env.get("XDG_RUNTIME_DIR")
+    if xdg_runtime:
+        candidates.append(pathlib.Path(xdg_runtime) / "containers" / "auth.json")
+    xdg_config = env.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        candidates.append(pathlib.Path(xdg_config) / "containers" / "auth.json")
+    docker_config = env.get("DOCKER_CONFIG")
+    if docker_config:
+        candidates.append(pathlib.Path(docker_config) / "config.json")
+    home = env.get("HOME")
+    if home:
+        home_path = pathlib.Path(home)
+        candidates.extend(
+            [
+                home_path / ".config" / "containers" / "auth.json",
+                home_path / ".docker" / "config.json",
+            ]
+        )
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _podman_anonymous_runtime_env(runtime_env: Mapping[str, str]) -> dict[str, str]:
+    """Return a task-scoped Podman environment that cannot reuse stale credentials.
+
+    Some Evergreen images are public in Quay, but a host can retain an expired robot
+    credential in ``$HOME/.docker/config.json``.  Podman reports that stale credential
+    as an authentication failure instead of falling back to anonymous access.  Keep
+    this fallback confined to the private task runtime so a retry never changes the
+    host's login state or exposes credential contents.
+    """
+    anonymous_env = dict(runtime_env)
+    runtime_dir = pathlib.Path(anonymous_env["XDG_RUNTIME_DIR"])
+    anonymous_home = runtime_dir / "anonymous-home"
+    anonymous_config = runtime_dir / "anonymous-config"
+    anonymous_home.mkdir(mode=0o700, parents=True, exist_ok=True)
+    anonymous_config.mkdir(mode=0o700, parents=True, exist_ok=True)
+    anonymous_env["HOME"] = str(anonymous_home)
+    anonymous_env["XDG_CONFIG_HOME"] = str(anonymous_config)
+    anonymous_env.pop("DOCKER_CONFIG", None)
+    anonymous_env.pop(PODMAN_AUTH_FILE_ENV, None)
+    return anonymous_env
+
+
+def _podman_authentication_failure(result: subprocess.CompletedProcess[str]) -> bool:
+    """Return whether a pull failed because the configured registry login was rejected."""
+    # Podman writes the high-level copy error to stderr, while the Docker
+    # compatibility shim can put the registry response on stdout.  Inspect both
+    # streams instead of selecting whichever one happens to be non-empty.
+    detail = f"{result.stderr or ''}\n{result.stdout or ''}".casefold()
+    return any(
+        marker in detail
+        for marker in (
+            "invalid username/password",
+            "could not find robot with specified username",
+            "authentication required",
+            "unauthorized",
+        )
+    )
+
+
 def _podman_runtime_dir() -> pathlib.Path:
     """Return a private, task-scoped runtime directory outside the action workspace."""
     uid = os.getuid()
@@ -2669,6 +2783,9 @@ def _container_runtime_env(command: Sequence[str]) -> dict[str, str] | None:
 
     runtime_dir = _podman_runtime_dir()
     storage_config = _podman_storage_config(runtime_dir)
+    containers_config = os.environ.get(PODMAN_CONFIG_ENV) or str(
+        _podman_containers_config(runtime_dir)
+    )
     runtime_env = dict(os.environ)
     runtime_env.update(
         {
@@ -2677,8 +2794,12 @@ def _container_runtime_env(command: Sequence[str]) -> dict[str, str] | None:
             "TMPDIR": str(runtime_dir),
             "TMP": str(runtime_dir),
             "TEMP": str(runtime_dir),
+            PODMAN_CONFIG_ENV: containers_config,
         }
     )
+    auth_file = _podman_auth_file(env=os.environ)
+    if auth_file is not None:
+        runtime_env[PODMAN_AUTH_FILE_ENV] = str(auth_file)
     return runtime_env
 
 
@@ -2760,19 +2881,22 @@ def _podman_command_detail(result: subprocess.CompletedProcess[str]) -> str:
     return (result.stderr or result.stdout or "").strip()
 
 
+def _print_container_command_output(result: subprocess.CompletedProcess[str]) -> None:
+    """Keep pull diagnostics off stdout while preserving both output streams.
+
+    Podman normally writes pull failures to stderr, but the Docker compatibility
+    shim has emitted registry errors on stdout on some RHEL images.  Capturing
+    both streams lets authentication-failure handling see the actual error while
+    keeping Bazel's machine-readable stdout clean.
+    """
+    for output in (result.stdout, result.stderr):
+        if output:
+            print(output, file=sys.stderr, end="" if output.endswith("\n") else "\n")
+
+
 def _podman_migration_is_allowed(env: Mapping[str, str]) -> bool:
     """Allow opting out of automatic `podman system migrate`."""
     return env.get("MONGO_BAZEL_PODMAN_AUTO_MIGRATE", "1").strip() not in ("0", "false", "False")
-
-
-def _podman_runtime_is_task_scoped(env: Mapping[str, str]) -> bool:
-    """Report whether Podman's runtime directory is private to one task.
-
-    ``_podman_task_root`` gives each Evergreen task its own runtime and storage
-    root, so no other user or task can own containers inside it. That makes
-    recovery of a stale runtime safe without an explicit force opt-in.
-    """
-    return bool(env.get(PODMAN_TASK_ID_ENV, "").strip())
 
 
 def _podman_migration_force_is_allowed(env: Mapping[str, str]) -> bool:
@@ -2783,6 +2907,64 @@ def _podman_migration_force_is_allowed(env: Mapping[str, str]) -> bool:
         "yes",
         "on",
     )
+
+
+def _podman_runtime_is_task_scoped(runtime_env: Mapping[str, str]) -> bool:
+    """Return whether a Podman runtime can be reset without touching shared state."""
+
+    task_id = runtime_env.get(PODMAN_TASK_ID_ENV, "")
+    storage_config = runtime_env.get("CONTAINERS_STORAGE_CONF", "")
+    if not task_id or not storage_config:
+        return False
+    try:
+        storage_path = pathlib.Path(storage_config).resolve()
+        task_root = _podman_task_root(runtime_env).resolve()
+        return task_root in storage_path.parents
+    except OSError:
+        return False
+
+
+def _reset_task_scoped_podman_runtime(
+    podman_argv: Sequence[str], runtime_env: Mapping[str, str]
+) -> tuple[bool, str]:
+    """Detach task-local overlays and reset state after a Podman panic."""
+
+    if not _podman_runtime_is_task_scoped(runtime_env):
+        return False, "Podman storage is not task-scoped"
+
+    storage_config = pathlib.Path(runtime_env["CONTAINERS_STORAGE_CONF"])
+    # Container writable layers are mounted below overlay-containers, not the
+    # top-level overlay layer store.  Unmount this parent recursively so a
+    # conmon abort cannot leave userdata/overlay mounted across task teardown.
+    overlay = storage_config.parent / "graphroot" / "overlay-containers"
+    unmount = subprocess.run(
+        [*podman_argv, "unshare", "umount", "-R", "-l", str(overlay)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+        env=runtime_env,
+    )
+    reset = subprocess.run(
+        [*podman_argv, "system", "reset", "--force"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+        env=runtime_env,
+    )
+    if reset.returncode != 0:
+        return False, (
+            "task-scoped Podman reset failed: "
+            f"{_podman_command_detail(reset) or f'exit code {reset.returncode}'}"
+        )
+    if unmount.returncode != 0 and _podman_command_detail(unmount):
+        # A missing mount is expected after a clean reset; retain diagnostics only
+        # when unshare reported a real error and let the info retry decide health.
+        return True, f"overlay unmount warning: {_podman_command_detail(unmount)}"
+    return True, ""
 
 
 def _podman_has_running_containers(
@@ -2849,6 +3031,8 @@ def _recover_stale_podman_runtime(
             has_running_containers, container_check_detail = _podman_has_running_containers(
                 podman_argv, runtime_env
             )
+            task_scoped_runtime = _podman_runtime_is_task_scoped(runtime_env)
+            reset_detail = ""
             # A listing that fails with the same stale-runtime signature is
             # evidence that the runtime is broken, not that containers are
             # reachable: every Podman command shares that state. Recover when the
@@ -2889,7 +3073,25 @@ def _recover_stale_podman_runtime(
                 env=runtime_env,
             )
             if migrate.returncode != 0:
-                migrate_detail = _podman_command_detail(migrate)
+                if task_scoped_runtime:
+                    reset, reset_detail = _reset_task_scoped_podman_runtime(
+                        podman_argv, runtime_env
+                    )
+                    if reset:
+                        retry = subprocess.run(
+                            info_argv,
+                            check=False,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+                            env=runtime_env,
+                        )
+                        if retry.returncode == 0:
+                            return True, reset_detail
+                migrate_detail = _compact_runtime_detail(_podman_command_detail(migrate))
+                if task_scoped_runtime and reset_detail:
+                    migrate_detail = f"{migrate_detail}; {reset_detail}".strip("; ")
                 return False, (
                     "`podman system migrate` failed: "
                     f"{migrate_detail or f'exit code {migrate.returncode}'}"
@@ -3401,6 +3603,13 @@ def _linux_host_container_config(
     task_id = env.get(PODMAN_TASK_ID_ENV)
     if task_id:
         config["podman_task_id"] = task_id
+    auth_file = _podman_auth_file(env)
+    if auth_file is not None:
+        # The action wrapper may run in a long-lived Bazel server whose process
+        # environment predates this task. Preserve only the credential-file path;
+        # Podman reads the file on the host and its contents never enter Bazel's
+        # action environment or command line.
+        config["podman_auth_file"] = str(auth_file)
     return config
 
 
@@ -3904,10 +4113,38 @@ def _ensure_linux_container_image(docker_command: str, image: str) -> bool:
     pull = _run_container_network_command(
         [*docker, "pull", image],
         check=False,
-        stdout=sys.stderr,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
         env=runtime_env,
         description=f"pulling build container image {image}",
     )
+    _print_container_command_output(pull)
+    if (
+        pull.returncode
+        and _is_podman_command(docker)
+        and _podman_authentication_failure(pull)
+        and runtime_env is not None
+    ):
+        # Quay's public build images should remain usable when an Evergreen host has
+        # an expired robot login. Retry anonymously without mutating the host auth
+        # file; private images still fail normally after this second attempt.
+        anonymous_env = _podman_anonymous_runtime_env(runtime_env)
+        _info(
+            f"registry credentials were rejected while pulling {image}; "
+            "retrying without host credentials"
+        )
+        pull = _run_container_network_command(
+            [*docker, "pull", image],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=anonymous_env,
+            description=f"anonymous pull of build container image {image}",
+        )
+        _print_container_command_output(pull)
+        runtime_env = anonymous_env
     if pull.returncode:
         return False
 
