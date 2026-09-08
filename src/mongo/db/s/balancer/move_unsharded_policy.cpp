@@ -261,8 +261,16 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 status.isA<ErrorCategory::WriteConcernError>() ||
                 status.isA<ErrorCategory::NeedRetargettingError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>();
+            // TODO SERVER-131381: Remove this once the race where resharding starts before an FCV
+            // transition and completes before the FCV transition has a chance to abort it has been
+            // fixed.
+            //
+            // This is similar to ReshardCollectionInterruptedDueToFCVChange, but can occur when
+            // resharding completes before the FCV transition has a chance to abort it.
+            const bool isReshardingFCVMismatchError = status.code() == 13222300;
             // ReshardingImrpovements flag is not enabled (refer to SERVER-90675)
-            if (isErrorInAcceptableCategory || status.code() == 90675) {
+            if (isErrorInAcceptableCategory || status.code() == 90675 ||
+                isReshardingFCVMismatchError) {
                 return true;
             }
 

@@ -251,5 +251,17 @@ TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfZeroNeverSkips) {
     ASSERT_EQ(unsplittableColl.getUuid(), migrateInfoVector[0].uuid);
 }
 
+TEST_F(MoveUnshardedPolicyTest, AcceptsFCVMismatchDuringResharding) {
+    const ChunkVersion version({OID::gen(), Timestamp(1)}, {1, 0});
+    const ChunkType chunk(
+        UUID::gen(), ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY)), version, kShardId0);
+    const MigrateInfo action(kShardId1, kNamespace, chunk, ForceJumbo::kDoNotForce, boost::none);
+
+    ASSERT_DOES_NOT_THROW(_unshardedPolicy.applyActionResult(
+        operationContext(),
+        action,
+        Status{ErrorCodes::Error(13222300), "FCV mismatch during resharding"}));
+}
+
 }  // namespace
 }  // namespace mongo
