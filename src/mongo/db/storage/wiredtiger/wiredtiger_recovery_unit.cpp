@@ -769,6 +769,14 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             break;
         }
         case ReadSource::kLastApplied: {
+            // Reads at lastApplied must still obey oplog visibility. Usually, oplog visibility is
+            // ahead of lastApplied, so there should be no behavioral differences. However, during
+            // step-up, the new primary writes a no-op that advances lastApplied
+            // directly, before the asynchronous oplog visibility thread has caught up. This will
+            // prevent secondaries from reading the no-op entry prematurely.
+            if (_oplogManager) {
+                _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
+            }
             _beginTransactionAtLastAppliedTimestamp();
             break;
         }

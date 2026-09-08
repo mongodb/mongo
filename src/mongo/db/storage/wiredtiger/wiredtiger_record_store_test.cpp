@@ -457,6 +457,76 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ASSERT_FALSE(isOpHidden(id2));
 }
 
+/**
+ * Tests that a forward oplog cursor reading at the kLastApplied read source does not return oplog
+ * entries beyond the oplog visibility timestamp, even when lastApplied has advanced past it. This
+ * models the SERVER-120205 step-up race: a node stepping up writes a no-op that advances
+ * lastApplied directly, before the asynchronous oplog visibility thread catches up. A chained
+ * secondary reading from that node at kLastApplied must not observe the no-op past the visibility
+ * point.
+ */
+TEST(WiredTigerRecordStoreTest, OplogReadAtLastAppliedClampsToVisibilityTimestamp) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    auto rs = &harnessHelper->oplogRecordStore();
+    auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    // Stop the visibility thread so the oplog visibility timestamp can be controlled manually.
+    engine->getOplogManager()->stop(nullptr);
+
+    auto insertOplogEntry = [&](int inc) {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
+        RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, inc);
+        txn.commit();
+        return id;
+    };
+
+    // Insert three oplog entries at increasing timestamps.
+    const RecordId id1 = insertOplogEntry(1);
+    const RecordId id2 = insertOplogEntry(2);
+    const RecordId id3 = insertOplogEntry(3);
+
+    // Reads the entire oplog forward at the kLastApplied read source. setTimestampReadSource caches
+    // lastApplied, so callers must set it (and the oplog visibility timestamp) beforehand.
+    auto readForwardAtLastApplied = [&]() {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        ru.setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
+        auto cursor = rs->getCursor(opCtx.get(), ru, /*forward=*/true);
+        std::vector<RecordId> seen;
+        while (auto record = cursor->next()) {
+            seen.push_back(record->id);
+        }
+        return seen;
+    };
+
+    // Visibility lags lastApplied: the third entry is applied (lastApplied = id3's timestamp) but
+    // not yet visible (visibility = id2's timestamp). The oplog read must be clamped to the
+    // visibility point and stop before id3. Without the fix it would return id3, exposing an entry
+    // past oplog visibility.
+    engine->getOplogManager()->setOplogReadTimestamp(
+        Timestamp(static_cast<unsigned long long>(id2.getLong())));
+    engine->getSnapshotManager()->setLastApplied(
+        Timestamp(static_cast<unsigned long long>(id3.getLong())));
+    ASSERT_EQ(readForwardAtLastApplied(), (std::vector<RecordId>{id1, id2}));
+
+    // Once visibility advances to include id3, the same read returns all three entries, confirming
+    // the clamp is inert when visibility is at or ahead of lastApplied.
+    engine->getOplogManager()->setOplogReadTimestamp(
+        Timestamp(static_cast<unsigned long long>(id3.getLong())));
+    engine->getSnapshotManager()->setLastApplied(
+        Timestamp(static_cast<unsigned long long>(id3.getLong())));
+    ASSERT_EQ(readForwardAtLastApplied(), (std::vector<RecordId>{id1, id2, id3}));
+
+    // The read remains bounded by lastApplied when lastApplied is behind visibility, so the added
+    // visibility bound does not regress the existing lastApplied clamp.
+    engine->getOplogManager()->setOplogReadTimestamp(
+        Timestamp(static_cast<unsigned long long>(id3.getLong())));
+    engine->getSnapshotManager()->setLastApplied(
+        Timestamp(static_cast<unsigned long long>(id2.getLong())));
+    ASSERT_EQ(readForwardAtLastApplied(), (std::vector<RecordId>{id1, id2}));
+}
+
 TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b"));
