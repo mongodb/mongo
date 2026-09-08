@@ -995,6 +995,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).transactionMetricsObserver.onUnstash(
+                opCtx,
                 ServerTransactionsMetrics::get(opCtx->getServiceContext()),
                 opCtx->getServiceContext()->getTickSource());
         }
@@ -1574,7 +1575,8 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
-        o(lk).transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
+        o(lk).transactionMetricsObserver.onStash(
+            opCtx, ServerTransactionsMetrics::get(opCtx), tickSource);
         o(lk).transactionMetricsObserver.onTransactionOperation(
             opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
     }
@@ -1760,7 +1762,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
         _releaseTransactionResourcesToOpCtx(
             opCtx, maxLockTimeout, forRecoveryPreparedTxnApplication);
         stdx::lock_guard<Client> lg(*opCtx->getClient());
-        o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+        o(lg).transactionMetricsObserver.onUnstash(opCtx,
+                                                   ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
         return;
     }
@@ -1831,7 +1834,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
 
     {
         stdx::lock_guard<Client> lg(*opCtx->getClient());
-        o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+        o(lg).transactionMetricsObserver.onUnstash(opCtx,
+                                                   ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
     }
 }

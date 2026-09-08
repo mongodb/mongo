@@ -87,12 +87,15 @@
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -166,6 +169,11 @@ public:
                 try {
                     txnParticipant.unstashTransactionResources(opCtx, "aggregate");
                 } catch (ExceptionFor<ErrorCodes::NoSuchTransaction>&) {
+                    LOGV2_WARNING(
+                        12336502,
+                        "FLE unyield: unstashTransactionResources encountered NoSuchTransaction",
+                        "lsid"_attr = opCtx->getLogicalSessionId(),
+                        "txnNumber"_attr = opCtx->getTxnNumber());
                 }
             }
         }

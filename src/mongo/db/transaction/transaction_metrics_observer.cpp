@@ -31,7 +31,6 @@
 #include <memory>
 #include <utility>
 
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -40,8 +39,11 @@
 #include "mongo/db/transaction/transaction_metrics_observer.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 namespace mongo {
 
@@ -69,11 +71,19 @@ void TransactionMetricsObserver::onChooseReadTimestamp(Timestamp readTimestamp) 
     _singleTransactionStats.setReadTimestamp(readTimestamp);
 }
 
-void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onStash(OperationContext* opCtx,
+                                         ServerTransactionsMetrics* serverTransactionsMetrics,
                                          TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
+    if (!_singleTransactionStats.isActive()) {
+        // Dump transaction info before hitting invariant.
+        LOGV2(12336500,
+              "Attempting to stash transaction metrics which were never unstashed",
+              "lsid"_attr = opCtx->getLogicalSessionId(),
+              "txnNumber"_attr = opCtx->getTxnNumber());
+    }
     invariant(_singleTransactionStats.isActive());
     _singleTransactionStats.setInactive(tickSource, tickSource->getTicks());
 
@@ -85,11 +95,19 @@ void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransa
     serverTransactionsMetrics->incrementCurrentInactive();
 }
 
-void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onUnstash(OperationContext* opCtx,
+                                           ServerTransactionsMetrics* serverTransactionsMetrics,
                                            TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
+    if (_singleTransactionStats.isActive()) {
+        // Dump transaction info before hitting invariant.
+        LOGV2(12336501,
+              "Attempting to unstash metrics which are already active",
+              "lsid"_attr = opCtx->getLogicalSessionId(),
+              "txnNumber"_attr = opCtx->getTxnNumber());
+    }
     invariant(!_singleTransactionStats.isActive());
     _singleTransactionStats.setActive(tickSource->getTicks());
 
@@ -190,13 +208,13 @@ void TransactionMetricsObserver::onAbort(OperationContext* opCtx,
 void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
                                                         OpDebug::AdditiveMetrics additiveMetrics,
                                                         bool isPrepared) {
-    // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics object stored in the
-    // SingleTransactionStats instance on the TransactionMetricsObserver.
+    // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics object stored in
+    // the SingleTransactionStats instance on the TransactionMetricsObserver.
     _singleTransactionStats.getOpDebug()->additiveMetrics.add(additiveMetrics);
 
     // If there are valid storage statistics for this operation, put those in the
-    // SingleTransactionStats instance either by creating a new storageStats instance or by adding
-    // into an existing storageStats instance stored in SingleTransactionStats.
+    // SingleTransactionStats instance either by creating a new storageStats instance or by
+    // adding into an existing storageStats instance stored in SingleTransactionStats.
     // WiredTiger doesn't let storage statistics be collected when transaction is prepared.
     if (!isPrepared) {
         std::unique_ptr<StorageStats> storageStats =
@@ -212,8 +230,8 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
     }
 
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
-    // TransactionMetricsObserver with this Client's information. This is the last client that ran a
-    // transaction operation on the txnParticipant.
+    // TransactionMetricsObserver with this Client's information. This is the last client that
+    // ran a transaction operation on the txnParticipant.
     _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
 }
 
