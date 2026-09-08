@@ -9,6 +9,7 @@ unclean shutdown. Once started, validate will be run on all collections. A valid
 indicates a problem.
 """
 
+import logging
 import os
 import random
 import shutil
@@ -19,6 +20,8 @@ import pymongo
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.testing.hooks import bghook
+
+LOGGER = logging.getLogger(__name__)
 
 
 def validate(mdb, logger, acceptable_err_codes):
@@ -137,7 +140,20 @@ class SimulateCrash(bghook.BGHook):
         while total_bytes_sent < in_bytes:
             bytes_sent = os.sendfile(out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent)
             if bytes_sent == 0:
-                raise ValueError("Unexpectedly reached EOF copying file")
+                # File may have shrunk since the stat above; re-check before giving up.
+                current_bytes = os.fstat(in_fd).st_size
+                if current_bytes <= total_bytes_sent:
+                    LOGGER.warning(
+                        "%s shrank from %d to %d bytes while copying for a crash simulation "
+                        "snapshot; keeping the %d bytes already copied",
+                        absolute_filepath,
+                        in_bytes,
+                        current_bytes,
+                        total_bytes_sent,
+                    )
+                    break
+                in_bytes = current_bytes
+                continue
             total_bytes_sent += bytes_sent
 
         os.close(out_fd)
