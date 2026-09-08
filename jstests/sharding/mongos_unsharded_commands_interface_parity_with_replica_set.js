@@ -63,6 +63,10 @@
  *
  * @tags: [
  *   requires_fcv_83,
+ *   # TODO (SERVER-132818/SERVER-48397): The collmod command does not return the same set of fields
+ *   # if the command is a noop versus a real change. This causes issues in sharded clusters where a
+ *   # retry can turn a command into a noop.
+ *   does_not_support_stepdowns,
  * ]
  */
 

@@ -230,3 +230,6 @@ filters:
   - "retryable_find_and_modify_remove_by_id_chunk_migration.js":
     approvers:
       - 10gen/query-execution-router
+  - "mongos_unsharded_commands_interface_parity_with_replica_set.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
