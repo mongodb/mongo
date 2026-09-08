@@ -539,7 +539,6 @@ class AggStageUnwind {
         // The $unwind: value object.
         this._self = {
             path: aggPipeline.getFieldNameRefManaged(),
-            includeArrayIndex: aggPipeline.getFieldNameManaged(),
             preserveNullAndEmptyArrays: aggPipeline.getBoolLiteralManaged(),
         };
     } // constructor
