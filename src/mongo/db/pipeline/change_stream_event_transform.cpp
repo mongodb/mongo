@@ -120,11 +120,13 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
 
 // Warns about the usage of an unsupported oplog entry type by logging an error and tasserting.
 [[noreturn]] void throwUnsupportedOplogEntryType(const Document& input, std::string error) {
-    LOGV2_WARNING(
-        11992902, "Unsupported oplog entry type", "error"_attr = error, "input"_attr = input);
+    LOGV2_WARNING(11992902,
+                  "Unsupported oplog entry type",
+                  "error"_attr = error,
+                  "input"_attr = redact(input.toBson()));
     tasserted(6330501,
               str::stream() << "Unsupported oplog entry type, error " << error << ": "
-                            << input.toString());
+                            << redact(input.toBson()));
 }
 
 Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
@@ -448,7 +450,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 // We should never see an unknown command.
                 LOGV2_WARNING(11992901,
                               "Unsupported command type found in command oplog entry",
-                              "oField"_attr = oField);
+                              "oField"_attr = redact(oField.toBson()));
                 tasserted(6654400,
                           str::stream() << "Unsupported command type found in command oplog entry "
                                         << oField.toString());
@@ -524,7 +526,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             // We should never see an unknown noop entry.
-            LOGV2_WARNING(11992900, "Invalid noop entry", "o2Field"_attr = o2Field);
+            LOGV2_WARNING(
+                11992900, "Invalid noop entry", "o2Field"_attr = redact(o2Field.toBson()));
             tasserted(5052201, str::stream() << "Invalid noop entry " << o2Field.toString());
         }
         default: {
