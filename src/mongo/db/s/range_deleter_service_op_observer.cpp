@@ -16,9 +16,12 @@
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -85,6 +88,17 @@ void invalidateRangePreservers(OperationContext* opCtx, const RangeDeletionTask&
     }
 }
 
+void clearBucketCatalogIfTimeseries(OperationContext* opCtx, const RangeDeletionTask& rdt) {
+    const auto& uuid = rdt.getCollectionUuid();
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+    if (!coll || !coll->getTimeseriesOptions()) {
+        return;
+    }
+
+    timeseries::bucket_catalog::clear(
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()), uuid);
+}
+
 }  // namespace
 
 RangeDeleterServiceOpObserver::RangeDeleterServiceOpObserver() = default;
@@ -103,6 +117,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
             auto deletionTask = RangeDeletionTask::parse(
                 it->doc, IDLParserContext("RangeDeleterServiceOpObserver"));
             if (!deletionTask.getPending() || !*(deletionTask.getPending())) {
+                clearBucketCatalogIfTimeseries(opCtx, deletionTask);
                 registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
             }
         }
@@ -141,6 +156,7 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
                 invalidateRangePreservers(opCtx, deletionTask);
             }
             if (pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
+                clearBucketCatalogIfTimeseries(opCtx, deletionTask);
                 registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
             }
         }
