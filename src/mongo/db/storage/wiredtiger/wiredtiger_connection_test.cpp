@@ -192,12 +192,12 @@ TEST(WiredTigerConnectionTest, resetConfigurationBeforeReleasingSessionToCache) 
     ASSERT_EQ(connection->getIdleSessionsCount(), 0U);
     {
         WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
-        // Set cache max wait time to be a non-default value.
-        recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
+        // Set ignore_cache_size to be true
+        recoveryUnit.optOutOfCacheEviction();
 
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
-        // Set ignore_cache_size to be true
-        session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
+        // Set cache max wait time to be a non-default value.
+        session->modifyConfiguration("cache_max_wait_ms=100", "cache_max_wait_ms=0");
         // Set isolation level to be read-uncommitted (by default it is snapshot)
         session->modifyConfiguration("isolation=read-uncommitted", "isolation=snapshot");
         // Set cache_cursors to be false
@@ -232,10 +232,9 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
     WiredTigerConnection* connection = harnessHelper.getConnection();
 
     WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
-    // Set cache max wait time to be a non-default value.
-    recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
-
     WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    // Set cache max wait time to be a non-default value.
+    session->modifyConfiguration("cache_max_wait_ms=100", "cache_max_wait_ms=0");
     // Set ignore_cache_size to be true
     session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     // Set isolation level to be read-uncommitted (by default it is snapshot)
@@ -252,13 +251,44 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
     ASSERT(undoConfigStringsSet.find("cache_cursors=true") != undoConfigStringsSet.end());
 
     // Set all values back to their defaults.
-    recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{0});
+    session->modifyConfiguration("cache_max_wait_ms=0", "cache_max_wait_ms=0");
     session->modifyConfiguration("ignore_cache_size=false", "ignore_cache_size=false");
     session->modifyConfiguration("isolation=snapshot", "isolation=snapshot");
     session->modifyConfiguration("cache_cursors=true", "cache_cursors=true");
 
     // Check that we do not store any undo config strings.
     ASSERT_EQ(session->getUndoConfigStrings().size(), 0);
+}
+
+// Test that opting out of cache eviction sets ignore_cache_size on the recovery unit's session.
+TEST(WiredTigerConnectionTest, optOutOfCacheEvictionIgnoresCacheSize) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+    WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    recoveryUnit.optOutOfCacheEviction();
+
+    auto undoConfigStringsSet = session->getUndoConfigStrings();
+
+    ASSERT_EQ(undoConfigStringsSet.size(), 1);
+    ASSERT(undoConfigStringsSet.find("ignore_cache_size=false") != undoConfigStringsSet.end());
+}
+
+// Test that opting out of cache eviction applies to a session opened after the opt-out.
+TEST(WiredTigerConnectionTest, optOutOfCacheEvictionAppliesToLaterSession) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+    // No session exists yet, so the opt-out must be recorded and replayed when one is opened.
+    recoveryUnit.optOutOfCacheEviction();
+
+    WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    auto undoConfigStringsSet = session->getUndoConfigStrings();
+
+    ASSERT_EQ(undoConfigStringsSet.size(), 1);
+    ASSERT(undoConfigStringsSet.find("ignore_cache_size=false") != undoConfigStringsSet.end());
 }
 
 TEST(WiredTigerConnectionTest, CheckSessionCacheMax) {

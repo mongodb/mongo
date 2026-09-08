@@ -122,11 +122,11 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
     // threads try to flush at the same time.
     std::lock_guard<std::mutex> flushLock(_flushMutex);
 
-    // When the session is destructed, it closes any cursors that remain open. Set the config to a
-    // magic number that indicates to WT that this session should not take part in optional
+    // When the session is destructed, it closes any cursors that remain open. Configure the session
+    // to ignore the cache size, which tells WT that this session should not take part in optional
     // eviction. This is important for this path as it can be called by any thread which may be
     // running a high priority operation.
-    WiredTigerSession session(_conn, nullptr, "isolation=snapshot,cache_max_wait_ms=1");
+    WiredTigerSession session(_conn, nullptr, "isolation=snapshot,ignore_cache_size=true");
 
     WT_CURSOR* cursor = session.getNewCursor(_storageUri, "overwrite=true");
 

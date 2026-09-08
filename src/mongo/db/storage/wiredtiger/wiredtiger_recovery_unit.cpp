@@ -99,10 +99,8 @@ void WiredTigerRecoveryUnit::_ensureSession() {
     }
     _session = _managedSession.get();
 
-    if (_cacheMaxWaitTimeout.count()) {
-        _session->modifyConfiguration(
-            fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
-            "cache_max_wait_ms=0");
+    if (_ignoreCacheSize) {
+        _session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     }
 }
 
@@ -528,10 +526,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
 
         if (_noEvictionAfterCommitOrRollback) {
-            // The only point at which commit_transaction() can time out is in the bonus-eviction
-            // phase. If the timeout expires here, the function will stop the eviction and return
-            // success. It cannot return an error due to timeout.
-            _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
+            // The only point at which commit_transaction() can do eviction work is in the
+            // bonus-eviction phase. Ignoring the cache size skips that phase, so the call cannot be
+            // held up behind eviction.
+            _session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
         }
 
         if (!_createdTables.empty() && _isTimestamped) {
@@ -552,10 +550,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     } else {
         invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
         if (_noEvictionAfterCommitOrRollback) {
-            // The only point at which rollback_transaction() can time out is in the bonus-eviction
-            // phase. If the timeout expires here, the function will stop the eviction and return
-            // success. It cannot return an error due to timeout.
-            _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
+            // The only point at which rollback_transaction() can do eviction work is in the
+            // bonus-eviction phase. Ignoring the cache size skips that phase, so the call cannot be
+            // held up behind eviction.
+            _session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
         }
 
         std::string confStr;
@@ -571,8 +569,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             22413, 3, "WT rollback_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
     }
 
-    if (_noEvictionAfterCommitOrRollback) {
-        _session->modifyConfiguration("cache_max_wait_ms=0", "cache_max_wait_ms=0");
+    // Restore the session unless the recovery unit as a whole opted out of eviction, in which case
+    // the flag must stay set for the sessions that outlive this transaction.
+    if (_noEvictionAfterCommitOrRollback && !_ignoreCacheSize) {
+        _session->modifyConfiguration("ignore_cache_size=false", "ignore_cache_size=false");
     }
 
     if (_isTimestamped) {
@@ -1291,15 +1291,13 @@ void WiredTigerRecoveryUnit::onCreateTable(const char* uri, StepdownState state)
     _createdTables.push_back({uri, ts, state});
 }
 
-void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
-    // Save timeout because if there is currently no session, the next session that is opened will
-    // set the timeout.
-    _cacheMaxWaitTimeout = timeout;
+void WiredTigerRecoveryUnit::optOutOfCacheEviction() {
+    // Save the flag because if there is currently no session, the next session that is opened will
+    // set it.
+    _ignoreCacheSize = true;
     WiredTigerConnection::BlockShutdown blockShutdown(_connection);
     if (_session && !_connection->isShuttingDown()) {
-        _session->modifyConfiguration(
-            fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
-            "cache_max_wait_ms=0");
+        _session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     }
 }
 

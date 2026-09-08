@@ -925,13 +925,6 @@ public:
     }
 
     /**
-     * Sets a maximum timeout that the storage engine will block an operation when the cache is
-     * under pressure.
-     * If not set (default 0) then the storage engine will block indefinitely.
-     */
-    virtual void setCacheMaxWaitTimeout(Milliseconds) {}
-
-    /**
      * Bounds every storage operation on this recovery unit's session: once exceeded, WiredTiger
      * fails the operation with WT_ROLLBACK (surfaced as a WriteConflict/TemporarilyUnavailable
      * error) instead of waiting indefinitely. Unlike a cache-wait bound, this also makes a
