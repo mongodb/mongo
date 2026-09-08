@@ -404,6 +404,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # an upgrade did). The server only accepts continuing in the interrupted direction, so
             # drive the FCV document's targetVersion to completion and then retry ours.
             _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE = 12587
+            _COMMAND_NOT_SUPPORTED_ON_VIEW = 166
             _INCOMPLETE_TRANSITION_CODES = (7428200, 10778001)
             _SET_FCV_RETRY_TIMEOUT_SECS = 5 * 60
             _SET_FCV_RETRY_INTERVAL_SECS = 0.2
@@ -1499,7 +1500,18 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     if coll_name.endswith(".") or ".." in coll_name:
                         continue
                     # Skip collections that contain TTL indexes or TTL options.
-                    indexes = db.get_collection(coll_name).list_indexes()
+                    try:
+                        indexes = db.get_collection(coll_name).list_indexes()
+                    except pymongo.errors.OperationFailure as err:
+                        # If the replica set is running an older version, make an exclusion for
+                        # legacy timeseries collections because they are views and do not support
+                        # the listIndexes command
+                        if (
+                            err.code != _COMMAND_NOT_SUPPORTED_ON_VIEW
+                            or coll["type"] != "timeseries"
+                        ):
+                            raise
+
                     if any("expireAfterSeconds" in index for index in indexes):
                         continue
                     if "expireAfterSeconds" in coll["options"]:
