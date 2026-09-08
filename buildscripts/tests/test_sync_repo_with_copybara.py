@@ -4,6 +4,7 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -11,7 +12,7 @@ import textwrap
 import traceback
 import unittest
 from collections.abc import Sequence
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
@@ -56,12 +57,44 @@ EVERGREEN_EXPANSIONS_PATHS = (Path("../expansions.yml"), Path("expansions.yml"))
 GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED: bool | None = None
 
 
-@unittest.skipUnless(
-    sys.platform == "linux",
-    "Copybara unit tests are only run on Linux.",
-)
 class CopybaraTestCase(unittest.TestCase):
-    """Base class for Copybara unit tests."""
+    """Base class for Copybara unit tests.
+
+    Copybara tests run locally on every supported developer platform, but in
+    Evergreen CI they are only exercised by the Linux copybara sync variants
+    (see etc/evergreen_yml_components/copybara/copybara.yml), so they must not
+    be wired into any other CI build variant.
+    """
+
+
+# Some tests mock os.getcwd and os.chdir; capture the real functions so
+# repo_temp_directory always operates on the real working directory.
+_REAL_GETCWD = os.getcwd
+_REAL_CHDIR = os.chdir
+
+
+@contextmanager
+def repo_temp_directory():
+    """Temporary directory that is safe to clean up after git repo tests.
+
+    The git repo tests chdir into repositories created under the temporary
+    directory, and Windows cannot delete a directory that is the process
+    working directory. Git also marks repository files read-only. Restore the
+    working directory and clear read-only bits before removing the tree.
+    """
+    original_cwd = _REAL_GETCWD()
+    tmpdir = tempfile.mkdtemp()
+    try:
+        yield tmpdir
+    finally:
+        _REAL_CHDIR(original_cwd)
+
+        def make_writable(function, path, _excinfo):
+            if not os.path.isdir(path) or os.path.islink(path):
+                os.chmod(path, stat.S_IWRITE)
+            function(path)
+
+        shutil.rmtree(tmpdir, onexc=make_writable)
 
 
 def get_current_evergreen_build_variant() -> str | None:
@@ -125,7 +158,7 @@ def git_supports_filtered_fetch_into_plain_repo() -> bool:
     if GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED is not None:
         return GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with repo_temp_directory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         source_dir = tmpdir_path / "source"
         fetch_dir = tmpdir_path / "fetch"
@@ -509,13 +542,15 @@ class TestBranchFunctions(CopybaraTestCase):
                 f.write(str(i))
 
             sync_repo_with_copybara.run_command("git add test.txt")
-            commit_message = f"test commit {i}"
+            # Use separate -m flags instead of embedding a newline in the command string, since
+            # cmd.exe splits commands on newlines when the tests run on Windows.
+            commit_command = f'git commit -m "test commit {i}"'
             # If there are private commit hashes need to be added in public repo commits, include them in the commit message
             if private_commit_hashes:
-                commit_message += f"\nGitOrigin-RevId: {private_commit_hashes[i]}"
+                commit_command += f' -m "GitOrigin-RevId: {private_commit_hashes[i]}"'
 
             # Get the current commit hash
-            sync_repo_with_copybara.run_command(f'git commit -m "{commit_message}"')
+            sync_repo_with_copybara.run_command(commit_command)
             commit_hashes.append(
                 sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
             )
@@ -605,7 +640,7 @@ class TestBranchFunctions(CopybaraTestCase):
         :param matched_public_commits: The number of commits in the public repository that match the private repository with tag 'GitOrigin-RevId'.
         :return: True if the last commit in the search result matches the last commit in the public repository, False otherwise.
         """
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             try:
                 os.chdir(tmpdir)
                 mock_10gen_dir = os.path.join(tmpdir, "mock_10gen")
@@ -662,7 +697,7 @@ class TestBranchFunctions(CopybaraTestCase):
         self.assertIsNone(result, f"{test_name}: SUCCESS!")
 
     def test_duplicate_destination_origin_commits_use_newest_same_branch_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -681,7 +716,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_duplicate_destination_origin_commits_are_ignored_outside_source_ref(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -700,7 +735,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_find_matching_commit_pair_ignores_unrelated_duplicates_before_relevant_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -725,7 +760,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_duplicate_destination_origin_commits_on_unrelated_branches_are_candidates(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -742,7 +777,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("master")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "master commit\nGitOrigin-RevId: {private_hashes[0]}"'
+                f'git commit -m "master commit" -m "GitOrigin-RevId: {private_hashes[0]}"'
             )
             master_public_hash = sync_repo_with_copybara.run_command(
                 'git log --pretty=format:"%H" -1'
@@ -753,7 +788,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("release")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "release commit\nGitOrigin-RevId: {private_hashes[0]}"'
+                f'git commit -m "release commit" -m "GitOrigin-RevId: {private_hashes[0]}"'
             )
             release_public_hash = sync_repo_with_copybara.run_command(
                 'git log --pretty=format:"%H" -1'
@@ -765,7 +800,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_find_matching_commit_pair_uses_bottom_most_origin_trailer(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -785,18 +820,15 @@ class TestBranchFunctions(CopybaraTestCase):
                 with open("test.txt", "a") as file:
                     file.write(str(i))
                 sync_repo_with_copybara.run_command("git add test.txt")
-                commit_message = textwrap.dedent(
-                    f"""\
-                    public backport {i}
-
-                    GitOrigin-RevId: {stale_origin}
-
-                    (cherry picked from commit c97e1c1)
-
-                    GitOrigin-RevId: {private_hashes[i]}
-                    """
-                ).strip()
-                sync_repo_with_copybara.run_command(f"git commit -m {shlex.quote(commit_message)}")
+                # Use separate -m flags instead of embedding newlines in the command string,
+                # since cmd.exe splits commands on newlines when the tests run on Windows. Each
+                # -m value becomes a paragraph separated by a blank line in the commit message.
+                sync_repo_with_copybara.run_command(
+                    f'git commit -m "public backport {i}"'
+                    f' -m "GitOrigin-RevId: {stale_origin}"'
+                    ' -m "(cherry picked from commit c97e1c1)"'
+                    f' -m "GitOrigin-RevId: {private_hashes[i]}"'
+                )
                 public_hashes.append(
                     sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
                 )
@@ -812,7 +844,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_find_matching_commit_pair_returns_source_and_destination(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -836,7 +868,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_find_matching_commit_pair_searches_all_destination_branches(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -855,7 +887,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("release")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "release branch commit\nGitOrigin-RevId: {private_hashes[1]}"'
+                f'git commit -m "release branch commit" -m "GitOrigin-RevId: {private_hashes[1]}"'
             )
             release_public_hash = sync_repo_with_copybara.run_command(
                 'git log --pretty=format:"%H" -1'
@@ -877,7 +909,7 @@ class TestBranchFunctions(CopybaraTestCase):
         test_name = "branch_exists_test"
         branch = "v0.0"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             remote_repo_dir = os.path.join(tmpdir, "remote_repo")
             os.mkdir(remote_repo_dir)
             self.create_mock_repo_commits(remote_repo_dir, 1)
@@ -898,7 +930,7 @@ class TestBranchFunctions(CopybaraTestCase):
         test_name = "branch_not_exists_test"
         branch = "..invalid-therefore-impossible-to-create-branch-name"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             remote_repo_dir = os.path.join(tmpdir, "remote_repo")
             os.mkdir(remote_repo_dir)
             self.create_mock_repo_commits(remote_repo_dir, 1)
@@ -977,7 +1009,7 @@ class TestBranchFunctions(CopybaraTestCase):
     def test_resolve_branch_target_ref_accepts_commit_in_branch_history(self):
         self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
             private_hashes = self.create_mock_repo_commits(source_dir, 3)
@@ -992,7 +1024,7 @@ class TestBranchFunctions(CopybaraTestCase):
     def test_resolve_branch_target_ref_accepts_tag_in_branch_history(self):
         self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
             private_hashes = self.create_mock_repo_commits(source_dir, 3)
@@ -1015,7 +1047,7 @@ class TestBranchFunctions(CopybaraTestCase):
     def test_resolve_branch_target_ref_rejects_tag_outside_branch_history(self):
         self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
             self.create_mock_repo_commits(source_dir, 2)
@@ -1049,7 +1081,7 @@ class TestBranchFunctions(CopybaraTestCase):
     def test_validate_destination_not_past_target_passes_when_destination_is_behind_or_at_target(
         self,
     ):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             behind_destination_dir = os.path.join(tmpdir, "behind_destination")
             at_destination_dir = os.path.join(tmpdir, "at_destination")
@@ -1083,7 +1115,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_validate_destination_not_past_target_fails_when_destination_is_past_target(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(source_dir)
@@ -1109,7 +1141,7 @@ class TestBranchFunctions(CopybaraTestCase):
             self.assertIn("already synced past target_ref target-tag", str(raised.exception))
 
     def test_fast_forward_destination_to_existing_match_reuses_synced_sibling_branch(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_work_dir = os.path.join(tmpdir, "destination_work")
             destination_remote_dir = os.path.join(tmpdir, "destination.git")
@@ -1129,7 +1161,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("public base")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+                f'git commit -m "public base" -m "GitOrigin-RevId: {private_hashes[0]}"'
             )
             public_base = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
             sync_repo_with_copybara.run_command("git branch v8.3")
@@ -1139,7 +1171,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("already synced on sibling branch")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[1]}"'
+                f'git commit -m "already synced" -m "GitOrigin-RevId: {private_hashes[1]}"'
             )
             already_synced_public = sync_repo_with_copybara.run_command(
                 'git log --pretty=format:"%H" -1'
@@ -1174,7 +1206,7 @@ class TestBranchFunctions(CopybaraTestCase):
     def test_fast_forward_destination_to_existing_match_uses_branch_match_when_duplicated(
         self,
     ):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_work_dir = os.path.join(tmpdir, "destination_work")
             destination_remote_dir = os.path.join(tmpdir, "destination.git")
@@ -1194,14 +1226,14 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("public base")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+                f'git commit -m "public base" -m "GitOrigin-RevId: {private_hashes[0]}"'
             )
             sync_repo_with_copybara.run_command("git checkout -b v8.3")
             with open("test.txt", "w") as file:
                 file.write("already synced on v8.3")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[2]}"'
+                f'git commit -m "already synced" -m "GitOrigin-RevId: {private_hashes[2]}"'
             )
             already_synced_public = sync_repo_with_copybara.run_command(
                 'git log --pretty=format:"%H" -1'
@@ -1212,7 +1244,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("duplicate synced elsewhere")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "duplicate\nGitOrigin-RevId: {private_hashes[2]}"'
+                f'git commit -m "duplicate" -m "GitOrigin-RevId: {private_hashes[2]}"'
             )
 
             sync_repo_with_copybara.run_command(
@@ -1236,7 +1268,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_find_destination_branch_match_for_source_commit_uses_branch_usable_duplicate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             destination_work_dir = os.path.join(tmpdir, "destination_work")
             destination_remote_dir = os.path.join(tmpdir, "destination.git")
             destination_lookup_dir = os.path.join(tmpdir, "destination_lookup")
@@ -1251,13 +1283,13 @@ class TestBranchFunctions(CopybaraTestCase):
             with open("test.txt", "w") as file:
                 file.write("public base")
             sync_repo_with_copybara.run_command("git add test.txt")
-            sync_repo_with_copybara.run_command("git commit -m 'public base'")
+            sync_repo_with_copybara.run_command('git commit -m "public base"')
             sync_repo_with_copybara.run_command("git checkout -b v8.3")
             with open("test.txt", "w") as file:
                 file.write("already synced on v8.3")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "already synced\nGitOrigin-RevId: {source_commit}"'
+                f'git commit -m "already synced" -m "GitOrigin-RevId: {source_commit}"'
             )
             expected_public = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
 
@@ -1266,7 +1298,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("duplicate synced elsewhere")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "duplicate\nGitOrigin-RevId: {source_commit}"'
+                f'git commit -m "duplicate" -m "GitOrigin-RevId: {source_commit}"'
             )
 
             sync_repo_with_copybara.run_command(
@@ -1298,7 +1330,7 @@ class TestBranchFunctions(CopybaraTestCase):
             )
 
     def test_fast_forward_destination_to_existing_match_uses_older_branch_start_point(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_work_dir = os.path.join(tmpdir, "destination_work")
             destination_remote_dir = os.path.join(tmpdir, "destination.git")
@@ -1318,7 +1350,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("public base")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+                f'git commit -m "public base" -m "GitOrigin-RevId: {private_hashes[0]}"'
             )
             public_base = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
             sync_repo_with_copybara.run_command("git branch v8.3")
@@ -1328,7 +1360,7 @@ class TestBranchFunctions(CopybaraTestCase):
                 file.write("already synced on divergent sibling branch")
             sync_repo_with_copybara.run_command("git add test.txt")
             sync_repo_with_copybara.run_command(
-                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[1]}"'
+                f'git commit -m "already synced" -m "GitOrigin-RevId: {private_hashes[1]}"'
             )
 
             sync_repo_with_copybara.run_command(
@@ -1398,7 +1430,7 @@ class TestBranchFunctions(CopybaraTestCase):
         )
 
     def test_find_destination_commit_for_source_commit_returns_newest_duplicate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             destination_dir = os.path.join(tmpdir, "destination")
             os.mkdir(destination_dir)
             source_commit = "a" * 40
@@ -2106,7 +2138,7 @@ class TestBranchFunctions(CopybaraTestCase):
         config_content = "blalla\n"
         config_content += "url = git@github.com:mongodb/mongo.git "
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             mongodb_mongo_dir = os.path.join(tmpdir, "mock_mongodb_mongo_repo")
             # Create Git configuration file
             self.create_mock_repo_git_config(mongodb_mongo_dir, config_content)
@@ -2131,7 +2163,7 @@ class TestBranchFunctions(CopybaraTestCase):
         config_content += "url = git@github.com:mongodb/mongo.git "
         config_content += "url = git@github.com:10gen/mongo.git "
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             mongodb_mongo_dir = os.path.join(tmpdir, "mock_mongodb_mongo_repo")
 
             # Create Git configuration file with provided content
@@ -2175,7 +2207,7 @@ class TestBranchFunctions(CopybaraTestCase):
         # Define a invalid branching off commit
         invalid_branching_off_commit = "123456789"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             mongodb_mongo_dir = os.path.join(tmpdir, "mock_mongodb_mongo_repo")
 
             # Create Git configuration file with provided content
@@ -2275,7 +2307,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
         )
 
     def test_resolve_requested_release_tag_branches_creates_synthetic_fragment(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             branch_to_fragment = {"master": Path("master.sky")}
 
             requested_branches, release_requests = (
@@ -2301,7 +2333,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             self.assertIn('sync_tag("r8.2.7")', synthetic_fragment.read_text())
 
     def test_resolve_requested_release_tag_branches_preserves_suffix(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             branch_to_fragment = {"master": Path("master.sky")}
 
             requested_branches, release_requests = (
@@ -2328,7 +2360,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_add_test_sync_tag_request_creates_version_scoped_test_tag_fragment(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             branch_to_fragment = {"master": Path("master.sky")}
 
             release_request = sync_repo_with_copybara.add_test_sync_tag_request(
@@ -2347,7 +2379,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_extract_release_tags_from_fragment_reads_sync_tag(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "release_tag.sky"
             fragment_path.write_text('sync_tag("r8.2.7-hotfix")\n')
 
@@ -2357,7 +2389,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_extract_branch_calls_from_fragment_reads_evergreen_activate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "branch.sky"
             fragment_path.write_text(
                 'sync_branch("master")\nsync_branch("v8.2", evergreen_activate = True)\n'
@@ -2372,7 +2404,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_extract_branch_calls_from_fragment_reads_target_ref(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "branch.sky"
             fragment_path.write_text(
                 'sync_branch("v8.2", target_ref = "r8.2.7", evergreen_activate = True)\n'
@@ -2394,7 +2426,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_extract_branch_calls_rejects_invalid_target_ref(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "branch.sky"
 
             fragment_path.write_text('sync_branch("v8.2", target_ref = "")\n')
@@ -2412,7 +2444,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
                 sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path)
 
     def test_extract_release_tag_calls_from_fragment_reads_evergreen_activate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "release_tag.sky"
             fragment_path.write_text(
                 'sync_tag("r8.2.7")\nsync_tag("r8.2.7-hotfix", evergreen_activate = True)\n'
@@ -2429,7 +2461,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
             )
 
     def test_extract_calls_reject_invalid_evergreen_activate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "branch.sky"
             fragment_path.write_text('sync_branch("master", evergreen_activate = true)\n')
 
@@ -2437,7 +2469,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
                 sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path)
 
     def test_extract_branches_from_fragment_rejects_release_tag_as_branch(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "bad_branch.sky"
             fragment_path.write_text('sync_branch("r8.2.7")\n')
 
@@ -2445,7 +2477,7 @@ class TestReleaseTagHelpers(CopybaraTestCase):
                 sync_repo_with_copybara.extract_branches_from_fragment(fragment_path)
 
     def test_extract_release_tags_from_fragment_rejects_branch_as_release_tag(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = Path(tmpdir) / "bad_tag.sky"
             fragment_path.write_text('sync_tag("v8.2")\n')
 
@@ -2508,7 +2540,7 @@ def write_base_copybara_config(
 
 class TestSkyExclusionChecks(CopybaraTestCase):
     def test_extract_sky_excluded_patterns(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
 
@@ -2518,7 +2550,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertIn("AGENTS.md", patterns)
 
     def test_extract_sky_excluded_patterns_prefers_adjacent_path_rules(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             sky_path.write_text('common_files_to_exclude = ["ignored/**"]\n')
             write_copybara_path_rules(
@@ -2532,7 +2564,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"src/authoritative/**"})
 
     def test_get_preview_excluded_patterns_includes_common_exclusions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2548,7 +2580,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertIn("AGENTS.md", patterns)
 
     def test_get_preview_excluded_patterns_includes_branch_specific_additions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -2563,7 +2595,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertIn("AGENTS.md", patterns)
 
     def test_get_preview_excluded_patterns_ignores_evergreen_activate(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -2578,7 +2610,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertIn("AGENTS.md", patterns)
 
     def test_get_preview_excluded_patterns_ignores_target_ref(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -2593,7 +2625,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertIn("AGENTS.md", patterns)
 
     def test_get_preview_excluded_patterns_deduplicates_common_and_branch_exclusions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2610,7 +2642,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, ["AGENTS.md", "internal/", "private/**"])
 
     def test_extract_branch_public_patterns_defaults_to_all_files(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(sky_path.read_text() + '\nsync_branch("master")\n')
@@ -2622,7 +2654,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"**"})
 
     def test_extract_branch_public_patterns_from_common_list(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2637,7 +2669,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"README.md", "docs/**"})
 
     def test_extract_branch_public_patterns_supports_sync_tag(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2652,7 +2684,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"README.md", "docs/**"})
 
     def test_extract_branch_public_patterns_ignores_branch_exclusions_only(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2670,7 +2702,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"src/", "buildscripts/", "jstests/**"})
 
     def test_extract_branch_public_patterns_prefers_adjacent_path_rules(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             sky_path.write_text(
                 'common_files_to_include = ["ignored/**"]\n' + '\nsync_branch("master")\n'
@@ -2688,7 +2720,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"README.md", "docs/**"})
 
     def test_extract_branch_public_patterns_from_named_list(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -2704,7 +2736,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             self.assertEqual(patterns, {"README.md", "docs/**"})
 
     def test_check_branch_top_level_paths_are_labeled_passes(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2719,7 +2751,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             )
 
     def test_check_branch_top_level_paths_are_labeled_supports_sync_tag(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2734,7 +2766,7 @@ class TestSkyExclusionChecks(CopybaraTestCase):
             )
 
     def test_check_branch_top_level_paths_are_labeled_fails_for_unlabeled_path(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 sky_path,
@@ -2831,7 +2863,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
         )
 
     def test_discover_copybara_branches_reads_fragments(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             write_base_copybara_config(get_repo_base_copybara_config_path(root))
             write_copybara_path_rules(
@@ -2859,7 +2891,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
             self.assertNotIn("v8.2.7", branch_to_fragment)
 
     def test_discover_copybara_branches_skips_disabled_fragments(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             write_base_copybara_config(get_repo_base_copybara_config_path(root))
             write_copybara_path_rules(
@@ -2883,7 +2915,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
             self.assertEqual(branch_to_fragment, {"master": fragment_dir / "master.sky"})
 
     def test_discover_copybara_branches_ignores_fragments_without_sync_call(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             write_base_copybara_config(get_repo_base_copybara_config_path(root))
             write_copybara_path_rules(
@@ -2918,7 +2950,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
         self.assertEqual(selected, ["v8.2", "master"])
 
     def test_prepare_branch_sync_for_test_workflow_generates_branch_specific_config(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base_config_path = get_repo_base_copybara_config_path(root)
             write_base_copybara_config(base_config_path)
@@ -3064,7 +3096,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
             self.assertNotIn("test-token", log_output)
 
     def test_prepare_branch_sync_for_test_workflow_uses_test_branch_for_sync_tag(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base_config_path = get_repo_base_copybara_config_path(root)
             write_base_copybara_config(base_config_path)
@@ -3131,7 +3163,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
     ):
         mock_check_destination_branch_exists.return_value = True
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base_config_path = get_repo_base_copybara_config_path(root)
             write_base_copybara_config(
@@ -3190,7 +3222,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
     ):
         mock_check_destination_branch_exists.return_value = True
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base_config_path = get_repo_base_copybara_config_path(root)
             write_base_copybara_config(
@@ -3252,7 +3284,7 @@ class TestCopybaraConfigHelpers(CopybaraTestCase):
 
 class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
     def test_get_test_workflow_base_branch_override_reads_sky_variable(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -3268,7 +3300,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             )
 
     def test_get_test_workflow_base_branch_override_defaults_to_none(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
 
@@ -3277,7 +3309,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             )
 
     def test_resolve_test_workflow_requested_branches_prefers_base_branch_override(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -3296,7 +3328,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             self.assertEqual(override, "v8.2")
 
     def test_resolve_test_workflow_requested_branches_defaults_to_requested_branches(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
 
@@ -3309,7 +3341,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             self.assertIsNone(override)
 
     def test_get_test_workflow_source_branch_override_reads_sky_variable(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             sky_path.write_text(
@@ -3325,7 +3357,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             )
 
     def test_get_test_workflow_source_branch_override_defaults_to_none(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
 
@@ -3335,7 +3367,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
     def test_list_untracked_paths_skips_untracked_directories(self, mock_run_command):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             repo_dir = Path(tmpdir)
             (repo_dir / "new.txt").write_text("new")
             (repo_dir / "copybara").mkdir()
@@ -3355,7 +3387,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
         if sys.platform == "win32":
             self.skipTest("symlink permissions vary on Windows")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             repo_dir = Path(tmpdir)
             (repo_dir / "target_dir").mkdir()
             os.symlink("target_dir", repo_dir / "linked_dir")
@@ -3402,8 +3434,8 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
 
     def test_copy_paths_into_repo_skips_directories(self):
         with (
-            tempfile.TemporaryDirectory() as source_tmpdir,
-            tempfile.TemporaryDirectory() as dest_tmpdir,
+            repo_temp_directory() as source_tmpdir,
+            repo_temp_directory() as dest_tmpdir,
         ):
             source_dir = Path(source_tmpdir)
             destination_dir = Path(dest_tmpdir)
@@ -3426,8 +3458,8 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
             self.skipTest("symlink permissions vary on Windows")
 
         with (
-            tempfile.TemporaryDirectory() as source_tmpdir,
-            tempfile.TemporaryDirectory() as dest_tmpdir,
+            repo_temp_directory() as source_tmpdir,
+            repo_temp_directory() as dest_tmpdir,
         ):
             source_dir = Path(source_tmpdir)
             destination_dir = Path(dest_tmpdir)
@@ -3449,7 +3481,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
         if sys.platform == "win32":
             self.skipTest("symlink permissions vary on Windows")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             repo_dir = Path(tmpdir)
             (repo_dir / "target.txt").write_text("target")
             os.symlink("target.txt", repo_dir / "linked.txt")
@@ -3768,36 +3800,39 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
 
     def test_create_patched_test_source_repo_collapses_patch_diff_onto_copybara_base(self):
         os.chdir(Path(__file__).resolve().parents[2])
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             repo_dir = Path(tmpdir) / "repo"
             repo_dir.mkdir()
-            sync_repo_with_copybara.run_command(f"git -C {repo_dir} init")
+            # Quote host paths so the commands also work through cmd.exe on Windows, where
+            # tempfile directories may contain spaces.
+            repo_dir_arg = sync_repo_with_copybara.shell_quote(repo_dir)
+            sync_repo_with_copybara.run_command(f"git -C {repo_dir_arg} init")
             sync_repo_with_copybara.run_command(
-                f'git -C {repo_dir} config --local user.email "test@example.com"'
+                f'git -C {repo_dir_arg} config --local user.email "test@example.com"'
             )
             sync_repo_with_copybara.run_command(
-                f'git -C {repo_dir} config --local user.name "Test User"'
+                f'git -C {repo_dir_arg} config --local user.name "Test User"'
             )
             sync_repo_with_copybara.run_command(
-                f"git -C {repo_dir} config --local commit.gpgsign false"
+                f"git -C {repo_dir_arg} config --local commit.gpgsign false"
             )
 
             tracked_file = repo_dir / "tracked.txt"
             tracked_file.write_text("base\n")
-            sync_repo_with_copybara.run_command(f"git -C {repo_dir} add tracked.txt")
-            sync_repo_with_copybara.run_command(f'git -C {repo_dir} commit -m "copybara base"')
+            sync_repo_with_copybara.run_command(f"git -C {repo_dir_arg} add tracked.txt")
+            sync_repo_with_copybara.run_command(f'git -C {repo_dir_arg} commit -m "copybara base"')
             copybara_base_revision = sync_repo_with_copybara.run_command(
-                f"git -C {repo_dir} rev-parse HEAD"
+                f"git -C {repo_dir_arg} rev-parse HEAD"
             ).strip()
 
             tracked_file.write_text("intermediate\n")
             (repo_dir / "upstream_only.txt").write_text("upstream only\n")
             sync_repo_with_copybara.run_command(
-                f"git -C {repo_dir} add tracked.txt upstream_only.txt"
+                f"git -C {repo_dir_arg} add tracked.txt upstream_only.txt"
             )
-            sync_repo_with_copybara.run_command(f'git -C {repo_dir} commit -m "patch base"')
+            sync_repo_with_copybara.run_command(f'git -C {repo_dir_arg} commit -m "patch base"')
             patch_base_revision = sync_repo_with_copybara.run_command(
-                f"git -C {repo_dir} rev-parse HEAD"
+                f"git -C {repo_dir_arg} rev-parse HEAD"
             ).strip()
 
             tracked_file.write_text("current workspace\n")
@@ -3810,6 +3845,7 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
                 "patch123",
             )
             try:
+                patched_repo_dir_arg = sync_repo_with_copybara.shell_quote(patched_repo_dir)
                 self.assertEqual(
                     (patched_repo_dir / "tracked.txt").read_text(), "current workspace\n"
                 )
@@ -3817,20 +3853,20 @@ class TestCopybaraConfigAndTestWorkflowHelpers(CopybaraTestCase):
                 self.assertFalse((patched_repo_dir / "upstream_only.txt").exists())
                 self.assertEqual(
                     sync_repo_with_copybara.run_command(
-                        f"git -C {patched_repo_dir} rev-list --count "
+                        f"git -C {patched_repo_dir_arg} rev-list --count "
                         f"{copybara_base_revision}..HEAD"
                     ).strip(),
                     "1",
                 )
                 self.assertEqual(
                     sync_repo_with_copybara.run_command(
-                        f"git -C {patched_repo_dir} rev-parse HEAD~1"
+                        f"git -C {patched_repo_dir_arg} rev-parse HEAD~1"
                     ).strip(),
                     copybara_base_revision,
                 )
                 self.assertEqual(
                     sync_repo_with_copybara.run_command(
-                        f"git -C {patched_repo_dir} log -1 --pretty=%s"
+                        f"git -C {patched_repo_dir_arg} log -1 --pretty=%s"
                     ).strip(),
                     "Evergreen patch for version_id patch123",
                 )
@@ -4265,7 +4301,7 @@ class TestMainWorkflow(CopybaraTestCase):
         )
         mock_resolve_test_workflow_baseline.return_value = test_baseline
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             fragment_path = Path(tmpdir) / "v8_2.sky"
             write_base_copybara_config(base_config_path)
@@ -4407,7 +4443,7 @@ class TestMainWorkflow(CopybaraTestCase):
         )
         mock_resolve_test_workflow_baseline.return_value = test_baseline
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             fragment_path = Path(tmpdir) / "master.sky"
             write_base_copybara_config(base_config_path)
@@ -4530,7 +4566,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_get_remote_tag_origin.return_value = None
         mock_get_remote_tag_commit.return_value = "tagsha123"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -4657,7 +4693,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_get_copybara_tokens.return_value = tokens
         mock_get_remote_branch_head.return_value = "mastersha123"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -4770,7 +4806,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_get_copybara_tokens.return_value = tokens
         mock_resolve_branch_target_ref.return_value = "targetsha123"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -4878,7 +4914,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_get_remote_tag_commit.return_value = "tagsha123"
         synthetic_fragment_contents = ""
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -4984,7 +5020,7 @@ class TestMainWorkflow(CopybaraTestCase):
             git_origin_rev_id="othersha456",
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -5066,7 +5102,7 @@ class TestMainWorkflow(CopybaraTestCase):
             git_origin_rev_id="tagsha123",
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 base_config_path,
@@ -5106,7 +5142,7 @@ class TestMainWorkflow(CopybaraTestCase):
         )
 
     def test_rewrite_copybara_config_refreshes_existing_tokens_and_prefix(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_path = Path(tmpdir) / "copy.bara.sky"
             config_path.write_text(
                 'source_url = "https://x-access-token:old@github.com/10gen/mongo.git"\n'
@@ -5157,7 +5193,7 @@ class TestMainWorkflow(CopybaraTestCase):
             self.assertIn("source_ref = source_refs.get(branch_name, branch_name)", rewritten)
 
     def test_rewrite_copybara_config_can_switch_source_url_to_local_mirror(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_path = Path(tmpdir) / "copy.bara.sky"
             config_path.write_text(
                 'source_url = "https://github.com/10gen/mongo.git"\n'
@@ -5198,7 +5234,7 @@ class TestMainWorkflow(CopybaraTestCase):
             self.assertNotIn("x-access-token:source-token@github.com/10gen/mongo.git", rewritten)
 
     def test_rewrite_copybara_config_can_switch_prod_url_to_test_repo(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_path = Path(tmpdir) / "copy.bara.sky"
             config_path.write_text(
                 'source_url = "https://github.com/10gen/mongo.git"\n'
@@ -5254,7 +5290,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_validate_sync_config,
         mock_validate_preview_exclusions,
     ):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             preview_dir = Path(tmpdir) / "preview"
             preview_dir.mkdir()
             stale_file = preview_dir / "stale.txt"
@@ -5402,7 +5438,7 @@ class TestMainWorkflow(CopybaraTestCase):
             total = 4096
             free = 2048
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             probe_path = Path(tmpdir) / "missing" / "child"
             with patch(
                 "buildscripts.copybara.sync_repo_with_copybara.shutil.disk_usage",
@@ -5463,7 +5499,7 @@ class TestMainWorkflow(CopybaraTestCase):
     def test_prepare_local_source_mirror_fetches_source_and_returns_local_sync(
         self, mock_run_command, mock_run_git_remote_command
     ):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             source_mirror_dir = (
                 tmpdir_path
@@ -5539,7 +5575,7 @@ class TestMainWorkflow(CopybaraTestCase):
         )
 
     def test_advertise_source_mirror_commits_makes_ancestor_shas_resolvable(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             source_dir = tmpdir_path / "source"
             mirror_dir = tmpdir_path / "source mirror.git"
@@ -6509,7 +6545,7 @@ class TestMainWorkflow(CopybaraTestCase):
 
         mock_run_command.side_effect = run_command_side_effect
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             bundle = sync_repo_with_copybara.fetch_remote_copybara_config_bundle(
                 tmpdir,
                 "https://x-access-token:token@github.com/10gen/mongo.git",
@@ -6564,7 +6600,7 @@ class TestMainWorkflow(CopybaraTestCase):
 
         mock_run_command.side_effect = run_command_side_effect
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             stdout = io.StringIO()
             with redirect_stdout(stdout):
                 with self.assertRaises(SystemExit):
@@ -6613,7 +6649,7 @@ class TestMainWorkflow(CopybaraTestCase):
                 return 'sync_branch("master")\n'
             raise AssertionError(f"Unexpected repo path: {repo_path}")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             fragment_path = (
                 Path(tmpdir)
                 / "tmp_copybara"
@@ -6675,7 +6711,7 @@ class TestMainWorkflow(CopybaraTestCase):
 
         mock_run_command.side_effect = run_command_side_effect
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             stdout = io.StringIO()
             with redirect_stdout(stdout):
                 with self.assertRaises(SystemExit):
@@ -6723,7 +6759,7 @@ class TestMainWorkflow(CopybaraTestCase):
 
         mock_run_command.side_effect = run_command_side_effect
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             stdout = io.StringIO()
             with redirect_stdout(stdout):
                 with self.assertRaises(SystemExit):
@@ -6742,7 +6778,7 @@ class TestMainWorkflow(CopybaraTestCase):
         self.assertIn("Start a new master build", log_output)
 
     def test_get_local_copybara_config_bundle_renders_checked_out_path_rules_module(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base_config_path = get_repo_base_copybara_config_path(root)
             write_base_copybara_config(base_config_path)
@@ -6785,7 +6821,7 @@ class TestGenerateCopybaraEvergreen(CopybaraTestCase):
         fragment_path.write_text(contents)
 
     def test_render_expected_copybara_evergreen_uses_branch_and_tag_fragments(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             self.write_fragment(
                 root,
@@ -6884,7 +6920,7 @@ class TestGenerateCopybaraEvergreen(CopybaraTestCase):
             )
 
     def test_check_generated_copybara_evergreen_detects_stale_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             self.write_fragment(root, "master.sky", 'sync_branch("master")\n')
             generated_path = root / generate_evergreen.COPYBARA_EVERGREEN_GENERATED_CONFIG_PATH
@@ -6899,7 +6935,7 @@ class TestGenerateCopybaraEvergreen(CopybaraTestCase):
             self.assertIn("Generated Copybara Evergreen config is stale", stdout.getvalue())
 
     def test_check_generated_copybara_evergreen_accepts_current_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             self.write_fragment(root, "master.sky", 'sync_branch("master")\n')
             generated_path = root / generate_evergreen.COPYBARA_EVERGREEN_GENERATED_CONFIG_PATH
@@ -7371,7 +7407,7 @@ class TestRedactSecrets(CopybaraTestCase):
             'f"https://x-access-token:{token}@github.com", 1)\n'
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             repo_dir = Path(tmpdir)
             git_env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull}
             subprocess.run(
@@ -7426,7 +7462,7 @@ class TestExtractSkyExcludedPatternsRejectsDuplicates(CopybaraTestCase):
     """Verify that duplicate common_files_to_exclude definitions are rejected."""
 
     def test_rejects_multiple_common_files_to_exclude_definitions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             sky_path.write_text(
                 textwrap.dedent("""\
@@ -7444,7 +7480,7 @@ class TestExtractSkyExcludedPatternsRejectsDuplicates(CopybaraTestCase):
                 sync_repo_with_copybara.extract_sky_excluded_patterns(str(sky_path))
 
     def test_accepts_single_definition(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(sky_path)
             patterns = sync_repo_with_copybara.extract_sky_excluded_patterns(str(sky_path))
@@ -7452,7 +7488,7 @@ class TestExtractSkyExcludedPatternsRejectsDuplicates(CopybaraTestCase):
             self.assertTrue(len(patterns) > 0)
 
     def test_ignores_commented_out_definitions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             sky_path = Path(tmpdir) / "copy.bara.sky"
             sky_path.write_text(
                 textwrap.dedent("""\
@@ -7555,7 +7591,7 @@ class TestAssembleCopybaraConfig(CopybaraTestCase):
     """Verify that base config and fragments are correctly concatenated."""
 
     def test_combines_base_and_single_fragment(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base = root / "base.sky"
             base.write_text('# base config\nsource_url = "foo"\n')
@@ -7573,7 +7609,7 @@ class TestAssembleCopybaraConfig(CopybaraTestCase):
             self.assertIn(f"# END {fragment.as_posix()}", assembled)
 
     def test_combines_base_and_multiple_fragments(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base = root / "base.sky"
             base.write_text("# base\n")
@@ -7594,7 +7630,7 @@ class TestAssembleCopybaraConfig(CopybaraTestCase):
             self.assertLess(idx_a, idx_b)
 
     def test_output_ends_with_newline(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             root = Path(tmpdir)
             base = root / "base.sky"
             base.write_text("# base\n")
@@ -7740,7 +7776,7 @@ class TestRealCopybaraSkyConfiguration(CopybaraTestCase):
         top_level_paths.add(".copybara_release_fragments")
         top_level_paths.update({"copybara.sky", "copybara.staging.sky"})
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_path = Path(tmpdir) / "copy.bara.sky"
             master_fragment_path = (
                 self.REAL_COPYBARA_ROOT / "buildscripts" / "copybara" / "master.sky"
@@ -7810,7 +7846,7 @@ class TestEvergreenProjectGuardVariantSelection(CopybaraTestCase):
             self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
 
     def test_skips_on_non_copybara_build_variant_from_expansions_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             expansions_path = Path(tmpdir) / "expansions.yml"
             expansions_path.write_text("build_variant: ubuntu2004\n")
 
@@ -7822,7 +7858,7 @@ class TestEvergreenProjectGuardVariantSelection(CopybaraTestCase):
                 self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
 
     def test_uses_later_expansions_file_when_first_file_cannot_be_parsed(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             bad_expansions_path = Path(tmpdir) / "bad-expansions.yml"
             good_expansions_path = Path(tmpdir) / "expansions.yml"
             bad_expansions_path.write_text("[\n")
@@ -7839,7 +7875,7 @@ class TestEvergreenProjectGuardVariantSelection(CopybaraTestCase):
                 self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
 
     def test_uses_later_expansions_file_when_first_file_is_not_a_mapping(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             list_expansions_path = Path(tmpdir) / "list-expansions.yml"
             good_expansions_path = Path(tmpdir) / "expansions.yml"
             list_expansions_path.write_text("- build_variant\n")
@@ -7908,7 +7944,7 @@ class TestHotfixTaskActivation(CopybaraTestCase):
         mock_api = mock_get_api.return_value
         mock_api.tasks_by_build.return_value = [inactive_task]
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_file = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 config_file,
@@ -7955,7 +7991,7 @@ class TestHotfixTaskActivation(CopybaraTestCase):
         mock_check_destination_branch_exists.return_value = True
         mock_get_api.return_value.tasks_by_build.return_value = []
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with repo_temp_directory() as tmpdir:
             config_file = Path(tmpdir) / "copy.bara.sky"
             write_base_copybara_config(
                 config_file,
