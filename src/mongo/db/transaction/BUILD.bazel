@@ -126,6 +126,7 @@ mongo_cc_unit_test(
     srcs = [
         "integer_interval_set_test.cpp",
         "reclaimed_prepared_txn_tracker_test.cpp",
+        "retryable_writes_stats_test.cpp",
         "transaction_api_test.cpp",
         "transaction_history_iterator_test.cpp",
         "transaction_operations_test.cpp",
