@@ -156,6 +156,19 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         goto err;
 
     /*
+     * A page whose entries all already carry a stop time gains nothing from a fast truncate: the
+     * page-delete information would only duplicate what the image says, and a reconciliation that
+     * legitimately skips writing such a page discards it while the parent still holds a
+     * fast-truncate proxy cell that depends on it. The history store is exempt: its pages routinely
+     * carry a stop on every entry, and rollback-to-stable's btree truncate depends on fast-deleting
+     * them.
+     */
+    if (!WT_IS_HS(session->dhandle) && WT_TIME_AGGREGATE_HAS_STOP(&addr.ta)) {
+        WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast_skip_deleted);
+        goto err;
+    }
+
+    /*
      * When performing a truncate operation with no associated timestamp, limit fast-truncate to
      * pages where all its data is globally visible. This is done to prevent data in the history
      * store (that should have been cleared) from appearing again. Technically we don't need to

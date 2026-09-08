@@ -852,7 +852,7 @@ typedef enum {
  *     Per-thread table operation.
  */
 static int
-table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
+table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op, bool pause_writes)
 {
     WT_DECL_RET;
     TABLE *table;
@@ -921,8 +921,8 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
          * work, but doesn't make sense. Reserving a row before a read won't be useful but it's not
          * unexpected. A row cannot be reserved with ignore prepare.
          */
-        if (intxn && iso_level == ISOLATION_SNAPSHOT && tinfo->ignore_prepare == false &&
-          mmrand(&tinfo->data_rnd, 0, 100) < GV(OPS_RESERVE)) {
+        if (!pause_writes && intxn && iso_level == ISOLATION_SNAPSHOT &&
+          tinfo->ignore_prepare == false && mmrand(&tinfo->data_rnd, 0, 100) < GV(OPS_RESERVE)) {
             switch (table->type) {
             case ROW:
                 ret = row_reserve(tinfo, positioned);
@@ -1449,7 +1449,7 @@ rollback_retry:
         skip1 = skip2 = NULL;
         if (op == MODIFY && table->mirror) {
             tinfo->table = g.base_mirror;
-            ret = table_op(tinfo, intxn, iso_level, op);
+            ret = table_op(tinfo, intxn, iso_level, op, pause_writes);
             testutil_assert(ret == 0 || ret == WT_ROLLBACK);
 
             /*
@@ -1470,7 +1470,7 @@ rollback_retry:
         }
         if (ret == 0 && table != skip1) {
             tinfo->table = table;
-            ret = table_op(tinfo, intxn, iso_level, op);
+            ret = table_op(tinfo, intxn, iso_level, op, pause_writes);
             testutil_assert(ret == 0 || ret == WT_ROLLBACK);
             if (GV(RUNS_PREDICTABLE_REPLAY) && ret == WT_ROLLBACK)
                 goto rollback;
@@ -1491,7 +1491,7 @@ rollback_retry:
             for (i = 1; i <= ntables; ++i)
                 if (tables[i] != skip1 && tables[i] != skip2 && tables[i]->mirror) {
                     tinfo->table = tables[i];
-                    ret = table_op(tinfo, intxn, iso_level, op);
+                    ret = table_op(tinfo, intxn, iso_level, op, pause_writes);
                     testutil_assert(ret == 0 || ret == WT_ROLLBACK);
                     if (GV(RUNS_PREDICTABLE_REPLAY) && ret == WT_ROLLBACK)
                         goto rollback;

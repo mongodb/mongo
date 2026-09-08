@@ -97,12 +97,33 @@ TEST_CASE("ignore_cache_size is scoped to the transaction that set it", "[txn_co
         REQUIRE(F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
     }
 
-    SECTION("a session-level reconfigure is rejected while a transaction is active")
+    SECTION("a session-level setting made during the transaction outlives it")
     {
         REQUIRE(session->iface.begin_transaction(&session->iface, "ignore_cache_size=true") == 0);
-        REQUIRE(session->iface.reconfigure(&session->iface, "ignore_cache_size=true") == EINVAL);
-        REQUIRE(session->iface.reconfigure(&session->iface, "ignore_cache_size=false") == EINVAL);
+        REQUIRE(session->iface.reconfigure(&session->iface, "ignore_cache_size=true") == 0);
+        REQUIRE(session->iface.commit_transaction(&session->iface, NULL) == 0);
         REQUIRE(F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
+    }
+
+    SECTION("a transaction can acquire the setting after it has begun")
+    {
+        /*
+         * A transaction that starts obeying the cache size can be exempted part way through, and
+         * the exemption is the session's from then on.
+         */
+        REQUIRE(session->iface.begin_transaction(&session->iface, NULL) == 0);
+        REQUIRE(!F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
+        REQUIRE(session->iface.reconfigure(&session->iface, "ignore_cache_size=true") == 0);
+        REQUIRE(F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
+        REQUIRE(session->iface.commit_transaction(&session->iface, NULL) == 0);
+        REQUIRE(F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
+    }
+
+    SECTION("a session-level clear during the transaction takes effect")
+    {
+        REQUIRE(session->iface.begin_transaction(&session->iface, "ignore_cache_size=true") == 0);
+        REQUIRE(session->iface.reconfigure(&session->iface, "ignore_cache_size=false") == 0);
+        REQUIRE(!F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
         REQUIRE(session->iface.commit_transaction(&session->iface, NULL) == 0);
         REQUIRE(!F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE));
     }

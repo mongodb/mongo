@@ -396,8 +396,9 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
     def test_follower_repeatable_read_with_read_ts_across_pickup(self):
         self.follower_reader_across_pickup('read_timestamp=' + self.timestamp_str(12))
 
-    # A writer begun after the cutoff commits successfully across the demotion.
-    def test_ingest_writer_survives_demotion(self):
+    # A writer begun after the cutoff commits before the demotion, and a follower writer can then
+    # continue writing to ingest.
+    def test_ingest_writes_before_and_after_demotion(self):
         self.set_global_ts(1, 1)
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
@@ -406,15 +407,18 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         cursor = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction()
         cursor['k1'] = 'v'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
-        # The step-down completes under the in-flight ingest writer.
+        # The step-down requires all application write transactions to be complete.
         self.complete_step_down(20)
 
-        # The ingest writer commits as a follower; its content is in ingest and readable.
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        # A follower writer continues to route writes to ingest.
+        self.session.begin_transaction()
+        cursor['k2'] = 'follower'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
         cursor.close()
-        self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), {'k1'})
-        self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'v'})
+        self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 50), {'k1', 'k2'})
+        self.assertEqual(self.read_kvs_at(self.uri, 50), {'k1': 'v', 'k2': 'follower'})
 
 
     # Once the step-down completes the node is a follower; setting the cutoff again is rejected.

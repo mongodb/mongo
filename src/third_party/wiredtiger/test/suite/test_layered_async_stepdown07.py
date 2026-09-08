@@ -494,20 +494,18 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
         cursor.close()
         self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'first'})
 
-    # An uncommitted ingest write survives the demotion; a follower writer must still see it.
-    def test_conflict_across_demotion(self):
+    # An uncommitted ingest write conflicts with another follower writer after demotion.
+    def test_conflict_after_demotion(self):
         self.set_global_ts(1, 1)
         self.session.create(self.uri, 'key_format=S,value_format=S')
         self.write_at(self.uri, {'k1': 'stable'}, 10)
 
         self.set_step_down_ts(20)
+        self.complete_step_down(20)
 
         cursor = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction()
         cursor['k1'] = 'held'
-
-        # The step-down completes with the write still uncommitted.
-        self.complete_step_down(20)
 
         wsession = self.conn.open_session()
         wcur = wsession.open_cursor(self.uri, None, None)

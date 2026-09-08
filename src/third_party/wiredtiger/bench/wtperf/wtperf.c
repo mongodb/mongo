@@ -716,7 +716,7 @@ op_err:
                      * threads retrying the same hot key stay synchronized and keep conflicting with
                      * each other indefinitely. The backoff grows up to ~1ms.
                      */
-                    (void)usleep((useconds_t)(WT_MIN(1ULL << retry_count, 1000) +
+                    (void)usleep((useconds_t)((1ULL << WT_MIN(retry_count, 10)) +
                       __wt_random(&thread->rnd) % 100));
                     goto retry;
                 }

@@ -3679,7 +3679,9 @@ __checkpoint_metadata(WT_SESSION_IMPL *session, const char *cfg[], WT_TXN *txn)
       __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_RET(__wt_session_get_dhandle(session, WT_DISAGG_METADATA_URI, NULL, NULL, 0));
         if (S2BT(session)->modified)
-            WT_RET(__wt_checkpoint_file(session, cfg));
+            ret = __wt_checkpoint_file(session, cfg);
+        WT_TRET(__wt_session_release_dhandle(session));
+        WT_RET(ret);
     }
 
     /* Disable metadata tracking during the metadata checkpoint. */

@@ -41,6 +41,9 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
+    # checkpoint_slow can stall eviction long enough to roll back session2's held-open transaction
+    # as the oldest pinned transaction; test_checkpoint11 hits the same condition.
+    rollbacks_allowed = 10
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),

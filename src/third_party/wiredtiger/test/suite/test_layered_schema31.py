@@ -45,7 +45,6 @@ class test_layered_schema31(WiredTigerTestCase, DisaggSchemaEpochMixin):
         "allocation_size=512B,"
         "block_allocation=first,"
         "block_compressor=snappy,"
-        "block_manager=disagg,"
         "checksum=unencrypted,"
         "dictionary=100,"
         "disaggregated=(storage_tier=cold),"
@@ -81,18 +80,33 @@ class test_layered_schema31(WiredTigerTestCase, DisaggSchemaEpochMixin):
         ),
     ]
 
+    block_manager_scenarios = [
+        ("block_manager_disagg", {"block_manager": "disagg"}),
+        ("block_manager_default", {"block_manager": "default"}),
+    ]
+
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages, uri_scenarios)
+    scenarios = make_scenarios(
+        disagg_storages, uri_scenarios, block_manager_scenarios
+    )
+
+    # Marks the ingest metadata so a stable configuration derived from it is
+    # recognizable.
+    ingest_marker = "app_metadata=ingest_only"
 
     def conn_extensions(self, extlist):
         self.add_scenario_config()
         extlist.extension("compressors", "snappy")
         return self.disagg_conn_extensions(extlist)
 
-    def create_on_follower_then_step_up(self, config, use_schema_epochs=True):
+    def table_config(self):
+        """The table configuration for this scenario."""
+        return f"{self.config},block_manager={self.block_manager}"
+
+    def create_on_follower_then_step_up(self, use_schema_epochs=True):
         """
-        Create the table in the follower role, then step up to create the
-        missing stable table.
+        Create the table in the follower role, mark its ingest metadata, then
+        step up to create the missing stable table.
         """
         self.step_down()
 
@@ -100,10 +114,13 @@ class test_layered_schema31(WiredTigerTestCase, DisaggSchemaEpochMixin):
             self.set_stable_epoch(1)
 
         # A follower create leaves the stable table missing until step-up.
-        self.session.create(self.uri, config)
+        self.session.create(self.uri, self.table_config())
 
         if use_schema_epochs:
             self.publish(self.uri, epoch=5)
+
+        ingest_uri = "file:" + self.uri.split(":", 1)[1] + ".wt_ingest"
+        self.session.alter(ingest_uri, self.ingest_marker)
 
         self.step_up()
 
@@ -113,48 +130,39 @@ class test_layered_schema31(WiredTigerTestCase, DisaggSchemaEpochMixin):
         with open_cursor(self.session, "metadata:create") as cursor:
             return cursor[stable_uri]
 
-    def check_step_up_stable_config(self, config):
+    def check_step_up_stable_config(self, derived_from_ingest):
         """
-        Check that step-up creates the stable table with the expected
-        configuration.
+        Check that step-up creates the stable table with the leader's
+        configuration, carrying the ingest marker only when the configuration
+        was derived from ingest metadata.
         """
         # Get the config produced when the leader creates the stable table.
         leader_table_uri = self.uri + "_leader"
-        self.session.create(leader_table_uri, config)
+        self.session.create(leader_table_uri, self.table_config())
         expected_config = self.read_stable_config(leader_table_uri)
 
-        # Compare it with the config of the stable table created at step-up.
         step_up_config = self.read_stable_config(self.uri)
+        if derived_from_ingest:
+            self.assertIn(self.ingest_marker, step_up_config)
+            step_up_config = step_up_config.replace(
+                self.ingest_marker, "app_metadata="
+            )
+        else:
+            self.assertNotIn(self.ingest_marker, step_up_config)
         self.assertEqual(step_up_config, expected_config)
 
     def test_schema_epoch_step_up_matches_leader_config(self):
         """
-        Verify that schema epoch step-up matches the leader's stable
-        configuration.
+        Verify that schema epoch step-up replays the create-time stable
+        configuration rather than deriving it from ingest metadata.
         """
-        self.create_on_follower_then_step_up(self.config)
-        self.check_step_up_stable_config(self.config)
+        self.create_on_follower_then_step_up()
+        self.check_step_up_stable_config(derived_from_ingest=False)
 
     def test_legacy_step_up_derives_config_from_ingest(self):
         """
         Verify that legacy step-up derives the stable configuration from ingest
-        metadata.
+        metadata and still matches the leader's configuration.
         """
-        self.create_on_follower_then_step_up(
-            self.config, use_schema_epochs=False
-        )
-        self.check_step_up_stable_config(self.config)
-
-    def test_schema_epoch_step_up_does_not_derive_from_ingest(self):
-        """
-        Verify that schema epoch step-up does not derive the stable
-        configuration from ingest metadata.
-        """
-        # Deriving the configuration from ingest metadata forces
-        # block_manager=disagg. If block_manager=default is found after
-        # step-up, it proves the ingest-derived path was not used.
-        table_config = self.config.replace(
-            "block_manager=disagg", "block_manager=default"
-        )
-        self.create_on_follower_then_step_up(table_config)
-        self.check_step_up_stable_config(table_config)
+        self.create_on_follower_then_step_up(use_schema_epochs=False)
+        self.check_step_up_stable_config(derived_from_ingest=True)

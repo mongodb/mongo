@@ -2729,6 +2729,7 @@ static WT_INLINE void __wt_timing_stress(
   WT_SESSION_IMPL *session, uint64_t flag, struct timespec *tsp);
 static WT_INLINE void __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_tree_modify_set(WT_SESSION_IMPL *session);
+static WT_INLINE void __wt_txn_config_clear(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_txn_cursor_op(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_txn_err_set(WT_SESSION_IMPL *session, int ret);
 static WT_INLINE void __wt_txn_op_delete_apply_prepare_state(

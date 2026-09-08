@@ -42,6 +42,7 @@ func_ok()
         -e '/int __curlog_reset$/d' \
         -e '/int __cursor_fix_implicit$/d' \
         -e '/int __delete_redo_window_cleanup_skip$/d' \
+        -e '/int __disagg_assert_no_active_writes_callback$/d' \
         -e '/int __gen_active_callback$/d' \
         -e '/int __gen_oldest_callback$/d' \
         -e '/int __handle_close_default$/d' \

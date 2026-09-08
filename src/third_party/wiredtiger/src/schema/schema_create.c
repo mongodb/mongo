@@ -1228,8 +1228,12 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     /* Build the stable constituent configuration for a later step-up. */
     stable_cfg[1] = disagg_config->data;
 
-    /* Disable logging on the stable table to ensure we have timestamps. */
-    stable_cfg[3] = "log=(enabled=false)";
+    /*
+     * Disable logging on the stable table to ensure we have timestamps. Force block_manager=disagg:
+     * a legacy step-up derives a missing stable constituent from the ingest metadata, cannot
+     * recover the user's value and forces disagg, so the create-time metadata must match.
+     */
+    stable_cfg[3] = "block_manager=disagg,log=(enabled=false)";
     WT_ERR(__wt_config_merge(session, stable_cfg, NULL, &constituent_cfg));
 
     /*

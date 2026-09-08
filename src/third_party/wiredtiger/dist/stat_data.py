@@ -1521,6 +1521,7 @@ conn_dsrc_stats = [
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
     RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
+    RecStat('rec_page_delete_fast_skip_deleted', 'fast-path page deletion skipped, all entries already deleted'),
     RecStat('rec_page_delta_eligible', 'pages eligible for delta generation'),
     RecStat('rec_page_delta_internal', 'internal page deltas written'),
     RecStat('rec_page_delta_internal_key_deleted', 'internal page delta keys deleted'),
