@@ -15,3 +15,9 @@ filters:
   - "drop_index_during_replan.js":
     approvers:
       - 10gen/query-optimization
+  - "invalidated_cursors.js":
+    approvers:
+      - 10gen/query-execution
+  - "kill_rooted_or.js":
+    approvers:
+      - 10gen/query-optimization

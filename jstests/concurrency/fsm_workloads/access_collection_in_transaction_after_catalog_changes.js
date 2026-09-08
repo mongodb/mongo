@@ -180,7 +180,14 @@ export const $config = (function () {
         function createIndex(db, collName) {
             assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
-                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument],
+                [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                    // createIndexes fails with ConflictingOperationInProgress after exhausting
+                    // its retries when the collection keeps being dropped and recreated
+                    // concurrently.
+                    ErrorCodes.ConflictingOperationInProgress,
+                ],
             );
         }
 

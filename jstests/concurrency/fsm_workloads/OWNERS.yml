@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "access_collection_in_transaction_after_catalog_changes.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*write_without_shard_key*":
     approvers:
       - 10gen/query-execution-router

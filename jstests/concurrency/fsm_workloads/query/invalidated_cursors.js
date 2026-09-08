@@ -42,13 +42,18 @@ export const $config = (function () {
         isCreateIndexRequested: false,
         isCreatedSucceedAtLeastOnce: false,
         createIndexAndAssert: function (db, collName, indexSpecs) {
+            // createIndexes fails with ConflictingOperationInProgress after exhausting its
+            // retries when the collection keeps being dropped and recreated concurrently (see
+            // the dropDatabase/dropCollection states).
             const errorCodesTxn = [
+                ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.IndexBuildAlreadyInProgress,
                 ErrorCodes.NoMatchingDocument,
             ];
             const errorCodesNonTxn = [
+                ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,

@@ -143,6 +143,9 @@ export const $config = (function () {
                 // Can occur when mongos exhausts its retries on StaleConfig errors from the shard
                 // and returns the StaleConfig error to the client.
                 ErrorCodes.StaleConfig,
+                // createIndexes fails with ConflictingOperationInProgress after exhausting its
+                // retries when the collection keeps being dropped and recreated concurrently.
+                ErrorCodes.ConflictingOperationInProgress,
             ]);
         },
         checkIndexes: function (db, collName) {

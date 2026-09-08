@@ -54,10 +54,12 @@ export const $config = (function () {
         createIndex: function (db, collName) {
             // Create a logical {meta: 1} index. This should not be targetted by collMod.
             // This will implicitly create a regular collection if it does not exist.
-            assert.commandWorkedOrFailedWithCode(
-                db[collName].createIndex({meta: 1}),
+            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({meta: 1}), [
                 ErrorCodes.NamespaceExists,
-            );
+                // createIndexes fails with ConflictingOperationInProgress after exhausting its
+                // retries when the collection keeps being dropped and recreated concurrently.
+                ErrorCodes.ConflictingOperationInProgress,
+            ]);
         },
 
         drop: function (db, collName) {
