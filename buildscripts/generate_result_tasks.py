@@ -306,6 +306,7 @@ def make_task_group(
         + [
             FunctionCall("attach engflow links"),
             FunctionCall("save failed tests"),
+            FunctionCall("map resmoke test debug symbols"),
             FunctionCall("generate result task hang analyzer"),
         ],
         teardown_group=[

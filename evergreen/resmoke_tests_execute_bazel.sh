@@ -69,6 +69,7 @@ build_ci_flags() {
     # For simple build ID generation:
     export compile_variant="${compile_variant}"
     export version_id="${version_id}"
+    export compile_task_type="test" # Distinguish the binaries resmoke_tests builds itself from the compile variant's
 
     if [[ "${evergreen_remote_exec}" == "on" && "${resmoke_disable_rbe}" != "true" ]]; then
         ci_flags="--config=remote_test ${ci_flags}"

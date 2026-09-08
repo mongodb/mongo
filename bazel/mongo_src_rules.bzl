@@ -36,7 +36,12 @@ load(
     "extract_debuginfo_test",
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
-load("@evergreen_variables//:evergreen_variables.bzl", "UNSAFE_COMPILE_VARIANT", "UNSAFE_VERSION_ID")
+load(
+    "@evergreen_variables//:evergreen_variables.bzl",
+    "UNSAFE_COMPILE_TASK_TYPE",
+    "UNSAFE_COMPILE_VARIANT",
+    "UNSAFE_VERSION_ID",
+)
 load("//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "MIN_VER_MAP")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
@@ -516,7 +521,7 @@ def mongo_cc_library(
                 "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
                                                            hex32(hash(name)) +
                                                            hex32(hash(name)) +
-                                                           hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+                                                           hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT) + str(UNSAFE_COMPILE_TASK_TYPE)))],
                 "//conditions:default": [],
             }),
             target_compatible_with = target_compatible_with,
@@ -704,7 +709,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
                                                        hex32(hash(name)) +
                                                        hex32(hash(name)) +
-                                                       hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+                                                       hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT) + str(UNSAFE_COMPILE_TASK_TYPE)))],
             "//conditions:default": [],
         }),
         "linkstatic": LINKSTATIC_ENABLED,

@@ -14,6 +14,13 @@ from json import JSONDecoder
 from typing import Generator, NamedTuple, Optional
 
 import requests
+from tenacity import (
+    Retrying,
+    before_sleep_log,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 # register parent directory in sys.path, so 'buildscripts' is detected no matter where the script is called from
 sys.path.append(str(pathlib.Path(os.path.join(os.getcwd(), __file__)).parent.parent))
@@ -23,10 +30,16 @@ from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     download,
 )
+from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.oauth import Configs, get_client_cred_oauth_credentials
 
 BUILD_INFO_RE = re.compile(r"Build Info: ({(\n.*)*})")
 MONGOD = "mongod"
+DEBUG_INFO_SUFFIXES = (".debug", ".dwp", ".pdb")
+
+# Display-name prefix of the "archive failed tests" s3.put that uploads the relinked test
+# binaries from the resmoke_tests task.
+FAILED_TESTS_ARTIFACT_PREFIX = "Test binaries and libraries"
 
 
 class CmdClient:
@@ -192,6 +205,11 @@ class Mapper:
         cache_dir: str = None,
         web_service_base_url: str = None,
         logger: logging.Logger = None,
+        binaries_dir: str = None,
+        binaries_url: str = None,
+        debug_symbols_url: str = None,
+        mongodb_version: str = None,
+        task_id: str = None,
     ):
         """
         Initialize instance.
@@ -204,12 +222,21 @@ class Mapper:
         :param cache_dir: Full path to cache directory as a string.
         :param web_service_base_url: URL of symbolizer web service.
         :param logger: Debug symbols mapper logger.
+        :param binaries_dir: Local directory of already-built binaries to map.
+        :param binaries_url: Download URL to record for the binaries in `binaries_dir`.
+        :param debug_symbols_url: Download URL to record for their debug symbols.
+        :param mongodb_version: Server version to record when it cannot be read off a binary.
+        :param task_id: Evergreen task whose "Test binaries and libraries" artifact holds the
+            binaries in `binaries_dir`.
         """
         self.evg_version = evg_version
         self.evg_variant = evg_variant
         self.is_san_variant = is_san_variant
         self.cache_dir = cache_dir or self.default_cache_dir
         self.web_service_base_url = web_service_base_url or self.default_web_service_base_url
+        self.binaries_dir = binaries_dir
+        self.mongodb_version = mongodb_version
+        self.task_id = task_id
 
         if not logger:
             logging.basicConfig()
@@ -219,11 +246,6 @@ class Mapper:
 
         self.http_client = requests.Session()
 
-        self.multiversion_setup = SetupMultiversion(
-            DownloadOptions(download_symbols=True, download_binaries=True),
-            variant=self.evg_variant,
-            ignore_failed_push=True,
-        )
         self.debug_symbols_url = None
         self.url = None
         self.configs = Configs(
@@ -233,12 +255,66 @@ class Mapper:
         self.client_id = client_id
         self.client_secret = client_secret
         self.path_options = PathOptions()
+        self.extractor = CmdOutputExtractor()
 
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 
         self.authenticate()
-        self.setup_urls()
+
+        if self.binaries_dir:
+            self.multiversion_setup = None
+            if binaries_url:
+                self.url = binaries_url
+                self.debug_symbols_url = debug_symbols_url or binaries_url
+            elif task_id:
+                self.url = self._resolve_failed_tests_artifact_url()
+                self.debug_symbols_url = debug_symbols_url or self.url
+            else:
+                raise ValueError(
+                    "--binaries-url is required when --binaries-dir is given (or pass --task-id "
+                    "to resolve the uploaded archive's URL from Evergreen)."
+                )
+        else:
+            self.multiversion_setup = SetupMultiversion(
+                DownloadOptions(download_symbols=True, download_binaries=True),
+                variant=self.evg_variant,
+                ignore_failed_push=True,
+            )
+            self.setup_urls()
+
+    def _resolve_failed_tests_artifact_url(self) -> str:
+        """
+        Resolve the download URL of this task's failed-tests archive from the Evergreen API.
+
+        :return: The artifact's URL.
+        """
+        evg_api = evergreen_conn.get_evergreen_api()
+
+        def get_artifact_urls() -> dict[str, str]:
+            task = evg_api.task_by_id(self.task_id)
+            return {
+                artifact.name: artifact.url
+                for artifact in task.artifacts
+                if artifact.name.startswith(FAILED_TESTS_ARTIFACT_PREFIX)
+            }
+
+        retrying = Retrying(
+            retry=retry_if_result(lambda artifact_urls: not artifact_urls),
+            wait=wait_exponential(
+                multiplier=self.url_retry_initial_delay_secs, max=self.url_retry_max_delay_secs
+            ),
+            stop=stop_after_attempt(self.num_url_retries),
+            before_sleep=before_sleep_log(self.logger, logging.WARNING),
+            retry_error_callback=lambda retry_state: retry_state.outcome.result(),
+        )
+        artifact_urls = retrying(get_artifact_urls)
+
+        if not artifact_urls:
+            self.logger.error("Couldn't find the failed-tests artifact for task %s.", self.task_id)
+            raise ValueError(f"Failed-tests artifact not found for task {self.task_id}")
+
+        return next(iter(artifact_urls.values()))
 
     def authenticate(self):
         """Login & get credentials for further requests to web service."""
@@ -298,8 +374,7 @@ class Mapper:
     def setup_urls(self):
         """Set up URLs using multiversion."""
 
-        urlinfo = None
-        for attempt in range(self.num_url_retries):
+        def get_urls() -> tuple[str, str, dict]:
             urlinfo = self.multiversion_setup.get_urls(self.evg_version, self.evg_variant)
 
             binaries_url = urlinfo.urls.get("Binaries", "")
@@ -311,33 +386,26 @@ class Mapper:
                     "mongo-debugsymbols.tgz"
                 ) or urlinfo.urls.get("mongo-debugsymbols.zip")
 
-            if binaries_url and download_symbols_url:
-                break
+            return binaries_url, download_symbols_url, urlinfo.urls
 
-            if attempt + 1 < self.num_url_retries:
-                delay = min(
-                    self.url_retry_initial_delay_secs * (2**attempt),
-                    self.url_retry_max_delay_secs,
-                )
-                self.logger.warning(
-                    "Couldn't find URL for binaries or debug symbols on attempt %d of %d. "
-                    "This can happen when the Evergreen API's secondary node lags behind on "
-                    "recently attached artifacts; retrying in %ds. Version: %s, URLs dict: %s",
-                    attempt + 1,
-                    self.num_url_retries,
-                    delay,
-                    self.evg_version,
-                    urlinfo.urls,
-                )
-                time.sleep(delay)
+        retrying = Retrying(
+            retry=retry_if_result(lambda result: not result[0] or not result[1]),
+            wait=wait_exponential(
+                multiplier=self.url_retry_initial_delay_secs, max=self.url_retry_max_delay_secs
+            ),
+            stop=stop_after_attempt(self.num_url_retries),
+            before_sleep=before_sleep_log(self.logger, logging.WARNING),
+            retry_error_callback=lambda retry_state: retry_state.outcome.result(),
+        )
+        binaries_url, download_symbols_url, urls = retrying(get_urls)
 
         if not binaries_url or not download_symbols_url:
             self.logger.error(
                 "Couldn't find URL for debug symbols. Version: %s, URLs dict: %s",
                 self.evg_version,
-                urlinfo.urls,
+                urls,
             )
-            raise ValueError(f"Debug symbols URL not found. URLs dict: {urlinfo.urls}")
+            raise ValueError(f"Debug symbols URL not found. URLs dict: {urls}")
 
         self.debug_symbols_url = download_symbols_url
         self.url = binaries_url
@@ -375,14 +443,110 @@ class Mapper:
         tarball_full_path = download.download_from_s3(url)
         return tarball_full_path
 
+    def _mapping_for(
+        self, bin_path: str, file_name: str, mongodb_version: str
+    ) -> Optional[dict[str, str]]:
+        """
+        :param bin_path: Path to the binary to read the build ID from.
+        :param file_name: Name to record for the binary, as it appears in a stacktrace.
+        :param mongodb_version: Server version to record.
+        :return: Mapping as dict, or None when the build ID could not be extracted.
+        """
+        build_id_output = self.extractor.get_build_id(bin_path)
+
+        if not build_id_output.build_id:
+            self.logger.error(
+                "Build ID couldn't be extracted from %s. \nReadELF output %s",
+                bin_path,
+                build_id_output.cmd_output,
+            )
+            return None
+
+        self.logger.info("Extracted build ID: %s", build_id_output.build_id)
+
+        return {
+            "url": self.url,
+            "debug_symbols_url": self.debug_symbols_url,
+            "build_id": build_id_output.build_id,
+            "file_name": file_name,
+            "version": mongodb_version,
+        }
+
+    def generate_local_build_id_mapping(self) -> Generator[dict[str, str], None, None]:
+        """
+        Extract build ids from an already-built local tree of binaries.
+
+        :return: mapped data as dict
+        """
+        bin_dir = os.path.join(self.binaries_dir, self.path_options.main_binary_folder_name)
+        lib_dir = os.path.join(self.binaries_dir, self.path_options.shared_library_folder_name)
+
+        mongodb_version = self._resolve_local_mongodb_version(bin_dir)
+        if mongodb_version is None:
+            return
+
+        mapped_any = False
+
+        for directory in (bin_dir, lib_dir):
+            if not os.path.isdir(directory):
+                self.logger.info("'%s' does not exist, skipping it.", directory)
+                continue
+
+            for file_name in sorted(os.listdir(directory)):
+                full_path = os.path.join(directory, file_name)
+
+                if not os.path.isfile(full_path):
+                    continue
+
+                if file_name.endswith(DEBUG_INFO_SUFFIXES):
+                    continue
+
+                mapping = self._mapping_for(full_path, file_name, mongodb_version)
+                if mapping:
+                    mapped_any = True
+                    yield mapping
+
+        if not mapped_any:
+            self.logger.error("Found no mappable binaries under '%s'.", self.binaries_dir)
+
+    def _resolve_local_mongodb_version(self, bin_dir: str) -> Optional[str]:
+        """
+        Determine the server version to record for a local tree of binaries.
+
+        :param bin_dir: Main binary folder of the local tree.
+        :return: Version or None.
+        """
+        mongod_bin = os.path.join(bin_dir, MONGOD)
+
+        if os.path.exists(mongod_bin):
+            bin_version_output = self.extractor.get_bin_version(mongod_bin)
+            if bin_version_output.mongodb_version:
+                return bin_version_output.mongodb_version
+            self.logger.warning(
+                "mongodb version could not be extracted. \n`%s --version` output: %s",
+                mongod_bin,
+                bin_version_output.cmd_output,
+            )
+
+        # A failed suite's relink only produces the binaries that suite needed, so mongod is
+        # not necessarily present. Fall back to the version the build was stamped with.
+        if self.mongodb_version:
+            self.logger.info("Using the mongodb version passed in: %s", self.mongodb_version)
+            return self.mongodb_version
+
+        self.logger.error(
+            "Could not determine the mongodb version: '%s' is absent or unreadable and no "
+            "version was passed in with --mongodb-version.",
+            mongod_bin,
+        )
+        return None
+
     def generate_build_id_mapping(self) -> Generator[dict[str, str], None, None]:
         """
         Extract build id from binaries and creates new dict using them.
 
         :return: mapped data as dict
         """
-
-        extractor = CmdOutputExtractor()
 
         binaries_path = self.download(self.url)
         binaries_unpacked_path = self.unpack(binaries_path)
@@ -402,7 +566,7 @@ class Mapper:
         mongod_bin = os.path.join(
             binaries_unpacked_path, self.path_options.main_binary_folder_name, MONGOD
         )
-        bin_version_output = extractor.get_bin_version(mongod_bin)
+        bin_version_output = self.extractor.get_bin_version(mongod_bin)
 
         if bin_version_output.mongodb_version is None:
             self.logger.error(
@@ -424,24 +588,9 @@ class Mapper:
                 self.logger.error("Could not find binary at %s", full_bin_path)
                 continue
 
-            build_id_output = extractor.get_build_id(full_bin_path)
-
-            if not build_id_output.build_id:
-                self.logger.error(
-                    "Build ID couldn't be extracted. \nReadELF output %s",
-                    build_id_output.cmd_output,
-                )
-                continue
-            else:
-                self.logger.info("Extracted build ID: %s", build_id_output.build_id)
-
-            yield {
-                "url": self.url,
-                "debug_symbols_url": self.debug_symbols_url,
-                "build_id": build_id_output.build_id,
-                "file_name": binary,
-                "version": bin_version_output.mongodb_version,
-            }
+            mapping = self._mapping_for(full_bin_path, binary, bin_version_output.mongodb_version)
+            if mapping:
+                yield mapping
 
         # move to shared libraries folder.
         # it contains all shared library binary files,
@@ -469,28 +618,18 @@ class Mapper:
                 self.logger.error("Could not find binary at %s", sofile_path)
                 continue
 
-            build_id_output = extractor.get_build_id(sofile_path)
-
-            if not build_id_output.build_id:
-                self.logger.error(
-                    "Build ID couldn't be extracted. \nReadELF out %s", build_id_output.cmd_output
-                )
-                continue
-            else:
-                self.logger.info("Extracted build ID: %s", build_id_output.build_id)
-
-            yield {
-                "url": self.url,
-                "debug_symbols_url": self.debug_symbols_url,
-                "build_id": build_id_output.build_id,
-                "file_name": sofile,
-                "version": bin_version_output.mongodb_version,
-            }
+            mapping = self._mapping_for(sofile_path, sofile, bin_version_output.mongodb_version)
+            if mapping:
+                yield mapping
 
     def run(self):
         """Run all necessary processes."""
 
-        mappings = self.generate_build_id_mapping()
+        mappings = (
+            self.generate_local_build_id_mapping()
+            if self.binaries_dir
+            else self.generate_build_id_mapping()
+        )
         if not mappings:
             self.logger.error("Could not generate mapping")
             return
@@ -523,6 +662,31 @@ def make_argument_parser(parser=None, **kwargs):
     parser.add_argument("--variant")
     parser.add_argument("--is-san-variant", action="store_true")
     parser.add_argument("--web-service-base-url", default="")
+    parser.add_argument(
+        "--binaries-dir",
+        help="Map an already-built local tree of binaries (with 'bin' and 'lib' subfolders) "
+        "instead of discovering and downloading compile task artifacts. Requires "
+        "--binaries-url or --task-id.",
+    )
+    parser.add_argument(
+        "--binaries-url",
+        help="Download URL to record for the binaries in --binaries-dir. Optional when "
+        "--task-id is given, which resolves the URL from the task's artifacts in Evergreen.",
+    )
+    parser.add_argument(
+        "--task-id",
+        help="Evergreen task whose 'Test binaries and libraries' artifact holds the binaries "
+        "in --binaries-dir. Used to resolve --binaries-url when it is not passed.",
+    )
+    parser.add_argument(
+        "--debug-symbols-url",
+        help="Download URL to record for the debug symbols of the binaries in --binaries-dir. "
+        "Defaults to --binaries-url, which is correct when one archive holds both.",
+    )
+    parser.add_argument(
+        "--mongodb-version",
+        help="Server version to record when it cannot be read off one of the binaries.",
+    )
     return parser
 
 
@@ -536,6 +700,11 @@ def main(options):
         client_id=options.client_id,
         client_secret=options.client_secret,
         web_service_base_url=options.web_service_base_url,
+        binaries_dir=options.binaries_dir,
+        binaries_url=options.binaries_url,
+        debug_symbols_url=options.debug_symbols_url,
+        mongodb_version=options.mongodb_version,
+        task_id=options.task_id,
     )
 
     # when used as a context manager, mapper instance automatically cleans files/folders after finishing its job.
