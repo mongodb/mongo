@@ -329,9 +329,13 @@ TEST_F(EngineSelectionPlanFixture, GroupLookupUnwindProjectFetchIxScanSelection)
     ASSERT_EQ(result.planPushdownRoot, groupNodePtr);
 }
 
-// When all flags are on (the default), every combination of join strategy and local access plan
-// runs in SBE.
+// When all flags are on, every combination of join strategy and local access plan runs in SBE.
 TEST_F(EngineSelectionPlanFixture, LuAllFlagsEnabledSelectsSbeForAllCombinations) {
+    unittest::ServerParameterGuard inljOn{"featureFlagSbeEqLookupUnwindIndexedLoopJoin", true};
+    unittest::ServerParameterGuard nljOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
+    unittest::ServerParameterGuard dinljOn{"featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin",
+                                           true};
+
     using Strategy = EqLookupNode::LookupStrategy;
     const Strategy strategies[] = {
         Strategy::kHashJoin,
@@ -529,6 +533,11 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
 // For each of the 7 IFR flags, disabling it must fall back exactly the combinations that are gated
 // by that flag, no more, no less.
 TEST_F(EngineSelectionPlanFixture, LuEachFlagDisablesExactlyExpectedCombinations) {
+    unittest::ServerParameterGuard inljOn{"featureFlagSbeEqLookupUnwindIndexedLoopJoin", true};
+    unittest::ServerParameterGuard nljOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
+    unittest::ServerParameterGuard dinljOn{"featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin",
+                                           true};
+
     using Strategy = EqLookupNode::LookupStrategy;
 
     // Each combo carries pointers to the flags that gate it; disabling either causes Classic.
@@ -658,8 +667,9 @@ TEST_F(EngineSelectionPlanFixture, LuEachFlagDisablesExactlyExpectedCombinations
 TEST_F(EngineSelectionPlanFixture, LuNonExistentForeignCollectionFlagGatedByNlj) {
     using Strategy = EqLookupNode::LookupStrategy;
 
-    // With NLJ flag on (default): NonExistentForeignCollection runs in SBE.
+    // With NLJ flag on: NonExistentForeignCollection runs in SBE.
     {
+        unittest::ServerParameterGuard flagOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
         auto dataAccess = std::make_unique<CollectionScanNode>(nss);
         const auto* dan = dataAccess.get();
         auto solution = makePlan(

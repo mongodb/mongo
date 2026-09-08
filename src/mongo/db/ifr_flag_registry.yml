@@ -32,13 +32,10 @@
 
 rollout:
   featureFlagGetExecutorDeferredEngineChoice: {}
-  featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: {}
   featureFlagSbeEqLookupUnwindHashJoin: {}
-  featureFlagSbeEqLookupUnwindIndexedLoopJoin: {}
   featureFlagSbeEqLookupUnwindLocalCollscan: {}
   featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: {}
   featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
-  featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeTransformStages: {}
 
