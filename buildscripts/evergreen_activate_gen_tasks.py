@@ -7,6 +7,7 @@ import sys
 import click
 import structlog
 from pydantic.main import BaseModel
+from retry.api import retry_call
 
 from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
@@ -80,12 +81,21 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                         task_name=task.display_name,
                     )
                     try:
-                        evg_api.configure_task(task.task_id, activated=True)
+                        retry_call(
+                            evg_api.configure_task,
+                            fargs=[task.task_id],
+                            fkwargs={"activated": True},
+                            tries=3,
+                            delay=5,
+                            backoff=2,
+                            exceptions=Exception,
+                        )
                     except Exception:
-                        LOGGER.warning(
+                        LOGGER.error(
                             "Could not activate task",
                             task_id=task.task_id,
                             task_name=task.display_name,
+                            exc_info=True,
                         )
                         tasks_not_activated.append(task.task_id)
 
@@ -95,12 +105,21 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
             if task.display_name == expansions.task:
                 LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
                 try:
-                    evg_api.configure_task(task.task_id, activated=True)
+                    retry_call(
+                        evg_api.configure_task,
+                        fargs=[task.task_id],
+                        fkwargs={"activated": True},
+                        tries=3,
+                        delay=5,
+                        backoff=2,
+                        exceptions=Exception,
+                    )
                 except Exception:
-                    LOGGER.warning(
+                    LOGGER.error(
                         "Could not activate task",
                         task_id=task.task_id,
                         task_name=task.display_name,
+                        exc_info=True,
                     )
                     tasks_not_activated.append(task.task_id)
     if len(tasks_not_activated) > 0:
