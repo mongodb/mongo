@@ -43,37 +43,47 @@ describe("$search query stats", function () {
         coll.drop();
     });
 
-    it("should anonymize the $searchMeta stage as one object", function () {
-        assert.commandWorked(
-            db.runCommand({
-                aggregate: collName,
-                pipeline: [{$searchMeta: searchQuery}],
-                cursor: {},
-            }),
-        );
+    // Confirm $search and $searchMeta are both serialized as a single literal object.
+    for (const stageName of ["$search", "$searchMeta"]) {
+        it(`should anonymize the ${stageName} stage as one object`, function () {
+            resetQueryStatsStore(db.getMongo(), "1MB");
 
-        const stats = getLatestQueryStatsEntry(db.getMongo(), {collName});
-        assert.eq(stats.key.queryShape.pipeline, [{$searchMeta: "?object"}], stats);
-        assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
-    });
-
-    it("should group repeated $searchMeta executions into a single shape", function () {
-        resetQueryStatsStore(db.getMongo(), "1MB");
-
-        const numExecs = 3;
-        for (let i = 0; i < numExecs; i++) {
-            // Test with different literals to confirm they don't affect the anonymized shape.
-            const query = Object.assign({}, searchQuery, {
-                text: {query: "cakes" + i, path: "title"},
-            });
             assert.commandWorked(
-                db.runCommand({aggregate: collName, pipeline: [{$searchMeta: query}], cursor: {}}),
+                db.runCommand({
+                    aggregate: collName,
+                    pipeline: [{[stageName]: searchQuery}],
+                    cursor: {},
+                }),
             );
-        }
 
-        const stats = getQueryStats(db, {collName});
-        assert.eq(stats.length, 1, stats);
-        assert.eq(stats[0].key.queryShape.pipeline, [{$searchMeta: "?object"}], stats[0]);
-        assert.eq(stats[0].metrics.execCount, numExecs, stats[0]);
-    });
+            const stats = getLatestQueryStatsEntry(db.getMongo(), {collName});
+            assert.eq(stats.key.queryShape.pipeline, [{[stageName]: "?object"}], stats);
+            // The collection is empty, so no documents are examined.
+            assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
+        });
+
+        it(`should group repeated ${stageName} executions into a single shape`, function () {
+            resetQueryStatsStore(db.getMongo(), "1MB");
+
+            const numExecs = 3;
+            for (let i = 0; i < numExecs; i++) {
+                // Test with different literals to confirm they don't affect the anonymized shape.
+                const query = Object.assign({}, searchQuery, {
+                    text: {query: "cakes" + i, path: "title"},
+                });
+                assert.commandWorked(
+                    db.runCommand({
+                        aggregate: collName,
+                        pipeline: [{[stageName]: query}],
+                        cursor: {},
+                    }),
+                );
+            }
+
+            const stats = getQueryStats(db, {collName});
+            assert.eq(stats.length, 1, stats);
+            assert.eq(stats[0].key.queryShape.pipeline, [{[stageName]: "?object"}], stats[0]);
+            assert.eq(stats[0].metrics.execCount, numExecs, stats[0]);
+        });
+    }
 });

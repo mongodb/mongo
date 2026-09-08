@@ -98,19 +98,23 @@ std::string_view DocumentSourceSearch::getSourceName() const {
 }
 
 Value DocumentSourceSearch::serialize(const query_shape::SerializationOptions& opts) const {
-    // For re-parseable output, emit the user query — the full IDL form's internal routing fields
-    // would trip the LiteParse-layer check on re-parse.
-    if (opts.serializeForReparse) {
+    // Emits just the mongot query, dropping the spec's internal routing fields.
+    auto serializeUserQuery = [&] {
         return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
+    };
+
+    // For re-parseable output, emit the user query — the full IDL form's internal routing fields
+    // would trip the LiteParse-layer check on re-parse. Query stats also emits the user query.
+    if (opts.serializeForReparse || opts.isShapifying()) {
+        return serializeUserQuery();
     }
 
-    // If we aren't shapifying or serializing for explain, serialize the full spec.
-    // If we are in a router, serialize the full spec.
-    // Otherwise, just serialize the mongotQuery.
-    if ((!opts.isShapifying() && !opts.isSerializingForExplain()) || getExpCtx()->getInRouter()) {
+    // Otherwise emit the full spec so the internal routing fields reach the shards. This covers all
+    // non-explain serialization and explain when running on a router.
+    if (!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) {
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
-    return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
+    return serializeUserQuery();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
