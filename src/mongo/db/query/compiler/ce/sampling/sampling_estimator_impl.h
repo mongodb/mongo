@@ -133,13 +133,6 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression* expr) const override;
 
     /**
-     * Batch Estimates the Cardinality of a vector of filter/MatchExpression by running the given
-     * MEs against the sample.
-     */
-    std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>& expr) const override;
-
-    /**
      * Estimates the number of keys scanned for the given IndexBounds. This function extracts all
      * index keys of a document in '_sample' and calculates the number of index keys scanned by
      * evaluating the index keys against the given IndexBounds.

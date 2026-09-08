@@ -111,18 +111,6 @@ void checkSampleContainsIndexBoundsFields(const StringSet& topLevelSampleFieldNa
 }
 
 /**
- * Helper function to determine if a given set of MatchExpresions contains only fields present in
- * the sample.
- */
-void checkSampleContainsMatchExpressionFields(
-    const StringSet& topLevelSampleFieldNames,
-    const std::vector<const MatchExpression*>& expressions) {
-    for (const auto& expr : expressions) {
-        checkSampleContainsMatchExpressionFields(topLevelSampleFieldNames, expr);
-    }
-}
-
-/**
  * Help function mapping confidence intervals to Z-scores.
  * A "95 confidence interval" means that 95% of the observations (in our case CEs computed from
  * samples) lie within that interval. The interval is defined based on a number of standard
@@ -875,40 +863,6 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
     return estimate;
 }
 
-std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
-    const std::vector<const MatchExpression*>& expressions) const {
-    tassert(10981501,
-            "Sample must be generated before calling estimateCardinality()",
-            _isSampleGenerated);
-    if (!_topLevelSampleFieldNames.empty()) {
-        checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expressions);
-    }
-    std::vector<double> counts(expressions.size(), 0);
-    std::vector<size_t> errorCounts(expressions.size(), 0);
-    // Experiment showed that this batch process performs better than calling
-    // 'estimateCardinality(const MatchExpression* expr)' over and over.
-    for (const auto& doc : _sample) {
-        for (size_t i = 0; i < expressions.size(); i++) {
-            auto result = tryMatchesBSON(expressions[i], doc);
-            if (!result) {
-                errorCounts[i]++;
-                continue;
-            }
-            if (*result) {
-                counts[i] += 1;
-            }
-        }
-    }
-
-    std::vector<CardinalityEstimate> estimates;
-    estimates.reserve(counts.size());
-    for (size_t i = 0; i < counts.size(); i++) {
-        estimates.push_back(makeScaledEstimate(
-            counts[i], errorCounts[i], _sampleSize, getCollCard(), _wasSamplePersisted));
-    }
-
-    return estimates;
-}
 
 CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds) const {
     tassert(10981502,

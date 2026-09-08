@@ -51,13 +51,6 @@ public:
     virtual CardinalityEstimate estimateCardinality(const MatchExpression* expr) const = 0;
 
     /**
-     * Batch Estimates the Cardinality of a vector of filter/MatchExpression by running the given
-     * MEs against the sample.
-     */
-    virtual std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>& expr) const = 0;
-
-    /**
      * Estimates the number of keys scanned for the given IndexBounds.
      */
     virtual CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const = 0;

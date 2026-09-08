@@ -890,53 +890,6 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
-    const size_t card = 4000;
-    insertDocuments(kTestNss, createDocuments(card));
-    const size_t sampleSize = 400;
-
-    auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
-
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  kTestNss,
-                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  sampleSize,
-                                                  SamplingCEMethodEnum::kRandom,
-                                                  numChunks,
-                                                  makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
-    samplingEstimator.generateSample(ce::NoProjection{});
-
-    auto operand1 = BSON("$lt" << 30);
-    LTMatchExpression lt("a"sv, operand1["$lt"]);
-    auto operand2 = BSON("$gt" << 8);
-    GTMatchExpression gt("b"sv, operand2["$gt"]);
-
-    auto operand3 = BSON("$lte" << 12);
-    auto operand4 = BSON("$eq" << 99);
-    auto pred1 = std::make_unique<LTEMatchExpression>("a"sv, operand3["$lte"]);
-    auto pred2 = std::make_unique<EqualityMatchExpression>("a"sv, operand4["$eq"]);
-    auto orExpr = OrMatchExpression{};
-    orExpr.add(std::move(pred1));
-    orExpr.add(std::move(pred2));
-
-    std::vector<const MatchExpression*> expressions;
-    expressions.push_back(&lt);
-    expressions.push_back(&gt);
-    expressions.push_back(&orExpr);
-
-    std::vector<double> expectedSel = {0.3, 0.1, 0.14};
-
-    auto estimates = samplingEstimator.estimateCardinality(expressions);
-
-    for (size_t i = 0; i < estimates.size(); i++) {
-        samplingEstimator.assertEstimateInConfidenceInterval(estimates[i], expectedSel[i] * card);
-    }
-}
-
 TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     const size_t card = 50;
     // Create 49 docs
@@ -1423,31 +1376,6 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"sv, operand["$eq"]);
     samplingEstimator.estimateCardinality(&eq);
-}
-
-DEATH_TEST_F(SamplingEstimatorTestDeathTest,
-             SampleDoesNotContainFieldInMatchExpressionEstimateCardinalityBatched,
-             "MatchExpression contains fields not present in topLevelSampleFieldNames") {
-    insertDocuments(kTestNss, createDocuments(10));
-
-    auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
-
-    SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
-                                                  kTestNss,
-                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  kSampleSize,
-                                                  SamplingCEMethodEnum::kRandom,
-                                                  numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
-    samplingEstimator.generateSample(StringSet{"a"});
-
-    auto operand = BSON("$eq" << 5);
-    EqualityMatchExpression eq("b"sv, operand["$eq"]);
-    samplingEstimator.estimateCardinality(std::vector<const MatchExpression*>{&eq});
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,

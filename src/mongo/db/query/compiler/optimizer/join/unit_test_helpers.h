@@ -151,10 +151,6 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression* expr) const override {
         MONGO_UNREACHABLE;
     }
-    std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>& expr) const override {
-        MONGO_UNREACHABLE;
-    }
     CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override {
         MONGO_UNREACHABLE;
     }

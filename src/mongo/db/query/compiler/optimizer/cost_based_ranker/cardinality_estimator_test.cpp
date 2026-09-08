@@ -1005,10 +1005,6 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression*) const override {
         return makeCard(10.0);
     }
-    std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>&) const override {
-        return {};
-    }
     CardinalityEstimate estimateKeysScanned(const IndexBounds&) const override {
         return makeCard(10.0);
     }
@@ -1425,10 +1421,6 @@ public:
           _ndvMultiKeyBounded(ndvMultiKeyBounded.value_or(_ndvMultiKey)) {}
 
     CardinalityEstimate estimateCardinality(const MatchExpression*) const override {
-        MONGO_UNIMPLEMENTED;
-    }
-    std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>&) const override {
         MONGO_UNIMPLEMENTED;
     }
     CardinalityEstimate estimateKeysScanned(const IndexBounds&) const override {
