@@ -24,6 +24,8 @@ public:
     static RetryableWritesStats* get(ServiceContext* service);
     static RetryableWritesStats* get(OperationContext* opCtx);
 
+    void incrementRetryableCommandsCount();
+
     void incrementRetriedCommandsCount();
 
     void incrementRetriedStatementsCount();
@@ -37,6 +39,11 @@ public:
     void updateStats(TransactionsStats* stats);
 
 private:
+    // The total number of received retryable commands.
+    // Contrast with '_retriedCommandsCount' to derive the proportion of retryable
+    // commands that were ultimately retried.
+    Atomic<unsigned long long> _retryableCommandsCount{0};
+
     // The number of received commands that contained a statement that had already been executed.
     Atomic<unsigned long long> _retriedCommandsCount{0};
 

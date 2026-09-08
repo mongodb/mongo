@@ -24,6 +24,10 @@ RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
+void RetryableWritesStats::incrementRetryableCommandsCount() {
+    _retryableCommandsCount.fetchAndAddRelaxed(1);
+}
+
 void RetryableWritesStats::incrementRetriedCommandsCount() {
     _retriedCommandsCount.fetchAndAddRelaxed(1);
 }
@@ -37,6 +41,7 @@ void RetryableWritesStats::incrementTransactionsCollectionWriteCount() {
 }
 
 void RetryableWritesStats::updateStats(TransactionsStats* stats) {
+    stats->setRetryableCommandsCount(_retryableCommandsCount.loadRelaxed());
     stats->setRetriedCommandsCount(_retriedCommandsCount.loadRelaxed());
     stats->setRetriedStatementsCount(_retriedStatementsCount.loadRelaxed());
     stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.loadRelaxed());

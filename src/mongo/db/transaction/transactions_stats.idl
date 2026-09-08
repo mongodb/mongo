@@ -55,6 +55,9 @@ structs:
             command with information about transactions"
         strict: true
         fields:
+            retryableCommandsCount:
+                type: long
+                default: 0
             retriedCommandsCount:
                 type: long
                 default: 0
