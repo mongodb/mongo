@@ -23,9 +23,12 @@ const assertNonShardedCluster = (conn) => {
 };
 
 try {
-    MetadataConsistencyChecker.run(conn);
+    // TODO(SERVER-130694): remove ignoreInconsistenciesTempWorkaround once this issue is fixed.
+    MetadataConsistencyChecker.run(conn, true /* ignoreInconsistenciesTempWorkaround */);
 } catch (e) {
     if (e.code === ErrorCodes.CommandNotFound) {
         assertNonShardedCluster(conn);
+    } else {
+        throw e;
     }
 }
