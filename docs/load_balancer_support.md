@@ -18,6 +18,13 @@ any drivers or shells used to connect to the database. Three conditions must be 
 `mongos` will emit appropiate error messages on connection attempts if these requirements are not
 met.
 
+# Security considerations
+
+The `proxyPort`/`loadBalancerPort` header's claimed source address is trusted without authentication
+and is used verbatim for audit log attribution. Access to this port **MUST be restricted to trusted
+hosts only** (the load balancer or reverse proxy) via firewall/security-group rules, since any other
+host reaching it can forge its recorded source address.
+
 There are some subtle behavioral differences that these configuration options enable, chief of
 which is how `mongos` deals with open cursors on client disconnection. Over a normal connection,
 `mongos` will keep open cursors alive for a short while after client disconnection in case the

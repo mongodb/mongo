@@ -41,12 +41,27 @@ namespace mongo::rpc {
 
 class AuditClientAttrs : public rpc::AuditClientAttrsBase {
 public:
-    AuditClientAttrs(HostAndPort local, HostAndPort remote, std::vector<HostAndPort> proxies)
-        : AuditClientAttrsBase(std::move(local), std::move(remote), std::move(proxies)) {}
-    AuditClientAttrs(HostAndPort local, HostAndPort remote)
-        : AuditClientAttrs(std::move(local), std::move(remote), {}) {}
+    AuditClientAttrs(HostAndPort local,
+                     HostAndPort remote,
+                     HostAndPort directRemote,
+                     std::vector<HostAndPort> proxies = {})
+        : AuditClientAttrsBase(std::move(local), std::move(remote), std::move(proxies)) {
+        setDirectRemote(std::move(directRemote));
+    }
 
     explicit AuditClientAttrs(const BSONObj& obj);
+
+    /**
+     * Returns the literal, directly-connected TCP peer address. 'directRemote' is optional on the
+     * wire for backwards-compatibility, so when it is absent (e.g. forwarded by a peer running an
+     * older binary) we fall back to 'remote', which is the best address available.
+     */
+    HostAndPort getDirectRemote() const {
+        if (const auto& directRemote = AuditClientAttrsBase::getDirectRemote()) {
+            return *directRemote;
+        }
+        return getRemote();
+    }
 
     static boost::optional<AuditClientAttrs> get(Client* client);
     static void set(Client* client, AuditClientAttrs clientAttrs);
