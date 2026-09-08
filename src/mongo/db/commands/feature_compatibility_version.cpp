@@ -278,16 +278,27 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 boost::optional<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
-    invariant(autoColl.ensureDbExists(opCtx), NamespaceString::kServerConfigurationNamespace.ns());
-
-    const auto query = BSON("_id" << multiversion::kParameterName);
-    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
-        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
-    if (!swFcv.isOK()) {
-        return boost::none;
+    // FCV is initialized before catalog repair on startup (as index builds may care about FCV),
+    // which means that if we crash during initial sync there may be incomplete foreground index
+    // builds that stop us from loading the index catalog. As a result, we need to perform a
+    // collection scan instead of findById(). The collection also contains sharding configuration so
+    // there can be more than one document, but it should still be a very small number.
+    auto result = repl::StorageInterface::get(opCtx)->findDocuments(
+        opCtx,
+        NamespaceString::kServerConfigurationNamespace,
+        boost::none,
+        repl::StorageInterface::ScanDirection::kForward,
+        {},
+        BoundInclusion::kIncludeStartKeyOnly,
+        std::numeric_limits<size_t>::max());
+    if (result.isOK()) {
+        for (auto&& doc : result.getValue()) {
+            if (doc["_id"].valueStringDataSafe() == multiversion::kParameterName) {
+                return doc;
+            }
+        }
     }
-    return swFcv.getValue();
+    return boost::none;
 }
 
 void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
