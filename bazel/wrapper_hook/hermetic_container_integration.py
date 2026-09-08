@@ -110,6 +110,7 @@ LINUX_CONTAINER_TOOL_MNEMONICS = (
     "WheelInstall",
 )
 LINUX_LOCAL_TEST_MNEMONICS = ("CoverageReport", "TestRunner")
+LINUX_LOCAL_JAVA_MNEMONICS = ("Javac", "JavaToolchainCompileBootClasspath", "Turbine")
 LINUX_HOST_CONTAINER_COMMANDS = frozenset(
     [
         "aquery",
@@ -3972,6 +3973,7 @@ def _linux_host_container_action_args(
         f"--experimental_persistent_container_worker_dir={worker_dir}",
         f"--sandbox_base={sandbox_base}",
         "--strategy=MongoInstallRule=persistent-container,local",
+        *[f"--strategy={mnemonic}=local" for mnemonic in LINUX_LOCAL_JAVA_MNEMONICS],
         *[
             f"--strategy={mnemonic}=persistent-container,local"
             for mnemonic in LINUX_LOCAL_CONTAINER_MNEMONICS
