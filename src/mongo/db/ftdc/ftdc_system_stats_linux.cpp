@@ -344,7 +344,8 @@ private:
 
         char* ptr = reinterpret_cast<char*>(gstrings) + sizeof(ethtool_gstrings);
         for (size_t i = 0; i < count; i++) {
-            _names->push_back(std::string(ptr));
+            auto sv = std::string_view(ptr, ETH_GSTRING_LEN);
+            _names->emplace_back(sv.substr(0, sv.find('\0')));
             ptr += ETH_GSTRING_LEN;
         }
     }
