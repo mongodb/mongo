@@ -1545,65 +1545,7 @@ export class ReplSetTest {
             });
         }
 
-        // Wait for 2 keys to appear before adding the other nodes. This is to prevent replica
-        // set configurations from interfering with the primary to generate the keys. One example
-        // of problematic configuration are delayed secondaries, which impedes the primary from
-        // generating the second key due to timeout waiting for write concern.
-        let shouldWaitForKeys = true;
-        if (this.waitForKeys != undefined) {
-            shouldWaitForKeys = this.waitForKeys;
-            jsTest.log.info("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
-        } else {
-            Object.keys(this.nodeOptions).forEach((key) => {
-                let val = this.nodeOptions[key];
-                if (
-                    typeof val === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                        (val.hasOwnProperty("binVersion") &&
-                            // Should not wait for keys if version is less than 3.6
-                            MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1))
-                ) {
-                    shouldWaitForKeys = false;
-                    jsTest.log.info(
-                        "Set shouldWaitForKeys from node options: " + shouldWaitForKeys,
-                    );
-                }
-            });
-            if (this.startOptions != undefined) {
-                let val = this.startOptions;
-                if (
-                    typeof val === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                        (val.hasOwnProperty("binVersion") &&
-                            // Should not wait for keys if version is less than 3.6
-                            MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1))
-                ) {
-                    shouldWaitForKeys = false;
-                    jsTest.log.info(
-                        "Set shouldWaitForKeys from start options: " + shouldWaitForKeys,
-                    );
-                }
-            }
-        }
-        /**
-         * Blocks until the primary node generates cluster time sign keys.
-         */
-        if (shouldWaitForKeys) {
-            asCluster(this, this.nodes, (timeout) => {
-                jsTest.log.info("Waiting for keys to sign $clusterTime to be generated");
-                assert.soonNoExcept(
-                    (timeout) => {
-                        let keyCnt = this.getPrimary(timeout)
-                            .getCollection("admin.system.keys")
-                            .find({purpose: "HMAC"})
-                            .itcount();
-                        return keyCnt >= 2;
-                    },
-                    "Awaiting keys",
-                    timeout,
-                );
-            });
-        }
+        this.waitForClusterTimeKeys();
 
         // Allow nodes to find sync sources more quickly. We also turn down the heartbeat interval
         // to speed up the initiation process. We use a failpoint so that we can easily turn this
@@ -1926,7 +1868,8 @@ export class ReplSetTest {
 
     /**
      *  Blocks until the set is initialized with a primary, then waits for step-up writes
-     *  (primary-only services + query analysis writer) to complete.
+     *  (primary-only services + query analysis writer) and for cluster time key generation to
+     *  complete.
      *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
      *  match ASC ReplSetTest.initiate.
      */
@@ -1941,6 +1884,8 @@ export class ReplSetTest {
         if (this._notX509Auth(primary) || primary.isTLS()) {
             asCluster(this, primary, () => this.waitForStepUpWrites(primary));
         }
+
+        this.waitForClusterTimeKeys();
 
         jsTest.log(
             "ReplSetTest initiateForDisagg took " +
@@ -2029,6 +1974,67 @@ export class ReplSetTest {
 
         jsTest.log("ReplSetTest stepUp: Finished stepping up " + node.host);
         return node;
+    }
+
+    /**
+     * Blocks until the primary node generates cluster time sign keys.
+     */
+    waitForClusterTimeKeys() {
+        // Wait for 2 keys to appear before adding the other nodes. This is to prevent replica
+        // set configurations from interfering with the primary to generate the keys. One example
+        // of problematic configuration are delayed secondaries, which impedes the primary from
+        // generating the second key due to timeout waiting for write concern.
+        //
+        // Some nodes never generate keys at all, so waiting on them would hang until the test
+        // times out: shard servers do not sign cluster times, binaries older than 3.6 have no
+        // keys collection, and a node started with the 'disableKeyGeneration' failpoint has
+        // opted out of key generation explicitly.
+        const neverGeneratesKeys = (val) =>
+            typeof val === "object" &&
+            (val.hasOwnProperty("shardsvr") ||
+                (val.hasOwnProperty("binVersion") &&
+                    // Should not wait for keys if version is less than 3.6
+                    MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1) ||
+                // 'setParameter' may be an object or a comma-separated string.
+                (typeof val.setParameter === "object" &&
+                    val.setParameter.hasOwnProperty("failpoint.disableKeyGeneration")) ||
+                (typeof val.setParameter === "string" &&
+                    val.setParameter.includes("failpoint.disableKeyGeneration")));
+
+        let shouldWaitForKeys = true;
+        if (this.waitForKeys != undefined) {
+            shouldWaitForKeys = this.waitForKeys;
+            jsTest.log.info("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
+        } else {
+            Object.keys(this.nodeOptions).forEach((key) => {
+                if (neverGeneratesKeys(this.nodeOptions[key])) {
+                    shouldWaitForKeys = false;
+                    jsTest.log.info(
+                        "Set shouldWaitForKeys from node options: " + shouldWaitForKeys,
+                    );
+                }
+            });
+            if (this.startOptions != undefined && neverGeneratesKeys(this.startOptions)) {
+                shouldWaitForKeys = false;
+                jsTest.log.info("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
+            }
+        }
+        if (shouldWaitForKeys) {
+            asCluster(this, this.nodes, (timeout) => {
+                jsTest.log.info("Waiting for keys to sign $clusterTime to be generated");
+                assert.soonNoExcept(
+                    (timeout) => {
+                        let keyCnt = this.getPrimary(timeout)
+                            .getCollection("admin.system.keys")
+                            .find({purpose: "HMAC"})
+                            .itcount();
+                        return keyCnt >= 2;
+                    },
+                    "Awaiting keys",
+                    timeout,
+                );
+            });
+        }
     }
 
     /**

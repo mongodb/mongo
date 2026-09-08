@@ -120,9 +120,13 @@ function runTest(conn) {
     );
 }
 
+// In replica set suites, cluster-time key generation runs a find on admin.system.keys shortly
+// after startup, which is recorded in the queryStats store (it is attributed to the shell's
+// application name, so it is not filtered out) and perturbs the exact entries asserted below.
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsSampleRate: 1,
+        "failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}",
     },
 });
 runTest(conn);

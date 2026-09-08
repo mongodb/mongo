@@ -17,13 +17,17 @@ const coll = primary.getDB("o").fake;
 const cdb = coll.getDB();
 
 function getLastOplogEntry() {
-    return primary.getDB("local").oplog.rs.find().limit(1).sort({$natural: -1}).next();
+    return primary
+        .getDB("local")
+        .oplog.rs.find({ns: coll.getFullName()})
+        .limit(1)
+        .sort({$natural: -1})
+        .next();
 }
 
 const assertLastOplog = function (o, o2, msg) {
     const last = getLastOplogEntry();
 
-    assert.eq(last.ns, coll.getFullName(), "ns bad : " + msg);
     assert.docEq(last.o, o, "o bad : " + msg);
     if (o2) assert.docEq(last.o2, o2, "o2 bad : " + msg);
     return last.ts;

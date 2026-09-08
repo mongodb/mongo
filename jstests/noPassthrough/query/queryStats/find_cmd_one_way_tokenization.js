@@ -47,6 +47,11 @@ function runTest(conn) {
 let conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsSampleRate: 1,
+        // In replica set suites, cluster-time key generation runs a find on admin.system.keys
+        // shortly after startup, which is recorded in the queryStats store (it is attributed to
+        // the shell's application name, so it is not filtered out) and perturbs the exact entry
+        // count asserted below.
+        "failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}",
     },
 });
 runTest(conn);
