@@ -609,17 +609,33 @@ export const $config = (function () {
                     currentTid: this.tid,
                     collection: targetThreadColl,
                 });
-                // Check if delete succeeded
-                this.assertWriteWorked(
-                    () => coll.remove({generation: generation}, {multi: true}),
-                    ErrorCodes.MovePrimaryInProgress,
-                );
-                // Check guarantees IF NO CONCURRENT DROP is running.
-                assert.eq(countDocuments(coll, {generation: generation}), 0, {
-                    tid,
-                    currentTid: this.tid,
-                    collection: targetThreadColl,
-                });
+                const deleteAttr = {tid, currentTid: this.tid, collection: targetThreadColl};
+                const deleteAndVerify = () => {
+                    // Issue delete and confirm it succeeds.
+                    this.assertWriteWorked(
+                        () => coll.remove({generation: generation}, {multi: true}),
+                        ErrorCodes.MovePrimaryInProgress,
+                    );
+                    // Check guarantees IF NO CONCURRENT DROP is running.
+                    return countDocuments(coll, {generation: generation}) === 0;
+                };
+                if (TestData.runningWithBalancer) {
+                    // When running with the balancer enabled, the '{multi: true}' delete might
+                    // run concurrently with a chunk migration and, due to the limitation described
+                    // in SERVER-20361, return success even if no document is removed; this means
+                    // that countDocuments might not return 0. If that happens, we retry.
+                    assert.soon(
+                        deleteAndVerify,
+                        "Multi-delete still leaves documents behind despite retries",
+                        undefined,
+                        undefined,
+                        undefined,
+                        deleteAttr,
+                    );
+                } else {
+                    // Check guarantees IF NO CONCURRENT DROP is running.
+                    assert.eq(deleteAndVerify(), true, deleteAttr);
+                }
             } finally {
                 this.mutexUnlock(this.mutexSession, tid, targetThreadColl);
                 jsTest.log.info("CRUD state finished", {
