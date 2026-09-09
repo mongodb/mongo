@@ -5,6 +5,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::extension {
 
@@ -186,17 +187,30 @@ struct ExtensionGetNextResult {
      */
     static ExtensionGetNextResult makeAdvancedFromApiResult(
         ::MongoExtensionGetNextResult& apiResult) {
+        if (isEmptyByteContainer(apiResult.resultDocument)) {
+            // An Advanced result must carry a valid result document; an empty/dangling byte view
+            // (e.g. Rust Vec::as_ptr() on an empty Vec) is a contract violation. Surface it as a
+            // query-level error instead of building a BSONObj from it.
+            uasserted(ErrorCodes::ExtensionSerializationError,
+                      "Extension returned kAdvanced with an empty result document");
+        }
+
+        auto doc = ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument);
+
         // send back metadata only if present
         return isEmptyByteContainer(apiResult.resultMetadata)
-            ? advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument))
-            : advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument),
+            ? advanced(std::move(doc))
+            : advanced(std::move(doc),
                        ExtensionBSONObj::makeFromByteContainer(apiResult.resultMetadata));
     };
 
+    // Whether the container has no bytes that can be parsed as a BSON document. In addition to
+    // genuinely empty containers, this also returns true for invalid byte views (null data with a
+    // non-zero length, or a non-null pointer with len 0) that must not be dereferenced.
     static bool isEmptyByteContainer(const ::MongoExtensionByteContainer& container) {
         switch (container.type) {
             case MongoExtensionByteContainerType::kByteView:
-                return container.bytes.view.data == nullptr && container.bytes.view.len == 0;
+                return container.bytes.view.data == nullptr || container.bytes.view.len == 0;
             case MongoExtensionByteContainerType::kByteBuf:
                 return container.bytes.buf == nullptr;
             default:
@@ -210,17 +224,26 @@ struct ExtensionGetNextResult {
      * MongoExtensionGetNextResult struct has an invalid code, asserts in that case.
      */
     static ExtensionGetNextResult makeFromApiResult(::MongoExtensionGetNextResult& apiResult) {
+        // get_next() transfers ownership of any kByteBuf to the host regardless of the result
+        // code, but only the kAdvanced path consumes the transferred bytes. Reclaim them on every
+        // other path (including any assertions) so a misbehaving extension cannot leak a buffer.
+        ScopeGuard reclaimTransferredBytes([&] {
+            destroyTransferredBytes(apiResult.resultDocument);
+            destroyTransferredBytes(apiResult.resultMetadata);
+        });
+
         ExtensionGetNextResult result;
         switch (apiResult.code) {
             case ::MongoExtensionGetNextResultCode::kAdvanced: {
                 result = ExtensionGetNextResult::makeAdvancedFromApiResult(apiResult);
+                reclaimTransferredBytes.dismiss();
                 break;
             }
             case ::MongoExtensionGetNextResultCode::kPauseExecution:
-                result = ExtensionGetNextResult::pauseExecution();
-                break;
             case ::MongoExtensionGetNextResultCode::kEOF: {
-                result = ExtensionGetNextResult::eof();
+                result = (apiResult.code == ::MongoExtensionGetNextResultCode::kPauseExecution)
+                    ? ExtensionGetNextResult::pauseExecution()
+                    : ExtensionGetNextResult::eof();
                 break;
             }
             default:
@@ -279,6 +302,15 @@ struct ExtensionGetNextResult {
     }
 
 private:
+    // Destroys a kByteBuf whose ownership was transferred to the host by an extension when the
+    // current path does not consume it. kByteView memory is owned by the extension and must not
+    // be freed here.
+    static void destroyTransferredBytes(::MongoExtensionByteContainer& container) {
+        if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
+            ExtensionByteBufHandle{container.bytes.buf};
+        }
+    }
+
     // Internal helper for populating an output ::MongoExtensionGetNextResult.
     void _toAdvancedApiResult(::MongoExtensionGetNextResult& outputResult) {
         tassert(ErrorCodes::ExtensionError,

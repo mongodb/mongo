@@ -2,12 +2,18 @@
 // SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/util/fail_point.h"
 
 #include <string_view>
 
 namespace mongo::extension {
+
+// Test-only fail point that corrupts the GetNextResult the host sees, simulating an extension
+// that returns an OK status with a kAdvanced result whose byte view is empty or dangling.
+MONGO_FAIL_POINT_DEFINE(failExtensionGetNextInvalidResult);
 
 void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {
     invokeCAndConvertStatusToException([&]() { return _vtable().set_source(get(), input.get()); });
@@ -17,6 +23,22 @@ ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionCont
     ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext();
     invokeCAndConvertStatusToException(
         [&]() { return _vtable().get_next(get(), execCtxPtr, &result); });
+
+    failExtensionGetNextInvalidResult.execute([&](const BSONObj& data) {
+        result.code = ::MongoExtensionGetNextResultCode::kAdvanced;
+        auto& container = (data.getStringField("field") == "resultMetadata")
+            ? result.resultMetadata
+            : result.resultDocument;
+        // Destroy a transferred kByteBuf before overwriting the container, else the owning
+        // pointer is dropped and the buffer leaks.
+        if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
+            ExtensionByteBufHandle{container.bytes.buf};
+        }
+        container.type = MongoExtensionByteContainerType::kByteView;
+        container.bytes.view = ::MongoExtensionByteView{
+            reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(data.getIntField("data"))),
+            static_cast<size_t>(data.getIntField("len"))};
+    });
 
     return ExtensionGetNextResult::makeFromApiResult(result);
 }
