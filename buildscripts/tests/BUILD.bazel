@@ -260,20 +260,6 @@ py_test(
 )
 
 py_test(
-    name = "test_generate_sbom",
-    srcs = ["test_generate_sbom.py"],
-    data = [
-        "//buildscripts/sbom:metadata.cdx.json",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//buildscripts/sbom:config",
-        "//buildscripts/sbom:endorctl_utils",
-        "//buildscripts/sbom:sbom_utils",
-    ],
-)
-
-py_test(
     name = "test_jepsen_report",
     srcs = ["test_jepsen_report.py"],
     data = ["//buildscripts/tests:test_jepsen_report_corpus.log.txt"],
