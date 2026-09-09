@@ -143,6 +143,20 @@ server_parameters:
         default: 0
         redact: false
 
+    migrationRecipientAbortTimeoutMS:
+        description: >-
+            How long the donor waits for the recipient to acknowledge the _recvChunkAbort command
+            sent when a migration is cancelled. This command is sent asynchronously on a
+            best-effort basis, so the timeout only bounds how long the network operation may remain
+            outstanding.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gMigrationRecipientAbortTimeoutMS
+        validator:
+            gte: 1
+        default: 30000
+        redact: false
+
     migrationLockAcquisitionMaxWaitMS:
         description: "How long to wait to acquire collection lock for migration related operations."
         set_at: [startup, runtime]

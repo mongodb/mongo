@@ -718,6 +718,49 @@ protected:
     }
 
     /**
+     * Runs startClone, answering the recipient's _recvChunkStart with 'recipientResponse'.
+     */
+    Status runStartClone(MigrationChunkClonerSource& cloner,
+                         const StatusWith<BSONObj>& recipientResponse) {
+        auto future = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return recipientResponse; });
+        });
+
+        const auto status = cloner.startClone(operationContext(),
+                                              UUID::gen(),
+                                              _lsid,
+                                              _txnNumber,
+                                              boost::none /* enclosingChunk */,
+                                              false /* isAuthoritative */);
+        future.default_timed_get();
+
+        return status;
+    }
+
+    /**
+     * Runs cancelClone and asserts that it aborts this cloner's migration on the recipient.
+     */
+    void runCancelClone(MigrationChunkClonerSource& cloner) {
+        BSONObj cmdObj;
+        Milliseconds timeout = RemoteCommandRequest::kNoTimeout;
+        auto future = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) {
+                cmdObj = request.cmdObj.getOwned();
+                timeout = request.timeout;
+                return BSON("ok" << true);
+            });
+        });
+
+        cloner.cancelClone(operationContext());
+        future.default_timed_get();
+
+        ASSERT(cmdObj.hasField("_recvChunkAbort")) << cmdObj;
+        ASSERT_EQ(cmdObj["sessionId"].str(), cloner.getSessionId().toString()) << cmdObj;
+
+        ASSERT_NE(timeout, RemoteCommandRequest::kNoTimeout);
+    }
+
+    /**
      * Shortcut to create BSON represenation of a moveChunk request for the specified range with
      * fixed kDonorConnStr and kRecipientConnStr, respectively.
      */
@@ -1208,23 +1251,10 @@ TEST_F(MigrationChunkClonerSourceTest, FailedToEngageRecipientShard) {
                                       kDonorConnStr,
                                       kRecipientConnStr.getServers()[0]);
 
-    {
-        auto futureStartClone = launchAsync([&]() {
-            onCommand([&](const RemoteCommandRequest& request) {
-                return Status(ErrorCodes::NetworkTimeout,
-                              "Did not receive confirmation from donor");
-            });
-        });
-
-        auto startCloneStatus = cloner.startClone(operationContext(),
-                                                  UUID::gen(),
-                                                  _lsid,
-                                                  _txnNumber,
-                                                  boost::none /* enclosingChunk */,
-                                                  false /* isAuthoritative */);
-        ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
-        futureStartClone.default_timed_get();
-    }
+    ASSERT_EQ(
+        ErrorCodes::NetworkTimeout,
+        runStartClone(
+            cloner, Status(ErrorCodes::NetworkTimeout, "Did not receive confirmation from donor")));
 
     // Ensure that if the recipient tries to fetch some documents, the cloner won't crash
     {
@@ -1243,9 +1273,50 @@ TEST_F(MigrationChunkClonerSourceTest, FailedToEngageRecipientShard) {
         }
     }
 
-    // Cancel clone should not send a cancellation request to the donor because we failed to engage
-    // it (see comment in the startClone method)
-    cloner.cancelClone(operationContext());
+    runCancelClone(cloner);
+}
+
+TEST_F(MigrationChunkClonerSourceTest, CancelCloneSendsAbortAfterOpCtxKilled) {
+    createShardedCollection({createCollectionDocument(100)});
+
+    const ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    ASSERT_OK(runStartClone(cloner, BSON("ok" << true)));
+
+    // Simulate MigrationSourceManager::abort(), which kills the migration's OperationContext.
+    {
+        std::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled();
+    }
+
+    runCancelClone(cloner);
+}
+
+TEST_F(MigrationChunkClonerSourceTest, CancelCloneSendsAbortWhenStartCloneResponseLost) {
+    createShardedCollection({createCollectionDocument(100)});
+
+    const ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    ASSERT_EQ(ErrorCodes::NetworkTimeout,
+              runStartClone(cloner,
+                            Status(ErrorCodes::NetworkTimeout,
+                                   "Did not receive confirmation from recipient")));
+
+    runCancelClone(cloner);
 }
 
 TEST_F(MigrationChunkClonerSourceTest, CloneFetchThatOverflows) {

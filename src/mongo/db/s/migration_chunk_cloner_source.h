@@ -28,6 +28,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
@@ -584,6 +585,17 @@ private:
      * at any time, but no methods should be called after it.
      */
     void _cleanup(bool wasSuccessful);
+
+    /**
+     * Schedules the specified command to be sent to the recipient shard, invoking 'callback' with
+     * the response. The remote command is aborted if it does not complete within 'timeout'; pass
+     * RemoteCommandRequest::kNoTimeout to let it run unbounded. Returns the handle of the scheduled
+     * callback, or the reason why it could not be scheduled.
+     */
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleRecipientCommand(
+        const BSONObj& cmdObj,
+        Milliseconds timeout,
+        executor::TaskExecutor::RemoteCommandCallbackFn callback);
 
     /**
      * Synchronously invokes the recipient shard with the specified command and either returns the

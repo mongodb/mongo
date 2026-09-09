@@ -91,6 +91,10 @@ const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
 MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
 
+std::shared_ptr<executor::TaskExecutor> getRecipientCommandExecutor() {
+    return Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
+}
+
 BSONObj createRequestWithSessionId(std::string_view commandName,
                                    const NamespaceString& nss,
                                    const MigrationSessionId& sessionId,
@@ -372,12 +376,6 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
         return startChunkCloneResponseStatus.getStatus();
     }
 
-    // TODO SERVER-122998: Setting the state to kCloning below means that if cancelClone was called
-    // we will send a cancellation command to the recipient. The reason to limit the cases when we
-    // send cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
-    // between cancellations for different migration sessions. It is thus possible that a second
-    // migration from different donor, but the same recipient would certainly abort an already
-    // running migration.
     std::lock_guard<std::mutex> sl(_mutex);
     _state = kCloning;
 
@@ -460,23 +458,36 @@ void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) {
     switch (_state) {
         case kDone:
             break;
-        case kCloning: {
-            const auto status =
-                _callRecipient(opCtx,
-                               createRequestWithSessionId(kRecvChunkAbort, nss(), _sessionId))
-                    .getStatus();
-            if (!status.isOK()) {
-                LOGV2(21991,
-                      "Failed to cancel migration",
-                      "error"_attr = redact(status),
+        case kCloning:
+        case kNew: {
+            const auto scheduleStatus = _scheduleRecipientCommand(
+                createRequestWithSessionId(kRecvChunkAbort, nss(), _sessionId),
+                Milliseconds(gMigrationRecipientAbortTimeoutMS.load()),
+                [nss = nss(), migrationId = _migrationId](
+                    const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                    const auto status = args.response.isOK()
+                        ? getStatusFromCommandResult(args.response.data)
+                        : args.response.status;
+                    if (!status.isOK()) {
+                        LOGV2(21991,
+                              "Failed to cancel migration",
+                              "error"_attr = redact(status),
+                              logAttrs(nss),
+                              "migrationId"_attr = migrationId);
+                    }
+                });
+
+            if (!scheduleStatus.isOK()) {
+                LOGV2(13439800,
+                      "Unable to notify the recipient of the migration abort",
+                      "error"_attr = redact(scheduleStatus.getStatus()),
                       logAttrs(nss()),
                       "migrationId"_attr = _migrationId);
             }
-            [[fallthrough]];
-        }
-        case kNew:
+
             _cleanup(false);
             break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -996,14 +1007,25 @@ void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
     _deferredUntransferredOpsCounter = 0;
 }
 
+StatusWith<executor::TaskExecutor::CallbackHandle>
+MigrationChunkClonerSource::_scheduleRecipientCommand(
+    const BSONObj& cmdObj,
+    Milliseconds timeout,
+    executor::TaskExecutor::RemoteCommandCallbackFn callback) {
+    return getRecipientCommandExecutor()->scheduleRemoteCommand(
+        executor::RemoteCommandRequest(
+            _recipientHost, DatabaseName::kAdmin, cmdObj, nullptr, timeout),
+        std::move(callback));
+}
+
 StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext* opCtx,
                                                                const BSONObj& cmdObj) {
     executor::RemoteCommandResponse responseStatus(
         _recipientHost, Status{ErrorCodes::InternalError, "Uninitialized value"});
 
-    auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
-    auto scheduleStatus = executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_recipientHost, DatabaseName::kAdmin, cmdObj, nullptr),
+    auto scheduleStatus = _scheduleRecipientCommand(
+        cmdObj,
+        executor::RemoteCommandRequest::kNoTimeout,
         [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             responseStatus = args.response;
         });
@@ -1012,6 +1034,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext*
         return scheduleStatus.getStatus();
     }
 
+    auto executor = getRecipientCommandExecutor();
     auto cbHandle = scheduleStatus.getValue();
 
     try {
