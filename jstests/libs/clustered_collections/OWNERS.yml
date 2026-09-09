@@ -3,3 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  - "*scan*":
+    approvers:
+      - 10gen/query-optimization
+  - "clustered_collection_hint_common.js":
+    approvers:
+      - 10gen/query-optimization

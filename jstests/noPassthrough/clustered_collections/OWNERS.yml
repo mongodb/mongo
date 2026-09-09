@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  - "*scan*":
+    approvers:
+      - 10gen/query-optimization
