@@ -390,6 +390,10 @@ py_binary(
             "bazel-runfiles",
             group = "testing",
         ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
     ],
 )
 

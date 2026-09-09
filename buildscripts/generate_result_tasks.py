@@ -340,31 +340,98 @@ def get_codeowners(target: str) -> list[str]:
     return resolve_codeowners().get(package, [])
 
 
+MOTHRA_EXPORT_BUCKET = "mothra-teams-prod"
+MOTHRA_EXPORT_PREFIX = "exports/"
+MOTHRA_EXPORT_REGION = "us-east-1"
+
+
+def assignment_tags_from_teams(teams: list[dict]) -> dict[str, str]:
+    """Build the GitHub team name to assignment tag mapping from Mothra team entries."""
+    assignment_tags = {}
+    for team in teams:
+        evergreen_tag_name = team.get("evergreen_tag_name")
+        github_teams = team.get("code_owners", {}).get("github_teams", [])
+        if not evergreen_tag_name:
+            continue
+        for github_team in github_teams:
+            name = github_team.get("team_name")
+            if name:
+                assignment_tags[name] = "assigned_to_jira_team_" + evergreen_tag_name
+    return assignment_tags
+
+
+def resolve_assignment_tags_from_s3(
+    bucket: str = MOTHRA_EXPORT_BUCKET,
+    prefix: str = MOTHRA_EXPORT_PREFIX,
+    region: str = MOTHRA_EXPORT_REGION,
+) -> dict[str, str]:
+    """Read every department's latest.yaml from the Mothra S3 export."""
+    import boto3
+
+    prefix = prefix.rstrip("/") + "/"
+    s3 = boto3.client("s3", region_name=region)
+
+    latest_keys = []
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for item in page.get("Contents", []):
+            if item["Key"].endswith("/latest.yaml"):
+                latest_keys.append(item["Key"])
+
+    if not latest_keys:
+        raise RuntimeError(f"No Mothra exports found under s3://{bucket}/{prefix}")
+
+    teams = []
+    for key in sorted(latest_keys):
+        response = s3.get_object(Bucket=bucket, Key=key)
+        export = yaml.safe_load(response["Body"].read()) or {}
+        if not isinstance(export, dict) or not isinstance(export.get("teams"), list):
+            raise ValueError(f"Invalid Mothra export: s3://{bucket}/{key}")
+        teams += export["teams"]
+
+    assignment_tags = assignment_tags_from_teams(teams)
+    if not assignment_tags:
+        raise RuntimeError(
+            f"Mothra export under s3://{bucket}/{prefix} produced no assignment tags"
+        )
+    return assignment_tags
+
+
+# TODO(DEVPROD-41449): Remove this fallback once the S3 export is stable, prior to YAML deletion.
+def resolve_assignment_tags_from_clone() -> dict[str, str]:
+    """Read the Mothra team YAMLs cloned into the workspace and exposed as @mothra//:teams."""
+    # Find the teams directory in the runfiles. Unfortunately, resolving the
+    # directory requires resolving a specific file within the runfiles, so
+    # an arbitrary team's YAML is used.
+    r = runfiles.Create()
+    teams_dir = os.path.dirname(r.Rlocation("mothra/mothra/teams/devprod.yaml"))
+
+    teams = []
+    for file in glob.glob(teams_dir + "/*.yaml"):
+        with open(file, "rt") as f:
+            teams += yaml.safe_load(f).get("teams", [])
+
+    return assignment_tags_from_teams(teams)
+
+
 @cache
 def resolve_assignment_tags() -> dict[str, str]:
+    """Resolve assignment tags from the Mothra S3 export, falling back to the Mothra clone."""
     try:
-        # Find the teams directory in the runfiles. Unfortunately, resolving the
-        # directory requires resolving a specific file within the runfiles, so
-        # an arbitrary team's YAML is used.
-        r = runfiles.Create()
-        teams_dir = os.path.dirname(r.Rlocation("mothra/mothra/teams/devprod.yaml"))
-
-        teams = []
-        for file in glob.glob(teams_dir + "/*.yaml"):
-            with open(file, "rt") as f:
-                teams += yaml.safe_load(f).get("teams", [])
-
-        assignment_tags = {}
-        for team in teams:
-            evergreen_tag_name = team.get("evergreen_tag_name")
-            github_teams = team.get("code_owners", {}).get("github_teams", [])
-            for github_team in github_teams:
-                name = github_team.get("team_name")
-                if name and evergreen_tag_name:
-                    assignment_tags[name] = "assigned_to_jira_team_" + evergreen_tag_name
-        return assignment_tags
+        return resolve_assignment_tags_from_s3()
     except Exception as e:
-        # Conservatively except any exception here. In the worst case, the contents/format of the
+        # The S3 export requires credentials that not every caller has, and the export
+        # could change out from under us. Fall back to the clone rather than failing.
+        print(
+            f"Failed to resolve assignment tags from S3, falling back to the Mothra clone: {e}",
+            file=sys.stderr,
+        )
+
+    # TODO(DEVPROD-41449): Remove the fallback once the S3 export is stable, prior to YAML deletion.
+    try:
+        return resolve_assignment_tags_from_clone()
+    except Exception as e:
+        # Conservatively except any exception here. In the worst case, the contents/format from
         # Mothra repo could change out from under us, and it should not completely fail
         # task generation.
         print(f"Failed to resolve assignment tags: {e}", file=sys.stderr)
