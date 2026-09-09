@@ -353,8 +353,7 @@ void BackgroundSync::_produce() {
             LOGV2_WARNING(21115,
                           "Too stale to catch up",
                           "lastOpTimeFetched"_attr = lastOpTimeFetched,
-                          "earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen,
-                          "syncSource"_attr = syncSourceResp.getSyncSource());
+                          "earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen);
             auto status = _replCoord->abortCatchupIfNeeded(
                 ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
             if (!status.isOK()) {
