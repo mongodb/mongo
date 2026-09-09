@@ -55,6 +55,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
@@ -158,23 +159,20 @@ void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
 ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
-    const auto opCtxHolder = makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    const auto& toShardId = _doc.getToShardId();
-    if (toShardId == ShardingState::get(opCtx)->shardId()) {
-        LOGV2(7120200,
-              "Database already on requested primary shard",
-              logAttrs(_dbName),
-              "to"_attr = toShardId);
-
-        return ExecutorFuture<void>(**executor);
-    }
-
     return ExecutorFuture<void>(**executor)
         .then([this, token, executor, anchor = shared_from_this()] {
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             const auto& toShardId = _doc.getToShardId();
+
+            if (toShardId == ShardingState::get(opCtx)->shardId()) {
+                LOGV2(7120200,
+                      "Database already on requested primary shard",
+                      logAttrs(_dbName),
+                      "to"_attr = toShardId);
+                uasserted(ErrorCodes::RequestAlreadyFulfilled,
+                          "Database already on requested primary shard");
+            }
 
             const auto toShardEntry = [&] {
                 const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -326,6 +324,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                                      logChange(opCtx, "end");
                                  }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                return Status::OK();
+            }
+
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
