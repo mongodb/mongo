@@ -121,8 +121,8 @@ public:
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            options.originalIndexes = indexList;
-            options.originalCollectionOptions = collectionOptions;
+            options.expectedIndexes = indexList;
+            options.expectedCollectionOptions = collectionOptions;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx, fromNss, toNss, options);
         }
 

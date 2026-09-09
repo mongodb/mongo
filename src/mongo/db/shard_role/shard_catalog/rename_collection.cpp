@@ -94,6 +94,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <memory>
 #include <string>
@@ -110,6 +111,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeAndAfterSourceDrop);
+MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesBeforeFinalize);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
@@ -343,6 +345,33 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
     });
 }
 
+// Validates that the target collection still matches the options and indexes the caller captured in
+// `renameOptions` (necessary for $out/$merge). `currentTargetOptions` is the target's current
+// collection options serialized to BSON, or an empty BSONObj if the target does not exist. No-op
+// when the caller did not provide expected options or indexes.
+Status checkTargetMatchesExpectedOptionsAndIndexes(OperationContext* opCtx,
+                                                   const NamespaceString& target,
+                                                   const BSONObj& currentTargetOptions,
+                                                   const RenameCollectionOptions& renameOptions) {
+    if (renameOptions.expectedCollectionOptions) {
+        auto status = checkTargetCollectionOptionsMatch(
+            target, renameOptions.expectedCollectionOptions.get(), currentTargetOptions);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    if (renameOptions.expectedIndexes) {
+        const auto currentIndexes =
+            listIndexesEmptyListIfMissing(opCtx, target, ListIndexesInclude::kNothing);
+        auto status = checkTargetCollectionIndexesMatch(
+            target, renameOptions.expectedIndexes.get(), currentIndexes);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status renameCollectionWithinDB(OperationContext* opCtx,
                                 const NamespaceString& source,
                                 const NamespaceString& target,
@@ -374,27 +403,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    if (options.originalCollectionOptions) {
-        // Check target collection options match expected.
-        const BSONObj collectionOptions =
-            targetColl ? targetColl->getCollectionOptions().toBSON() : BSONObj();
-        status = checkTargetCollectionOptionsMatch(
-            target, options.originalCollectionOptions.get(), collectionOptions);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-    if (options.originalIndexes) {
-        // Check target collection indexes match expected.
-        const auto currentIndexes =
-            listIndexesEmptyListIfMissing(opCtx, target, ListIndexesInclude::kNothing);
-        status = checkTargetCollectionIndexesMatch(
-            target, options.originalIndexes.get(), currentIndexes);
-
-        if (!status.isOK()) {
-            return status;
-        }
-    }
+    auto currentTargetOptions =
+        targetColl ? targetColl->getCollectionOptions().toBSON() : BSONObj();
+    status =
+        checkTargetMatchesExpectedOptionsAndIndexes(opCtx, target, currentTargetOptions, options);
+    if (!status.isOK())
+        return status;
 
     AutoStatsTracker statsTracker(opCtx,
                                   source,
@@ -781,6 +795,36 @@ Status copySourceToTemporaryCollectionOnTargetDB(
     return Status::OK();
 }
 
+Status finalizeWithinDbRenameWithLocksHeld(OperationContext* opCtx,
+                                           Database* db,
+                                           const NamespaceString& tmpName,
+                                           const NamespaceString& target,
+                                           const RenameCollectionOptions& options) {
+    invariant(tmpName.isEqualDb(target));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(tmpName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(target, MODE_X));
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto tmpColl = catalog->lookupCollectionByNamespace(opCtx, tmpName);
+    invariant(tmpColl);
+    auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
+
+    if (!targetColl) {
+        return renameCollectionDirectly(opCtx, db, tmpColl->uuid(), tmpName, target, options);
+    }
+    if (tmpColl->uuid() == targetColl->uuid()) {
+        return Status::OK();
+    }
+    return renameCollectionAndDropTarget(opCtx,
+                                         db,
+                                         tmpColl->uuid(),
+                                         tmpName,
+                                         target,
+                                         CollectionPtr::CollectionPtr_UNSAFE(targetColl),
+                                         options,
+                                         {});
+}
+
 Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                        const NamespaceString& source,
                                        const NamespaceString& target,
@@ -817,15 +861,14 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         }
     }();
 
-    // Acquire the locks for the copy of the collection from the source to the target DB.
+    // Acquire MODE_X collection locks for all involved collections.
     struct RenameAcrossDatabasesCollectionLocks {
-        // Source collection, locked in MODE_S.
         boost::optional<AutoGetCollection> sourceColl;
         // NSS of a temporary collection used to copy the data from the source to the target DB
         // before renaming it over the target namespace, guaranteed to not exist after acquiring it.
         NamespaceString tmpName;
-        // MODE_X lock on the temporary collection.
         boost::optional<Lock::CollectionLock> tempCollLock;
+        boost::optional<Lock::CollectionLock> targetCollLock;
     };
 
     auto acqStatus = [&]() -> StatusWith<RenameAcrossDatabasesCollectionLocks> {
@@ -846,18 +889,24 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
             }
             const auto& tmpName = tmpNameResult.getValue();
 
-            auto locks = [&]() -> RenameAcrossDatabasesCollectionLocks {
-                if (ResourceId{RESOURCE_COLLECTION, source} <
-                    ResourceId{RESOURCE_COLLECTION, tmpName}) {
-                    AutoGetCollection sourceColl{opCtx, source, MODE_S};
-                    Lock::CollectionLock tempCollLock{opCtx, tmpName, MODE_X};
-                    return {std::move(sourceColl), tmpName, std::move(tempCollLock)};
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+            std::array<NamespaceString, 3> nssesToLock = {source, target, tmpName};
+            std::sort(nssesToLock.begin(), nssesToLock.end(), [](const auto& a, const auto& b) {
+                return ResourceId{RESOURCE_COLLECTION, a} < ResourceId{RESOURCE_COLLECTION, b};
+            });
+
+            RenameAcrossDatabasesCollectionLocks locks;
+            locks.tmpName = tmpName;
+            for (const auto& nss : nssesToLock) {
+                if (nss == source) {
+                    locks.sourceColl.emplace(opCtx, source, MODE_X);
+                } else if (nss == target) {
+                    locks.targetCollLock.emplace(opCtx, target, MODE_X);
                 } else {
-                    Lock::CollectionLock tempCollLock{opCtx, tmpName, MODE_X};
-                    AutoGetCollection sourceColl{opCtx, source, MODE_S};
-                    return {std::move(sourceColl), tmpName, std::move(tempCollLock)};
+                    locks.tempCollLock.emplace(opCtx, tmpName, MODE_X);
                 }
-            }();
+            }
 
             if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, locks.tmpName)) {
                 return locks;
@@ -873,7 +922,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     }();
     if (!acqStatus.isOK())
         return acqStatus.getStatus();
-    auto& [sourceColl, tmpName, tempCollLock] = acqStatus.getValue();
+    auto& locks = acqStatus.getValue();
+    auto& tmpName = locks.tmpName;
 
     DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
@@ -887,13 +937,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                   DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(source.dbName()));
 
-    if (!sourceColl.get()) {
+    if (!locks.sourceColl.get()) {
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
     // TODO SERVER-89089 move this check up in the rename stack execution once we have the guarante
     // that all bucket collection have timeseries options.
-    if (source.isTimeseriesBucketsCollection() && sourceColl.get()->getTimeseriesOptions() &&
+    if (source.isTimeseriesBucketsCollection() && locks.sourceColl.get()->getTimeseriesOptions() &&
         !target.isTimeseriesBucketsCollection()) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "Cannot rename timeseries buckets collection '"
@@ -906,8 +956,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections across a replicated and an unreplicated database"};
 
+    if (auto status = checkSourceAndTargetNamespaces(
+            opCtx, source, target, options, /*targetExistsAllowed=*/true);
+        !status.isOK())
+        return status;
+
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        sourceColl.get()->uuid());
+        locks.sourceColl.get()->uuid());
 
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
@@ -916,7 +971,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     const auto targetColl =
         targetDB.getDb() ? catalog->lookupCollectionByNamespace(opCtx, target) : nullptr;
     if (targetColl) {
-        if (sourceColl.get()->uuid() == targetColl->uuid()) {
+        if (locks.sourceColl.get()->uuid() == targetColl->uuid()) {
             invariant(source == target);
             return Status::OK();
         }
@@ -929,6 +984,17 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "a view already exists with that name: "
                                     << target.toStringForErrorMsg());
+    }
+
+    // Because the target collection is held in MODE_X for the entire operation, it cannot change
+    // between this check and the rename, so a single check up front (before the expensive copy)
+    // suffices.
+    auto currentTargetOptions =
+        targetColl ? targetColl->getCollectionOptions().toBSON() : BSONObj();
+    if (auto status = checkTargetMatchesExpectedOptionsAndIndexes(
+            opCtx, target, currentTargetOptions, options);
+        !status.isOK()) {
+        return status;
     }
 
     // Dismissed on success
@@ -956,35 +1022,26 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     });
 
     Status copyStatus = copySourceToTemporaryCollectionOnTargetDB(opCtx,
-                                                                  **sourceColl,
+                                                                  **locks.sourceColl,
                                                                   targetDB.ensureDbExists(opCtx),
                                                                   tmpName,
                                                                   options.newTargetCollectionUuid);
     if (!copyStatus.isOK())
         return copyStatus;
 
-    // Drop the locks on the source and temporary collections
-    sourceColl.reset();
-    tempCollLock.reset();
-
-    // We shouldn't be holding any collection locks at this point.
-    for (auto& nss : {tmpName, source, target}) {
-        tassert(9962101,
-                str::stream() << "Rename unexpectedly holding lock on "
-                              << nss.toStringForErrorMsg(),
-                shard_role_details::getLocker(opCtx)->getLockMode(
-                    ResourceId{RESOURCE_COLLECTION, nss}) == MODE_NONE);
-    }
+    hangRenameCollectionAcrossDatabasesBeforeFinalize.pauseWhileSet(opCtx);
 
     // The functions below expect to work over the latest state of the collections,
     // so abandon any snapshot that we may have acquired during the data copy.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Getting here means we successfully built the target copy. We now do the final
-    // in-place rename and remove the source collection.
+    // in-place rename and remove the source collection. Collection locks were acquired in
+    // ResourceId order above and remain held through this phase.
     invariant(tmpName.isEqualDb(target));
     RenameCollectionOptions tempOptions(options);
-    Status status = renameCollectionWithinDB(opCtx, tmpName, target, tempOptions);
+    Status status = finalizeWithinDbRenameWithLocksHeld(
+        opCtx, targetDB.ensureDbExists(opCtx), tmpName, target, tempOptions);
     if (!status.isOK())
         return status;
 
@@ -1007,7 +1064,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
                                                     const RenameCollectionOptions& options) {
-    // Pass in originalIndexes and originalCollectionOptions to be evaluated later,
+    // Pass in expectedIndexes and expectedCollectionOptions to be evaluated later,
     // under a collection lock in renameCollectionWithinDB.
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
@@ -1169,13 +1226,15 @@ Status renameCollection(OperationContext* opCtx,
     }
 
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
+    bool sameDB = source.isEqualDb(target);
     LOGV2(20400,
           "renameCollectionForCommand",
           "sourceNamespace"_attr = source,
           "targetNamespace"_attr = target,
-          "dropTarget"_attr = dropTargetMsg);
+          "dropTarget"_attr = dropTargetMsg,
+          "sameDB"_attr = sameDB);
 
-    if (source.isEqualDb(target))
+    if (sameDB)
         return renameCollectionWithinDB(opCtx, source, target, options);
     else {
         return renameCollectionAcrossDatabases(opCtx, source, target, options);
