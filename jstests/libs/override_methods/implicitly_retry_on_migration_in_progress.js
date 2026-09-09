@@ -233,6 +233,7 @@ function runCommandWithRetryUponMigration(
         "count",
         "distinct",
         "explain",
+        "dataSize",
     ]);
 
     if (typeof commandObj !== "object" || commandObj === null) {
