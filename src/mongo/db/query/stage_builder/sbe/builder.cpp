@@ -1521,8 +1521,6 @@ SbExpr SlotBasedStageBuilder::buildLimitSkipSumExpression(
 
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QuerySolutionNode* root,
                                                                     const PlanStageReqs& reqsIn) {
-    SbBuilder b(_state, root->nodeId());
-
     const auto sn = static_cast<const SortNode*>(root);
     auto sortPattern = SortPattern{sn->pattern, _cq.getExpCtx()};
 
@@ -1535,8 +1533,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
     for (const auto& part : sortPattern) {
         tassert(5037002, "Sort with $meta is not supported in SBE", part.fieldPath);
     }
-
-    auto child = sn->children[0].get();
 
     if (auto [ixn, ct] = root->getFirstNodeByType(STAGE_IXSCAN);
         !sn->fetched() && !reqsIn.hasResult() && ixn && ct >= 1) {
@@ -1575,7 +1571,26 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
         MONGO_UNREACHABLE;
     }
 
+    auto child = sn->children[0].get();
     auto [stage, childOutputs] = build(child, childReqs);
+
+    return buildSortFinish(
+        root, reqs, forwardingReqs, std::move(plan), std::move(stage), std::move(childOutputs));
+}
+
+MONGO_COMPILER_NOINLINE
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortFinish(
+    const QuerySolutionNode* root,
+    const PlanStageReqs& reqs,
+    const PlanStageReqs& forwardingReqs,
+    BuildSortKeysPlan plan,
+    SbStage stage,
+    PlanStageSlots childOutputs) {
+    SbBuilder b(_state, root->nodeId());
+
+    const auto sn = static_cast<const SortNode*>(root);
+    auto sortPattern = SortPattern{sn->pattern, _cq.getExpCtx()};
+
     auto outputs = std::move(childOutputs);
 
     auto sortKeys = buildSortKeys(_state, plan, sortPattern, outputs);

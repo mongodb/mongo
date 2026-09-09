@@ -951,6 +951,17 @@ private:
     std::pair<SbStage, PlanStageSlots> buildSort(const QuerySolutionNode* root,
                                                  const PlanStageReqs& reqs);
 
+    // This function is called as the last step of buildSort, to finish setting up a SortStage. Its
+    // aim is to reduce the stack space required by the buildSort function, which is valuable in
+    // case we have to build pipelines composed of multiple $sort.
+    MONGO_COMPILER_NOINLINE
+    std::pair<SbStage, PlanStageSlots> buildSortFinish(const QuerySolutionNode* root,
+                                                       const PlanStageReqs& reqs,
+                                                       const PlanStageReqs& forwardingReqs,
+                                                       BuildSortKeysPlan plan,
+                                                       SbStage stage,
+                                                       PlanStageSlots childOutputs);
+
     std::pair<SbStage, PlanStageSlots> buildSortCovered(const QuerySolutionNode* root,
                                                         const PlanStageReqs& reqs);
 
