@@ -585,6 +585,12 @@ public:
                 return;
             }
 
+            // For the purposes of OpDebug's reporting, we only need 'collectionType' to distinguish
+            // between view/timeseries/collection. For view/timeseries, 'collectionType' will be set
+            // on the agg path taken above. In the normal path (i.e. here), we bypass the
+            // getCollectionType() call and hardcode "kCollection".
+            CurOp::get(opCtx)->debug().collectionType = query_shape::CollectionType::kCollection;
+
             // Create an RAII object that prints the collection's shard key in the case of a tassert
             // or crash.
             auto collShardingDescription =
