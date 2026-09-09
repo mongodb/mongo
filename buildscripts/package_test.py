@@ -358,6 +358,15 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
             "yum-config-manager --enable epel",
         ]
 
+    if test.os_name.startswith('debian11'):
+        # Debian 11 (bullseye) reached end-of-life on 2026-08-31
+        # (https://www.debian.org/News/2026/20260831), so the Valid-Until field on its
+        # release files has expired and apt refuses to refresh the package index. The
+        # repository (including bullseye-security) is still served from deb.debian.org
+        # and has not yet been moved to archive.debian.org, so keep using it in place
+        # with the Valid-Until check disabled.
+        test.update_command += " -o Acquire::Check-Valid-Until=false"
+
     commands += [
         test.update_command,
         test.install_command.format(" ".join(test.base_packages)),
