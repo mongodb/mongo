@@ -344,6 +344,7 @@ void InitialSyncer::_cancelRemainingWork(WithLock lk) {
     _cancelHandle(lk, _chooseSyncSourceHandle);
     _cancelHandle(lk, _getBaseRollbackIdHandle);
     _cancelHandle(lk, _getLastRollbackIdHandle);
+    _cancelHandle(lk, _cleanShutdownCheckHandle);
     _cancelHandle(lk, _getNextApplierBatchHandle);
 
     _shutdownComponent(lk, _oplogFetcher);
@@ -911,11 +912,55 @@ void InitialSyncer::_rollbackCheckerResetCallback(
         return;
     }
 
+    // Read the parameter once here and use that value for the whole attempt. Every check site then
+    // agrees about whether the check is running, and the baseline can never be absent while the
+    // checks are on. Changing the parameter takes effect on the next attempt.
+    _cleanShutdownCheckEnabled = enableInitialSyncCleanShutdownCheck.load();
+    if (!_cleanShutdownCheckEnabled) {
+        _scheduleDefaultBeginFetchingOpTimeFetcher(lock, onCompletionGuard);
+        return;
+    }
+
+    // Capture the sync source's clean shutdown baseline immediately after the base rollback ID, and
+    // before any further work. A clean shutdown of the sync source from this point on must land
+    // after the baseline so that a later check can evaluate it; anything captured later would
+    // absorb such a shutdown into the baseline itself and silently never look at it again.
+    _setPhase(lock, Phase::kCheckingSourceCleanShutdown);
+    _cleanShutdownChecker = std::make_unique<CleanShutdownChecker>(*_attemptExec, _syncSource);
+    auto cleanShutdownScheduleResult =
+        _cleanShutdownChecker->reset([=, this](const Status& resetStatus) {
+            _cleanShutdownCheckerResetCallback(resetStatus, onCompletionGuard);
+        });
+    if (!cleanShutdownScheduleResult.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock,
+                                                           cleanShutdownScheduleResult.getStatus());
+        return;
+    }
+    _cleanShutdownCheckHandle = cleanShutdownScheduleResult.getValue();
+}
+
+void InitialSyncer::_cleanShutdownCheckerResetCallback(
+    const Status& result, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus(
+        lock, result, "error while getting base clean shutdown ID");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        return;
+    }
+
+    _scheduleDefaultBeginFetchingOpTimeFetcher(lock, onCompletionGuard);
+}
+
+// Called either straight from _rollbackCheckerResetCallback when the clean shutdown check is off
+// for this attempt, or from _cleanShutdownCheckerResetCallback once the baseline is captured.
+void InitialSyncer::_scheduleDefaultBeginFetchingOpTimeFetcher(
+    const std::lock_guard<std::mutex>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     // Since the beginFetchingOpTime is retrieved before significant work is done copying
     // data from the sync source, we allow the OplogEntryFetcher to use its default retry strategy
     // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
     // quickly in the presence of network errors, allowing us to choose a different sync source.
-    status = _scheduleLastOplogEntryFetcher(
+    auto status = _scheduleLastOplogEntryFetcher(
         lock,
         [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
                   mongo::Fetcher::NextAction*,
@@ -1384,10 +1429,14 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // This is where the flow of control starts to split into two parallel tracks:
     // - oplog fetcher
     // - data cloning and applier
-    _sharedData =
-        std::make_unique<InitialSyncSharedData>(_rollbackChecker->getBaseRBID(),
-                                                _allowedOutageDuration,
-                                                getGlobalServiceContext()->getFastClockSource());
+    _sharedData = std::make_unique<InitialSyncSharedData>(
+        _rollbackChecker->getBaseRBID(),
+        _cleanShutdownCheckEnabled,
+        _cleanShutdownCheckEnabled ? _cleanShutdownChecker->getBaseCleanShutdownId()
+                                   : kNoCleanShutdownId,
+        lastOpTime.getTimestamp(),
+        _allowedOutageDuration,
+        getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
     auto fastCountAggregator = std::make_shared<FastCountInitialSyncAggregator>();
     _initialSyncState =
@@ -1528,10 +1577,18 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             onCompletionGuard.reset();
         });
     _setPhase(lock, Phase::kCloningData);
+    // Capture the cloner executor while still holding the lock. _clonerAttemptExec is an (X)
+    // member, so this read is already serialized by running in an _exec callback; reading it into
+    // a local before unlocking keeps the access under the lock as well. The raw pointer stays
+    // valid past the unlock below because _clonerAttemptExec is only replaced or reset when the
+    // current attempt finishes, and attempt completion is gated on every outstanding
+    // onCompletionGuard reference being dropped; we are holding one for the lifetime of this
+    // function, so the underlying ScopedTaskExecutor cannot be destroyed out from under us.
+    auto* clonerAttemptExec = _clonerAttemptExec.get();
     lock.unlock();
     // Start (and therefore finish) the cloners outside the lock.  This ensures onCompletion
     // is not run with the mutex held, which would result in self-deadlock.
-    (*_clonerAttemptExec)->signalEvent(startCloner);
+    (*clonerAttemptExec)->signalEvent(startCloner);
 }
 
 void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus,
@@ -1604,12 +1661,61 @@ void InitialSyncer::_allDatabaseClonerCallback(
     // converge from.
     _seedFastCountFromInitialSync(lock);
 
+    // Check whether the sync source cleanly shut down while we were cloning before going on to
+    // replay the oplog. This is an optimization to fail earlier in initial sync if our sync
+    // source did fail. We will check again at the end of initial sync as a final verification.
+    if (_cleanShutdownCheckEnabled) {
+        status = _scheduleCleanShutdownCheck(lock,
+                                             onCompletionGuard,
+                                             [this](const std::lock_guard<std::mutex>& lock,
+                                                    std::shared_ptr<OnCompletionGuard> guard) {
+                                                 _scheduleStopTimestampFetcher(lock, guard);
+                                             });
+        if (!status.isOK()) {
+            onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        }
+        return;
+    }
+
+    _scheduleStopTimestampFetcher(lock, onCompletionGuard);
+}
+
+void InitialSyncer::_cleanShutdownCheckCallback(
+    const Status& result,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    CleanShutdownCheckContinuation continuation) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus(
+        lock, result, "error while checking sync source for clean shutdowns");
+
+    if (_shouldRetryError(lock, status)) {
+        LOGV2_DEBUG(13224504,
+                    1,
+                    "Retrying clean shutdown check because of network error",
+                    "error"_attr = status);
+        auto scheduleStatus = _scheduleCleanShutdownCheck(lock, onCompletionGuard, continuation);
+        if (!scheduleStatus.isOK()) {
+            onCompletionGuard->setResultAndCancelRemainingWork(lock, scheduleStatus);
+        }
+        return;
+    }
+
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        return;
+    }
+
+    continuation(lock, onCompletionGuard);
+}
+
+void InitialSyncer::_scheduleStopTimestampFetcher(
+    const std::lock_guard<std::mutex>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     // Since the stopTimestamp is retrieved after we have done all the work of retrieving collection
     // data, we handle retries within this class by retrying for
     // 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).  This is the same retry
     // strategy used when retrieving collection data, and avoids retrieving all the data and then
     // throwing it away due to a transient network outage.
-    status = _scheduleLastOplogEntryFetcher(
+    auto status = _scheduleLastOplogEntryFetcher(
         lock,
         [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& status,
                   mongo::Fetcher::NextAction*,
@@ -1678,6 +1784,22 @@ void InitialSyncer::_seedFastCountFromInitialSync(WithLock) {
                                         rss::consensus::IntentRegistry::Intent::LocalWrite});
         mgr.populateFromInitialSync(opCtxPtr, entries, tsStoreTs);
     }
+}
+
+Status InitialSyncer::_scheduleCleanShutdownCheck(
+    const std::lock_guard<std::mutex>& lk,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    CleanShutdownCheckContinuation continuation) {
+    auto scheduleResult = _cleanShutdownChecker->checkForCleanShutdown(
+        _initialSyncState->beginApplyingTimestamp,
+        [this, onCompletionGuard, continuation](const Status& status) {
+            _cleanShutdownCheckCallback(status, onCompletionGuard, continuation);
+        });
+    if (!scheduleResult.isOK()) {
+        return scheduleResult.getStatus();
+    }
+    _cleanShutdownCheckHandle = scheduleResult.getValue();
+    return Status::OK();
 }
 
 void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
@@ -1796,7 +1918,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
           "stopTimestamp"_attr = _initialSyncState->stopTimestamp.toBSON());
 
     // This sets the error in 'onCompletionGuard' and shuts down the OplogFetcher on error.
-    _scheduleRollbackCheckerCheckForRollback(lock, onCompletionGuard);
+    _scheduleFinalSourceChecks(lock, onCompletionGuard);
 }
 
 void InitialSyncer::_getNextApplierBatchCallback(
@@ -2303,9 +2425,9 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch(
               "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp.toBSON());
         // Fall through to scheduling _getNextApplierBatchCallback().
     } else if (_lastApplied.opTime.getTimestamp() >= _initialSyncState->stopTimestamp) {
-        // Check for rollback if we have applied far enough to be consistent.
+        // Check the sync source for rollback if we have applied far enough to be consistent.
         invariant(!_lastApplied.opTime.getTimestamp().isNull());
-        _scheduleRollbackCheckerCheckForRollback(lock, onCompletionGuard);
+        _scheduleFinalSourceChecks(lock, onCompletionGuard);
         return;
     }
 
@@ -2322,6 +2444,29 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch(
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
     }
+}
+
+void InitialSyncer::_scheduleFinalSourceChecks(
+    const std::lock_guard<std::mutex>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    // The rollback ID only moves on an unclean shutdown of the sync source, so check first that it
+    // did not cleanly shut down either, which leaves the rollback ID alone but can still have
+    // rolled back writes this attempt cloned.
+    if (_cleanShutdownCheckEnabled) {
+        _setPhase(lock, Phase::kCheckingSourceCleanShutdown);
+        auto status =
+            _scheduleCleanShutdownCheck(lock,
+                                        onCompletionGuard,
+                                        [this](const std::lock_guard<std::mutex>& lock,
+                                               std::shared_ptr<OnCompletionGuard> guard) {
+                                            _scheduleRollbackCheckerCheckForRollback(lock, guard);
+                                        });
+        if (!status.isOK()) {
+            onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        }
+        return;
+    }
+
+    _scheduleRollbackCheckerCheckForRollback(lock, onCompletionGuard);
 }
 
 void InitialSyncer::_scheduleRollbackCheckerCheckForRollback(
@@ -2632,6 +2777,8 @@ std::string_view InitialSyncer::phaseToString(Phase phase) {
             return "preparingStorage"sv;
         case Phase::kCheckingSourceRollback:
             return "checkingSourceRollback"sv;
+        case Phase::kCheckingSourceCleanShutdown:
+            return "checkingSourceCleanShutdown"sv;
         case Phase::kDeterminingStartOpTime:
             return "determiningStartOpTime"sv;
         case Phase::kFetchingFCV:

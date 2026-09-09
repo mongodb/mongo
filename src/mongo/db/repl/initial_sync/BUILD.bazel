@@ -58,6 +58,34 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "clean_shutdown_checker",
+    srcs = [
+        "clean_shutdown_checker.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/repl:clean_shutdown_idl",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/repl/clang_checked",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "clean_shutdown_checker_test",
+    size = "small",
+    srcs = ["clean_shutdown_checker_test.cpp"],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":clean_shutdown_checker",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_library(
     name = "initial_sync_cloners",
     srcs = [
         "all_database_cloner.cpp",
@@ -70,6 +98,7 @@ mongo_cc_library(
     ],
     deps = [
         ":base_cloner",
+        ":clean_shutdown_checker",
         ":cloner_utils",
         ":repl_sync_shared_data",
         "//src/mongo:base",
@@ -103,6 +132,7 @@ mongo_cc_library(
         "initial_syncer_factory.cpp",
     ],
     deps = [
+        ":clean_shutdown_checker",
         ":initial_sync_cloners",
         ":repl_sync_shared_data",
         "//src/mongo/client:clientdriver_network",

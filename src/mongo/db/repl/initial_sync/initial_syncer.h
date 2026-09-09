@@ -16,6 +16,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_sync/callback_completion_guard.h"
+#include "mongo/db/repl/initial_sync/clean_shutdown_checker.h"
 #include "mongo/db/repl/initial_sync/initial_sync_shared_data.h"
 #include "mongo/db/repl/initial_sync/initial_syncer_interface.h"
 #include "mongo/db/repl/multiapplier.h"
@@ -132,6 +133,7 @@ public:
         kSelectingSyncSource,
         kPreparingStorage,
         kCheckingSourceRollback,
+        kCheckingSourceCleanShutdown,
         kDeterminingStartOpTime,
         kFetchingFCV,
         kCloningData,
@@ -360,6 +362,10 @@ private:
      *         |
      *         |
      *         V
+     *    _cleanShutdownCheckerResetCallback()
+     *         |
+     *         |
+     *         V
      *   _lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime()
      *         |
      *         |
@@ -434,6 +440,10 @@ private:
      *         |                        (reached end timestamp)
      *         |                              |       |
      *         |                              V       V
+     *         |                _cleanShutdownCheckCallback()  (if enabled)
+     *         |                              |
+     *         |                              |
+     *         |                              V
      *         |                _rollbackCheckerCheckForRollbackCallback()
      *         |                              |
      *         |                              |
@@ -489,6 +499,55 @@ private:
      * Callback for rollback checker's first replSetGetRBID command before starting data cloning.
      */
     void _rollbackCheckerResetCallback(const RollbackChecker::Result& result,
+                                       std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for the clean shutdown checker's baseline find, issued immediately after the base
+     * rollback ID. Capturing the baseline this early is what makes the check sound: a clean
+     * shutdown of the sync source between here and the start of cloning would otherwise be absorbed
+     * into the baseline and never evaluated.
+     */
+    void _cleanShutdownCheckerResetCallback(const Status& status,
+                                            std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Schedules the fetcher that determines the default beginFetchingOpTime. Reached either
+     * directly, when the clean shutdown check is off for this attempt, or by way of the baseline
+     * capture when it is on.
+     */
+    void _scheduleDefaultBeginFetchingOpTimeFetcher(
+        const std::lock_guard<std::mutex>& lk,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * What the attempt goes on to do once a clean shutdown check passes. The two post-cloning
+     * check sites differ only in this, so they share one callback and one retry path.
+     */
+    using CleanShutdownCheckContinuation =
+        std::function<void(const std::lock_guard<std::mutex>&, std::shared_ptr<OnCompletionGuard>)>;
+
+    /**
+     * Schedules a check of the sync source's clean shutdowns against the baseline captured for this
+     * attempt, storing the handle.
+     */
+    Status _scheduleCleanShutdownCheck(const std::lock_guard<std::mutex>& lk,
+                                       std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                       CleanShutdownCheckContinuation continuation);
+
+    /**
+     * Callback for the post-cloning clean shutdown checks. Retries on the shared outage budget
+     * rather than failing the attempt, since a sync source having restarted is the very thing being
+     * checked for, and running 'continuation' only once the check has passed.
+     */
+    void _cleanShutdownCheckCallback(const Status& status,
+                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                     CleanShutdownCheckContinuation continuation);
+
+    /**
+     * Schedules the fetcher that determines the stop timestamp, which is what cloning hands off to
+     * once the clean shutdown check above has passed.
+     */
+    void _scheduleStopTimestampFetcher(const std::lock_guard<std::mutex>& lk,
                                        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -688,6 +747,13 @@ private:
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
+     * Runs the checks of the sync source that gate declaring this attempt a success: the clean
+     * shutdown check, when it is enabled for this attempt, followed by the final rollback check.
+     */
+    void _scheduleFinalSourceChecks(const std::lock_guard<std::mutex>& lock,
+                                    std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
      * Schedules a rollback checker to get the rollback ID after data cloning or applying. This
      * helps us check if a rollback occurred on the sync source.
      * If we fail to schedule the rollback checker, we set the error status in 'onCompletionGuard'
@@ -811,6 +877,21 @@ private:
     // Handle returned from RollbackChecker::checkForRollback().
     RollbackChecker::CallbackHandle _getLastRollbackIdHandle;  // (M)
 
+    // Whether this attempt checks its sync source for clean shutdowns, read once from
+    // enableInitialSyncCleanShutdownCheck when the attempt starts so that every site agrees.
+    bool _cleanShutdownCheckEnabled = false;  // (M)
+
+    // CleanShutdownChecker to get the sync source's clean shutdown baseline before, and to check it
+    // after, each initial sync attempt. Recreated per attempt alongside _rollbackChecker, since a
+    // baseline is only meaningful against the sync source it was taken from.
+    std::unique_ptr<CleanShutdownChecker> _cleanShutdownChecker;  // (M)
+
+    // Handle returned from whichever CleanShutdownChecker operation is outstanding. One member
+    // covers both reset() and checkForCleanShutdown(): the baseline completes before the attempt
+    // advances and the final check is only scheduled after oplog application, so the two are never
+    // in flight at the same time.
+    CleanShutdownChecker::CallbackHandle _cleanShutdownCheckHandle;  // (M)
+
     // Handle to currently scheduled _getNextApplierBatchCallback() task.
     executor::TaskExecutor::CallbackHandle _getNextApplierBatchHandle;  // (M)
 
@@ -824,7 +905,6 @@ private:
     std::unique_ptr<Fetcher> _fastCountTimestampStoreFetcher;    // (S)
     std::unique_ptr<Fetcher> _fastCountOldestOplogEntryFetcher;  // (S)
     std::unique_ptr<Fetcher> _fCVFetcher;                        // (S)
-    std::unique_ptr<Fetcher> _earliestOplogEntryFetcher;         // (S)
     std::unique_ptr<MultiApplier> _applier;                      // (M)
     HostAndPort _syncSource;                                     // (M)
     std::unique_ptr<DBClientConnection> _client;                 // (M)

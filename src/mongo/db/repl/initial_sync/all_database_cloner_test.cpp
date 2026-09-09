@@ -61,6 +61,63 @@ protected:
     std::vector<DatabaseName> getDatabasesFromCloner(AllDatabaseCloner* cloner) {
         return cloner->_databases;
     }
+
+    /**
+     * Drives a listDatabases stage retry in which the sync source reports 'cleanShutdownDoc' from
+     * its clean shutdown collection once we reconnect, and hands back the cloner's status so
+     * callers can assert on the specific verdict rather than just success or failure.
+     *
+     * Asserts the stage really was retried, so a test cannot pass by failing before the check ran.
+     */
+    Status runListDatabasesRetryWithCleanShutdown(boost::optional<BSONObj> cleanShutdownDoc) {
+        auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+        _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
+        _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));
+
+        // Stop at the listDatabases stage.
+        auto timesEnteredBeforeStage =
+            beforeStageFailPoint->setMode(FailPoint::alwaysOn,
+                                          0,
+                                          fromjson("{cloner: 'AllDatabaseCloner', stage: "
+                                                   "'listDatabases'}"));
+
+        auto cloner = makeAllDatabaseCloner();
+
+        Status result = Status(ErrorCodes::InternalError, "cloner did not run");
+        stdx::thread clonerThread([&] {
+            Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
+            result = cloner->run();
+        });
+
+        beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+        // Bring the server down so the stage fails and has to be retried.
+        _mockServer->shutdown();
+
+        auto beforeRBIDFailPoint =
+            globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
+        auto timesEnteredRBID =
+            beforeRBIDFailPoint->setMode(FailPoint::alwaysOn,
+                                         0,
+                                         fromjson("{cloner: 'AllDatabaseCloner', stage: "
+                                                  "'listDatabases'}"));
+        beforeStageFailPoint->setMode(FailPoint::off, 0);
+        beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
+        _clock.advance(Minutes(60));
+
+        // What the sync source says about its clean shutdowns when we reconnect.
+        _mockServer->setCommandReply("find", makeCleanShutdownFindResponse(cleanShutdownDoc));
+
+        LOGV2(13224505, "Bringing mock server back up.");
+        _mockServer->reboot();
+
+        beforeRBIDFailPoint->setMode(FailPoint::off, 0);
+        clonerThread.join();
+
+        // The stage really was retried, so the clean shutdown check ran.
+        ASSERT_EQ(1, getSharedData()->getTotalRetries(WithLock::withoutLock()));
+        return result;
+    }
 };
 
 TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyGlobalAdminBeforeTenantAdmin) {
@@ -363,6 +420,54 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButRollBackIdChanges) {
     ASSERT_EQ(0, getSharedData()->getRetryingOperationsCount(WithLock::withoutLock()));
     ASSERT_EQ(1, getSharedData()->getTotalRetries(WithLock::withoutLock()));
     ASSERT_EQ(Minutes(60), getSharedData()->getTotalTimeUnreachable(WithLock::withoutLock()));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesWhenSyncSourceReportsNoCleanShutdown) {
+    ASSERT_OK(runListDatabasesRetryWithCleanShutdown(boost::none));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButSyncSourceCleanlyShutDown) {
+    // The sync source rolled back to a checkpoint older than the point from which oplog replay
+    // covers us, so writes this cloner already read may have been lost.
+    auto status = runListDatabasesRetryWithCleanShutdown(
+        makeCleanShutdownDoc(kBaseCleanShutdownId + 1, Timestamp(50, 1)));
+    ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "cleanly shut down during initial sync");
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesWithCleanShutdownPastBeginApplyingTimestamp) {
+    // The checkpoint is at beginApplyingTimestamp, so the vulnerable window is empty and cloning
+    // continues even though the sync source restarted.
+    ASSERT_OK(runListDatabasesRetryWithCleanShutdown(
+        makeCleanShutdownDoc(kBaseCleanShutdownId + 1, kBeginApplyingTimestamp)));
+}
+
+TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButCleanShutdownHistoryTruncated) {
+    // The shutdown immediately after our baseline aged out of the capped collection. A later
+    // checkpoint on the surviving document says nothing about the one that was truncated, so this
+    // must fail rather than pass.
+    auto status = runListDatabasesRetryWithCleanShutdown(
+        makeCleanShutdownDoc(kBaseCleanShutdownId + 5, Timestamp(500, 1)));
+    ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "truncated away");
+}
+
+TEST_F(AllDatabaseClonerTest, DoesNotCheckCleanShutdownWhenDisabledForThisAttempt) {
+    // Rebuild the shared data as an attempt that started with enableInitialSyncCleanShutdownCheck
+    // off. Whether the check runs is decided once, when the attempt starts, and carried here.
+    _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId,
+                                                          false /* cleanShutdownCheckEnabled */,
+                                                          kBaseCleanShutdownId,
+                                                          kBeginApplyingTimestamp,
+                                                          Days(1),
+                                                          &_clock);
+    setInitialSyncId();
+
+    // This is the exact document that fails the attempt in
+    // RetriesListDatabasesButSyncSourceCleanlyShutDown above. With the check off, the cloner never
+    // looks at it and the retry succeeds.
+    ASSERT_OK(runListDatabasesRetryWithCleanShutdown(
+        makeCleanShutdownDoc(kBaseCleanShutdownId + 1, Timestamp(50, 1))));
 }
 
 TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {

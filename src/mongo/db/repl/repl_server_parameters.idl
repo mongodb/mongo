@@ -341,6 +341,20 @@ server_parameters:
             gte: 0
         redact: false
 
+    enableInitialSyncCleanShutdownCheck:
+        description: >-
+            Whether an initial syncing node checks its sync source for clean shutdowns that could
+            have rolled back writes the node has already cloned. Settable at runtime so that a sync
+            source can be deliberately restarted during an initial sync without having to restart
+            the syncing node, which would discard the attempt's progress. This value is read at
+            the start of each initial sync attempt, so any changes to this parameter will not be in
+            effect until the next initial sync attempt.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: enableInitialSyncCleanShutdownCheck
+        default: true
+        redact: false
+
     oplogNetworkTimeoutBufferSeconds:
         description: >-
             Number of seconds to add to the `find` and `getMore` timeouts for oplog fetching to
