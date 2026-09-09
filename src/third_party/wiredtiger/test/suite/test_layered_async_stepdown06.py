@@ -36,7 +36,8 @@ from wtscenario import make_scenarios
 #    demotion, and the step-up leg that proves the node is reusable.
 @disagg_test_class
 class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestCase):
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = \
+        'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -477,3 +478,7 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.conn.reconfigure('disaggregated=(role="leader")')
         self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 80), {'a', 'b', 'c', 'd'})
         self.assertEqual(self.read_kvs_at(self.uri, 80), expected)
+
+        # Settle the final leader state after the behavior assertions so teardown can verify it.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(70))
+        self.session.checkpoint()

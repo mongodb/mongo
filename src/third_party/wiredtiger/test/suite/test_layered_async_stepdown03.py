@@ -36,7 +36,8 @@ from wtscenario import make_scenarios
 #    back.
 @disagg_test_class
 class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestCase):
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = \
+        'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -93,6 +94,7 @@ class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assert_step_down_rollback(lambda: cursor.remove())
         self.session.rollback_transaction()
         cursor.close()
+        self.complete_step_down(20)
 
     # A transaction that wrote beforehand rolls back at commit; the retry lands in ingest.
     def test_straddler_commit_rolls_back(self):
@@ -169,6 +171,7 @@ class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestC
         # Committing a read-only transaction must succeed (no WT_ROLLBACK).
         self.session.commit_transaction()
         rcur.close()
+        self.complete_step_down(20)
 
     # Shared body: begin a stable write, set the cutoff, advance stable to it, checkpoint.
     def stable_writer_through_checkpoint(self):

@@ -26,6 +26,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
    */
   {"aggressive_stash_free", WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE},
   {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
+  {"backup_blkmod_delay", WT_TIMING_STRESS_BACKUP_BLKMOD_DELAY},
   {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
   {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},
   {"checkpoint_handle", WT_TIMING_STRESS_CHECKPOINT_HANDLE},

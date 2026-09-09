@@ -247,6 +247,9 @@ __wt_block_disagg_manager_open(WT_SESSION_IMPL *session, const char *uri, const 
 
     WT_ERR(__wti_block_disagg_open(session, uri, cfg, forced_salvage, readonly, &bm->block));
 
+    WT_ASSERT_ALWAYS(session, ((WT_BLOCK_DISAGG *)bm->block)->tableid == S2BT(session)->id,
+      "block manager bound to a block handle for a different table");
+
     *bmp = bm;
     return (0);
 

@@ -38,7 +38,8 @@ from wtscenario import make_scenarios
 @disagg_test_class
 class test_layered_async_stepdown01(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     test_name = __qualname__
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = \
+        'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -71,6 +72,7 @@ class test_layered_async_stepdown01(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), after)
         self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), before,
             'later writes must not reach the stable table')
+        self.complete_step_down(20)
 
     # Update, modify and remove of stable keys route to ingest, like insert.
     def test_update_modify_remove_routing_after_step_down_ts(self):
@@ -137,6 +139,7 @@ class test_layered_async_stepdown01(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_keys_at(self.stable_uri(uri2), 40), {'b'})
         self.assertEqual(self.read_kvs_at(uri1, 40), {'a': 'stable', 'c': 'ingest'})
         self.assertEqual(self.read_kvs_at(uri2, 40), {'b': 'stable', 'd': 'ingest'})
+        self.complete_step_down(20)
 
     # A non-overwrite insert of a stable key conflicts even though the write targets ingest.
     def test_duplicate_key_detection_while_step_down_ts_set(self):
@@ -158,6 +161,7 @@ class test_layered_async_stepdown01(LayeredStepdownMixin, wttest.WiredTigerTestC
         # The rejected insert left the stable value alone and nothing in ingest.
         self.assertEqual(self.read_kvs_at(self.uri, 40), {'dup': 'stable'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), set())
+        self.complete_step_down(20)
 
     # overwrite=false update and remove consult the merged view; the writes land in ingest.
     def test_overwrite_false_ops_while_step_down_ts_set(self):
@@ -230,3 +234,4 @@ class test_layered_async_stepdown01(LayeredStepdownMixin, wttest.WiredTigerTestC
         cursor.close()
         self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'stable'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), set())
+        self.complete_step_down(20)

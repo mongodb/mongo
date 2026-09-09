@@ -2689,8 +2689,31 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
          * disk. In local mode, if restoring saved update chains, we can skip the disk written.
          */
         if (r->page->disagg_info != NULL) {
-            if (chunk->entries == 0)
+            if (chunk->entries == 0) {
+                /*
+                 * Nothing survives onto the page: every update was restored to the in-memory chain.
+                 * If a previous reconciliation left a block behind, treat this like any other
+                 * disagg skip-write so the page keeps pointing at it instead of losing track of it:
+                 * otherwise the address a follower would need to find it is never recorded, and the
+                 * block itself can be freed out from under still-live content. There's nothing to
+                 * copy forward when no such block exists. This can only apply to the one-chunk
+                 * case: a split produces more than one chunk precisely because the old single page
+                 * is becoming multiple new ones, so no single chunk can claim to still be "the"
+                 * previous page and inherit its address.
+                 *
+                 * This is the second cause of a skip-write, and deliberately counts against the
+                 * same statistic as the one below: both mean the page kept the block it already
+                 * had.
+                 */
+                if (last_block && r->multi_next == 1 &&
+                  page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
+                  WT_REC_RESULT_SINGLE_PAGE(session, r)) {
+                    WT_RET(__rec_copy_prev_addr(session, r));
+                    F_SET(multi, WT_MULTI_SKIP_WRITE);
+                    WT_STAT_CONN_DSRC_INCR(session, rec_skip_write);
+                }
                 goto copy_image;
+            }
         } else if (F_ISSET(multi, WT_MULTI_SUPD_RESTORE))
             goto copy_image;
 

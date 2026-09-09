@@ -753,7 +753,7 @@ __wt_schema_open_layered(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE) {
         WT_RET_NOTFOUND_OK(ret = __wt_metadata_search(session, layered->stable_uri, &stable_value));
         if (ret == WT_NOTFOUND)
-            F_SET(layered, WT_LAYERED_TABLE_STEP_DOWN_CREATED);
+            __wt_atomic_store_bool_relaxed(&layered->step_down_created, true);
         __wt_free(session, stable_value);
     }
 

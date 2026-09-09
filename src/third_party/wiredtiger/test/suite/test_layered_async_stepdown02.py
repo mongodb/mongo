@@ -38,7 +38,8 @@ from wtscenario import make_scenarios
 @disagg_test_class
 class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     test_name = __qualname__
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = \
+        'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -107,6 +108,7 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
         expected[updated] = 'ingest-update'
         del expected[removed]
         self.assertEqual(self.read_kvs_at(uri, 70), expected)
+        self.complete_step_down(50)
 
     # Point/range lookups merge ingest over stable.
     def test_search_and_search_near_merged(self):
@@ -145,6 +147,7 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(order, ['a', 'b', 'c', 'd', 'e', 'f'])
         self.session.rollback_transaction()
         cursor.close()
+        self.complete_step_down(20)
 
     # A write to ingest is visible to a later read in the same transaction.
     def test_read_your_own_writes_after_step_down_ts(self):
@@ -171,6 +174,7 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         # Ground truth: both writes landed in ingest; the stable version is untouched.
         self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 40), {'old': 'stable'})
+        self.complete_step_down(20)
 
     # Reverse iteration and largest_key on either side of the step-down timestamp; largest_key is
     # non-transactional.
@@ -209,6 +213,7 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
         # Reverse merged order across both constituents.
         self.assertEqual(reverse_keys(40), ['z', 'f', 'e', 'd', 'c', 'b', 'a'])
         self.assertEqual(largest(), 'z')
+        self.complete_step_down(20)
 
     # Read ops through straddling reader: snapshot pins stable; ingest invisible except largest_key.
     def test_read_ops_across_step_down_ts(self):
@@ -258,6 +263,7 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         self.session.rollback_transaction()
         rcur.close()
+        self.complete_step_down(20)
 
     # Check every read op against a per-timestamp oracle: tombstone/re-insert/straddler merges.
     def test_oracle_reads_merges(self):

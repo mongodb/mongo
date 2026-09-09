@@ -267,7 +267,12 @@ err:
     if (F_ISSET(cb, WT_CURBACKUP_FORCE_STOP)) {
         __wt_verbose(
           session, WT_VERB_BACKUP, "%s", "Releasing resources from forced stop incremental");
-        __wt_backup_destroy(session);
+        /*
+         * Checkpoints read the connection's backup identifiers with no synchronization beyond the
+         * checkpoint lock they already hold, so take that lock to keep an in-flight checkpoint from
+         * reading an identifier as this releases it.
+         */
+        WT_WITH_CHECKPOINT_LOCK(session, __wt_backup_destroy(session));
     }
 
     /*

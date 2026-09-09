@@ -40,7 +40,7 @@ from wtscenario import make_scenarios
 @disagg_test_class
 class test_layered_async_stepdown09(LayeredStepdownMixin, wttest.WiredTigerTestCase,
                                     suite_subprocess):
-    conn_config = 'disaggregated=(role="leader")'
+    conn_config = 'precise_checkpoint=true,disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     checkpoints = [
@@ -75,6 +75,8 @@ class test_layered_async_stepdown09(LayeredStepdownMixin, wttest.WiredTigerTestC
         self._step_down_with_checkpoint_at(self.checkpoint_ts)
 
     def test_step_down_checkpoint_boundary(self):
+        # Precise checkpoint requires a stable timestamp when the parent connection closes.
+        self.set_global_ts(1, 1)
         rc, _ = self.run_subprocess_function(
             'SUBPROCESS',
             'test_layered_async_stepdown09.test_layered_async_stepdown09.subprocess_step_down',

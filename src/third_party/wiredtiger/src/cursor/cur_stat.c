@@ -437,7 +437,7 @@ retry:
      * constituent until a later step-up creates one, so it reports the same way a follower does.
      */
     if (!__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) ||
-      F_ISSET(layered, WT_LAYERED_TABLE_STEP_DOWN_CREATED)) {
+      __wt_atomic_load_bool_relaxed(&layered->step_down_created)) {
         /*
          * Neither case has the stable's pages resident in the local cache, so its non-walk stats
          * are ~0 - except the block size, which we read from the checkpoint metadata directly since
@@ -484,11 +484,10 @@ retry:
 
     /*
      * A reader races the role change across a step-up or step-down, so a leader can still find the
-     * stable constituent missing here.
-     *
-     * FIXME-WT-18359: Investigate whether this guard is reachable now that
-     * WT_LAYERED_TABLE_STEP_DOWN_CREATED routes tables without a stable constituent through the
-     * follower path above.
+     * stable constituent missing here. The role and the step-down mark are read above without a
+     * lock: step-down clears the mark before it publishes the follower role, and step-up publishes
+     * the leader role before it creates the stable tables a follower era left missing.
+
      */
     if (ret == ENOENT) {
         ret = 0;

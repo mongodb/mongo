@@ -129,9 +129,19 @@ struct __wt_layered_table {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LAYERED_TABLE_OPEN 0x1u
-#define WT_LAYERED_TABLE_STEP_DOWN_CREATED 0x2u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    /* These flags are only modified while the handle is held exclusively, at open or close. */
     uint8_t flags;
+
+    /*
+     * Created while the step-down timestamp was set, so there is no stable constituent. Relaxed
+     * order suffices: the set happens before the handle is published, and the clear precedes
+     * step-down's release store of the follower role, so a cursor that resolved its role with the
+     * acquire load has already seen the clear. A cursor that still holds the leader role may see
+     * the clear early; its stable open then fails under the schema lock and
+     * __clayered_ignore_missing_stable tolerates the miss.
+     */
+    wt_shared bool step_down_created;
 };
 
 /* Holds metadata entry name and the associated config string. */

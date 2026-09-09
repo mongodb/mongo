@@ -428,7 +428,7 @@ __clayered_enter_flags(
      * by contract.
      */
     if (role == WTI_CLAYERED_ROLE_FOLLOWER || session->txn->stepdown_ts_set ||
-      F_ISSET((WT_LAYERED_TABLE *)clayered->dhandle, WT_LAYERED_TABLE_STEP_DOWN_CREATED) ||
+      __wt_atomic_load_bool_relaxed(&((WT_LAYERED_TABLE *)clayered->dhandle)->step_down_created) ||
       mode == WTI_CLAYERED_MODE_LARGEST_KEY)
         LF_SET(CLAYERED_ENTER_OPEN_INGEST);
 
@@ -1216,9 +1216,10 @@ __clayered_ignore_missing_stable(WT_SESSION_IMPL *session, WTI_CLAYERED_ROLE rol
      * the step-down window is marked at handle open and never attempts this open, so any other miss
      * is a genuinely missing constituent and must be reported.
      *
-     * FIXME-WT-18359: Investigate whether this guard is reachable now that
-     * WT_LAYERED_TABLE_STEP_DOWN_CREATED skips opening the stable constituent for tables created
-     * during the step-down window.
+     * The step-down mark does not close this window: step-down clears it before publishing the
+     * follower role, so a cursor that read the mark as clear can still resolve the leader role and
+     * attempt the open.
+
      */
     return (role == WTI_CLAYERED_ROLE_LEADER &&
       !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
@@ -1273,7 +1274,8 @@ __clayered_update_stable(WTI_CURSOR_LAYERED *clayered, uint32_t flags, WTI_CLAYE
 
     if (clayered->stable_cursor == NULL) {
         /* Open stable the first time if needed, unless the constituent does not exist yet. */
-        if (!F_ISSET((WT_LAYERED_TABLE *)clayered->dhandle, WT_LAYERED_TABLE_STEP_DOWN_CREATED) &&
+        if (!__wt_atomic_load_bool_relaxed(
+              &((WT_LAYERED_TABLE *)clayered->dhandle)->step_down_created) &&
           (role == WTI_CLAYERED_ROLE_LEADER || !LF_ISSET(CLAYERED_ENTER_SKIP_STABLE)))
             WT_RET(__clayered_open_stable_first(clayered, role, conn_lsn));
     } else if (LF_ISSET(CLAYERED_ENTER_ROLE_CHANGE) ||
@@ -2457,7 +2459,7 @@ __clayered_lookup_lazy_stable_open(WTI_CLAYERED_OP *op)
      * stable constituent at all, not because it is waiting on a checkpoint: opening as a follower
      * would refuse the bind against the leader-era snapshot.
      */
-    if (F_ISSET((WT_LAYERED_TABLE *)clayered->dhandle, WT_LAYERED_TABLE_STEP_DOWN_CREATED))
+    if (__wt_atomic_load_bool_relaxed(&((WT_LAYERED_TABLE *)clayered->dhandle)->step_down_created))
         return (0);
 
     WT_RET(__clayered_open_stable_first(clayered, WTI_CLAYERED_ROLE_FOLLOWER,

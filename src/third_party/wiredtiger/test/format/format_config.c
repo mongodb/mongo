@@ -150,6 +150,15 @@ config_random(TABLE *table, bool table_only)
             continue;
 
         /*
+         * The stable-dhandle delay stalls only the follower's stable checkpoint cursor opens; under
+         * multi-node the leader waits at a rendezvous for the follower to finish, so the delay can
+         * starve the follower past the task budget and hang the leader. Don't random-enable it
+         * there.
+         */
+        if (cp->off == V_GLOBAL_STRESS_DISAGG_STABLE_DHANDLE_DELAY && disagg_is_multi_node())
+            continue;
+
+        /*
          * Boolean flags are 0 or 1, where the variable's "min" value is the percent chance the flag
          * is "on" (so "on" if random rolled <= N, otherwise "off").
          */

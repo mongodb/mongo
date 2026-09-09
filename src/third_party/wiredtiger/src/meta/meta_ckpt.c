@@ -606,15 +606,24 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
         if (!F_ISSET(blk, WT_BLKINCR_VALID)) {
             free = true;
             setup = false;
-        } else if (F_ISSET(blk_mod, WT_CKPT_BLOCK_MODS_VALID) &&
-          WT_STRING_MATCH(blk_mod->id_str, blk->id_str, strlen(blk->id_str))) {
-            /* We match, keep our entry and don't set up. */
-            setup = false;
-            free = false;
         } else {
-            /* We don't match, free any old information. */
-            free = true;
-            setup = true;
+            /*
+             * Wait between observing the global entry as valid and reading its id string, widening
+             * the window in which a concurrent force stop of incremental backup can free that
+             * string.
+             */
+            __wt_timing_stress(session, WT_TIMING_STRESS_BACKUP_BLKMOD_DELAY, NULL);
+
+            if (F_ISSET(blk_mod, WT_CKPT_BLOCK_MODS_VALID) &&
+              WT_STRING_MATCH(blk_mod->id_str, blk->id_str, strlen(blk->id_str))) {
+                /* We match, keep our entry and don't set up. */
+                setup = false;
+                free = false;
+            } else {
+                /* We don't match, free any old information. */
+                free = true;
+                setup = true;
+            }
         }
 
         /* If we are keeping or setting up an entry on a rename, set the flag. */

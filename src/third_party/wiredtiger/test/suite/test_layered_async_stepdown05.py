@@ -35,7 +35,8 @@ from wtscenario import make_scenarios
 #    Validation of the step-down timestamp itself and the timestamp guards it imposes.
 @disagg_test_class
 class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestCase):
-    conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = \
+        'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -72,6 +73,7 @@ class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_step_down_ts(9),
             '/must not be older than the newest durable timestamp/')
         self.set_step_down_ts(10)
+        self.complete_step_down(10)
 
     # Stable may reach the cutoff exactly but never pass it.
     def test_stable_cannot_pass_cutoff(self):
@@ -192,3 +194,4 @@ class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestC
         # A commit above the cutoff carries all_durable past it: drained.
         self.write_at(self.uri, {'k3': 'v'}, 25)
         self.assertEqual(self.all_durable(), 25)
+        self.complete_step_down(20)

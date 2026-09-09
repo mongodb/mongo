@@ -95,6 +95,11 @@ class test_verify_btree_size(wttest.WiredTigerTestCase):
         real_size = self.get_ckpt_size()
         self.assertGreater(real_size, 0)
 
+        # Reopen so the stable file's dhandle is closed before it gets corrupted below: otherwise
+        # verify would keep consulting the dhandle's cached, pre-corruption checkpoint list and
+        # never see a mismatch to fix.
+        self.reopen_conn()
+
         # Corrupt the checkpoint size in the metadata.
         self.set_ckpt_size(1)
 
@@ -139,6 +144,11 @@ class test_verify_btree_size(wttest.WiredTigerTestCase):
         self.populate()
 
         real_size = self.get_ckpt_size()
+
+        # Reopen so the stable file's dhandle is closed before it gets corrupted below: otherwise
+        # verify would keep consulting the dhandle's cached, pre-corruption checkpoint list and
+        # never see a mismatch to fix.
+        self.reopen_conn()
         self.set_ckpt_size(1)
 
         with self.customStdoutPattern(
@@ -164,6 +174,11 @@ class test_verify_btree_size(wttest.WiredTigerTestCase):
             self.session.create(uri, 'key_format=S,value_format=S')
             self.populate(uri)
             real_sizes.append(self.get_ckpt_size(stable_uri))
+
+        # Reopen so every stable file's dhandle is closed before corruption below: otherwise
+        # verify would keep consulting a dhandle's cached, pre-corruption checkpoint list and
+        # never see a mismatch to fix.
+        self.reopen_conn()
 
         # Corrupt each table with a distinct bogus size.
         for i, stable_uri in enumerate(stable_uris):
