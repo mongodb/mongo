@@ -7,6 +7,7 @@ import argparse
 import atexit
 import logging
 import os
+import signal
 import sys
 import time
 
@@ -94,6 +95,12 @@ def main():
         include_extraneous_status=args.include_extraneous_status,
         issuer_hash_algorithm=args.issuer_hash_algorithm,
     )
+
+    # Python has a long-standing bug (https://github.com/python/cpython/issues/78667) where
+    # KeyboardInterrupt during threading.Condition.wait() inside Thread.start() corrupts a
+    # lock and raises RuntimeError, leaving the process hung rather than exiting. Install a
+    # SIGINT handler that calls os._exit() directly to bypass the threading cleanup path.
+    signal.signal(signal.SIGINT, lambda _sig, _frame: os._exit(0))
 
     logger.debug("Mock OCSP Responder will be started on port %s" % (str(args.port)))
     mock_ocsp_responder.init(port=args.port, debug=args.verbose, host=args.bind_ip)
