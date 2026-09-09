@@ -622,10 +622,13 @@ struct FetchFromCollectionCallback {
 };
 
 /**
- * A document iterator that uses an arbitrary index to iterate over documents in a collection that
- * match a simple equality predicate on the first field in the index key pattern. There is no
- * uniqueness requirement for the queried field, and this iterator can produce multiple matching
- * documents.
+ * A document iterator that uses an arbitrary index to find documents in a collection that match a
+ * simple equality predicate on the first field in the index key pattern. There is no uniqueness
+ * requirement for the queried field.
+ *
+ * Produces at most one document and then reports itself exhausted -- it holds no cursor across
+ * 'consumeOne()' calls, so it cannot advance. 'getIndexForExpressEquality()' only admits this plan
+ * where one document is enough: a unique single-field index, or an unsharded limit(1) query.
  *
  * The iterator owns the resources associated with the collection it iterates.
  */
@@ -724,7 +727,12 @@ public:
                               IndexKeyEntry::rehydrateKey(keyPattern, dehydratedKp),
                               keyPattern,
                               accessCollection(collection).ns());
-            return Ready();
+
+            // TODO SERVER-87016: If this iterator gains multi-key scanning, advance a persisted
+            // cursor past the bad entry instead, so a multi-result query is not silently
+            // truncated at the first orphaned index key.
+            _exhausted = true;
+            return Exhausted();
         }
 
         auto progress =

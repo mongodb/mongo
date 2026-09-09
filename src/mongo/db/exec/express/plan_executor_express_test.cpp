@@ -4,9 +4,20 @@
 #include "mongo/db/exec/express/plan_executor_express.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -54,6 +65,137 @@ public:
 
     ServiceContext::UniqueOperationContext _opCtxOwned;
 };
+
+/**
+ * Drives a real 'PlanExecutorExpress' over a real collection, which the eligibility tests above
+ * cannot do. This is what pins termination end to end: 'PlanExecutorExpress::getNext()' loops while
+ * it has no output and breaks only on 'ExpressPlan::exhausted()', so an iterator that reports a
+ * non-terminal result on a fetch miss spins in the executor, not in the iterator.
+ */
+class ExpressExecutorTest : public CatalogTestFixture {
+protected:
+    static inline const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("ExpressExecutorTest.TestCollection");
+    static constexpr auto kIndexName = "a_1";
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
+
+        auto collection = acquire();
+        {
+            WriteUnitOfWork wuow(operationContext());
+            CollectionWriter writer{operationContext(), &collection};
+            auto* writable = writer.getWritableCollection(operationContext());
+            ASSERT_OK(writable->getIndexCatalog()->createIndexOnEmptyCollection(
+                operationContext(),
+                writable,
+                BSON("v" << 2 << "name" << kIndexName << "key" << BSON("a" << 1))));
+            wuow.commit();
+        }
+        {
+            WriteUnitOfWork wuow(operationContext());
+            std::vector<BSONObj> docs{fromjson("{_id: 0, a: 2}"), fromjson("{_id: 1, a: 5}")};
+            ASSERT_OK(Helpers::insert(operationContext(), collection.getCollectionPtr(), docs));
+            wuow.commit();
+        }
+    }
+
+    CollectionAcquisition acquire() {
+        return acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(kNss,
+                                         PlacementConcern(boost::none, boost::none),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_X);
+    }
+
+    /**
+     * Deletes the record behind the 'a: 5' index key without touching the index, leaving an entry
+     * that references a record which no longer exists.
+     */
+    void orphanIndexKeyForValueFive(const CollectionPtr& collectionPtr) {
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        auto* recordStore = collectionPtr->getRecordStore();
+
+        boost::optional<RecordId> orphanedRid;
+        {
+            auto cursor = recordStore->getCursor(operationContext(), ru);
+            while (auto record = cursor->next()) {
+                if (record->data.toBson().getIntField("a") == 5) {
+                    orphanedRid = record->id;
+                    break;
+                }
+            }
+        }
+        ASSERT(bool(orphanedRid));
+
+        WriteUnitOfWork wuow(operationContext());
+        recordStore->deleteRecord(operationContext(), ru, *orphanedRid);
+        wuow.commit();
+    }
+
+    std::unique_ptr<CanonicalQuery> canonicalizeFindByA() {
+        auto findCommand = std::make_unique<FindCommandRequest>(kNss);
+        findCommand->setFilter(fromjson("{a: 5}"));
+        findCommand->setLimit(1);
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx =
+                ExpressionContextBuilder{}.fromRequest(operationContext(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    }
+
+    IndexForExpressEquality indexForA(const CollectionPtr& collectionPtr,
+                                      const CanonicalQuery& cq) {
+        boost::optional<IndexEntry> entry;
+        for (auto&& ice : collectionPtr->getIndexCatalog()->getEntriesShared(
+                 IndexCatalog::InclusionPolicy::kReady)) {
+            if (ice->descriptor()->indexName() == kIndexName) {
+                entry = indexEntryFromIndexCatalogEntry(operationContext(), collectionPtr, ice, cq);
+            }
+        }
+        ASSERT(bool(entry));
+        return IndexForExpressEquality(std::move(*entry), false /* coversProjection */);
+    }
+};
+
+// A fetch miss must drain to EOF within a short deadline, having examined the orphaned key exactly
+// once. The two assertions are complementary: the key count rules out an executor that loops a
+// bounded number of times, and the deadline rules out one that never terminates at all.
+TEST_F(ExpressExecutorTest, orphanIndexKeyReturnsEofOnPlainRead) {
+    auto collection = acquire();
+    orphanIndexKeyForValueFive(collection.getCollectionPtr());
+
+    // Matches what the command layer gives an ordinary find, which is the configuration that spun.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    auto cq = canonicalizeFindByA();
+    auto index = indexForA(collection.getCollectionPtr(), *cq);
+    auto exec = makeExpressExecutorForFindByUserIndex(operationContext(),
+                                                      std::move(cq),
+                                                      collection,
+                                                      index,
+                                                      boost::none /* collectionFilter */,
+                                                      false /* returnOwnedBson */);
+
+    // Bounds only the drain loop, so setup cost cannot eat into it. One seek and one failed fetch
+    // is microseconds of work; seconds of headroom covers a loaded sanitizer host.
+    operationContext()->setDeadlineByDate(Date_t::now() + Seconds(5), ErrorCodes::MaxTimeMSExpired);
+
+    BSONObj out;
+    ASSERT_EQ(exec->getNext(&out, nullptr), PlanExecutor::IS_EOF);
+
+    // EOF alone would also be reported by an executor that looped a hundred times before giving
+    // up. Pinning the key count is what proves the orphaned entry was seeked once.
+    PlanSummaryStats summaryStats;
+    exec->getPlanExplainer().getSummaryStats(&summaryStats);
+    ASSERT_EQ(summaryStats.totalKeysExamined, 1);
+    ASSERT_EQ(summaryStats.totalDocsExamined, 0);
+    ASSERT_EQ(summaryStats.nReturned, 0);
+}
 
 }  // namespace
 

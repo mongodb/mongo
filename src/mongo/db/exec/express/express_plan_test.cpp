@@ -24,6 +24,9 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
@@ -401,6 +404,157 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
     ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
+}
+
+/**
+ * Deletes the record that '{a: 5}' indexes directly from the record store, leaving its index key in
+ * place: an index entry referencing a record that no longer exists.
+ */
+static void orphanIndexKeyForFilterValueFive(OperationContext* opCtx,
+                                             const CollectionPtr& collectionPtr) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto* recordStore = collectionPtr->getRecordStore();
+
+    boost::optional<RecordId> orphanedRid;
+    {
+        auto cursor = recordStore->getCursor(opCtx, ru);
+        while (auto record = cursor->next()) {
+            if (record->data.toBson().getIntField("a") == 5) {
+                orphanedRid = record->id;
+                break;
+            }
+        }
+    }
+    ASSERT(bool(orphanedRid));
+
+    WriteUnitOfWork wuow(opCtx);
+    recordStore->deleteRecord(opCtx, ru, *orphanedRid);
+    wuow.commit();
+}
+
+/**
+ * Asserts that a fetch miss on the user-index path terminates the iterator, rather than leaving
+ * the executor's drain loop re-seeking the same orphaned key forever.
+ *
+ * 'exhausted()' is the whole liveness guarantee, not just bookkeeping: the drain loop in
+ * 'PlanExecutorExpress::getNext()' breaks on 'ExpressPlan::exhausted()', which forwards this
+ * iterator's flag verbatim. Asserting the flag therefore proves the loop terminates.
+ */
+static void assertOrphanIndexKeyExhaustsIterator(OperationContext* opCtx,
+                                                 CollectionAcquisition collection,
+                                                 std::string_view indexName) {
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
+    auto indexEntry = collectionPtr->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT(indexEntry);
+
+    IteratorStats iteratorStats;
+    auto filter = fromjson("{a: 5}");
+    CollatorInterface* collator = nullptr;
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
+    iterator.open(opCtx, collection, /*forWrite=*/false, &iteratorStats);
+
+    for (size_t i = 0; i < 3; ++i) {
+        auto result = iterateButExpectNoDocument(opCtx, iterator);
+        ASSERT(std::holds_alternative<Exhausted>(result));
+        ASSERT(iterator.exhausted());
+    }
+
+    // The orphaned key is examined once, on the first call; the fetch then misses. Later calls
+    // short-circuit on '_exhausted' without touching the index again.
+    ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
+    ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
+}
+
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyOnPlainRead) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // This is what a plain read gets: a non-transactional find at local/majority read concern is
+    // eligible to ignore prepare conflicts, unlike the 'kEnforce' default 'CatalogTestFixture'
+    // gives us here. 'logRecordNotFound()' then returns without logging or throwing.
+    //
+    // Must come after the orphaning step above, whose committed WriteUnitOfWork closes the storage
+    // transaction: 'setPrepareConflictBehavior()' invariants on '!_isActive()'.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyLoggingDataCorruption) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // 'logRecordNotFound()' logs the warning and returns instead of uasserting.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setDataCorruptionDetectionMode(DataCorruptionDetectionMode::kLogAndContinue);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+// Documents the truncation this terminator accepts. With two keys for the same value, orphaning the
+// first makes the query report EOF even though the second still resolves to a live record. The
+// alternative was an unbounded spin, so this is the better of two bad outcomes -- but it is a
+// behavior change worth pinning.
+//
+// If this test fails because a document was produced, SERVER-87016 has added multi-key scanning and
+// the miss branch must now skip the orphaned entry rather than terminate.
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyTruncatesRemainingMatches) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 5}"sv, "{_id: 2, a: 5}"sv);
+
+    // Orphans the lowest RecordId matching 'a: 5', which is the first of the two 'a: 5' entries in
+    // index order, since duplicate keys are ordered by RecordId.
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // '{_id: 2, a: 5}' survives and its index key still resolves, so a scanning iterator could
+    // return it.
+    ASSERT_EQ(collection.getCollectionPtr()->numRecords(operationContext()), 2);
+
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+// Reads that enforce prepare conflicts -- multi-document transactions, snapshot/linearizable read
+// concern, or any read with 'afterClusterTime' -- never reach the miss branch's return at all:
+// 'logRecordNotFound()' uasserts first. This is the narrower case, not the common one.
+TEST_F(ExpressPlanTest,
+       TestLookupViaUserIndexWithOrphanIndexKeyThrowsWhenEnforcingPrepareConflicts) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collectionPtr);
+
+    auto indexEntry =
+        collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
+    ASSERT(indexEntry);
+
+    IteratorStats iteratorStats;
+    auto filter = fromjson("{a: 5}");
+    CollatorInterface* collator = nullptr;
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
+
+    ASSERT_THROWS_CODE(iterateButExpectNoDocument(operationContext(), iterator),
+                       DBException,
+                       ErrorCodes::DataCorruptionDetected);
 }
 
 projection_ast::Projection parseProjection(OperationContext* opCtx, BSONObj projection) {
