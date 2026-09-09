@@ -43,12 +43,28 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
     std::lock_guard lk(_mutex);
     // The boost::none state means we have not buffered any oplog entries yet.
     if (_lastBufferedRid.has_value()) {
-        // Oplog truncation should never truncate the last buffered record ID.
-        tassert(12101812,
-                str::stream() << "Unable to find oplog start point for next size count checkpoint"
-                              << ", lastBufferedRid: "
-                              << _lastBufferedRid.value().toStringHumanReadable(),
-                cursor.seekExact(_lastBufferedRid.value()));
+        const bool lastBufferedRidFound = cursor.seekExact(_lastBufferedRid.value()).has_value();
+        if (!lastBufferedRidFound) {
+            if (!_reportedLostLastBufferedRid) {
+                // Avoid looping with the same assertion.
+                _reportedLostLastBufferedRid = true;
+                tasserted(
+                    12101812,
+                    fmt::format(
+                        "Unable to find oplog start point for next size count "
+                        "checkpoint at lastBufferedRid: {}. A repair procedure will be needed.",
+                        _lastBufferedRid.value().toStringHumanReadable()));
+            }
+
+            if (boost::optional<Record> record = cursor.seek(
+                    _lastBufferedRid.value(), SeekableRecordCursor::BoundInclusion::kExclude)) {
+                _pending->consumeRecord(*record);
+                _lastBufferedRid = record->id;
+                // Unset the flag so the next loss of the last buffered record is a new anomaly and
+                // gets its own tassert.
+                _reportedLostLastBufferedRid = false;
+            }
+        }
     }
 
     // We advance lastBufferedRid on each iteration so that if cursor.next() throws a

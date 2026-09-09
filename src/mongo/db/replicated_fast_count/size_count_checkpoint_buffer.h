@@ -68,6 +68,11 @@ private:
     // not buffered any oplog entries yet.
     boost::optional<RecordId> _lastBufferedRid = boost::none;
 
+    // Set while the last buffered record ID has been observed to be lost and the anomaly reported,
+    // so the same loss is not re-reported on every scan. Cleared once scanning has recovered,
+    // re-arming the report for the next loss.
+    bool _reportedLostLastBufferedRid = false;
+
     mutable std::mutex _mutex;
     // Accumulated size/count deltas buffered but not checked out. See checkoutForFlush().
     boost::optional<StreamingOplogDeltaAccumulator> _pending;
