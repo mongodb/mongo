@@ -660,7 +660,9 @@ void sortQueryResults(std::vector<BSONObj>& input) {
  */
 BSONObj _resultSetsEqualUnordered(const BSONObj& input, void*) {
     BSONObjIterator i(input);
+    uassert(9422901, "_resultSetsEqualUnordered expects two arguments", i.more());
     auto first = i.next();
+    uassert(9422902, "_resultSetsEqualUnordered expects two arguments", i.more());
     auto second = i.next();
     uassert(9193201,
             str::stream() << "_resultSetsEqualUnordered expects two arrays of containing objects "
