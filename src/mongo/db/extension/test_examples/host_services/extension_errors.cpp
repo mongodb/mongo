@@ -114,11 +114,11 @@ public:
     }
 
     mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return _stageBson;
+        return BSON(_name << _stageBson);
     }
 
     mongo::BSONObj toBsonForLog() const override {
-        return _stageBson;
+        return BSON(_name << _stageBson);
     }
 
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {

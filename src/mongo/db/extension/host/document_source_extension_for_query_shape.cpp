@@ -61,7 +61,20 @@ Value DocumentSourceExtensionForQueryShape::serialize(
     // cannot because hybrid search desugars when running against query stats. Restore the tassert
     // when hybrid search can compute query shape without desugaring.
     host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
-    return Value(_parseNode->getQueryShape(adapter));
+    BSONObj queryShape = _parseNode->getQueryShape(adapter);
+    // An extension stage's query shape must be a single-field {$stageName: ...} object so it can be
+    // reparsed on query stats store read.
+    uassert(13462501,
+            str::stream() << "Extension stage " << _stageName << " produced a query shape with "
+                          << queryShape.nFields()
+                          << " field(s); expected exactly one (a {$stageName: ...} object)",
+            queryShape.nFields() == 1);
+    uassert(13462502,
+            str::stream() << "Extension stage " << _stageName << " produced a query shape with "
+                          << queryShape.firstElementFieldName()
+                          << " as the sole field name; expected \"" << _stageName << "\"",
+            queryShape.firstElementFieldNameStringData() == _stageName);
+    return Value(queryShape);
 }
 
 DocumentSource::Id DocumentSourceExtensionForQueryShape::getId() const {
