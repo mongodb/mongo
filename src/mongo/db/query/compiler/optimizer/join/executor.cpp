@@ -35,6 +35,7 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -435,6 +436,9 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
  * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
  * if it is stale and the query must be replanned.
  *
+ * 'planCacheKeyHex' is an output parameter, left empty on the fast 'kCurrent' path and otherwise
+ * filled lazily with the formatted plan cache key once a log line fires.
+ *
  * A bumped collection version alone is not enough to reject the entry. The DDL responsible may have
  * touched an index this plan could never use, or one it considered but did not choose; neither can
  * change which plan the optimizer would pick now. The per-node index fingerprints tell the two
@@ -443,16 +447,41 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
 bool validateCacheEntry(JoinPlanCacheEntry& hit,
                         const MultipleCollectionAccessor& mca,
                         const AggJoinModel& model,
-                        const AvailableIndexes& perCollIdxs) {
+                        const AvailableIndexes& perCollIdxs,
+                        const JoinPlanCacheKey& cacheKey,
+                        std::string& planCacheKeyHex) {
     auto cachedTags = hit.getCollectionTags();
-    switch (classifyCollectionTags(cachedTags, mca)) {
+    auto validation = classifyCollectionTags(cachedTags, mca);
+
+    // The formatted plan cache key costs a hash pass over the whole key plus an allocation, so only
+    // compute it when a log line will actually be emitted; the value lands in 'planCacheKeyHex' so
+    // this function's reason logs and the caller's removal log share it instead of hashing twice.
+    const auto getPlanCacheKeyHex = [&]() -> const std::string& {
+        if (planCacheKeyHex.empty()) {
+            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
+        }
+        return planCacheKeyHex;
+    };
+
+    switch (validation.status) {
         case CollectionTagStatus::kCurrent:
             // Nothing has changed since the entry was cached, so no fingerprinting is needed.
             return true;
         case CollectionTagStatus::kStale:
             // A stale tag can mean a dropped collection or a sample refresh.
+            if (validation.droppedCollectionUuid) {
+                LOGV2(12926600,
+                      "Join plan cache entry references a collection which no longer exists",
+                      "planCacheKey"_attr = getPlanCacheKeyHex(),
+                      "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
+                      "uuid"_attr = *validation.droppedCollectionUuid);
+            }
             return false;
         case CollectionTagStatus::kNeedsIndexRevalidation:
+            LOGV2_DEBUG(13445403,
+                        5,
+                        "the entry against the current indexes",
+                        "planCacheKey"_attr = getPlanCacheKeyHex());
             break;
     }
 
@@ -464,10 +493,21 @@ bool validateCacheEntry(JoinPlanCacheEntry& hit,
         model.getGraph(), model.getResolvedPaths(), perCollIdxs, *hit.joinTree);
     for (size_t node = 0; node < hit.nodeFingerprints.size(); ++node) {
         if (!canReuseNodeFingerprint(hit.nodeFingerprints[node], currentFingerprints[node])) {
-            LOGV2_DEBUG(13036802,
-                        5,
-                        "Join plan cache entry invalidated by a change to an index it relies on",
-                        "node"_attr = node);
+            LOGV2(13036802,
+                  "Join plan cache entry invalidated by a DDL",
+                  "planCacheKey"_attr = getPlanCacheKeyHex(),
+                  "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
+                  "node"_attr = static_cast<int>(node),
+                  "nss"_attr = redact(toStringForLogging(
+                      model.getGraph().getNode(static_cast<NodeId>(node)).collectionName)),
+                  "cachedUsedFingerprint"_attr =
+                      static_cast<unsigned long long>(hit.nodeFingerprints[node].usedFingerprint),
+                  "currentUsedFingerprint"_attr =
+                      static_cast<unsigned long long>(currentFingerprints[node].usedFingerprint),
+                  "cachedRelevantIndexCount"_attr =
+                      static_cast<int>(hit.nodeFingerprints[node].relevantIndexHashes.size()),
+                  "currentRelevantIndexCount"_attr =
+                      static_cast<int>(currentFingerprints[node].relevantIndexHashes.size()));
             return false;
         }
     }
@@ -502,9 +542,22 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
         return nullptr;
     }
 
-    if (!validateCacheEntry(*hit, mca, model, perCollIdxs)) {
+    // validateCacheEntry fills 'planCacheKeyHex' lazily while deciding the entry is stale, so the
+    // failure path below reuses it instead of hashing the key a second time.
+    std::string planCacheKeyHex;
+    if (!validateCacheEntry(*hit, mca, model, perCollIdxs, cacheKey, planCacheKeyHex)) {
+        if (planCacheKeyHex.empty()) {
+            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
+        }
         if (cache.removeIfMatches(cacheKey, hit)) {
             joinPlanCacheInvalidations.increment(1);
+            LOGV2(13445401, "Join plan cache entry removed", "planCacheKey"_attr = planCacheKeyHex);
+        } else {
+            LOGV2_DEBUG(13445402,
+                        2,
+                        "Join plan cache entry invalidated but already removed or replaced by "
+                        "another operation; no removal performed",
+                        "planCacheKey"_attr = planCacheKeyHex);
         }
         return nullptr;
     }
@@ -780,11 +833,34 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
         auto fingerprints = makeNodeFingerprints(
             model.getGraph(), model.getResolvedPaths(), eligibleIdxs, *reordered.cachedJoinPlan);
+        auto currentTags = makeCollectionTags(mca);
+        const auto planCacheKeyHex = joinPlanCacheKeyForLog(*cacheKey);
+        // 'serializeForLogging()' handles redaction of user content per the 'redactClientLogData'
+        // policy.
+        const auto queryShapeForLog = pipeline.serializeForLogging();
+        const NamespaceString baseNss = model.getGraph().getNode(reordered.baseNode).collectionName;
+        const auto logVersions = collectionVersionsForLog(currentTags);
+
         auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
                                                           reordered.baseNode,
-                                                          makeCollectionTags(mca),
+                                                          std::move(currentTags),
                                                           std::move(fingerprints));
-        JoinPlanCache::get(opCtx->getServiceContext()).put(std::move(*cacheKey), std::move(entry));
+        const BSONObj planShapeForLog =
+            entry->joinTree ? entry->joinTree->toBSONForLog() : BSONObj();
+        const long long estimatedSizeBytes = static_cast<long long>(entry->estimatedEntrySizeBytes);
+        const size_t numEntriesEvicted = JoinPlanCache::get(opCtx->getServiceContext())
+                                             .put(std::move(*cacheKey), std::move(entry));
+
+        LOGV2(13445400,
+              "Join plan cache entry put",
+              "planCacheKey"_attr = planCacheKeyHex,
+              "queryShape"_attr = queryShapeForLog,
+              "planShape"_attr = planShapeForLog,
+              "nss"_attr = redact(toStringForLogging(baseNss)),
+              "baseNode"_attr = static_cast<int>(reordered.baseNode),
+              "estimatedSizeBytes"_attr = estimatedSizeBytes,
+              "collections"_attr = logVersions,
+              "entriesEvicted"_attr = static_cast<long long>(numEntriesEvicted));
     }
 
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the

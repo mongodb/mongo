@@ -10,6 +10,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -128,6 +129,10 @@ BSONObj CachedJoinPlan::toBSON() const {
                },
                node);
     return bob.obj();
+}
+
+BSONObj CachedJoinPlan::toBSONForLog() const {
+    return redact(toBSON());
 }
 
 size_t NodeFingerprint::estimateObjectSizeInBytes() const {
@@ -300,9 +305,15 @@ BSONObj collectionVersionsForLog(const std::vector<CollectionTag>& tags) {
     return builder.obj();
 }
 
-CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tags,
-                                           const MultipleCollectionAccessor& mca) {
-    auto status = CollectionTagStatus::kCurrent;
+std::string joinPlanCacheKeyForLog(const JoinPlanCacheKey& key) {
+    // Identical formatting to joinPlanCacheEntryToBSON's "planCacheKey" field, so a log line can be
+    // cross-referenced with a $joinPlanCacheStats entry.
+    return zeroPaddedHex(canonical_query_encoder::computeHash(key));
+}
+
+CollectionTagValidationResult classifyCollectionTags(const std::vector<CollectionTag>& tags,
+                                                     const MultipleCollectionAccessor& mca) {
+    CollectionTagValidationResult result{.status = CollectionTagStatus::kCurrent};
 
     // TODO (SERVER-130873): Simplify lookup once we have constant time access via UUID.
     for (const auto& tag : tags) {
@@ -317,26 +328,18 @@ CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tag
         if (!liveTag) {
             // The collection with the given UUID no longer exists, i.e. it was dropped.
             // This is the most restrictive status, so no other collection can change the outcome.
-            LOGV2_DEBUG(12926600,
-                        5,
-                        "Join plan cache entry references a collection which no longer exists",
-                        "uuid"_attr = tag.uuid);
-            return CollectionTagStatus::kStale;
+            result.status = CollectionTagStatus::kStale;
+            result.droppedCollectionUuid = tag.uuid;
+            return result;
         }
         if (liveTag->collectionVersion != tag.versionTag.collectionVersion) {
             // A DDL ran, but it may have been on an index this plan could never use, which
             // the relevant-index fingerprints can settle.
-            LOGV2_DEBUG(13036800,
-                        5,
-                        "Collection version bumped since the join plan was cached",
-                        "uuid"_attr = tag.uuid,
-                        "cachedVersion"_attr = tag.versionTag.collectionVersion,
-                        "currentVersion"_attr = liveTag->collectionVersion);
-            status = CollectionTagStatus::kNeedsIndexRevalidation;
+            result.status = CollectionTagStatus::kNeedsIndexRevalidation;
         }
         // TODO (SERVER-129270): Return kStale when the persisted sample has been refreshed.
     }
-    return status;
+    return result;
 }
 
 }  // namespace mongo

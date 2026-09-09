@@ -91,7 +91,7 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsAdoptsTheCurrentColle
 
     bumpCatalogVersion(coll);
     ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation,
-              classifyCollectionTags(entry->getCollectionTags(), mca));
+              classifyCollectionTags(entry->getCollectionTags(), mca).status);
 
     // Simulates what a lookup does once the per-node fingerprints have revalidated the entry
     // against the post-DDL catalog: adopt that catalog's version tags so the next lookup takes the
@@ -100,7 +100,7 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsAdoptsTheCurrentColle
 
     ASSERT_EQ(baseVersion + 1, entry->getCollectionTags()[0].versionTag.collectionVersion);
     ASSERT_EQ(CollectionTagStatus::kCurrent,
-              classifyCollectionTags(entry->getCollectionTags(), mca));
+              classifyCollectionTags(entry->getCollectionTags(), mca).status);
 }
 
 DEATH_TEST_F(
@@ -198,7 +198,7 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreCurrentWhenNothingChanged) {
     MultipleCollectionAccessor mca(coll);
 
     auto tags = makeCollectionTags(mca);
-    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca).status);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationAfterSimulatedCatalogChange) {
@@ -215,7 +215,10 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationAfterSimulatedCatalogC
 
     // The DDL may have been irrelevant to any cached plan, so this is the recoverable status
     // rather than an outright rejection.
-    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
+    auto validation = classifyCollectionTags(tags, mca);
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, validation.status);
+    // The collection still exists, so no dropped uuid is reported.
+    ASSERT_FALSE(validation.droppedCollectionUuid);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationWhenCachedTagIsAheadOfCurrent) {
@@ -230,7 +233,8 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsNeedRevalidationWhenCachedTagIsAheadOf
     std::vector<CollectionTag> tags{CollectionTag{
         coll.uuid(), CollectionVersionTag{.collectionVersion = 5, .sampleVersion = 0}}};
 
-    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation,
+              classifyCollectionTags(tags, mca).status);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, TagsAreStaleWhenCollectionIsGone) {
@@ -244,7 +248,11 @@ TEST_F(JoinPlanCacheInvalidationTest, TagsAreStaleWhenCollectionIsGone) {
     // having been dropped/renamed since the plan was cached). This must not crash, and there is no
     // catalog left to fingerprint against, so it must not ask for revalidation either.
     MultipleCollectionAccessor emptyMca;
-    ASSERT_EQ(CollectionTagStatus::kStale, classifyCollectionTags(tags, emptyMca));
+    auto validation = classifyCollectionTags(tags, emptyMca);
+    ASSERT_EQ(CollectionTagStatus::kStale, validation.status);
+    // The classification names the exact collection that vanished, so the caller can log it.
+    ASSERT_TRUE(validation.droppedCollectionUuid);
+    ASSERT_EQ(coll.uuid(), *validation.droppedCollectionUuid);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, MultiCollectionTagsTrackMainAndSecondary) {
@@ -261,11 +269,12 @@ TEST_F(JoinPlanCacheInvalidationTest, MultiCollectionTagsTrackMainAndSecondary) 
 
     auto tags = makeCollectionTags(mca);
     ASSERT_EQ(2, tags.size());
-    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kCurrent, classifyCollectionTags(tags, mca).status);
 
     // Bumping only the secondary collection's tag should be enough to invalidate.
     bumpCatalogVersion(secondaryColl);
-    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation,
+              classifyCollectionTags(tags, mca).status);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, ClassifyTagsReportsMostRestrictiveStatusAcrossCollections) {
@@ -287,7 +296,7 @@ TEST_F(JoinPlanCacheInvalidationTest, ClassifyTagsReportsMostRestrictiveStatusAc
     // than given the fingerprint second chance.
     ++tags[0].versionTag.collectionVersion;
     tags[1].uuid = UUID::gen();
-    ASSERT_EQ(CollectionTagStatus::kStale, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kStale, classifyCollectionTags(tags, mca).status);
 }
 
 TEST_F(JoinPlanCacheInvalidationTest, BumpCollectionVersionForDDLIncrementsVersion) {
@@ -347,7 +356,8 @@ TEST_F(JoinPlanCacheInvalidationTest, RealIndexCreationBumpsVersionAndRequiresRe
     // tags no longer validate on their own.
     ASSERT_LT(baseVersion,
               JoinPlanCache::currentVersionTags(coll.getCollectionPtr().get()).collectionVersion);
-    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation, classifyCollectionTags(tags, mca));
+    ASSERT_EQ(CollectionTagStatus::kNeedsIndexRevalidation,
+              classifyCollectionTags(tags, mca).status);
 }
 
 }  // namespace

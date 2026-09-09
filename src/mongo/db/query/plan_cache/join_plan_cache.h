@@ -80,6 +80,12 @@ struct CachedJoinPlan {
     size_t estimateObjectSizeInBytes() const;
 
     BSONObj toBSON() const;
+
+    /*
+     * Renders this plan for a log line, redacting user content (join predicate fields, access-path
+     * bounds) per the 'redactClientLogData' policy.
+     */
+    BSONObj toBSONForLog() const;
 };
 
 // Live per-Collection version counters, bumped on DDL/sample refresh. Lives as a Collection
@@ -200,6 +206,13 @@ std::vector<CollectionTag> makeCollectionTags(const MultipleCollectionAccessor& 
 BSONObj collectionVersionsForLog(const std::vector<CollectionTag>& tags);
 
 /*
+ * Renders 'key' as the zero-padded hex plan cache key hash used in the lifecycle logs, matching
+ * the 'planCacheKey' field of $joinPlanCacheStats so log lines can be correlated with the cache's
+ * contents.
+ */
+std::string joinPlanCacheKeyForLog(const JoinPlanCacheKey& key);
+
+/*
  * The action to take with a cached entry, given its collection tags.
  */
 enum class CollectionTagStatus {
@@ -215,11 +228,23 @@ enum class CollectionTagStatus {
 };
 
 /*
- * Classifies 'tags' against the live collections in 'mca'. When several collections disagree, the
- * most restrictive status wins, in the order kStale > kNeedsIndexRevalidation > kCurrent.
+ * The action to take with a cached entry, given its collection tags, plus the collection-level
+ * detail behind that decision so the caller can log it.
  */
-CollectionTagStatus classifyCollectionTags(const std::vector<CollectionTag>& tags,
-                                           const MultipleCollectionAccessor& mca);
+struct CollectionTagValidationResult {
+    CollectionTagStatus status;
+
+    // Set iff 'status' is kStale: the uuid of a referenced collection that no longer exists.
+    boost::optional<UUID> droppedCollectionUuid;
+};
+
+/*
+ * Classifies 'tags' against the live collections in 'mca'. When several collections disagree, the
+ * most restrictive status wins, in the order kStale > kNeedsIndexRevalidation > kCurrent. Pure
+ * logic: the caller (validateCacheEntry) turns the returned detail into log output.
+ */
+CollectionTagValidationResult classifyCollectionTags(const std::vector<CollectionTag>& tags,
+                                                     const MultipleCollectionAccessor& mca);
 
 // Functor for estimating the memory footprint of a join plan cache entry.
 struct JoinPlanCacheBudgetEstimator {
