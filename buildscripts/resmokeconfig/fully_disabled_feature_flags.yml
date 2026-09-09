@@ -21,7 +21,7 @@
 - featureFlagPrimaryDrivenIndexBuilds
 - featureFlagResumablePrimaryDrivenIndexBuilds
 - featureFlagContainerWrites
-# TODO (SERVER-133237): Remove once the pipelined oplog applier works end-to-end, so it
+# TODO (SERVER-133236): Remove once the pipelined oplog applier works end-to-end, so it
 # can bake in the all-feature-flags variants before being enabled by default.
 - featureFlagPipelinedOplogApplier
 # TODO SERVER-117454: Enable the feature flag in the all-feature-flags variant.
