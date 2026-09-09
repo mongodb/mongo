@@ -808,4 +808,76 @@ TEST_F(SessionHistoryIteratorTest, RetryableWritesApplyOps) {
     }
 }
 
+
+namespace {
+
+// A fake iterator with a fixed number of remaining steps, to exercise walkApplyOpsChain's budget
+// logic without an oplog.
+class CountingHistoryIterator : public TransactionHistoryIteratorBase {
+public:
+    explicit CountingHistoryIterator(int stepsAvailable) : _stepsAvailable(stepsAvailable) {}
+
+    bool hasNext() const override {
+        return _stepsAvailable > 0;
+    }
+    repl::OplogEntry next(OperationContext*) override {
+        // These tests drive the walk through nextOpTime().
+        MONGO_UNREACHABLE;
+    }
+    repl::OpTime nextOpTime(OperationContext*) override {
+        --_stepsAvailable;
+        return {};
+    }
+
+private:
+    int _stepsAvailable;
+};
+
+TEST(WalkApplyOpsChainTest, NoBudgetWalksToEndOfChain) {
+    CountingHistoryIterator iter(3);
+    int steps = 0;
+    walkApplyOpsChain(iter, boost::none, [&] {
+        iter.nextOpTime(nullptr);
+        ++steps;
+        return std::size_t{1};
+    });
+    ASSERT_EQ(3, steps);
+}
+
+TEST(WalkApplyOpsChainTest, BudgetStopsOnceOperationsCollected) {
+    // A budget of four operations, consumed two at a time, stops after two steps.
+    CountingHistoryIterator iter(100);
+    int steps = 0;
+    walkApplyOpsChain(iter, std::size_t{4}, [&] {
+        iter.nextOpTime(nullptr);
+        ++steps;
+        return std::size_t{2};
+    });
+    ASSERT_EQ(2, steps);
+}
+
+TEST(WalkApplyOpsChainTest, ZeroBudgetDoesNotStep) {
+    CountingHistoryIterator iter(3);
+    int steps = 0;
+    walkApplyOpsChain(iter, std::size_t{0}, [&] {
+        ++steps;
+        return std::size_t{1};
+    });
+    ASSERT_EQ(0, steps);
+}
+
+TEST(WalkApplyOpsChainTest, BudgetStopsEvenWhenLargerThanChain) {
+    // A budget larger than the chain still stops at the end of the chain rather than overrunning.
+    CountingHistoryIterator iter(2);
+    int steps = 0;
+    walkApplyOpsChain(iter, std::size_t{10}, [&] {
+        iter.nextOpTime(nullptr);
+        ++steps;
+        return std::size_t{1};
+    });
+    ASSERT_EQ(2, steps);
+}
+
+}  // namespace
+
 }  // namespace mongo

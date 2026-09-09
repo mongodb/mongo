@@ -1210,6 +1210,144 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxn) {
     ASSERT(!doc);
 }
 
+// A two-entry atomic batch whose previous statement has been truncated. Fetching it must ship only
+// its own operations, bounded by the terminal's 'count'; following the link would reach the gone
+// statement and fail.
+TEST_F(ReshardingAggTest, VerifyPipelineAtomicRetryableWriteToleratesTruncatedPreviousStatement) {
+    // Statement 0 is absent from the source and from the oplog the mock serves, standing in for a
+    // statement truncated ahead of statement 1. Statement 1's first entry links to it at
+    // {t: 1609800491, i: 1}.
+    std::deque<DocumentSource::GetNextResult> pipelineSource = {
+        // Statement 1, first of two entries. Its prevOpTime points at the truncated statement.
+        Document(fromjson(R"({
+        "lsid": {
+          "id": { "$binary": "+0TxuFyBSeqjfJzju2Xl+w==", "$type": "04" },
+          "uid": { "$binary": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", "$type": "00" }
+        },
+        "txnNumber": { "$numberLong": "0" },
+        "op": "c",
+        "ns": "admin.$cmd",
+        "o": {
+          "applyOps": [ {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 2, "x": -20, "y": 2 },
+              "destinedRecipient": "shard1"
+            }
+          ],
+          "partialTxn": true
+        },
+        "ts": { "$timestamp": { "t": 1609800491, "i": 2 } },
+        "t": { "$numberLong": "1" },
+        "wall": { "$date": "2021-01-04T17:48:11.240-05:00" },
+        "v": { "$numberLong": "2" },
+        "prevOpTime": {
+          "ts": { "$timestamp": { "t": 1609800491, "i": 1 } },
+          "t": { "$numberLong": "1" }
+        },
+        "multiOpType": 2
+    })")),
+        // Statement 1's terminal entry. 'count' covers the two ops of this batch only.
+        Document(fromjson(R"({
+        "lsid": {
+          "id": { "$binary": "+0TxuFyBSeqjfJzju2Xl+w==", "$type": "04" },
+          "uid": { "$binary": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", "$type": "00" }
+        },
+        "txnNumber": { "$numberLong": "0" },
+        "op": "c",
+        "ns": "admin.$cmd",
+        "o": {
+          "applyOps": [ {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 3, "x": -30, "y": 3 },
+              "destinedRecipient": "shard1"
+            }
+          ],
+          "count": { "$numberLong": "2" }
+        },
+        "ts": { "$timestamp": { "t": 1609800491, "i": 3 } },
+        "t": { "$numberLong": "1" },
+        "wall": { "$date": "2021-01-04T17:48:11.243-05:00" },
+        "v": { "$numberLong": "2" },
+        "prevOpTime": {
+          "ts": { "$timestamp": { "t": 1609800491, "i": 2 } },
+          "t": { "$numberLong": "1" }
+        },
+        "multiOpType": 2
+    })"))};
+
+    auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    // Exactly statement 1's two operations. A walk past the boundary would reach for the truncated
+    // statement and fail with IncompleteTransactionHistory.
+    std::vector<int> emittedIds;
+    while (auto doc = execPipeline->getNext()) {
+        auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
+        ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
+        for (const auto& innerOp : oplogEntry.getObject()["applyOps"].Obj()) {
+            emittedIds.push_back(innerOp.Obj()["o"].Obj()["_id"].numberInt());
+        }
+    }
+
+    ASSERT_EQ(2U, emittedIds.size()) << "emitted ids: " << emittedIds.size();
+    ASSERT_EQ(2, emittedIds[0]);
+    ASSERT_EQ(3, emittedIds[1]);
+}
+
+TEST_F(ReshardingAggTest, VerifyPipelineSingleEntryAtomicRetryableWriteSkipsChainWalk) {
+    // A single-entry retryable atomic batch has no 'count'; its prevOpTime is only a
+    // session-history link, so the unwind must not walk it. The link points at an optime the mock
+    // cannot supply, so any walk would fail with IncompleteTransactionHistory.
+    std::deque<DocumentSource::GetNextResult> pipelineSource = {Document(fromjson(R"({
+        "lsid": {
+          "id": { "$binary": "+0TxuFyBSeqjfJzju2Xl+w==", "$type": "04" },
+          "uid": { "$binary": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", "$type": "00" }
+        },
+        "txnNumber": { "$numberLong": "0" },
+        "op": "c",
+        "ns": "admin.$cmd",
+        "o": {
+          "applyOps": [ {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 5, "x": -50, "y": 5 },
+              "destinedRecipient": "shard1"
+            }
+          ]
+        },
+        "ts": { "$timestamp": { "t": 1609800491, "i": 2 } },
+        "t": { "$numberLong": "1" },
+        "wall": { "$date": "2021-01-04T17:48:11.240-05:00" },
+        "v": { "$numberLong": "2" },
+        "prevOpTime": {
+          "ts": { "$timestamp": { "t": 1609800491, "i": 1 } },
+          "t": { "$numberLong": "1" }
+        },
+        "multiOpType": 2
+    })"))};
+
+    auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    // Exactly the batch's own operation, with no walk to the unreachable prevOpTime.
+    std::vector<int> emittedIds;
+    while (auto doc = execPipeline->getNext()) {
+        auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
+        ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
+        for (const auto& innerOp : oplogEntry.getObject()["applyOps"].Obj()) {
+            emittedIds.push_back(innerOp.Obj()["o"].Obj()["_id"].numberInt());
+        }
+    }
+
+    ASSERT_EQ(1U, emittedIds.size()) << "emitted ids: " << emittedIds.size();
+    ASSERT_EQ(5, emittedIds[0]);
+}
+
 TEST_F(ReshardingAggTest, VerifyPipelineLargeBatchedRetryableWrite) {
     std::deque<DocumentSource::GetNextResult> pipelineSource = {Document(fromjson(R"({
         "lsid": {
