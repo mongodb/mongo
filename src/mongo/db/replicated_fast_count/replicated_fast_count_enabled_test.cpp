@@ -82,16 +82,6 @@ TEST(ReplicatedFastCountEligibleNsTest, ImplicitlyReplicatedNotEligible) {
     EXPECT_FALSE(isReplicatedFastCountEligible(configImageCollectionNss));
 }
 
-TEST(ReplicatedFastCountEligibleNsTest, SizeCountAndTimestampStoresNotEligible) {
-    const NamespaceString fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    EXPECT_FALSE(isReplicatedFastCountEligible(fastCountStoreNss));
-
-    const NamespaceString fastCountTimestampStoreNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    EXPECT_FALSE(isReplicatedFastCountEligible(fastCountTimestampStoreNss));
-}
-
 TEST(ReplicatedFastCountEligibleNsTest, AdminSystemVersionNotEligible) {
     EXPECT_FALSE(isReplicatedFastCountEligible(NamespaceString::kServerConfigurationNamespace));
 }
@@ -230,10 +220,6 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
-                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
-                {"config",
-                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
-                 false},
                 {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
                  std::string{NamespaceString::kRsOplogNamespace.coll()},
                  false},
@@ -258,10 +244,6 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
-                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
-                {"config",
-                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
-                 false},
             },
         },
         ShouldReadFromReplicatedFastCountParams{
@@ -281,10 +263,6 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
-                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
-                {"config",
-                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
-                 false},
             },
         },
         ShouldReadFromReplicatedFastCountParams{
@@ -304,10 +282,6 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
-                {"config", std::string{NamespaceString::kReplicatedFastCountStore}, false},
-                {"config",
-                 std::string{NamespaceString::kReplicatedFastCountStoreTimestamps},
-                 false},
             },
         }),
     [](const ::testing::TestParamInfo<ShouldReadFromReplicatedFastCountParams>& info) {

@@ -104,25 +104,6 @@ ScanFields extractScanFields(const BSONObj& raw) {
     return v;
 }
 
-bool isFastCountStoreCollName(std::string_view coll) {
-    return coll == NamespaceString::kReplicatedFastCountStore ||
-        coll == NamespaceString::kReplicatedFastCountStoreTimestamps;
-}
-
-// True if `nsElem` references the no-tenant `config.fast_count_metadata_store{_timestamps}`
-// namespace.
-bool nsIsFastCountStore(BSONElement nsElem) {
-    if (nsElem.type() != BSONType::string) {
-        return false;
-    }
-    const auto ns = nsElem.valueStringData();
-    constexpr std::string_view kConfigDot = "config."sv;
-    if (!ns.starts_with(kConfigDot)) {
-        return false;
-    }
-    return isFastCountStoreCollName(ns.substr(kConfigDot.size()));
-}
-
 bool isContainerOpType(std::string_view op) {
     return op.size() == 2 && op[0] == 'c' && (op[1] == 'i' || op[1] == 'u' || op[1] == 'd');
 }
@@ -181,10 +162,6 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
     }
     const auto opStr = f.op.valueStringData();
 
-    if (nsIsFastCountStore(f.ns)) {
-        return FastDecision::kFastCountStoreSkip;
-    }
-
     if (opStr.size() == 1) {
         switch (opStr[0]) {
             case 'i':
@@ -212,8 +189,7 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
         const bool isContainerOp = isContainerOpType(opStr);
         if (isContainerOp || (opStr[0] == 'k' && opStr[1] == 'm')) {
             // Container ops targeting a replicated-fast-count ident are internal writes; skip
-            // them without advancing lastTimestamp to avoid the feedback loop the typed path
-            // documents in `operationsOnFastCountStores`.
+            // them without advancing lastTimestamp.
             if (isContainerOp && f.container.type() == BSONType::string &&
                 ident::isReplicatedFastCountIdent(f.container.valueStringData())) {
                 return FastDecision::kFastCountStoreSkip;
@@ -330,7 +306,7 @@ struct FastApplyOpsOutcome {
 //
 // Inner ops that target the internal fast-count-store (a fast-count-store namespace, or a
 // container op on a replicated-fast-count ident) are tracked separately. If every inner op is
-// internal the outcome is `kAllInternal` (skip the entry, like `operationsOnFastCountStores`).
+// internal the outcome is `kAllInternal`, skip the entry.
 // Otherwise the outcome is `kProcessed`: internal inner ops are dropped silently, container ops on
 // other idents contribute no delta but still advance the checkpoint, and user-collection CRUD
 // deltas are recorded.
@@ -394,7 +370,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
             }
             if (ident::isReplicatedFastCountIdent(innerF.container.valueStringData())) {
                 // Internal fast-count-store inner op; skip it without advancing the checkpoint, to
-                // avoid the feedback loop documented in operationsOnFastCountStores().
+                // avoid the feedback loop.
                 continue;
             }
             // Container op on any other ident (e.g. an index container). No delta, but it is a real
@@ -409,11 +385,6 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
         const char ch = innerOp[0];
         if (ch != 'i' && ch != 'u' && ch != 'd') {
             return {FastApplyOpsOutcome::kFallThrough};
-        }
-
-        if (nsIsFastCountStore(innerF.ns)) {
-            // Internal fast-count-store inner op contributes no delta.
-            continue;
         }
 
         sawNonInternalOp = true;
@@ -478,55 +449,6 @@ bool isContainerOpOnFastCountIdent(const repl::OplogEntry& oplogEntry) {
     auto container = oplogEntry.getContainer();
     return container && ident::isReplicatedFastCountIdent(*container);
 }
-
-// Returns true if all operations within the provided oplog entry are on the internal fast count
-// collections or containers.
-bool operationsOnFastCountStores(const NamespaceString& nss, const repl::OplogEntry& oplogEntry) {
-    if (isContainerOpOnFastCountIdent(oplogEntry)) {
-        return true;
-    }
-
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
-    if (nss == fastCountStoreNss || nss == fastCountTimestampNss) {
-        return true;
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kCreate ||
-        oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
-        // kCreate/kDrop entries use the $cmd namespace (e.g. config.$cmd), not the target
-        // collection's namespace. Use CommandHelpers::parseNsCollectionRequired to extract the
-        // actual target NSS from the first field of the command object (o.create / o.drop).
-        const auto targetNss =
-            CommandHelpers::parseNsCollectionRequired(nss.dbName(), oplogEntry.getObject());
-        if (targetNss == fastCountStoreNss || targetNss == fastCountTimestampNss) {
-            return true;
-        }
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        std::vector<repl::OplogEntry> innerEntries;
-        repl::ApplyOps::extractOperationsTo(
-            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
-
-        for (const auto& op : innerEntries) {
-            if (isContainerOpOnFastCountIdent(op)) {
-                continue;
-            }
-            const auto& nss = op.getNss();
-            if (nss != fastCountStoreNss && nss != fastCountTimestampNss) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    return false;
-}
-
 }  // namespace
 
 boost::optional<int> TxnDeltaBuffer::tryConsume(const repl::OplogEntry& entry,
@@ -695,7 +617,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
     }
 
     const auto entry = massertStatusOK(repl::OplogEntry::parse(raw));
-    if (operationsOnFastCountStores(entry.getNss(), entry)) {
+    if (isContainerOpOnFastCountIdent(entry)) {
         if (_options.isCheckpoint) {
             recordCheckpointOplogEntrySkipped();
         }

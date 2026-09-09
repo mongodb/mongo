@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/key_format.h"
 
 #include <string_view>
@@ -54,19 +53,4 @@ namespace mongo {
     std::string_view existingIdent,
     KeyFormat existingIdentFormat);
 
-namespace replicated_fast_count {
-/**
- * Creates the replicated fast count collection using the global namespace string
- * kReplicatedFastCountStore.
- */
-Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                           OperationContext* opCtx);
-
-/**
- * Creates the replicated fast count timestamp collection using the global namespace string
- * kReplicatedFastCountStoreTimestamps.
- */
-Status createReplicatedFastCountTimestampCollection(repl::StorageInterface* storageInterface,
-                                                    OperationContext* opCtx);
-}  // namespace replicated_fast_count
 }  // namespace mongo

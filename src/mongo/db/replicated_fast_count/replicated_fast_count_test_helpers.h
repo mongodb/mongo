@@ -151,13 +151,11 @@ bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSON
  * Checks the persisted values of count and size for the given UUID in the underlying fast count
  * store.
  */
-void checkFastCountMetadataInInternalStore(
-    OperationContext* opCtx,
-    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
-    const UUID& uuid,
-    bool expectPersisted,
-    int64_t expectedCount,
-    int64_t expectedSize);
+void checkFastCountMetadataInInternalStore(OperationContext* opCtx,
+                                           const UUID& uuid,
+                                           bool expectPersisted,
+                                           int64_t expectedCount,
+                                           int64_t expectedSize);
 
 /**
  * Checks the uncommitted fast count changes for the given UUID.
@@ -388,6 +386,14 @@ repl::OplogEntry makeOplogEntry(Timestamp ts,
                                 int32_t sizeDelta,
                                 boost::optional<int64_t> hash = boost::none);
 repl::OplogEntry makeOplogEntry(Timestamp ts, NsAndUUID userColl, repl::OpTypeEnum opType);
+
+/**
+ * Generates a synthetic top-level container-write oplog entry for the provided `containerIdent`.
+ * `opType` must be kContainerInsert, kContainerUpdate, or kContainerDelete.
+ */
+repl::OplogEntry makeContainerOplogEntry(Timestamp ts,
+                                         std::string_view containerIdent,
+                                         repl::OpTypeEnum opType);
 
 /**
  * Generates a truncateRange command oplog entry for the given collection UUID with the specified

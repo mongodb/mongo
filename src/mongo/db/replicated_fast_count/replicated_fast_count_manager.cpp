@@ -96,12 +96,9 @@ void ReplicatedFastCountManager::initializeContainerStores(
     invariant(metadataRS, "metadata RecordStore must not be null");
     invariant(timestampsRS, "timestamps RecordStore must not be null");
 
-    // TODO (SERVER-126250): This can be a nullptr check once we change the
-    // ReplicatedFastCountManager() constructor to default initialize Collection stores.
-    if (_sizeCountStore->usesContainers()) {
-        massert(13337202,
-                "Timestamp store must use containers when the size/count store uses containers",
-                _timestampStore->usesContainers());
+    if (_sizeCountStore || _timestampStore) {
+        invariant(_sizeCountStore && _timestampStore,
+                  "Replicated fast count stores must be initialized together");
         LOGV2(13337200, "Replicated fast count container stores are already initialized; skipping");
         return;
     }
@@ -256,11 +253,9 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         const auto startTime = Date_t::now();
         int numRecordsScanned = 0;
 
-        // TODO SERVER-126250: We should only need the nullptr check since we won't have a
-        // non-null CollectionSizeCountStore pointer.
         massert(12231701,
                 "_sizeCountStore should be uninitialized when initializeMetadata is called",
-                !_sizeCountStore || !_sizeCountStore->usesContainers());
+                !_sizeCountStore);
         auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         if (storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore)) {
@@ -517,6 +512,9 @@ void ReplicatedFastCountManager::commit(OperationContext* opCtx,
 
 boost::optional<std::pair<CollectionReplicatedMetadata, Timestamp>>
 ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) const {
+    if (!_sizeCountStore) {
+        return boost::none;
+    }
     const auto entry = _sizeCountStore->read(opCtx, uuid);
     if (!entry) {
         return boost::none;
@@ -530,6 +528,9 @@ ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) co
 
 boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
     OperationContext* opCtx) const {
+    if (!_timestampStore) {
+        return boost::none;
+    }
     return _timestampStore->read(opCtx);
 }
 
@@ -577,13 +578,6 @@ void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
 bool ReplicatedFastCountManager::isRunning_ForTest() {
     std::lock_guard lock(_checkpointerMutex);
     return _checkpointer && _checkpointer->isRunning_ForTest();
-}
-
-bool ReplicatedFastCountManager::usesContainers_ForTest() const {
-    tassert(13337201,
-            "Size/count store and timestamp store must agree on whether they use containers",
-            _sizeCountStore->usesContainers() == _timestampStore->usesContainers());
-    return _sizeCountStore->usesContainers();
 }
 
 std::pair<SizeCountStore*, SizeCountTimestampStore*>

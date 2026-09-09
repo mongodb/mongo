@@ -14,9 +14,8 @@ class OperationContext;
 class ServiceContext;
 
 /**
- * Adds an OpObserver that watches writes to `config.fast_count_metadata_store_timestamps` (the
- * collection-mode store) and to the fast-count timestamps container (via the container-write op
- * observer hooks), and feeds the observed valid-as-of timestamp into the
+ * Adds an OpObserver that watches writes to the fast-count timestamps container (via the
+ * container-write op observer hooks), and feeds the observed valid-as-of timestamp into the
  * `replicated_fast_count.oplog_lag_secs` gauge. Should be called once per ServiceContext; calling
  * more than once just adds extra (idempotent) observer instances.
  */

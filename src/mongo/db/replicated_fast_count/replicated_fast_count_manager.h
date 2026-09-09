@@ -61,10 +61,7 @@ public:
 
     static ReplicatedFastCountManager& get(ServiceContext* svcCtx);
 
-    // TODO (SERVER-126250): Leave the stores as nullptrs.
-    ReplicatedFastCountManager()
-        : _sizeCountStore(std::make_unique<CollectionSizeCountStore>()),
-          _timestampStore(std::make_unique<CollectionSizeCountTimestampStore>()) {
+    ReplicatedFastCountManager() {
         initializeFastCountCommitFn();
     }
 
@@ -139,7 +136,8 @@ public:
 
     /**
      * Returns the persisted singleton timestamp from the timestamp store, or boost::none if the
-     * store has no entry. Used by initial sync to read the donor's checkpoint timestamp.
+     * store is uninitialized or has no entry. Used by initial sync to read the donor's checkpoint
+     * timestamp.
      *
      * This returns an optional because it is possible that we try find the timestamp before the
      * first flush persists one to disk.
@@ -150,7 +148,8 @@ public:
 
     /**
      * Returns the persisted size/count and validation hash, along with its `validAsOf` timestamp,
-     * for the collection with `uuid`, or boost::none if no entry exists for that UUID.
+     * for the collection with `uuid`, or boost::none if the store is uninitialized or no entry
+     * exists for that UUID.
      *
      * This returns an optional because it is possible that we try to find a uuid that is present in
      * the catalog but doesn't have a persisted fast count entry because it hasn't been flushed yet.
@@ -213,12 +212,6 @@ public:
     bool isRunning_ForTest();
 
     /**
-     * Returns true if this manager is using the container-backed path for the size count store.
-     * Intended for tests that need to pick which on-disk read path to exercise.
-     */
-    bool usesContainers_ForTest() const;
-
-    /**
      * Returns raw pointers to the metadata and timestamp SizeCount[Timestamp]Store's. Intended for
      * tests that need access to the underlying RecordStore objects when testing the container path.
      */
@@ -276,12 +269,12 @@ private:
     /**
      * Interface for reads / writes to the fast count metadata store.
      */
-    std::unique_ptr<SizeCountStore> _sizeCountStore;
+    std::unique_ptr<SizeCountStore> _sizeCountStore = nullptr;
 
     /**
      * Interface for reads / writes to the fast count timestamp store.
      */
-    std::unique_ptr<SizeCountTimestampStore> _timestampStore;
+    std::unique_ptr<SizeCountTimestampStore> _timestampStore = nullptr;
 
     /**
      * Guards _checkpointer.

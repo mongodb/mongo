@@ -32,12 +32,7 @@ bool isReplicatedFastCountEligible(const NamespaceString& nss) {
         nss.isSystemDotProfile()) {
         return false;
     }
-    // Exclude the fast count store collections themselves to avoid circular tracking.
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto fastCountTimestampsNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    return nss != fastCountStoreNss && nss != fastCountTimestampsNss;
+    return true;
 }
 
 bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceString& nss) {

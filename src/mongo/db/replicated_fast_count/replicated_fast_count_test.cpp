@@ -219,13 +219,11 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalContainer) {
     // Verify that the committed changes have not been written to the internal fast count container
     // yet.
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid1,
                                                         /*expectPersisted=*/false,
                                                         /*expectedCount=*/0,
                                                         /*expectedSize=*/0);
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid2,
                                                         /*expectPersisted=*/false,
                                                         /*expectedCount=*/0,
@@ -235,14 +233,12 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalContainer) {
     _fastCountManager->flushSync_ForTest(_opCtx);
 
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid1,
                                                         /*expectPersisted=*/true,
                                                         numDocsColl1,
                                                         numDocsColl1 *
                                                             sampleDocForInsert.objsize());
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid2,
                                                         /*expectPersisted=*/true,
                                                         numDocsColl2,
@@ -555,7 +551,7 @@ TEST_F(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
 
     // Verify that all of our writes were persisted to disk.
     test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx, _fastCountManager, _uuid1, true, numTotalDocs, totalSize);
+        _opCtx, _uuid1, true, numTotalDocs, totalSize);
 }
 
 // TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and

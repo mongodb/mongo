@@ -16,6 +16,7 @@
 namespace mongo::replicated_fast_count {
 namespace {
 using namespace std::literals::string_view_literals;
+using test_helpers::makeContainerOplogEntry;
 
 class StreamingOplogDeltaAccumulatorTest : public CatalogTestFixture {
 protected:
@@ -227,9 +228,6 @@ protected:
     test_helpers::NsAndUUID collB = {.nss = NamespaceString::createNamespaceString_forTest(
                                          "streaming_accumulator_test", "collB"),
                                      .uuid = UUID::gen()};
-    test_helpers::NsAndUUID fastCountColl = {.nss = NamespaceString::makeGlobalConfigCollection(
-                                                 NamespaceString::kReplicatedFastCountStore),
-                                             .uuid = UUID::gen()};
     const UUID oplogUuid = UUID::gen();
 };
 
@@ -282,20 +280,20 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TracksRawBytesAcrossAllReco
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TrackedEvenForInternalEntries) {
     const Timestamp ts1{1, 1};
-    auto entry = test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto entry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     const int64_t expectedBytes = entry.getEntry().toBSON().objsize();
     const auto result = runAccumulator({.oplogUuid = oplogUuid}, {std::move(entry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
     EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
     EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 1);
     EXPECT_FALSE(result.lastTimestamp);
-    EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, InternalOnly_NoLastTimestamp) {
     const Timestamp ts1{1, 1};
-    const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+    const auto result = runAccumulator({makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_FALSE(result.lastTimestamp);
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -304,7 +302,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, InternalThenUser_LastTimestampIsUserE
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10),
+        {makeContainerOplogEntry(
+             ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert),
          test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50)});
     EXPECT_EQ(result.lastTimestamp, ts2);
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
@@ -317,7 +316,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, UserThenInternal_LastTimestampDoesNot
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
         {test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 50),
-         test_helpers::makeOplogEntry(ts2, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+         makeContainerOplogEntry(
+             ts2, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     // Internal entry must not advance lastTimestamp past the latest non-internal entry.
     EXPECT_EQ(result.lastTimestamp, ts1);
 }
@@ -326,7 +326,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_ErasesOplogUuidWhenOnlyInt
     const Timestamp ts1{1, 1};
     const auto result = runAccumulator(
         {.isCheckpoint = true, .oplogUuid = oplogUuid},
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+        {makeContainerOplogEntry(
+            ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -334,8 +335,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_ErasesOplogUuidWhenOnlyInt
 TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_KeepsOplogUuidWhenUserEntriesPresent) {
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
-    auto fastCountEntry =
-        test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto fastCountEntry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     auto userEntry = test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50);
     const int64_t expectedOplogBytes =
         fastCountEntry.getEntry().toBSON().objsize() + userEntry.getEntry().toBSON().objsize();
@@ -350,7 +351,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_KeepsOplogUuidWhenUserEntr
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, NonCheckpoint_KeepsOplogUuidEvenWithNoUserEntries) {
     const Timestamp ts1{1, 1};
-    auto entry = test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto entry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     const int64_t expectedBytes = entry.getEntry().toBSON().objsize();
     const auto result =
         runAccumulator({.isCheckpoint = false, .oplogUuid = oplogUuid}, {std::move(entry)});
@@ -440,8 +442,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_DirectCrudOnFastCountStore_NoTimestampAdvance) {
     const Timestamp ts{1, 1};
-    const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, /*sz=*/10)});
+    const auto result = runAccumulator({test_helpers::makeContainerOplogEntry(
+        ts, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -581,10 +583,10 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
 TEST_F(StreamingOplogDeltaAccumulatorTest,
        FastLane_ApplyOpsAllInternalInnerOps_NoTimestampAdvance) {
     // applyOps where every inner op targets the fast-count store maps to kAllInternal: the
-    // entry is skipped entirely (no ts advance), mirroring `operationsOnFastCountStores`.
+    // entry is skipped entirely (no ts advance).
     const Timestamp ts{1, 1};
-    const auto applyOpsBson =
-        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 50)));
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts, BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
@@ -595,12 +597,13 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // Mixed inner ops: internal-store inner ops are silently dropped, user-collection inner ops
     // contribute deltas. ts advances because at least one user op was observed.
     const Timestamp ts{1, 1};
-    const auto applyOpsBson = makeApplyOpsBson(
-        ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 1) << makeInnerInsertBson(collA, 100)));
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts,
+                         BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                                    << makeInnerInsertBson(collA, 100)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
-    EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -731,7 +734,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     const Timestamp ts{1, 1};
     const auto result = runAccumulator(
         {.isCheckpoint = true, .oplogUuid = oplogUuid},
-        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+        {test_helpers::makeContainerOplogEntry(
+            ts, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     // The only entry is an internal store write, so lastTimestamp never advances and finish()
     // erases the oplog self-delta, leaving no deltas.
     EXPECT_TRUE(result.deltas.empty());

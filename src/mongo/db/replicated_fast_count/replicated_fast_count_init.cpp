@@ -11,7 +11,6 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -30,51 +29,6 @@
 namespace mongo {
 
 namespace {
-
-void _handleStatus(const Status& status,
-                   std::string_view collDescription,
-                   const NamespaceString& nss) {
-    if (status.isOK()) {
-        LOGV2(11718601,
-              "Created internal {collDescription} collection.",
-              "collDescription"_attr = collDescription,
-              "ns"_attr = nss.toStringForErrorMsg());
-    } else if (status.code() == ErrorCodes::NamespaceExists) {
-        LOGV2(11886900,
-              "{collDescription} collection already exists.",
-              "collDescription"_attr = collDescription,
-              "ns"_attr = nss.toStringForErrorMsg());
-    } else {
-        massertStatusOK(
-            status.withContext(fmt::format("Failed to create the {} collection", collDescription)));
-    }
-}
-
-Status _createInternalFastCountCollection(repl::StorageInterface* storageInterface,
-                                          OperationContext* opCtx,
-                                          const NamespaceString& nss) {
-    return storageInterface->createCollection(
-        opCtx,
-        nss,
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
-}
-
-void _createInternalFastCountCollections(repl::StorageInterface* storageInterface,
-                                         OperationContext* opCtx) {
-    const auto storeNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    _handleStatus(
-        replicated_fast_count::createReplicatedFastCountCollection(storageInterface, opCtx),
-        "replicated fast count metadata store",
-        storeNss);
-
-    const auto timestampsNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    _handleStatus(replicated_fast_count::createReplicatedFastCountTimestampCollection(
-                      storageInterface, opCtx),
-                  "replicated fast count metadata store timestamps",
-                  timestampsNss);
-}
 
 void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
     InitReplicatedFastCountO2 o2;
@@ -300,24 +254,4 @@ void dropInternalFastCountContainers(OperationContext* opCtx) {
               "ident"_attr = containerIdent);
     }
 }
-
-namespace replicated_fast_count {
-
-Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                           OperationContext* opCtx) {
-    return _createInternalFastCountCollection(
-        storageInterface,
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore));
-}
-
-Status createReplicatedFastCountTimestampCollection(repl::StorageInterface* storageInterface,
-                                                    OperationContext* opCtx) {
-    return _createInternalFastCountCollection(
-        storageInterface,
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps));
-}
-}  // namespace replicated_fast_count
 }  // namespace mongo

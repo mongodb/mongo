@@ -3,12 +3,14 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/uuid.h"
 
@@ -17,6 +19,7 @@
 namespace mongo::replicated_fast_count {
 namespace {
 using namespace std::literals::string_view_literals;
+using test_helpers::makeContainerOplogEntry;
 
 UUID getOplogUuid(OperationContext* opCtx) {
     const auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
@@ -288,14 +291,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
        CheckpointIsNoOpWhenOplogOnlyContainsTimestampStoreEntries) {
-    const test_helpers::NsAndUUID timestampStoreNsAndUUID{
-        .nss = NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps),
-        .uuid = UUID::gen()};
     test_helpers::writeToOplog(opCtx,
-                               test_helpers::makeOplogEntry(Timestamp(1, 1),
-                                                            timestampStoreNsAndUUID,
-                                                            repl::OpTypeEnum::kUpdate));
+                               makeContainerOplogEntry(Timestamp(1, 1),
+                                                       ident::kFastCountMetadataStoreTimestamps,
+                                                       repl::OpTypeEnum::kContainerUpdate));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 0);
 
@@ -304,14 +303,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
        CheckpointIsNoOpWhenOplogOnlyContainsFastCountStoreEntries) {
-    const test_helpers::NsAndUUID fastCountStoreNsAndUUID{
-        .nss =
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        .uuid = UUID::gen()};
     test_helpers::writeToOplog(opCtx,
-                               test_helpers::makeOplogEntry(Timestamp(1, 1),
-                                                            fastCountStoreNsAndUUID,
-                                                            repl::OpTypeEnum::kUpdate));
+                               makeContainerOplogEntry(Timestamp(1, 1),
+                                                       ident::kFastCountMetadataStore,
+                                                       repl::OpTypeEnum::kContainerUpdate));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 0);
 
@@ -325,14 +320,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     test_helpers::writeToOplog(
         opCtx, test_helpers::makeOplogEntry(userWriteTs, collA, repl::OpTypeEnum::kInsert, 10));
-    const test_helpers::NsAndUUID timestampStoreNsAndUUID{
-        .nss = NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps),
-        .uuid = UUID::gen()};
     test_helpers::writeToOplog(opCtx,
-                               test_helpers::makeOplogEntry(internalEntryTs,
-                                                            timestampStoreNsAndUUID,
-                                                            repl::OpTypeEnum::kUpdate));
+                               makeContainerOplogEntry(internalEntryTs,
+                                                       ident::kFastCountMetadataStoreTimestamps,
+                                                       repl::OpTypeEnum::kContainerUpdate));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 2);
 
@@ -354,20 +345,13 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     ASSERT_TRUE(tsAfterFirstAdvance.has_value());
     EXPECT_EQ(userWriteTs, *tsAfterFirstAdvance);
 
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
     BSONArrayBuilder innerOpsBuilder;
-    innerOpsBuilder.append(BSON("op" << "u"
-                                     << "ns" << fastCountStoreNss.ns_forTest() << "ui"
-                                     << UUID::gen() << "o" << BSON("$set" << BSON("count" << 1))
-                                     << "o2" << BSON("_id" << 1)));
-    innerOpsBuilder.append(
-        BSON("op" << "u"
-                  << "ns" << fastCountTimestampNss.ns_forTest() << "ui" << UUID::gen() << "o"
-                  << BSON("$set" << BSON("ts" << userWriteTs)) << "o2" << BSON("_id" << 1)));
+    innerOpsBuilder.append(BSON("op" << "cu"
+                                     << "container" << ident::kFastCountMetadataStore << "o"
+                                     << BSON("k" << 1LL)));
+    innerOpsBuilder.append(BSON("op" << "cu"
+                                     << "container" << ident::kFastCountMetadataStoreTimestamps
+                                     << "o" << BSON("k" << 1LL)));
 
     const repl::OplogEntry applyOpsEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(applyOpsTs, 1),
@@ -854,13 +838,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
        OnlyWritesToFastCountCollDoesNotCreateOplogFastCountEntry) {
     EXPECT_FALSE(readSizeCount(getOplogUuid(opCtx)).has_value());
 
-    const test_helpers::NsAndUUID fastCountNsAndUUID{
-        .nss =
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        .uuid = UUID::gen()};
     test_helpers::writeToOplog(opCtx,
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(1, 1), fastCountNsAndUUID, repl::OpTypeEnum::kUpdate));
+                               makeContainerOplogEntry(Timestamp(1, 1),
+                                                       ident::kFastCountMetadataStore,
+                                                       repl::OpTypeEnum::kContainerUpdate));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 0);
 

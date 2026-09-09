@@ -5,9 +5,11 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <list>
@@ -212,13 +214,11 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
 
 TEST(SizeCountCheckpointBufferTest, InternalOnlyScanProducesNoFlushableWork) {
     const UUID oplogUuid = UUID::gen();
-    const NsAndUUID internalColl{.nss = NamespaceString::makeGlobalConfigCollection(
-                                     NamespaceString::kReplicatedFastCountStore),
-                                 .uuid = UUID::gen()};
+    const repl::OplogEntry entry = test_helpers::makeContainerOplogEntry(
+        Timestamp(2, 1), ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
 
     SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
-    OplogCursorMock cursor({makeOplogEntry(
-        Timestamp(2, 1), internalColl, repl::OpTypeEnum::kInsert, /*sizeDelta=*/9)});
+    OplogCursorMock cursor({entry});
     buffer.scanToNoHolesEOF(cursor);
 
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());

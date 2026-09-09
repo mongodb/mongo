@@ -16,7 +16,6 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 
-#include <algorithm>
 #include <memory>
 #include <string_view>
 
@@ -26,21 +25,8 @@ namespace {
 class ReplicatedFastCountOpObserver final : public OpObserverNoop {
 public:
     NamespaceFilters getNamespaceFilters() const final {
-        return {NamespaceFilter::kConfig, NamespaceFilter::kNone};
+        return {NamespaceFilter::kNone, NamespaceFilter::kNone};
     }
-
-    void onInserts(OperationContext* opCtx,
-                   const CollectionPtr& coll,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   const std::vector<RecordId>& recordIds,
-                   const std::vector<bool>& fromMigrate,
-                   bool defaultFromMigrate,
-                   OpStateAccumulator* opAccumulator = nullptr) final;
-
-    void onUpdate(OperationContext* opCtx,
-                  const OplogUpdateEntryArgs& args,
-                  OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onContainerInsert(OperationContext* opCtx,
                            std::string_view ident,
@@ -88,44 +74,9 @@ public:
     }
 };
 
-bool isFastCountTimestampsNss(const NamespaceString& nss) {
-    static const auto timestampsNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    return nss == timestampsNss;
-}
-
 void scheduleRecordOnCommit(OperationContext* opCtx, const Timestamp& ts) {
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [ts](OperationContext*, boost::optional<Timestamp>) { recordCheckpointAdvanced(ts); });
-}
-
-void ReplicatedFastCountOpObserver::onInserts(OperationContext* opCtx,
-                                              const CollectionPtr& coll,
-                                              std::vector<InsertStatement>::const_iterator begin,
-                                              std::vector<InsertStatement>::const_iterator end,
-                                              const std::vector<RecordId>&,
-                                              const std::vector<bool>&,
-                                              bool,
-                                              OpStateAccumulator*) {
-    if (begin == end || !isFastCountTimestampsNss(coll->ns())) {
-        return;
-    }
-    Timestamp maxTs;
-    for (auto it = begin; it != end; ++it) {
-        maxTs = std::max(maxTs, it->doc.getField(replicated_fast_count::kValidAsOfKey).timestamp());
-    }
-    scheduleRecordOnCommit(opCtx, maxTs);
-}
-
-void ReplicatedFastCountOpObserver::onUpdate(OperationContext* opCtx,
-                                             const OplogUpdateEntryArgs& args,
-                                             OpStateAccumulator*) {
-    if (!isFastCountTimestampsNss(args.coll->ns())) {
-        return;
-    }
-    scheduleRecordOnCommit(
-        opCtx,
-        args.updateArgs->updatedDoc.getField(replicated_fast_count::kValidAsOfKey).timestamp());
 }
 
 }  // namespace

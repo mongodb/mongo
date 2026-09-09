@@ -183,7 +183,6 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
         std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
     manager->startup(_opCtx);
     ASSERT_TRUE(manager->isRunning_ForTest());
-    ASSERT_TRUE(manager->usesContainers_ForTest());
 
     SizeCountStore* boundSizeCountStore = manager->getSizeCountStores_ForTest().first;
     SizeCountTimestampStore* boundTimestampStore = manager->getSizeCountStores_ForTest().second;
@@ -195,7 +194,6 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
     manager->initializeContainerStores(std::move(metadataRS2), std::move(timestampsRS2));
 
     ASSERT_TRUE(manager->isRunning_ForTest());
-    ASSERT_TRUE(manager->usesContainers_ForTest());
     ASSERT_EQ(manager->getSizeCountStores_ForTest().first, boundSizeCountStore);
     ASSERT_EQ(manager->getSizeCountStores_ForTest().second, boundTimestampStore);
 
@@ -238,7 +236,6 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
     manager->initializeContainerStores(std::move(metadataRS2), std::move(timestampsRS2));
 
     ASSERT_TRUE(manager->isRunning_ForTest());
-    ASSERT_TRUE(manager->usesContainers_ForTest());
     ASSERT_EQ(manager->getSizeCountStores_ForTest().first, boundSizeCountStore);
     ASSERT_EQ(manager->getSizeCountStores_ForTest().second, boundTimestampStore);
 
@@ -1327,9 +1324,6 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 100 + 30, .count = 5 + 1});
 }
 
-// `populateFromInitialSync` calls `writeToTable`, which is only implemented by the container-backed
-// stores (`CollectionSizeCountStore` / `CollectionSizeCountTimestampStore` mark it UNREACHABLE). To
-// exercise the actual write path the fixture configures the manager with container-backed stores.
 class ReplicatedFastCountManagerPopulateFromInitialSyncTest : public CatalogTestFixture {
 public:
     ReplicatedFastCountManagerPopulateFromInitialSyncTest()
@@ -1453,6 +1447,20 @@ TEST_F(ReplicatedFastCountManagerPopulateFromInitialSyncTest,
     ASSERT_TRUE(e.has_value());
     EXPECT_EQ(e->first.sizeCount.size, 1);
     EXPECT_EQ(e->first.sizeCount.count, 1);
+}
+
+TEST_F(ReplicatedFastCountManagerTest, FindPersistedReturnsNoneWhenStoresUninitialized) {
+    ReplicatedFastCountManager uninitializedManager;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
+    EXPECT_FALSE(uninitializedManager.findPersisted(operationContext(), UUID::gen()).has_value());
+}
+
+TEST_F(ReplicatedFastCountManagerTest,
+       FindPersistedTimestampStoreTsReturnsNoneWhenStoresUninitialized) {
+    ReplicatedFastCountManager uninitializedManager;
+    Lock::GlobalLock readLock(operationContext(), MODE_IS);
+    EXPECT_FALSE(
+        uninitializedManager.findPersistedTimestampStoreTs(operationContext()).has_value());
 }
 
 }  // namespace

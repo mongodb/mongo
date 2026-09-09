@@ -386,13 +386,10 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
 
     // Now write an applyOps that only touches the internal fast count containers. This entry
     // should be counted as skipped, not processed.
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
     BSONArrayBuilder innerOps;
-    innerOps.append(BSON("op" << "u"
-                              << "ns" << fastCountStoreNss.ns_forTest() << "ui" << UUID::gen()
-                              << "o" << BSON("$set" << BSON("count" << 1)) << "o2"
-                              << BSON("_id" << 1)));
+    innerOps.append(BSON("op" << "cu"
+                              << "container" << ident::kFastCountMetadataStore << "o"
+                              << BSON("k" << 1)));
     const repl::OplogEntry internalEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(Timestamp{1, 2}, 1),
         .opType = repl::OpTypeEnum::kCommand,
@@ -456,11 +453,9 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
         .nss = NamespaceString::createNamespaceString_forTest("db", "collA"), .uuid = UUID::gen()};
     const NamespaceString adminCmdNss =
         NamespaceString::createNamespaceString_forTest("admin", "$cmd");
-    const NamespaceString fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
 
     // -- Entry 1: applyOps with 3 user inserts, each carrying size metadata.
-    // operationsOnFastCountStores() returns false (user ops present), so this entry is
+    // isContainerOpOnFastCountIdent() returns false (user ops present), so this entry is
     // counted as processed. extractReplicatedMetadataDeltasForApplyOps sees 3 inner ops with
     // "m.sz", so sizeCount is incremented 3 times.
     const BSONObj userInsert1 = BSON("op" << "i"
@@ -483,15 +478,13 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
         }}});
 
     // -- Entry 2: applyOps with 2 ops that only touch internal fast-count containers.
-    // operationsOnFastCountStores() returns true, so the entire entry is skipped.
+    // isContainerOpOnFastCountIdent() returns true, so the entire entry is skipped.
     const BSONObj internalOp1 =
-        BSON("op" << "u"
-                  << "ns" << fastCountStoreNss.ns_forTest() << "ui" << UUID::gen() << "o"
-                  << BSON("$set" << BSON("count" << 5)) << "o2" << BSON("_id" << 1));
+        BSON("op" << "cu"
+                  << "container" << ident::kFastCountMetadataStore << "o" << BSON("k" << 1));
     const BSONObj internalOp2 =
-        BSON("op" << "u"
-                  << "ns" << fastCountStoreNss.ns_forTest() << "ui" << UUID::gen() << "o"
-                  << BSON("$set" << BSON("count" << 3)) << "o2" << BSON("_id" << 2));
+        BSON("op" << "cu"
+                  << "container" << ident::kFastCountMetadataStore << "o" << BSON("k" << 2));
     test_helpers::writeToOplog(
         opCtx,
         repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{

@@ -18,17 +18,11 @@ namespace mongo::replicated_fast_count {
  * This class is useful for tracking when persisted size and count metadata were last known to be
  * accurate and thus the timestamp after which the oplog is needed for correctness.
  *
- * Two implementations exist: `CollectionSizeCountTimestampStore` (collection-backed) and
- * `ContainerSizeCountTimestampStore` (container-backed).
- *
  * Locking: the container-backed implementation reads and writes the underlying container and does
  * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
  * of the call:
  *   MODE_IS - read()
  *   MODE_IX - write()
- *
- * The collection-backed implementation acquires the collection (and its locks) internally, but
- * callers should hold the same locks so the two implementations are interchangeable.
  */
 class SizeCountTimestampStore {
 public:
@@ -61,25 +55,6 @@ public:
      * `canAcceptWritesFor` primary check, so the write is not replicated.
      */
     virtual void writeToTable(OperationContext* opCtx, Timestamp timestamp) = 0;
-
-    virtual bool usesContainers() const = 0;
-};
-
-/**
- * Collection-backed implementation of `SizeCountTimestampStore`. Reads and writes target the
- * `config.fast_count_metadata_timestamp_store` collection.
- */
-class CollectionSizeCountTimestampStore final : public SizeCountTimestampStore {
-public:
-    CollectionSizeCountTimestampStore() = default;
-
-    boost::optional<Timestamp> read(OperationContext* opCtx) const override;
-    void write(OperationContext* opCtx, Timestamp timestamp) override;
-    void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
-
-    bool usesContainers() const override {
-        return false;
-    }
 };
 
 /**
@@ -96,10 +71,6 @@ public:
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
     void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
-
-    bool usesContainers() const override {
-        return true;
-    }
 
     RecordStore* rs_ForTest() const;
 

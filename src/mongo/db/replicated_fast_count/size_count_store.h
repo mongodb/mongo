@@ -6,7 +6,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
-#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -30,32 +29,13 @@ inline constexpr std::string_view kHashKey = "h"sv;
 inline constexpr std::string_view kValidAsOfKey = "valid-as-of"sv;
 
 /**
- * Acquires the replicated fast count collection for read access.
- * Returns boost::none if the collection does not exist.
- */
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
-    OperationContext* opCtx);
-
-/**
- * Acquire the fastcount collection that underpins this class with write intent.
- * Returns boost::none if it doesn't exist.
- */
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
-    OperationContext* opCtx);
-
-/**
- * Abstract interface for read/write access to the persisted size and count metadata. Two
- * implementations exist: `CollectionSizeCountStore` (collection-backed) and
- * `ContainerSizeCountStore` (container-backed).
+ * Abstract interface for read/write access to the persisted size and count metadata.
  *
  * Locking: the container-backed implementation reads and writes the underlying container and does
  * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
  * of the call:
  *   MODE_IS - read(), readAndIncrementReplicatedMetadata()
  *   MODE_IX - write(), insert(), remove()
- *
- * The collection-backed implementation acquires the collection (and its locks) internally, but
- * callers should hold the same locks so the two implementations are interchangeable.
  */
 class SizeCountStore {
 public:
@@ -126,35 +106,12 @@ public:
     virtual void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
                                                     ReplicatedMetadataDeltas& deltas) const = 0;
 
-    virtual bool usesContainers() const = 0;
-
     /**
      * Performs a single write of `entry` for `uuid` directly to the underlying physical table.
      * Unlike write(), this does not log to the oplog: it skips invoking op observers and bypasses
      * the `canAcceptWritesFor` primary check, so the write is not replicated.
      */
     virtual void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
-};
-
-/**
- * Collection-backed implementation of `SizeCountStore`. Reads and writes target the
- * `config.fast_count_metadata_store` collection.
- */
-class CollectionSizeCountStore final : public SizeCountStore {
-public:
-    CollectionSizeCountStore() = default;
-
-    boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const override;
-    void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    size_t remove(OperationContext* opCtx, UUID uuid) override;
-    void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
-                                            ReplicatedMetadataDeltas& deltas) const override;
-    void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-
-    bool usesContainers() const override {
-        return false;
-    }
 };
 
 /**
@@ -175,10 +132,6 @@ public:
     void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
                                             ReplicatedMetadataDeltas& deltas) const override;
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-
-    bool usesContainers() const override {
-        return true;
-    }
 
     /**
      * Encodes `uuid` as the container key. The returned span views into `uuid` and is valid only

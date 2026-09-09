@@ -1088,26 +1088,13 @@ private:
             }
         }
 
-        // Stop the background metadata checkpoint thread and drop the metadata store collections
-        // when downgrading to an FCV that disables the replicated size and count feature.
+        // Stop the background metadata checkpoint thread when downgrading to an FCV that disables
+        // the replicated size and count feature.
         if (gFeatureFlagReplicatedFastCount.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion) &&
             repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
                 .shutdown(opCtx);
-            DropReply unused;
-            uassertStatusOK(
-                dropCollection(opCtx,
-                               NamespaceString::makeGlobalConfigCollection(
-                                   NamespaceString::kReplicatedFastCountStore),
-                               &unused,
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-            uassertStatusOK(
-                dropCollection(opCtx,
-                               NamespaceString::makeGlobalConfigCollection(
-                                   NamespaceString::kReplicatedFastCountStoreTimestamps),
-                               &unused,
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
         }
 
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);

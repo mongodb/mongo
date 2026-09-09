@@ -64,11 +64,6 @@ public:
     // Name for the profile collection
     static constexpr std::string_view kSystemDotProfileCollectionName{"system.profile"};
 
-    // Name for fastcount - replicated collection size and count - collections.
-    static constexpr std::string_view kReplicatedFastCountStore{"fast_count_metadata_store"};
-    static constexpr std::string_view kReplicatedFastCountStoreTimestamps{
-        "fast_count_metadata_store_timestamps"};
-
     // Names of privilege document collections
     static constexpr std::string_view kSystemUsers{"system.users"};
     static constexpr std::string_view kSystemRoles{"system.roles"};
