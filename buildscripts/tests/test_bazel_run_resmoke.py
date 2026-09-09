@@ -21,7 +21,7 @@ class TestBazelRunResmoke(unittest.TestCase):
             [
                 "bazel",
                 "run",
-                "--config=local",
+                "--config=no-remote-exec",
                 "//buildscripts:resmoke",
                 "--",
                 "run",
