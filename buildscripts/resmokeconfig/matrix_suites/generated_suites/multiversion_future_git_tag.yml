@@ -43,8 +43,6 @@ selector:
     - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
     - jstests/multiVersion/genericBinVersion/authz_schema_version.js
     - jstests/multiVersion/genericBinVersion/server-security/dollar_audit_mixed_version_mongods.js
-    - jstests/multiVersion/genericBinVersion/query-integration-search/rank_fusion_upgrade_downgrade.js
-    - jstests/multiVersion/genericBinVersion/query-integration-search/score_fusion_upgrade_downgrade.js
     - jstests/multiVersion/genericBinVersion/query-execution/constraint_validation_level_setfcv_concurrent.js
     - jstests/multiVersion/genericBinVersion/query-execution/constraint_validation_level_fcv_gating.js
     - jstests/multiVersion/genericBinVersion/query-execution/schema_validation_level.js

@@ -124,18 +124,6 @@ selector:
     # assertion at line 91 fails and the $audit metadata includes $impersonatedClient.
     - jstests/multiVersion/genericBinVersion/server-security/dollar_audit_mixed_version_mongods.js
 
-    # TODO SERVER-133002: featureFlagRankFusionBasic/Full are FCV-gated at 8.1. The
-    # test asserts $rankFusion is completely rejected in all last-LTS-FCV states. Now that last-LTS is
-    # 9.0 (>= 8.1), $rankFusion is accepted at last-LTS and the queries succeed, breaking the
-    # rejection expectations.
-    - jstests/multiVersion/genericBinVersion/query-integration-search/rank_fusion_upgrade_downgrade.js
-
-    # TODO SERVER-133002: featureFlagSearchHybridScoringFull is FCV-gated at 8.2.
-    # The test expects $scoreFusion/$score and scoreDetails to be rejected in all last-LTS-FCV states.
-    # Now that last-LTS is 9.0 (>= 8.2), these features are enabled at last-LTS and the rejection
-    # expectations fail.
-    - jstests/multiVersion/genericBinVersion/query-integration-search/score_fusion_upgrade_downgrade.js
-
     # TODO SERVER-133012: featureFlagConstraintValidationLevel is FCV-gated at 9.0. The test
     # downgrades from latest to last-LTS and expects the constraint-upgrade collMod steps to be
     # rejected with InvalidOptions while FCV is kDowngrading. Now that last-LTS is 9.0 (= 9.0), the
