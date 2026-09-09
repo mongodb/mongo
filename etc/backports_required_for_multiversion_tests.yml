@@ -78,6 +78,8 @@ last-continuous:
       ticket: SERVER-127985
     - test_file: jstests/aggregation/expressions/subtype.js
       ticket: SERVER-129103
+    - test_file: jstests/aggregation/sources/bucket/bucket_literal_values.js
+      ticket: SERVER-134618
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
@@ -255,6 +257,8 @@ last-lts:
       ticket: SERVER-90869
     - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
+    - test_file: jstests/aggregation/sources/bucket/bucket_literal_values.js
+      ticket: SERVER-134618
     - test_file: jstests/aggregation/sources/foreign_coll_read_foreign_db_write.js
       ticket: SERVER-96197
     - test_file: jstests/aggregation/sources/lookup/lookup_absorb_match.js
