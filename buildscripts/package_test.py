@@ -360,11 +360,24 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
 
     if test.os_name.startswith('debian11'):
         # Debian 11 (bullseye) reached end-of-life on 2026-08-31
-        # (https://www.debian.org/News/2026/20260831), so the Valid-Until field on its
-        # release files has expired and apt refuses to refresh the package index. The
-        # repository (including bullseye-security) is still served from deb.debian.org
-        # and has not yet been moved to archive.debian.org, so keep using it in place
-        # with the Valid-Until check disabled.
+        # (https://www.debian.org/News/2026/20260831) and its repositories are being
+        # moved to archive.debian.org. The security repository is in a partially-pruned
+        # state in the meantime: its release files still list packages whose .debs have
+        # been removed from the pool (404 on install), and it has not yet been mirrored
+        # to archive.debian.org. The container image ships no curl/wget, so probe
+        # archive.debian.org with apt itself: point bullseye-security at
+        # archive.debian.org, tolerate a failed update, and check whether the security
+        # index was actually fetched. If archive.debian.org does not serve
+        # bullseye-security yet, fall back to a pinned pre-EOL snapshot.debian.org
+        # timestamp, which retains the complete security pool. Once the archive mirror
+        # is populated, the snapshot fallback becomes dead code and the final
+        # archive.debian.org layout matches the debian92/debian10 handling.
+        commands += [
+            "sed -i 's|deb.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list",
+            "apt-get update -o Acquire::Check-Valid-Until=false || true",
+            "if ! ls /var/lib/apt/lists/*archive.debian.org_debian-security_dists_bullseye-security* > /dev/null 2>&1; then "
+            "sed -i 's|archive.debian.org/debian-security|snapshot.debian.org/archive/debian-security/20260831T033337Z|g' /etc/apt/sources.list; fi",
+        ]
         test.update_command += " -o Acquire::Check-Valid-Until=false"
 
     commands += [
