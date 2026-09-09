@@ -60,8 +60,9 @@ commands:
         type: fcv_string
         fields:
             confirm:
-                description: "A required parameter that ensures that the user is
-                    upgrading/downgrading with support assistance. Internal setFCV
+                description:
+                    "A required parameter that ensures that the user explicitly
+                    acknowledges the upgrade/downgrade process. Internal setFCV
                     commands issue from the config svr will not require this parameter.
                     If this parameter is not specified from a user command, the setFCV
                     command will error out. This parameter is declared optional so that

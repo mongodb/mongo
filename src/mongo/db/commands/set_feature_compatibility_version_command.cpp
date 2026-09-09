@@ -626,14 +626,10 @@ public:
 
         auto isConfirmed = request.getConfirm().value_or(false);
         const auto upgradeMsg = fmt::format(
-            "Once you have upgraded to {}, you will not be able to downgrade FCV and binary "
-            "version without support assistance. Please re-run this command with 'confirm: true' "
-            "to acknowledge this and continue with the FCV upgrade.",
+            "To proceed with the FCV upgrade, please re-run this command with 'confirm: true'.",
             multiversion::toString(requestedVersion));
         const auto downgradeMsg =
-            "Once you have downgraded the FCV, if you choose to downgrade the binary version, "
-            "it will require support assistance. Please re-run this command with 'confirm: "
-            "true' to acknowledge this and continue with the FCV downgrade.";
+            "To proceed with the FCV downgrade, please re-run this command with 'confirm: true'.";
         uassert(7369100,
                 (requestedVersion > actualVersion ? upgradeMsg : downgradeMsg),
                 // If the request is from a config svr, skip requiring the 'confirm: true'
