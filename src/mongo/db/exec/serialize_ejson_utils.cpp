@@ -612,7 +612,7 @@ static const StringDataMap<ConvertFunction> convertFromExtendedJsonMap{
  */
 boost::optional<Value> tryConvertFromSingleKeyExtendedJson(std::string_view fieldName,
                                                            Value value) {
-    if (fieldName.front() != '$') {
+    if (!fieldName.starts_with('$')) {
         return boost::none;
     }
     if (auto it = parsers::convertFromExtendedJsonMap.find(fieldName);

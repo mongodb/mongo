@@ -2842,5 +2842,16 @@ TEST(ExpressionReplaceAllTest, RegExCorrectSerializationTest) {
         serializedStr);
 }
 
+TEST(ExpressionDeserializeEJSONTest, EmptyFieldNameInInputDocument) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // User MQL can supply an object whose field name is the empty string via $literal.
+    auto exprBSON = fromjson(R"({$deserializeEJSON: {input: {$literal: {"": 1}}}})");
+    auto expr = Expression::parseExpression(&expCtx, exprBSON, expCtx.variablesParseState);
+
+    auto result = expr->evaluate(Document{}, &expCtx.variables);
+    ASSERT_VALUE_EQ(result, Value(BSON("" << 1)));
+}
+
 }  // namespace ExpressionTests
 }  // namespace mongo
