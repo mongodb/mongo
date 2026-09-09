@@ -8,6 +8,7 @@ import {findMatchingLogLine} from "jstests/libs/log.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 const kWriteConflictCount = 3;
+const kMaxAttempts = 10;
 
 describe("write conflict preserves plan stats", function () {
     let conn, db, coll;
@@ -24,29 +25,58 @@ describe("write conflict preserves plan stats", function () {
         MongoRunner.stopMongod(conn);
     });
 
-    function runAndCheckStats(comment, fn) {
-        const fp = configureFailPoint(
-            conn,
-            "WTWriteConflictException",
-            {},
-            {times: kWriteConflictCount},
-        );
-        fn(comment);
-        fp.off();
+    // The WTWriteConflictException failpoint budget is process-wide: WT_OP_CHECK evaluates it on
+    // every modifying WiredTiger cursor call, so concurrent writes can consume activations that
+    // never reach the operation under test. Retry the whole case until at least one conflict lands.
+    // See SERVER-134502.
+    function runAndCheckStats(comment, setupFn, fn) {
+        for (let attempt = 0; attempt < kMaxAttempts; ++attempt) {
+            const attemptComment = `${comment}_${attempt}`;
+            setupFn();
 
-        const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-        const entry = findMatchingLogLine(globalLog.log, {id: 51803, comment: comment});
-        assert.neq(null, entry, "Slow query log entry not found for comment: " + comment);
-        return JSON.parse(entry);
+            const fp = configureFailPoint(
+                conn,
+                "WTWriteConflictException",
+                {},
+                {times: kWriteConflictCount},
+            );
+            try {
+                fn(attemptComment);
+            } finally {
+                // The failpoint is process-wide, so leaving it armed after a failure would cascade
+                // into the remaining cases that mochalite still runs.
+                fp.off();
+            }
+
+            const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+            const entry = findMatchingLogLine(globalLog.log, {id: 51803, comment: attemptComment});
+            assert.neq(
+                null,
+                entry,
+                "Slow query log entry not found for comment: " + attemptComment,
+            );
+            const parsed = JSON.parse(entry);
+            if ((parsed.attr.writeConflicts || 0) > 0) {
+                return parsed;
+            }
+        }
+        assert(
+            false,
+            `${comment}: no write conflict reached the operation in ${kMaxAttempts} attempts`,
+        );
+    }
+
+    function singleDocSetup(indexOptions = {}) {
+        return () => {
+            coll.drop();
+            coll.createIndex({x: 1}, indexOptions);
+            assert.commandWorked(coll.insertOne({x: 1}));
+        };
     }
 
     function assertStatsAccumulated(parsed, label) {
         const wc = parsed.attr.writeConflicts || 0;
-        assert.gte(
-            wc,
-            kWriteConflictCount,
-            `${label}: expected at least ${kWriteConflictCount} writeConflicts, got ${wc}`,
-        );
+        assert.gte(wc, 1, `${label}: expected at least 1 writeConflict, got ${wc}`);
         assert.eq(
             wc + 1,
             parsed.attr.docsExamined,
@@ -55,11 +85,7 @@ describe("write conflict preserves plan stats", function () {
     }
 
     it("findAndModify update accumulates keysExamined and docsExamined", function () {
-        coll.drop();
-        coll.createIndex({x: 1});
-        assert.commandWorked(coll.insertOne({x: 1}));
-
-        const parsed = runAndCheckStats("fam_update", (c) => {
+        const parsed = runAndCheckStats("fam_update", singleDocSetup(), (c) => {
             assert.commandWorked(
                 db.runCommand({
                     findAndModify: collName,
@@ -74,11 +100,7 @@ describe("write conflict preserves plan stats", function () {
     });
 
     it("findAndModify delete accumulates keysExamined and docsExamined", function () {
-        coll.drop();
-        coll.createIndex({x: 1});
-        assert.commandWorked(coll.insertOne({x: 1}));
-
-        const parsed = runAndCheckStats("fam_delete", (c) => {
+        const parsed = runAndCheckStats("fam_delete", singleDocSetup(), (c) => {
             assert.commandWorked(
                 db.runCommand({
                     findAndModify: collName,
@@ -93,11 +115,7 @@ describe("write conflict preserves plan stats", function () {
     });
 
     it("sorted updateOne accumulates keysExamined and docsExamined", function () {
-        coll.drop();
-        coll.createIndex({x: 1});
-        assert.commandWorked(coll.insertOne({x: 1}));
-
-        const parsed = runAndCheckStats("sorted_update", (c) => {
+        const parsed = runAndCheckStats("sorted_update", singleDocSetup(), (c) => {
             assert.commandWorked(
                 db.runCommand({
                     update: collName,
@@ -161,11 +179,7 @@ describe("write conflict preserves plan stats", function () {
     });
 
     it("express update accumulates keysExamined and docsExamined", function () {
-        coll.drop();
-        coll.createIndex({x: 1}, {unique: true});
-        assert.commandWorked(coll.insertOne({x: 1}));
-
-        const parsed = runAndCheckStats("express_update", (c) => {
+        const parsed = runAndCheckStats("express_update", singleDocSetup({unique: true}), (c) => {
             assert.commandWorked(
                 db.runCommand({
                     update: collName,
@@ -179,31 +193,35 @@ describe("write conflict preserves plan stats", function () {
     });
 
     it("delete accumulates keysExamined and docsExamined", function () {
-        coll.drop();
-        coll.createIndex({x: 1});
-
         const kDocCount = 100;
-        const docs = [];
-        for (let i = 0; i < kDocCount; ++i) {
-            docs.push({x: i});
-        }
-        assert.commandWorked(coll.insertMany(docs));
+        const batchDeleteSetup = () => {
+            coll.drop();
+            coll.createIndex({x: 1});
+            const docs = [];
+            for (let i = 0; i < kDocCount; ++i) {
+                docs.push({x: i});
+            }
+            assert.commandWorked(coll.insertMany(docs));
+        };
 
-        const parsed = runAndCheckStats("batch_delete", (c) => {
+        const parsed = runAndCheckStats("batch_delete", batchDeleteSetup, (c) => {
             const fp = configureFailPoint(
                 conn,
                 "throwWriteConflictExceptionInBatchedDeleteStage",
                 {},
                 {activationProbability: 0.25},
             );
-            assert.commandWorked(
-                db.runCommand({
-                    delete: collName,
-                    deletes: [{q: {x: {$gte: kDocCount / 2}}, limit: 0}],
-                    comment: c,
-                }),
-            );
-            fp.off();
+            try {
+                assert.commandWorked(
+                    db.runCommand({
+                        delete: collName,
+                        deletes: [{q: {x: {$gte: kDocCount / 2}}, limit: 0}],
+                        comment: c,
+                    }),
+                );
+            } finally {
+                fp.off();
+            }
         });
 
         const wc = parsed.attr.writeConflicts || 0;
