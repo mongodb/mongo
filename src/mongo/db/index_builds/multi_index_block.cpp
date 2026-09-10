@@ -1859,7 +1859,7 @@ void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) const {
     writeConflictRetry(opCtx, "writeAllIndexBuildState", NamespaceString::kEmpty, [&] {
         // Group all records into a single replicated transaction so secondaries apply the writes
         // atomically.
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         _upsertIntoContainer(opCtx, indexBuildMetadataKey, metadataObj);
         for (size_t i = 0; i < _indexes.size(); ++i) {
             _upsertIntoContainer(opCtx,

@@ -808,7 +808,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
     {
         // Insert documents and confirm the aggregation.
         auto acq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, acq.getCollectionPtr(), docs));
         wuow.commit();
     }
@@ -831,7 +831,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
     };
     {
         auto acq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, acq.getCollectionPtr(), docsNewInserts));
         wuow.commit();
     }
@@ -857,7 +857,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpd
     {
         // Pre-populate collection
         auto acq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, acq.getCollectionPtr(), docs));
         wuow.commit();
     }
@@ -866,7 +866,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpd
     {
         // Update 2 of the documents.
         auto collAcq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         Helpers::update(
             _opCtx, collAcq, BSON("_id" << 0), BSON("$set" << BSON("greeting" << "Howdy")));
         Helpers::update(
@@ -896,7 +896,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDel
     {
         // Pre-populate collection
         auto acq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, acq.getCollectionPtr(), docs));
         wuow.commit();
     }
@@ -905,7 +905,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDel
     {
         // Delete 2 of the documents.
         auto collAcq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         const std::vector<BSONObj> removeFilters{BSON("_id" << 0), BSON("_id" << 2)};
         for (const auto& docFilter : removeFilters) {
             const auto rid = Helpers::findOne(_opCtx, collAcq, docFilter);
@@ -933,7 +933,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
 
     {
         auto collAcq = acquireCollForWrite(_nss1);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         // Insert doc0 and doc1.
         ASSERT_OK(
             Helpers::insert(_opCtx, collAcq.getCollectionPtr(), std::vector<BSONObj>{doc0, doc1}));
@@ -975,7 +975,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
         // In a grouped applyOps, insert one document into each collection.
         auto collAcq = acquireCollForWrite(_nss1);
         auto collAcq2 = acquireCollForWrite(_nss2);
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, collAcq.getCollectionPtr(), doc1));
         ASSERT_OK(Helpers::insert(_opCtx, collAcq2.getCollectionPtr(), doc2));
 

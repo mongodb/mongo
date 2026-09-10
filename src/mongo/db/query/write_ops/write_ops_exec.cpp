@@ -366,12 +366,12 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool inTransaction = opCtx->inMultiDocumentTransaction();
     const bool oplogDisabled = replCoord->isOplogDisabledFor(opCtx, collection.nss());
-    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::noGroup;
 
     // For multiple inserts not part of a multi-document transaction, the inserts will be
     // batched into a single applyOps oplog entry.
     if (!inTransaction && batchSize > 1 && !oplogDisabled) {
-        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+        oplogEntryGroupType = WriteUnitOfWork::nonAtomicGroup;
     }
 
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to

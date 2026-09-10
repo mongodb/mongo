@@ -48,7 +48,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
 
@@ -80,7 +80,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
@@ -104,7 +104,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
     auto opCtx = opCtxRaii.get();
     opCtx->setInMultiDocumentTransaction();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     // Need to explicitly set writes are batched to simulate op observer starting batched write.
     bwc.setWritesAreBatched(true);
@@ -120,7 +120,7 @@ TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
     auto opCtx = opCtxRaii.get();
     auto& bwc = BatchedWriteContext::get(opCtx);
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     // Need to explicitly set writes are batched to simulate op observer
     bwc.setWritesAreBatched(true);
 
@@ -159,7 +159,7 @@ TEST_F(BatchedWriteContextTest, TestDDLSucceedsWithEmptyBatch) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     bwc.setWritesAreBatched(true);
 
@@ -171,7 +171,7 @@ TEST_F(BatchedWriteContextTest, TestCRUDSucceedsWithNoPriorDDL) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     bwc.setWritesAreBatched(true);
 
@@ -183,7 +183,7 @@ TEST_F(BatchedWriteContextTest, TestDDLFailsWithCRUDOpsInBatch) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     bwc.setWritesAreBatched(true);
 
@@ -204,7 +204,7 @@ TEST_F(BatchedWriteContextTest, TestCRUDFailsAfterDDL) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     bwc.setWritesAreBatched(true);
 
@@ -223,7 +223,7 @@ TEST_F(BatchedWriteContextTest, TestClearResetsDDLFlag) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     auto& bwc = BatchedWriteContext::get(opCtx);
     bwc.setWritesAreBatched(true);
 
@@ -242,7 +242,7 @@ TEST_F(BatchedWriteContextTest, AtomicOperationGroupStampsStagedOperations) {
     auto opCtx = opCtxRaii.get();
     auto& bwc = BatchedWriteContext::get(opCtx);
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     bwc.setWritesAreBatched(true);
     EXPECT_FALSE(bwc.hasAtomicOperationGroups());
 

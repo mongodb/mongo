@@ -1494,11 +1494,10 @@ are broken up into batches with a maximum of `internalInsertMaxBatchSize` docume
 `insertVectorMaxBytes` bytes, whichever results in a smaller batch.
 
 When we open the `WriteUnitOfWork` for these batches, we specify a
-`WriteUnitOfWork::OplogEntryGroupType` of `kGroupForPossiblyRetryableOperations`. This will set the
-`writesAreBatched` flag on the `BatchedWriteContext` decoration on the OperationContext. When this
-flag is set, the `OpObserverImpl` will collect writes in a `BatchedOperations` (an alias for
-`TransactionOperations`) structure on the `BatchedWriteContext` rather than write oplog entries for
-them.
+`WriteUnitOfWork::OplogEntryGroupType` of `nonAtomicGroup`. This will set the `writesAreBatched`
+flag on the `BatchedWriteContext` decoration on the OperationContext. When this flag is set, the
+`OpObserverImpl` will collect writes in a `BatchedOperations` (an alias for `TransactionOperations`)
+structure on the `BatchedWriteContext` rather than write oplog entries for them.
 
 When the `WriteUnitOfWork` commits, the OpObserverImpl will write these oplog entries in an
 `applyOps` entry. If this insert is not within a retryable session, this applyOps entry will lack
@@ -1508,10 +1507,10 @@ from transactions. All `applyOps` entries generated from batches within a single
 insert will have the same `lsid` and `txnNumber`, and will be linked to the previous entry using the
 `prevOpTime` field, which will be a null optime for the first `applyOps`.
 
-It is expected that users of the `kGroupForPossiblyRetryableOperations` parameter will ensure that
-no more than `BSONMaxUserSize` bytes of user data are inserted within one `WriteUnitOfWork`. If this
-is exceeded, multiple `applyOps` entries will be generated, with sequential optimes; if they are
-within a retryable write they will be linked together.
+It is expected that users of the `nonAtomicGroup` parameter will ensure that no more than
+`BSONMaxUserSize` bytes of user data are inserted within one `WriteUnitOfWork`. If this is exceeded,
+multiple `applyOps` entries will be generated, with sequential optimes; if they are within a
+retryable write they will be linked together.
 
 When applied on a secondary, each `applyOps` in a batched operation will be applied separately;
 unlike transactions, there is no requirement that all writes within a single vectored insert are

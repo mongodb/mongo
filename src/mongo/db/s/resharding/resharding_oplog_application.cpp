@@ -483,7 +483,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
     {
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         const auto outputColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
         // Query the output collection for a doc with _id == [op _id].

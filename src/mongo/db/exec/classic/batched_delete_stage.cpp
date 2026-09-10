@@ -311,8 +311,8 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
     // Start a WUOW with 'groupOplogEntries' which groups a delete batch into a single timestamp
     // and oplog entry.
     WriteUnitOfWork wuow(opCtx(),
-                         _stagedDeletesBuffer.size() > 1U ? WriteUnitOfWork::kGroupForTransaction
-                                                          : WriteUnitOfWork::kDontGroup);
+                         _stagedDeletesBuffer.size() > 1U ? WriteUnitOfWork::atomicGroup
+                                                          : WriteUnitOfWork::noGroup);
     // We iterate pending deletes in reverse order of staging to work around duplicate deletions
     // that can result when the same document gets staged twice. When the batch of documents to
     // delete comes from an index scan, it can contain duplicates in the rare case that a yield

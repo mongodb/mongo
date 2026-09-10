@@ -60,8 +60,7 @@ TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
                                       operationContext(), nss, AcquisitionPrerequisites::kWrite),
                                   LockMode::MODE_IX);
     {
-        WriteUnitOfWork wuow(operationContext(),
-                             WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(operationContext(), WriteUnitOfWork::nonAtomicGroup);
         for (int i = 0; i < expectedCount; ++i) {
             const BSONObj document = BSON("_id" << i << "x" << i);
             ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), document));

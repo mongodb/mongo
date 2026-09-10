@@ -777,7 +777,7 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
     const UUID internalUuid = internalColl.uuid();
     const long long docsToInsertCount = 10;
 
-    WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::nonAtomicGroup);
     for (size_t i = 0; i < docsToInsertCount; ++i) {
         const BSONObj document = docGeneratorForInsert(i);
         ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
@@ -813,7 +813,7 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
         const long long docsToInsertCount = 10;
 
         long long expectedSize = 0;
-        WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::nonAtomicGroup);
         for (size_t i = 0; i < docsToInsertCount; ++i) {
             const BSONObj document = docGeneratorForInsert(i);
             ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
@@ -989,7 +989,7 @@ TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
     const auto doc1 = BSON("_id" << 0 << "x" << 0);
     const auto doc2 = BSON("_id" << 1 << "abcdefg" << 1);
     {
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc1));
         ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc2));
         wuow.commit();

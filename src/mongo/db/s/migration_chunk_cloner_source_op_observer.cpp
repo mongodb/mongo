@@ -321,18 +321,17 @@ bool MigrationChunkClonerSourceOpObserver::shouldLogBatchedWriteForSessionMigrat
     }
     // Only retryable batched writes need their session history migrated.
     switch (oplogGroupingFormat) {
-        case WriteUnitOfWork::kGroupForPossiblyRetryableOperations:
+        case WriteUnitOfWork::nonAtomicGroup:
             // A non-atomic batch's eligibility is decided by the session-info check below.
             break;
-        case WriteUnitOfWork::kGroupForRetryableAtomicWrite:
-        case WriteUnitOfWork::kGroupForTransaction:
+        case WriteUnitOfWork::atomicGroup:
             // An atomic batch is retryable only if it actually carried a retryable statement; the
             // grouping format alone reflects the session, not the batch contents.
             if (!opAccumulator->isRetryableAtomicBatch) {
                 return false;
             }
             break;
-        case WriteUnitOfWork::kDontGroup:
+        case WriteUnitOfWork::noGroup:
             // WriteUnitOfWork::commit() only invokes this observer when grouping oplog entries.
             MONGO_UNREACHABLE_TASSERT(13277400);
     }

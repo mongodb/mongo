@@ -934,11 +934,11 @@ Status performAtomicTimeseriesWrites(
     const bool pdibEnabled = index_builds::primary_driven::enabled(
         opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::noGroup;
     const bool shouldGroup = pdibEnabled ? (insertOps.size() + updateOps.size() > 1)
                                          : (insertOps.size() > 1 && updateOps.empty());
     if (shouldGroup && !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
-        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+        oplogEntryGroupType = WriteUnitOfWork::nonAtomicGroup;
     }
     WriteUnitOfWork wuow{opCtx, oplogEntryGroupType};
 

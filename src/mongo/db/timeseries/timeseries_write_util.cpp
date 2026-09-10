@@ -167,8 +167,8 @@ void performAtomicWrites(
     // replicated atomically.
     auto groupOplogEntries =
         !opCtx->getTxnNumber() && (!insertOps.empty() || !updateOps.empty()) && modificationOp
-        ? WriteUnitOfWork::kGroupForTransaction
-        : WriteUnitOfWork::kDontGroup;
+        ? WriteUnitOfWork::atomicGroup
+        : WriteUnitOfWork::noGroup;
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
     if (modificationOp) {

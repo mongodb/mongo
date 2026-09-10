@@ -971,7 +971,7 @@ TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest, HashNotPersistedWhenAbs
                      .state = state}}}};
 
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
         wuow.commit();
 
@@ -999,7 +999,7 @@ TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest, HashPersistedWhenPresen
                      .state = state}}}};
 
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
         wuow.commit();
 
@@ -1033,7 +1033,7 @@ TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest,
                      .state = DDLState::kDropped}}}};
 
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
         wuow.commit();
 
@@ -1052,7 +1052,7 @@ TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest,
                      .state = DDLState::kCreated}}}};
 
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
         wuow.commit();
 
@@ -1083,7 +1083,7 @@ TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest,
                  .state = DDLState::kDroppedAndRecreated}}}};
 
     Lock::GlobalLock writeLock(opCtx, MODE_IX);
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
     persistCheckpointSnapshot(opCtx, snapshot, *sizeCountStore, *timestampStore);
     wuow.commit();
 

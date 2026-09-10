@@ -151,7 +151,7 @@ boost::optional<SizeCountCheckpointFlusher::FlushResult> SizeCountCheckpointFlus
 
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         const size_t entryWriteCount =
             persistCheckpointSnapshot(opCtx, checkpoint, *_sizeCountStore, *_timestampStore);
         wuow.commit();

@@ -66,9 +66,10 @@ public:
 
             {
                 // Using the original operation context, the write operations to update the
-                // shard catalog would fail since retryable writes are not compatible with
-                // applying the WriteUnitOfWork as a transaction (kGroupForTransaction). A tactical
-                // solution is to use an alternative client as well as a new operation context.
+                // shard catalog would fail since retryable writes are not compatible with grouping
+                // the WriteUnitOfWork's writes into a single atomic applyOps (atomicGroup). A
+                // tactical solution is to use an alternative client as well as a new operation
+                // context.
 
                 auto newClient = getGlobalServiceContext()->getService()->makeClient(
                     "ShardsvrCommitDropDatabaseMetadata");

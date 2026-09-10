@@ -189,7 +189,7 @@ void insertOplogBatch(OperationContext* opCtx,
                       const ShardId& donorShard,
                       const std::vector<InsertStatement>& oplogBatch,
                       bool storeProgress) {
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
     uassertStatusOK(collection_internal::insertDocuments(
         opCtx, oplogBufferColl, oplogBatch.begin(), oplogBatch.end(), nullptr));
@@ -803,7 +803,7 @@ bool ReshardingOplogFetcher::consume(
                                       MODE_IX);
             }
 
-            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
             // deleteObjects returns the number of deleted docs, which matches the progress doc
             // increment exactly (including progress-mark noops counted by insertOplogBatch).
             const long long numDeleted =

@@ -740,8 +740,8 @@ Status copySourceToTemporaryCollectionOnTargetDB(
 
             bool isGroupedOplogEntries = stmts.size() > 1U;
             WriteUnitOfWork wunit(opCtx,
-                                  isGroupedOplogEntries ? WriteUnitOfWork::kGroupForTransaction
-                                                        : WriteUnitOfWork::kDontGroup);
+                                  isGroupedOplogEntries ? WriteUnitOfWork::atomicGroup
+                                                        : WriteUnitOfWork::noGroup);
 
             if (!isOplogDisabledForTmpColl && !BatchedWriteContext::get(opCtx).writesAreBatched()) {
                 if (autoTmpColl->needsCappedLock()) {

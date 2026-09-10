@@ -59,9 +59,8 @@ public:
      * contained in any of the replicated operations.
      *
      * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
-     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
-     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
-     * (kGroupForPossiblyRetryableOperations)
+     * transaction (noGroup), a batched write applied atomically (atomicGroup), or a batched
+     * write whose entries apply independently (nonAtomicGroup).
      *
      * This is based on the signature of the logApplyOps() function within the OpObserverImpl
      * implementation, which takes a few more arguments that can be derived from the caller's
@@ -217,7 +216,7 @@ public:
      * When 'respectAtomicGroups' is true, a group's operations are never split across "applyOps"
      * entries: a group that would straddle a boundary is packed whole into the next entry, and a
      * group too large for one entry throws TransactionTooLarge. The operations must already be
-     * grouped (see groupByRecordId). Used for kGroupForPossiblyRetryableOperations, whose entries
+     * grouped (see groupByRecordId). Used for nonAtomicGroup, whose entries
      * apply independently on secondaries.
      */
     ApplyOpsInfo getApplyOpsInfo(std::size_t oplogEntryCountLimit,
@@ -244,9 +243,8 @@ public:
      * assignment to "applyOps" oplog entries for a transaction.
      *
      * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
-     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
-     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
-     * (kGroupForPossiblyRetryableOperations)
+     * transaction (noGroup), a batched write applied atomically (atomicGroup), or a batched
+     * write whose entries apply independently (nonAtomicGroup).
      *
      * The number of oplog entries written is returned.
      *

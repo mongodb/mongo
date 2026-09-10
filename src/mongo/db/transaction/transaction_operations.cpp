@@ -73,7 +73,7 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
         if (exceedsCount || exceedsSize) {
             // The operation does not fit in this oplog entry. If it belongs to the same group as
             // the last operation packed, ending the entry here would split the group across
-            // entries. Under kGroupForPossiblyRetryableOperations, whose entries apply separately
+            // entries. Under nonAtomicGroup, whose entries apply separately
             // on secondaries, the group's operations would then not apply atomically.
             const bool wouldSplitGroup =
                 respectAtomicGroups && lastGroupId && opGroupId == lastGroupId;
@@ -381,8 +381,7 @@ std::size_t TransactionOperations::logOplogEntries(
     auto stmtsIter = _transactionOperations.begin();
     auto applyOpsIter = applyOpsOperationAssignment.applyOpsEntries.begin();
     const bool prepare = applyOpsOperationAssignment.prepare;
-    const bool applyOpsAppliedSeparately =
-        oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+    const bool applyOpsAppliedSeparately = oplogGroupingFormat == WriteUnitOfWork::nonAtomicGroup;
     while (stmtsIter != _transactionOperations.end()) {
         tassert(6278509,
                 "Not enough \"applyOps\" entries",

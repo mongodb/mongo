@@ -333,7 +333,7 @@ DEATH_TEST(TransactionOperationsTestDeathTest,
     ops.logOplogEntries(/*oplogSlots=*/{},
                         applyOpsInfo,
                         kWallClockTime,
-                        WriteUnitOfWork::OplogEntryGroupType::kDontGroup,
+                        WriteUnitOfWork::OplogEntryGroupType::noGroup,
                         doNothingLogApplyOpsFn,
                         &imageToWrite);
 }
@@ -358,7 +358,7 @@ DEATH_TEST(TransactionOperationsTestDeathTest,
     ops.logOplogEntries(oplogSlots,
                         applyOpsInfo,
                         kWallClockTime,
-                        WriteUnitOfWork::OplogEntryGroupType::kDontGroup,
+                        WriteUnitOfWork::OplogEntryGroupType::noGroup,
                         doNothingLogApplyOpsFn,
                         &imageToWrite);
 }
@@ -665,7 +665,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesDoesNothingOnEmptyOperations) {
     auto numEntries = ops.logOplogEntries(oplogSlots,
                                           info,
                                           kWallClockTime,
-                                          WriteUnitOfWork::kDontGroup,
+                                          WriteUnitOfWork::noGroup,
                                           brokenLogApplyOpsFn,
                                           &imageToWrite);
     ASSERT_EQ(numEntries, 0);
@@ -730,12 +730,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
         return oplogSlots.back();
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries = ops.logOplogEntries(oplogSlots,
-                                          info,
-                                          kWallClockTime,
-                                          WriteUnitOfWork::kDontGroup,
-                                          logApplyOpsFn,
-                                          &imageToWrite);
+    auto numEntries = ops.logOplogEntries(
+        oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOpsFn, &imageToWrite);
     ASSERT_EQ(numEntries, 1U);
 }
 
@@ -857,12 +853,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
         return expectedOpTime;
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries = ops.logOplogEntries(oplogSlots,
-                                          info,
-                                          kWallClockTime,
-                                          WriteUnitOfWork::kDontGroup,
-                                          logApplyOpsFn,
-                                          &imageToWrite);
+    auto numEntries = ops.logOplogEntries(
+        oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOpsFn, &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
 }
 
@@ -985,12 +977,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
         return expectedOpTime;
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries = ops.logOplogEntries(oplogSlots,
-                                          info,
-                                          kWallClockTime,
-                                          WriteUnitOfWork::kDontGroup,
-                                          logApplyOpsFn,
-                                          &imageToWrite);
+    auto numEntries = ops.logOplogEntries(
+        oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOpsFn, &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
 }
 
@@ -1109,7 +1097,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsRetryableWrite)
     auto numEntries = ops.logOplogEntries(oplogSlots,
                                           info,
                                           kWallClockTime,
-                                          WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                                          WriteUnitOfWork::nonAtomicGroup,
                                           logApplyOpsFn,
                                           &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
@@ -1138,7 +1126,7 @@ DEATH_TEST(TransactionOperationsTestDeathTest,
     ops.logOplogEntries(oplogSlots,
                         info,
                         kWallClockTime,
-                        WriteUnitOfWork::kDontGroup,
+                        WriteUnitOfWork::noGroup,
                         doNothingLogApplyOpsFn,
                         &imageToWrite);
 }
@@ -1178,7 +1166,7 @@ TEST(TransactionOperationsTest,
     ASSERT_THROWS(ops.logOplogEntries(oplogSlots,
                                       info,
                                       kWallClockTime,
-                                      WriteUnitOfWork::kDontGroup,
+                                      WriteUnitOfWork::noGroup,
                                       doNothingLogApplyOpsFn,
                                       &imageToWrite),
                   ExceptionFor<ErrorCodes::TransactionTooLarge>);
@@ -1218,13 +1206,10 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         return writeOpTime;
     };
-    ASSERT_EQ(ops.logOplogEntries(oplogSlots,
-                                  info,
-                                  kWallClockTime,
-                                  WriteUnitOfWork::kDontGroup,
-                                  logApplyOps,
-                                  &imageToWrite),
-              info.numberOfOplogSlotsRequired);
+    ASSERT_EQ(
+        ops.logOplogEntries(
+            oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOps, &imageToWrite),
+        info.numberOfOplogSlotsRequired);
 
     // Check image bundle.
     // Timestamp in image bundle should be based on optime returned by 'logApplyOps'.
@@ -1268,13 +1253,10 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         return writeOpTime;
     };
-    ASSERT_EQ(ops.logOplogEntries(oplogSlots,
-                                  info,
-                                  kWallClockTime,
-                                  WriteUnitOfWork::kDontGroup,
-                                  logApplyOps,
-                                  &imageToWrite),
-              info.numberOfOplogSlotsRequired);
+    ASSERT_EQ(
+        ops.logOplogEntries(
+            oplogSlots, info, kWallClockTime, WriteUnitOfWork::noGroup, logApplyOps, &imageToWrite),
+        info.numberOfOplogSlotsRequired);
 
     // Check image bundle.
     // Timestamp in image bundle should be based on optime returned by 'logApplyOps'.
@@ -1315,7 +1297,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesSkipsImageExtractionWithNullImage
     ASSERT_EQ(ops.logOplogEntries(oplogSlots,
                                   info,
                                   kWallClockTime,
-                                  WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                                  WriteUnitOfWork::nonAtomicGroup,
                                   doNothingLogApplyOpsFn,
                                   /*prePostImageToWriteToImageCollection=*/nullptr),
               info.numberOfOplogSlotsRequired);
@@ -1349,7 +1331,7 @@ DEATH_TEST(TransactionOperationsTestDeathTest,
     ops.logOplogEntries(oplogSlots,
                         info,
                         kWallClockTime,
-                        WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                        WriteUnitOfWork::nonAtomicGroup,
                         doNothingLogApplyOpsFn,
                         &imageToWrite);
 }
@@ -1392,7 +1374,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry)
     ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
                                            info,
                                            kWallClockTime,
-                                           WriteUnitOfWork::kDontGroup,
+                                           WriteUnitOfWork::noGroup,
                                            doNothingLogApplyOpsFn,
                                            &imageToWrite),
                        AssertionException,
@@ -1442,7 +1424,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
     ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
                                            info,
                                            kWallClockTime,
-                                           WriteUnitOfWork::kDontGroup,
+                                           WriteUnitOfWork::noGroup,
                                            doNothingLogApplyOpsFn,
                                            &imageToWrite),
                        AssertionException,

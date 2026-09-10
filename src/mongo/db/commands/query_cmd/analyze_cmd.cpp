@@ -566,7 +566,7 @@ void runSampleMode(OperationContext* opCtx,
                               << " does not exist",
                 collection.exists());
 
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
         // Remove all existing pages of any prior sample.
         deleteObjects(

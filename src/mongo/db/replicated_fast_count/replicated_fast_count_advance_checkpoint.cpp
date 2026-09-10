@@ -108,7 +108,7 @@ size_t advanceCheckpoint(OperationContext* opCtx,
         return 0;
     }
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
     const size_t entryWriteCount =
         persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
     wuow.commit();

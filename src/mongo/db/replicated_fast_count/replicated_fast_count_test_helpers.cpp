@@ -124,7 +124,7 @@ void insertDocs(OperationContext* opCtx,
         MODE_IX);
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startingCount; i < startingCount + numDocs; ++i) {
             BSONObj doc = makeDoc(i);
             ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
@@ -170,7 +170,7 @@ void updateDocs(OperationContext* opCtx,
     const int numTotalUpdates = endIdx - startIdx + 1;
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startIdx; i <= endIdx; ++i) {
             BSONObj updated = makeUpdatedDoc(i);
             Helpers::update(opCtx, coll, BSON("_id" << i), BSON("$set" << updated));
@@ -207,7 +207,7 @@ void deleteDocsByIDRange(OperationContext* opCtx,
     ASSERT(numTotalDeletes <= startingCount);
     ASSERT(numTotalDeletes * sampleDoc.objsize() <= startingSize);
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startIdx; i <= endIdx; ++i) {
             RecordId rid = Helpers::findOne(opCtx, coll, BSON("_id" << i));
             Helpers::deleteByRid(opCtx, coll, rid);

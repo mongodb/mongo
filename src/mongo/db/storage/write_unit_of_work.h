@@ -59,13 +59,15 @@ public:
     };
 
     enum OplogEntryGroupType {
-        kDontGroup,
-        kGroupForTransaction,
-        kGroupForPossiblyRetryableOperations,
-        kGroupForRetryableAtomicWrite,
+        // The caller requests no specific grouping. When an OplogGroupingPolicy enables grouping, a
+        // top-level WriteUnitOfWork is grouped atomically; otherwise its writes are not grouped and
+        // each gets its own oplog entry.
+        noGroup,
+        atomicGroup,
+        nonAtomicGroup,
     };
 
-    WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = kDontGroup);
+    WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = noGroup);
 
     ~WriteUnitOfWork();
 
@@ -108,7 +110,7 @@ private:
      * Whether this WUOW is grouping oplog entries, regardless of the grouping type.
      */
     bool _isGroupingOplogEntries() const {
-        return _groupOplogEntries != kDontGroup;
+        return _groupOplogEntries != noGroup;
     }
 
     OperationContext* _opCtx;
