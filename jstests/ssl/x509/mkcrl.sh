@@ -40,6 +40,8 @@ crl() {
         openssl ca -config "$CADB/config" -revoke "$4"
     fi
     openssl ca -config "$CADB/config" -gencrl -out "$DEST" -md sha256 $VALIDITY_OPTIONS
+    jstests/ssl/x509/mkdigest.py crl sha256 "$DEST"
+    jstests/ssl/x509/mkdigest.py crl sha1 "$DEST"
 }
 
 crl $CA_PEM_PATH crl.pem empty
