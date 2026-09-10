@@ -71,13 +71,12 @@ boost::optional<std::string_view> checkComparisonPredicateEligibility(
         return "can't handle string comparison with a non-default collation"sv;
     }
 
-    // This function only handles time and measurement predicates--not metadata.
+    // This function only handles time and measurement predicates--not metadata. Metadata predicates
+    // are expected to be handled before in 'BucketSpec::createPredicatesOnBucketLevelField'.
     if (bucketSpec.metaField() &&
         (matchExprPath == bucketSpec.metaField().value() ||
          expression::isPathPrefixOf(bucketSpec.metaField().value(), matchExprPath))) {
-        tasserted(6707200,
-                  str::stream() << "createPredicate() does not handle metadata predicates: "
-                                << matchExpr);
+        return "createPredicate() does not handle metadata predicates"sv;
     }
 
     // We must avoid mapping predicates on fields computed via $addFields or a computed $project.

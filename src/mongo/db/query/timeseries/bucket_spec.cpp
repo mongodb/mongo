@@ -126,7 +126,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
     // {$or: [ {a: 5}, {meta.b: 5} ]} can't be split, and can't be metadata-only, so we have to
     // handle it here.
     const auto matchExprPath = matchExpr->path();
-    if (!matchExprPath.empty() && bucketSpec.metaField() &&
+    if (matchExpr->fieldRef() && bucketSpec.metaField() &&
         (matchExprPath == bucketSpec.metaField().value() ||
          expression::isPathPrefixOf(bucketSpec.metaField().value(), matchExprPath))) {
 
