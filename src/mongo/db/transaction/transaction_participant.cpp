@@ -3884,6 +3884,16 @@ bool TransactionParticipant::Participant::checkStatementExecuted(OperationContex
     return bool(_checkStatementExecuted(opCtx, stmtId));
 }
 
+boost::optional<repl::OpTime>
+TransactionParticipant::Participant::checkStatementExecutedAndGetOpTime(OperationContext* opCtx,
+                                                                        StmtId stmtId) const {
+    const auto stmtInfo = _checkStatementExecuted(opCtx, stmtId);
+    if (!stmtInfo) {
+        return boost::none;
+    }
+    return stmtInfo->oplogEntryOpTime;
+}
+
 boost::optional<TransactionParticipant::Participant::StatementInfo>
 TransactionParticipant::Participant::_checkStatementExecuted(OperationContext* opCtx,
                                                              StmtId stmtId) const {
