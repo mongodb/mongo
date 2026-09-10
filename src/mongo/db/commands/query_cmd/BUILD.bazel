@@ -64,6 +64,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "clear_join_plan_cache_gen",
+    src = "clear_join_plan_cache.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "plan_cache_clear_gen",
     src = "plan_cache_clear.idl",
     deps = [
@@ -75,8 +84,10 @@ idl_generator(
 mongo_cc_library(
     name = "plan_cache_commands",
     srcs = [
+        "clear_join_plan_cache_command.cpp",
         "plan_cache_clear_command.cpp",
         "plan_cache_commands.cpp",
+        ":clear_join_plan_cache_gen",
         ":plan_cache_clear_gen",
     ],
     deps = [
@@ -86,6 +97,7 @@ mongo_cc_library(
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:collection_query_info",
+        "//src/mongo/db/query/plan_cache:join_plan_cache",
     ],
 )
 

@@ -158,6 +158,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_aggregate_cmd_s.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_analyze_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_cmd_s.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_clear_join_plan_cache_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_count_cmd_s.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_current_op.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_distinct_cmd.cpp",

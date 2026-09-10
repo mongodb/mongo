@@ -36,4 +36,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "upgradeDowngradeViewlessTimeseries",
     "getMetricsFilteringAllowlist",
     "updateMetricsFilteringAllowlist",
+    "clearJoinPlanCache",
 ];

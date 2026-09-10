@@ -104,4 +104,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "wiredTigerRepair",
     "getMetricsFilteringAllowlist",
     "updateMetricsFilteringAllowlist",
+    "clearJoinPlanCache",
 ];

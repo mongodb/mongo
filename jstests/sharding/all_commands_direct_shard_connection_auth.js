@@ -365,6 +365,31 @@ const allCommands = {
         },
     },
     cleanupStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
+    clearJoinPlanCache: {
+        // The command is collectionless against 'admin', so it is exempt from the direct shard
+        // connection checks. Enable the knobs it is gated behind so it can actually run.
+        setUp: function (mongoS, withDirectConnections, withoutDirectConnections) {
+            assert.commandWorked(
+                withoutDirectConnections.adminCommand({
+                    setParameter: 1,
+                    internalEnableJoinOptimization: true,
+                    internalEnableJoinPlanCache: true,
+                }),
+            );
+        },
+        command: {clearJoinPlanCache: 1},
+        isAdminCommand: true,
+        shouldFail: false,
+        teardown: function (mongoS, withDirectConnections, withoutDirectConnections) {
+            assert.commandWorked(
+                withoutDirectConnections.adminCommand({
+                    setParameter: 1,
+                    internalEnableJoinOptimization: false,
+                    internalEnableJoinPlanCache: false,
+                }),
+            );
+        },
+    },
     clearJumboFlag: {skip: requiresMongoS},
     clearLog: {
         command: {clearLog: "global"},

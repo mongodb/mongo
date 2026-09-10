@@ -591,6 +591,50 @@ export let MongosAPIParametersUtil = (function () {
             skip: "executes locally on mongos (not sent to any remote node)",
         },
         {
+            commandName: "clearJoinPlanCache",
+            run: {
+                inAPIVersion1: false,
+                shardCommandName: "clearJoinPlanCache",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                // The command is gated behind the join plan cache knobs, which are off by default.
+                // It is broadcast to all shards, which includes the config server.
+                setUp: () => {
+                    for (const conn of [
+                        st.s0,
+                        st.configRS.getPrimary(),
+                        st.rs0.getPrimary(),
+                        st.rs1.getPrimary(),
+                    ]) {
+                        assert.commandWorked(
+                            conn.adminCommand({
+                                setParameter: 1,
+                                internalEnableJoinOptimization: true,
+                                internalEnableJoinPlanCache: true,
+                            }),
+                        );
+                    }
+                },
+                command: () => ({clearJoinPlanCache: 1}),
+                cleanUp: () => {
+                    for (const conn of [
+                        st.s0,
+                        st.configRS.getPrimary(),
+                        st.rs0.getPrimary(),
+                        st.rs1.getPrimary(),
+                    ]) {
+                        assert.commandWorked(
+                            conn.adminCommand({
+                                setParameter: 1,
+                                internalEnableJoinOptimization: false,
+                                internalEnableJoinPlanCache: false,
+                            }),
+                        );
+                    }
+                },
+            },
+        },
+        {
             commandName: "clearJumboFlag",
             skip: "executes locally on mongos (not sent to any remote node)",
         },

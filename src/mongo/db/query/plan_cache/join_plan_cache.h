@@ -329,6 +329,13 @@ public:
                          const std::shared_ptr<JoinPlanCacheEntry>& expected);
 
     /*
+     * Removes every entry from the cache, releasing the memory budget they held. The memory budget
+     * itself is left unchanged, so the cache remains usable. Partitions are cleared under a single
+     * all-partition lock. Backs the 'clearJoinPlanCache' command.
+     */
+    void clear();
+
+    /*
      * Resets the total memory budget, evicting least-recently-used entries as needed to fit.
      * Returns the number of entries evicted.
      */

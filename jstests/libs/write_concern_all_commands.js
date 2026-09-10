@@ -553,6 +553,7 @@ const wcCommandsTests = {
     checkShardingIndex: {skip: "does not accept write concern"},
     cleanupOrphaned: {skip: "only exist on direct shard connection"},
     cleanupStructuredEncryptionData: {skip: "does not accept write concern"},
+    clearJoinPlanCache: {skip: "does not accept write concern"},
     clearJumboFlag: {skip: "does not accept write concern"},
     clearLog: {skip: "does not accept write concern"},
     cloneCollectionAsCapped: {
@@ -3974,6 +3975,7 @@ const wcTimeseriesCommandsTests = {
     checkShardingIndex: {skip: "does not accept write concern"},
     cleanupOrphaned: {skip: "only exist on direct shard connection"},
     cleanupStructuredEncryptionData: {skip: "does not accept write concern"},
+    clearJoinPlanCache: {skip: "does not accept write concern"},
     clearJumboFlag: {skip: "does not accept write concern"},
     clearLog: {skip: "does not accept write concern"},
     // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.

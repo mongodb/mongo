@@ -90,6 +90,10 @@ const allCommands = {
     },
     checkMetadataConsistency: {command: {checkMetadataConsistency: 1}, isAdminCommand: true},
     cleanupStructuredEncryptionData: {skip: "requires encrypted collection setup"},
+    clearJoinPlanCache: {
+        command: {clearJoinPlanCache: 1},
+        isAdminCommand: true,
+    },
     clearJumboFlag: {
         command: {clearJumboFlag: fullNs, bounds: [{x: MinKey}, {x: MaxKey}]},
         isAdminCommand: true,

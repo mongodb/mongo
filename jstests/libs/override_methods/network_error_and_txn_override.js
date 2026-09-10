@@ -153,6 +153,7 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
 // Commands that may return different values or fail if retried on a new primary after a
 // failover.
 const kNonFailoverTolerantCommands = new Set([
+    "clearJoinPlanCache", // The join plan cache isn't replicated.
     "currentOp", // Failovers can change currentOp output.
     "getLog", // The log is different on different servers.
     "killOp", // Failovers may interrupt operations intended to be killed later in the test.

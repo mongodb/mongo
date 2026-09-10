@@ -159,6 +159,7 @@ let testCases = {
     checkShardingIndex: {skip: "primary only"},
     cleanupOrphaned: {skip: "primary only"},
     cleanupStructuredEncryptionData: {skip: "does not return user data"},
+    clearJoinPlanCache: {skip: "does not return user data"},
     clearJumboFlag: {skip: "primary only"},
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},

@@ -480,6 +480,14 @@ const allCommands = {
         },
     },
     cleanupStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
+    clearJoinPlanCache: {
+        command: {clearJoinPlanCache: 1},
+        isAdminCommand: true,
+        // The join plan cache knobs are off by default. Rather than toggling them on every node of
+        // the fixture, assert the command is reachable and reaches its feature gate.
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.QueryFeatureNotAllowed,
+    },
     clearJumboFlag: {
         isShardedOnly: true,
         fullScenario: function (conn, fixture) {

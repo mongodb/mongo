@@ -496,6 +496,7 @@ const allTestCases = {
             },
         },
         cleanupStructuredEncryptionData: {skip: "requires encrypted collections"},
+        clearJoinPlanCache: {skip: "unversioned and executes on all shards"},
         clearJumboFlag: {skip: "does not forward command to primary shard"},
         clearLog: {skip: "executes locally on mongos (not sent to any remote node)"},
         collMod: {
@@ -1351,6 +1352,7 @@ const allTestCases = {
         checkShardingIndex: {skip: "TODO"},
         cleanupOrphaned: {skip: "TODO"},
         cleanupStructuredEncryptionData: {skip: "TODO"},
+        clearJoinPlanCache: {skip: "not on a user database"},
         clearLog: {skip: "TODO"},
         cloneCollectionAsCapped: {skip: "TODO"},
         clusterAbortTransaction: {skip: "TODO"},

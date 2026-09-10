@@ -225,6 +225,10 @@ bool JoinPlanCache::removeIfMatches(const JoinPlanCacheKey& key,
     return partitionLock->erase(key);
 }
 
+void JoinPlanCache::clear() {
+    _cache.clear();
+}
+
 size_t JoinPlanCache::reset(size_t cacheSizeBytes) {
     return _cache.reset(cacheSizeBytes);
 }

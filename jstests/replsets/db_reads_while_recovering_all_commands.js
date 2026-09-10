@@ -219,6 +219,7 @@ const allCommands = {
     checkShardingIndex: {skip: isPrimaryOnly},
     cleanupOrphaned: {skip: isPrimaryOnly},
     cleanupStructuredEncryptionData: {skip: isPrimaryOnly},
+    clearJoinPlanCache: {skip: isNotAUserDataRead},
     clearLog: {skip: isNotAUserDataRead},
     cloneCollectionAsCapped: {skip: isPrimaryOnly},
     clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},

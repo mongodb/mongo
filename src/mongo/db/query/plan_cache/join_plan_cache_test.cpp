@@ -376,6 +376,51 @@ TEST(JoinPlanCacheEvictionTest, ResetToSmallerBudgetEvictsDownToFit) {
     ASSERT_EQ(cRawPtr, cache.lookup("c").get());
 }
 
+TEST(JoinPlanCacheClearTest, ClearEmptyCacheIsNoop) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.clear();
+    ASSERT_EQ(0, cache.size());
+    ASSERT_TRUE(cache.serializeEntries().empty());
+}
+
+TEST(JoinPlanCacheClearTest, ClearRemovesAllEntries) {
+    // Use several partitions so that the entries are spread across more than one of them.
+    JoinPlanCache cache{kLargeBudget, 4};
+    for (const char* key : {"a", "b", "c", "d", "e"}) {
+        cache.put(key, makeEntry());
+    }
+    ASSERT_GT(cache.size(), 0);
+    ASSERT_EQ(5u, cache.serializeEntries().size());
+
+    cache.clear();
+    ASSERT_EQ(0, cache.size());
+    ASSERT_TRUE(cache.serializeEntries().empty());
+}
+
+TEST(JoinPlanCacheClearTest, LookupMissesAfterClear) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+    cache.put("key", makeEntry());
+    ASSERT_NE(nullptr, cache.lookup("key"));
+
+    cache.clear();
+    ASSERT_EQ(nullptr, cache.lookup("key"));
+}
+
+TEST(JoinPlanCacheClearTest, PutWorksAfterClear) {
+    const size_t perEntryCost = trivialEntryCost(1);
+    // A budget for exactly one entry: if clear() failed to release the budget, this put() would
+    // evict rather than insert cleanly.
+    JoinPlanCache cache{perEntryCost, 1};
+    cache.put("a", makeEntry());
+    cache.clear();
+
+    auto entry = makeEntry();
+    const JoinPlanCacheEntry* rawPtr = entry.get();
+    ASSERT_EQ(0, cache.put("b", std::move(entry)));
+    ASSERT_EQ(rawPtr, cache.lookup("b").get());
+    ASSERT_EQ(perEntryCost, cache.size());
+}
+
 TEST(JoinPlanCacheEvictionTest, SizeReflectsRunningByteTotal) {
     const size_t perEntryCost = trivialEntryCost(1);
     JoinPlanCache cache{kLargeBudget, 1};
