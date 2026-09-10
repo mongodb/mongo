@@ -179,8 +179,8 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
     // background threads.
     auto [metadataRS, timestampsRS] = makeContainerStores();
     auto manager = std::make_unique<ReplicatedFastCountManager>(
-        std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
-        std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+        std::make_unique<SizeCountStore>(std::move(metadataRS)),
+        std::make_unique<SizeCountTimestampStore>(std::move(timestampsRS)));
     manager->startup(_opCtx);
     ASSERT_TRUE(manager->isRunning_ForTest());
 
@@ -212,8 +212,8 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
 
     auto [metadataRS, timestampsRS] = makeContainerStores();
     auto manager = std::make_unique<ReplicatedFastCountManager>(
-        std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
-        std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+        std::make_unique<SizeCountStore>(std::move(metadataRS)),
+        std::make_unique<SizeCountTimestampStore>(std::move(timestampsRS)));
     manager->startup(_opCtx);
     ASSERT_TRUE(manager->isRunning_ForTest());
 
@@ -487,7 +487,7 @@ protected:
     std::unique_ptr<SizeCountStore> sizeCountStore() {
         KVEngine* engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
 
-        return std::make_unique<ContainerSizeCountStore>(
+        return std::make_unique<SizeCountStore>(
             engine->getRecordStore(operationContext(),
                                    NamespaceString::kAdminCommandNamespace,
                                    ident::kFastCountMetadataStore,
@@ -504,7 +504,7 @@ protected:
      */
     std::unique_ptr<SizeCountTimestampStore> sizeCountTimestampStore() {
         KVEngine* engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
-        return std::make_unique<ContainerSizeCountTimestampStore>(
+        return std::make_unique<SizeCountTimestampStore>(
             engine->getRecordStore(operationContext(),
                                    NamespaceString::kAdminCommandNamespace,
                                    ident::kFastCountMetadataStoreTimestamps,
@@ -815,8 +815,8 @@ protected:
                                    RecordStore::Options{.keyFormat = KeyFormat::Long},
                                    /*uuid=*/boost::none);
         manager = std::make_unique<ReplicatedFastCountManager>(
-            std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
-            std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+            std::make_unique<SizeCountStore>(std::move(metadataRS)),
+            std::make_unique<SizeCountTimestampStore>(std::move(timestampsRS)));
     }
 
     unittest::ServerParameterGuard _ffFastCount{"featureFlagReplicatedFastCount", true};
@@ -1357,8 +1357,8 @@ protected:
                                    /*uuid=*/boost::none);
 
         manager = std::make_unique<ReplicatedFastCountManager>(
-            std::make_unique<ContainerSizeCountStore>(std::move(metadataRS)),
-            std::make_unique<ContainerSizeCountTimestampStore>(std::move(timestampsRS)));
+            std::make_unique<SizeCountStore>(std::move(metadataRS)),
+            std::make_unique<SizeCountTimestampStore>(std::move(timestampsRS)));
     }
 
     std::unique_ptr<ReplicatedFastCountManager> manager;

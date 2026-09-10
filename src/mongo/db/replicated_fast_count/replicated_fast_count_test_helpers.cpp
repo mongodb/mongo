@@ -785,13 +785,13 @@ ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx)
                                                 /*writeToOplog=*/false));
     KVEngine* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     return ContainerFastCountStores{
-        .sizeCountStore = std::make_unique<ContainerSizeCountStore>(
+        .sizeCountStore = std::make_unique<SizeCountStore>(
             engine->getRecordStore(opCtx,
                                    NamespaceString::kAdminCommandNamespace,
                                    ident::kFastCountMetadataStore,
                                    RecordStore::Options{.keyFormat = KeyFormat::String},
                                    /*uuid=*/boost::none)),
-        .timestampStore = std::make_unique<ContainerSizeCountTimestampStore>(
+        .timestampStore = std::make_unique<SizeCountTimestampStore>(
             engine->getRecordStore(opCtx,
                                    NamespaceString::kAdminCommandNamespace,
                                    ident::kFastCountMetadataStoreTimestamps,

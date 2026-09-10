@@ -62,8 +62,8 @@ protected:
     }
 
     OperationContext* _opCtx = nullptr;
-    std::unique_ptr<ContainerSizeCountStore> _sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> _timestampStore;
+    std::unique_ptr<SizeCountStore> _sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> _timestampStore;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
 };
 
@@ -322,8 +322,8 @@ protected:
     };
 
     OperationContext* _opCtx = nullptr;
-    std::unique_ptr<ContainerSizeCountStore> _sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> _timestampStore;
+    std::unique_ptr<SizeCountStore> _sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> _timestampStore;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
 };
 

@@ -83,9 +83,7 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
     // Write a record to the metadata store so we can verify it is preserved on re-setup.
     {
         auto [metadataSCS, _] = _fastCountManager->getSizeCountStores_ForTest();
-        auto metadataContainerSCS = dynamic_cast<ContainerSizeCountStore*>(metadataSCS);
-        ASSERT(metadataContainerSCS);
-        auto metadataRS = metadataContainerSCS->rs_ForTest();
+        auto metadataRS = metadataSCS->rs_ForTest();
 
         WriteUnitOfWork wuow(_opCtx);
         std::string key = "test_key";
@@ -106,9 +104,7 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
     // Verify the previously written record is still present.
     {
         auto [metadataSCS, _] = _fastCountManager->getSizeCountStores_ForTest();
-        auto metadataContainerSCS = dynamic_cast<ContainerSizeCountStore*>(metadataSCS);
-        ASSERT(metadataContainerSCS);
-        auto metadataRS = metadataContainerSCS->rs_ForTest();
+        auto metadataRS = metadataSCS->rs_ForTest();
 
         auto cursor = metadataRS->getCursor(_opCtx, *ru);
         EXPECT_TRUE(cursor->next());

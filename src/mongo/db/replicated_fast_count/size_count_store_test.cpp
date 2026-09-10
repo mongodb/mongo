@@ -63,7 +63,7 @@ protected:
         store = test_helpers::createContainerFastCountStores(operationContext()).sizeCountStore;
     }
 
-    std::unique_ptr<ContainerSizeCountStore> store;
+    std::unique_ptr<SizeCountStore> store;
 };
 
 TEST_F(SizeCountStoreTest, ReadReturnsNoneWhenEmpty) {

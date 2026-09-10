@@ -47,12 +47,12 @@ protected:
         store = test_helpers::createContainerFastCountStores(operationContext()).sizeCountStore;
     }
 
-    void doReadAndIncrement(ContainerSizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
+    void doReadAndIncrement(SizeCountStore& store, ReplicatedMetadataDeltas& deltas) {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
         store.readAndIncrementReplicatedMetadata(operationContext(), deltas);
     }
 
-    std::unique_ptr<ContainerSizeCountStore> store;
+    std::unique_ptr<SizeCountStore> store;
 };
 
 TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {

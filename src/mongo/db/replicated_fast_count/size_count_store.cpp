@@ -65,16 +65,16 @@ SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> 
     return parseEntry(BSONObj(value.data()));
 }
 
-std::span<const char> ContainerSizeCountStore::uuidToContainerKey(const UUID& uuid) {
+std::span<const char> SizeCountStore::uuidToContainerKey(const UUID& uuid) {
     auto cdr = uuid.toCDR();
     return {reinterpret_cast<const char*>(cdr.data()), cdr.length()};
 }
 
-RecordStore* ContainerSizeCountStore::rs_ForTest() const {
+RecordStore* SizeCountStore::rs_ForTest() const {
     return _recordStore.get();
 }
 
-StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const {
+StringKeyedContainer& SizeCountStore::_getStringKeyedContainer() const {
     auto container = _recordStore->getContainer();
     massert(12566002,
             "Expected replicated fast count metadata record store to hold a StringKeyedContainer",
@@ -82,8 +82,8 @@ StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const 
     return std::get<std::reference_wrapper<StringKeyedContainer>>(container);
 }
 
-boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationContext* opCtx,
-                                                                     UUID uuid) const {
+boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* opCtx,
+                                                            UUID uuid) const {
     massert(12915203,
             "Must hold the GlobalLock in a read mode when calling SizeCountStore::read()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
@@ -98,7 +98,7 @@ boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationCo
     return SizeCountStore::parseContainerValue(*result);
 }
 
-void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "write");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -137,7 +137,7 @@ void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const En
     }
 }
 
-void ContainerSizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+void SizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto val = entryToContainerValue(entry);
@@ -152,7 +152,7 @@ void ContainerSizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, c
         container.insert(ru, keySpan, valSpan, container::ExistingKeyPolicy::overwrite));
 }
 
-void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+void SizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -162,7 +162,7 @@ void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const E
         container_write::insert(opCtx, ru, container, uuidToContainerKey(uuid), bsonToSpan(val)));
 }
 
-size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+size_t SizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "remove");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -179,8 +179,8 @@ size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     return 1;
 }
 
-void ContainerSizeCountStore::readAndIncrementReplicatedMetadata(
-    OperationContext* opCtx, ReplicatedMetadataDeltas& deltas) const {
+void SizeCountStore::readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                                        ReplicatedMetadataDeltas& deltas) const {
     massert(12915202,
             "Must hold the GlobalLock in a read mode when calling "
             "SizeCountStore::readAndIncrementReplicatedMetadata()",

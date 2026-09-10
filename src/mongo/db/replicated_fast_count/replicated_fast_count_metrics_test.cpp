@@ -340,8 +340,8 @@ protected:
     }
 
     OperationContext* opCtx;
-    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+    std::unique_ptr<SizeCountStore> sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> timestampStore;
     OtelMetricsCapturer capturer;
 };
 

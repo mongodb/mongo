@@ -32,7 +32,7 @@ void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx) {
 }
 }  // namespace
 
-boost::optional<Timestamp> ContainerSizeCountTimestampStore::read(OperationContext* opCtx) const {
+boost::optional<Timestamp> SizeCountTimestampStore::read(OperationContext* opCtx) const {
     massert(12915200,
             "Must hold the GlobalLock in a read mode when calling SizeCountTimestampStore::read()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
@@ -48,7 +48,7 @@ boost::optional<Timestamp> ContainerSizeCountTimestampStore::read(OperationConte
     return data.getField(kValidAsOfKey).timestamp();
 }
 
-void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
+void SizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
     assertInWriteUnitOfWorkAndLocked(opCtx);
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -67,11 +67,11 @@ void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp 
     }
 }
 
-RecordStore* ContainerSizeCountTimestampStore::rs_ForTest() const {
+RecordStore* SizeCountTimestampStore::rs_ForTest() const {
     return _recordStore.get();
 }
 
-void ContainerSizeCountTimestampStore::writeToTable(OperationContext* opCtx, Timestamp timestamp) {
+void SizeCountTimestampStore::writeToTable(OperationContext* opCtx, Timestamp timestamp) {
     assertInWriteUnitOfWorkAndLocked(opCtx);
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);

@@ -34,7 +34,7 @@ protected:
         return _store->read(operationContext());
     }
 
-    std::unique_ptr<ContainerSizeCountTimestampStore> _store;
+    std::unique_ptr<SizeCountTimestampStore> _store;
 };
 
 TEST_F(SizeCountTimestampStoreTest, ReadMassertsWithoutGlobalReadLock) {

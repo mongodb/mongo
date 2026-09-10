@@ -29,13 +29,13 @@ inline constexpr std::string_view kHashKey = "h"sv;
 inline constexpr std::string_view kValidAsOfKey = "valid-as-of"sv;
 
 /**
- * Abstract interface for read/write access to the persisted size and count metadata.
+ * The `SizeCountStore` provides read and write access to the persisted metadata of each collection.
+ * Owns the RecordStore that backs the underlying StringKeyedContainer.
  *
- * Locking: the container-backed implementation reads and writes the underlying container and does
- * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
- * of the call:
- *   MODE_IS - read(), readAndIncrementReplicatedMetadata()
- *   MODE_IX - write(), insert(), remove()
+ * Locking: this class reads and writes the underlying container and does not acquire any locks of
+ * its own. Callers must therefore hold the global lock for the duration of the call:
+ *     MODE_IS - read(), readAndIncrementReplicatedMetadata()
+ *     MODE_IX - write(), insert(), remove()
  */
 class SizeCountStore {
 public:
@@ -53,8 +53,10 @@ public:
         bool operator==(const Entry&) const = default;
     };
 
-    SizeCountStore() = default;
-    virtual ~SizeCountStore() = default;
+    explicit SizeCountStore(std::unique_ptr<RecordStore> recordStore)
+        : _recordStore(std::move(recordStore)) {
+        invariant(_recordStore, "SizeCountStore requires a non-null RecordStore");
+    }
 
     SizeCountStore(SizeCountStore&&) = default;
     SizeCountStore& operator=(SizeCountStore&&) = default;
@@ -71,14 +73,14 @@ public:
      *
      * If no entry exists for `uuid`, read() returns boost::none.
      */
-    [[nodiscard]] virtual boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const = 0;
+    [[nodiscard]] boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const;
 
     /**
      * Upserts `entry` into the store. `entry` will overwrite any pre-existing document for `uuid`.
      *
      * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
      */
-    virtual void write(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
+    void write(OperationContext* opCtx, UUID uuid, const Entry& entry);
 
     /**
      * Inserts `entry` into the store. If an entry for `uuid` already exists, this operation will
@@ -86,52 +88,29 @@ public:
      *
      * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
      */
-    virtual void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
+    void insert(OperationContext* opCtx, UUID uuid, const Entry& entry);
 
     /**
      * Removes the entry for `uuid` from the store if one exists, otherwise does nothing.
      *
      * Returns the number of entries removed, either 0 or 1.
      */
-    virtual size_t remove(OperationContext* opCtx, UUID uuid) = 0;
+    size_t remove(OperationContext* opCtx, UUID uuid);
 
     /**
      * For each entry in `deltas`, looks up the persisted size and count for that UUID in the
      * on-disk fast count store and adds the persisted values to the entry's size and count
      * in place. If a UUID has no on-disk entry, its delta is left unchanged.
-     *
-     * Implementations are expected to acquire any underlying storage handles once and reuse them
-     * across all UUIDs in `deltas`, since this is the checkpoint hot path.
      */
-    virtual void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
-                                                    ReplicatedMetadataDeltas& deltas) const = 0;
+    void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                            ReplicatedMetadataDeltas& deltas) const;
 
     /**
      * Performs a single write of `entry` for `uuid` directly to the underlying physical table.
      * Unlike write(), this does not log to the oplog: it skips invoking op observers and bypasses
      * the `canAcceptWritesFor` primary check, so the write is not replicated.
      */
-    virtual void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) = 0;
-};
-
-/**
- * Container-backed implementation of `SizeCountStore`. Owns the RecordStore that backs the
- * underlying StringKeyedContainer.
- */
-class ContainerSizeCountStore final : public SizeCountStore {
-public:
-    explicit ContainerSizeCountStore(std::unique_ptr<RecordStore> recordStore)
-        : _recordStore(std::move(recordStore)) {
-        invariant(_recordStore, "ContainerSizeCountStore requires a non-null RecordStore");
-    }
-
-    boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const override;
-    void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    size_t remove(OperationContext* opCtx, UUID uuid) override;
-    void readAndIncrementReplicatedMetadata(OperationContext* opCtx,
-                                            ReplicatedMetadataDeltas& deltas) const override;
-    void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
+    void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry);
 
     /**
      * Encodes `uuid` as the container key. The returned span views into `uuid` and is valid only

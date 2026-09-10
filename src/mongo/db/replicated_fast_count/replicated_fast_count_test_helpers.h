@@ -458,8 +458,8 @@ std::span<const char> bsonSpan(const BSONObj& obj);
  * The container-backed fast count stores, which are always created as a pair.
  */
 struct ContainerFastCountStores {
-    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+    std::unique_ptr<SizeCountStore> sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> timestampStore;
 };
 
 /**

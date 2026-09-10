@@ -104,9 +104,9 @@ void ReplicatedFastCountManager::initializeContainerStores(
     }
 
     _sizeCountStore =
-        std::make_unique<replicated_fast_count::ContainerSizeCountStore>(std::move(metadataRS));
-    _timestampStore = std::make_unique<replicated_fast_count::ContainerSizeCountTimestampStore>(
-        std::move(timestampsRS));
+        std::make_unique<replicated_fast_count::SizeCountStore>(std::move(metadataRS));
+    _timestampStore =
+        std::make_unique<replicated_fast_count::SizeCountTimestampStore>(std::move(timestampsRS));
 }
 
 void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
@@ -298,7 +298,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
             RecordStore::Options{.keyFormat = KeyFormat::Long},
             /*uuid=*/boost::none);
         massert(12580002, "Storage engine returned a null RecordStore for timestamps", timestampRS);
-        ContainerSizeCountTimestampStore tempStore(std::move(timestampRS));
+        SizeCountTimestampStore tempStore(std::move(timestampRS));
         return tempStore.read(opCtx);
     }();
 

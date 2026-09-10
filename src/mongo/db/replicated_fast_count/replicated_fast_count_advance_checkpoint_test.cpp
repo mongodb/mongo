@@ -62,8 +62,8 @@ protected:
     }
 
     OperationContext* opCtx;
-    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+    std::unique_ptr<SizeCountStore> sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> timestampStore;
 };
 
 // Test: `advanceCheckpoint` when there was no pre-existing entry for a user collection.
@@ -953,8 +953,8 @@ protected:
                                         .uuid = UUID::gen()};
 
     OperationContext* opCtx;
-    std::unique_ptr<ContainerSizeCountStore> sizeCountStore;
-    std::unique_ptr<ContainerSizeCountTimestampStore> timestampStore;
+    std::unique_ptr<SizeCountStore> sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> timestampStore;
 };
 
 TEST_F(ReplicatedFastCountPersistCheckpointSnapshotTest, HashNotPersistedWhenAbsent) {

@@ -14,20 +14,22 @@ namespace mongo::replicated_fast_count {
 
 /**
  * The `SizeCountTimestampStore` provides read and write access to a single, persisted timestamp.
+ * Owns the RecordStore that backs the underlying IntegerKeyedContainer.
  *
  * This class is useful for tracking when persisted size and count metadata were last known to be
  * accurate and thus the timestamp after which the oplog is needed for correctness.
  *
- * Locking: the container-backed implementation reads and writes the underlying container and does
- * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
- * of the call:
+ * Locking: this class reads and writes the underlying container and does not acquire any locks of
+ * its own. Callers must therefore hold the global lock for the duration of the call:
  *   MODE_IS - read()
  *   MODE_IX - write()
  */
 class SizeCountTimestampStore {
 public:
-    SizeCountTimestampStore() = default;
-    virtual ~SizeCountTimestampStore() = default;
+    explicit SizeCountTimestampStore(std::unique_ptr<RecordStore> recordStore)
+        : _recordStore(std::move(recordStore)) {
+        invariant(_recordStore, "SizeCountTimestampStore requires a non-null RecordStore");
+    }
 
     SizeCountTimestampStore(SizeCountTimestampStore&&) = default;
     SizeCountTimestampStore& operator=(SizeCountTimestampStore&&) = default;
@@ -39,7 +41,7 @@ public:
      *
      * If no timestamp exists, read() returns boost::none.
      */
-    [[nodiscard]] virtual boost::optional<Timestamp> read(OperationContext* opCtx) const = 0;
+    [[nodiscard]] boost::optional<Timestamp> read(OperationContext* opCtx) const;
 
     /**
      * Upserts `timestamp` into the store. If a timestamp already exists, it will be replaced.
@@ -47,30 +49,14 @@ public:
      * write() must be called within a WriteUnitOfWork. Otherwise, the function raises an assertion
      * error.
      */
-    virtual void write(OperationContext* opCtx, Timestamp timestamp) = 0;
+    void write(OperationContext* opCtx, Timestamp timestamp);
 
     /**
      * Performs a single write of `timestamp` directly to the underlying physical table. Unlike
      * write(), this does not log to the oplog: it skips invoking op observers and bypasses the
      * `canAcceptWritesFor` primary check, so the write is not replicated.
      */
-    virtual void writeToTable(OperationContext* opCtx, Timestamp timestamp) = 0;
-};
-
-/**
- * Container-backed implementation of `SizeCountTimestampStore`. Owns the RecordStore that
- * backs the underlying IntegerKeyedContainer.
- */
-class ContainerSizeCountTimestampStore final : public SizeCountTimestampStore {
-public:
-    explicit ContainerSizeCountTimestampStore(std::unique_ptr<RecordStore> recordStore)
-        : _recordStore(std::move(recordStore)) {
-        invariant(_recordStore, "ContainerSizeCountTimestampStore requires a non-null RecordStore");
-    }
-
-    boost::optional<Timestamp> read(OperationContext* opCtx) const override;
-    void write(OperationContext* opCtx, Timestamp timestamp) override;
-    void writeToTable(OperationContext* opCtx, Timestamp timestamp) override;
+    void writeToTable(OperationContext* opCtx, Timestamp timestamp);
 
     RecordStore* rs_ForTest() const;
 
