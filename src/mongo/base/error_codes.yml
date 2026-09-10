@@ -1351,5 +1351,11 @@ error_codes:
   # ErrorCodes::InvalidBSON or ErrorCodes::NonConformantBSON.
   - {code: 525, name: BSONInternalError, categories: [CloseConnectionError]}
 
+  - {
+      code: 526,
+      name: StreamProcessorPreviewConnectTimeout,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
