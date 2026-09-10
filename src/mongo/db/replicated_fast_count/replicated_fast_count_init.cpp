@@ -11,6 +11,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -173,63 +174,66 @@ Status createInternalFastCountContainers(OperationContext* opCtx,
                                : rss::consensus::IntentRegistry::Intent::LocalWrite;
     Lock::GlobalLock globalLock(opCtx, MODE_IX, Lock::GlobalLockOptions{.explicitIntent = intent});
 
-    // Try creating both containers. ObjectAlreadyExists tells us which idents exist.
+    return writeConflictRetry(opCtx, "createInternalFastCountContainers", nss, [&]() -> Status {
+        // Try creating both containers. ObjectAlreadyExists tells us which idents exist.
 
-    WriteUnitOfWork wuow(opCtx);
-    auto metadataStatus =
-        _createInternalFastCountContainer(opCtx, nss, metadataIdent, metadataKeyFormat);
-    auto timestampsStatus =
-        _createInternalFastCountContainer(opCtx, nss, timestampsIdent, timestampsKeyFormat);
+        WriteUnitOfWork wuow(opCtx);
+        auto metadataStatus =
+            _createInternalFastCountContainer(opCtx, nss, metadataIdent, metadataKeyFormat);
+        auto timestampsStatus =
+            _createInternalFastCountContainer(opCtx, nss, timestampsIdent, timestampsKeyFormat);
 
-    if (metadataStatus.isOK() && timestampsStatus.isOK()) {
-        if (writeToOplog) {
-            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        if (metadataStatus.isOK() && timestampsStatus.isOK()) {
+            if (writeToOplog) {
+                _writeInitReplicatedFastCountOplogEntry(opCtx);
+            }
+            wuow.commit();
+            LOGV2(12231704,
+                  "Created replicated fast count idents",
+                  "metadataIdent"_attr = ident::kFastCountMetadataStore,
+                  "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
+            return Status::OK();
         }
-        wuow.commit();
-        LOGV2(12231704,
-              "Created replicated fast count idents",
-              "metadataIdent"_attr = ident::kFastCountMetadataStore,
-              "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
-        return Status::OK();
-    }
 
-    if (metadataStatus == ErrorCodes::ObjectAlreadyExists &&
-        timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
-        // Handling for both idents existing differs between stepup initialization and oplog
-        // application.
-        return metadataStatus;
-    }
-
-    if ((!metadataStatus.isOK() && metadataStatus != ErrorCodes::ObjectAlreadyExists) ||
-        (!timestampsStatus.isOK() && timestampsStatus != ErrorCodes::ObjectAlreadyExists)) {
-        // Return any unexpected error. WUOW rollback will remove any ident that was newly created.
-        return !metadataStatus.isOK() ? metadataStatus : timestampsStatus;
-    }
-
-    // TODO SERVER-114575 Layered table drops can sometimes report OK but collide with subsequent
-    // table creations. We can re-use the colliding ident as long as it is empty.
-    Status existingIdentStatus = Status::OK();
-    std::string msg;
-    if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) =
-            handleExistingFastCountIdent(opCtx, nss, metadataIdent, metadataKeyFormat);
-    } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) =
-            handleExistingFastCountIdent(opCtx, nss, timestampsIdent, timestampsKeyFormat);
-    } else {
-        // Success cases or unexpected errors should have already been handled.
-        MONGO_UNREACHABLE_TASSERT(12309405);
-    }
-
-    if (existingIdentStatus.isOK()) {
-        // The colliding ident was empty so we can treat it as newly created.
-        LOGV2(12309400, "Reusing empty ident", "details"_attr = msg);
-        if (writeToOplog) {
-            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        if (metadataStatus == ErrorCodes::ObjectAlreadyExists &&
+            timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+            // Handling for both idents existing differs between stepup initialization and oplog
+            // application.
+            return metadataStatus;
         }
-        wuow.commit();
-    }
-    return existingIdentStatus;
+
+        if ((!metadataStatus.isOK() && metadataStatus != ErrorCodes::ObjectAlreadyExists) ||
+            (!timestampsStatus.isOK() && timestampsStatus != ErrorCodes::ObjectAlreadyExists)) {
+            // Return any unexpected error. WUOW rollback will remove any ident that was newly
+            // created.
+            return !metadataStatus.isOK() ? metadataStatus : timestampsStatus;
+        }
+
+        // TODO SERVER-114575 Layered table drops can sometimes report OK but collide with
+        // subsequent table creations. We can re-use the colliding ident as long as it is empty.
+        Status existingIdentStatus = Status::OK();
+        std::string msg;
+        if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
+            std::tie(existingIdentStatus, msg) =
+                handleExistingFastCountIdent(opCtx, nss, metadataIdent, metadataKeyFormat);
+        } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+            std::tie(existingIdentStatus, msg) =
+                handleExistingFastCountIdent(opCtx, nss, timestampsIdent, timestampsKeyFormat);
+        } else {
+            // Success cases or unexpected errors should have already been handled.
+            MONGO_UNREACHABLE_TASSERT(12309405);
+        }
+
+        if (existingIdentStatus.isOK()) {
+            // The colliding ident was empty so we can treat it as newly created.
+            LOGV2(12309400, "Reusing empty ident", "details"_attr = msg);
+            if (writeToOplog) {
+                _writeInitReplicatedFastCountOplogEntry(opCtx);
+            }
+            wuow.commit();
+        }
+        return existingIdentStatus;
+    });
 }
 
 void dropInternalFastCountContainers(OperationContext* opCtx) {

@@ -456,6 +456,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/transaction",
     ],

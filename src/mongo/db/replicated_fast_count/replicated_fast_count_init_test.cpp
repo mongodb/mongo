@@ -3,7 +3,11 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -12,6 +16,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
@@ -496,6 +501,102 @@ TEST_F(ReplicatedFastCountInitTest, dropInternalFastCountContainersAllowsCleanRe
                                      boost::none);
     auto cursor = rs->getCursor(_opCtx, *ru);
     EXPECT_FALSE(cursor->next());
+}
+
+/**
+ * Fixture to inject a WriteConflictException when creating internal fast count containers.
+ * Specifically, this injects a WCE into the call to write an oplog entry for container creation,
+ * not into the write to create the containers, since there isn't currently machinery to inject a
+ * WCE there; however, a WCE from either of these writes would be handled in the same write conflict
+ * retry loop, which gets exercised in these tests.
+ */
+class ReplicatedFastCountInitOplogTest : public ReplicatedFastCountInitTest {
+protected:
+    void setUp() override {
+        ReplicatedFastCountInitTest::setUp();
+
+        auto* registry = dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        ASSERT(registry);
+        registry->addObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+    }
+
+    Status createContainers() {
+        return createInternalFastCountContainers(_opCtx,
+                                                 NamespaceString::kAdminCommandNamespace,
+                                                 ident::kFastCountMetadataStore,
+                                                 KeyFormat::String,
+                                                 ident::kFastCountMetadataStoreTimestamps,
+                                                 KeyFormat::Long,
+                                                 /*writeToOplog=*/true);
+    }
+
+    // Asserts both containers exist and do not contain any records.
+    void assertContainersExistAndAreEmpty() {
+        auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
+        auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
+
+        ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+        ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+
+        for (auto [identName, keyFormat] :
+             {std::pair{ident::kFastCountMetadataStore, KeyFormat::String},
+              std::pair{ident::kFastCountMetadataStoreTimestamps, KeyFormat::Long}}) {
+            auto rs = engine->getRecordStore(_opCtx,
+                                             NamespaceString::kAdminCommandNamespace,
+                                             identName,
+                                             RecordStore::Options{.keyFormat = keyFormat},
+                                             /*uuid=*/boost::none);
+            ASSERT(rs);
+            ASSERT_EQ(rs->keyFormat(), keyFormat);
+            EXPECT_FALSE(rs->getCursor(_opCtx, *ru)->next()) << identName << " is not empty";
+        }
+    }
+
+    // Returns the detected number of 'initReplicatedFastCount' oplog entries.
+    int64_t countInitOplogEntries() {
+        DBDirectClient client(_opCtx);
+        return client.count(NamespaceString::kRsOplogNamespace,
+                            BSON("o.initReplicatedFastCount" << 1));
+    }
+};
+
+TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesOnWriteConflict) {
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
+
+    ASSERT_OK(createContainers());
+
+    ASSERT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+
+    assertContainersExistAndAreEmpty();
+    ASSERT_EQ(countInitOplogEntries(), 1);
+}
+
+TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesRepeatedlyOnWriteConflict) {
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 3});
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
+
+    ASSERT_OK(createContainers());
+
+    ASSERT_EQ(initialTimesEntered + 3, (*failPoint)->waitForTimesEntered(initialTimesEntered + 3));
+
+    assertContainersExistAndAreEmpty();
+    ASSERT_EQ(countInitOplogEntries(), 1);
+}
+
+TEST_F(ReplicatedFastCountInitOplogTest, SetUpReplicatedFastCountDoesNotCrashOnWriteConflict) {
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
+
+    setUpReplicatedFastCount(_opCtx);
+
+    ASSERT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+
+    assertContainersExistAndAreEmpty();
 }
 
 }  // namespace
