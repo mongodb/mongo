@@ -59,8 +59,6 @@ TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegacySizeStorer) {
 };
 
 TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsBoth) {
-    // TODO SERVER-126250: Remove the guard once the collection branch is gone.
-    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     createReplicatedFastCountContainers(operationContext());
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::both);
