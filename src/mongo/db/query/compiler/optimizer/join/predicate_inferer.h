@@ -34,14 +34,11 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     OpDebug::JoinOptimizationMetrics& metrics);
 
 /**
- * Builds a new CanonicalQuery over 'nss' whose filter is 'expr', reusing the projection from
- * 'cqOld'. Used to snapshot a node's filter as parsed, before predicate inference mutates the
- * node's access path by ANDing in inferred single-table predicates.
+ * Builds a new CanonicalQuery whose filter is 'expr', cloning the FindCommandRequest and
+ * ExpressionContext state of 'cqOld'. Used to snapshot a node's filter as parsed, before predicate
+ * inference mutates the node's access path by ANDing in inferred single-table predicates.
  */
 StatusWith<std::unique_ptr<CanonicalQuery>> cloneCQWithUpdatedFilter(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    NamespaceString nss,
-    std::unique_ptr<MatchExpression> expr,
-    const CanonicalQuery& cqOld);
+    const CanonicalQuery& cqOld, std::unique_ptr<MatchExpression> expr, bool enableSimplification);
 
 }  // namespace mongo::join_ordering

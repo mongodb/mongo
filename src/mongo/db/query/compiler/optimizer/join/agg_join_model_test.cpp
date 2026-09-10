@@ -3,7 +3,15 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_text_noop.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
+#include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/compiler/parsers/matcher/parsed_match_expression_for_test.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
@@ -19,6 +27,27 @@ unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join
 
 using mongo::ParsedMatchExpressionForTest;
 using PipelineAnalyzerTest = AggJoinModelFixture;
+
+// Pipeline with join A.a = B.a and STP 'B.a = 3', so 'a = 3' is inferred onto node 0.
+constexpr auto kSameFieldLookupPipeline = R"([
+    {
+        $lookup: {
+            from: "B",
+            localField: "a",
+            foreignField: "a",
+            pipeline: [{$match: {a: 3}}],
+            as: "final"
+        }
+    },
+    { $unwind: "$final" }
+    ])";
+
+void useReverseStringCollator(ExpressionContext* expCtx) {
+    CollatorFactoryInterface::set(expCtx->getOperationContext()->getServiceContext(),
+                                  std::make_unique<CollatorFactoryMock>());
+    expCtx->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+}
 
 std::vector<std::string> sortedAndChildStrings(const MatchExpression* expr) {
     ASSERT_EQ(expr->matchType(), MatchExpression::AND);
@@ -40,20 +69,7 @@ std::vector<std::string> sortedAndChildStrings(const MatchExpression* expr) {
 
 TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
     // For join A.a = B.a and STP B.a = 3, we can infer access path A.a = 3
-    auto query = R"([
-    {
-        $lookup: {
-            from: "B",
-            localField: "a",
-            foreignField: "a",
-            pipeline: [{$match: {a: 3}}],
-            as: "final"
-        }
-    },
-    { $unwind: "$final" }
-    ])";
-
-    auto pipeline = makePipeline(query, {"B"});
+    auto pipeline = makePipeline(kSameFieldLookupPipeline, {"B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"a"sv}}});
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel =
@@ -89,6 +105,153 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
     ASSERT_EQ(bCollCQ->nss().coll(), "B");
     expectedChildren = "{ a: { $eq: 3 } }";
     ASSERT_EQ(expectedChildren, bCollCQ->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, InferSingleTablePredicatePreservesExpressionContextState) {
+    getExpCtx()->setAllowDiskUse(true);
+    getExpCtx()->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+    useReverseStringCollator(getExpCtx().get());
+    const auto letVarId = getExpCtx()->variablesParseState.defineVariable("joinTestVar");
+    getExpCtx()->variables.setConstantValue(letVarId, Value(17));
+
+    auto pipeline = makePipeline(kSameFieldLookupPipeline, {"B"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"a"sv}}});
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
+
+    auto& joinGraph = swJoinModel.getValue().getGraph();
+    ASSERT_EQ(joinGraph.numNodes(), 2);
+    for (size_t i = 0; i < joinGraph.numNodes(); ++i) {
+        const auto* accessPath = joinGraph.accessPathAt((NodeId)i);
+        ASSERT_TRUE(accessPath->getExpCtx()->getAllowDiskUse())
+            << "node " << i << " (" << accessPath->nss().toStringForErrorMsg()
+            << ") lost 'allowDiskUse' from the original ExpressionContext";
+        ASSERT_TRUE(CollatorInterface::collatorsMatch(accessPath->getCollatorShared().get(),
+                                                      getExpCtx()->getCollator()))
+            << "node " << i << " (" << accessPath->nss().toStringForErrorMsg()
+            << ") lost the collator from the original ExpressionContext";
+        ASSERT_TRUE(accessPath->getExpCtx()->getExplain() ==
+                    ExplainOptions::Verbosity::kQueryPlanner)
+            << "node " << i << " (" << accessPath->nss().toStringForErrorMsg()
+            << ") lost the explain verbosity from the original ExpressionContext";
+        ASSERT_EQ(accessPath->getExpCtx()->variables.getValue(letVarId, Document{}).getInt(), 17)
+            << "node " << i << " (" << accessPath->nss().toStringForErrorMsg()
+            << ") lost let variables from the original ExpressionContext";
+    }
+}
+
+TEST_F(PipelineAnalyzerTest, CloneCQWithUpdatedFilterPreservesSourceState) {
+    getExpCtx()->setAllowDiskUse(true);
+    getExpCtx()->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+    useReverseStringCollator(getExpCtx().get());
+    const auto letVarId = getExpCtx()->variablesParseState.defineVariable("joinTestVar");
+    getExpCtx()->variables.setConstantValue(letVarId, Value(17));
+    const auto& nss = getExpCtx()->getNamespaceString();
+    auto pathArrayness = std::make_shared<PathArrayness>();
+    pathArrayness->addPath(FieldPath("a"), MultikeyComponents{}, /*isFullRebuild=*/true);
+    getExpCtx()->setPathArraynessForNss(nss, std::move(pathArrayness));
+
+    const auto projectionBson = fromjson("{_id: 0, a: 1}");
+    const auto collationBson = getExpCtx()->getCollatorBSON().getOwned();
+    auto fcrOld = std::make_unique<FindCommandRequest>(nss);
+    fcrOld->setFilter(fromjson("{a: 3}"));
+    fcrOld->setProjection(projectionBson);
+    fcrOld->setCollation(collationBson);
+    auto cqOld = uassertStatusOK(CanonicalQuery::make(
+        {.expCtx = getExpCtx(),
+         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcrOld)}}));
+
+    ParsedMatchExpressionForTest newFilter("{b: 5}");
+    auto swCq =
+        cloneCQWithUpdatedFilter(*cqOld, newFilter.release(), /*enableSimplification=*/true);
+    ASSERT_OK(swCq);
+
+    const auto& rebuiltFcr = swCq.getValue()->getFindCommandRequest();
+    ASSERT_EQ(swCq.getValue()->nss(), cqOld->nss());
+    ASSERT_BSONOBJ_EQ(rebuiltFcr.getFilter(), fromjson("{b: {$eq: 5}}"));
+    ASSERT_BSONOBJ_EQ(rebuiltFcr.getProjection(), projectionBson);
+    ASSERT_BSONOBJ_EQ(rebuiltFcr.getCollation(), collationBson);
+    ASSERT_EQ(swCq.getValue()->getPrimaryMatchExpression()->matchType(), MatchExpression::EQ);
+
+    const auto& rebuiltExpCtx = swCq.getValue()->getExpCtx();
+    ASSERT_TRUE(rebuiltExpCtx->getAllowDiskUse());
+    ASSERT_TRUE(rebuiltExpCtx->getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
+    ASSERT_EQ(rebuiltExpCtx->getCollator(), getExpCtx()->getCollator());
+    ASSERT_EQ(rebuiltExpCtx->variables.getValue(letVarId, Document{}).getInt(), 17);
+    ASSERT_FALSE(rebuiltExpCtx->canPathBeArrayForNss(FieldRef("a"sv), nss));
+    ASSERT_TRUE(rebuiltExpCtx->canPathBeArrayForNss(FieldRef("b"sv), nss));
+}
+
+TEST_F(PipelineAnalyzerTest, CloneCQWithUpdatedFilterSimplifiesOnlyWhenEnabled) {
+    getExpCtx()->setInLookup(true);
+    auto fcrOld = std::make_unique<FindCommandRequest>(getExpCtx()->getNamespaceString());
+
+    fcrOld->setFilter(fromjson("{$and: [{a: 1}, {$or: [{a: 1}, {b: 2}]}]}"));
+    auto cqOld = uassertStatusOK(CanonicalQuery::make(
+        {.expCtx = getExpCtx(),
+         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcrOld)}}));
+
+    auto snapshot = cloneCQWithUpdatedFilter(
+        *cqOld, cqOld->getPrimaryMatchExpression()->clone(), /*enableSimplification=*/false);
+    ASSERT_OK(snapshot.getStatus());
+    ASSERT_EQ(snapshot.getValue()->getPrimaryMatchExpression()->toString(),
+              cqOld->getPrimaryMatchExpression()->toString());
+
+    // The Boolean simplifier absorbs 'a = 1 AND (a = 1 OR b = 2)' to 'a = 1'.
+    auto rebuilt = cloneCQWithUpdatedFilter(
+        *cqOld, cqOld->getPrimaryMatchExpression()->clone(), /*enableSimplification=*/true);
+    ASSERT_OK(rebuilt.getStatus());
+    const auto* rebuiltFilter = rebuilt.getValue()->getPrimaryMatchExpression();
+    ASSERT_EQ(rebuiltFilter->matchType(), MatchExpression::EQ);
+    ASSERT_EQ(rebuiltFilter->path(), "a"sv);
+    ASSERT_EQ(static_cast<const EqualityMatchExpression*>(rebuiltFilter)->getData().number(), 1);
+}
+
+TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateExprNonSimpleCollation) {
+    useReverseStringCollator(getExpCtx().get());
+
+    // $expr STP 'C.c = 10' over join A.c = C.c, so an $expr predicate is inferred onto node 0.
+    auto query = R"([
+    {
+        $lookup: {
+            from: "C",
+            let: { c_val: "$c" },
+            pipeline: [
+                { $match: { $expr: { $and: [ { $eq: ["$c", "$$c_val"] }, { $eq: ["$c", 10] } ] } } }
+            ],
+            as: "Cdocs"
+        }
+    },
+    { $unwind: "$Cdocs" }
+    ])";
+    auto pipeline = makePipeline(query, {"C"});
+    markFieldsAsScalar(*pipeline, {"c"sv}, {{"C", {"c"sv}}});
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
+
+    auto& joinGraph = swJoinModel.getValue().getGraph();
+    ASSERT_EQ(joinGraph.numNodes(), 2);
+
+    // The inferred $expr predicate reached the rebuilt node 0.
+    const auto* rebuiltAccessPath = joinGraph.accessPathAt((NodeId)0);
+    ASSERT_EQ(
+        "{ $and: [ { $expr: { $eq: [ \"$c\", { $const: 10 } ] } }, { c: { $_internalExprEq: 10 } } "
+        "] }",
+        rebuiltAccessPath->getPrimaryMatchExpression()->toString());
+
+    ASSERT_TRUE(CollatorInterface::collatorsMatch(rebuiltAccessPath->getCollatorShared().get(),
+                                                  getExpCtx()->getCollator()))
+        << "the rebuilt node lost the collator from the original ExpressionContext";
+
+    const auto* internalExprEq = rebuiltAccessPath->getPrimaryMatchExpression()->getChild(1);
+    ASSERT_EQ(internalExprEq->matchType(), MatchExpression::INTERNAL_EXPR_EQ);
+    ASSERT_EQ(static_cast<const ComparisonMatchExpressionBase*>(internalExprEq)->getCollator(),
+              rebuiltAccessPath->getExpCtx()->getCollator())
+        << "the rebuilt filter is not bound to its own ExpressionContext's collator";
 }
 
 TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {

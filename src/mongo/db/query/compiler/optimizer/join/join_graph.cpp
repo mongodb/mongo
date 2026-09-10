@@ -123,7 +123,7 @@ boost::optional<NodeId> MutableJoinGraph::addNode(NamespaceString collectionName
         // 'originalFilter' is a snapshot of the node's filter as parsed, before predicate
         // inference mutates 'accessPath' by ANDing in inferred single-table predicates.
         auto swOriginalFilter = cloneCQWithUpdatedFilter(
-            cq->getExpCtx(), cq->nss(), cq->getPrimaryMatchExpression()->clone(), *cq);
+            *cq, cq->getPrimaryMatchExpression()->clone(), /*enableSimplification=*/false);
         uassertStatusOK(swOriginalFilter.getStatus());
         originalFilter = std::move(swOriginalFilter.getValue());
     }

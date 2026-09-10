@@ -1,6 +1,7 @@
 /**
  * Runs explain on join queries with single table predicates to ensure the memory of the new filters
  * created by JOO's STP propagation logic is held onto for the whole lifetime of the query.
+ * Also verifies that an access path rebuilt by STP inference retains the command's 'allowDiskUse'.
  * @tags: [
  * requires_fcv_90,
  * requires_sbe,
@@ -10,6 +11,8 @@
 
 import {getWinningPlanFromExplain, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {runTestWithUnorderedComparison} from "jstests/libs/query/join_utils.js";
+import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 let conn = MongoRunner.runMongod({
     setParameter: {
@@ -487,5 +490,119 @@ runTest({
         },
     ],
 });
+
+/*
+ * An access path rebuilt by STP inference must retain the command's 'allowDiskUse'.
+ */
+
+runWithParamsAllNonConfigNodes(
+    db,
+    {
+        internalJoinMethod: "HJ",
+        internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill: 1,
+        allowDiskUseByDefault: true,
+    },
+    () => {
+        // Force the foreign collection (node 1) as the base node.
+        const foreignBaseHint = {
+            perSubsetLevelMode: [
+                {level: NumberInt(0), hint: {node: NumberInt(1)}, mode: "CHEAPEST"},
+                {
+                    level: NumberInt(1),
+                    hint: {node: NumberInt(0), isLeftChild: false},
+                    mode: "CHEAPEST",
+                },
+            ],
+        };
+        const foreignBaseLookup = {
+            $lookup: {
+                from: collB.getName(),
+                localField: "a",
+                foreignField: "b",
+                as: "joinedB",
+            },
+        };
+        // $match a=5 is inferred onto the hinted base (foreign) node as b=5, rebuilding its access path.
+        const hintedWithInference = [
+            {$_internalJoinHint: foreignBaseHint},
+            {$match: {a: 5}},
+            foreignBaseLookup,
+            {$unwind: "$joinedB"},
+        ];
+        // same plan shape, but nothing is inferred, so no access path is rebuilt.
+        const hintedWithoutInference = [
+            {$_internalJoinHint: foreignBaseHint},
+            foreignBaseLookup,
+            {$unwind: "$joinedB"},
+        ];
+
+        function getLeftmostLeafNss(explain) {
+            let node = getWinningPlanFromExplain(explain);
+            while (true) {
+                if (Array.isArray(node.inputStages) && node.inputStages.length > 0) {
+                    node = node.inputStages[0];
+                } else if (node.inputStage) {
+                    node = node.inputStage;
+                } else {
+                    return node.nss;
+                }
+            }
+        }
+
+        const explain = collA
+            .explain("executionStats")
+            .aggregate(hintedWithInference, {allowDiskUse: true});
+
+        const queryPlanner = getQueryPlanner(explain);
+        assert(
+            queryPlanner.winningPlan.usedJoinOptimization,
+            "Join optimizer was not used as expected",
+            {explain},
+        );
+        assert.eq(
+            collB.getFullName(),
+            getLeftmostLeafNss(explain),
+            "expected the foreign collection to be the join base node",
+            {explain},
+        );
+
+        const filters = extractFilters(getWinningPlanFromExplain(explain));
+        assert.eq(filters["B"], {"b": {"$eq": 5}}, "expected the inferred predicate on B", {
+            filters,
+        });
+
+        const hashJoins = getSbePlanStages(explain, "hj");
+        assert.gt(hashJoins.length, 0, "expected a hash join stage", {explain});
+        assert(
+            hashJoins.some((hj) => hj.usedDisk),
+            "expected the hash join to spill",
+            {hashJoins},
+        );
+
+        assert.eq(1, collA.aggregate(hintedWithInference, {allowDiskUse: true}).toArray().length);
+        // 'allowDiskUseByDefault' is set, so omitting the flag behaves like 'allowDiskUse: true'.
+        assert.eq(1, collA.aggregate(hintedWithInference).toArray().length);
+
+        runWithParamsAllNonConfigNodes(db, {allowDiskUseByDefault: false}, () => {
+            assert.throwsWithCode(
+                () => collA.aggregate(hintedWithInference).toArray(),
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+            );
+        });
+        assert.throwsWithCode(
+            () => collA.aggregate(hintedWithInference, {allowDiskUse: false}).toArray(),
+            ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        );
+
+        assert.eq(
+            100,
+            collA.aggregate(hintedWithoutInference, {allowDiskUse: true}).toArray().length,
+        );
+        assert.throwsWithCode(
+            () => collA.aggregate(hintedWithoutInference, {allowDiskUse: false}).toArray(),
+            ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        );
+    },
+);
 
 MongoRunner.stopMongod(conn);

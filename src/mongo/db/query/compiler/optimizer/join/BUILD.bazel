@@ -32,6 +32,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:subplanning_utils",
         "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_request",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
         "//src/mongo/db/query/util:query_util_bitset",
         "//src/mongo/db/query/util:query_util_disjoint_set",
@@ -122,6 +123,8 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/query/collation:collator_interface_mock",
     ],
 )
 
