@@ -196,6 +196,18 @@ def mongod_program(
             bin_version_suffix,
             "9.1.0",
         )
+        remove_set_parameter_if_before_version(
+            suite_set_parameters,
+            "validateParallelTargetRecordsPerSlice",
+            bin_version_suffix,
+            "9.1.0",
+        )
+        remove_set_parameter_if_before_version(
+            suite_set_parameters,
+            "validateParallelMaxRecordStoreSlices",
+            bin_version_suffix,
+            "9.1.0",
+        )
 
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
         mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
