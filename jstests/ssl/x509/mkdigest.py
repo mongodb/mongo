@@ -5,6 +5,7 @@ Invoke as `mkdigest.py <cert|crl> <sha256|sha1> <filename1> [filename2 ...]`
 """
 import argparse
 import OpenSSL
+import cryptography.x509
 import cryptography.hazmat.primitives.hashes as hashes
 
 DIGEST_NAME_TO_HASH = {'sha256': hashes.SHA256(), 'sha1': hashes.SHA1()}
@@ -21,8 +22,8 @@ def make_digest(filename, item_type, digest_type):
         rawdigest = cert.digest(digest_type)
         digest = rawdigest.decode('utf8').replace(':', '')
     elif item_type == 'crl':
-        crl = OpenSSL.crypto.load_crl(OpenSSL.crypto.FILETYPE_PEM, data)
-        rawdigest = crl.to_cryptography().fingerprint(DIGEST_NAME_TO_HASH[digest_type])
+        crl = cryptography.x509.load_pem_x509_crl(data.encode('utf-8'))
+        rawdigest = crl.fingerprint(DIGEST_NAME_TO_HASH[digest_type])
         digest = rawdigest.hex().upper()
 
     with open(filename + '.digest.' + digest_type, 'w') as f:

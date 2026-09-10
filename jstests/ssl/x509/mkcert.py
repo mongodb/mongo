@@ -17,15 +17,18 @@ import yaml
 import OpenSSL
 import re
 import shutil
-
 import mkdigest
 
-# pylint: disable=protected-access
-OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
-OpenSSL._util.lib.OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
-OpenSSL._util.lib.OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
-                              b'Sequence of MongoDB Database Roles')
-# pylint: enable=protected-access
+try:
+    # pylint: disable=protected-access
+    # Newer versions of PyOpenSSL hide OBJ_create, but also seem okay without it.
+    OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
+    OpenSSL._util.lib.OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
+    OpenSSL._util.lib.OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
+                                  b'Sequence of MongoDB Database Roles')
+    # pylint: enable=protected-access
+except AttributeError:
+    pass
 
 CONFIGFILE = 'jstests/ssl/x509/certs.yml'
 
@@ -39,9 +42,6 @@ MUST_STAPLE_KEY = bytes(MUST_STAPLE_KEY_STR, "utf-8")
 # status_request extension as defined in https://tools.ietf.org/html/rfc4366#section-2.3
 MUST_STAPLE_VALUE_STR = 'DER:30:03:02:01:05' # ASN.1 value: SEQUENCE { INTEGER 0x05 (5 decimal) }
 MUST_STAPLE_VALUE = str(MUST_STAPLE_VALUE_STR).encode('utf-8')
-
-# <= 825 in order to abide by https://support.apple.com/en-us/HT210176. 
-MAX_VALIDITY_PERIOD_DAYS = 824
 
 def glbl(key, default=None):
     """Fetch a key from the global dict."""
@@ -144,7 +144,8 @@ def set_validity(x509, cert):
         # TODO: Parse human readable dates and/or datedeltas
         not_after = int(not_after)
     else:
-        not_after = not_before + MAX_VALIDITY_PERIOD_DAYS * 24 * 60 * 60
+        # Default 20 years hence.
+        not_after = 20 * 365 * 24 * 60 * 60
     x509.gmtime_adj_notAfter(not_after)
 
 def set_general_dict_extension(x509, exts, cert, name, typed_values):
@@ -527,7 +528,7 @@ def process_client_multivalue_rdn(cert):
     subject = '/CN=client+OU=KernelUser+O=MongoDB/L=New York City+ST=New York+C=US'
     subprocess.check_call(['openssl', 'req', '-new', '-nodes', '-multivalue-rdn', '-subj', subject, '-keyout', key, '-out', csr])
     subprocess.check_call(['openssl', 'rsa', '-in', key, '-out', rsa])
-    subprocess.check_call(['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-CA', ca, '-CAkey', ca, '-days', str(MAX_VALIDITY_PERIOD_DAYS), '-sha256', '-set_serial', serial])
+    subprocess.check_call(['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-CA', ca, '-CAkey', ca, '-days', '3650', '-sha256', '-set_serial', serial])
 
     open(dest, 'wt').write(get_header_comment(cert) + "\n" + open(pem, 'rt').read() + open(rsa, 'rt').read())
     os.remove(key)
@@ -587,7 +588,7 @@ def process_ecdsa_ca(cert):
     subject = '/C=US/ST=New York/L=New York City/O=MongoDB/OU=Kernel/CN=Kernel Test ESCDA CA/'
 
     reqargs = ['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject]
-    x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-signkey', key, '-days', str(MAX_VALIDITY_PERIOD_DAYS), '-sha256', '-set_serial', serial]
+    x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-signkey', key, '-days', '7300', '-sha256', '-set_serial', serial]
     ecparamargs = (['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key, '-noout']
                    if "ocsp" in cert.get('tags', [])
                    else ['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key])
@@ -631,7 +632,7 @@ def process_ecdsa_leaf(cert):
     subject = '/C=US/ST=New York/L=New York City/O=MongoDB/OU=' + ou + '/CN=' + mode
 
     reqargs = ['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject]
-    x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-CA', ca, '-CAkey', ca, '-days', str(MAX_VALIDITY_PERIOD_DAYS), '-sha256', '-set_serial', serial]
+    x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-CA', ca, '-CAkey', ca, '-days', '7300', '-sha256', '-set_serial', serial]
     if mode == 'server':
         reqargs = reqargs + ['-reqexts', 'v3_req']
         extfile = tempfile.mkstemp()[1]
