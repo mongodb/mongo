@@ -397,7 +397,7 @@ public:
 
     std::unique_ptr<SpillTable> createSpillTable(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const final {
-        MONGO_UNREACHABLE;
+        tasserted(13043100, "Cannot spill to disk on a router");
     }
     void writeRecordsToSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   SpillTable& spillTable,

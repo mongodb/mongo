@@ -457,6 +457,28 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
         expectedCount: 50,
     });
 
+    // Test that $graphLookup, which may spill, is only merged on mongoS when 'allowDiskUse' is
+    // not set.
+    assertMergeOnMongoX({
+        testName: "agg_mongos_merge_graph_lookup_disk_use_" + allowDiskUse,
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            // Force the $graphLookup onto the merge pipeline.
+            {$_internalSplitPipeline: {}},
+            {
+                $graphLookup: {
+                    from: mongosColl.getName(),
+                    startWith: "$_id",
+                    connectFromField: "_id",
+                    connectToField: "_id",
+                    as: "graphLookupField",
+                },
+            },
+        ],
+        allowDiskUse: allowDiskUse,
+        expectedCount: 400,
+    });
+
     //
     // Test composite stages.
     //

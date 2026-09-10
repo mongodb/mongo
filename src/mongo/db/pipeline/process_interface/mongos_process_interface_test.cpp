@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -99,5 +100,19 @@ TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByInde
         AssertionException,
         51190);
 }
+
+using MongosProcessInterfaceDeathTest = MongosProcessInterfaceTest;
+
+DEATH_TEST_REGEX_F(MongosProcessInterfaceDeathTest,
+                   FailsToCreateSpillTable,
+                   "Tripwire assertion.*13043100") {
+    auto expCtx = getExpCtx();
+    auto processInterface = getProcessInterface();
+
+    ASSERT_THROWS_CODE(processInterface->createSpillTable(expCtx, KeyFormat::String),
+                       AssertionException,
+                       13043100);
+}
+
 }  // namespace
 }  // namespace mongo

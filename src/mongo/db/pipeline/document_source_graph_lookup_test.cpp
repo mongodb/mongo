@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -85,6 +86,37 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
     ASSERT_EQ(1U, modifiedPaths.paths.size());
     ASSERT_EQ(1U, modifiedPaths.paths.count("results"));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookupReportsThatItMaySpill) {
+    if (!ShardingState::get(getServiceContext())) {
+        ShardingState::create(getServiceContext());
+    }
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<test::GraphLookUpMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    for (auto pipeState : {PipelineSplitState::kUnsplit,
+                           PipelineSplitState::kSplitForShards,
+                           PipelineSplitState::kSplitForMerge}) {
+        ASSERT(graphLookupStage->constraints(pipeState).diskRequirement ==
+               StageConstraints::DiskUseRequirement::kWritesTmpData);
+    }
 }
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbsorbedUnwind) {

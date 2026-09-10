@@ -180,11 +180,12 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
 StageConstraints DocumentSourceGraphLookUp::constraints(PipelineSplitState pipeState) const {
     // $graphLookup can execute on a mongos or a shard, so its host type requirement is
     // 'kNone'. If it needs to execute on a specific merging shard, it can request this
-    // later.
+    // later. A router cannot spill, so reporting 'kWritesTmpData' keeps this stage off the
+    // router whenever 'allowDiskUse' is on.
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  HostTypeRequirement::kNone,
-                                 DiskUseRequirement::kNoDiskUse,
+                                 DiskUseRequirement::kWritesTmpData,
                                  FacetRequirement::kAllowed,
                                  TransactionRequirement::kAllowed,
                                  LookupRequirement::kAllowed,
