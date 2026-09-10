@@ -121,7 +121,8 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
             buildUpdateLookupExecutor(
                 expCtx->getOperationContext(), isOptimized, isCollectionStream),
             buildUpdateLookupLimits(
-                expCtx->getQueryKnobConfiguration(), isOptimized, isCollectionStream));
+                expCtx->getQueryKnobConfiguration(), isOptimized, isCollectionStream),
+            exec::agg::BatchedEnrichmentStatsRecorder::makeChangeStreamUpdateLookupRecorder());
     }
 
     return make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(

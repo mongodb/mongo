@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/change_stream.h"
@@ -11,13 +12,20 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
 #include <utility>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo::exec::agg {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeChangeStreamUpdateLookup);
+
 namespace {
 using namespace std::literals::string_view_literals;
 Value assertFieldHasType(const Document& fullDoc,
@@ -121,8 +129,9 @@ ChangeStreamUpdateLookupStage::ChangeStreamUpdateLookupStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-    Limits limits)
-    : BatchedEnrichmentStage(stageName, pExpCtx, limits),
+    Limits limits,
+    BatchedEnrichmentStatsRecorder batchStatsRecorder)
+    : BatchedEnrichmentStage(stageName, pExpCtx, limits, std::move(batchStatsRecorder)),
       _lookupExecutor(std::move(lookupExecutor)),
       _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)) {
     tassert(12841000, "SingleDocumentLookupExecutor must be provided", _lookupExecutor);
@@ -145,6 +154,17 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
                                           DocumentSourceChangeStream::kDocumentKeyField,
                                           BSONType::object)
                            .getDocument();
+
+    if (MONGO_unlikely(hangBeforeChangeStreamUpdateLookup.shouldFail())) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeChangeStreamUpdateLookup,
+            pExpCtx->getOperationContext(),
+            "hangBeforeChangeStreamUpdateLookup",
+            []() {
+                LOGV2(13458100,
+                      "Hanging aggregation due to 'hangBeforeChangeStreamUpdateLookup' failpoint");
+            });
+    }
 
     try {
         auto result = _lookupExecutor->performLookup(

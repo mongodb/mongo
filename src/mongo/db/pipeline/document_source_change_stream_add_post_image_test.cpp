@@ -110,7 +110,8 @@ public:
             exec::agg::BatchedEnrichmentStage::Limits{
                 .maxInputEvents = 1,
                 .maxInputBytes = std::numeric_limits<size_t>::max(),
-                .maxOutputBytes = std::numeric_limits<size_t>::max()});
+                .maxOutputBytes = std::numeric_limits<size_t>::max()},
+            exec::agg::BatchedEnrichmentStatsRecorder::makeNoopRecorder_forTest());
         exec::agg::stitchStage(*stage, source.get());
         return stage;
     }

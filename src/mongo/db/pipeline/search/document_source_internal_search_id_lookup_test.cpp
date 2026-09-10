@@ -235,7 +235,9 @@ protected:
         auto metrics =
             std::make_shared<exec::agg::InternalSearchIdLookUpStage::SearchIdLookupMetrics>();
         auto executor = std::make_unique<exec::agg::InternalSearchIdLookUpLocalReadExecutor>(
-            catalogResourceHandle, boost::none /* view */);
+            catalogResourceHandle,
+            boost::none /* view */,
+            exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder());
         exec::agg::StagePtr stage = make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
             DocumentSourceInternalSearchIdLookUp::kStageName,
             std::move(spec),

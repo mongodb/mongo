@@ -12,6 +12,7 @@
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility.h"
 #include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -99,17 +100,22 @@ std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
             std::make_unique<PreAcquiredCollectionAcquirer>(
                 catalogResourceHandle->getStasher(),
                 catalogResourceHandle->getCollectionForLookupExecutor()),
-            std::make_unique<AlwaysLocalEligibility>());
-        auto localRead = std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(
-            catalogResourceHandle, boost::none /* view */);
+            std::make_unique<AlwaysLocalEligibility>(),
+            exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupSbeRecorder());
+        auto aggregation = std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(
+            catalogResourceHandle,
+            boost::none /* view */,
+            exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder());
         return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
-            std::move(sbe), std::move(localRead));
+            std::move(sbe), std::move(aggregation));
     }
 
-    // Local-read path: `$match`-on-_id (optionally + view pipeline) against the stashed
+    // Aggregation-executor path: `$match`-on-_id (optionally + view pipeline) against the stashed
     // acquisition.
-    return std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(catalogResourceHandle,
-                                                                     std::move(viewPipeline));
+    return std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(
+        catalogResourceHandle,
+        std::move(viewPipeline),
+        exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder());
 }
 
 InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
@@ -120,8 +126,9 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
         catalogResourceHandle,
     const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
     std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-    Limits limits)
-    : BatchedEnrichmentStage(stageName, expCtx, limits),
+    Limits limits,
+    BatchedEnrichmentStatsRecorder batchStatsRecorder)
+    : BatchedEnrichmentStage(stageName, expCtx, limits, std::move(batchStatsRecorder)),
       _stageName(stageName),
       _spec(std::move(spec)),
       _catalogResourceHandle(catalogResourceHandle),

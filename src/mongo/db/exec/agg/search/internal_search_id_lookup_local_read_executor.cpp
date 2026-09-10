@@ -12,6 +12,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 namespace mongo::exec::agg {
 
@@ -21,6 +22,7 @@ SingleDocumentLookupExecutor::LookupResult InternalSearchIdLookUpLocalReadExecut
     boost::optional<UUID> collectionUUID,
     const Document& documentKey,
     boost::optional<Timestamp> afterClusterTime) {
+    Timer timer;
     // Find the document by performing a local read.
     pipeline_factory::MakePipelineOptions pipelineOpts;
     pipelineOpts.attachCursorSource = false;
@@ -69,8 +71,10 @@ SingleDocumentLookupExecutor::LookupResult InternalSearchIdLookUpLocalReadExecut
     }
 
     if (!result) {
+        _recorder.recordNotFound(timer.elapsed());
         return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
     }
+    _recorder.recordFound(timer.elapsed());
     return {LookupResult::HandledStatus::kDocumentFound, std::move(result)};
 }
 

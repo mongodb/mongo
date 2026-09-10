@@ -49,7 +49,9 @@ public:
             catalogResourceHandle,
         const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
         std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-        Limits limits);
+        Limits limits,
+        BatchedEnrichmentStatsRecorder batchStatsRecorder =
+            BatchedEnrichmentStatsRecorder::makeSearchIdLookupRecorder());
 
     const SpecificStats* getSpecificStats() const override {
         return &_stats;

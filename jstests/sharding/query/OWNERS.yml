@@ -27,6 +27,9 @@ filters:
   - "hidden_index.js":
     approvers:
       - 10gen/query-optimization
+  - "internal_search_id_lookup*.js":
+    approvers:
+      - 10gen/query-integration-search
   - "sharded_profile.js":
     approvers:
       - 10gen/query-integration-observability

@@ -295,6 +295,15 @@ public:
         "mongodb.serverStatus.metrics.changeStreams.batch.shardLatencyMicros.sum");
     static constexpr MetricName kChangeStreamBatchConfigLatencyMicrosSum = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.changeStreams.batch.configLatencyMicros.sum");
+
+    // BatchedEnrichmentStage's batch count. Counted before beginBatch(), so it can include
+    // failed batch openings.
+    static constexpr MetricName kChangeStreamUpdateLookupEnrichBatchesStarted =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.updateLookup.enrichBatchesStarted");
+    static constexpr MetricName kSearchIdLookupEnrichBatchesStarted =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.enrichBatchesStarted");
+
     // Per-(consumer x engine) single-document lookup metrics for change stream updateLookup.
     static constexpr MetricName kChangeStreamUpdateLookupExpressFound = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.changeStreams.updateLookup.express.found");
@@ -322,6 +331,24 @@ public:
         "mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.notHandled");
     static constexpr MetricName kChangeStreamUpdateLookupSbeLatency = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.latencyMicros");
+    // Per-(consumer x engine) single-document lookup metrics for search idLookup.
+    static constexpr MetricName kSearchIdLookupSbeFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.found");
+    static constexpr MetricName kSearchIdLookupSbeNotFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.notFound");
+    static constexpr MetricName kSearchIdLookupSbeNotHandled =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.notHandled");
+    static constexpr MetricName kSearchIdLookupSbeLatency =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.latencyMicros");
+    static constexpr MetricName kSearchIdLookupAggregationFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.aggregation.found");
+    static constexpr MetricName kSearchIdLookupAggregationNotFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.aggregation.notFound");
+    static constexpr MetricName kSearchIdLookupAggregationNotHandled = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.search.idLookup.aggregation.notHandled");
+    static constexpr MetricName kSearchIdLookupAggregationLatency = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.search.idLookup.aggregation.latencyMicros");
+
     static constexpr MetricName kChangeStreamErrorNonRetriableHistoryLost = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
     static constexpr MetricName kChangeStreamErrorNonRetriableFatalError = MetricNameMaker::make(

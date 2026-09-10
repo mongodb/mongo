@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/exec/agg/batched_enrichment_stats.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
@@ -102,7 +103,8 @@ public:
 protected:
     BatchedEnrichmentStage(std::string_view stageName,
                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                           Limits limits);
+                           Limits limits,
+                           BatchedEnrichmentStatsRecorder batchStatsRecorder);
 
     /**
      * Open / close the resource scope for one enrich sub-batch. enrich() runs only while a scope is
@@ -228,6 +230,11 @@ private:
     std::deque<GetNextResult> _outputBuffer;
 
     const Limits _limits;
+
+    /**
+     * Records one beginBatch() call per enrich sub-batch.
+     */
+    BatchedEnrichmentStatsRecorder _batchStatsRecorder;
 
     /**
      * Bytes buffered across both buffers, feeding operation/cursor memory accounting.

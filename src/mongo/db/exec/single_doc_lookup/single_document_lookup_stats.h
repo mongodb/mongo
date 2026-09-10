@@ -29,6 +29,8 @@ public:
     static SingleDocumentLookupStatsRecorder makeUpdateLookupExpressRecorder();
     static SingleDocumentLookupStatsRecorder makeUpdateLookupAggregationRecorder();
     static SingleDocumentLookupStatsRecorder makeUpdateLookupSbeRecorder();
+    static SingleDocumentLookupStatsRecorder makeSearchIdLookupAggregationRecorder();
+    static SingleDocumentLookupStatsRecorder makeSearchIdLookupSbeRecorder();
 
     void recordFound(Microseconds elapsed) {
         _found.add(1);

@@ -229,6 +229,60 @@ export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModif
 }
 
 /**
+ * Asserts that 'actualChanges' and 'expectedChanges' contain the same change events, in any order.
+ *
+ * This is a multiset comparison: each actual event must match a distinct expected event (per
+ * assertChangeStreamEventEq semantics), so a duplicate actual event cannot stand in for a missing
+ * expected one. Use it where event order is not guaranteed, e.g. on sharded topologies where
+ * cross-shard event order may not match client issue order.
+ */
+export function assertChangeStreamEventsEqUnordered(actualChanges, expectedChanges, eventModifier) {
+    assert.eq(
+        actualChanges.length,
+        expectedChanges.length,
+        "Change event count mismatch (order ignored)",
+        {actualChanges, expectedChanges},
+    );
+
+    const remaining = [...expectedChanges];
+    for (const actual of actualChanges) {
+        const i = remaining.findIndex((expected) =>
+            isChangeStreamEventEq(actual, expected, eventModifier),
+        );
+        assert.neq(i, -1, "No expected event matched the observed event (order ignored)", {
+            actual,
+            remaining,
+        });
+        remaining.splice(i, 1);
+    }
+}
+
+/**
+ * Asserts that the observed change events equal the expected ones, with deployment awareness:
+ * ordered on replica sets and standalone, unordered on sharded clusters, where cross-shard event
+ * order may not match client issue order.
+ *
+ * The array-based counterpart of ChangeStreamTest.assertNextChangesEqualWithDeploymentAwareness,
+ * for tests that drain their cursor themselves (e.g. via plain cursor.next()) rather than through
+ * ChangeStreamTest's batchSize:1 batches.
+ */
+export function assertChangeStreamEventsEqWithDeploymentAwareness(
+    db,
+    actualChanges,
+    expectedChanges,
+    eventModifier,
+) {
+    assert.eq(actualChanges.length, expectedChanges.length, {actualChanges, expectedChanges});
+    if (FixtureHelpers.isMongos(db)) {
+        assertChangeStreamEventsEqUnordered(actualChanges, expectedChanges, eventModifier);
+    } else {
+        for (let i = 0; i < expectedChanges.length; i++) {
+            assertChangeStreamEventEq(actualChanges[i], expectedChanges[i], eventModifier);
+        }
+    }
+}
+
+/**
  * Asserts that there are no changes waiting on the change stream cursor.
  */
 export function assertNoChanges(cursor) {

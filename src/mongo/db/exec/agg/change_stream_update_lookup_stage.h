@@ -35,7 +35,8 @@ public:
     ChangeStreamUpdateLookupStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
-                                  Limits limits);
+                                  Limits limits,
+                                  BatchedEnrichmentStatsRecorder batchStatsRecorder);
 
     /**
      * Test-only: returns the injected SingleDocumentLookupExecutor so wiring tests can assert the

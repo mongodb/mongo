@@ -689,6 +689,12 @@ Mongo.prototype._extractChangeStreamOptions = function (opts) {
         delete options.showCommitTimestamp;
     }
 
+    if (options.hasOwnProperty("matchCollectionUUIDForUpdateLookup")) {
+        changeStreamOptions.matchCollectionUUIDForUpdateLookup =
+            options.matchCollectionUUIDForUpdateLookup;
+        delete options.matchCollectionUUIDForUpdateLookup;
+    }
+
     // If no maxAwaitTimeMS is set in the options, we set a high wait timeout, so that there won't
     // be any issues with no data being available on the server side due to limited processing
     // resources during testing.

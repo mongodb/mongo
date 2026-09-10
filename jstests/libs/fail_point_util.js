@@ -184,3 +184,23 @@ export function configureFailPointForAllShardsAndMongos({
         }
     }
 }
+
+/**
+ * Configures the given fail point, runs 'callback(fp)' with it armed, and guarantees the fail
+ * point is turned back off afterwards, whether the callback returns, throws, or fails an
+ * assertion. 'fp' is the configured fail point, so the callback can wait on it or read its
+ * timesEntered.
+ */
+export function withFailPoint(
+    conn,
+    failPointName,
+    callback,
+    {data = {}, failPointMode = "alwaysOn"} = {},
+) {
+    const fp = configureFailPoint(conn, failPointName, data, failPointMode);
+    try {
+        return callback(fp);
+    } finally {
+        fp.off();
+    }
+}
