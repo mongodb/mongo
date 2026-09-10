@@ -1093,6 +1093,7 @@ replication.oplog:
     - src/mongo/db/repl/*insert_group*
     - src/mongo/db/repl/*noop_writer*
     - src/mongo/db/repl/*oplog*
+    - src/mongo/db/repl/*pipelined*
     - src/mongo/db/repl/*oplog_visibility_manager*
     - src/mongo/db/repl/*optime*
     - src/mongo/db/repl/*reporter*
