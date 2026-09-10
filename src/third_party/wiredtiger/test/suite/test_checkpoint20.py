@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import threading, time
+import os, threading, time
 import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -143,3 +143,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check(ds, self.first_checkpoint, nrows, value_a, 10)
         self.check(ds, self.first_checkpoint, nrows, value_a, 20)
         self.check(ds, self.first_checkpoint, nrows, value_a, None)
+
+        # The Windows CI builders can be slow.
+        if os.name == 'nt':
+            self.ignoreStdoutPatternIfExists('tree walk took more than')

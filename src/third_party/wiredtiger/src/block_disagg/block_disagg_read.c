@@ -151,6 +151,10 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
     if (S2BT(session)->storage_tier == WT_BTREE_STORAGE_TIER_COLD)
         F_SET(&get_args, WT_PAGE_LOG_COLD);
 
+    /* A checkpoint cursor reads historical page versions, so bypass any block cache. */
+    if (WT_DHANDLE_IS_CHECKPOINT(S2BT(session)->dhandle))
+        F_SET(&get_args, WT_PAGE_LOG_CACHE_BYPASS);
+
     __wt_verbose(session, WT_VERB_READ,
       "page_id %" PRIu64 ", table_id %" PRIu64 ", flags %" PRIx64 ", lsn %" PRIu64
       ", base_lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32,

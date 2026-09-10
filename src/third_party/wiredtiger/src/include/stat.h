@@ -769,6 +769,12 @@ struct __wt_connection_stats {
     int64_t cache_write_restore_scrub_checkpoint;
     int64_t cache_write_restore_invisible;
     int64_t cache_write_restore_scrub;
+    int64_t cache_top_dirty_pct;
+    int64_t cache_top5_dirty_pct;
+    int64_t cache_top_updates_pct;
+    int64_t cache_top5_updates_pct;
+    int64_t cache_top_inuse_pct;
+    int64_t cache_top5_inuse_pct;
     int64_t cache_overhead;
     int64_t cache_eviction_blocked_precise_checkpoint;
     int64_t cache_evict_split_failed_lock;
@@ -1030,6 +1036,7 @@ struct __wt_connection_stats {
     int64_t disagg_step_down_in_progress;
     int64_t disagg_step_down_time;
     int64_t disagg_step_up_in_progress;
+    int64_t disagg_step_up_clear_ingest_retry;
     int64_t disagg_step_up_time;
     int64_t disagg_step_down_window_creates;
     int64_t layered_curs_insert;

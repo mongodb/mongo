@@ -88,6 +88,10 @@ __evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
     if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
         return (false);
 
+    /* A checkpoint cursor's btree is not eligible for the victim cache. */
+    if (WT_DHANDLE_IS_CHECKPOINT(S2BT(session)->dhandle))
+        return (false);
+
     WT_BM *bm = S2BT(session)->bm;
     if (bm == NULL)
         return (false);

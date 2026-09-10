@@ -314,7 +314,7 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
         return (__layered_create_missing_stable_tables_legacy(session));
 
     last_ckpt_epoch =
-      __wt_atomic_load_uint64_acquire(&conn->txn_global.last_ckpt_disaggregated_schema_epoch);
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_disaggregated_schema_epoch);
     WT_UNUSED(last_ckpt_epoch); /* Only read by the assertion below. */
 
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);

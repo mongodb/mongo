@@ -265,6 +265,30 @@ struct __wt_btree {
     wt_shared uint64_t bytes_updates;     /* Bytes in updates. */
 
     /*
+     * Cache-consumer tracking. Each entry is the value the tree must reach before the accounting
+     * path looks at this metric's ranking again. A newly opened tree starts at 0, so it is
+     * considered on its very first byte, which is where the entry gets its real value; a tree
+     * excluded from the rankings (metadata, the history store) instead starts at UINT64_MAX, set by
+     * __wt_cache_top_btree_open, so it is never considered at all. Keeping this here rather than
+     * reading the threshold from the connection is what keeps the check in the accounting path to a
+     * comparison against a cache line that is already being written.
+     */
+    wt_shared uint64_t cache_top_recheck_at[WT_CACHE_TOP_METRICS];
+
+    /*
+     * Which slot of a ranking this tree currently occupies, or WT_CACHE_TOP_NOT_TRACKED if it is
+     * not in that ranking. This lets the accounting path find and update the tree's own entry
+     * directly, without scanning the ranking to find it, and lets a path that must not take the
+     * ranking's lock (see __cache_top_levels_refresh) tell whether the tree is already tracked.
+     */
+    wt_shared uint8_t cache_top_slot[WT_CACHE_TOP_METRICS];
+    /* Bytes read into and evicted from cache, decayed over time. */
+    wt_shared uint64_t bytes_read_decayed;
+    wt_shared uint64_t bytes_read_decay_clock;
+    wt_shared uint64_t bytes_evict_decayed;
+    wt_shared uint64_t bytes_evict_decay_clock;
+
+    /*
      * Reserved marker value for leaf_entry_ewma / approx_leaf_pages meaning "never tracked": the
      * table's checkpoint metadata predates this tracking and no WT_STAT_TYPE_TREE_WALK correction
      * has run since. Neither field is updated by ordinary split/reconciliation activity while it

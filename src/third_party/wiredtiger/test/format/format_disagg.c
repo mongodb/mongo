@@ -277,6 +277,28 @@ stepdown_pause_worker_writes(void)
     __wt_atomic_store_bool_v_release(&g.stepdown_pause_writes, true);
 }
 
+/*
+ * disagg_stepdown_drain_dump_stragglers --
+ *     On drain timeout, dump each worker's last published commit timestamp relative to step_down_ts
+ *     so a genuinely hung worker can be told apart from one still slowly committing under load.
+ */
+static void
+disagg_stepdown_drain_dump_stragglers(wt_timestamp_t step_down_ts)
+{
+    TINFO **tlp;
+    wt_timestamp_t commit_ts;
+
+    if (tinfo_list == NULL)
+        return;
+    for (tlp = tinfo_list; *tlp != NULL; ++tlp) {
+        commit_ts = __wt_atomic_load_uint64_acquire(&(*tlp)->commit_ts);
+        if (commit_ts == WT_TS_NONE || commit_ts < step_down_ts)
+            track_msg("[stepdown] straggler: thread %d commit_ts=%" PRIu64 " (step_down_ts=%" PRIu64
+                      ")",
+              (*tlp)->id, commit_ts, step_down_ts);
+    }
+}
+
 /* !!!
  * disagg_async_stepdown --
  *     Perform an async step-down while worker threads are still live:
@@ -351,18 +373,23 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
 
     /*
      * Drain: wait until every in-flight transaction at or below step_down_ts has committed or been
-     * rolled back. Timeout after 60 seconds; a permanently hung worker is caught by the 15-minute
-     * abort in the outer spin loop.
+     * rolled back. A worker that grabbed a commit timestamp before the boundary but is still
+     * inside WT's commit path (e.g. stalled making room in a full cache) holds up the whole drain,
+     * so the budget has to cover a slow commit under load, not just message latency. Timeout after
+     * 120 seconds; a permanently hung worker is caught by the 15-minute abort in the outer spin
+     * loop.
      */
-    for (drain_polls = 60 * WT_THOUSAND / 250; drain_polls > 0; --drain_polls) {
+    for (drain_polls = 120 * WT_THOUSAND / 250; drain_polls > 0; --drain_polls) {
         if (stepdown_workers_drained(step_down_ts))
             break;
         __wt_sleep(0, 250 * WT_THOUSAND);
     }
+    if (drain_polls == 0)
+        disagg_stepdown_drain_dump_stragglers(step_down_ts);
     testutil_assertfmt(
       drain_polls > 0, "step-down drain timed out at step_down_ts=%" PRIu64, step_down_ts);
     track_msg("[stepdown] drain complete after %" PRIu64 "ms",
-      (60 * WT_THOUSAND / 250 - drain_polls) * 250);
+      (120 * WT_THOUSAND / 250 - drain_polls) * 250);
 
     /*
      * Let the workers keep writing above the boundary for a window: post-step-down leader writes

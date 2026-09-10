@@ -2458,6 +2458,12 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages written requiring in-memory restoration due to checkpoint scrub",
   "cache: pages written requiring in-memory restoration due to invisible updates",
   "cache: pages written requiring in-memory restoration due to scrub eviction",
+  "cache: percentage of cache held as dirty leaf bytes by the top 32 tables",
+  "cache: percentage of cache held as dirty leaf bytes by the top 5 tables",
+  "cache: percentage of cache held as update bytes by the top 32 tables",
+  "cache: percentage of cache held as update bytes by the top 5 tables",
+  "cache: percentage of cache held by the top 32 tables",
+  "cache: percentage of cache held by the top 5 tables",
   "cache: percentage overhead",
   "cache: precise checkpoint caused an eviction to be skipped because any dirty content needs to "
   "remain in cache",
@@ -2725,6 +2731,7 @@ static const char *const __stats_connection_desc[] = {
   "disagg: step down in progress",
   "disagg: step down most recent time (msecs)",
   "disagg: step up in progress",
+  "disagg: step up ingest table clear truncates retried after a conflict",
   "disagg: step up most recent time (msecs)",
   "disagg: tables created without a stable constituent while the step-down timestamp is set",
   "layered: Layered table cursor insert operations",
@@ -3597,6 +3604,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_write_restore_scrub_checkpoint = 0;
     stats->cache_write_restore_invisible = 0;
     stats->cache_write_restore_scrub = 0;
+    /* not clearing cache_top_dirty_pct */
+    /* not clearing cache_top5_dirty_pct */
+    /* not clearing cache_top_updates_pct */
+    /* not clearing cache_top5_updates_pct */
+    /* not clearing cache_top_inuse_pct */
+    /* not clearing cache_top5_inuse_pct */
     /* not clearing cache_overhead */
     stats->cache_eviction_blocked_precise_checkpoint = 0;
     stats->cache_evict_split_failed_lock = 0;
@@ -3858,6 +3871,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing disagg_step_down_in_progress */
     stats->disagg_step_down_time = 0;
     /* not clearing disagg_step_up_in_progress */
+    stats->disagg_step_up_clear_ingest_retry = 0;
     stats->disagg_step_up_time = 0;
     stats->disagg_step_down_window_creates = 0;
     stats->layered_curs_insert = 0;
@@ -4815,6 +4829,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, cache_write_restore_scrub_checkpoint);
     to->cache_write_restore_invisible += WT_STAT_CONN_READ(from, cache_write_restore_invisible);
     to->cache_write_restore_scrub += WT_STAT_CONN_READ(from, cache_write_restore_scrub);
+    to->cache_top_dirty_pct += WT_STAT_CONN_READ(from, cache_top_dirty_pct);
+    to->cache_top5_dirty_pct += WT_STAT_CONN_READ(from, cache_top5_dirty_pct);
+    to->cache_top_updates_pct += WT_STAT_CONN_READ(from, cache_top_updates_pct);
+    to->cache_top5_updates_pct += WT_STAT_CONN_READ(from, cache_top5_updates_pct);
+    to->cache_top_inuse_pct += WT_STAT_CONN_READ(from, cache_top_inuse_pct);
+    to->cache_top5_inuse_pct += WT_STAT_CONN_READ(from, cache_top5_inuse_pct);
     to->cache_overhead += WT_STAT_CONN_READ(from, cache_overhead);
     to->cache_eviction_blocked_precise_checkpoint +=
       WT_STAT_CONN_READ(from, cache_eviction_blocked_precise_checkpoint);
@@ -5126,6 +5146,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->disagg_step_down_in_progress += WT_STAT_CONN_READ(from, disagg_step_down_in_progress);
     to->disagg_step_down_time += WT_STAT_CONN_READ(from, disagg_step_down_time);
     to->disagg_step_up_in_progress += WT_STAT_CONN_READ(from, disagg_step_up_in_progress);
+    to->disagg_step_up_clear_ingest_retry +=
+      WT_STAT_CONN_READ(from, disagg_step_up_clear_ingest_retry);
     to->disagg_step_up_time += WT_STAT_CONN_READ(from, disagg_step_up_time);
     to->disagg_step_down_window_creates += WT_STAT_CONN_READ(from, disagg_step_down_window_creates);
     to->layered_curs_insert += WT_STAT_CONN_READ(from, layered_curs_insert);

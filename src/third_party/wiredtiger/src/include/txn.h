@@ -194,6 +194,10 @@ struct __wt_txn_global {
     wt_shared volatile uint64_t oldest_id;
 
     wt_shared wt_timestamp_t durable_timestamp;
+    /*
+     * All accesses are relaxed: the value never orders other memory. Writers and the in-engine
+     * readers hold the checkpoint lock, and query_timestamp only returns it.
+     */
     wt_shared wt_timestamp_t last_ckpt_disaggregated_schema_epoch;
     /*
      * Release-stored by checkpoint once its durable state is established, acquire-loaded by sweep

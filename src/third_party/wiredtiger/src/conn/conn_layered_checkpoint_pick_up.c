@@ -1648,7 +1648,8 @@ __disagg_finalize_checkpoint_meta(WT_SESSION_IMPL *session,
       &conn->disaggregated_storage.last_checkpoint_timestamp, metadata->checkpoint_timestamp);
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_oldest_timestamp, metadata->oldest_timestamp);
-    conn->txn_global.last_ckpt_disaggregated_schema_epoch = metadata->schema_epoch;
+    __wt_atomic_store_uint64_relaxed(
+      &conn->txn_global.last_ckpt_disaggregated_schema_epoch, metadata->schema_epoch);
     /* Release store to pair with the acquire load in sweep. */
     __wt_atomic_store_uint64_release(
       &conn->txn_global.last_ckpt_timestamp, metadata->checkpoint_timestamp);

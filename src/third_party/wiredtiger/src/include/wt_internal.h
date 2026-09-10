@@ -111,6 +111,12 @@ struct __wt_cache_eviction_controls;
 typedef struct __wt_cache_eviction_controls WT_CACHE_EVICTION_CONTROLS;
 struct __wt_cache_pool;
 typedef struct __wt_cache_pool WT_CACHE_POOL;
+struct __wt_cache_top;
+typedef struct __wt_cache_top WT_CACHE_TOP;
+struct __wt_cache_top_array;
+typedef struct __wt_cache_top_array WT_CACHE_TOP_ARRAY;
+struct __wt_cache_top_entry;
+typedef struct __wt_cache_top_entry WT_CACHE_TOP_ENTRY;
 struct __wt_cell;
 typedef struct __wt_cell WT_CELL;
 struct __wt_cell_kv;
@@ -629,6 +635,7 @@ typedef uint64_t wt_timestamp_t;
 #include "block.h"
 #include "block_cache.h"
 #include "btmem.h"
+#include "cache_top.h" /* required by btree.h */
 #include "btree.h"
 #include "cache.h"
 #include "../reconcile/reconcile.h"

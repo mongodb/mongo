@@ -376,9 +376,12 @@ class test_checkpoint_scrub_evict(eviction_util):
 class test_checkpoint_scrub_evict_config(wttest.WiredTigerTestCase):
     """
     Verify the eviction.checkpoint_scrub_eviction override:
-      - off:  checkpoint never scrub-evicts, even under precise checkpoint + pressure.
+      - off:  checkpoint never scrub-evicts, even under precise checkpoint.
       - on:   checkpoint always scrub-evicts eligible row-leaf pages.
-      - auto: defers to the cache-pressure heuristic (the default).
+
+    Auto is absent since it depends on the eviction server's scrub mode.
+    That auto stays off without precise checkpoint is covered by
+    test_checkpoint_scrub_evict_no_precise.
 
     The checkpoint scrub activation counter increments once per reconciliation
     that retains a scrub image, so it is a clean signal for whether the override
@@ -390,14 +393,12 @@ class test_checkpoint_scrub_evict_config(wttest.WiredTigerTestCase):
     vsize = 200
 
     mode = [
-        ('off',  dict(mode='off',  expect_scrub=False)),
-        ('on',   dict(mode='on',   expect_scrub=True)),
-        ('auto', dict(mode='auto', expect_scrub=True)),
+        ('off', dict(mode='off', expect_scrub=False)),
+        ('on',  dict(mode='on',  expect_scrub=True)),
     ]
     scenarios = make_scenarios(mode)
 
-    # Small cache creates eviction pressure; precise checkpoint is required for the feature. Under
-    # this pressure the auto heuristic also enables scrub, so auto and on share the same expectation.
+    # Small cache creates eviction pressure; precise checkpoint is required for the feature.
     def conn_config(self):
         return (
             'cache_size=50MB,statistics=(all),precise_checkpoint=true,'

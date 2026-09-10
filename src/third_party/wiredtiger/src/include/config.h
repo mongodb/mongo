@@ -211,6 +211,7 @@ extern const char __WT_CONFIG_CHOICE_best[];
 extern const char __WT_CONFIG_CHOICE_block[];
 extern const char __WT_CONFIG_CHOICE_block_cache[];
 extern const char __WT_CONFIG_CHOICE_btree[];
+extern const char __WT_CONFIG_CHOICE_cache_top[];
 extern const char __WT_CONFIG_CHOICE_cache_walk[];
 extern const char __WT_CONFIG_CHOICE_checkpoint[];
 extern const char __WT_CONFIG_CHOICE_checkpoint_cleanup[];

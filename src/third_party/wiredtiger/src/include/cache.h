@@ -151,6 +151,8 @@ struct __wt_cache {
 
     WT_CACHE_EVICTION_CONTROLS cache_eviction_controls;
 
+    WT_CACHE_TOP cache_top; /* Largest cache consumers, by tree. */
+
     /*
      * History store cache usage. TODO: The values for these variables are cached and potentially
      * outdated.
