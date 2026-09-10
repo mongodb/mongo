@@ -251,6 +251,7 @@ def make_source_commit(
         sha=sha,
         author="Test User <test@example.com>",
         author_date="2026-05-01T00:00:00+00:00",
+        committer_date="2026-05-01T00:00:00+00:00",
         subject=subject or f"Subject for {sha}",
     )
 
@@ -453,9 +454,11 @@ class TestSourceCommitParsing(CopybaraTestCase):
     def test_parse_source_commit_log_handles_git_record_newlines(self):
         output = (
             "commit1\0Author One <one@example.com>\0"
-            "2026-05-01T00:00:00+00:00\0Subject one\0\n"
+            "2026-05-01T00:00:00+00:00\0"
+            "2026-05-02T00:00:00+00:00\0Subject one\0\n"
             "commit2\0Author Two <two@example.com>\0"
-            "2026-05-01T00:01:00+00:00\0Subject two\0\n"
+            "2026-05-01T00:01:00+00:00\0"
+            "2026-05-02T00:01:00+00:00\0Subject two\0\n"
         )
 
         self.assertEqual(
@@ -465,15 +468,137 @@ class TestSourceCommitParsing(CopybaraTestCase):
                     sha="commit1",
                     author="Author One <one@example.com>",
                     author_date="2026-05-01T00:00:00+00:00",
+                    committer_date="2026-05-02T00:00:00+00:00",
                     subject="Subject one",
                 ),
                 sync_repo_with_copybara.SourceCommit(
                     sha="commit2",
                     author="Author Two <two@example.com>",
                     author_date="2026-05-01T00:01:00+00:00",
+                    committer_date="2026-05-02T00:01:00+00:00",
                     subject="Subject two",
                 ),
             ],
+        )
+
+
+class TestSourceCommitDelay(CopybaraTestCase):
+    def test_filter_source_commits_by_delay_uses_committer_date(self):
+        commits = [
+            replace(
+                make_source_commit("author-old-commit"),
+                author_date="2026-07-20T00:00:00+00:00",
+                committer_date="2026-07-27T00:00:00+00:00",
+            ),
+            replace(
+                make_source_commit("recent-commit"),
+                author_date="2026-07-20T00:00:00+00:00",
+                committer_date="2026-07-27T00:00:01+00:00",
+            ),
+        ]
+
+        eligible_commits = sync_repo_with_copybara.filter_source_commits_by_delay(
+            commits,
+            now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+        )
+
+        self.assertEqual([commit.sha for commit in eligible_commits], ["author-old-commit"])
+
+    def test_filter_source_commits_by_delay_stops_at_first_delayed_commit(self):
+        commits = [
+            replace(
+                make_source_commit("old-commit"),
+                committer_date="2026-07-26T00:00:00+00:00",
+            ),
+            replace(
+                make_source_commit("newer-parent"),
+                committer_date="2026-08-02T00:00:00+00:00",
+            ),
+            replace(
+                make_source_commit("older-dated-descendant"),
+                committer_date="2026-07-20T00:00:00+00:00",
+            ),
+        ]
+
+        eligible_commits = sync_repo_with_copybara.filter_source_commits_by_delay(
+            commits,
+            now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+        )
+
+        self.assertEqual([commit.sha for commit in eligible_commits], ["old-commit"])
+
+    def test_filter_source_commits_by_delay_allows_future_clock_skew_at_limit(self):
+        commit = replace(
+            make_source_commit("clock-skewed-commit"),
+            committer_date="2026-08-04T00:00:00+00:00",
+        )
+
+        eligible_commits = sync_repo_with_copybara.filter_source_commits_by_delay(
+            [commit],
+            now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+        )
+
+        self.assertEqual(eligible_commits, [])
+
+    def test_filter_source_commits_by_delay_rejects_far_future_commit(self):
+        commits = [
+            replace(
+                make_source_commit("recent-commit"),
+                committer_date="2026-08-02T00:00:00+00:00",
+            ),
+            replace(
+                make_source_commit("far-future-commit"),
+                committer_date="2036-08-03T00:00:00+00:00",
+            ),
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "far-future-commit.*allowed 24-hour future clock skew",
+        ):
+            sync_repo_with_copybara.filter_source_commits_by_delay(
+                commits,
+                now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+            )
+
+    def test_get_source_commits_eligible_for_sync_delays_public_master_only(self):
+        sync = sync_repo_with_copybara.PreparedBranchSync(
+            branch="master",
+            source_ref="headsha",
+            config_sha="local",
+            workflow_name="prod_master",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo",),
+            copybara_config=sync_repo_with_copybara.build_copybara_config("prod", "master"),
+        )
+        recent_commit = replace(
+            make_source_commit("recent-commit"),
+            committer_date="2026-08-02T00:00:00+00:00",
+        )
+
+        self.assertEqual(
+            sync_repo_with_copybara.get_source_commits_eligible_for_sync(
+                sync,
+                [recent_commit],
+                now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+            ),
+            [],
+        )
+
+        test_sync = replace(
+            sync,
+            branch="v8.2",
+            workflow_name="prod_v8.2",
+            copybara_config=sync_repo_with_copybara.build_copybara_config("prod", "v8.2"),
+        )
+        self.assertEqual(
+            sync_repo_with_copybara.get_source_commits_eligible_for_sync(
+                test_sync,
+                [recent_commit],
+                now=datetime.datetime(2026, 8, 3, tzinfo=datetime.timezone.utc),
+            ),
+            [recent_commit],
         )
 
 
@@ -5680,6 +5805,7 @@ class TestMainWorkflow(CopybaraTestCase):
         mock_run_command.side_effect = [
             "",
             f"{pending_sha}\0Test User <test@example.com>\0"
+            f"2026-05-01T00:00:00+00:00\0"
             f"2026-05-01T00:00:00+00:00\0Subject for {pending_sha}\0",
         ]
 
