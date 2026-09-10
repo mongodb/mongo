@@ -155,6 +155,13 @@
               # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
               enableOTELTracing: false
 
+- name: concurrency_sharded_replication_backport_required_multiversion_exclude
+  value:
+    # TODO BACKPORT-29703: remove backport_required_multiversion when the IFRContext
+    # egress-metadata caching backport lands on v9.0 (last-lts/last-continuous).
+    exclude_with_any_tags:
+      - backport_required_multiversion
+
 # last-patch fixture, mirroring its last-lts/last-continuous siblings. Add a new
 # shape here when enabling last-patch for another suite.
 - name: sharded_fixture_last_patch_new_old_old_new

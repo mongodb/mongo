@@ -23,14 +23,19 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string_view>
+#include <utility>
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
@@ -38,6 +43,68 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+// Test-only. When enabled, holds ('parks') a scheduled ARM getMore retry callback at the start of
+// its execution: after the owning 'AsyncResultsMerger' has been re-locked via its weak_ptr but
+// before it inspects '_opCtx' or defers. This deterministically widens the window in which the
+// callback can observe (and re-target its request at) an 'OperationContext' belonging to a *later*
+// getMore than the one that originally scheduled the retry.
+MONGO_FAIL_POINT_DEFINE(stallBeforeReDispatchingArmRetry);
+
+// Test-only and observation-only. Entered at the end of '_scheduleRetryCallback', after the backoff
+// timer (or 'sleepFor') has been armed with a fixed deadline. Tests enable this fail point and call
+// 'waitForTimesEntered()' to deterministically learn that the retry alarm has been registered, so
+// they can advance the mock clock *after* the deadline is fixed. This replaces fixed 'sleepmillis'
+// waits that could not prove the alarm was armed and were vulnerable to a deadline-shift race.
+MONGO_FAIL_POINT_DEFINE(armRetryScheduledForTesting);
+
+namespace {
+
+// How often 'StallableRetryCallback' re-checks 'stallBeforeReDispatchingArmRetry'.
+constexpr auto kArmRetryStallPollInterval = Milliseconds(10);
+
+/**
+ * Test-only wrapper which delays invoking 'task' for as long as the
+ * 'stallBeforeReDispatchingArmRetry' failpoint is enabled.
+ *
+ * This deliberately does *not* use 'FailPoint::pauseWhileSet()'. Sharding task executors are backed
+ * by a 'NetworkInterfaceThreadPool', which runs scheduled work inline on the network interface's
+ * (single) reactor thread. Blocking there would stall every egress operation on the process, so
+ * instead of holding the thread we repeatedly re-post ourselves to the executor until the failpoint
+ * is disabled. Note that this means 'timesEntered' grows once per poll rather than once per stalled
+ * callback; tests should only rely on it becoming non-zero.
+ */
+template <typename Task>
+struct StallableRetryCallback {
+    void operator()(Status status) const {
+        // 'sleeping' is set on the copy we hand to 'sleepFor()' below. If that sleep did not
+        // complete successfully - e.g. because the executor is shutting down, in which case
+        // 'sleepFor()' completes inline - stop polling. Otherwise we would recurse without bound.
+        const bool sleepFailed = sleeping && !status.isOK();
+
+        if (!sleepFailed && MONGO_unlikely(stallBeforeReDispatchingArmRetry.shouldFail())) {
+            auto reposted = *this;
+            reposted.sleeping = true;
+            executor->sleepFor(kArmRetryStallPollInterval, token).getAsync(std::move(reposted));
+            return;
+        }
+
+        task(std::move(status));
+    }
+
+    std::shared_ptr<executor::TaskExecutor> executor;
+    CancellationToken token;
+    Task task;
+    bool sleeping = false;
+};
+
+template <typename Task>
+StallableRetryCallback<Task> makeStallableRetryCallback(
+    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token, Task task) {
+    return StallableRetryCallback<Task>{std::move(executor), std::move(token), std::move(task)};
+}
+
+}  // namespace
 
 const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
@@ -1312,6 +1379,35 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
         compareSortKeys(newMinSortKey, *remote.promisedMinSortKey, *_params.getSort()) > 0;
 }
 
+void AsyncResultsMerger::_scheduleRetryCallback(std::function<void(Status)> callback,
+                                                Milliseconds delay) {
+    auto stallableCallback =
+        makeStallableRetryCallback(_executor, _cancellationSource.token(), std::move(callback));
+    if (!_opCtx) {
+        // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
+        // resolve immediately and attempt to re-acquire _mutex on the same thread,
+        // deadlocking. Instead, wait on the executor.
+        _executor->sleepFor(delay, _cancellationSource.token()).getAsync(stallableCallback);
+    } else {
+        // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance
+        // is captured here using a weak_ptr, so that the scheduled retry operation does not
+        // block the destruction of the instance. If the retry is scheduled after the
+        // instance was destroyed, we will notice this inside the callback and do nothing.
+        _subBaton
+            ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
+                        _cancellationSource.token())
+            .thenRunOn(_executor)
+            .getAsync(stallableCallback);
+    }
+
+    // The backoff timer (or 'sleepFor') is now armed with a deadline fixed relative to the current
+    // mock-clock reading. Enter the observation-only fail point so tests can synchronize on this
+    // point via 'waitForTimesEntered()' before advancing the mock clock. Behavior is unchanged.
+    if (MONGO_unlikely(armRetryScheduledForTesting.shouldFail())) {
+        // Intentionally empty: only the entry count is observed.
+    }
+}
+
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
                                               StatusWith<CursorResponse>& parsedResponse,
@@ -1366,73 +1462,57 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                        remote->shardHostAndPort,
                        cbData.response.getErrorLabels(),
                        cbData.response.getBaseBackoffMS())) {
+            // The getMore failed with a retryable error. We want to apply the backoff policy to
+            // schedule the next retry after the proscribed delay.
+            //
+            // Note: the code block here does not actually schedule any remote command retry. The
+            // new network request to the shard won't be scheduled until the next call to
+            // 'nextEvent()'. That calling thread will be blocked on '_currentEvent' until this
+            // callback signals it, and then it will re-enter '_scheduleGetMores()' to schedule a
+            // new getMore with a fresh OperationContext.
+            //
+            // This complexity is because there have been historical problems with attempting to
+            // schedule the retry immediately, since the callback from the executor is not
+            // guaranteed to be on the same thread as the original getMore, and the original
+            // getMore's OperationContext may have been detached from the ARM by the time this
+            // callback runs. Doing a prompt/speedy retry is not the priority here - correctness is
+            // more important. So, we simply record the backoff delay and signal '_currentEvent' so
+            // that the next call to 'nextEvent()' will schedule a new getMore with a fresh
+            // OperationContext.
             const auto delay = retryStrategy.getNextRetryDelay();
-            auto callback = [weak = weak_from_this(),
-                             request = cbData.request,
-                             remote /* intrusive_ptr copy! */,
-                             delay](Status s) {
-                auto self = weak.lock();
-                if (!self) {
-                    // Do not continue here if the last shared_ptr pointing to this
-                    // 'AsyncResultsMerger' instance has already gone out of scope. In this case
-                    // there is no need to schedule further retries.
-                    return;
-                }
-
-                std::lock_guard<std::mutex> lk(self->_mutex);
-
-                if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
-                    remote->outstandingRequest = false;
-                    self->_signalCurrentEventIfReady(
-                        lk);  // First, wake up anyone waiting on '_currentEvent'.
-                    if (self->_lifecycleState == kKillStarted) {
-                        self->_cleanUpKilledBatch(lk);
+            // Note this is wrapped in a 'StallableRetryCallback' below, which - for tests only -
+            // can hold it back (without holding '_mutex', so detach/reattach on other threads can
+            // proceed) so that a test can line up a *different*, later getMore's OperationContext
+            // to be attached by the time the retry callback defers.
+            auto retryCallback =
+                [weak = weak_from_this(), remote /* intrusive_ptr copy! */, delay](Status s) {
+                    auto self = weak.lock();
+                    if (!self) {
+                        // Do not continue here if the last shared_ptr pointing to this
+                        // 'AsyncResultsMerger' instance has already gone out of scope. In this case
+                        // there is no need to schedule further retries.
+                        return;
                     }
-                    return;
-                }
 
-                // The retry captured a copy of the original 'RemoteCommandRequest', which holds a
-                // raw OperationContext pointer. By the time this callback runs, the originating
-                // getMore may have returned and the ARM been detached from its OperationContext
-                // (which may since have been destroyed - e.g. the cursor was checked in between
-                // getMores). Never re-dispatch using the captured opCtx:
-                //  - If detached, leave the remote reschedulable and defer the retry to the next
-                //    '_scheduleGetMores()' after reattach. A failed (e.g. rate-limited) getMore did
-                //    not advance the shard cursor, so this neither loses nor duplicates results.
-                //  - If attached, retarget the request at the OperationContext we are attached to
-                //    now (which may differ from the one the request was originally built with).
-                if (!self->_opCtx) {
+                    std::lock_guard<std::mutex> lk(self->_mutex);
+
+                    if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
+                        remote->outstandingRequest = false;
+                        remote->cbHandle = executor::TaskExecutor::CallbackHandle();
+                        self->_signalCurrentEventIfReady(
+                            lk);  // First, wake up anyone waiting on '_currentEvent'.
+                        if (self->_lifecycleState == kKillStarted) {
+                            self->_cleanUpKilledBatch(lk);
+                        }
+                        return;
+                    }
+
                     remote->retryStrategy.recordBackoff(delay);
                     remote->outstandingRequest = false;
                     remote->cbHandle = executor::TaskExecutor::CallbackHandle();
                     self->_signalCurrentEventIfReady(lk);
-                    return;
-                }
-                auto refreshedRequest = request;
-                refreshedRequest.opCtx = self->_opCtx;
-
-                remote->retryStrategy.recordBackoff(delay);
-                auto status = self->_sendRequestWithRetries(lk, refreshedRequest, remote);
-                if (!status.isOK()) {
-                    self->_signalCurrentEventIfReady(lk);
-                }
-            };
-            if (!_opCtx) {
-                // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
-                // resolve immediately and attempt to re-acquire _mutex on the same thread,
-                // deadlocking. Instead, wait on the executor.
-                _executor->sleepFor(delay, _cancellationSource.token()).getAsync(callback);
-            } else {
-                // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance
-                // is captured here using a weak_ptr, so that the scheduled retry operation does not
-                // block the destruction of the instance. If the retry is scheduled after the
-                // instance was destroyed, we will notice this inside the callback and do nothing.
-                _subBaton
-                    ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
-                                _cancellationSource.token())
-                    .thenRunOn(_executor)
-                    .getAsync(callback);
-            }
+                };
+            _scheduleRetryCallback(std::move(retryCallback), delay);
 
             remote->outstandingRequest = true;
             return;

@@ -25,6 +25,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
@@ -385,6 +386,27 @@ protected:
         net->enterNetwork();
         net->runReadyNetworkOperations();
         net->exitNetwork();
+    }
+
+    // Advance any operations scheduled on 'opCtx's baton, because otherwise they would wait
+    // forever. In these fixtures the baton is not driven by a transport layer, so work scheduled on
+    // it (including SubBaton timers armed by the ARM's attached retry path) only progresses when
+    // something explicitly calls 'Baton::run'. This schedules a sentinel task and runs the baton
+    // until that sentinel completes, which implicitly waits for all previously scheduled work
+    // (and fires any timers whose deadline the mock clock has passed) to run first. Pair with
+    // 'advanceTime()' / 'getMockClockSource()->advance()' to move the mock clock past a timer
+    // deadline before calling this.
+    void runScheduledTasks(OperationContext* opCtx) {
+        Atomic<bool> didRun{false};
+        auto baton = opCtx->getBaton();
+        auto clockSource = opCtx->getServiceContext()->getPreciseClockSource();
+
+        // Schedule a sentinel that runs only after all previously scheduled tasks have run. Waiting
+        // for the sentinel to complete thus waits for all earlier baton work, too.
+        baton->schedule([&](Status status) { didRun.store(true); });
+        while (!didRun.load()) {
+            baton->run(clockSource);
+        }
     }
 
     void blackHoleNextRequest() {
