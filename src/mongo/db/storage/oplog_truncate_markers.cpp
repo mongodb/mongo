@@ -38,8 +38,54 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTrun
         *rs.oplog());
 }
 
+int64_t OplogTruncateMarkers::estimateOplogSize(RecordStore& rs) {
+    return rs.oplog()->getMaxSize();
+}
+
+namespace {
+struct MarkerSizing {
+    uint64_t numTruncateMarkersToKeep;
+    int64_t minBytesPerTruncateMarker;
+};
+
+MarkerSizing calculateMarkerSizing(int64_t oplogSize, long long maxOplogTruncateMarkers) {
+    invariant(oplogSize > 0);
+
+    // The minimum oplog truncate marker size should be BSONObjMaxInternalSize.
+    // use 64-bit int to avoid possible overflow on multiplication
+    const uint64_t oplogTruncateMarkerSize =
+        std::max<uint64_t>(gOplogTruncateMarkerSizeMB * 1024ULL * 1024ULL, BSONObjMaxInternalSize);
+
+    // IDL does not support unsigned types.
+    const uint64_t kMinTruncateMarkersToKeep = static_cast<uint64_t>(gMinOplogTruncateMarkers);
+    const uint64_t kMaxTruncateMarkersToKeep = static_cast<uint64_t>(maxOplogTruncateMarkers);
+    const uint64_t kMaxBytesPerTruncateMarker =
+        static_cast<uint64_t>(gMaxOplogTruncateMarkerSizeMB.load()) * 1024 * 1024;
+
+    uint64_t numTruncateMarkers = oplogSize / oplogTruncateMarkerSize;
+    uint64_t numTruncateMarkersToKeep = std::min(
+        kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
+
+    // We sometimes support a very small oplog size, so round up to avoid zero.
+    int64_t minBytesPerTruncateMarker =
+        std::ceil(static_cast<double>(oplogSize) / numTruncateMarkersToKeep);
+
+    // On a large enough oplog, dividing by the target number of markers produces markers so big
+    // that truncating is disruptive. Cap the marker size and override the max count in this case.
+    if (kMaxBytesPerTruncateMarker > 0 &&
+        static_cast<uint64_t>(minBytesPerTruncateMarker) > kMaxBytesPerTruncateMarker) {
+        minBytesPerTruncateMarker = static_cast<int64_t>(kMaxBytesPerTruncateMarker);
+        numTruncateMarkersToKeep = static_cast<uint64_t>(
+            std::ceil(static_cast<double>(oplogSize) / minBytesPerTruncateMarker));
+    }
+
+    return {.numTruncateMarkersToKeep = numTruncateMarkersToKeep,
+            .minBytesPerTruncateMarker = minBytesPerTruncateMarker};
+}
+}  // namespace
+
 OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarkerCreation(
-    OperationContext* opCtx, RecordStore& rs) {
+    OperationContext* opCtx, RecordStore& rs, int64_t estimatedOplogSize) {
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     bool asyncGenerationEnabled = provider.supportsAsyncOplogMarkerGeneration();
     bool samplingEnabled = provider.supportsOplogSampling();
@@ -61,29 +107,15 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
           "Beginning initial marker creation.",
           "asyncGenerationEnabled"_attr = asyncGenerationEnabled,
           "samplingEnabled"_attr = samplingEnabled,
-          "scanningEnabled"_attr = scanningEnabled);
+          "scanningEnabled"_attr = scanningEnabled,
+          "estimatedOplogSize"_attr = estimatedOplogSize);
 
-    long long maxSize = rs.oplog()->getMaxSize();
-    invariant(maxSize > 0);
+    invariant(estimatedOplogSize > 0);
     invariant(rs.keyFormat() == KeyFormat::Long);
 
-    // The minimum oplog truncate marker size should be BSONObjMaxInternalSize.
-    const unsigned int oplogTruncateMarkerSize =
-        std::max(gOplogTruncateMarkerSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
-
-    // IDL does not support unsigned long long types.
-    const unsigned long long kMinTruncateMarkersToKeep =
-        static_cast<unsigned long long>(gMinOplogTruncateMarkers);
-    const unsigned long long kMaxTruncateMarkersToKeep =
-        static_cast<unsigned long long>(gMaxOplogTruncateMarkersDuringStartup);
-
-    unsigned long long numTruncateMarkers = maxSize / oplogTruncateMarkerSize;
-    size_t numTruncateMarkersToKeep = std::min(
-        kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
-    int64_t minBytesPerTruncateMarker = maxSize / numTruncateMarkersToKeep;
-    uassert(7206300,
-            fmt::format("Cannot create oplog of size less than {} bytes", numTruncateMarkersToKeep),
-            minBytesPerTruncateMarker > 0);
+    auto [numTruncateMarkersToKeep, minBytesPerTruncateMarker] =
+        calculateMarkerSizing(estimatedOplogSize, gMaxOplogTruncateMarkersDuringStartup);
+    invariant(minBytesPerTruncateMarker > 0);
 
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
     ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
@@ -131,7 +163,8 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateM
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     if (!provider.supportsAsyncOplogMarkerGeneration()) {
         // Synchronous path: build the full initial marker set before returning.
-        auto initialSetOfMarkers = beginMarkerCreation(opCtx, rs);
+        auto initialSetOfMarkers =
+            beginMarkerCreation(opCtx, rs, OplogTruncateMarkers::estimateOplogSize(rs));
         return std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers), *rs.oplog());
     }
     // Asynchronous path: return an empty placeholder. The cap maintainer thread will later call
@@ -340,20 +373,23 @@ bool OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
     return truncateMarker.wallTime <= newestExpiredWallTime(opCtx);
 }
 
-void OplogTruncateMarkers::adjust(int64_t maxSize) {
-    const unsigned int oplogTruncateMarkerSize =
-        std::max(gOplogTruncateMarkerSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
+void OplogTruncateMarkers::recomputeMinBytesPerMarker(RecordStore& rs) {
+    int64_t oplogSize = getEstimatedOplogSize(rs);
 
-    // IDL does not support unsigned long long types.
-    const unsigned long long kMinTruncateMarkersToKeep =
-        static_cast<unsigned long long>(gMinOplogTruncateMarkers);
-    const unsigned long long kMaxTruncateMarkersToKeep =
-        static_cast<unsigned long long>(gMaxOplogTruncateMarkersAfterStartup);
+    auto [_, minBytesPerTruncateMarker] =
+        calculateMarkerSizing(oplogSize, gMaxOplogTruncateMarkersAfterStartup);
 
-    unsigned long long numTruncateMarkers = maxSize / oplogTruncateMarkerSize;
-    size_t numTruncateMarkersToKeep = std::min(
-        kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
-    setMinBytesPerMarker(maxSize / numTruncateMarkersToKeep);
+    LOGV2_DEBUG(13190501,
+                2,
+                "Updating minBytesPerMarker.",
+                "estimatedOplogSize"_attr = oplogSize,
+                "minBytesPerMarker"_attr = minBytesPerTruncateMarker);
+    setMinBytesPerMarker(minBytesPerTruncateMarker);
+}
+
+void OplogTruncateMarkers::adjust(RecordStore& rs) {
+    recomputeMinBytesPerMarker(rs);
+
     // Notify the reclaimer thread as there might be an opportunity to recover space.
     _reclaimCv.notify_all();
 }

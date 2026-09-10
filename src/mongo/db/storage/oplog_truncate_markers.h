@@ -84,7 +84,7 @@ public:
                                                const RecordId& firstRemovedId);
 
     // Resize oplog size
-    void adjust(int64_t maxSize);
+    void adjust(RecordStore& rs);
 
     // The start point of where to truncate next. Used by the background reclaim thread to
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
@@ -95,26 +95,38 @@ public:
     /*
      * Initialize truncation marker creation. This may either create all the truncation markers
      * synchronously, or initialize async sampling, depending on what creation method is chosen.
+     * estimatedOplogSize should be an estimate of oplog size at steady-state, to use in marker
+     * sizing calculations.
      */
-    static InitialSetOfOplogMarkers beginMarkerCreation(OperationContext* opCtx, RecordStore& rs);
+    static InitialSetOfOplogMarkers beginMarkerCreation(OperationContext* opCtx,
+                                                        RecordStore& rs,
+                                                        int64_t estimatedOplogSize);
 
     static std::shared_ptr<OplogTruncateMarkers> createOplogTruncateMarkers(OperationContext* opCtx,
                                                                             RecordStore& rs);
-    //
-    // The following methods are public only for use in tests.
-    //
 
-    bool processedBySampling() const {
-        return getMarkersCreationMethod() ==
-            CollectionTruncateMarkers::MarkersCreationMethod::Sampling;
+    /**
+     * Return estimated size of oplog to use for truncation marker sizing calculations.
+     * The standard implementation uses the oplog's max size.
+     */
+    static int64_t estimateOplogSize(RecordStore& rs);
+
+protected:
+    virtual int64_t getEstimatedOplogSize(RecordStore& rs) const {
+        return estimateOplogSize(rs);
+    }
+
+    /**
+     * Computes and sets minBytesPerMarker based on the oplog's current configuration
+     */
+    void recomputeMinBytesPerMarker(RecordStore& rs);
+
+    void _notifyNewMarkerCreation() override {
+        _reclaimCv.notify_all();
     }
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const final;
-
-    void _notifyNewMarkerCreation() final {
-        _reclaimCv.notify_all();
-    }
 
     std::mutex _reclaimMutex;
     stdx::condition_variable _reclaimCv;

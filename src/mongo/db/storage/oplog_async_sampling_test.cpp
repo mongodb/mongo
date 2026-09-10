@@ -98,7 +98,8 @@ protected:
 
     std::shared_ptr<OplogTruncateMarkers> beginMarkerCreation(OperationContext* opCtx,
                                                               RecordStore& rs) {
-        auto initialSetOfMarkers = OplogTruncateMarkers::beginMarkerCreation(opCtx, rs);
+        auto initialSetOfMarkers = OplogTruncateMarkers::beginMarkerCreation(
+            opCtx, rs, OplogTruncateMarkers::estimateOplogSize(rs));
         return std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers), *rs.oplog());
     }
 

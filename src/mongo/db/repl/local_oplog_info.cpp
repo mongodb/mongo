@@ -122,7 +122,7 @@ void LocalOplogInfo::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> ma
     _truncateMarkers = std::move(markers);
     // Re-adjust in case the max size changed while sampling.
     if (_truncateMarkers) {
-        _truncateMarkers->adjust(_rs->oplog()->getMaxSize());
+        _truncateMarkers->adjust(*_rs);
     }
 }
 

@@ -976,5 +976,91 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NewestExpiredWallTime) {
     EXPECT_EQ(Date_t(), OplogTruncateMarkers::newestExpiredWallTime(getOperationContext()));
 }
 
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeCapsTheComputedMarkerSize) {
+    // A 100MB oplog would otherwise be divided into 10MB markers.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024 * 1024);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeLeavesSmallerMarkersAlone) {
+    // The 1MB oplog below yields markers well under the cap.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    // Below ~168MB the marker count pins at minOplogTruncationPoints, so the marker size is just
+    // the oplog size divided by that count, rounded up.
+    ASSERT_EQ(markers->minBytesPerMarker(), (maxSize + 9) / 10);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeOfZeroLeavesMarkerSizeUncapped) {
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 0);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), maxSize / 10);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeOverridesTheTargetMarkerCount) {
+    unittest::ServerParameterGuard maxMarkerCount("maxOplogTruncationPointsAfterStartup", 100);
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1024);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    // Divided into the target count of 100 this oplog would need 2GB markers, so the cap binds and
+    // the oplog is instead covered by 200 markers of 1GB.
+    const int64_t maxSize = 200LL * 1024 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024LL * 1024 * 1024);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_LoweringMaxMarkerSizeTakesEffectOnAdjust) {
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+    ASSERT_EQ(markers->minBytesPerMarker(), maxSize / 10);
+
+    // Setting the cap at runtime is the escape hatch for a cluster already producing oversized
+    // truncates, so it must take effect on an existing marker set.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024 * 1024);
+}
+
 }  // namespace repl
 }  // namespace mongo

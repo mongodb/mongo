@@ -948,7 +948,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
             return status;
         }
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
-            truncateMarkers->adjust(*newCappedSize);
+            truncateMarkers->adjust(*_shared->_recordStore);
         }
     }
 

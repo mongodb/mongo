@@ -470,7 +470,8 @@ void OplogCapMaintainerThread::run() {
 
 std::shared_ptr<OplogTruncateMarkers> OplogCapMaintainerThread::_createInitialMarkers(
     OperationContext* opCtx, RecordStore& rs) const {
-    auto initialMarkers = OplogTruncateMarkers::beginMarkerCreation(opCtx, rs);
+    auto initialMarkers = OplogTruncateMarkers::beginMarkerCreation(
+        opCtx, rs, OplogTruncateMarkers::estimateOplogSize(rs));
     return std::make_shared<OplogTruncateMarkers>(std::move(initialMarkers), *rs.oplog());
 }
 

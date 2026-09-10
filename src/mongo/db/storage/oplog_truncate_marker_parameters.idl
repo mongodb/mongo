@@ -41,6 +41,19 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    maxOplogTruncationPointSizeMB:
+        description: >-
+            Maximum target size of a single oplog truncation point, bounding how much oplog may be
+            truncated in a single operation. Takes precedence over the maxOplogTruncationPoints
+            parameters. A truncation point may exceed this size by up to one oplog write batch.
+            0 disables the cap.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: gMaxOplogTruncateMarkerSizeMB
+        default: 51200 # 50GB
+        validator: {gte: 0, lte: 1073741824} # gte 0; lte 1PB (in MB)
+        redact: false
+
     oplogTruncationCheckPeriodSeconds:
         description: "The number of seconds the oplog truncation thread wakes up periodically to check and truncate oplog."
         set_at: [startup, runtime]
