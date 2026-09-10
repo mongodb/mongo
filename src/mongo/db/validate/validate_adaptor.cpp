@@ -272,19 +272,20 @@ void _validateFastCountAndSize(OperationContext* opCtx,
                             fastCount,
                             numRecords,
                             coll.ns().toStringForErrorMsg(),
-                            toString(fastCountType)));
+                            toString(fastCountType)),
+                /*stopValidation=*/false);
         }
     }
 
     if (validateState.shouldEnforceFastSize(opCtx, fastCountType)) {
         if (const auto fastSize = coll.latestSizeCount(opCtx).size; fastSize != dataSizeTotal) {
-            results.addError(
-                fmt::format("fast size ({}) does not match data size ({}) "
-                            "for collection '{}' with fast count store type '{}'",
-                            fastSize,
-                            dataSizeTotal,
-                            coll.ns().toStringForErrorMsg(),
-                            toString(fastCountType)));
+            results.addError(fmt::format("fast size ({}) does not match data size ({}) "
+                                         "for collection '{}' with fast count store type '{}'",
+                                         fastSize,
+                                         dataSizeTotal,
+                                         coll.ns().toStringForErrorMsg(),
+                                         toString(fastCountType)),
+                             /*stopValidation=*/false);
         }
     }
 }

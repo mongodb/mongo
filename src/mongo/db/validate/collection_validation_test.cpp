@@ -424,6 +424,40 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCountSkippedWhenTraversalSee
          collection_validation::ValidateMode::kForegroundFullEnforceFastCountAndSize});
 }
 
+TEST_F(CollectionValidationTest, ValidateEnforceFastCountMismatchDoesNotStopValidation) {
+    auto opCtx = operationContext();
+    const int numRecords = insertDataRange(opCtx, 0, 5);
+
+    // Skew the fast count so it disagrees with the records the traversal will observe.
+    {
+        const AutoGetCollection coll(opCtx, kNss, MODE_X);
+        const int64_t skewedFastCount = numRecords + 2;
+        coll->getRecordStore()->updateStatsAfterRepair(skewedFastCount, /*dataSize=*/64);
+        ASSERT_EQ(skewedFastCount, coll->latestSizeCount(opCtx).count);
+    }
+
+    const auto allResults =
+        foregroundValidate(kNss,
+                           opCtx,
+                           {.valid = false,
+                            .numRecords = numRecords,
+                            .numInvalidDocuments = 0,
+                            .numErrors = 1,
+                            .numWarnings = 0},
+                           {collection_validation::ValidateMode::kForegroundFullEnforceFastCount});
+    ASSERT_EQ(1u, allResults.size());
+
+    const auto& results = allResults[0];
+    ASSERT_FALSE(results.isValid());
+    ASSERT_TRUE(results.continueValidation());
+
+    // Index validation must still have run; it only executes after the fast count check when
+    // validation is allowed to continue.
+    const auto& indexResults = results.getIndexResultsMap();
+    ASSERT_EQ(1u, indexResults.count("_id_"));
+    ASSERT_EQ(numRecords, indexResults.at("_id_").getKeysTraversed());
+}
+
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeUserLimit) {
     auto opCtx = operationContext();
     foregroundValidate(kNss,
