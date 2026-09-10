@@ -159,6 +159,30 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, UpdateMultipleDocuments) {
     ASSERT_TRUE(stage->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceInternalApplyOplogUpdateTest, StageOwnsOplogUpdateAfterSourceBsonIsFreed) {
+    // Regression test for a heap-use-after-free: the stage must not read the oplog update BSON from
+    // the original command request, which is freed once the initial aggregate returns a cursor and
+    // its 'Invocation' is destroyed (before any getMore).
+    auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
+
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    {
+        // Build the stage from a spec whose backing BSON buffer is freed at the end of this scope.
+        auto spec = fromjson(
+            R"({$_internalApplyOplogUpdate: {oplogUpdate: {"$v": NumberInt(2), diff: {i: {b: 3}}}}})");
+        auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
+                                                                             getExpCtx());
+        stage = exec::agg::buildStageAndStitch(source, mock);
+    }
+
+    // The BSON backing the oplog update has now been freed; executing the stage must not read it.
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 0}, {"b", 3}}));
+
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
 TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
     {
         auto spec = fromjson(
