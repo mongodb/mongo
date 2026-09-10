@@ -20,6 +20,10 @@ public:
 
     ReleaseMemoryCmd() : TypedCommand("releaseMemory") {}
 
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
     const std::set<std::string>& apiVersions() const override;
     bool allowedInTransactions() const final;
     bool allowedWithSecurityToken() const final;
