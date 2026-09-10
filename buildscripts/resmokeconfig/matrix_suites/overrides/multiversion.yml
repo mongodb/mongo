@@ -483,6 +483,9 @@
     exclude_files:
       # TODO (SERVER-122386) Re-enable the following tests
       - jstests/sharding/flush_resharding_state_change_errors.js
+      # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
+      # enabled at 9.0, so the v2 reader bypasses the v1 failpoint used by this test.
+      - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
 
 - name: sharding_last_continuous_excluded_files
   value:
