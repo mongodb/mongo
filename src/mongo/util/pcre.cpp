@@ -10,6 +10,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <array>
@@ -458,8 +459,24 @@ public:
         // 'PCRE2_UNSET' before. When accessing the ovector entries later via
         // 'MatchDataImpl::operator[](size_t)', the accessed ovector entry is compared against
         // PCRE2_UNSET, and an empty 'std::string_view' value is returned.
-        if (matched < 0)
+        if (matched < 0) {
             _error = toErrc(matched);
+            return;
+        }
+        const char* inputBegin = _input.data();
+        const char* inputEnd = inputBegin ? (inputBegin + _input.size()) : nullptr;
+        const size_t n = captureCount();
+        // The 0th element is the full matched substring; the 'n' that follow are the captures.
+        for (size_t i = 0; i < n + 1; ++i) {
+            std::string_view group = (*this)[i];
+            if (group.data() == nullptr)
+                continue;
+            const char* groupEnd = group.data() + group.size();
+            uassert(12407700,
+                    "regex match boundary falls inside a UTF-8 character",
+                    !(!group.empty() && str::isUTF8ContinuationByte(*group.data())) &&
+                        !(groupEnd < inputEnd && str::isUTF8ContinuationByte(*groupEnd)));
+        }
     }
 
 private:

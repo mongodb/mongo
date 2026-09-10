@@ -112,5 +112,26 @@ TEST(PcreUtilTest, QuoteMeta) {
     }
 }
 
+TEST(PcreUtilTest, BackslashCKMatchAtContinuationByteThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("\\C\\K\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"), DBException, 12407700);
+}
+
+TEST(PcreUtilTest, BackslashCMatchEndingMidCharacterThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("\\C", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"), DBException, 12407700);
+}
+
+TEST(PcreUtilTest, BackslashCCaptureGroupMidCharacterThrows) {
+    using namespace pcre::options;
+    pcre::Regex re("(\\C)(\\C)", flagsToOptions(""));
+    ASSERT_TRUE(!!re);
+    ASSERT_THROWS_CODE(re.matchView("\xC3\xA9"), DBException, 12407700);
+}
+
 }  // namespace
 }  // namespace mongo::pcre_util

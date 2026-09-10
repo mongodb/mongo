@@ -145,6 +145,8 @@ last-lts:
   all:
     - test_file: jstests/aggregation/expressions/comparison_missing_and_key_values.js
       ticket: SERVER-131544
+    - test_file: jstests/aggregation/expressions/regex_backslash_c.js
+      ticket: SERVER-127985
     - test_file: jstests/aggregation/optimization/do_not_push_match_past_rename_onto_dotted_path.js
       ticket: SERVER-132414
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
