@@ -620,9 +620,10 @@ public:
     bool isCommand() const;
 
     /**
-     * Returns if the applyOps oplog entry is linked through its prevOpTime field as part of a
-     * transaction, rather than as a retryable write or stand-alone applyOps.  Valid only for
-     * applyOps entries.
+     * Returns if the applyOps oplog entry has a prevOpTime link to follow, i.e. prevOpTime is set
+     * and this is not a stand-alone kApplyOpsAppliedSeparately entry.  Valid only for applyOps
+     * entries.  A true result does not mean the linked entry belongs to the same unit of work: a
+     * retryable batch's first entry links to the previous statement.
      */
     bool applyOpsIsLinkedTransactionally() const;
 

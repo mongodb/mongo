@@ -6,6 +6,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::repl::apply_ops_command_info_details {
@@ -47,3 +48,32 @@ TEST(ApplyOpsCommandInfoTest, TestParseAreOpsCrudOnlyMultipleOps) {
 }
 
 }  // namespace mongo::repl::apply_ops_command_info_details
+
+namespace mongo::repl {
+namespace {
+
+TEST(ApplyOpsChainHelpersTest, RemainingApplyOpsChainOpsSaturatesAtZero) {
+    // The common case: more still to collect than already collected.
+    ASSERT_EQ(3U, remainingApplyOpsChainOps(5, 2));
+    ASSERT_EQ(1U, remainingApplyOpsChainOps(5, 4));
+
+    // Exactly collected, and the underflow guard: collected must never wrap to a huge size_t,
+    // which would send a chain walk looking for entries that do not exist.
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(5, 5));
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(2, 5));
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(0, 0));
+}
+
+TEST(ApplyOpsChainHelpersTest, NumOperationsInApplyOpsCountsEntries) {
+    ASSERT_EQ(1U, numOperationsInApplyOps(Value(BSON_ARRAY(BSON("op" << "i")))));
+    ASSERT_EQ(3U,
+              numOperationsInApplyOps(
+                  Value(BSON_ARRAY(BSON("op" << "i") << BSON("op" << "u") << BSON("op" << "d")))));
+
+    // A missing applyOps array (e.g. a commitTransaction entry) counts as zero operations.
+    ASSERT_EQ(0U, numOperationsInApplyOps(Value()));
+}
+
+}  // namespace
+}  // namespace mongo::repl
+

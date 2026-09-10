@@ -507,9 +507,27 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     // include the commit oplog entry's 'ts' field, which is what we want.
     auto lastEntryInTxnObj = lastEntryInTxn.getEntry().toBSON();
 
+    // A retryable batch links its first entry to the previous applyOps chain, so its walk must
+    // stop at this chain's boundary rather than run to the end as a transaction does.
+    // applyOpsChainOperationTotal() reads the terminal's 'count', the total number of operations in
+    // the chain; subtract the ones we already hold outside the oplog walk (the terminal itself,
+    // plus any cachedOps from the same applier batch) to get how many the walk still needs to
+    // collect from the oplog. walkApplyOpsChain() then decrements that budget per entry and stops
+    // at zero, before reaching the previous chain. A single-entry batch has no 'count', so the
+    // total falls back to this entry's own op count and nothing is left to walk.
+    boost::optional<std::size_t> opsStillToCollect;
+    if (lastEntryInTxn.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedAtomically) {
+        auto accountedFor = repl::numOperationsInApplyOps(prepareOrUnpreparedCommit);
+        for (const auto* cachedOp : cachedOps) {
+            accountedFor += repl::numOperationsInApplyOps(*cachedOp);
+        }
+        opsStillToCollect = repl::remainingApplyOpsChainOps(
+            repl::applyOpsChainOperationTotal(lastEntryInTxn), accountedFor);
+    }
+
     // First retrieve and transform the ops from the oplog, which will be retrieved
     // in reverse order.
-    while (iter.hasNext()) {
+    walkApplyOpsChain(iter, opsStillToCollect, [&] {
         const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
@@ -522,7 +540,8 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
         // the entire thing in chronological order.  Fortunately STL arrays of BSON
         // objects should be fast to reverse (just pointer copies).
         std::reverse(ops.begin() + prevOpsEnd, ops.end());
-    }
+        return repl::numOperationsInApplyOps(operationEntry);
+    });
     std::reverse(ops.begin(), ops.end());
 
     // Next retrieve and transform the ops from the current batch, which are in

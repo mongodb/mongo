@@ -2763,6 +2763,107 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
                                        2));
 }
 
+// Builds one entry of a kApplyOpsAppliedAtomically batch: an applyOps wrapping a single insert of
+// 'insertId', tagged with the atomic multiOpType. 'partialTxn' and 'count' are set when provided,
+// which is how a multi-entry batch's non-terminal and terminal entries are distinguished.
+repl::OplogEntry makeAtomicBatchEntry(const OperationSessionInfo& sessionInfo,
+                                      repl::OpTime opTime,
+                                      repl::OpTime prevOpTime,
+                                      int insertId,
+                                      bool partialTxn = false,
+                                      boost::optional<int> count = boost::none) {
+    BSONObjBuilder oField;
+    oField.append(
+        "applyOps",
+        BSON_ARRAY(BSON("op" << "i"
+                             << "ns" << nss.ns_forTest() << "ui" << testUuid() << "o"
+                             << BSON("_id" << insertId) << "o2" << BSON("_id" << insertId))));
+    if (partialTxn) {
+        oField.append("partialTxn", true);
+    }
+    if (count) {
+        oField.append("count", *count);
+    }
+    auto entry = makeOplogEntry(OpTypeEnum::kCommand,
+                                nss.getCommandNS(),
+                                oField.obj(),
+                                testUuid(),
+                                boost::none,  // fromMigrate
+                                boost::none,  // o2 field
+                                opTime,
+                                sessionInfo,
+                                prevOpTime);
+    return unittest::assertGet(repl::OplogEntry::parse(entry.getEntry().toBSON().addField(
+        BSON(repl::OplogEntry::kMultiOpTypeFieldName
+             << repl::MultiOplogEntryType::kApplyOpsAppliedAtomically)
+            .firstElement())));
+}
+
+// The previous statement has fallen off the oplog. Bounding the unwind by 'count' means the batch's
+// own entries suffice, so a truncated predecessor is not a spurious ChangeStreamHistoryLost.
+TEST_F(ChangeStreamStageTest, RetryableAtomicBatchUnwindToleratesTruncatedPreviousStatement) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    // Statement 0 is not built at all: it stands in for a statement truncated from the oplog.
+    // Statement 1's first entry links to where it used to be.
+    repl::OpTime truncatedStmt0OpTime(Timestamp(100, 1), 1);
+    repl::OpTime stmt1FirstOpTime(Timestamp(100, 2), 1);
+    repl::OpTime stmt1TerminalOpTime(Timestamp(100, 3), 1);
+    auto stmt1First = makeAtomicBatchEntry(
+        sessionInfo, stmt1FirstOpTime, truncatedStmt0OpTime, 456, true /* partialTxn */);
+    auto stmt1Terminal = makeAtomicBatchEntry(sessionInfo,
+                                              stmt1TerminalOpTime,
+                                              stmt1FirstOpTime,
+                                              789,
+                                              false /* partialTxn */,
+                                              2 /* count */);
+
+    auto execPipeline = makeExecPipeline(stmt1Terminal, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    // The mock has only statement 1's entries. Reaching for statement 0 would raise
+    // IncompleteTransactionHistory, which the stage surfaces as ChangeStreamHistoryLost.
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        std::vector<repl::OplogEntry>{stmt1Terminal, stmt1First}));
+
+    for (int expectedId : {456, 789}) {
+        auto next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        auto nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), expectedId);
+    }
+    ASSERT(transform->getNext().isEOF());
+}
+
+// A single-entry atomic batch's prevOpTime is purely a session-history link, so the unwind must
+// not walk it at all. The link points at an entry the mock cannot supply, so any walk fails.
+TEST_F(ChangeStreamStageTest, RetryableAtomicBatchSingleEntryUnwindSkipsChainWalk) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    // A single-entry batch: no 'count', and prevOpTime links to a statement the mock cannot supply.
+    repl::OpTime unreachablePrevOpTime(Timestamp(100, 1), 1);
+    auto entry = makeAtomicBatchEntry(
+        sessionInfo, repl::OpTime(Timestamp(100, 2), 1), unreachablePrevOpTime, 123);
+
+    auto execPipeline = makeExecPipeline(entry, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    // Only the entry itself is available; there is nothing behind it to walk to.
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<ChangeStreamMockMongoInterface>(std::vector<repl::OplogEntry>{entry}));
+
+    auto next = transform->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.releaseDocument()[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    ASSERT(transform->getNext().isEOF());
+}
+
 TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     OperationSessionInfo sessionInfo;
     sessionInfo.setTxnNumber(1);

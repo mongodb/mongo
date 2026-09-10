@@ -53,6 +53,10 @@ enums:
                                         independently of other applyOps entries in the chain.
                                         Used for vectored inserts which require more than one
                                         storage transaction.
+            kApplyOpsAppliedAtomically: This oplog entry is an applyOps which should be applied
+                                        atomically with the other applyOps entries in the chain.
+                                        Used for a retryable write statement, represented by one or
+                                        more applyOps entries.
         type: int
         values:
             kLegacyMultiOpType: 0
