@@ -228,7 +228,9 @@ describe("$changeStream v2", function () {
         });
 
         csTest.getNextChanges(csCursor, 2);
-        csTest.assertNoChange(csCursor);
+        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+            csTest.assertNoChange(csCursor);
+        });
 
         assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
 
