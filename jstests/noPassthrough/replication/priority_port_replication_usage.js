@@ -261,6 +261,7 @@ describe("Tests for priority port usage within replication internals", function 
         newConfig.members = this.rs.getReplSetConfig().members;
         newConfig.version += 1;
         assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: newConfig}));
+        this.rs.waitForConfigReplication(this.rs.getPrimary());
 
         jsTest.log.info(
             "Do some writes to make sure there is someone to sync from which is ahead of us",
