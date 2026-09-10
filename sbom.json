@@ -14,7 +14,7 @@
     "tools": [
       {
         "name": "Endor Labs Inc",
-        "version": "v1.7.1133"
+        "version": "v1.7.1141"
       }
     ],
     "component": {
@@ -273,10 +273,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/mongo/shell/linenoise.h"
+            "location": "src/mongo/shell/linenoise.cpp"
           },
           {
-            "location": "src/mongo/shell/linenoise.cpp"
+            "location": "src/mongo/shell/linenoise.h"
           }
         ],
         "licenses": [
