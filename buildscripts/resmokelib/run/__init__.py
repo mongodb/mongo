@@ -2382,6 +2382,13 @@ class RunPlugin(PluginInterface):
         )
 
         def fast_check_params_parser(params: str | None) -> dict | None:
+            if params:
+                # Tools such as burn_in_tests.py read resmoke_args straight out of the Evergreen
+                # project config, where expansions have not been substituted yet. Treat an
+                # unexpanded expansion (e.g. "${fastCheckParameters|}") the same as an empty value.
+                params = params.strip().strip("'\"")
+                if params.startswith("${") and params.endswith("}"):
+                    params = ""
             if not params:
                 return None
             try:
