@@ -63,37 +63,5 @@ private:
     const bool _areOpsCrudOnly;
 };
 
-/**
- * Returns the number of operations in an applyOps, given its array or the oplog entry carrying it.
- */
-inline std::size_t numOperationsInApplyOps(const Value& applyOpsArray) {
-    return applyOpsArray.missing() ? 0U : applyOpsArray.getArrayLength();
-}
-
-inline std::size_t numOperationsInApplyOps(const OplogEntry& applyOpsEntry) {
-    return static_cast<std::size_t>(
-        applyOpsEntry.getObject()[ApplyOpsCommandInfoBase::kOperationsFieldName].Obj().nFields());
-}
-
-/**
- * Returns the total number of operations in the applyOps chain terminated by 'entry': its 'count'
- * field when present (a multi-entry batch), otherwise this entry's own operation count (a
- * single-entry batch).
- */
-inline std::size_t applyOpsChainOperationTotal(const OplogEntry& entry) {
-    const auto count = entry.getObject()[ApplyOpsCommandInfoBase::kCountFieldName];
-    return count.eoo() ? numOperationsInApplyOps(entry)
-                       : static_cast<std::size_t>(count.numberLong());
-}
-
-/**
- * Saturating 'totalOps - opsAlreadyCollected', for bounding an applyOps chain walk by the
- * terminal's 'count'. See walkApplyOpsChain().
- */
-inline std::size_t remainingApplyOpsChainOps(std::size_t totalOps,
-                                             std::size_t opsAlreadyCollected) {
-    return totalOps > opsAlreadyCollected ? totalOps - opsAlreadyCollected : 0;
-}
-
 }  // namespace repl
 }  // namespace mongo

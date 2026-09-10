@@ -3,14 +3,9 @@
 
 #pragma once
 
-#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/modules.h"
-
-#include <cstddef>
-
-#include <boost/optional/optional.hpp>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
@@ -42,27 +37,6 @@ public:
      */
     virtual repl::OpTime nextOpTime(OperationContext* opCtx) = 0;
 };
-
-/**
- * Walks back through an applyOps chain, running 'step' (which fetches and processes one entry and
- * returns how many operations it consumed) until the chain ends or 'opsStillToCollect' reaches
- * zero. A transaction's chain is null-terminated, so it passes no budget and walks to the end. A
- * retryable batch's first entry instead links to the previous applyOps chain, so it passes the ops
- * left to collect; stopping on the count avoids reading a previous chain that may have been
- * truncated from the oplog. 'step' owns the fetch because callers differ over next(), nextOpTime()
- * and nextFatalOnErrors().
- */
-template <typename StepFn>
-void walkApplyOpsChain(TransactionHistoryIteratorBase& iter,
-                       boost::optional<std::size_t> opsStillToCollect,
-                       StepFn&& step) {
-    while ((!opsStillToCollect || *opsStillToCollect > 0) && iter.hasNext()) {
-        const std::size_t consumed = step();
-        if (opsStillToCollect) {
-            *opsStillToCollect = repl::remainingApplyOpsChainOps(*opsStillToCollect, consumed);
-        }
-    }
-}
 
 class TransactionHistoryIterator : public TransactionHistoryIteratorBase {
 public:

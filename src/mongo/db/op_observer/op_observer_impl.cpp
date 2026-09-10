@@ -2687,26 +2687,16 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             bool lastOp,
             std::vector<StmtId> stmtIdsWritten,
             WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
-            if (firstOp) {
-                if (isRetryableAtomicBatch) {
-                    // Link this retryable write's first entry to the session's last write, so its
-                    // statements are chained into a single session history and stay retryable
-                    // after failover.
-                    const auto txnParticipant = TransactionParticipant::get(opCtx);
-                    oplogEntry->setPrevWriteOpTimeInTransaction(
-                        txnParticipant ? boost::make_optional(txnParticipant.getLastWriteOpTime())
-                                       : boost::none);
-                } else if (lastOp) {
-                    // Remove 'prevOpTime' when a non-retryable batch replicates as a single
-                    // applyOps oplog entry. This preserves backwards compatibility with the legacy
-                    // atomic applyOps oplog entry format that we use to replicate batched writes.
-                    // OplogApplierImpl::_deriveOpsAndFillWriterVectors() enforces this restriction
-                    // using an invariant added in SERVER-43651. For batched writes that replicate
-                    // over a chain of applyOps oplog entries, we keep 'prevOpTime' so that oplog
-                    // application is able to consume all the linked operations, similar to large
-                    // multi-document transactions. See SERVER-70572.
-                    oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
-                }
+            // Remove 'prevOpTime' when replicating as a single applyOps oplog entry.
+            // This preserves backwards compatibility with the legacy atomic applyOps oplog
+            // entry format that we use to replicate batched writes.
+            // OplogApplierImpl::_deriveOpsAndFillWriterVectors() enforces this restriction
+            // using an invariant added in SERVER-43651.
+            // For batched writes that replicate over a chain of applyOps oplog entries, we include
+            // 'prevOpTime' so that oplog application is able to consume all the linked operations,
+            // similar to large multi-document transactions. See SERVER-70572.
+            if (firstOp && lastOp) {
+                oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
             }
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             // A kGroupForPossiblyRetryableOperations batch is only actually retryable when it

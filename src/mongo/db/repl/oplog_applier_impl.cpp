@@ -1090,20 +1090,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 
         // Extract applyOps operations and fill writers with extracted operations.
         if (op.isTerminalApplyOps()) {
-            // A retryable terminal without 'count' is a single-entry batch with no chain: extract
-            // it directly rather than walk the oplog once per statement on every secondary.
-            const bool isLinked = op.applyOpsIsLinkedTransactionally();
-            const bool isSingleEntryRetryableBatch = isLinked &&
-                op.getMultiOpType() == MultiOplogEntryType::kApplyOpsAppliedAtomically &&
-                op.getObject()["count"].eoo();
-            if (isSingleEntryRetryableBatch) {
-                // Anything cached would be dropped by skipping the walk.
-                tassert(13423904,
-                        "Single-entry retryable batch has cached partial operations",
-                        getPartialTxnList(op)->empty());
-            }
-
-            if (isLinked && !isSingleEntryRetryableBatch) {
+            if (op.applyOpsIsLinkedTransactionally()) {
                 // On commit of unprepared transactions, get transactional operations from the
                 // oplog and fill writers with those operations.
                 // Flush partialTxnList operations for current transaction.

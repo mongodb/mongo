@@ -12,7 +12,6 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/util/str.h"
@@ -228,18 +227,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
 
     // When operations span multiple applyOps entries linked by 'prevOpTime', walk that chain to
     // gather them all. kApplyOpsAppliedSeparately entries are standalone, so there is no chain to
-    // follow. kApplyOpsAppliedAtomically entries also use 'prevOpTime' to link between retryable
-    // write statements, so bound its walk by the terminal's 'count' of operations. A terminal
-    // entry without 'count' is a single-entry batch with no chain to walk. See walkApplyOpsChain().
-    boost::optional<std::size_t> opsStillToCollect;
-    if (isRetryableApplyOps) {
-        const Value count = commandObj["count"sv];
-        opsStillToCollect = count.missing()
-            ? 0
-            : repl::remainingApplyOpsChainOps(static_cast<std::size_t>(count.getLong()),
-                                              repl::numOperationsInApplyOps(applyOps));
-    }
-
+    // follow.
     if (!applyOpsAppliedSeparately &&
         BSONType::object ==
             input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {
@@ -247,8 +235,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         // in order to parse an OpTime, this time from the "prevOpTime" field.
         repl::OpTime prevOpTime = repl::OpTime::parse(
             input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getDocument().toBson());
-        _collectAllOpTimesFromTransaction(
-            expCtx->getOperationContext(), prevOpTime, opsStillToCollect);
+        _collectAllOpTimesFromTransaction(expCtx->getOperationContext(), prevOpTime);
     }
 
     // Pop the first OpTime off the stack and use it to load the first oplog entry into the
@@ -393,30 +380,14 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::_lookUpOplogEntryByOp
 }
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTimesFromTransaction(
-    OperationContext* opCtx,
-    repl::OpTime firstOpTime,
-    boost::optional<std::size_t> opsStillToCollect) {
-    // A single-entry batch links to the previous applyOps chain with nothing of its own to walk.
-    if (opsStillToCollect && *opsStillToCollect == 0) {
-        return;
-    }
-
+    OperationContext* opCtx, repl::OpTime firstOpTime) {
     std::unique_ptr<TransactionHistoryIteratorBase> iterator(
         _mongoProcessInterface->createTransactionHistoryIterator(firstOpTime));
 
     try {
-        walkApplyOpsChain(*iterator, opsStillToCollect, [&]() -> std::size_t {
-            if (!opsStillToCollect) {
-                // A transaction walks the whole chain and only needs each entry's optime; the
-                // returned op count is unused when there is no budget to decrement.
-                _txnOplogEntries.push(iterator->nextOpTime(opCtx));
-                return 0;
-            }
-            // A retryable chain is bounded by 'count', so fetch the entry to count its operations.
-            const auto entry = iterator->next(opCtx);
-            _txnOplogEntries.push(entry.getOpTime());
-            return repl::numOperationsInApplyOps(entry);
-        });
+        while (iterator->hasNext()) {
+            _txnOplogEntries.push(iterator->nextOpTime(opCtx));
+        }
     } catch (ExceptionFor<ErrorCodes::IncompleteTransactionHistory>& ex) {
         ex.addContext(
             str::stream()

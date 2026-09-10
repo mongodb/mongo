@@ -487,6 +487,8 @@ bool DurableOplogEntry::shouldPrepare() const {
 }
 
 bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
+    // An applyOps with a prevWriteOpTime is part of a transaction, unless multiOpType is
+    // kApplyOpsAppliedSeparately.
     return static_cast<bool>(getPrevWriteOpTimeInTransaction()) &&
         getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
         MultiOplogEntryType::kApplyOpsAppliedSeparately;

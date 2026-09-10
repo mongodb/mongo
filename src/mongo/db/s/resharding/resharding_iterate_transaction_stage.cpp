@@ -8,7 +8,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -165,14 +164,6 @@ ReshardingIterateTransactionStage::TransactionOpIterator::TransactionOpIterator(
                                                       << input[repl::OpTime::kTermFieldName]));
     _clusterTime = txnOpTime.getTimestamp();
 
-    Value multiOpTypeValue = input[repl::OplogEntry::kMultiOpTypeFieldName];
-    tassert(13423910,
-            "oplog entry 'multiOpType' must be an int if present",
-            multiOpTypeValue.missing() || multiOpTypeValue.getType() == BSONType::numberInt);
-    const bool isRetryableApplyOps = !multiOpTypeValue.missing() &&
-        static_cast<repl::MultiOplogEntryType>(multiOpTypeValue.getInt()) ==
-            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically;
-
     auto commandObj = input["o"].getDocument();
     Value applyOps = commandObj["applyOps"];
 
@@ -195,27 +186,13 @@ ReshardingIterateTransactionStage::TransactionOpIterator::TransactionOpIterator(
                 !commandObj["commitTransaction"].missing());
     }
 
-    // When operations span multiple applyOps entries linked by 'prevOpTime', walk that chain to
-    // gather them all. kApplyOpsAppliedAtomically entries also use 'prevOpTime' to link between
-    // retryable write statements, so bound its walk by the terminal's 'count' of operations. A
-    // terminal entry without 'count' is a single-entry batch with no chain to walk. See
-    // walkApplyOpsChain().
-    boost::optional<std::size_t> opsStillToCollect;
-    if (isRetryableApplyOps) {
-        const Value count = commandObj["count"];
-        opsStillToCollect = count.missing()
-            ? 0
-            : repl::remainingApplyOpsChainOps(static_cast<std::size_t>(count.getLong()),
-                                              repl::numOperationsInApplyOps(applyOps));
-    }
-
     if (BSONType::object ==
         input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {
         // As with the 'txnOpTime' parsing above, we convert a portion of 'input' back to BSON
         // in order to parse an OpTime, this time from the "prevOpTime" field.
         repl::OpTime prevOpTime = repl::OpTime::parse(
             input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getDocument().toBson());
-        _collectAllOpTimesFromTransaction(opCtx, prevOpTime, opsStillToCollect);
+        _collectAllOpTimesFromTransaction(opCtx, prevOpTime);
     }
 
     // By this stage, we should always have at least one transaction entry optime in the stack.
@@ -260,29 +237,13 @@ ReshardingIterateTransactionStage::TransactionOpIterator::_lookUpOplogEntryByOpT
 }
 
 void ReshardingIterateTransactionStage::TransactionOpIterator::_collectAllOpTimesFromTransaction(
-    OperationContext* opCtx,
-    repl::OpTime firstOpTime,
-    boost::optional<std::size_t> opsStillToCollect) {
-    // A single-entry batch links to the previous applyOps chain with nothing of its own to walk.
-    if (opsStillToCollect && *opsStillToCollect == 0) {
-        return;
-    }
-
+    OperationContext* opCtx, repl::OpTime firstOpTime) {
     std::unique_ptr<TransactionHistoryIteratorBase> iterator(
         _mongoProcessInterface->createTransactionHistoryIterator(firstOpTime));
 
-    walkApplyOpsChain(*iterator, opsStillToCollect, [&]() -> std::size_t {
-        if (!opsStillToCollect) {
-            // A transaction walks the whole chain and only needs each entry's optime; the returned
-            // op count is unused when there is no budget to decrement.
-            _txnOplogEntries.push(iterator->nextOpTime(opCtx));
-            return 0;
-        }
-        // A retryable chain is bounded by 'count', so fetch the entry to count its operations.
-        const auto entry = iterator->next(opCtx);
-        _txnOplogEntries.push(entry.getOpTime());
-        return repl::numOperationsInApplyOps(entry);
-    });
+    while (iterator->hasNext()) {
+        _txnOplogEntries.push(iterator->nextOpTime(opCtx));
+    }
 }
 }  // namespace exec::agg
 }  // namespace mongo
