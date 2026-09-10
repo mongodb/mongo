@@ -22,7 +22,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
+const st = new ShardingTest({
+    shards: 2,
+    rs: {
+        nodes: 3,
+        // This test stops replication on one secondary but needs the other to acknowledge
+        // majority write concern. Prevent the healthy secondary from chaining through it.
+        settings: {chainingAllowed: false},
+    },
+});
 
 if (!FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
     jsTest.log.info("Skipping test because featureFlagAuthoritativeShardsDDL is disabled");
