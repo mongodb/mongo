@@ -31,7 +31,9 @@ namespace repl {
  * Caches per-collection properties which are relevant for oplog application, so that they don't
  * have to be retrieved repeatedly for each op.
  */
-class [[MONGO_MOD_PRIVATE]] CachedCollectionProperties {
+// TODO SERVER-134375: Restore MONGO_MOD_PRIVATE once the pipelined oplog applier moves into the
+// replication module.
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CachedCollectionProperties {
 public:
     struct CollectionProperties {
         bool isCapped = false;
