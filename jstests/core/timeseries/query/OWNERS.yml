@@ -3,10 +3,10 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-timeseries
-  - "timeseries_block_explain.js":
+  - "timeseries_group*":
     approvers:
       - 10gen/query-execution-sbe
-  - "timeseries_group*":
+  - "timeseries_block*":
     approvers:
       - 10gen/query-execution-sbe
   - "timeseries_homogeneous_top_bottom.js":

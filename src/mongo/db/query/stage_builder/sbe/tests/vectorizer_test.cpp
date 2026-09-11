@@ -3639,10 +3639,6 @@ void assertArithmeticOperationBlockBlockBlock(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Variable\", \n"
-            "            name: \"var1\"\n"
-            "        }, \n"
-            "        {\n"
             "            nodeType: \"FunctionCall\", \n"
             "            name: \"" +
             fnStr +
@@ -3654,13 +3650,17 @@ void assertArithmeticOperationBlockBlockBlock(const std::string& fnStr,
             "                }, \n"
             "                {\n"
             "                    nodeType: \"Variable\", \n"
-            "                    name: \"var2\"\n"
+            "                    name: \"var1\"\n"
             "                }, \n"
             "                {\n"
             "                    nodeType: \"Variable\", \n"
-            "                    name: \"var3\"\n"
+            "                    name: \"var2\"\n"
             "                }\n"
             "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var3\"\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3682,24 +3682,30 @@ void assertArithmeticOperationBlockScalarScalar(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Variable\", \n"
-            "            name: \"var\"\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"" +
+            fnStr +
+            "\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"Nothing\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }\n"
+            "            ]\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"BinaryOp\", \n"
-            "            op: \"" +
-            opStr +
-            "\", \n"
-            "            left: {\n"
-            "                nodeType: \"Const\", \n"
-            "                tag: \"NumberInt32\", \n"
-            "                value: 9\n"
-            "            }, \n"
-            "            right: {\n"
-            "                nodeType: \"Const\", \n"
-            "                tag: \"NumberInt32\", \n"
-            "                value: 20\n"
-            "            }\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 20\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3720,11 +3726,6 @@ void assertArithmeticOperationScalarBlockScalar(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Const\", \n"
-            "            tag: \"NumberInt32\", \n"
-            "            value: 9\n"
-            "        }, \n"
-            "        {\n"
             "            nodeType: \"FunctionCall\", \n"
             "            name: \"" +
             fnStr +
@@ -3735,15 +3736,20 @@ void assertArithmeticOperationScalarBlockScalar(const std::string& fnStr,
             "                    tag: \"Nothing\"\n"
             "                }, \n"
             "                {\n"
-            "                    nodeType: \"Variable\", \n"
-            "                    name: \"var\"\n"
-            "                }, \n"
-            "                {\n"
             "                    nodeType: \"Const\", \n"
             "                    tag: \"NumberInt32\", \n"
-            "                    value: 20\n"
+            "                    value: 9\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var\"\n"
             "                }\n"
             "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 20\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3751,6 +3757,7 @@ void assertArithmeticOperationScalarBlockScalar(const std::string& fnStr,
 }
 
 void assertArithmeticOperationScalarScalarBlock(const std::string& fnStr,
+                                                const std::string& opStr,
                                                 const Vectorizer::Tree& processed) {
     ASSERT_EXPLAIN_BSON(
         "{\n"
@@ -3764,30 +3771,24 @@ void assertArithmeticOperationScalarScalarBlock(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Const\", \n"
-            "            tag: \"NumberInt32\", \n"
-            "            value: 9\n"
+            "            nodeType: \"BinaryOp\", \n"
+            "            op: \"" +
+            opStr +
+            "\", \n"
+            "            left: {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"NumberInt32\", \n"
+            "                value: 9\n"
+            "            }, \n"
+            "            right: {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"NumberInt32\", \n"
+            "                value: 20\n"
+            "            }\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"FunctionCall\", \n"
-            "            name: \"" +
-            fnStr +
-            "\", \n"
-            "            arguments: [\n"
-            "                {\n"
-            "                    nodeType: \"Const\", \n"
-            "                    tag: \"Nothing\"\n"
-            "                }, \n"
-            "                {\n"
-            "                    nodeType: \"Const\", \n"
-            "                    tag: \"NumberInt32\", \n"
-            "                    value: 20\n"
-            "                }, \n"
-            "                {\n"
-            "                    nodeType: \"Variable\", \n"
-            "                    name: \"var\"\n"
-            "                }\n"
-            "            ]\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var\"\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3808,10 +3809,6 @@ void assertArithmeticOperationBlockBlockScalar(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Variable\", \n"
-            "            name: \"var1\"\n"
-            "        }, \n"
-            "        {\n"
             "            nodeType: \"FunctionCall\", \n"
             "            name: \"" +
             fnStr +
@@ -3823,14 +3820,18 @@ void assertArithmeticOperationBlockBlockScalar(const std::string& fnStr,
             "                }, \n"
             "                {\n"
             "                    nodeType: \"Variable\", \n"
-            "                    name: \"var2\"\n"
+            "                    name: \"var1\"\n"
             "                }, \n"
             "                {\n"
-            "                    nodeType: \"Const\", \n"
-            "                    tag: \"NumberInt32\", \n"
-            "                    value: 9\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var2\"\n"
             "                }\n"
             "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3851,10 +3852,6 @@ void assertArithmeticOperationBlockScalarBlock(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Variable\", \n"
-            "            name: \"var1\"\n"
-            "        }, \n"
-            "        {\n"
             "            nodeType: \"FunctionCall\", \n"
             "            name: \"" +
             fnStr +
@@ -3865,15 +3862,19 @@ void assertArithmeticOperationBlockScalarBlock(const std::string& fnStr,
             "                    tag: \"Nothing\"\n"
             "                }, \n"
             "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"var1\"\n"
+            "                }, \n"
+            "                {\n"
             "                    nodeType: \"Const\", \n"
             "                    tag: \"NumberInt32\", \n"
             "                    value: 9\n"
-            "                }, \n"
-            "                {\n"
-            "                    nodeType: \"Variable\", \n"
-            "                    name: \"var2\"\n"
             "                }\n"
             "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var2\"\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3894,11 +3895,6 @@ void assertArithmeticOperationScalarBlockBlock(const std::string& fnStr,
             "            tag: \"Nothing\"\n"
             "        }, \n"
             "        {\n"
-            "            nodeType: \"Const\", \n"
-            "            tag: \"NumberInt32\", \n"
-            "            value: 9\n"
-            "        }, \n"
-            "        {\n"
             "            nodeType: \"FunctionCall\", \n"
             "            name: \"" +
             fnStr +
@@ -3909,14 +3905,19 @@ void assertArithmeticOperationScalarBlockBlock(const std::string& fnStr,
             "                    tag: \"Nothing\"\n"
             "                }, \n"
             "                {\n"
-            "                    nodeType: \"Variable\", \n"
-            "                    name: \"var1\"\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
             "                }, \n"
             "                {\n"
             "                    nodeType: \"Variable\", \n"
-            "                    name: \"var2\"\n"
+            "                    name: \"var1\"\n"
             "                }\n"
             "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"var2\"\n"
             "        }\n"
             "    ]\n"
             "}\n",
@@ -3932,11 +3933,6 @@ void assertArithmeticOperationScalarScalarScalar(const std::string& opStr,
             opStr +
             "\", \n"
             "    left: {\n"
-            "        nodeType: \"Const\", \n"
-            "        tag: \"NumberInt32\", \n"
-            "        value: 9\n"
-            "    }, \n"
-            "    right: {\n"
             "        nodeType: \"BinaryOp\", \n"
             "        op: \"" +
             opStr +
@@ -3944,13 +3940,18 @@ void assertArithmeticOperationScalarScalarScalar(const std::string& opStr,
             "        left: {\n"
             "            nodeType: \"Const\", \n"
             "            tag: \"NumberInt32\", \n"
-            "            value: 20\n"
+            "            value: 9\n"
             "        }, \n"
             "        right: {\n"
             "            nodeType: \"Const\", \n"
             "            tag: \"NumberInt32\", \n"
-            "            value: 100\n"
+            "            value: 20\n"
             "        }\n"
+            "    }, \n"
+            "    right: {\n"
+            "        nodeType: \"Const\", \n"
+            "        tag: \"NumberInt32\", \n"
+            "        value: 100\n"
             "    }\n"
             "}\n",
         *processed.expr);
@@ -4107,7 +4108,7 @@ TEST(VectorizerTest, ConvertAdd) {
             treeScalarScalarBlock, bindings, boost::none);
 
         ASSERT_TRUE(processed.expr.has_value());
-        assertArithmeticOperationScalarScalarBlock(fnStr, processed);
+        assertArithmeticOperationScalarScalarBlock(fnStr, opStr, processed);
     }
 
     {
@@ -4130,7 +4131,7 @@ TEST(VectorizerTest, ConvertAdd) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(
@@ -4152,7 +4153,7 @@ TEST(VectorizerTest, ConvertAdd) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(
@@ -4174,7 +4175,7 @@ TEST(VectorizerTest, ConvertAdd) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(
@@ -4417,7 +4418,7 @@ TEST(VectorizerTest, ConvertMult) {
             treeScalarScalarBlock, bindings, boost::none);
 
         ASSERT_TRUE(processed.expr.has_value());
-        assertArithmeticOperationScalarScalarBlock(fnStr, processed);
+        assertArithmeticOperationScalarScalarBlock(fnStr, opStr, processed);
     }
 
     {
@@ -4440,7 +4441,7 @@ TEST(VectorizerTest, ConvertMult) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(
@@ -4462,7 +4463,7 @@ TEST(VectorizerTest, ConvertMult) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(
@@ -4484,7 +4485,7 @@ TEST(VectorizerTest, ConvertMult) {
 
         Vectorizer::VariableTypes bindings;
         bindings.emplace(
-            "var"sv,
+            "var1"sv,
             std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                            boost::none));
         bindings.emplace(

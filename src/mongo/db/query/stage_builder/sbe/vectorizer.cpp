@@ -478,23 +478,24 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::BinaryOp& 
 Vectorizer::Tree Vectorizer::vectorizeNaryHelper(const abt::NaryOp& op, size_t argIdx) {
     // Verify that we have at least 2 items to process.
     tassert(10199602, "index out of range", argIdx < op.nodes().size() - 1);
-    auto lhsNode = [&]() {
-        return op.nodes()[argIdx].visit(*this);
-    };
-    auto rhsNode = [&]() {
-        // If this is the last item, process it directly, otherwise recurse simulating
-        // the presence of a nested logical operation.
-        size_t rhsIdx = argIdx + 1;
-        return (rhsIdx == op.nodes().size() - 1) ? op.nodes()[rhsIdx].visit(*this)
-                                                 : vectorizeNaryHelper(op, rhsIdx);
-    };
+    // Only the And/Or logical operations are supported here. Add/Mult must not be handled by this
+    // helper because its right-nested recursion does not preserve their left-associative
+    // evaluation order (see operator()(const abt::NaryOp&) below).
     switch (op.op()) {
         case abt::Operations::And:
-        case abt::Operations::Or:
+        case abt::Operations::Or: {
+            auto lhsNode = [&]() {
+                return op.nodes()[argIdx].visit(*this);
+            };
+            auto rhsNode = [&]() {
+                // If this is the last item, process it directly, otherwise recurse simulating
+                // the presence of a nested logical operation.
+                size_t rhsIdx = argIdx + 1;
+                return (rhsIdx == op.nodes().size() - 1) ? op.nodes()[rhsIdx].visit(*this)
+                                                         : vectorizeNaryHelper(op, rhsIdx);
+            };
             return vectorizeLogicalOp(op.op(), lhsNode, rhsNode);
-        case abt::Operations::Add:
-        case abt::Operations::Mult:
-            return vectorizeArithmeticOp(op.op(), lhsNode, rhsNode);
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -504,9 +505,27 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::NaryOp& op
     switch (op.op()) {
         case abt::Operations::And:
         case abt::Operations::Or:
+            // Keep the original right-nested recursion to preserve operand order and short-circuit
+            // evaluation; vectorizeLogicalOp() treats the result of the left side as the mask to be
+            // applied when processing the right side.
+            return vectorizeNaryHelper(op, 0);
         case abt::Operations::Add:
         case abt::Operations::Mult: {
-            return vectorizeNaryHelper(op, 0);
+            // Add and Mult are only left-associative: the scalar SBE VM and the ABT constant
+            // folder both evaluate them by combining the operands from left to right, and a
+            // different order can produce different results due to type promotion rules and
+            // floating-point/Decimal128 rounding (e.g. [$x, Decimal128(-0), INT64_MIN, DBL_MAX]
+            // must not compute Decimal128(-0) * (INT64_MIN * DBL_MAX) = NaN). Recurse combining
+            // the operands from left to right to preserve that order.
+            Tree lhs = op.nodes()[0].visit(*this);
+            for (size_t i = 1; i < op.nodes().size() && lhs.expr.has_value(); ++i) {
+                size_t rhsIdx = i;
+                lhs = vectorizeArithmeticOp(
+                    op.op(),
+                    [&lhs]() -> Tree { return std::exchange(lhs, {}); },
+                    [&]() { return op.nodes()[rhsIdx].visit(*this); });
+            }
+            return lhs;
         }
         default:
             break;
