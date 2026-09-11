@@ -129,6 +129,17 @@ value::MaterializedRow makeCompositeKeyRow(int64_t key1, int64_t key2) {
     return row;
 }
 
+/**
+ * Returns a single-slot MaterializedRow whose slot is an unowned view into slot 0 of
+ * 'source'. Mirrors HashJoinStage's pattern of capturing outer-child accessor views via
+ * `_probeKey.reset(idx, accessor->getViewOfValue())`.
+ */
+value::MaterializedRow makeUnownedView(const value::MaterializedRow& source) {
+    value::MaterializedRow row(1);
+    row.reset(0, source.getViewOfValue(0));
+    return row;
+}
+
 
 /**
  * Test fixture providing an OperationContext for HybridHashJoin tests.
@@ -1329,12 +1340,9 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
     auto cursor = JoinCursor::empty();
     hhj->probe(probeKey, probeProject, cursor);
 
-    // First save: _savedProbeProject[0] gets an independent copy of the full doc (buffer A),
-    // _savedProbeProject[1] gets an independent copy of the sub-doc (buffer B).
+    // First save: probeProject[0] already owns the full doc and is left alone; probeProject[1]
+    // gets its own copy of the sub-doc (buffer B).
     cursor.saveState();
-
-    // First restore: probeProject[0] -> non-owned A, probeProject[1] -> non-owned B.
-    cursor.restoreState();
 
     // Simulate the cross-slot aliasing
     {
@@ -1347,16 +1355,47 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
                                                value::bitcastFrom<const char*>(savedSubPtr)});
     }
 
-    // Second save: probeProject[1] now aliases into _savedProbeProject[0]'s buffer.
+    // Second save: probeProject[1] again aliases into probeProject[0]'s buffer and must be copied
+    // without disturbing slot 0.
     cursor.saveState();
 
-    cursor.restoreState();
-
-    // Verify the sub-document value survived both save/restore cycles correctly.
+    // Verify the sub-document value survived both save cycles correctly.
     auto [tag1, val1] = probeProject.getViewOfValue(1);
     ASSERT_EQ(tag1, value::TypeTags::bsonObject);
     BSONObj restoredSubDoc(value::bitcastTo<const char*>(val1));
     ASSERT_BSONOBJ_EQ(restoredSubDoc, BSON("value" << 99));
+}
+
+TEST_F(HybridHashJoinTestFixture, SaveStateOwnsProbeRowsWhenCursorHasMatches) {
+    auto hhj = makeHHJ();
+    // Strings longer than 7 bytes are heap-allocated.
+    hhj->addBuild(makeStringKeyRow("match_key_value"), makeProjectRow("build_projection"));
+    hhj->finishBuild();
+
+    // outerKey / outerProject play the role of the outer child's owned accessor storage.
+    // probeKey / probeProject are unowned views into it
+    auto outerKey = makeStringKeyRow("match_key_value");
+    auto outerProject = makeProjectRow("probe_projection_value");
+    auto probeKey = makeUnownedView(outerKey);
+    auto probeProject = makeUnownedView(outerProject);
+
+    auto cursor = JoinCursor::empty();
+    hhj->probe(probeKey, probeProject, cursor);
+
+    cursor.saveState();
+
+    // Simulate the yield releasing the upstream storage: the buffers backing the probe-row
+    // views are freed while the plan is saved.
+    outerKey.reset(0, value::TagValueView::nothing());
+    outerProject.reset(0, value::TagValueView::nothing());
+
+    auto matchOpt = cursor.next();
+    ASSERT_TRUE(matchOpt.has_value());
+    ASSERT_EQ(getStringValue(matchOpt->buildKeyRow), "match_key_value");
+    ASSERT_EQ(getStringValue(matchOpt->buildProjectRow), "build_projection");
+    ASSERT_EQ(getStringValue(matchOpt->probeKeyRow), "match_key_value");
+    ASSERT_EQ(getStringValue(matchOpt->probeProjectRow), "probe_projection_value");
+    ASSERT_FALSE(cursor.next().has_value());
 }
 }  // namespace
 }  // namespace mongo::sbe

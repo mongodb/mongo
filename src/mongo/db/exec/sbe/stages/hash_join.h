@@ -76,9 +76,10 @@ public:
 
 protected:
     void doSaveState() final;
-    void doRestoreState() final;
 
 private:
+    bool probeRowsLiveAcrossYield() const;
+
     using HashElementAccessor = value::SingleRowPointerAccessor<const value::MaterializedRow*>;
 
     const value::SlotVector _outerKey;
