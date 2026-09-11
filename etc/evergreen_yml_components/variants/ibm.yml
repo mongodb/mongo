@@ -58,6 +58,10 @@ buildvariants:
     depends_on:
       - name: package
       - name: jsCore
+  - name: save_waterfall_artifacts_linux_packages
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: save_waterfall_artifacts_cryptd
     depends_on:
       - name: package
@@ -126,6 +130,10 @@ buildvariants:
     depends_on:
       - name: package
       - name: jsCore
+  - name: save_waterfall_artifacts_linux_packages
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: save_waterfall_artifacts_cryptd
     depends_on:
       - name: package
@@ -191,6 +199,10 @@ buildvariants:
     depends_on:
       - name: package
       - name: jsCore
+  - name: save_waterfall_artifacts_linux_packages
+    depends_on:
+      - name: package
+      - name: jsCore
   - name: save_waterfall_artifacts_cryptd
     depends_on:
       - name: package
@@ -248,6 +260,10 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+    depends_on:
+      - name: package
+      - name: jsCore
+  - name: save_waterfall_artifacts_linux_packages
     depends_on:
       - name: package
       - name: jsCore

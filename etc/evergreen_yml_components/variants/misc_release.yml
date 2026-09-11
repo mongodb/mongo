@@ -51,6 +51,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -110,6 +111,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -160,6 +162,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -282,6 +285,7 @@ buildvariants:
     distros:
     - amazon2-arm64-latest-large
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -445,6 +449,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -496,8 +501,8 @@ buildvariants:
   - name: .sharding .txns !.csrs
   - name: slow1_gen
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
-  - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -545,6 +550,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -647,8 +653,8 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
-  - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -820,6 +826,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
@@ -870,6 +877,7 @@ buildvariants:
   - name: .publish_crypt
   - name: .publish
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: generate_buildid_to_debug_symbols_mapping
@@ -926,6 +934,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -978,6 +987,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -1031,6 +1041,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1122,6 +1133,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: selinux_rhel8_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1242,6 +1254,7 @@ buildvariants:
     distros:
     - rhel80-large
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -1297,6 +1310,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1355,6 +1369,7 @@ buildvariants:
     - rhel82-arm64-large
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -1411,6 +1426,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1487,6 +1503,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -1542,6 +1559,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1600,6 +1618,7 @@ buildvariants:
     - rhel90-arm64-large
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -1659,6 +1678,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1709,6 +1729,7 @@ buildvariants:
     - suse12-sp5-large
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -1756,6 +1777,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -1810,6 +1832,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1867,6 +1890,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1934,6 +1958,7 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -1990,6 +2015,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -2026,6 +2052,7 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2078,6 +2105,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2130,6 +2158,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2184,6 +2213,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -2240,6 +2270,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh
@@ -2321,6 +2352,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -2357,6 +2389,7 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2411,6 +2444,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: .publish
@@ -2447,6 +2481,7 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 

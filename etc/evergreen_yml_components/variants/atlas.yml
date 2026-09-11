@@ -73,6 +73,7 @@ buildvariants:
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
   - name: save_waterfall_artifacts_mh

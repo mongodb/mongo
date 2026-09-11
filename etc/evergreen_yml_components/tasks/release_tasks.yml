@@ -228,7 +228,7 @@ tasks:
           binary: bash
           args:
             - "./src/evergreen/waterfall_jsign_sign.sh"
-            - "./build/cached/msi/mongodb-win32-${push_arch}-windows-${version}.msi"
+            - "./build/opt/msi/mongodb-win32-${push_arch}-windows-${version}.msi"
             - "mongodb-${push_name}-${push_arch}-${version}-signed.msi"
           env:
             GARASIGN_USERNAME: ${garasign_jsign_username}
@@ -398,3 +398,43 @@ tasks:
           local_file: "./src/mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
           remote_file: "mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
           upload_content_type: "${content_type|application/gzip}"
+
+  - name: save_waterfall_artifacts_linux_packages
+    run_on: rhel8.7-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["commit"]
+    stepback: false
+    depends_on:
+      - name: package
+      - name: jsCore
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "set up venv"
+
+      - command: s3.get
+        display_name: "fetch linux packages file"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+          bucket: mciuploads
+          local_file: ./src/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+
+      - command: s3.put
+        display_name: "upload artifact"
+        params:
+          role_arn: ${waterfall_role_arn}
+          local_file: ./src/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+          remote_file: server-waterfall/${project}/${revision}/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+          bucket: origin-mongodb-server-waterfall
+          permissions: private
+          visibility: signed
+          content_type: "application/gzip"
+          skip_existing: true
