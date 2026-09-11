@@ -748,6 +748,11 @@ void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& tim
     _metrics.commitIndexOplogEntryTime = time;
 }
 
+void ReplIndexBuildState::setIndexBuildStartPhase(IndexBuildPhaseEnum phase) {
+    std::lock_guard lk(_mutex);
+    _metrics.startPhase = phase;
+}
+
 SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> ReplIndexBuildState::getOutcomeFuture()
     const {
     return _outcomePromise.getFuture();

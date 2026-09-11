@@ -320,6 +320,13 @@ public:
      */
     void appendBuildInfo(BSONObjBuilder* builder) const;
 
+    /**
+     * Returns the phase the index build is currently in.
+     */
+    IndexBuildPhaseEnum getPhase() const {
+        return _phase;
+    }
+
 private:
     struct IndexToBuild {
         std::unique_ptr<IndexBuildBlock> block;

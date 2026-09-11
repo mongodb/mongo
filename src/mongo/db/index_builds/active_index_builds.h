@@ -25,6 +25,7 @@
 #include <initializer_list>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 
@@ -37,6 +38,11 @@ enum class IndexBuildOutcome {
     // stepdown) and will be resumed.
     kToBeResumed,
 };
+
+/**
+ * Serializes the IndexBuildOutcome enum.
+ */
+std::string_view toString(IndexBuildOutcome outcome);
 
 /**
  * This is a helper class used by IndexBuildsCoordinator to safely manage the data structures

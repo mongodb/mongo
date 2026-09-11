@@ -185,6 +185,12 @@ public:
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
 
     /**
+     * Provides passthrough access to MultiIndexBlock for the phase the build is currently in.
+     * Returns boost::none if the build UUID does not refer to an active index build.
+     */
+    boost::optional<IndexBuildPhaseEnum> getPhase(const UUID& buildUUID) const;
+
+    /**
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();

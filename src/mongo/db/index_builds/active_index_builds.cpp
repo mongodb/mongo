@@ -12,6 +12,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -33,6 +34,18 @@
 
 
 namespace mongo {
+
+std::string_view toString(IndexBuildOutcome outcome) {
+    switch (outcome) {
+        case IndexBuildOutcome::kSuccess:
+            return "success";
+        case IndexBuildOutcome::kFailure:
+            return "failure";
+        case IndexBuildOutcome::kToBeResumed:
+            return "to_be_resumed";
+    }
+    MONGO_UNREACHABLE;
+}
 
 namespace {
 
@@ -94,6 +107,49 @@ void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
     }
     MONGO_UNREACHABLE;
 }
+
+// The histogram buckets for `kIndexBuildCompletedDurationMillis`. Index builds range from
+// milliseconds for a no-op completion to days for a large collection.
+const std::vector<double> kIndexBuildDurationBucketsMillis = {
+    10,           // 10ms
+    1'000,        // 1s
+    10'000,       // 10s
+    60'000,       // 1min
+    300'000,      // 5min
+    1'800'000,    // 30min
+    7'200'000,    // 2h
+    28'800'000,   // 8h
+    86'400'000,   // 1d
+    172'800'000,  // 2d
+    259'200'000,  // 3d
+    432'000'000,  // 5d
+};
+
+auto& indexBuildsCompletedDurationMillisHistogram =
+    otel::metrics::MetricsService::instance()
+        .createInt64Histogram<std::string_view, std::string_view>(
+            otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
+            "Duration of index builds on this node, by the phase they were "
+            "started or resumed from and by their outcome",
+            otel::metrics::MetricUnit::kMilliseconds,
+            otel::metrics::AttributeDefinition<std::string_view>{
+                .name = "start_phase",
+                .values =
+                    {
+                        idl::serialize(IndexBuildPhaseEnum::kInitialized),
+                        idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                        idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
+                        idl::serialize(IndexBuildPhaseEnum::kDrainWrites),
+                    }},
+            otel::metrics::AttributeDefinition<std::string_view>{
+                .name = "outcome",
+                .values =
+                    {
+                        toString(IndexBuildOutcome::kSuccess),
+                        toString(IndexBuildOutcome::kFailure),
+                        toString(IndexBuildOutcome::kToBeResumed),
+                    }},
+            {.explicitBucketBoundaries = kIndexBuildDurationBucketsMillis});
 
 bool includesPrimaryDriven(std::initializer_list<IndexBuildProtocol> protocols) {
     return std::find(protocols.begin(), protocols.end(), IndexBuildProtocol::kPrimaryDriven) !=
@@ -260,13 +316,27 @@ void ActiveIndexBuilds::unregisterIndexBuild(
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
-    LOGV2_DEBUG(4656004,
-                1,
-                "Index build: unregistering",
-                "buildUUID"_attr = replIndexBuildState->buildUUID,
-                "collectionUUID"_attr = replIndexBuildState->collectionUUID);
+    const auto metrics = replIndexBuildState->getIndexBuildMetrics();
+    // The phase that the index build was in when we unregistered it. If there are no index
+    // builds with this build UUID present (i.e, if we registered it as an active index build but
+    // did not successfully set it up), fall back to reporting kInitialized as the endPhase.
+    const auto endPhase = indexBuildsManager->getPhase(replIndexBuildState->buildUUID)
+                              .value_or(IndexBuildPhaseEnum::kInitialized);
+    const int64_t durationMillis =
+        std::max(int64_t{0}, (Date_t::now() - metrics.startTime).count());
+
+    LOGV2(4656004,
+          "Index build: completed",
+          "buildUUID"_attr = replIndexBuildState->buildUUID,
+          "collectionUUID"_attr = replIndexBuildState->collectionUUID,
+          "outcome"_attr = toString(outcome),
+          "startPhase"_attr = idl::serialize(metrics.startPhase),
+          "endPhase"_attr = idl::serialize(endPhase),
+          "durationMillis"_attr = durationMillis);
 
     recordIndexBuildOutcome(outcome);
+    indexBuildsCompletedDurationMillisHistogram.record(
+        durationMillis, {idl::serialize(metrics.startPhase), toString(outcome)});
     activeIndexBuildsGauge.set(_allIndexBuilds.size());
     indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;

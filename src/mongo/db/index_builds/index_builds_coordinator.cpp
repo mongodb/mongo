@@ -1067,6 +1067,7 @@ Status IndexBuildsCoordinator::_registerResumeIndexBuild(OperationContext* opCtx
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collection->uuid(), dbName, mutableIndexes, protocol, Date_t::now());
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
+    replIndexBuildState->setIndexBuildStartPhase(resumeInfo.getPhase());
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {

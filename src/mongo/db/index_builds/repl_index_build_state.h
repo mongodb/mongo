@@ -371,6 +371,8 @@ struct IndexBuildMetrics {
     Date_t voteCommitTime = Date_t::min();
     // The time at which we received a 'commitIndexBuild' oplog entry.
     Date_t commitIndexOplogEntryTime = Date_t::min();
+    // The phase from which the index build has been started or resumed.
+    IndexBuildPhaseEnum startPhase = IndexBuildPhaseEnum::kInitialized;
 };
 
 /**
@@ -626,6 +628,11 @@ public:
      * Stores the time at which we received the `commitIndexBuild` oplog entry.
      */
     void setReceivedCommitIndexBuildEntryTime(const Date_t& time);
+
+    /**
+     * Stores the phase from which the index build is started or resumed.
+     */
+    void setIndexBuildStartPhase(IndexBuildPhaseEnum phase);
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;
