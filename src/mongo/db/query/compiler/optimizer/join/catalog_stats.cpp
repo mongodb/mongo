@@ -22,11 +22,15 @@ double quantizePageCount(double pages) {
 
 }  // namespace
 
+bool CollectionStats::hasApproxNumLeafPages() const {
+    return _approxNumLeafPages.has_value() && _approxNumLeafPages.value() > 0;
+}
+
 double CollectionStats::numPages() const {
     // Prefer the storage engine's leaf page count if available: it tracks the actual page structure
     // of the tree, whereas the size-based fallback assumes leaf pages are filled to
     // '_pageSizeBytes'.
-    if (_approxNumLeafPages && *_approxNumLeafPages > 0) {
+    if (hasApproxNumLeafPages()) {
         return quantizePageCount(*_approxNumLeafPages);
     }
 

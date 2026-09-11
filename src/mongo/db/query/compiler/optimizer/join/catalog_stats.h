@@ -39,6 +39,14 @@ struct CollectionStats {
      */
     double numPages() const;
 
+    /**
+     * Whether the storage engine reported a usable (positive) approximate leaf page count for
+     * this collection. False when no count was reported or the reported count was non-positive
+     * (defensive; the WT record store already maps its raw "never tracked / tree never split"
+     * 0 to boost::none). When false, numPages() falls back to the size-based estimate.
+     */
+    bool hasApproxNumLeafPages() const;
+
     // Estimate of the data size of this collection when in-memory (uncompressed and unencrypted).
     double logicalDataSizeBytes;
 

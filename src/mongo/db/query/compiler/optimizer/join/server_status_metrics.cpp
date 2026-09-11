@@ -30,6 +30,10 @@ void recordJoinOptimizationMetrics(const OpDebug::JoinOptimizationMetrics& metri
         joinOptMetrics.numSamplingCalls.increment(pe->numSamplingCalls);
         joinOptMetrics.numPersistentSamplesUsed.increment(pe->numPersistentSamplesUsed);
         joinOptMetrics.numPersistentNDVStatsUsed.increment(pe->numPersistentNDVStatsUsed);
+        if (pe->numApproxLeafPagesUnavailable) {
+            joinOptMetrics.numApproxLeafPagesUnavailable.increment(
+                *pe->numApproxLeafPagesUnavailable);
+        }
         joinOptMetrics.numPlansEnumerated.increment(pe->numPlansEnumerated);
         joinOptMetrics.numMemoizedNodes.increment(pe->numMemoizedNodes);
         joinOptMetrics.numJoinNodesRejectedByCost.increment(pe->numJoinNodesRejectedByCost);

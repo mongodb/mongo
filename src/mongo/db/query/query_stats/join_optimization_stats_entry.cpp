@@ -101,6 +101,10 @@ void JoinOptimizationStatsEntry::appendTo(BSONObjBuilder& builder) const {
                                                                     "numUniqueIndexesUsedForNDV");
         planEnumerationMetrics->numPersistentNDVStatsUsed.appendTo(metricsEntryBuilder,
                                                                    "numPersistentNDVStatsUsed");
+        if (planEnumerationMetrics->numApproxLeafPagesUnavailable) {
+            planEnumerationMetrics->numApproxLeafPagesUnavailable->appendTo(
+                metricsEntryBuilder, "numApproxLeafPagesUnavailable");
+        }
         planEnumerationMetrics->samplingTimeMicros.appendTo(metricsEntryBuilder,
                                                             "samplingTimeMicros");
         planEnumerationMetrics->cbrPlanningTimeMicros.appendTo(metricsEntryBuilder,
@@ -161,6 +165,15 @@ void JoinOptimizationStatsEntry::updateStats(const SupplementalStatsEntry* other
                 other.numUniqueIndexesUsedForNDV);
             planEnumerationMetrics->numPersistentNDVStatsUsed.combine(
                 other.numPersistentNDVStatsUsed);
+            if (other.numApproxLeafPagesUnavailable) {
+                if (planEnumerationMetrics->numApproxLeafPagesUnavailable) {
+                    planEnumerationMetrics->numApproxLeafPagesUnavailable->combine(
+                        *other.numApproxLeafPagesUnavailable);
+                } else {
+                    planEnumerationMetrics->numApproxLeafPagesUnavailable =
+                        other.numApproxLeafPagesUnavailable;
+                }
+            }
             planEnumerationMetrics->samplingTimeMicros.combine(other.samplingTimeMicros);
             planEnumerationMetrics->cbrPlanningTimeMicros.combine(other.cbrPlanningTimeMicros);
             planEnumerationMetrics->planEnumerationTimeMicros.combine(

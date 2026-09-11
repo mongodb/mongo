@@ -274,27 +274,28 @@ plan cache hit. They are therefore reported alongside their own counter, `numPla
 which should be used as the denominator rather than `updateCount`. The whole group is omitted when
 this shape never enumerated a plan.
 
-| Metric                               | Type             | Description                                                                                 |
-| ------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------- |
-| `numPlanEnumerations`                | count            | Number of executions of this shape that ran plan enumeration.                               |
-| `numPlansEnumerated`                 | counter          | Number of plans considered in the final subset.                                             |
-| `numHashJoins`                       | counter          | Number of hash joins enumerated.                                                            |
-| `numIndexedNestedLoopJoins`          | counter          | Number of indexed nested loop joins enumerated.                                             |
-| `numNestedLoopJoins`                 | counter          | Number of nested loop joins enumerated.                                                     |
-| `numFinalPlanHashJoins`              | counter          | Number of hash joins in the winning plan.                                                   |
-| `numFinalPlanIndexedNestedLoopJoins` | counter          | Number of indexed nested loop joins in the winning plan.                                    |
-| `numFinalPlanNestedLoopJoins`        | counter          | Number of nested loop joins in the winning plan.                                            |
-| `numJoinNodesRejectedByCost`         | counter          | Number of join nodes considered but not memoized because their cost was too high.           |
-| `numMemoizedNodes`                   | counter          | Number of nodes memoized.                                                                   |
-| `winningPlanCost`                    | counter (double) | Cost of the winning plan.                                                                   |
-| `numSamplingCalls`                   | counter          | Number of times join optimization sampled for cardinality estimation.                       |
-| `numPersistentSamplesUsed`           | counter          | Number of persistent samples that could be reused instead of sampling.                      |
-| `numUniqueIndexesUsedForNDV`         | counter          | Number of unique indexes used for NDV estimation.                                           |
-| `samplingTimeMicros`                 | counter (micros) | Time spent acquiring samples for cardinality estimation.                                    |
-| `cbrPlanningTimeMicros`              | counter (micros) | Time spent generating single-table access plans in CBR.                                     |
-| `planEnumerationTimeMicros`          | counter (micros) | Time spent enumerating plans and picking a winner.                                          |
-| `ceTimeMicros`                       | counter (micros) | Time spent evaluating cardinality estimates for join optimization, separate from CE in CBR. |
-| `numPersistentNDVStatsUsed`          | counter          | Number of persisted NDV statistics (analyze mode "ndv") that served join planning.          |
+| Metric                               | Type             | Description                                                                                                                                                                                                                            |
+| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `numPlanEnumerations`                | count            | Number of executions of this shape that ran plan enumeration.                                                                                                                                                                          |
+| `numPlansEnumerated`                 | counter          | Number of plans considered in the final subset.                                                                                                                                                                                        |
+| `numHashJoins`                       | counter          | Number of hash joins enumerated.                                                                                                                                                                                                       |
+| `numIndexedNestedLoopJoins`          | counter          | Number of indexed nested loop joins enumerated.                                                                                                                                                                                        |
+| `numNestedLoopJoins`                 | counter          | Number of nested loop joins enumerated.                                                                                                                                                                                                |
+| `numFinalPlanHashJoins`              | counter          | Number of hash joins in the winning plan.                                                                                                                                                                                              |
+| `numFinalPlanIndexedNestedLoopJoins` | counter          | Number of indexed nested loop joins in the winning plan.                                                                                                                                                                               |
+| `numFinalPlanNestedLoopJoins`        | counter          | Number of nested loop joins in the winning plan.                                                                                                                                                                                       |
+| `numJoinNodesRejectedByCost`         | counter          | Number of join nodes considered but not memoized because their cost was too high.                                                                                                                                                      |
+| `numMemoizedNodes`                   | counter          | Number of nodes memoized.                                                                                                                                                                                                              |
+| `winningPlanCost`                    | counter (double) | Cost of the winning plan.                                                                                                                                                                                                              |
+| `numSamplingCalls`                   | counter          | Number of times join optimization sampled for cardinality estimation.                                                                                                                                                                  |
+| `numPersistentSamplesUsed`           | counter          | Number of persistent samples that could be reused instead of sampling.                                                                                                                                                                 |
+| `numUniqueIndexesUsedForNDV`         | counter          | Number of unique indexes used for NDV estimation.                                                                                                                                                                                      |
+| `samplingTimeMicros`                 | counter (micros) | Time spent acquiring samples for cardinality estimation.                                                                                                                                                                               |
+| `cbrPlanningTimeMicros`              | counter (micros) | Time spent generating single-table access plans in CBR.                                                                                                                                                                                |
+| `planEnumerationTimeMicros`          | counter (micros) | Time spent enumerating plans and picking a winner.                                                                                                                                                                                     |
+| `ceTimeMicros`                       | counter (micros) | Time spent evaluating cardinality estimates for join optimization, separate from CE in CBR.                                                                                                                                            |
+| `numPersistentNDVStatsUsed`          | counter          | Number of persisted NDV statistics (analyze mode "ndv") that served join planning.                                                                                                                                                     |
+| `numApproxLeafPagesUnavailable`      | counter          | Number of join-graph collections without a usable approximate leaf page count from the storage engine, forcing cost estimation onto the size-based page estimate. Omitted if planning failed before catalog statistics were collected. |
 
 ##### Fallback Reasons
 

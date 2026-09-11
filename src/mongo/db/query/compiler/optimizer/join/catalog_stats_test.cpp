@@ -59,6 +59,12 @@ TEST_F(CatalogStatsTest, NumPagesPrefersStorageEngineLeafPageCount) {
     ASSERT_EQ(CollectionStats(1000, 500, 100, 0.0).numPages(), sizeBasedPages);
     ASSERT_EQ(CollectionStats(1000, 500, 100, -1.0).numPages(), sizeBasedPages);
 
+    // hasApproxNumLeafPages() reports whether the size-based fallback was avoided.
+    ASSERT_TRUE(CollectionStats(1000, 500, 100, 4096.0).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, boost::none).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, 0.0).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, -1.0).hasApproxNumLeafPages());
+
     // Both paths are quantized, so values within the same 2^(1/4) bucket produce identical
     // results.
     ASSERT_EQ(CollectionStats(1000, 500, 100).numPages(),

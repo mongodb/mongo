@@ -491,6 +491,12 @@ public:
             // plan enumeration, for edge selectivity estimation or costing. Repeated requests
             // for the same statistics are memoized and counted once.
             int numPersistentNDVStatsUsed = 0;
+            // Number of join-graph collections for which the storage engine did not report a
+            // usable approximate leaf page count (see RecordStore::approxNumLeafPages()), forcing
+            // cost estimation to fall back to a size-based estimate. 'boost::none' until catalog
+            // statistics are collected, so a planning failure reads as "never measured" rather
+            // than as a measured zero.
+            boost::optional<int> numApproxLeafPagesUnavailable;
 
             // Time spent acquiring samples for CE.
             int64_t samplingTimeMicros = 0;

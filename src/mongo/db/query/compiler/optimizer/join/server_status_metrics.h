@@ -86,6 +86,8 @@ struct JoinOptimizationServerStatusMetrics {
         *MetricBuilder<Counter64>{"query.joinOptimization.numPersistentSamplesUsed"};
     Counter64& numPersistentNDVStatsUsed =
         *MetricBuilder<Counter64>{"query.joinOptimization.numPersistentNDVStatsUsed"};
+    Counter64& numApproxLeafPagesUnavailable =
+        *MetricBuilder<Counter64>{"query.joinOptimization.numApproxLeafPagesUnavailable"};
     Counter64& numSuffixSourcesPushedToSbe =
         *MetricBuilder<Counter64>{"query.joinOptimization.numSuffixSourcesPushedToSbe"};
     Counter64& numResidualClassicSources =

@@ -769,6 +769,16 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
 
+    // Count the distinct join-graph namespaces whose storage-engine approximate leaf page count is
+    // unavailable, forcing cost estimation onto the size-based fallback. 'collStats' covers every
+    // collection in 'mca', a superset of the join-graph namespaces; collections referenced only by
+    // the unoptimized suffix are never costed, so they are not counted.
+    const auto& graphNamespaces = model.getDistinctNamespaces();
+    peMetrics.numApproxLeafPagesUnavailable = static_cast<int>(
+        std::count_if(graphNamespaces.begin(), graphNamespaces.end(), [&](const auto& nss) {
+            return !ctx.catStats.collStats.at(nss).hasApproxNumLeafPages();
+        }));
+
     JoinCardinalityEstimator cardEstimator(
         JoinCardinalityEstimator::make(ctx, samplingEstimators, peMetrics));
     JoinCostEstimatorImpl costEstimator(ctx, cardEstimator);

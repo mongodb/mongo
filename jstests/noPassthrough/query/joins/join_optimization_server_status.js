@@ -24,6 +24,7 @@ describe("join optimization serverStatus metrics", function () {
         "numSamplingCalls",
         "numPersistentSamplesUsed",
         "numPersistentNDVStatsUsed",
+        "numApproxLeafPagesUnavailable",
         "numSuffixSourcesPushedToSbe",
         "numResidualClassicSources",
     ];
@@ -232,6 +233,14 @@ describe("join optimization serverStatus metrics", function () {
         assert.eq(counterDelta(before, after, "numEnumerations"), 1, "enumerations", attr);
         // One sample is generated per distinct namespace in the join graph.
         assert.eq(counterDelta(before, after, "numSamplingCalls"), 3, "sampling calls", attr);
+        // All three collections are small enough that their b-trees never split (fit on a single leaf), so the storage
+        // engine's approximate leaf page count is unavailable for each.
+        assert.eq(
+            counterDelta(before, after, "numApproxLeafPagesUnavailable"),
+            3,
+            "approx leaf pages unavailable",
+            attr,
+        );
         // The winning plan joins three nodes, so it contains exactly two joins.
         assert.eq(
             counterDelta(before, after, "numFinalPlanHashJoins") +
@@ -245,6 +254,138 @@ describe("join optimization serverStatus metrics", function () {
             assert.eq(histogramDelta(before, after, name), 1, `histogram '${name}'`, attr);
         }
         assert.docEq({}, fallbackReasonDelta(before, after), "query was fully optimized", attr);
+    });
+
+    it("does not count collections whose approximate leaf page count is available", function () {
+        // Insert enough data that the collection's b-tree splits into multiple leaf pages, then
+        // checkpoint so the incrementally maintained leaf page counter is reconciled to a positive
+        // value and the storage engine can report it.
+        const bigItems = this.db.bigItems;
+        bigItems.drop();
+        const pad = "x".repeat(10 * 1024);
+        assert.commandWorked(
+            bigItems.insertMany(
+                Array.from({length: 1000}, (_, i) => ({_id: i, b: i % 10, pad: pad})),
+            ),
+        );
+        assert.commandWorked(bigItems.createIndex({a: 1, b: 1}));
+        assert.commandWorked(this.db.adminCommand({fsync: 1}));
+
+        const before = this.metrics();
+        assert.eq(
+            this.orders
+                .aggregate(
+                    [
+                        {
+                            $lookup: {
+                                from: bigItems.getName(),
+                                localField: "b",
+                                foreignField: "b",
+                                as: "item",
+                            },
+                        },
+                        {$unwind: "$item"},
+                    ],
+                    {cursor: {batchSize: 100000}},
+                )
+                .itcount(),
+            10000,
+        );
+        const after = this.metrics();
+
+        // Only the small 'orders' collection lacks a page count; 'bigItems' reports one.
+        assert.eq(
+            counterDelta(before, after, "numApproxLeafPagesUnavailable"),
+            1,
+            "only the never-split collection should be counted",
+            {before, after},
+        );
+    });
+
+    it("counts numApproxLeafPagesUnavailable once per distinct namespace", function () {
+        // 'customers' appears in two $lookups but is a single namespace in the catalog stats, so
+        // its missing page count is counted once.
+        const before = this.metrics();
+        assert.eq(
+            this.orders
+                .aggregate(
+                    [
+                        {
+                            $lookup: {
+                                from: this.customers.getName(),
+                                localField: "a",
+                                foreignField: "a",
+                                as: "c1",
+                            },
+                        },
+                        {$unwind: "$c1"},
+                        {
+                            $lookup: {
+                                from: this.customers.getName(),
+                                localField: "b",
+                                foreignField: "b",
+                                as: "c2",
+                            },
+                        },
+                        {$unwind: "$c2"},
+                    ],
+                    {cursor: {batchSize: 100000}},
+                )
+                .itcount(),
+            1000,
+        );
+        const after = this.metrics();
+
+        assert.eq(
+            counterDelta(before, after, "numApproxLeafPagesUnavailable"),
+            2,
+            "orders and customers each counted once",
+            {before, after},
+        );
+    });
+
+    it("does not count namespaces referenced only by the unoptimized suffix", function () {
+        // The $group ends the join-optimizable prefix, so the second $lookup stays in the suffix:
+        // 'items' is acquired but never costed, leaving only 'orders' and 'customers' counted.
+        const before = this.metrics();
+        assert.eq(
+            this.orders
+                .aggregate(
+                    [
+                        {
+                            $lookup: {
+                                from: this.customers.getName(),
+                                localField: "a",
+                                foreignField: "a",
+                                as: "customer",
+                            },
+                        },
+                        {$unwind: "$customer"},
+                        {$group: {_id: "$b", n: {$sum: 1}}},
+                        {$_internalInhibitOptimization: {}},
+                        {
+                            $lookup: {
+                                from: this.items.getName(),
+                                localField: "_id",
+                                foreignField: "b",
+                                as: "item",
+                            },
+                        },
+                        {$unwind: "$item"},
+                    ],
+                    {cursor: {batchSize: 100000}},
+                )
+                .itcount(),
+            100,
+        );
+        const after = this.metrics();
+
+        assert.eq(
+            counterDelta(before, after, "numApproxLeafPagesUnavailable"),
+            2,
+            "suffix-only namespace should not be counted",
+            {before, after},
+        );
     });
 
     it("skips enumeration on a join plan cache hit", function () {

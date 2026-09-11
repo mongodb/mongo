@@ -128,6 +128,53 @@ TEST(WiredTigerRecordStoreTest, ConfigStringValueFormatOverridesUserSuppliedForm
     ASSERT_BSONOBJ_EQ(doc, readBack);
 }
 
+TEST(WiredTigerRecordStoreTest, ApproxNumLeafPagesUnavailableUntilTreeSplits) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    // An empty tree has never split a leaf page, so the count is the "unavailable" sentinel.
+    ASSERT_EQ(rs->approxNumLeafPages(ru), boost::none);
+
+    // A single small document still fits on one leaf page: the WT counter stays 0 even after a
+    // checkpoint reconciles the tree, and 0 is reported as unavailable.
+    BSONObj doc = BSON("x" << "hello");
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->insertRecord(opCtx.get(), ru, doc.objdata(), doc.objsize(), Timestamp())
+                      .getStatus());
+        txn.commit();
+    }
+    harnessHelper->getEngine()->checkpoint();
+    ASSERT_EQ(rs->approxNumLeafPages(ru), boost::none);
+
+    // Write well past one 32KB leaf page of data; once a checkpoint reconciles the tree into
+    // multiple leaf pages, the count becomes available and positive. Insert one record per
+    // transaction and retry on transient rollbacks (e.g. TemporarilyUnavailable under cache
+    // pressure on slow machines), which production write paths retry but a test must handle.
+    BSONObj bigDoc = BSON("pad" << std::string(10 * 1024, 'x'));
+    for (int i = 0; i < 40; ++i) {
+        for (int attempt = 0;; ++attempt) {
+            try {
+                StorageWriteTransaction txn(ru);
+                ASSERT_OK(rs->insertRecord(
+                                opCtx.get(), ru, bigDoc.objdata(), bigDoc.objsize(), Timestamp())
+                              .getStatus());
+                txn.commit();
+                break;
+            } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+                ASSERT_LT(attempt, 100) << "insert kept rolling back transiently";
+            }
+        }
+    }
+    harnessHelper->getEngine()->checkpoint();
+    const auto pages = rs->approxNumLeafPages(ru);
+    ASSERT_TRUE(pages.has_value());
+    ASSERT_GT(*pages, 1);
+}
+
 TEST(WiredTigerRecordStoreTest, WriteThrottlerStorageWriteCountedOnInsert) {
     // Each successful record write is counted on WriteThrottlerAdmissionContext when the op was
     // write-throttle admitted. A record store with no indexes writes exactly one key per inserted

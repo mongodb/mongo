@@ -65,6 +65,10 @@ public:
                 AggregatedMetric<int64_t>(pe->planEnumerationTimeMicros),
                 AggregatedMetric<int64_t>(pe->ceTimeMicros),
             };
+            if (pe->numApproxLeafPagesUnavailable) {
+                planEnumerationMetrics->numApproxLeafPagesUnavailable =
+                    AggregatedMetric<int64_t>(*pe->numApproxLeafPagesUnavailable);
+            }
         }
         updateCount++;
     }
@@ -132,6 +136,8 @@ public:
         AggregatedMetric<int64_t> cbrPlanningTimeMicros;
         AggregatedMetric<int64_t> planEnumerationTimeMicros;
         AggregatedMetric<int64_t> ceTimeMicros;
+
+        boost::optional<AggregatedMetric<int64_t>> numApproxLeafPagesUnavailable;
     };
     boost::optional<PlanEnumerationMetrics> planEnumerationMetrics;
 };

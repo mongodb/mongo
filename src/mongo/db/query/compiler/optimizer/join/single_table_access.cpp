@@ -21,6 +21,10 @@ namespace mongo::join_ordering {
 MONGO_FAIL_POINT_DEFINE(sleepWhileSamplingForJoinOptimization);
 MONGO_FAIL_POINT_DEFINE(sleepWhileCbrPlanningForJoinOptimization);
 
+// Fails single-table access planning, so tests can exercise the fallback path where enumeration
+// started but planning stopped before catalog statistics were collected.
+MONGO_FAIL_POINT_DEFINE(failSingleTableAccessPlansForJoinOptimization);
+
 SamplingEstimatorMap makeSamplingEstimators(
     const MultipleCollectionAccessor& collections,
     const JoinGraph& graph,
@@ -188,6 +192,12 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     ON_BLOCK_EXIT([&]() { metrics.cbrPlanningTimeMicros = cbrPlanningTimer.micros(); });
     sleepWhileCbrPlanningForJoinOptimization.execute(
         [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
+    if (MONGO_unlikely(failSingleTableAccessPlansForJoinOptimization.shouldFail())) {
+        return Status(ErrorCodes::InternalError,
+                      "single-table access planning failed due to "
+                      "'failSingleTableAccessPlansForJoinOptimization' fail point");
+    }
 
     const auto numNodes = graph.numNodes();
     QuerySolutionMap solns;

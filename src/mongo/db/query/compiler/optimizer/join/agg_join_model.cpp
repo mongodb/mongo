@@ -421,21 +421,20 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     auto expCtx = pipeline.getContext();
 
     // Count number of unique namespaces involved in join graph prefix for metrics collection
-    // purposes. Ensure that we update this metric for any exit path, be it a fallback or a
-    // successful AggJoinModel construction. The same goes for the modeling time: we record it even
-    // if model construction fails, so that the cost of an unsuccessful join-optimization attempt is
-    // visible.
+    // purposes.
     absl::flat_hash_set<NamespaceString> uniqueNamespaces;
+
     Timer joinModelingTimer;
-    ON_BLOCK_EXIT([&]() {
-        metrics.numNamespaces = uniqueNamespaces.size();
-        metrics.joinModelingTimeMicros = joinModelingTimer.micros();
-    });
+    // Ensure that we update the join modeling timing metric on any exit path, even if model
+    // construction fails, so that the cost of an unsuccessful join-optimization attempt is
+    // visible.
+    ON_BLOCK_EXIT([&]() { metrics.joinModelingTimeMicros = joinModelingTimer.micros(); });
     sleepWhileBuildingJoinModel.execute(
         [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
 
     const auto& nss = expCtx->getNamespaceString();
     uniqueNamespaces.insert(nss);
+    metrics.numNamespaces = uniqueNamespaces.size();
     auto clonedExpCtx = makeCopyFromExpressionContext(expCtx, nss);
     auto suffix = pipeline.clone(clonedExpCtx);
 
@@ -544,6 +543,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
             }
 
             uniqueNamespaces.insert(lookup->getFromNs());
+            metrics.numNamespaces = uniqueNamespaces.size();
 
         } else if (auto* match = dynamic_cast<DocumentSourceMatch*>(stage); match) {
             if (graph.numNodes() < 2) {
@@ -630,7 +630,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
                         std::move(prefix),
                         std::move(suffix),
                         std::move(swVec.getValue()),
-                        std::move(clonedExpCtx));
+                        std::move(clonedExpCtx),
+                        std::move(uniqueNamespaces));
 }
 
 BSONObj AggJoinModel::toBSON() const {
