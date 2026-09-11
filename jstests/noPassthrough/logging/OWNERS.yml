@@ -6,3 +6,6 @@ filters:
   - "log_collectionType*.js":
     approvers:
       - 10gen/query-integration-observability
+  - "log_write_command_fields.js":
+    approvers:
+      - 10gen/query-integration-observability
