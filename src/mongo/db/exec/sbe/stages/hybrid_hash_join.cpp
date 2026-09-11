@@ -674,10 +674,8 @@ void HybridHashJoin::finishBuild() {
                 // finishProbe()
             }
         }
-        if (_recordsAddedToWriter > 0) {
-            updateSpillingStats(_recordsAddedToWriter);
-            _recordsAddedToWriter = 0;
-        }
+        updateSpillingStats(_recordsAddedToWriter);
+        _recordsAddedToWriter = 0;
 
         // Re-initialize hash table from memory-resident partitions
         buildHashTableFromInMemPartitions();
@@ -833,17 +831,23 @@ boost::filesystem::path HybridHashJoin::getTempDir() const {
 
 void HybridHashJoin::updateSpillingStats(uint64_t nRecords) {
     auto& spillingStats = _stats.spillingStats;
-    auto spillToDiskBytes =
-        _fileStats->bytesSpilledUncompressed() - spillingStats.getSpilledBytes();
 
-    auto spilledDataStorageIncrease = spillingStats.updateSpillingStats(
-        1,
-        spillToDiskBytes,
-        nRecords,
-        _fileStats->bytesSpilled() - (int64_t)spillingStats.getSpilledDataStorageSize());
+    const int64_t totalSpilledBytes = _fileStats->bytesSpilledUncompressed();
+    const int64_t previouslyReportedBytes = static_cast<int64_t>(spillingStats.getSpilledBytes());
+    const uint64_t spillToDiskBytes =
+        static_cast<uint64_t>(totalSpilledBytes - previouslyReportedBytes);
+
+    if (nRecords == 0 && spillToDiskBytes == 0) {
+        return;
+    }
+
+    const uint64_t nSpills = nRecords > 0 ? 1 : 0;
+
+    const uint64_t spilledDataStorageIncrease = spillingStats.updateSpillingStats(
+        nSpills, spillToDiskBytes, nRecords, static_cast<uint64_t>(_fileStats->bytesSpilled()));
 
     hashJoinCounters.incrementPerSpilling(
-        1, spillToDiskBytes, nRecords, spilledDataStorageIncrease);
+        nSpills, spillToDiskBytes, nRecords, spilledDataStorageIncrease);
 }
 
 // Return kNumPartitions if no more left
@@ -862,6 +866,10 @@ size_t HybridHashJoin::findNextSpilledPartitionIdx() {
  * when the stage is reopened.
  */
 void HybridHashJoin::reset() {
+    if (_fileStats) {
+        updateSpillingStats(_recordsAddedToWriter);
+    }
+
     _ht->clear();
     _ht->rehash(0);
 
@@ -873,7 +881,6 @@ void HybridHashJoin::reset() {
     _partitionSpills.shrink_to_fit();
     _bloomFilter.reset();
 
-    _fileStats.reset();
     _memUsage = 0;
     _isPartitioned = false;
 

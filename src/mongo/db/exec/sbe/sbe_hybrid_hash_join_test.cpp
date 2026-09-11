@@ -794,6 +794,86 @@ TEST_F(HybridHashJoinTestFixture, ResetAfterSpillAllowsReuse) {
     ASSERT_EQ(matches2.size(), 0u);
 }
 
+TEST_F(HybridHashJoinTestFixture, SpillingStatsAccumulateAcrossReset) {
+    auto runSpillingPass = [&](HybridHashJoin& hhj) {
+        for (int i = 0; i < 50; ++i) {
+            hhj.addBuild(makeKeyRow(i), makeProjectRow("build_payload_" + std::to_string(i)));
+        }
+        hhj.finishBuild();
+        ASSERT_TRUE(hhj.isPartitioned());
+
+        value::MaterializedRow probeKey(1);
+        value::MaterializedRow probeProject(1);
+        auto cursor = JoinCursor::empty();
+        for (int i = 0; i < 50; ++i) {
+            probeKey = makeKeyRow(i);
+            probeProject = makeProjectRow("probe_payload_" + std::to_string(i));
+            hhj.probe(probeKey, probeProject, cursor);
+        }
+        hhj.finishProbe();
+        while (auto cursorOpt = hhj.nextSpilledJoinCursor()) {
+            while (cursorOpt->next()) {
+            }
+        }
+    };
+
+    auto hhj = makeHHJ();
+    runSpillingPass(*hhj);
+    const auto singleSpills = stats.spillingStats.getSpills();
+    const auto singleBytes = stats.spillingStats.getSpilledBytes();
+    const auto singleRecords = stats.spillingStats.getSpilledRecords();
+    const auto singleStorage = stats.spillingStats.getSpilledDataStorageSize();
+    ASSERT_GT(singleBytes, 0u);
+    ASSERT_GT(singleStorage, 0u);
+
+    hhj->reset();
+    runSpillingPass(*hhj);
+    ASSERT_EQ(stats.spillingStats.getSpills(), 2 * singleSpills);
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 2 * singleRecords);
+    ASSERT_EQ(stats.spillingStats.getSpilledBytes(), 2 * singleBytes);
+    ASSERT_EQ(stats.spillingStats.getSpilledDataStorageSize(), 2 * singleStorage);
+}
+
+TEST_F(HybridHashJoinTestFixture, ResetReportsUnreportedSpilledRecords) {
+    auto hhj = makeHHJ();
+    for (int i = 0; i < 50; ++i) {
+        hhj->addBuild(makeKeyRow(i), makeProjectRow("build_payload_" + std::to_string(i)));
+    }
+    hhj->finishBuild();
+    ASSERT_TRUE(hhj->isPartitioned());
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 50u);
+
+    const auto recordsAfterBuild = stats.spillingStats.getSpilledRecords();
+    const auto spillsAfterBuild = stats.spillingStats.getSpills();
+
+    // Write probe records to the spilled partitions, then reset before finishProbe() gets a
+    // chance to report them.
+    value::MaterializedRow probeKey(1);
+    value::MaterializedRow probeProject(1);
+    auto cursor = JoinCursor::empty();
+    for (int i = 0; i < 50; ++i) {
+        probeKey = makeKeyRow(i);
+        probeProject = makeProjectRow("probe_payload_" + std::to_string(i));
+        hhj->probe(probeKey, probeProject, cursor);
+    }
+
+    hhj->reset();
+
+    ASSERT_GT(stats.spillingStats.getSpilledRecords(), recordsAfterBuild);
+    ASSERT_EQ(stats.spillingStats.getSpills(), spillsAfterBuild + 1);
+}
+
+TEST_F(HybridHashJoinTestFixture, FinishBuildReportsFinalBufferFlushWithoutPendingRecords) {
+    auto hhj = makeHHJ();
+    hhj->addBuild(makeKeyRow(1), makeProjectRow(std::string(512, 'x')));
+    hhj->finishBuild();
+    ASSERT_TRUE(hhj->isPartitioned());
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 1u);
+    ASSERT_GT(stats.spillingStats.getSpilledBytes(), 0u);
+    ASSERT_GT(stats.spillingStats.getSpilledDataStorageSize(), 0u);
+    ASSERT_EQ(stats.spillingStats.getSpills(), 1u);
+}
+
 TEST_F(HybridHashJoinTestFixture, ProbeOnlyNonMatchingKeysToSpilledPartition) {
     auto hhj = makeHHJ();
 
