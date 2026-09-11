@@ -203,31 +203,18 @@ DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
     return std::next(itr);
 }
 
-std::pair<Value, Value> DocumentSourceGraphLookUp::serializeFromAndInternalFromPipeline(
-    const query_shape::SerializationOptions& opts) const {
+// TODO SERVER-125478 refactor serialization to use IDL toBSON.
+void DocumentSourceGraphLookUp::serializeToArray(
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
+    // Rewrite to the resolved backing whenever we're producing a wire-bound payload — that covers
+    // both the router and a shard acting as sub-router. Without the latter, a shard dispatching a
+    // sub-aggregate to peer shards would emit the view name and the peers would re-resolve it,
+    // which races with concurrent view-catalog mutations.
     const bool serializeForRemote =
         getExpCtx()->getInRouter() || opts.isSerializingForRemoteDispatch;
-    // Only carry the resolved view pipeline as $_internalFromPipeline when
-    // featureFlagExtensionsInsideHybridSearch is enabled.
-    const auto& ifrCtx = getExpCtx()->getIfrContext();
-    const auto hybridSearchFlagEnabled = ifrCtx &&
-        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-    // When the flag is enabled and we're producing a wire-bound serialization, rewrite 'from' to
-    // the resolved backing collection. The backing rewrite is only safe alongside
-    // $_internalFromPipeline (serialized below). If we don't include the resolved pipeline, we need
-    // to be sure that the recipient receives the view name so it can be re-derived.
-    //
-    // TODO SERVER-134527: When it comes to explain, $graphLookup faces a decision with no good
-    // answer:
-    // 1) We can serialize the request as the user specified it, no views resolved. This is
-    // inconsistent with $lookup and $unionWith, which display the resolved view in explain.
-    // 2) We can serialize the request with the resolved view, which would require outputting an
-    // $_internal field to the user. Other such fields are often hidden from explain.
-    // The longstanding behavior is to do (1), so we do that for now.
-    const auto useBackingNs = serializeForRemote && hybridSearchFlagEnabled &&
-        !opts.isSerializingForExplain() && !opts.isShapifying();
-    const auto& serializeFromNs = useBackingNs ? _fromExpCtx->getNamespaceString() : getFromNs();
+    const auto& serializeFromNs =
+        serializeForRemote ? _fromExpCtx->getNamespaceString() : getFromNs();
     auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(serializeFromNs)
         ? Value(opts.serializeIdentifier(serializeFromNs.coll()))
         : Value(Document{{"db",
@@ -235,38 +222,12 @@ std::pair<Value, Value> DocumentSourceGraphLookUp::serializeFromAndInternalFromP
                               serializeFromNs.dbName().serializeWithoutTenantPrefix_UNSAFE())},
                          {"coll", opts.serializeIdentifier(serializeFromNs.coll())}});
 
-    // When producing a wire-bound serialization (router dispatch or shard sub-router), carry the
-    // resolved view pipeline so the recipient shard can reconstruct _params.fromLpp without
-    // re-resolving the view. This is necessary because 'serializeFromNs' above uses the backing
-    // collection name (not the view name) when the flag is enabled, so the receiver's lite parse
-    // sees no view and leaves fromLpp empty.
-    Value internalFromPipelineValue;
-    if (useBackingNs && _params.fromLpp && !(*_params.fromLpp)->getStages().empty()) {
-        auto pipeline = Pipeline::parseFromLiteParsed(_params.fromLpp->pipeline(), _fromExpCtx);
-        std::vector<Value> pipelineVals;
-        for (const auto& stage : pipeline->getSources()) {
-            stage->serializeToArray(pipelineVals, opts);
-        }
-        internalFromPipelineValue = Value(std::move(pipelineVals));
-    }
-
-    return {std::move(fromValue), std::move(internalFromPipelineValue)};
-}
-
-// TODO SERVER-125478 refactor serialization to use IDL toBSON.
-void DocumentSourceGraphLookUp::serializeToArray(
-    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
-    auto [fromValue, internalFromPipelineValue] = serializeFromAndInternalFromPipeline(opts);
-
     // Serialize default options.
-    MutableDocument spec(
-        Document{{"from", std::move(fromValue)},
-                 {"as", opts.serializeFieldPath(getAsField())},
-                 {"connectToField", opts.serializeFieldPath(getConnectToField())},
-                 {"connectFromField", opts.serializeFieldPath(getConnectFromField())},
-                 {"startWith", getStartWithField()->serialize(opts)},
-                 {DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName,
-                  std::move(internalFromPipelineValue)}});
+    MutableDocument spec(DOC("from"
+                             << fromValue << "as" << opts.serializeFieldPath(getAsField())
+                             << "connectToField" << opts.serializeFieldPath(getConnectToField())
+                             << "connectFromField" << opts.serializeFieldPath(getConnectFromField())
+                             << "startWith" << getStartWithField()->serialize(opts)));
 
     // depthField is optional; serialize it if it was specified.
     if (getDepthField()) {
@@ -287,15 +248,31 @@ void DocumentSourceGraphLookUp::serializeToArray(
         }
     }
 
+    // When producing a wire-bound payload (router dispatch or shard sub-router), carry the
+    // resolved view pipeline so the receiver can reconstruct _params.fromLpp without re-resolving
+    // the view. This is necessary because serializeFromNs above uses the backing collection name
+    // (not the view name), so the receiver's lite parse sees no view and leaves fromLpp empty.
+    if (serializeForRemote && !opts.isSerializingForExplain() && !opts.isShapifying()) {
+        if (_params.fromLpp && !(*_params.fromLpp)->getStages().empty()) {
+            auto pipeline = Pipeline::parseFromLiteParsed(_params.fromLpp->pipeline(), _fromExpCtx);
+            std::vector<Value> pipelineVals;
+            for (const auto& stage : pipeline->getSources()) {
+                stage->serializeToArray(pipelineVals, opts);
+            }
+            spec[DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName] =
+                Value(std::move(pipelineVals));
+        }
+    }
+
     // If we are explaining, include an absorbed $unwind inside the $graphLookup
     // specification.
     if (_unwind && opts.isSerializingForExplain()) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
-            Value(Document{{"preserveNullAndEmptyArrays",
-                            opts.serializeLiteral((*_unwind)->preserveNullAndEmptyArrays())},
-                           {"includeArrayIndex",
-                            (indexPath ? Value(opts.serializeFieldPath(*indexPath)) : Value())}});
+            Value(DOC("preserveNullAndEmptyArrays"
+                      << opts.serializeLiteral((*_unwind)->preserveNullAndEmptyArrays())
+                      << "includeArrayIndex"
+                      << (indexPath ? Value(opts.serializeFieldPath(*indexPath)) : Value())));
     }
 
     MutableDocument out;
@@ -526,12 +503,12 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                 AllowedWithClientType::kInternal);
 
             // A router that resolved a view for 'from' sends the resolved definition in this field,
-            // but only when it serialized the request while
-            // 'featureFlagExtensionsInsideHybridSearch' was enabled; We enter this parsing function
-            // when 'featureFlagExtensionsInsideHybridSearch' is disabled. That combination should
-            // be impossible: a shard that disables the flag mid-operation propagates the
-            // IFRFlagRetry back to the router, and the router then retries the request with the
-            // flag off, which does not serialize '$_internalFromPipeline' at all.
+            // but only when it parsed the request with 'featureFlagExtensionsInsideHybridSearch'
+            // enabled; We enter this parsing function when
+            // 'featureFlagExtensionsInsideHybridSearch' is disabled. That combination should be
+            // impossible: a shard that disables the flag mid-operation propagates the IFRFlagRetry
+            // back to the router, and the router then retries the request with the flag off, which
+            // does not serialize '$_internalFromPipeline' at all.
             tasserted(13248900,
                       "Cannot parse '$_internalFromPipeline' when "
                       "'featureFlagExtensionsInsideHybridSearch' is disabled");
