@@ -1357,5 +1357,11 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  - {
+      code: 527,
+      name: StreamProcessorMaterializeError,
+      categories: [StreamProcessorUserError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
