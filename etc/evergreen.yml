@@ -485,6 +485,131 @@ functions:
     params:
       directory: ${git_project_directory|src}
 
+  "log into devprod container registry":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${ecr_role_evergreen_arn}
+    - command: shell.exec
+      params:
+        shell: bash
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+        script: |
+          cd src
+          set -oe
+          attempts=0
+          max_attempts=4
+          while ! aws ecr get-login-password --region us-east-1 | podman login --password-stdin --username ${release_tools_container_registry_username_ecr} ${release_tools_container_registry_ecr}; do
+            [ "$attempts" -ge "$max_attempts" ] && exit 1
+            ((attempts++))
+            sleep 10
+          done
+
+  "upload waterfall artifact":
+    - command: s3.put
+      display_name: "upload artifact"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: ${upload_content_type}
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sig file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sig
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sig
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: application/pgp-signature
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha1 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha1
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha1
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha256 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha256
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha256
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .md5 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.md5
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.md5
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+
+  "upload waterfall msi artifact":
+    - command: s3.put
+      display_name: "upload artifact"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: ${upload_content_type}
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha1 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha1
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha1
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .sha256 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.sha256
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.sha256
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+    - command: s3.put
+      display_name: "upload artifact .md5 file"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ${local_file}.md5
+        remote_file: server-waterfall/${project}/${revision}/${remote_file}.md5
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        skip_existing: true
+
   "fetch artifacts": &fetch_artifacts
     command: s3.get
     params:
@@ -8762,9 +8887,249 @@ tasks:
       content_type: application/tar
       display_name: Custom Build Dist Tarball
 
-#######################################
-#             Task Groups             #
-#######################################
+- name: save_waterfall_artifacts_binaries
+  run_on: rhel8.7-small
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+  allowed_requesters: ["commit"]
+  stepback: false
+  depends_on:
+    - name: package
+    - name: jsCore
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *fetch_artifacts
+    - func: "set up virtualenv"
+    - func: "apply compile expansions"
+    - command: s3.get
+      display_name: "fetch dist tarball"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        local_file: ./src/mongodb-${push_name}-${push_arch}-${version}.${ext|tgz}
+    - command: s3.get
+      display_name: "fetch dist debugsymbols"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+        bucket: mciuploads
+        local_file: ./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.${ext|tgz}
+    - func: "log into devprod container registry"
+    - command: subprocess.exec
+      display_name: "sign and generate checksums"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/waterfall_gpg_sign.sh"
+          - "mongodb-${push_name}-${push_arch}-${version}.${ext|tgz}"
+          - "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.${ext|tgz}"
+        env:
+          GARASIGN_USERNAME: ${garasign_gpg_username_44}
+          GARASIGN_PASSWORD: ${garasign_gpg_password_44}
+          GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mongodb-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        remote_file: "mongodb-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        upload_content_type: "${content_type|application/gzip}"
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.${ext|tgz}"
+        remote_file: "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.${ext|tgz}"
+        upload_content_type: "${content_type|application/gzip}"
+
+- name: save_waterfall_artifacts_binaries_windows
+  run_on: rhel8.7-small
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+  allowed_requesters: ["commit"]
+  stepback: false
+  depends_on:
+    - name: package
+    - name: jsCore
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *fetch_artifacts
+    - func: "fetch packages"
+    - func: "set up virtualenv"
+    - func: "apply compile expansions"
+    - command: s3.get
+      display_name: "fetch dist zip"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.zip
+        bucket: mciuploads
+        local_file: ./src/mongodb-${push_name}-${push_arch}-${version}.zip
+    - command: s3.get
+      display_name: "fetch dist debugsymbols"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.zip
+        bucket: mciuploads
+        local_file: ./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip
+    - func: "log into devprod container registry"
+    - command: subprocess.exec
+      display_name: "sign and generate checksums"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/waterfall_gpg_sign.sh"
+          - "mongodb-${push_name}-${push_arch}-${version}.zip"
+          - "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+        env:
+          GARASIGN_USERNAME: ${garasign_gpg_username_44}
+          GARASIGN_PASSWORD: ${garasign_gpg_password_44}
+          GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+    - command: subprocess.exec
+      display_name: "sign msi"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/waterfall_jsign_sign.sh"
+          - "./build/opt/msi/mongodb-win32-${push_arch}-windows-${version}.msi"
+          - "mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+        env:
+          GARASIGN_USERNAME: ${garasign_jsign_username}
+          GARASIGN_PASSWORD: ${garasign_jsign_password}
+          GARASIGN_IMAGE: ${garasign_jsign_image_ecr}
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mongodb-${push_name}-${push_arch}-${version}.zip"
+        remote_file: "mongodb-${push_name}-${push_arch}-${version}.zip"
+        upload_content_type: "application/zip"
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+        remote_file: "mongodb-${push_name}-${push_arch}-debugsymbols-${version}.zip"
+        upload_content_type: "application/zip"
+    - func: "upload waterfall msi artifact"
+      vars:
+        local_file: "./src/mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+        remote_file: "mongodb-${push_name}-${push_arch}-${version}-signed.msi"
+        upload_content_type: "application/x-msi"
+
+- name: save_waterfall_artifacts_cryptd
+  run_on: rhel8.7-small
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+  allowed_requesters: ["commit"]
+  stepback: false
+  depends_on:
+    - name: package
+    - name: jsCore
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *fetch_artifacts
+    - func: "set up virtualenv"
+    - func: "apply compile expansions"
+    - command: s3.get
+      display_name: "fetch cryptd binary"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${mongo_cryptd}
+        bucket: mciuploads
+        local_file: ./src/mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}
+    - func: "log into devprod container registry"
+    - command: subprocess.exec
+      display_name: "sign and generate checksums"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/waterfall_gpg_sign.sh"
+          - "mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        env:
+          GARASIGN_USERNAME: ${garasign_gpg_username_44}
+          GARASIGN_PASSWORD: ${garasign_gpg_password_44}
+          GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        remote_file: "mongodb-cryptd-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        upload_content_type: "${content_type|application/gzip}"
+
+- name: save_waterfall_artifacts_mh
+  run_on: rhel8.7-small
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+  allowed_requesters: ["commit"]
+  stepback: false
+  depends_on:
+    - name: package
+    - name: jsCore
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *fetch_artifacts
+    - func: "set up virtualenv"
+    - func: "apply compile expansions"
+    - command: s3.get
+      display_name: "fetch mh binary"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${mh_archive}
+        bucket: mciuploads
+        local_file: ./src/mh-${push_name}-${push_arch}-${version}.${ext|tgz}
+    - func: "log into devprod container registry"
+    - command: subprocess.exec
+      display_name: "sign and generate checksums"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/waterfall_gpg_sign.sh"
+          - "mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        env:
+          GARASIGN_USERNAME: ${garasign_gpg_username_44}
+          GARASIGN_PASSWORD: ${garasign_gpg_password_44}
+          GARASIGN_IMAGE: ${garasign_gpg_image_ecr}
+    - func: "upload waterfall artifact"
+      vars:
+        local_file: "./src/mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        remote_file: "mh-${push_name}-${push_arch}-${version}.${ext|tgz}"
+        upload_content_type: "${content_type|application/gzip}"
+
+- name: save_waterfall_artifacts_linux_packages
+  run_on: rhel8.7-small
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+  allowed_requesters: ["commit"]
+  stepback: false
+  depends_on:
+    - name: package
+    - name: jsCore
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *fetch_artifacts
+    - func: "set up virtualenv"
+    - func: "apply compile expansions"
+    - command: s3.get
+      display_name: "fetch linux packages file"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        bucket: mciuploads
+        local_file: ./src/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+    - command: s3.put
+      display_name: "upload artifact"
+      params:
+        role_arn: ${waterfall_role_arn}
+        local_file: ./src/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+        remote_file: server-waterfall/${project}/${revision}/mongo-packages-${push_name}-${push_arch}-${version}.tgz
+        bucket: origin-mongodb-server-waterfall
+        permissions: private
+        visibility: signed
+        content_type: "application/gzip"
+        skip_existing: true
+
+ #######################################
+ #             Task Groups             #
+ #######################################
 task_groups:
 - <<: *compile_task_group_template
   name: compile_without_package_TG
@@ -9090,6 +9455,8 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: ubuntu2204
@@ -9182,6 +9549,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .watchdog
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: enterprise-ubuntu2204-64
@@ -9279,6 +9650,8 @@ buildvariants:
   - name: .sharding .txns
   - name: .stitch
   - name: .ssl
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-ubuntu1604-arm64
@@ -9320,6 +9693,8 @@ buildvariants:
   - name: sharding_gen
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-ubuntu1804-arm64
@@ -9367,6 +9742,9 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: enterprise-ubuntu2204-arm64
@@ -9434,6 +9812,8 @@ buildvariants:
     - release-ubuntu1804-arm64-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: ubuntu2204-arm64
@@ -9503,6 +9883,8 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-ubuntu2004-64
@@ -9551,6 +9933,9 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: enterprise-ubuntu2004-arm64
@@ -9597,6 +9982,9 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: ubuntu2004-arm64
@@ -9627,6 +10015,8 @@ buildvariants:
     - release-ubuntu2004-arm64-large
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-linux-64-amazon-ami
@@ -9675,6 +10065,9 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: amazon
@@ -9722,6 +10115,8 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-amazon2
@@ -9770,6 +10165,9 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: amazon2
@@ -9818,6 +10216,8 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-amazon2-arm64
@@ -9864,6 +10264,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: amazon2-arm64
@@ -9906,6 +10310,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: tig-daily-cron
@@ -10090,6 +10496,9 @@ buildvariants:
     - name: sharding_opportunistic_secondary_targeting_gen
     - name: snmp
     - name: unittest_shell_hang_analyzer_gen
+    - name: save_waterfall_artifacts_binaries_windows
+    - name: save_waterfall_artifacts_cryptd
+    - name: save_waterfall_artifacts_mh
     - name: push
 
 - <<: *enterprise-windows-nopush-template
@@ -10202,6 +10611,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
+  - name: save_waterfall_artifacts_binaries_windows
   - name: push
 
 - name: enterprise-windows-debug-unoptimized
@@ -10278,6 +10688,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
   - name: push
 
 - name: macos-debug
@@ -10335,6 +10746,9 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: push
 
 ###########################################
@@ -10498,6 +10912,10 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: secondary_reads_passthrough_gen
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -11005,6 +11423,10 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - &enterprise-rhel-80-64-bit-template
@@ -11055,6 +11477,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: enterprise-rhel-82-arm64
@@ -11102,6 +11527,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - <<: *enterprise-rhel-70-64-bit-template
@@ -11206,6 +11635,9 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: ubuntu1604-debug
@@ -11297,6 +11729,8 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: rhel70
@@ -11342,6 +11776,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: rhel80
@@ -11387,6 +11823,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: rhel-82-arm64
@@ -11429,6 +11867,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
@@ -11493,6 +11933,9 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: enterprise-rhel-72-s390x
@@ -11541,6 +11984,9 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 ###########################################
@@ -11588,6 +12034,10 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .watchdog
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 
@@ -11700,6 +12150,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: suse12
@@ -11747,6 +12200,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-suse15-64
@@ -11783,6 +12238,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: suse15
@@ -11827,6 +12285,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 ###########################################
@@ -11870,6 +12330,10 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: debian92
@@ -11915,6 +12379,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 - name: enterprise-debian10-64
@@ -11954,6 +12420,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: debian10
@@ -11999,6 +12468,8 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .stitch
+  - name: save_waterfall_artifacts_binaries
+  - name: save_waterfall_artifacts_linux_packages
   - name: .publish
 
 ################################
