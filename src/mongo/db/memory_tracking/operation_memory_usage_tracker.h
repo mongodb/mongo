@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 
 namespace mongo {
 
@@ -41,6 +42,12 @@ class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationMemoryUsageTracker
     OperationMemoryUsageTracker() = delete;
 
 public:
+    /**
+     * Whether attachToOpCtxIfAvailable() should also point the tracker's CurOp reporting target at
+     * the destination opCtx. See that method for details.
+     */
+    enum class ReportToCurOp { kNo, kYes };
+
     /**
      * When constructing a stage containing a SimpleMemoryUsageTracker, use this method to ensure
      * that we aggregate operation-wide memory stats.
@@ -98,17 +105,31 @@ public:
     }
 
     /**
-     * Move the memory tracker out from the operation context, if there is one there. The caller
-     * will take ownership of the tracker.
+     * Detach the operation's memory tracker from the operation context. Returns a co-owning
+     * reference to it (or nullptr if there was none).
      */
-    static std::unique_ptr<OperationMemoryUsageTracker> moveFromOpCtxIfAvailable(
+    static std::shared_ptr<OperationMemoryUsageTracker> detachFromOpCtxIfAvailable(
         OperationContext* opCtx);
 
     /**
-     * Passes ownership of the memory tracker from the caller to the given operation context.
+     * Attach the given memory tracker to the operation context. A null tracker is a no-op that
+     * leaves any tracker already parked on the opCtx by a sibling cursor in place.
+     *
+     * With ReportToCurOp::kYes, also point the tracker's CurOp reporting target at 'opCtx' and
+     * flush current stats to that CurOp. With kNo, the tracker is published for binding only and
+     * its CurOp reporting target is cleared.
      */
-    static void moveToOpCtxIfAvailable(OperationContext* opCtx,
-                                       std::unique_ptr<OperationMemoryUsageTracker> tracker);
+    static void attachToOpCtxIfAvailable(OperationContext* opCtx,
+                                         std::shared_ptr<OperationMemoryUsageTracker> tracker,
+                                         ReportToCurOp reportToCurOp = ReportToCurOp::kYes);
+
+    /**
+     * Returns a co-owning reference to the operation's memory tracker without removing it from the
+     * operation context, or nullptr if there is none. Unlike getOperationMemoryUsageTracker(), does
+     * not create one.
+     */
+    [[nodiscard]] static std::shared_ptr<OperationMemoryUsageTracker> getOwningIfExists(
+        OperationContext* opCtx);
 
     /**
      * Returns true if the given operation context currently holds a memory tracker. Unlike
@@ -126,14 +147,17 @@ public:
     /**
      * Re-point 'tracker' at the operation memory tracker for 'opCtx'. For stages whose lifetime
      * spans getMore opCtx swaps to re-bind after being detached, since the operation tracker lives
-     * on the OperationContext. No-op when memory tracking is disabled, matching the
-     * create*ForStage() factories, so a stage built without a base stays standalone.
+     * on the OperationContext. No-op when memory tracking is disabled or when 'expCtx' excludes
+     * operation memory tracking, matching the create*ForStage() factories, so a stage built without
+     * a base stays standalone.
      *
      * TODO SERVER-131203: this is a stopgap and is NOT for general use -- it exists specifically to
      * let BatchedEnrichmentStage rebind its tracker base across getMore opCtx swaps. Remove it once
      * that stage's memory tracking is properly integrated with the operation memory tracker.
      */
-    static void rebindToOperation(SimpleMemoryUsageTracker& tracker, OperationContext* opCtx);
+    static void rebindToOperation(SimpleMemoryUsageTracker& tracker,
+                                  const ExpressionContext& expCtx,
+                                  OperationContext* opCtx);
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 

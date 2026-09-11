@@ -36,7 +36,13 @@ void ReshardingExecutablePipeline::reattachToOpCtx(OperationContext* opCtx) {
     _pipeline->reattachToOperationContext(opCtx);
 
     if (_memoryUsageTracker) {
-        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryUsageTracker));
+        auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
+        tassert(13159804,
+                "reattachToOpCtx() would displace a different operation memory tracker already on "
+                "the destination operation context",
+                !trackerOnOpCtx || trackerOnOpCtx == _memoryUsageTracker.get());
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
+                                                              std::move(_memoryUsageTracker));
     }
 }
 
@@ -46,7 +52,7 @@ void ReshardingExecutablePipeline::detachFromOpCtx() {
     auto* opCtx = _pipeline->getContext()->getOperationContext();
     _execPipeline->detachFromOperationContext();
     _pipeline->detachFromOperationContext();
-    _memoryUsageTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+    _memoryUsageTracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
 }
 
 void ReshardingExecutablePipeline::dispose(OperationContext* opCtx) {
@@ -57,7 +63,8 @@ void ReshardingExecutablePipeline::dispose(OperationContext* opCtx) {
     _execPipeline->reattachToOperationContext(opCtx);
 
     if (_memoryUsageTracker) {
-        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryUsageTracker));
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
+                                                              std::move(_memoryUsageTracker));
     }
 
     _execPipeline->dispose();

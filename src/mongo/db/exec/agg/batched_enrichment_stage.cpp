@@ -37,7 +37,7 @@ void BatchedEnrichmentStage::detachFromOperationContext() {
 }
 
 void BatchedEnrichmentStage::reattachToOperationContext(OperationContext* opCtx) {
-    OperationMemoryUsageTracker::rebindToOperation(_memTracker, opCtx);
+    OperationMemoryUsageTracker::rebindToOperation(_memTracker, *getContext(), opCtx);
 }
 
 void BatchedEnrichmentStage::trackPush(const Document& doc) {

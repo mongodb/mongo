@@ -270,6 +270,18 @@ bool hasReferenceToSearchMeta(const DocumentSource& ds) {
                                              std::set<Variables::Id>{Variables::kSearchMetaId});
 }
 
+void excludeOperationMemoryTrackingForSecondaryMetadataCursor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (expCtx->getExcludeOperationMemoryTracking()) {
+        return;
+    }
+    LOGV2_DEBUG(13090700,
+                4,
+                "Disabling operation memory tracking: this $search query establishes a secondary "
+                "metadata cursor that shares the operation's memory tracker");
+    expCtx->setExcludeOperationMemoryTracking(true);
+}
+
 bool canMovePastDuringSplit(const DocumentSource& ds) {
     return !hasReferenceToSearchMeta(ds) && ds.constraints().preservesOrderAndMetadata;
 }

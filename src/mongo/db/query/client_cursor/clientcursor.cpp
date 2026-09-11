@@ -152,7 +152,9 @@ ClientCursor::ClientCursor(ClientCursorParams params,
           CurOp::get(operationUsingCursor)->debug().usesOptimizedUpdateLookup),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
-      _opKey(operationUsingCursor->getOperationKey()) {
+      _opKey(operationUsingCursor->getOperationKey()),
+      // Take a co-owning reference to the operation's memory tracker.
+      _memoryUsageTracker(OperationMemoryUsageTracker::getOwningIfExists(operationUsingCursor)) {
     invariant(_exec);
     invariant(_operationUsingCursor);
 
@@ -310,8 +312,8 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     if (_cursor->_isChangeStreamQuery) {
         change_stream_metrics::gCursorsOpenPinned.add(1);
     }
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        std::move(_cursor->_memoryUsageTracker));
+    // Publish a copy of the tracker onto the operation context.
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, _cursor->_memoryUsageTracker);
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -370,8 +372,12 @@ void ClientCursorPin::release() {
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
 
-    _cursor->_memoryUsageTracker =
-        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(_cursor->_operationUsingCursor);
+    // Reclaim the tracker from the operation context, but only overwrite the cursor's reference if
+    // one was there -- otherwise keep the reference captured at construction (don't clobber it).
+    if (auto tracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(
+            _cursor->_operationUsingCursor)) {
+        _cursor->_memoryUsageTracker = std::move(tracker);
+    }
     const bool isChangeStream = _cursor->_isChangeStreamQuery;
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor

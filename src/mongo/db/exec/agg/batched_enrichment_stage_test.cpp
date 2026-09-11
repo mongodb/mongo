@@ -543,10 +543,10 @@ TEST_F(BatchedEnrichmentStageTest, MemoryTrackerRebindsToNewOperationAcrossGetMo
     {
         // The first operation's tracker reflects the buffered bytes. Peeking by moving it off and
         // back does not disturb the stage's base, which points at the same object.
-        auto opTrackerA = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtxA.get());
+        auto opTrackerA = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtxA.get());
         ASSERT_TRUE(opTrackerA);
         ASSERT_EQ(opTrackerA->inUseTrackedMemoryBytes(), buffered);
-        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtxA.get(), std::move(opTrackerA));
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtxA.get(), std::move(opTrackerA));
     }
 
     // The getMore boundary: detach, then destroy the first operation context (and with it its
@@ -564,10 +564,10 @@ TEST_F(BatchedEnrichmentStageTest, MemoryTrackerRebindsToNewOperationAcrossGetMo
     ASSERT_EQ(stage->bufferedMemoryBytes_forTest(), buffered);
     ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtxB.get()));
     {
-        auto opTrackerB = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtxB.get());
+        auto opTrackerB = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtxB.get());
         ASSERT_TRUE(opTrackerB);
         ASSERT_EQ(opTrackerB->inUseTrackedMemoryBytes(), buffered);
-        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtxB.get(), std::move(opTrackerB));
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtxB.get(), std::move(opTrackerB));
     }
 
     // Draining touches the (rebound) tracker on every pop; pre-fix that wrote through a dangling

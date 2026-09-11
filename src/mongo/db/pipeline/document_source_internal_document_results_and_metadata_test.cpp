@@ -12,15 +12,19 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
 #include "mongo/db/pipeline/document_source_internal_stream_terminator.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
@@ -29,6 +33,7 @@
 #include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -70,7 +75,35 @@ protected:
         return docResultsAndMetadata;
     }
 
+    OperationContext* opCtx() {
+        return getExpCtx()->getOperationContext();
+    }
+
+    // $group is the one that binds to the operation tracker in its constructor.
+    boost::intrusive_ptr<DocumentSource> makeGroup() {
+        const auto& expCtx = getExpCtx();
+        return DocumentSourceGroup::create(
+            expCtx,
+            ExpressionFieldPath::parse(expCtx.get(), "$x", expCtx->variablesParseState),
+            {},
+            /*willBeMerged=*/false);
+    }
+
+    // $sort binds to the operation tracker when it is lowered to an exec stage, not when parsed.
+    boost::intrusive_ptr<DocumentSource> makeSort() {
+        return DocumentSourceSort::create(getExpCtx(), {BSON("x" << 1), getExpCtx()});
+    }
+
+    // Builds a pipeline of the parsed $_internalDRM stage followed by 'next'.
+    std::unique_ptr<Pipeline> makePipelineWith(boost::intrusive_ptr<DocumentSource> next) {
+        return Pipeline::create({_stages.front(), std::move(next)}, getExpCtx());
+    }
+
 private:
+    // The memory tracker is only created on demand, so an operation that tracks nothing has none.
+    // Not FCV-gated, but pin the flag so these tests don't ride on its default.
+    unittest::ServerParameterGuard _memoryTrackingFlag{"featureFlagQueryMemoryTracking", true};
+
     std::unique_ptr<InternalDocumentResultsAndMetadataLiteParsed> _liteParsed;
     DocumentSourceContainer _stages;
 };
@@ -675,6 +708,51 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
     terminator->getNext();
     terminator->getNext();
 }
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       SecondaryMetadataCursorExcludesOperationMemoryTracking) {
+    ASSERT_FALSE(getExpCtx()->getExcludeOperationMemoryTracking());
+    parse(BSON(kStageName << kFullSpec));
+    ASSERT_TRUE(getExpCtx()->getExcludeOperationMemoryTracking());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       InProcessMetadataKeepsOperationMemoryTracking) {
+    // Without 'returnCursor' the metadata is bound to $$SEARCH_META in process: one cursor, one
+    // OperationContext, nothing to race.
+    parse(BSON(kStageName << kSourceWithMeta));
+    ASSERT_FALSE(getExpCtx()->getExcludeOperationMemoryTracking());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamGroupIsNotOperationTrackedWithSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kFullSpec));
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+
+    auto group = makeGroup();
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamSortIsNotOperationTrackedWithSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kFullSpec));
+    auto pipeline = makePipelineWith(makeSort());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamSortIsOperationTrackedWithoutSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kSourceWithMeta));
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+
+    auto pipeline = makePipelineWith(makeSort());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
 
 }  // namespace
 }  // namespace mongo

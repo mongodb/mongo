@@ -15,6 +15,8 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -34,6 +36,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -136,6 +139,88 @@ TEST_F(CursorManagerTest, RegisteredWithCustomServiceContext) {
 TEST_F(CursorManagerTest, CanAccessFromOperationContext) {
     CursorManager* cursorManager = CursorManager::get(_opCtx.get());
     ASSERT(cursorManager);
+}
+
+TEST_F(CursorManagerTest, KillingOneOfTwoCursorsSharingMemoryTrackerLeavesSiblingValid) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    OperationContext* opCtx = _opCtx.get();
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kTestNss);
+
+    // Operation tracker on the opCtx plus a stage-level tracker bound to it, standing in for a
+    // stage in the surviving cursor's executor. Note that 'stageTracker' holds a raw pointer to
+    // the operation tracker as its base, which is what dangles if the tracker is freed while the
+    // surviving cursor is still alive.
+    auto stageTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    stageTracker.add(16);  // Propagates to the operation tracker via _base.
+
+    // A non-owning handle, so the cursors are the only owners below and this test fails under ASAN
+    // if co-ownership regresses. The reference count is the proxy for "who co-owns this tracker
+    // instance": one per cursor, plus the opCtx's until the first pin is released.
+    std::weak_ptr<OperationMemoryUsageTracker> weakTracker;
+    long expectedUseCount = 0;
+
+    // Register two cursors under one operation; both co-own the tracker.
+    CursorId survivorId;
+    CursorId ownerToKillId;
+    {
+        auto survivorPin = makeCursor(opCtx);
+        auto ownerPin = makeCursor(opCtx);
+        survivorId = survivorPin.getCursor()->cursorid();
+        ownerToKillId = ownerPin.getCursor()->cursorid();
+
+        auto owningTracker = OperationMemoryUsageTracker::getOwningIfExists(opCtx);
+        ASSERT(owningTracker);
+        weakTracker = owningTracker;
+        // Both cursors reference the same instance, plus the opCtx's reference and our local one.
+        ASSERT_EQ(4, owningTracker.use_count());
+        expectedUseCount = 2;
+    }
+
+    // Releasing the pins moves the tracker off the opCtx and onto a cursor, so from here the
+    // cursors are its only owners.
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    ASSERT_EQ(expectedUseCount, weakTracker.use_count());
+
+    // Kill the cursor registered second, which under the pre-fix model owned the tracker outright.
+    ASSERT_OK(_cursorManager.killCursor(opCtx, ownerToKillId));
+
+    // The surviving cursor is now the sole owner, so writing through the stage tracker's base
+    // pointer is still safe.
+    auto survivingTracker = weakTracker.lock();
+    ASSERT(survivingTracker);
+    ASSERT_EQ(1, weakTracker.use_count() - 1);  // Only the surviving cursor, besides our lock().
+    survivingTracker.reset();
+
+    stageTracker.add(32);
+    ASSERT_EQ(48, weakTracker.lock()->peakTrackedMemoryBytes());
+
+    ASSERT_OK(_cursorManager.killCursor(opCtx, survivorId));
+
+    // With no cursor left to own it, the tracker is destroyed.
+    ASSERT_TRUE(weakTracker.expired());
+}
+
+TEST_F(CursorManagerTest, PublishingNullTrackerDoesNotClobberLiveOperationTracker) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    OperationContext* opCtx = _opCtx.get();
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kTestNss);
+    auto stageTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
+    stageTracker.add(64);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+
+    // A tracker-less sibling cursor being pinned publishes a null tracker onto the opCtx.
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, nullptr);
+
+    // The live tracker must still be there for the sibling's stages to keep reporting through.
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    auto tracker = OperationMemoryUsageTracker::getOwningIfExists(opCtx);
+    ASSERT(tracker);
+    ASSERT_EQ(64, tracker->peakTrackedMemoryBytes());
 }
 
 /**

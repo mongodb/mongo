@@ -79,11 +79,14 @@ public:
      * reported.
      */
     enum class InputMemoryPolicy {
-        // The Exchange takes the tracker off the opCtx and owns it for its lifetime, and publishes
-        // it to consumer 0's opCtx while consumer 0 executes so the producer's memory reaches
-        // CurOp. Requires the consumer pipelines to be bare exchange readers with no operation
-        // memory tracker of their own: publishing overwrites the opCtx's tracker slot, and two
-        // trackers reporting to one CurOp would overwrite each other's stats.
+        // The Exchange takes a reference to the memory tracker of any active opCtx, co-owning it.
+        // The co-ownership is important because there is no guaranteed lifetime ordering between
+        // the Exchange and an opCtx: in the case of getMores, the opCtx can come and go multiple
+        // times. With this policy, a co-owning copy of the tracker is published to whichever
+        // consumer drives the load, but memory is only reported to consumer 0's
+        // curOp. Requires the consumer pipelines to not have a distinct memory tracker: publishing
+        // overwrites the opCtx's tracker slot, and two trackers reporting to one CurOp would
+        // overwrite each other's stats.
         kOwnAndReportToCurOp,
 
         // The Exchange owns the tracker as above but never puts it on an opCtx: the producer's
@@ -151,8 +154,15 @@ public:
 
 private:
     /**
-     * Attaches the subpipeline to the given opCtx. If consumerId is zero, also attaches the
-     * OperationMemoryUsageTracker to the current opCtx, so memory metrics are reported to CurOp.
+     * Needed before executing/using the sub-pipeline (by the driving consumer).
+     *
+     * Attaches the subpipeline to the given opCtx, ensuring state like maxTimeMS is visible.
+     *
+     * Concerning memory tracking: If this->reportsInputMemoryToCurOp(), then this also attaches the
+     * Exchange's OperationMemoryUsageTracker to this opCtx. That way, the subpipeline's
+     * memory-tracked stages bind to the co-owned tracker and we aggregate memory use regardless of
+     * which consuming thread is driving the execution. The producer's memory is reported to CurOp
+     * only for consumer 0, so the metric is not duplicated across consumers.
      */
     void attachContext(OperationContext* opCtx, size_t consumerId);
 
@@ -163,8 +173,14 @@ private:
     size_t loadNextBatch();
 
     /**
-     * Detaches the subpipeline from its opCtx. If consumerId is zero, moves the
-     * OperationMemoryUsageTracker from the opCtx back to the Exchange object.
+     * Detaches the subpipeline from its opCtx.
+     *
+     * If 'this->reportsInputMemoryToCurOp()', also unpublishes the OperationMemoryUsageTracker from
+     * that opCtx. Note that this never clears the Exchange's own reference to the memory tracker:
+     * If it came from attachContext(), then the co-ownership ensures that unpublishing it does not
+     * free it.  If it was created lazily during the subpipeline load, the Exchange adopts it.
+     *
+     * 'consumerId' is used only for diagnostics in the tripwire message.
      */
     void detachContext(OperationContext* opCtx, size_t consumerId);
 
@@ -288,12 +304,14 @@ private:
 
     // The OperationMemoryTracker for the exchange pipeline. Stages in the subpipeline that track
     // memory will report to this memory tracker. Only set when this Exchange owns the tracker
-    // (otherwise the tracker stays on the opCtx and this is null); the operation memory tracker is
-    // stored here and not attached to any particular OperationContext, except while consumer 0 is
-    // executing the subpipeline under InputMemoryPolicy::kOwnAndReportToCurOp. We do this to avoid
-    // data races that would occur if we were to move the memory tracker between the
-    // OperationContext and ClientCursor while a pipeline is executing.
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryTracker;
+    // (otherwise the tracker stays on the opCtx and this is null). Under
+    // InputMemoryPolicy::kOwnAndReportToCurOp a co-owning copy is also published on the driving
+    // consumer's opCtx. The Exchange stays an owner throughout, so the tracker cannot
+    // be destroyed out from under sub-stages -- which hold their tracker base as a raw pointer --
+    // when a consumer's opCtx goes away. Co-owning rather than moving the tracker also avoids the
+    // data races that arose from handing it back and forth between the OperationContext and the
+    // ClientCursor while a pipeline is executing.
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryTracker;
 };
 
 /**

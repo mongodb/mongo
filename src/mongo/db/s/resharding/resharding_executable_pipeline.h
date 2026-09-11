@@ -88,7 +88,7 @@ private:
     // by the operation context they were built with. We stash that tracker here while detached so
     // it outlives the operation context it came from, and restore it onto the new operation context
     // on reattach.
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
 
     // The raw pipeline. This by itself is not executable but is kept alive for '_execPipeline'.
     std::unique_ptr<Pipeline> _pipeline;
