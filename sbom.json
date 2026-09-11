@@ -1,30 +1,22 @@
 {
-  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
-  "specVersion": "1.5",
+  "specVersion": "1.6",
   "serialNumber": "urn:uuid:da777b1f-b6b1-4ffc-8a54-9bcbf23efa2c",
-  "version": 3,
+  "version": 4,
   "metadata": {
-    "timestamp": "2026-08-12T23:01:45Z",
+    "timestamp": "2026-09-11T17:20:22+00:00",
     "lifecycles": [
       {
         "phase": "pre-build"
       }
     ],
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.1104"
-        }
-      ]
-    },
-    "supplier": {
-      "name": "MongoDB, Inc.",
-      "url": [
-        "https://mongodb.com"
-      ]
-    },
+    "tools": [
+      {
+        "name": "Endor Labs Inc",
+        "version": "v1.7.1149"
+      }
+    ],
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@v8.0",
@@ -34,7 +26,11 @@
           "https://mongodb.com"
         ]
       },
-      "author": "MongoDB, Inc.",
+      "authors": [
+        {
+          "name": "MongoDB, Inc."
+        }
+      ],
       "publisher": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "mongodb/mongo",
@@ -54,6 +50,14 @@
           "type": "license"
         },
         {
+          "url": "https://www.mongodb.com/docs/manual/release-notes/",
+          "type": "release-notes"
+        },
+        {
+          "url": "https://github.com/mongodb/mongo",
+          "type": "vcs"
+        },
+        {
           "url": "https://www.mongodb.com/products/self-managed/community-edition",
           "comment": "MongoDB Community Edition is self-managed and can be hosted locally or in the cloud.",
           "type": "website"
@@ -62,117 +66,17 @@
           "url": "https://www.mongodb.com/products/self-managed/enterprise-advanced",
           "comment": "MongoDB Enterprise Advanced has powerful tools for automation, operations, and security in self-managed environments.",
           "type": "website"
-        },
-        {
-          "url": "https://www.mongodb.com/docs/manual/release-notes/",
-          "type": "release-notes"
-        },
-        {
-          "url": "https://github.com/mongodb/mongo",
-          "type": "vcs"
         }
+      ]
+    },
+    "supplier": {
+      "name": "MongoDB, Inc.",
+      "url": [
+        "https://mongodb.com"
       ]
     }
   },
   "components": [
-    {
-      "type": "library",
-      "bom-ref": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
-      "supplier": {
-        "name": "Mozilla Corporation",
-        "url": [
-          "https://mozilla.org"
-        ]
-      },
-      "author": "Mozilla Corporation",
-      "group": "mozilla",
-      "name": "Mozilla Firefox ESR",
-      "version": "140.11.0esr",
-      "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "MPL-2.0"
-          }
-        }
-      ],
-      "copyright": "Mozilla Corporation",
-      "cpe": "cpe:2.3:a:mozilla:firefox:140.11.0:*:*:*:esr:*:*:*",
-      "purl": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
-      "externalReferences": [
-        {
-          "url": "https://github.com/mozilla-firefox/firefox.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/mozjs"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/mozjs/scripts/import.sh"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-      "supplier": {
-        "name": "Intel",
-        "url": [
-          "https://www.intel.com/content/www/us/en/developer/articles/tool/intel-decimal-floating-point-math-library.html"
-        ],
-        "contact": [
-          {
-            "email": "decimalfp@intel.com"
-          }
-        ]
-      },
-      "author": "Marius Cornea",
-      "group": "intel",
-      "name": "Intel\u00ae Decimal Floating-Point Math Library",
-      "version": "2.0.1",
-      "description": "A software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-3-Clause"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2011, Intel Corp.",
-      "purl": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-      "externalReferences": [
-        {
-          "url": "https://www.netlib.org/misc/intel/",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/IntelRDFPMathLib20U1"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ]
-    },
     {
       "type": "data",
       "bom-ref": "pkg:generic/unicode-org/unicode@8.0.0",
@@ -182,7 +86,11 @@
           "http://www.unicode.org/"
         ]
       },
-      "author": "Unicode, Inc.",
+      "authors": [
+        {
+          "name": "Unicode, Inc."
+        }
+      ],
       "group": "unicode-org",
       "name": "Unicode Character Database",
       "version": "8.0.0",
@@ -191,12 +99,13 @@
       "licenses": [
         {
           "license": {
-            "id": "Unicode-DFS-2016"
+            "id": "Unicode-DFS-2016",
+            "acknowledgement": "concluded"
           }
         }
       ],
       "copyright": "Copyright \u00a9 1991\u20132015 Unicode, Inc",
-      "purl": "pkg:generic/unicode-org/unicode@8.0.0?repository_url=https%3A%2F%2Fwww.unicode.org%2FPublic%2F8.0.0%2F",
+      "purl": "pkg:generic/unicode-org/unicode@8.0.0?repository_url=https://www.unicode.org/Public/8.0.0/",
       "externalReferences": [
         {
           "url": "https://www.unicode.org/Public/8.0.0/",
@@ -208,6 +117,13 @@
           {
             "location": "src/third_party/unicode-8.0.0"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Unicode-DFS-2016"
+            }
+          }
         ]
       },
       "properties": [
@@ -218,47 +134,71 @@
       ]
     },
     {
-      "type": "library",
-      "bom-ref": "pkg:generic/valgrind/valgrind@3.17.0",
-      "author": "The Valgrind Developers",
-      "group": "valgrind",
-      "name": "valgrind.h",
-      "version": "3.17.0",
-      "description": "This header file is part of Valgrind, a dynamic binary instrumentation framework.",
+      "type": "framework",
+      "bom-ref": "pkg:github/wiredtiger/wiredtiger@11.3.0",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "authors": [
+        {
+          "name": "MongoDB, Inc."
+        }
+      ],
+      "group": "mongodb",
+      "name": "WiredTiger",
+      "version": "11.3.0",
+      "description": "WiredTiger is an high performance, scalable, production quality, NoSQL, Open Source extensible platform for data management.",
       "scope": "required",
       "licenses": [
         {
           "license": {
-            "id": "BSD-4-Clause"
+            "id": "GPL-2.0-only",
+            "acknowledgement": "concluded"
           }
         }
       ],
-      "copyright": "Copyright (C) 2000-2017 Julian Seward. All rights reserved.",
-      "purl": "pkg:generic/valgrind/valgrind@3.17.0?vcs_url=https%3A%2F%2Fsourceware.org%2Fgit%2F%3Fp%3Dvalgrind.git",
+      "copyright": "Copyright (c) 2014-present MongoDB, Inc., Copyright (c) 2008-2014 WiredTiger, Inc., All rights reserved.",
+      "purl": "pkg:github/wiredtiger/wiredtiger@11.3.0",
       "externalReferences": [
         {
-          "url": "https://sourceware.org/git/valgrind.git",
+          "url": "https://github.com/wiredtiger/wiredtiger.git",
           "type": "distribution"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/valgrind"
+            "location": "src/third_party/wiredtiger"
+          }
+        ],
+        "licenses": [
+          {
+            "expression": "GPL-2.0-only OR GPL-3.0-only"
           }
         ]
       },
       "properties": [
         {
           "name": "emits_persisted_data",
-          "value": "false"
+          "value": "true"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ]
     },
     {
       "type": "library",
       "bom-ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-      "author": "Austin Appleby",
+      "authors": [
+        {
+          "name": "Austin Appleby"
+        }
+      ],
       "group": "aappleby",
       "name": "MurmurHash3",
       "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
@@ -267,7 +207,8 @@
       "licenses": [
         {
           "license": {
-            "name": "Public Domain"
+            "name": "Public-Domain",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -284,49 +225,12 @@
           {
             "location": "src/third_party/murmurhash3"
           }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/abseil/abseil-cpp@20230802.1",
-      "supplier": {
-        "name": "Abseil",
-        "url": [
-          "https://abseil.io/"
-        ]
-      },
-      "author": "The Abseil Authors",
-      "group": "google.opensource",
-      "name": "Abseil Common Libraries (C++)",
-      "version": "20230802.1",
-      "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
-      "scope": "required",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "copyright": "Copyright 2023 The Abseil Authors.",
-      "purl": "pkg:github/abseil/abseil-cpp@20230802.1",
-      "externalReferences": [
-        {
-          "url": "https://github.com/abseil/abseil-cpp.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
+        ],
+        "licenses": [
           {
-            "location": "src/third_party/abseil-cpp"
+            "license": {
+              "name": "Public Domain"
+            }
           }
         ]
       },
@@ -334,17 +238,17 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/abseil-cpp/scripts/import.sh"
         }
       ]
     },
     {
       "type": "library",
       "bom-ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
-      "author": "Salvatore Sanfilippo",
+      "authors": [
+        {
+          "name": "Salvatore Sanfilippo"
+        }
+      ],
       "group": "antirez",
       "name": "linenoise",
       "version": "6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
@@ -353,7 +257,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-2-Clause"
+            "id": "BSD-2-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -368,10 +273,17 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/mongo/shell/linenoise.h"
+            "location": "src/mongo/shell/linenoise.cpp"
           },
           {
-            "location": "src/mongo/shell/linenoise.cpp"
+            "location": "src/mongo/shell/linenoise.h"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-2-Clause"
+            }
           }
         ]
       },
@@ -388,7 +300,11 @@
       "supplier": {
         "name": "sinusoidal engineering"
       },
-      "author": "Juanpe Bol\u00edvar",
+      "authors": [
+        {
+          "name": "Juanpe Bol\u00edvar"
+        }
+      ],
       "group": "arximboldi",
       "name": "immer",
       "version": "0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
@@ -397,7 +313,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSL-1.0"
+            "id": "BSL-1.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -413,6 +330,13 @@
         "occurrences": [
           {
             "location": "src/third_party/immer"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSL-1.0"
+            }
           }
         ]
       },
@@ -432,7 +356,11 @@
           "https://www.boost.org/"
         ]
       },
-      "author": "Boost Developers",
+      "authors": [
+        {
+          "name": "Boost Developers"
+        }
+      ],
       "group": "boost",
       "name": "Boost C++ Libraries",
       "version": "1.79.0",
@@ -441,7 +369,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSL-1.0"
+            "id": "BSL-1.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -459,6 +388,13 @@
           {
             "location": "src/third_party/boost"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSL-1.0"
+            }
+          }
         ]
       },
       "properties": [
@@ -471,7 +407,11 @@
     {
       "type": "library",
       "bom-ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
-      "author": "Christopher M. Kohlhoff",
+      "authors": [
+        {
+          "name": "Christopher M. Kohlhoff"
+        }
+      ],
       "group": "chriskohlhoff",
       "name": "Asio C++ Library",
       "version": "1.12.2",
@@ -480,7 +420,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSL-1.0"
+            "id": "BSL-1.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -497,6 +438,13 @@
           {
             "location": "src/third_party/asio-master"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSL-1.0"
+            }
+          }
         ]
       },
       "properties": [
@@ -512,7 +460,11 @@
       "supplier": {
         "name": "Confluent Inc."
       },
-      "author": "Magnus Edenhill",
+      "authors": [
+        {
+          "name": "Magnus Edenhill"
+        }
+      ],
       "group": "confluentinc",
       "name": "librdkafka - The Apache Kafka C/C++ library",
       "version": "2.0.2",
@@ -521,7 +473,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-2-Clause"
+            "id": "BSD-2-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -538,6 +491,13 @@
         "occurrences": [
           {
             "location": "src/third_party/librdkafka"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-2-Clause"
+            }
           }
         ]
       },
@@ -562,7 +522,11 @@
           "https://www.cyrusimap.org/sasl/"
         ]
       },
-      "author": "The Cyrus Team",
+      "authors": [
+        {
+          "name": "The Cyrus Team"
+        }
+      ],
       "group": "cyrus",
       "name": "Cyrus SASL",
       "version": "2.1.28",
@@ -571,7 +535,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-Attribution-HPND-disclaimer"
+            "id": "BSD-Attribution-HPND-disclaimer",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -589,6 +554,13 @@
           {
             "location": "src/third_party/sasl"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-Attribution-HPND-disclaimer"
+            }
+          }
         ]
       },
       "properties": [
@@ -601,7 +573,11 @@
     {
       "type": "library",
       "bom-ref": "pkg:github/dcleblanc/safeint@3.0.26",
-      "author": "David LeBlanc",
+      "authors": [
+        {
+          "name": "David LeBlanc"
+        }
+      ],
       "group": "dcleblanc",
       "name": "SafeInt",
       "version": "3.0.26",
@@ -610,7 +586,8 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -627,6 +604,13 @@
           {
             "location": "src/third_party/SafeInt"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
         ]
       },
       "properties": [
@@ -639,7 +623,11 @@
     {
       "type": "library",
       "bom-ref": "pkg:github/derickr/timelib@2022.10",
-      "author": "Derick Rethans",
+      "authors": [
+        {
+          "name": "Derick Rethans"
+        }
+      ],
       "group": "derickr",
       "name": "timelib",
       "version": "2022.10",
@@ -648,7 +636,8 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -665,6 +654,13 @@
           {
             "location": "src/third_party/timelib"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
         ]
       },
       "properties": [
@@ -680,6 +676,65 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/facebook/zstd@v1.5.5",
+      "supplier": {
+        "name": "Meta Open Source",
+        "url": [
+          "https://opensource.fb.com/"
+        ]
+      },
+      "authors": [
+        {
+          "name": "Meta Platforms, Inc."
+        }
+      ],
+      "group": "facebook",
+      "name": "Zstandard (zstd)",
+      "version": "1.5.5",
+      "description": "Zstandard - Fast real-time compression algorithm",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "acknowledgement": "concluded"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.",
+      "cpe": "cpe:2.3:a:facebook:zstandard:1.5.5:*:*:*:*:*:*:*",
+      "purl": "pkg:github/facebook/zstd@v1.5.5",
+      "externalReferences": [
+        {
+          "url": "https://github.com/facebook/zstd.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/zstandard"
+          }
+        ],
+        "licenses": [
+          {
+            "expression": "BSD-3-Clause OR GPL-2.0-only"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/zstandard_get_sources.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/facebook/folly@v2025.04.21.00",
       "supplier": {
         "name": "Meta Open Source",
@@ -687,7 +742,11 @@
           "https://opensource.fb.com/"
         ]
       },
-      "author": "Meta",
+      "authors": [
+        {
+          "name": "Meta"
+        }
+      ],
       "group": "facebook",
       "name": "folly",
       "version": "2025.04.21.00",
@@ -696,7 +755,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -714,6 +774,13 @@
           {
             "location": "src/third_party/folly"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
+          }
         ]
       },
       "properties": [
@@ -729,53 +796,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/facebook/zstd@v1.5.5",
-      "supplier": {
-        "name": "Meta Open Source",
-        "url": [
-          "https://opensource.fb.com/"
-        ]
-      },
-      "author": "Meta Platforms, Inc.",
-      "group": "facebook",
-      "name": "Zstandard (zstd)",
-      "version": "1.5.5",
-      "description": "Zstandard - Fast real-time compression algorithm",
-      "scope": "required",
-      "licenses": [
-        {
-          "expression": "BSD-3-Clause OR GPL-2.0-only"
-        }
-      ],
-      "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.",
-      "cpe": "cpe:2.3:a:facebook:zstandard:1.5.5:*:*:*:*:*:*:*",
-      "purl": "pkg:github/facebook/zstd@v1.5.5",
-      "externalReferences": [
-        {
-          "url": "https://github.com/facebook/zstd.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/zstandard"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/scripts/zstandard_get_sources.sh"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/fmtlib/fmt@7.1.3",
       "supplier": {
         "name": "fmt.dev",
@@ -783,7 +803,11 @@
           "https://fmt.dev/"
         ]
       },
-      "author": "Victor Zverovich",
+      "authors": [
+        {
+          "name": "Victor Zverovich"
+        }
+      ],
       "group": "fmtlib",
       "name": "fmt",
       "version": "7.1.3",
@@ -792,7 +816,8 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -810,6 +835,13 @@
           {
             "location": "src/third_party/fmt"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
         ]
       },
       "properties": [
@@ -825,38 +857,50 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/benchmark@v1.5.2",
+      "bom-ref": "pkg:github/abseil/abseil-cpp@20230802.1",
       "supplier": {
-        "name": "Google LLC",
+        "name": "Abseil",
         "url": [
-          "https://opensource.google/"
+          "https://abseil.io/"
         ]
       },
-      "author": "Google LLC",
+      "authors": [
+        {
+          "name": "The Abseil Authors"
+        }
+      ],
       "group": "google.opensource",
-      "name": "benchmark",
-      "version": "1.5.2",
-      "description": "A microbenchmark support library",
-      "scope": "excluded",
+      "name": "Abseil Common Libraries (C++)",
+      "version": "20230802.1",
+      "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
+      "scope": "required",
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
-      "copyright": "Copyright 2015 Google Inc. All rights reserved.",
-      "purl": "pkg:github/google/benchmark@v1.5.2",
+      "copyright": "Copyright 2023 The Abseil Authors.",
+      "purl": "pkg:github/abseil/abseil-cpp@20230802.1",
       "externalReferences": [
         {
-          "url": "https://github.com/google/benchmark.git",
+          "url": "https://github.com/abseil/abseil-cpp.git",
           "type": "distribution"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/benchmark"
+            "location": "src/third_party/abseil-cpp"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
           }
         ]
       },
@@ -867,7 +911,7 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/benchmark/scripts/import.sh"
+          "value": "src/third_party/abseil-cpp/scripts/import.sh"
         }
       ]
     },
@@ -880,7 +924,11 @@
           "http://s2geometry.io/"
         ]
       },
-      "author": "S2Geometry",
+      "authors": [
+        {
+          "name": "S2Geometry"
+        }
+      ],
       "group": "google.opensource",
       "name": "S2 Geometry Library",
       "version": "a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
@@ -889,7 +937,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -906,12 +955,140 @@
           {
             "location": "src/third_party/s2"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
+          }
         ]
       },
       "properties": [
         {
           "name": "emits_persisted_data",
           "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/google/benchmark@v1.5.2",
+      "supplier": {
+        "name": "Google LLC",
+        "url": [
+          "https://opensource.google/"
+        ]
+      },
+      "authors": [
+        {
+          "name": "Google LLC"
+        }
+      ],
+      "group": "google.opensource",
+      "name": "benchmark",
+      "version": "1.5.2",
+      "description": "A microbenchmark support library",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
+          }
+        }
+      ],
+      "copyright": "Copyright 2015 Google Inc. All rights reserved.",
+      "purl": "pkg:github/google/benchmark@v1.5.2",
+      "externalReferences": [
+        {
+          "url": "https://github.com/google/benchmark.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/benchmark"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/benchmark/scripts/import.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/gperftools/gperftools@2.9.1",
+      "supplier": {
+        "name": "Google LLC",
+        "url": [
+          "https://opensource.google/"
+        ]
+      },
+      "authors": [
+        {
+          "name": "gperftools Project"
+        }
+      ],
+      "group": "google.opensource",
+      "name": "gperftools",
+      "version": "2.9.1",
+      "description": "gperftools (originally Google Performance Tools) is a collection of a high-performance multi-threaded malloc() implementation, plus some pretty nifty performance analysis tools.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "acknowledgement": "concluded"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2005, Google Inc. All rights reserved.",
+      "cpe": "cpe:2.3:a:gperftools_project:gperftools:2.9.1:*:*:*:*:*:*:*",
+      "purl": "pkg:github/gperftools/gperftools@2.9.1",
+      "externalReferences": [
+        {
+          "url": "https://github.com/gperftools/gperftools.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/gperftools"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-3-Clause"
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/gperftools/scripts/import.sh"
         }
       ]
     },
@@ -924,7 +1101,11 @@
           "https://opensource.google/"
         ]
       },
-      "author": "Snappy Project",
+      "authors": [
+        {
+          "name": "Snappy Project"
+        }
+      ],
       "group": "google.opensource",
       "name": "snappy",
       "version": "1.1.10",
@@ -933,7 +1114,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -950,6 +1132,13 @@
         "occurrences": [
           {
             "location": "src/third_party/snappy"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-3-Clause"
+            }
           }
         ]
       },
@@ -973,7 +1162,11 @@
           "https://opensource.google/"
         ]
       },
-      "author": "Google LLC",
+      "authors": [
+        {
+          "name": "Google LLC"
+        }
+      ],
       "group": "google.opensource",
       "name": "tcmalloc",
       "version": "f3b20f9a07e175c5d897df7b49d9830d4efa6110",
@@ -982,7 +1175,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1018,6 +1212,13 @@
           {
             "location": "src/third_party/tcmalloc"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
+          }
         ]
       },
       "properties": [
@@ -1033,39 +1234,55 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/gperftools/gperftools@2.9.1",
+      "bom-ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
       "supplier": {
-        "name": "Google LLC",
+        "name": "Intel",
         "url": [
-          "https://opensource.google/"
+          "https://www.intel.com/content/www/us/en/developer/articles/tool/intel-decimal-floating-point-math-library.html"
+        ],
+        "contact": [
+          {
+            "email": "decimalfp@intel.com"
+          }
         ]
       },
-      "author": "gperftools Project",
-      "group": "google.opensource",
-      "name": "gperftools",
-      "version": "2.9.1",
-      "description": "gperftools (originally Google Performance Tools) is a collection of a high-performance multi-threaded malloc() implementation, plus some pretty nifty performance analysis tools.",
+      "authors": [
+        {
+          "name": "Marius Cornea"
+        }
+      ],
+      "group": "intel",
+      "name": "Intel\u00ae Decimal Floating-Point Math Library",
+      "version": "2.0.1",
+      "description": "A software implementation of the IEEE Standard 754-2019 Decimal Floating-Point Arithmetic specification.",
       "scope": "required",
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
-      "copyright": "Copyright (c) 2005, Google Inc. All rights reserved.",
-      "cpe": "cpe:2.3:a:gperftools_project:gperftools:2.9.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/gperftools/gperftools@2.9.1",
+      "copyright": "Copyright (c) 2011, Intel Corp.",
+      "purl": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
       "externalReferences": [
         {
-          "url": "https://github.com/gperftools/gperftools.git",
+          "url": "https://www.netlib.org/misc/intel/",
           "type": "distribution"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/gperftools"
+            "location": "src/third_party/IntelRDFPMathLib20U1"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-3-Clause"
+            }
           }
         ]
       },
@@ -1073,17 +1290,17 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/gperftools/scripts/import.sh"
         }
       ]
     },
     {
       "type": "library",
       "bom-ref": "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
-      "author": "Jesse Beder",
+      "authors": [
+        {
+          "name": "Jesse Beder"
+        }
+      ],
       "group": "jbeder",
       "name": "yaml-cpp",
       "version": "0.6.3",
@@ -1092,7 +1309,8 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1109,6 +1327,13 @@
         "occurrences": [
           {
             "location": "src/third_party/yaml-cpp"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
           }
         ]
       },
@@ -1132,7 +1357,11 @@
           "https://json-schema.org/"
         ]
       },
-      "author": "Julian Berman",
+      "authors": [
+        {
+          "name": "Julian Berman"
+        }
+      ],
       "group": "jsonschema",
       "name": "JSON-Schema-Test-Suite",
       "version": "728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
@@ -1141,7 +1370,8 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1157,6 +1387,13 @@
         "occurrences": [
           {
             "location": "src/third_party/JSON-Schema-Test-Suite"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
           }
         ]
       },
@@ -1176,7 +1413,11 @@
           "https://www.libtom.net/"
         ]
       },
-      "author": "LibTom Projects",
+      "authors": [
+        {
+          "name": "LibTom Projects"
+        }
+      ],
       "group": "libtom",
       "name": "LibTomCrypt",
       "version": "1.18.2",
@@ -1185,7 +1426,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Unlicense"
+            "id": "Unlicense",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1203,6 +1445,13 @@
           {
             "location": "src/third_party/tomcrypt-1.18.2"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Unlicense"
+            }
+          }
         ]
       },
       "properties": [
@@ -1218,14 +1467,18 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/libunwind/libunwind@v1.8.1",
+      "bom-ref": "pkg:github/libunwind/libunwind@1.8.1",
       "supplier": {
         "name": "The libunwind project",
         "url": [
           "https://www.nongnu.org/libunwind/"
         ]
       },
-      "author": "The libunwind project",
+      "authors": [
+        {
+          "name": "The libunwind project"
+        }
+      ],
       "group": "libunwind",
       "name": "libunwind",
       "version": "1.8.1",
@@ -1234,13 +1487,14 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "acknowledgement": "concluded"
           }
         }
       ],
       "copyright": "Copyright (C) 2008 CodeSourcery, 2021 Loongson Technology Corporation Limited",
       "cpe": "cpe:2.3:a:libunwind_project:libunwind:1.8.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/libunwind/libunwind@v1.8.1",
+      "purl": "pkg:github/libunwind/libunwind@1.8.1",
       "externalReferences": [
         {
           "url": "https://github.com/libunwind/libunwind.git",
@@ -1251,6 +1505,13 @@
         "occurrences": [
           {
             "location": "src/third_party/unwind"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
           }
         ]
       },
@@ -1274,7 +1535,11 @@
           "https://zlib.net/"
         ]
       },
-      "author": "Jean-loup Gailly, Mark Adler",
+      "authors": [
+        {
+          "name": "Jean-loup Gailly, Mark Adler"
+        }
+      ],
       "group": "madler",
       "name": "zlib",
       "version": "1.3.2",
@@ -1283,7 +1548,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Zlib"
+            "id": "Zlib",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1301,6 +1567,13 @@
           {
             "location": "src/third_party/zlib"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Zlib"
+            }
+          }
         ]
       },
       "properties": [
@@ -1316,82 +1589,34 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/mongodb/libmongocrypt@1.8.4",
+      "bom-ref": "pkg:github/mongodb/mongo-c-driver@1.27.6",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
           "https://mongodb.com"
         ]
       },
-      "author": "MongoDB, Inc.",
-      "group": "mongodb",
-      "name": "libmongocrypt",
-      "version": "1.8.4",
-      "description": "Required C library for Client Side and Queryable Encryption in MongoDB",
-      "scope": "required",
-      "licenses": [
+      "authors": [
         {
-          "license": {
-            "id": "Apache-2.0"
-          }
+          "name": "MongoDB, Inc."
         }
       ],
-      "copyright": "Copyright 2019-present MongoDB, Inc.",
-      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.8.4:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/libmongocrypt@1.8.4",
-      "externalReferences": [
-        {
-          "url": "https://github.com/mongodb/libmongocrypt.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/libmongocrypt"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/libmongocrypt/import.sh"
-        },
-        {
-          "name": "mdb_first_party",
-          "value": "true"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/mongodb/mongo-c-driver@1.23.2",
-      "supplier": {
-        "name": "MongoDB, Inc.",
-        "url": [
-          "https://mongodb.com"
-        ]
-      },
-      "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "MongoDB C Driver",
-      "version": "1.23.2",
+      "version": "1.27.6",
       "description": "The Official MongoDB driver for C language",
       "scope": "required",
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
       "copyright": "2009-present, MongoDB, Inc.",
-      "cpe": "cpe:2.3:a:mongodb:c_driver:1.23.2:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/mongo-c-driver@1.23.2",
+      "cpe": "cpe:2.3:a:mongodb:c_driver:1.27.6:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/mongo-c-driver@1.27.6",
       "externalReferences": [
         {
           "url": "https://github.com/mongodb/mongo-c-driver.git",
@@ -1402,6 +1627,13 @@
         "occurrences": [
           {
             "location": "src/third_party/libbson"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
           }
         ]
       },
@@ -1422,6 +1654,132 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/mongodb/libmongocrypt@1.8.4",
+      "supplier": {
+        "name": "MongoDB, Inc.",
+        "url": [
+          "https://mongodb.com"
+        ]
+      },
+      "authors": [
+        {
+          "name": "MongoDB, Inc."
+        }
+      ],
+      "group": "mongodb",
+      "name": "libmongocrypt",
+      "version": "1.8.4",
+      "description": "Required C library for Client Side and Queryable Encryption in MongoDB",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
+          }
+        }
+      ],
+      "copyright": "Copyright 2019-present MongoDB, Inc.",
+      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.8.4:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/libmongocrypt@1.8.4",
+      "externalReferences": [
+        {
+          "url": "https://github.com/mongodb/libmongocrypt.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libmongocrypt"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libmongocrypt/import.sh"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
+      "supplier": {
+        "name": "Mozilla Corporation",
+        "url": [
+          "https://mozilla.org"
+        ]
+      },
+      "authors": [
+        {
+          "name": "Mozilla Corporation"
+        }
+      ],
+      "group": "mozilla",
+      "name": "Mozilla Firefox ESR",
+      "version": "140.11.0esr",
+      "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MPL-2.0",
+            "acknowledgement": "concluded"
+          }
+        }
+      ],
+      "copyright": "Mozilla Corporation",
+      "cpe": "cpe:2.3:a:mozilla:firefox:140.11.0:*:*:*:esr:*:*:*",
+      "purl": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
+      "externalReferences": [
+        {
+          "url": "https://github.com/mozilla-firefox/firefox.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/mozjs"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "MPL-2.0"
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/mozjs/scripts/import.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/pcre2project/pcre2@pcre2-10.40",
       "supplier": {
         "name": "PCRE2 Project",
@@ -1429,7 +1787,11 @@
           "https://pcre2project.github.io/pcre2/"
         ]
       },
-      "author": "Philip Hazel, Nicholas Wilson, Zolt\u00e1n Herczeg",
+      "authors": [
+        {
+          "name": "Philip Hazel, Nicholas Wilson, Zolt\u00e1n Herczeg"
+        }
+      ],
       "group": "pcre2",
       "name": "PCRE2 - Perl-Compatible Regular Expressions",
       "version": "10.40",
@@ -1437,7 +1799,8 @@
       "scope": "required",
       "licenses": [
         {
-          "expression": "BSD-3-Clause WITH PCRE2-exception"
+          "expression": "BSD-3-Clause WITH PCRE2-exception",
+          "acknowledgement": "concluded"
         }
       ],
       "copyright": "Retired from University of Cambridge Computing Service, Cambridge, England. Copyright (c) 1997-2007 University of Cambridge. Copyright (c) 2007-2024 Philip Hazel. All rights reserved.",
@@ -1453,6 +1816,11 @@
         "occurrences": [
           {
             "location": "src/third_party/pcre2"
+          }
+        ],
+        "licenses": [
+          {
+            "expression": "BSD-3-Clause WITH PCRE2-exception"
           }
         ]
       },
@@ -1476,7 +1844,11 @@
           "https://roaringbitmap.org/"
         ]
       },
-      "author": "The CRoaring authors",
+      "authors": [
+        {
+          "name": "The CRoaring authors"
+        }
+      ],
       "group": "roaringbitmap",
       "name": "CRoaring",
       "version": "2.1.2",
@@ -1484,7 +1856,10 @@
       "scope": "required",
       "licenses": [
         {
-          "expression": "Apache-2.0 OR MIT"
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "concluded"
+          }
         }
       ],
       "copyright": "Copyright 2016-2022 The CRoaring authors",
@@ -1500,6 +1875,11 @@
         "occurrences": [
           {
             "location": "src/third_party/croaring"
+          }
+        ],
+        "licenses": [
+          {
+            "expression": "Apache-2.0 OR MIT"
           }
         ]
       },
@@ -1523,7 +1903,11 @@
           "https://www.schemastore.org/"
         ]
       },
-      "author": "Mads Kristensen and Contributors",
+      "authors": [
+        {
+          "name": "Mads Kristensen and Contributors"
+        }
+      ],
       "group": "schemastore",
       "name": "JSON Schema Store",
       "version": "6847cfc3a17a04a7664474212db50c627e1e3408",
@@ -1532,7 +1916,8 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1548,6 +1933,13 @@
         "occurrences": [
           {
             "location": "src/third_party/schemastore.org"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Apache-2.0"
+            }
           }
         ]
       },
@@ -1567,7 +1959,11 @@
           "https://snowballstem.org/"
         ]
       },
-      "author": "Dr. Martin Porter",
+      "authors": [
+        {
+          "name": "Dr. Martin Porter"
+        }
+      ],
       "group": "snowballstem",
       "name": "Snowball Stemming Algorithms (libstemmer)",
       "version": "1.0.0",
@@ -1576,7 +1972,8 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1593,6 +1990,13 @@
           {
             "location": "src/third_party/libstemmer_c"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-3-Clause"
+            }
+          }
         ]
       },
       "properties": [
@@ -1608,6 +2012,95 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:pypi/ocspresponder@0.5.0",
+      "supplier": {
+        "name": "Threema GmbH",
+        "url": [
+          "https://threema.ch/"
+        ]
+      },
+      "authors": [
+        {
+          "name": "Threema GmbH"
+        }
+      ],
+      "group": "threema-ch",
+      "name": "pypi/ocspresponder",
+      "version": "0.5.0",
+      "description": "RFC 6960 compliant OCSP Responder framework written in Python 3.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache-2.0",
+            "acknowledgement": "declared"
+          }
+        },
+        {
+          "license": {
+            "name": "OTHER",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "copyright": "Copyright 2016 Threema GmbH",
+      "purl": "pkg:pypi/ocspresponder@0.5.0",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspresponder/",
+          "type": "distribution"
+        },
+        {
+          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspresponder/0.5.0",
+          "comment": "License metadata retrieved via clearlydefined.io lookup.",
+          "type": "evidence"
+        },
+        {
+          "url": "https://api.deps.dev/v3/systems/pypi/packages/%2Focspresponder/versions/0.5.0",
+          "comment": "License metadata retrieved via deps.dev lookup.",
+          "type": "evidence"
+        },
+        {
+          "url": "https://github.com/threema-ch/ocspresponder",
+          "type": "vcs"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/mock_ocsp_responder"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "name": "Apache-2.0",
+              "acknowledgement": "declared"
+            }
+          },
+          {
+            "license": {
+              "name": "OTHER",
+              "acknowledgement": "declared"
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/unicode-org/icu@icu-release-57-1",
       "supplier": {
         "name": "The Unicode Consortium",
@@ -1615,7 +2108,11 @@
           "https://icu.unicode.org/"
         ]
       },
-      "author": "The Unicode Consortium",
+      "authors": [
+        {
+          "name": "The Unicode Consortium"
+        }
+      ],
       "group": "unicode-org",
       "name": "ICU4C - International Components for Unicode C/C++",
       "version": "57.1",
@@ -1625,7 +2122,7 @@
         {
           "license": {
             "id": "Unicode-3.0",
-            "url": "https://github.com/unicode-org/icu/blob/main/LICENSE"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -1643,6 +2140,14 @@
           {
             "location": "src/third_party/icu4c-57.1"
           }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "Unicode-3.0",
+              "url": "https://github.com/unicode-org/icu/blob/main/LICENSE"
+            }
+          }
         ]
       },
       "properties": [
@@ -1657,79 +2162,45 @@
       ]
     },
     {
-      "type": "framework",
-      "bom-ref": "pkg:github/wiredtiger/wiredtiger@11.3.0",
-      "supplier": {
-        "name": "MongoDB, Inc.",
-        "url": [
-          "https://mongodb.com"
-        ]
-      },
-      "author": "MongoDB, Inc.",
-      "group": "mongodb",
-      "name": "WiredTiger",
-      "version": "11.3.0",
-      "description": "WiredTiger is an high performance, scalable, production quality, NoSQL, Open Source extensible platform for data management.",
+      "type": "library",
+      "bom-ref": "pkg:generic/valgrind/valgrind@3.17.0",
+      "authors": [
+        {
+          "name": "The Valgrind Developers"
+        }
+      ],
+      "group": "valgrind",
+      "name": "valgrind.h",
+      "version": "3.17.0",
+      "description": "This header file is part of Valgrind, a dynamic binary instrumentation framework.",
       "scope": "required",
       "licenses": [
         {
-          "expression": "GPL-2.0-only OR GPL-3.0-only"
-        }
-      ],
-      "copyright": "Copyright (c) 2014-present MongoDB, Inc., Copyright (c) 2008-2014 WiredTiger, Inc., All rights reserved.",
-      "purl": "pkg:github/wiredtiger/wiredtiger@11.3.0",
-      "externalReferences": [
-        {
-          "url": "https://github.com/wiredtiger/wiredtiger.git",
-          "type": "distribution"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/wiredtiger"
-          }
-        ]
-      },
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "true"
-        },
-        {
-          "name": "mdb_first_party",
-          "value": "true"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:pypi/ocspbuilder@0.10.2",
-      "author": "Will Bond",
-      "group": "wbond",
-      "name": "pypi/ocspbuilder",
-      "version": "0.10.2",
-      "description": "Creates and signs online certificate status protocol (OCSP) requests and responses for X.509 certificates",
-      "scope": "excluded",
-      "licenses": [
-        {
           "license": {
-            "id": "MIT"
+            "id": "BSD-4-Clause",
+            "acknowledgement": "concluded"
           }
         }
       ],
-      "copyright": "Copyright (c) 2015-2018 Will Bond <will@wbond.net>",
-      "purl": "pkg:pypi/ocspbuilder@0.10.2",
+      "copyright": "Copyright (C) 2000-2017 Julian Seward. All rights reserved.",
+      "purl": "pkg:generic/valgrind/valgrind@3.17.0?vcs_url=https://sourceware.org/git/%3Fp%3Dvalgrind.git",
       "externalReferences": [
         {
-          "url": "https://pypi.org/project/ocspbuilder/",
+          "url": "https://sourceware.org/git/valgrind.git",
           "type": "distribution"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/mock_ocsp_responder"
+            "location": "src/third_party/valgrind"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "id": "BSD-4-Clause"
+            }
           }
         ]
       },
@@ -1742,38 +2213,60 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/ocspresponder@0.5.0",
-      "supplier": {
-        "name": "Threema GmbH",
-        "url": [
-          "https://threema.ch/"
-        ]
-      },
-      "author": "Threema GmbH",
-      "group": "threema-ch",
-      "name": "pypi/ocspresponder",
-      "version": "0.5.0",
-      "description": "RFC 6960 compliant OCSP Responder framework written in Python 3.",
+      "bom-ref": "pkg:pypi/ocspbuilder@0.10.2",
+      "authors": [
+        {
+          "name": "Will Bond"
+        }
+      ],
+      "group": "wbond",
+      "name": "pypi/ocspbuilder",
+      "version": "0.10.2",
+      "description": "Creates and signs online certificate status protocol (OCSP) requests and responses for X.509 certificates",
       "scope": "excluded",
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        },
+        {
+          "license": {
+            "name": "MIT",
+            "acknowledgement": "declared"
           }
         }
       ],
-      "copyright": "Copyright 2016 Threema GmbH",
-      "purl": "pkg:pypi/ocspresponder@0.5.0",
+      "copyright": "Copyright (c) 2015-2018 Will Bond <will@wbond.net>",
+      "purl": "pkg:pypi/ocspbuilder@0.10.2",
       "externalReferences": [
         {
-          "url": "https://pypi.org/project/ocspresponder/",
+          "url": "https://pypi.org/project/ocspbuilder/",
           "type": "distribution"
+        },
+        {
+          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspbuilder/0.10.2",
+          "comment": "License metadata retrieved via clearlydefined.io lookup.",
+          "type": "evidence"
+        },
+        {
+          "url": "https://github.com/wbond/ocspbuilder",
+          "type": "vcs"
         }
       ],
       "evidence": {
         "occurrences": [
           {
             "location": "src/third_party/mock_ocsp_responder"
+          }
+        ],
+        "licenses": [
+          {
+            "license": {
+              "name": "MIT",
+              "acknowledgement": "declared"
+            }
           }
         ]
       },
@@ -1786,6 +2279,96 @@
     }
   ],
   "dependencies": [
+    {
+      "ref": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source"
+    },
+    {
+      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1"
+    },
+    {
+      "ref": "pkg:generic/unicode-org/unicode@8.0.0"
+    },
+    {
+      "ref": "pkg:generic/valgrind/valgrind@3.17.0"
+    },
+    {
+      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb"
+    },
+    {
+      "ref": "pkg:github/abseil/abseil-cpp@20230802.1"
+    },
+    {
+      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3"
+    },
+    {
+      "ref": "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3"
+    },
+    {
+      "ref": "pkg:github/boostorg/boost@boost-1.79.0"
+    },
+    {
+      "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2"
+    },
+    {
+      "ref": "pkg:github/confluentinc/librdkafka@2.0.2"
+    },
+    {
+      "ref": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28"
+    },
+    {
+      "ref": "pkg:github/dcleblanc/safeint@3.0.26"
+    },
+    {
+      "ref": "pkg:github/derickr/timelib@2022.10"
+    },
+    {
+      "ref": "pkg:github/facebook/folly@v2025.04.21.00"
+    },
+    {
+      "ref": "pkg:github/facebook/zstd@v1.5.5"
+    },
+    {
+      "ref": "pkg:github/fmtlib/fmt@7.1.3"
+    },
+    {
+      "ref": "pkg:github/google/benchmark@v1.5.2"
+    },
+    {
+      "ref": "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306"
+    },
+    {
+      "ref": "pkg:github/google/snappy@1.1.10"
+    },
+    {
+      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110"
+    },
+    {
+      "ref": "pkg:github/gperftools/gperftools@2.9.1"
+    },
+    {
+      "ref": "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3"
+    },
+    {
+      "ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0"
+    },
+    {
+      "ref": "pkg:github/libtom/libtomcrypt@v1.18.2"
+    },
+    {
+      "ref": "pkg:github/libunwind/libunwind@1.8.1"
+    },
+    {
+      "ref": "pkg:github/madler/zlib@1.3.2"
+    },
+    {
+      "ref": "pkg:github/mongodb/libmongocrypt@1.8.4"
+    },
+    {
+      "ref": "pkg:github/mongodb/mongo-c-driver@1.27.6",
+      "dependsOn": [
+        "pkg:github/madler/zlib@1.3.2"
+      ]
+    },
     {
       "ref": "pkg:github/mongodb/mongo@v8.0",
       "dependsOn": [
@@ -1814,10 +2397,10 @@
         "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/libtom/libtomcrypt@v1.18.2",
-        "pkg:github/libunwind/libunwind@v1.8.1",
+        "pkg:github/libunwind/libunwind@1.8.1",
         "pkg:github/madler/zlib@1.3.2",
         "pkg:github/mongodb/libmongocrypt@1.8.4",
-        "pkg:github/mongodb/mongo-c-driver@1.23.2",
+        "pkg:github/mongodb/mongo-c-driver@1.27.6",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
         "pkg:github/roaringbitmap/croaring@v2.1.2",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
@@ -1829,154 +2412,29 @@
       ]
     },
     {
-      "ref": "pkg:github/mongodb/mongo-c-driver@1.23.2",
-      "dependsOn": [
-        "pkg:github/madler/zlib@1.3.2"
-      ]
+      "ref": "pkg:github/pcre2project/pcre2@pcre2-10.40"
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@140.11.0esr-1?arch=source",
-      "dependsOn": []
+      "ref": "pkg:github/roaringbitmap/croaring@v2.1.2"
     },
     {
-      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-      "dependsOn": []
+      "ref": "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408"
     },
     {
-      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
-      "dependsOn": []
+      "ref": "pkg:github/snowballstem/snowball@1.0.0"
     },
     {
-      "ref": "pkg:generic/valgrind/valgrind@3.17.0",
-      "dependsOn": []
+      "ref": "pkg:github/unicode-org/icu@icu-release-57-1"
     },
     {
-      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-      "dependsOn": []
+      "ref": "pkg:github/wiredtiger/wiredtiger@11.3.0"
     },
     {
-      "ref": "pkg:github/abseil/abseil-cpp@20230802.1",
-      "dependsOn": []
+      "ref": "pkg:pypi/ocspbuilder@0.10.2"
     },
     {
-      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/boostorg/boost@boost-1.79.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/confluentinc/librdkafka@2.0.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/dcleblanc/safeint@3.0.26",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/derickr/timelib@2022.10",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/facebook/folly@v2025.04.21.00",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/facebook/zstd@v1.5.5",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/fmtlib/fmt@7.1.3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/benchmark@v1.5.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/snappy@1.1.10",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/gperftools/gperftools@2.9.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/libtom/libtomcrypt@v1.18.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/libunwind/libunwind@v1.8.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/madler/zlib@1.3.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/mongodb/libmongocrypt@1.8.4",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/pcre2project/pcre2@pcre2-10.40",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/roaringbitmap/croaring@v2.1.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/snowballstem/snowball@1.0.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/unicode-org/icu@icu-release-57-1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/wiredtiger/wiredtiger@11.3.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:pypi/ocspbuilder@0.10.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:pypi/ocspresponder@0.5.0",
-      "dependsOn": []
+      "ref": "pkg:pypi/ocspresponder@0.5.0"
     }
-  ]
+  ],
+  "vulnerabilities": []
 }
