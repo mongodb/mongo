@@ -336,12 +336,6 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                   "ident"_attr = identInfo->identName,
                   "dropTimestamp"_attr = identInfo->dropTime,
                   "error"_attr = status);
-        } else if (status == ErrorCodes::WriteConflict) {
-            LOGV2(13285200,
-                  "WriteConflict while dropping ident, will retry later",
-                  "ident"_attr = identInfo->identName,
-                  "dropTimestamp"_attr = identInfo->dropTime,
-                  "error"_attr = status);
         } else if (status.isA<ErrorCategory::Interruption>()) {
             LOGV2(11873702,
                   "Interruption while dropping ident",
@@ -552,7 +546,7 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                         wuow.commit();
                     }
                     return s;
-                } catch (const StorageUnavailableException& ex) {
+                } catch (const DBException& ex) {
                     // Replicating the ident drop writes an oplog entry, which can hit a transient
                     // WriteConflict or TemporarilyUnavailable. Leave the ident drop-pending and let
                     // the next reaper pass redo the whole drop from scratch.
@@ -561,8 +555,6 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                     // entry.
                     // Whereas if the storage-level drop already happened, redoing it is harmless -
                     // WiredTigerKVEngine::_drop() treats ENOENT as success.
-                    return ex.toStatus();
-                } catch (const DBException& ex) {
                     return ex.toStatus();
                 }
             },
