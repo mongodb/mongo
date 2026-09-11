@@ -24,17 +24,47 @@ const kSystemDbs = new Set(["admin", "local", "config"]);
 // (need persisted sample) from unanalyzed (must be empty or a view).
 const analyzedNamespaces = new Set();
 
+const joinOptRes = db.adminCommand({
+    getParameter: 1,
+    internalEnableJoinOptimization: 1,
+    internalJoinPlanSamplingSize: 1,
+});
+const kJoinOptEnabled = joinOptRes.ok && joinOptRes.internalEnableJoinOptimization;
+const kJoinPlanSamplingSize = kJoinOptEnabled ? joinOptRes.internalJoinPlanSamplingSize : null;
+
 function analyzeNamespace(conn, fullNs) {
     const dot = fullNs.indexOf(".");
+    const dbName = fullNs.slice(0, dot);
+    const collName = fullNs.slice(dot + 1);
+    const dbObj = conn.getDB(dbName);
+
     OverrideHelpers.withPreOverrideRunCommand(() =>
         assert.commandWorked(
-            conn.getDB(fullNs.slice(0, dot)).runCommand({
-                analyze: fullNs.slice(dot + 1),
+            dbObj.runCommand({
+                analyze: collName,
                 mode: "sample",
                 samplingMethod: "random",
             }),
         ),
     );
+
+    // When join optimization is enabled, also persist a sample with the join plan sampling size so
+    // the join optimizer can find it. The default calculateSampleSize() may differ from
+    // internalJoinPlanSamplingSize.
+    // TODO SERVER-132398: Persist just one larger sample.
+    if (kJoinOptEnabled) {
+        OverrideHelpers.withPreOverrideRunCommand(() =>
+            assert.commandWorked(
+                dbObj.runCommand({
+                    analyze: collName,
+                    mode: "sample",
+                    samplingMethod: "random",
+                    sampleSize: kJoinPlanSamplingSize,
+                }),
+            ),
+        );
+    }
+
     analyzedNamespaces.add(fullNs);
 }
 
