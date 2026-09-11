@@ -47,10 +47,8 @@
 namespace mongo {
 
 inline BSONObj prepareCountForPassthrough(const OperationContext* opCtx,
-                                          const BSONObj& cmdObj,
+                                          CountCommandRequest& countRequest,
                                           bool requestQueryStats) {
-    BSONObjBuilder bob(cmdObj);
-
     // Pass the queryShapeHash to the shards. We must validate that all participating shards can
     // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last
     // LTS when the FCV is uninitialized, since count commands can run during initial sync. This is
@@ -61,15 +59,16 @@ inline BSONObj prepareCountForPassthrough(const OperationContext* opCtx,
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (auto&& queryShapeHash = CurOp::get(opCtx)->debug().getQueryShapeHash()) {
-            bob.append(CountCommandRequest::kOriginalQueryShapeHashFieldName,
-                       queryShapeHash->toHexString());
+            countRequest.setOriginalQueryShapeHash(queryShapeHash);
         }
     }
+    // Set rather than append so a client-supplied includeQueryStatsMetrics is overwritten instead
+    // of duplicated in the shard OP_MSG.
     if (requestQueryStats) {
-        bob.append(CountCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
+        countRequest.setIncludeQueryStatsMetrics(true);
     }
 
-    return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
+    return CommandHelpers::filterCommandRequestForPassthrough(countRequest.toBSON());
 }
 
 inline bool convertAndRunAggregateIfViewlessTimeseries(
@@ -300,8 +299,9 @@ public:
                         countRequestForShard.setSkip(boost::none);
 
                         // The includeQueryStatsMetrics field is not supported on mongos for the
-                        // count command, so we do not need to check the value on the original
-                        // request when updating requestQueryStats here.
+                        // count command (it is not returned in the client reply). When this op is
+                        // sampled, prepareCountForPassthrough overwrites the field to true so
+                        // shards return metrics for the query stats store.
                         bool requestQueryStats =
                             query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
@@ -312,7 +312,7 @@ public:
                                 routingCtx,
                                 nss,
                                 prepareCountForPassthrough(
-                                    opCtx, countRequestForShard.toBSON(), requestQueryStats),
+                                    opCtx, countRequestForShard, requestQueryStats),
                                 ReadPreferenceSetting::get(opCtx),
                                 Shard::RetryPolicy::kIdempotent,
                                 countRequestForShard.getQuery(),

@@ -74,5 +74,10 @@ TEST_F(ClusterDistinctTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kDistinctCmdTargeted, kDistinctCmdScatterGather);
 }
 
+TEST_F(ClusterDistinctTest, IncludeQueryStatsMetrics) {
+    testIncludeQueryStatsMetrics(kDistinctCmdTargeted, true /* isTargeted */);
+    testIncludeQueryStatsMetrics(kDistinctCmdScatterGather, false /* isTargeted */);
+}
+
 }  // namespace
 }  // namespace mongo

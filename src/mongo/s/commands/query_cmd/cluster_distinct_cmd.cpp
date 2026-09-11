@@ -5,6 +5,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -170,12 +171,16 @@ BSONObj prepareDistinctForPassthrough(
         }
         return cmd;
     }();
-    if (requestQueryStats || !qsBson.isEmpty() || queryShapeHash) {
-        BSONObjBuilder bob(cmdWithResolvedMaxTimeMS);
-        // Append distinct command with the query settings and includeQueryStatsMetrics if needed.
-        if (requestQueryStats) {
-            bob.append(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
-        }
+    // addField replaces in place so a client-supplied includeQueryStatsMetrics is overwritten
+    // instead of duplicated in the shard OP_MSG.
+    auto cmdForPassthrough = cmdWithResolvedMaxTimeMS;
+    if (requestQueryStats) {
+        cmdForPassthrough = cmdForPassthrough.addField(
+            BSON(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName << true)
+                .firstElement());
+    }
+    if (!qsBson.isEmpty() || queryShapeHash) {
+        BSONObjBuilder bob(cmdForPassthrough);
         if (!qsBson.isEmpty() && !cmd.hasField(DistinctCommandRequest::kQuerySettingsFieldName)) {
             bob.append(DistinctCommandRequest::kQuerySettingsFieldName, qsBson);
         }
@@ -198,7 +203,7 @@ BSONObj prepareDistinctForPassthrough(
         return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
     }
 
-    return CommandHelpers::filterCommandRequestForPassthrough(cmdWithResolvedMaxTimeMS);
+    return CommandHelpers::filterCommandRequestForPassthrough(cmdForPassthrough);
 }
 
 void runDistinctAsAgg(OperationContext* opCtx,
@@ -457,8 +462,9 @@ public:
                 cmdForShards = ClusterExplain::wrapAsExplain(
                     cmdObj, *verbosity, canonicalQuery->getExpCtx()->getQuerySettings().toBSON());
             } else {
-                // Users cannot set 'includeQueryStatsMetrics' for distinct commands on mongos. We
-                // will decide if remote query stats metrics should be collected.
+                // includeQueryStatsMetrics is not returned in the mongos distinct reply. When this
+                // op is sampled, prepareDistinctForPassthrough overwrites the field to true so
+                // shards return metrics for the query stats store.
                 requestQueryStats =
                     query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
                 boost::optional<query_shape::QueryShapeHash> queryShapeHash =

@@ -349,8 +349,16 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
 
     auto expectFieldIs = [&](bool value) {
         return [value, &fieldName](const executor::RemoteCommandRequest& request) {
-            auto elt = request.cmdObj[fieldName];
-            ASSERT(!elt.eoo());
+            int n = 0;
+            BSONElement elt;
+            for (auto&& e : request.cmdObj) {
+                if (e.fieldNameStringData() == fieldName) {
+                    elt = e;
+                    ++n;
+                }
+            }
+            // A duplicate field fatals debug/ASAN mongos in OpMsgBuilder (40474).
+            ASSERT_EQ(n, 1);
             ASSERT_EQ(elt.boolean(), value);
         };
     };
