@@ -526,6 +526,7 @@ const skippedStages = [
     "$cachedLookup",
     "$externalFunction",
     "$_streamsVectorSearch",
+    "$throttle",
 
     // Stages that cannot be made by user requests and run on oplog data.
     "$_internalFindAndModifyImageLookup",

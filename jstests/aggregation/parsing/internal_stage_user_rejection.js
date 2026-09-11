@@ -127,6 +127,7 @@ const kInternalClientTypeStages = new Set([
     "$https",
     "$setStreamMeta",
     "$_streamsVectorSearch",
+    "$throttle",
     "$validate",
     "$tumblingWindow",
     "$hoppingWindow",

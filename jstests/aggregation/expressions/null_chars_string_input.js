@@ -480,6 +480,7 @@ const skips = new Set([
     "$setVariableFromSubPipeline",
     "$shardedDataDistribution",
     "$skip",
+    "$throttle",
     "$tumblingWindow",
     "$validate",
     "$vectorSearch",

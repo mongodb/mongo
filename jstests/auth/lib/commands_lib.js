@@ -9915,6 +9915,20 @@ export const authCommandsLib = {
             testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
         {
+            testname: "aggregate_$throttle",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$throttle: {}}],
+                cursor: {},
+            },
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") ||
+                _isWindows() ||
+                getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail,
+        },
+        {
             testname: "aggregate_$tumblingWindow",
             command: {
                 aggregate: "foo",
