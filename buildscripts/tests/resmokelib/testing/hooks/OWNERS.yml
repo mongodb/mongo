@@ -9,3 +9,6 @@ filters:
   - "test_generate_and_check_perf_results.py":
     approvers:
       - 10gen/devprod-performance-infrastructure
+  - "test_simulate_crash.py":
+    approvers:
+      - 10gen/query-execution-router

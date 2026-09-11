@@ -9,6 +9,18 @@ py_library(
 )
 
 py_test(
+    name = "test_simulate_crash",
+    srcs = [
+        "__init__.py",
+        "test_simulate_crash.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
     name = "test_stepdown",
     srcs = [
         "__init__.py",
