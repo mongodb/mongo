@@ -1574,12 +1574,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
     auto child = sn->children[0].get();
     auto [stage, childOutputs] = build(child, childReqs);
 
-    return buildSortFinish(
+    return buildSortStageAndOutputs(
         root, reqs, forwardingReqs, std::move(plan), std::move(stage), std::move(childOutputs));
 }
 
 MONGO_COMPILER_NOINLINE
-std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortFinish(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortStageAndOutputs(
     const QuerySolutionNode* root,
     const PlanStageReqs& reqs,
     const PlanStageReqs& forwardingReqs,
