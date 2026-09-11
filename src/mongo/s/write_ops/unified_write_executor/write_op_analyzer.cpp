@@ -45,7 +45,13 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
     const NamespaceString& bucketsNss = it->second;
 
-    if (routingCtx.hasNss(bucketsNss)) {
+    // Translate to the buckets namespace only for an untracked view whose buckets collection is
+    // tracked (as CollectionRoutingInfoTargeter::_init does); bare map membership is
+    // client-forgeable.
+    if (!nss.isTimeseriesBucketsCollection() &&
+        !routingCtx.getCollectionRoutingInfo(nss).hasRoutingTable() &&
+        routingCtx.hasNss(bucketsNss) &&
+        routingCtx.getCollectionRoutingInfo(bucketsNss).hasRoutingTable()) {
         nss = bucketsNss;
         isViewfulTimeseries = true;
     }
