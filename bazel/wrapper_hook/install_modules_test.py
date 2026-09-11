@@ -303,7 +303,7 @@ class HermeticPythonTest(unittest.TestCase):
             self.tmp
             / "output_base"
             / "external"
-            / install_modules._PY_HOST_REPO_DIR
+            / install_modules._PY_HOST_REPO_DIRS[0]
             / "dist"
             / "bin"
             / "python3"
@@ -311,6 +311,17 @@ class HermeticPythonTest(unittest.TestCase):
         with mock.patch.object(install_modules.sys, "executable", str(exe)):
             # No filesystem probing at all: we're already running it.
             self.assertEqual(install_modules._hermetic_python(), pathlib.Path(str(exe)))
+
+    def test_legacy_bazel_7_py_host_spelling_still_counts_as_hermetic(self):
+        # Bazel 7 mangled canonical repo names with "~"; Bazel 9 uses "+". Both output
+        # bases can exist on a machine, so neither spelling may be dropped.
+        for repo_dir in install_modules._PY_HOST_REPO_DIRS:
+            with self.subTest(repo_dir=repo_dir):
+                self.assertTrue(
+                    install_modules._is_hermetic_python(
+                        f"/output_base/external/{repo_dir}/dist/bin/python3"
+                    )
+                )
 
     def test_windows_wrapper_python_copy_counts_as_hermetic(self):
         self.assertTrue(
@@ -323,11 +334,11 @@ class HermeticPythonTest(unittest.TestCase):
         self.assertFalse(install_modules._is_hermetic_python("/usr/bin/python3"))
         self.assertFalse(install_modules._is_hermetic_python(""))
 
-    def _make_py_host(self, output_base: pathlib.Path) -> pathlib.Path:
+    def _make_py_host(self, output_base: pathlib.Path, repo_dir: str | None = None) -> pathlib.Path:
         interpreter = (
             output_base
             / "external"
-            / install_modules._PY_HOST_REPO_DIR
+            / (repo_dir or install_modules._PY_HOST_REPO_DIRS[0])
             / install_modules._py_host_interpreter_relpath()
         )
         interpreter.parent.mkdir(parents=True)

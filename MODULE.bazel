@@ -1,6 +1,6 @@
 # Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
-bazel_dep(name = "apple_support", version = "1.24.1", repo_name = "build_bazel_apple_support")
-bazel_dep(name = "bazel_features", version = "1.37.0")
+bazel_dep(name = "apple_support", version = "1.24.2", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "bazel_features", version = "1.43.0")
 
 bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
 use_repo(bazel_features_deps, "bazel_features_globals", "bazel_features_version")
@@ -52,9 +52,9 @@ spidermonkey_wasi_repo(
     ] * 5,
 )
 
-bazel_dep(name = "rules_cc", version = "0.2.10")
+bazel_dep(name = "rules_cc", version = "0.2.18")
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
-bazel_dep(name = "rules_shell", version = "0.4.1")
+bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 single_version_override(
@@ -64,22 +64,28 @@ single_version_override(
 
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_multirun", version = "0.9.0")
-bazel_dep(name = "aspect_bazel_lib", version = "2.13.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 single_version_override(
     module_name = "aspect_bazel_lib",
-    version = "2.13.0",
+    version = "2.22.5",
 )
 
-bazel_dep(name = "aspect_rules_js", version = "2.1.3")
+# Pinned to 2.7.0, the last release before rules_js switched npm_import from the
+# system `tar` to a hermetic bsdtar from aspect_bazel_lib (2.8.0). aspect_bazel_lib
+# only defines bsdtar for {darwin,linux}_{amd64,arm64} and windows_{amd64,arm64}
+# (BSDTAR_PLATFORMS in lib/private/tar_toolchain.bzl), so 2.8.0+ fails on ppc64le and
+# s390x with "unknown repo 'bsd_tar_linux_ppc64le'". Revisit when aspect_bazel_lib
+# gains bsdtar for those architectures.
+bazel_dep(name = "aspect_rules_js", version = "2.7.0")
 single_version_override(
     module_name = "aspect_rules_js",
-    version = "2.1.3",
+    version = "2.7.0",
 )
 
-bazel_dep(name = "rules_nodejs", version = "6.3.0")
+bazel_dep(name = "rules_nodejs", version = "6.7.5")
 single_version_override(
     module_name = "rules_nodejs",
-    version = "6.3.0",
+    version = "6.7.5",
 )
 
 # rules_pycross reads uv.lock directly and generates Bazel-native targets
@@ -162,6 +168,20 @@ bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 local_path_override(
     module_name = "grpc",
     path = "src/third_party/grpc/dist",
+)
+
+# envoy_api's older releases call native.java_proto_library, which Bazel 9 removed and autoloading
+# does not rewrite. The 2026-01-30 snapshot loads the rule properly.
+single_version_override(
+    module_name = "envoy_api",
+    version = "0.0.0-20260130-84e8436",
+)
+
+# cel-spec 0.15.0's BUILD files use the proto/cc/java rules as builtins, which Bazel 9 removed and
+# which autoloading does not reach in that repo. 0.25.3 carries the load statements.
+single_version_override(
+    module_name = "cel-spec",
+    version = "0.25.3",
 )
 
 # googleapis still requests older grpc-java releases that import repos from
@@ -733,7 +753,7 @@ crate.annotation(
     deps = ["@@//src/third_party/zstandard:zstd"],
 )
 
-# Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"
+# Update the lock file using "CARGO_BAZEL_REPIN=1 bazel mod deps --lockfile_mode=update"
 # You may need to delete the contents of crates.lock first
 crate.from_specs(
     cargo_lockfile = "//bazel:crates.toml",

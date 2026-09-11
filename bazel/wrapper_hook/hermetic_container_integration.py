@@ -56,7 +56,7 @@ LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME = "mongo_linux_output_base_generatio
 # Keep this in lockstep with the action wrapper.  The layout version is included
 # in the container identity and invalidates containers created with an older mount
 # topology when the wrapper changes its bind mounts.
-LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION = "v6"
+LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION = "v7"
 LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT = (
     REPO_ROOT / "bazel" / "toolchains" / "cc" / "mongo_linux" / "linux_container_action_wrapper.py"
 )

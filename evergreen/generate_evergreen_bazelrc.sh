@@ -26,10 +26,11 @@ if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
     # Z:/ path is necessary to avoid running into MSVC's file length limit,
     # see https://jira.mongodb.org/browse/DEVPROD-11126
     abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
-    echo "startup --output_user_root=Z:/b" >.bazelrc.evergreen
     echo "startup --output_base=Z:/b/b" >.bazelrc.evergreen
     echo "common --action_env=TMP=Z:/b" >>.bazelrc.evergreen
     echo "common --action_env=TEMP=Z:/b" >>.bazelrc.evergreen
+    echo "common --repo_env=TMP=Z:/b" >>.bazelrc.evergreen
+    echo "common --repo_env=TEMP=Z:/b" >>.bazelrc.evergreen
     echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >>.bazeliskrc
     GIT_REV=$(git rev-parse HEAD)
     echo "common --define GIT_COMMIT_HASH=${GIT_REV}" >>.bazelrc.git

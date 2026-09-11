@@ -18,7 +18,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
     @staticmethod
     def _valid_config(**overrides: str) -> dict:
         config = {
-            "container_layout_version": "v6",
+            "container_layout_version": wrapper._CONTAINER_LAYOUT_VERSION,
             "docker_command": "/usr/bin/docker",
             "sandbox_base": "/action-sandbox",
             "shared_install_dir": "/shared-install",
@@ -184,6 +184,72 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             wrapper._container_name(config, pathlib.Path("/other-output")),
         )
 
+    def _mount_config(self, root: pathlib.Path) -> tuple[dict, pathlib.Path]:
+        output_base = root / "user-root" / "output-base"
+        (output_base / "external").mkdir(parents=True)
+        config = {
+            "container_name": "mongo_linux_action_configured",
+            "image": "image@sha256:digest",
+            "repo_root": str(root / "repo"),
+            "sandbox_base": str(root / "sandbox"),
+            "shared_install_dir": str(root / "shared-install"),
+        }
+        return config, output_base
+
+    def test_mount_specs_cover_repo_cache_and_install_roots(self) -> None:
+        """Fetched repos and embedded_tools live beside the output base, not inside it."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            config, output_base = self._mount_config(root)
+            user_root = output_base.parent
+            repo_cache = user_root / wrapper._REPO_CACHE_DIRNAME
+            install_root = user_root / wrapper._INSTALL_DIRNAME
+            repo_cache.mkdir(parents=True)
+            install_root.mkdir(parents=True)
+
+            sources = [source for source, _, _ in wrapper._mount_specs(config, output_base)]
+            self.assertIn(repo_cache, sources)
+            self.assertIn(install_root, sources)
+
+    def test_mount_specs_skip_external_targets_under_mounted_roots(self) -> None:
+        """A repository symlinked into the repo cache needs no mount of its own."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            config, output_base = self._mount_config(root)
+            repo_cache = output_base.parent / wrapper._REPO_CACHE_DIRNAME
+            fetched = repo_cache / "repos" / "v1" / "contents" / "deadbeef"
+            fetched.mkdir(parents=True)
+            (output_base / "external" / "rules_rust+").symlink_to(fetched)
+
+            sources = [source for source, _, _ in wrapper._mount_specs(config, output_base)]
+            self.assertIn(repo_cache, sources)
+            self.assertNotIn(fetched, sources)
+
+    def test_mount_specs_still_cover_targets_outside_mounted_roots(self) -> None:
+        """A local_path_override outside the workspace is not under any fixed root."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            config, output_base = self._mount_config(root)
+            outside = root / "elsewhere"
+            outside.mkdir()
+            (output_base / "external" / "local_module+").symlink_to(outside)
+
+            sources = [source for source, _, _ in wrapper._mount_specs(config, output_base)]
+            self.assertIn(outside, sources)
+
+    def test_container_name_changes_when_the_mount_set_changes(self) -> None:
+        """A container whose mounts no longer match the host must not keep its name."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            config, output_base = self._mount_config(root)
+            original = wrapper._container_name(config, output_base)
+
+            outside = root / "elsewhere"
+            outside.mkdir()
+            (output_base / "external" / "local_module+").symlink_to(outside)
+
+            self.assertNotEqual(original, wrapper._container_name(config, output_base))
+
     def test_trusted_config_dir_uses_reboot_persistent_storage(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             persistent_root = pathlib.Path(temp_dir) / "var-tmp"
@@ -277,6 +343,23 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             cwd = root / "action-sandbox" / "execroot" / "_main"
             output_base = root / "output-base"
             repository = output_base / "external" / "_main~setup_mongo_toolchains~libvoidstar"
+            cwd.mkdir(parents=True)
+            repository.mkdir(parents=True)
+            (repository / "libvoidstar.so").touch()
+            with mock.patch.dict("os.environ", {}, clear=True):
+                args = wrapper._exec_env(cwd, pathlib.Path("/action/tmp"), output_base)
+
+        self.assertIn(f"LD_LIBRARY_PATH={repository}", args)
+
+    def test_exec_env_finds_libvoidstar_in_bazel_9_canonical_repository(self) -> None:
+        # Bazel 9 mangles canonical repository names with "+" instead of Bazel 7's "~", and
+        # leaves the main-repo segment empty. A tool linked against libvoidstar fails to start
+        # with "cannot open shared object file" when only the "~" spelling is recognized.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            cwd = root / "action-sandbox" / "execroot" / "_main"
+            output_base = root / "output-base"
+            repository = output_base / "external" / "+_repo_rules+libvoidstar"
             cwd.mkdir(parents=True)
             repository.mkdir(parents=True)
             (repository / "libvoidstar.so").touch()
@@ -479,7 +562,7 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
 
         self.assertEqual(destination, reused)
 
-    def test_read_config_rejects_non_v6_layout(self) -> None:
+    def test_read_config_rejects_stale_layout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = pathlib.Path(temp_dir) / "config.json"
             config_path.write_text(
@@ -492,7 +575,9 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "expected v6"):
+            with self.assertRaisesRegex(
+                ValueError, f"expected {wrapper._CONTAINER_LAYOUT_VERSION}"
+            ):
                 wrapper._read_config(config_path)
 
     def test_start_container_reuses_running_container(self) -> None:

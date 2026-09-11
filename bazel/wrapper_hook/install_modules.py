@@ -47,10 +47,10 @@ _CYGDRIVE_RE = re.compile(r"^/cygdrive/([a-zA-Z])(/.*)?$")
 _WINDOWS_BASH_SYSTEM_PREFIXES = ("CYGWIN_NT", "MINGW", "MSYS")
 _BASH_OVERRIDE_ENV = "MONGO_BAZEL_BASH"
 
-# The hermetic Python toolchain repo, as materialized under the output base by
-# `@py_host//:all`. tools/bazel and tools/bazel.bat locate the wrapper
-# interpreter the same way; keep the three in sync.
-_PY_HOST_REPO_DIR = "_main~setup_mongo_python_toolchains~py_host"
+_PY_HOST_REPO_DIRS = (
+    "+setup_mongo_python_toolchains+py_host",
+    "_main~setup_mongo_python_toolchains~py_host",
+)
 # tools/bazel.bat copies the py_host dist here when it can't run the
 # interpreter in place (Windows file locking), so the copy is hermetic too.
 _WINDOWS_WRAPPER_PYTHON_PARTS = (".tmp", "bazel", "wrapper-python")
@@ -227,7 +227,7 @@ def _is_hermetic_python(candidate) -> bool:
     if not candidate:
         return False
     parts = pathlib.PurePath(candidate).parts
-    if _PY_HOST_REPO_DIR in parts:
+    if any(repo_dir in parts for repo_dir in _PY_HOST_REPO_DIRS):
         return True
     n = len(_WINDOWS_WRAPPER_PYTHON_PARTS)
     return any(parts[i : i + n] == _WINDOWS_WRAPPER_PYTHON_PARTS for i in range(len(parts)))
@@ -285,15 +285,12 @@ def _hermetic_python():
         if not symlink.exists():
             continue
         # <output_base>/execroot/_main/../../external/<py_host>/dist/...
-        candidate = (
-            symlink.resolve().parent.parent
-            / "external"
-            / _PY_HOST_REPO_DIR
-            / _py_host_interpreter_relpath()
-        )
-        if _python_works(candidate):
-            wrapper_debug(f"using hermetic python for bootstrap: {candidate}")
-            return candidate
+        external = symlink.resolve().parent.parent / "external"
+        for repo_dir in _PY_HOST_REPO_DIRS:
+            candidate = external / repo_dir / _py_host_interpreter_relpath()
+            if _python_works(candidate):
+                wrapper_debug(f"using hermetic python for bootstrap: {candidate}")
+                return candidate
 
     wrapper_debug("hermetic python toolchain not found; bootstrapping without it")
     return None

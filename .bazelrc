@@ -13,14 +13,16 @@ common --@rules_rust//rust/settings:extra_exec_rustc_flag=--cfg=reset_cache_A
 # Don't use legacy toolchain resolution.
 common --incompatible_enable_cc_toolchain_resolution
 
-# Bazel 9 removed the built-in C++ rules; they must now be loaded from @rules_cc. All first-party
-# code loads them explicitly, but our vendored third-party modules (protobuf, grpc, tcmalloc,
-# abseil) still rely on the old built-ins, and several have no Bazel 9 compatible release yet.
-# Autoloading rewrites those references to @rules_cc without patching vendored trees that
-# scripts/import.sh would clobber anyway. Note this deliberately does not cover the main
-# repository: --incompatible_disable_autoloads_in_main_repo defaults to true, so first-party code
-# still needs real load statements. Remove this once the vendored deps are upgraded.
-common --incompatible_autoload_externally=+@rules_cc
+# This forces third parties to resolve these rules against the external version of these rules rather than
+# the internal version that used to exist inside bazel
+common --incompatible_autoload_externally=+@rules_cc,+@rules_shell,+@rules_java,+@rules_proto,+@com_google_protobuf,+PyInfo
+
+# Bazel 9 flipped --incompatible_disallow_empty_glob to true. Some third parties have not yet, so disable for now
+common --noincompatible_disallow_empty_glob
+
+# Used to treat third parties as having -isystem passed to them, which is then disable on first party code
+common --features=system_include_paths
+common --host_features=system_include_paths
 
 # Require Python packages to explicitly declare their __init__.py files rather than having
 # rules_python synthesize them in executable runfiles.
@@ -29,12 +31,8 @@ build --incompatible_default_to_explicit_init_py
 # https://github.com/bazelbuild/bazel/issues/8766
 # there is WIP to allow users to inject constraints
 # this flag is required because the default for BZLMOD is @platform//host:host
-build --platforms=//bazel/platforms:host
+build --platforms=@internal_platforms_do_not_use//host
 common --enable_workspace=false
-
-# Improves build performance after first clean pull by
-# about 1 minute on developer machines
-common --experimental_remote_merkle_tree_cache
 
 # Linter will have issues with duplicate configurations due to some of our
 # install targets depending on tests that have testonly set. This flag can be removed
@@ -46,10 +44,6 @@ common --incompatible_modify_execution_info_additive
 
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 common --incompatible_strict_action_env=true
-
-# allows us to use python rules. This is needed because of the bug:
-# https://github.com/bazelbuild/bazel/issues/4327
-common --experimental_inprocess_symlink_creation
 
 # cc_library transitively propagates link opts. The build uses cc_shared_library to avoid this when linking
 # dynamically.
@@ -110,6 +104,11 @@ common --define=LOCAL_RESOURCES="port_block=20000,20250,20500,20750,21000,21250,
 # NOTE: Keep in sync with SIZE_TO_MEMORY_MB in bazel/test_exec_properties.bzl
 common --default_test_resources=memory=3584,3584,7168,14336
 common --default_test_resources=cpu=1,1,2,4
+
+# Reserve 40GB against the local resource manager for every C++ link action. Bazel's built-in
+# estimate for CppLink is far below what linking our larger binaries actually costs, so without
+# this the scheduler runs too many links concurrently and the machine OOMs. Memory is in MB.
+common --modify_execution_info=CppLink=+resources:memory:40960
 
 # Pin down the OSS LLVM Clang version for MacOS builds.
 common:macos --repo_env=LLVM_VERSION=19
@@ -415,6 +414,8 @@ common:evg --evg=True
 common:evg --//bazel/config:build_atlas=False
 common:evg --//bazel/config:opt=auto
 common:evg --//bazel/config:separate_debug=True
+# This helps CI cache more actions as it lets the remote host win more often
+common:evg --dynamic_local_execution_delay=20000
 common:evg --enable_platform_specific_config=true
 
 --config=evg_crypt

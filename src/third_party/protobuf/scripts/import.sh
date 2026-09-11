@@ -23,7 +23,9 @@ fi
 
 git clone --branch $VERSION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
-#git apply $PATCH_DIR/*.patch
+# See patches/README.md -- these are Bazel 9 build-logic fixes only, and a newer protobuf
+# release will very likely make them unnecessary.
+git apply $PATCH_DIR/*.patch
 rm -rf benchmarks
 rm -rf cmake
 rm -rf conformance

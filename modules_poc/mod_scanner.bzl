@@ -12,7 +12,6 @@ def _run_mod_scan(
         infile,
         discriminator):
     cc_toolchain = find_cc_toolchain(ctx)
-    tool_inputs, tool_input_mfs = ctx.resolve_tools(tools = [ctx.attr._mod_scanner])
     inputs = depset(
         direct = (
             [infile]
@@ -58,8 +57,7 @@ def _run_mod_scan(
             "MOD_SCANNER_UNUSED": unused_inputs.path,
         },
         progress_message = "Run mod_scanner on {}".format(infile.short_path),
-        tools = tool_inputs,
-        input_manifests = tool_input_mfs,
+        tools = [ctx.attr._mod_scanner[DefaultInfo].files_to_run],
         unused_inputs_list = unused_inputs,
     )
     return outfile

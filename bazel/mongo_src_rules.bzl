@@ -240,14 +240,18 @@ DISABLE_3RD_PARTY_FEATURES = select({
         "thread_safety_warnings",
         "first_party_gcc_or_clang_warnings",
         "-ubsan_third_party",
+        "-system_include_paths",
     ],
     "//bazel/config:compiler_type_gcc": [
         "-disable_warnings_for_third_party_libraries_gcc",
         "first_party_gcc_or_clang_warnings",
         "first_party_gcc_warnings",
         "-ubsan_third_party",
+        "-system_include_paths",
     ],
-    "//conditions:default": [],
+    "//conditions:default": [
+        "-system_include_paths",
+    ],
 })
 
 MONGO_GLOBAL_SRC_DEPS = [

@@ -27,6 +27,7 @@ import glob
 import os
 import pathlib
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -43,6 +44,35 @@ def get_cmd(tarball: str, extraction_command: str) -> list[str]:
         return [bash.as_posix(), "-c", f"{extraction_command} {tarball}"]
 
     return [shell, "-c", f"{extraction_command} {tarball}"]
+
+
+def clean_directory(target: str, working_dir: str | None) -> None:
+    """Remove an extraction destination that an earlier extraction may have left read-only.
+
+    tar applies the archive's directory modes once extraction finishes, so a tree it wrote
+    before can come back with unwritable directories. Re-extracting into one fails with
+    "Cannot open: File exists": the entry exists and tar cannot unlink it, because removing a
+    file needs write permission on its parent directory rather than on the file itself.
+    """
+    root = pathlib.Path(working_dir).resolve() if working_dir else pathlib.Path.cwd()
+    path = (root / target).resolve()
+    # A strict descendant, so "." cannot name the extraction directory itself: removing it would
+    # delete the cwd the extraction process is about to be started in.
+    if root not in path.parents:
+        raise ValueError(f"--clean-dir must name a directory strictly inside {root}, got: {target}")
+    if not path.exists():
+        return
+
+    print(f"Removing existing {path} before extracting.")
+    # Restore owner write/search top down, so every directory can be emptied on the way back up.
+    for directory, _, _ in os.walk(path):
+        current = pathlib.Path(directory)
+        if current.is_symlink():
+            continue
+        current.chmod(stat.S_IMODE(current.stat().st_mode) | stat.S_IRWXU)
+    parent = path.parent
+    parent.chmod(stat.S_IMODE(parent.stat().st_mode) | stat.S_IRWXU)
+    shutil.rmtree(path)
 
 
 parser = argparse.ArgumentParser()
@@ -71,6 +101,13 @@ parser.add_argument(
     help="Should this fail if extraction fails. Useful for optional success.",
 )
 parser.add_argument(
+    "--clean-dir",
+    type=str,
+    action="append",
+    help="Remove this path, relative to --change-dir, before extracting. Use when the archive "
+    "carries read-only directories, which make a repeat extraction fail.",
+)
+parser.add_argument(
     "--try-zstd",
     type=str,
     action="store",
@@ -86,6 +123,10 @@ if args.change_dir:
 else:
     working_dir = None
     tarball = pathlib.Path(args.tarball).as_posix()
+
+if args.clean_dir:
+    for target in args.clean_dir:
+        clean_directory(target, working_dir)
 
 # Attempt zstd extraction first, if enabled.
 zstd_succeeded = False

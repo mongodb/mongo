@@ -1,7 +1,7 @@
 """Fetches the private 10gen/jstestfuzz repo via the canonical git_repository rule.
 
 To fetch a specific commit without editing MODULE.bazel:
-    bazel sync --repo_env=JSTESTFUZZ_COMMIT=abc123def456...
+    bazel fetch --repo=@jstestfuzz --repo_env=JSTESTFUZZ_COMMIT=abc123def456....
 """
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")

@@ -39,6 +39,37 @@ assert_not_contains() {
     fi
 }
 
+# Replaces a function for the duration of one test. Saves the previous definition (if any) so
+# restore_stubbed_functions can put it back -- `unset -f` would delete the production function.
+STUBBED_FUNCTION_DEFS=()
+STUBBED_FUNCTION_NAMES=()
+
+stub_function() {
+    local name="$1"
+    local body="$2"
+
+    if declare -F "$name" >/dev/null 2>&1; then
+        STUBBED_FUNCTION_DEFS+=("$(declare -f "$name")")
+    else
+        STUBBED_FUNCTION_NAMES+=("$name")
+    fi
+    eval "${name}() { ${body} }"
+}
+
+restore_stubbed_functions() {
+    local name
+    # Re-eval saved definitions verbatim; iterate by index to keep multi-line bodies intact.
+    local i
+    for ((i = 0; i < ${#STUBBED_FUNCTION_DEFS[@]}; i++)); do
+        eval "${STUBBED_FUNCTION_DEFS[$i]}"
+    done
+    for name in ${STUBBED_FUNCTION_NAMES+"${STUBBED_FUNCTION_NAMES[@]}"}; do
+        unset -f "$name"
+    done
+    STUBBED_FUNCTION_DEFS=()
+    STUBBED_FUNCTION_NAMES=()
+}
+
 count_log_lines() {
     local log_file="$1"
     local pattern="$2"
@@ -187,6 +218,97 @@ run_retry_test_command() {
 
     RETRY_STATUS=0
     RETRY_OUTPUT="$(bazel_evergreen_shutils::retry_bazel_cmd "$attempts" "$RETRY_FAKE_BAZEL" build //evergreen:fake_target 2>&1)" || RETRY_STATUS=$?
+}
+
+test_pid_is_live_detects_live_and_dead_pids_on_posix() {
+    stub_function bazel_evergreen_shutils::is_windows "return 1;"
+
+    local status=0
+    bazel_evergreen_shutils::pid_is_live "$$" || status=$?
+    assert_eq "0" "$status" "the current process should be reported as live"
+
+    status=0
+    bazel_evergreen_shutils::pid_is_live "notapid" || status=$?
+    assert_eq "1" "$status" "a non-numeric PID should be reported as dead"
+
+    restore_stubbed_functions
+}
+
+test_pid_is_live_uses_tasklist_on_windows() {
+    stub_function bazel_evergreen_shutils::is_windows "return 0;"
+    # Emulate the Win32 tool: it lists the PID when the process exists and prints an INFO line
+    # otherwise. A bash function satisfies the `command -v tasklist` probe.
+    stub_function tasklist '
+        if [[ "$*" == *"PID eq 4242"* ]]; then
+            echo "java.exe                      4242 Services                   0    2,000,000 K"
+        else
+            echo "INFO: No tasks are running which match the specified criteria."
+        fi
+    '
+
+    local status=0
+    bazel_evergreen_shutils::pid_is_live 4242 || status=$?
+    assert_eq "0" "$status" "tasklist hit should report the server as live"
+
+    status=0
+    bazel_evergreen_shutils::pid_is_live 5353 || status=$?
+    assert_eq "1" "$status" "tasklist miss should report the server as dead"
+
+    restore_stubbed_functions
+}
+
+test_pid_is_live_reports_unknown_when_tasklist_fails() {
+    stub_function bazel_evergreen_shutils::is_windows "return 0;"
+    # tasklist is present but errors out (access denied, a wedged WMI service, ...). Its own exit
+    # status must be consulted: piping into grep would silently turn this into "no match", i.e.
+    # a positively dead verdict, and shut down a healthy server.
+    stub_function tasklist '
+        echo "ERROR: The RPC server is unavailable." >&2
+        return 1
+    '
+
+    local status=0
+    bazel_evergreen_shutils::pid_is_live 4242 || status=$?
+    assert_eq "2" "$status" "a failing tasklist should report liveness as undetermined"
+
+    restore_stubbed_functions
+}
+
+test_pid_is_live_reports_unknown_when_it_cannot_check() {
+    stub_function bazel_evergreen_shutils::is_windows "return 0;"
+    # No tasklist available: liveness is undeterminable and must not be reported as death.
+    stub_function command '
+        if [[ "$*" == "-v tasklist" ]]; then
+            return 1
+        fi
+        builtin command "$@"
+    '
+
+    local status=0
+    bazel_evergreen_shutils::pid_is_live 4242 || status=$?
+    assert_eq "2" "$status" "an unavailable tasklist should report liveness as undetermined"
+
+    restore_stubbed_functions
+}
+
+# Regression test for the Windows failure where server.pid.txt holds a native Win32 PID that
+# `kill -0` cannot see. The retry loop used to read that as a server death, run `bazel shutdown`
+# on a healthy server, and corrupt in-flight external repository fetches (py_host), which then
+# failed with "libcrypto-3-x64.dll (Permission denied)" on the next attempt.
+test_retry_bazel_cmd_does_not_shutdown_server_when_liveness_is_undetermined() {
+    setup_retry_test running
+    export FAKE_BAZEL_BUILD_MODE="fail_once"
+    RETRY_ON_FAIL=1
+    stub_function bazel_evergreen_shutils::pid_is_live "return 2;"
+
+    run_retry_test_command 2
+
+    restore_stubbed_functions
+
+    assert_eq "0" "$RETRY_STATUS" "undetermined liveness should still retry to success"
+    assert_eq "0" "$(count_exact_log_lines "$FAKE_BAZEL_LOG" "shutdown")" "undetermined liveness must not shut down a possibly-healthy server"
+    assert_eq "0" "$(count_log_lines "$FAKE_BAZEL_LOG" "--local_resources=cpu=HOST_CPUS*.5")" "undetermined liveness must not apply the OOM guard"
+    assert_not_contains "$RETRY_OUTPUT" "OOM/killed" "undetermined liveness must not be diagnosed as an OOM"
 }
 
 test_cache_bazel_output_base_uses_plain_info_once() {
@@ -481,6 +603,11 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
     assert_not_contains "$RETRY_OUTPUT" "next attempt" "final server-death failure should not claim that another retry will run"
 }
 
+test_pid_is_live_detects_live_and_dead_pids_on_posix
+test_pid_is_live_uses_tasklist_on_windows
+test_pid_is_live_reports_unknown_when_it_cannot_check
+test_pid_is_live_reports_unknown_when_tasklist_fails
+test_retry_bazel_cmd_does_not_shutdown_server_when_liveness_is_undetermined
 test_cache_bazel_output_base_uses_plain_info_once
 test_should_disable_gdb_index_for_all_ci_builds
 test_remote_unittest_wrapper_is_test_scoped

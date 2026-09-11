@@ -125,9 +125,13 @@ echo "Writing Bazel execution root for Coverity path normalization"
 "$BAZEL_BINARY" $bazel_cache info execution_root >"$workdir/coverity_execroot.txt"
 echo "Bazel execution root: $(cat "$workdir/coverity_execroot.txt")"
 repo_python=""
+# Bazel 9 mangles canonical repo names with "+" and an empty main-repo segment; Bazel 7
+# used "~" and prefixed "_main". Try both before falling back to the glob below.
 python_candidates=(
+    "$compiledb_output_base/external/+setup_mongo_python_toolchains+py_host/dist/bin/python3"
     "$compiledb_output_base/external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
     "$compiledb_output_base/external/py_host/dist/bin/python3"
+    "$compiledb_output_base/external/+setup_mongo_python_toolchains+py_host/dist/python.exe"
     "$compiledb_output_base/external/_main~setup_mongo_python_toolchains~py_host/dist/python.exe"
     "$compiledb_output_base/external/py_host/dist/python.exe"
 )

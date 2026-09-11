@@ -22,9 +22,9 @@ def _setup_mongo_toolchains_impl(_ctx):
     _setup_gdb_toolchains()
 
 # NOTE: the extension is named `setup_mongo_toolchains` on purpose. Repos
-# created by a module extension are canonically named
-# `_main~<extension>~<repo>`, so this spelling is what makes the toolchain land
-# at `external/_main~setup_mongo_toolchains~mongo_toolchain_v5`. Several
+# created by a module extension are canonically named after it — `+<extension>+<repo>`
+# on Bazel 9, `_main~<extension>~<repo>` on Bazel 7 — so this spelling is what makes the
+# toolchain land at `external/+setup_mongo_toolchains+mongo_toolchain_v5`. Several
 # out-of-Bazel consumers hardcode that path (buildscripts/clangd_vscode.sh,
 # .devcontainer/devcontainer.json, .vscode_defaults/*.code-workspace), so
 # renaming this symbol means updating them too.

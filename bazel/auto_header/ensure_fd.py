@@ -107,7 +107,7 @@ RG_VERSION = "v15.1.0"
 def _rg_cache_dir() -> Path:
     override = os.environ.get("RG_CACHE_DIR")
     if not override and os.environ.get("CI"):
-        return Path(os.getcwd()) / ".cache" / "rg-binaries" / FD_VERSION
+        return Path(os.getcwd()) / ".cache" / "rg-binaries" / RG_VERSION
     if override:
         return Path(override).expanduser().resolve() / RG_VERSION
     return Path.home() / ".cache" / "rg-binaries" / RG_VERSION

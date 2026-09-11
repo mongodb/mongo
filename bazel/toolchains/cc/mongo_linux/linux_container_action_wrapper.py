@@ -70,10 +70,15 @@ _PODMAN_CONFIG_ENV = "CONTAINERS_CONF"
 _TRUSTED_CONFIG_ROOT = pathlib.Path("/var/tmp")
 _TRUSTED_CONFIG_DIR_PREFIX = "mongo-linux-action-config-"
 _MOUNT_PROBE_PREFIX = ".mongo-linux-action-mount-"
+# Siblings of the output base, under Bazel's output user root. The repo contents cache holds
+# fetched repositories (Bazel 9 and newer); the install base holds embedded_tools, which
+# external/bazel_tools symlinks into.
+_REPO_CACHE_DIRNAME = "cache"
+_INSTALL_DIRNAME = "install"
 # Bump this whenever the bind-mount layout changes.  The version is part of the
 # deterministic container identity, so old containers (including containers that
 # still bind the output base's child temp directory read-only) cannot be reused.
-_CONTAINER_LAYOUT_VERSION = "v6"
+_CONTAINER_LAYOUT_VERSION = "v7"
 _PODMAN_RECOVERY_MARKERS = (
     "invalid internal status",
     "conmon exited prematurely",
@@ -414,6 +419,10 @@ def _container_name(config: dict, output_base: pathlib.Path) -> str:
         "shared_install_dir": config.get("shared_install_dir", ""),
         "state_dir": config.get("state_dir", ""),
         "user": config.get("user", ""),
+        # Without this a container started against a different mount set keeps this name and is
+        # reused, so inputs that live under a path it never mounted fail to resolve inside it —
+        # as a missing file, not as a container error.
+        "mounts": _mount_digest(_mount_specs(config, output_base)),
     }
     runtime_digest = hashlib.sha256(
         json.dumps(runtime_identity, sort_keys=True, separators=(",", ":")).encode()
@@ -494,18 +503,21 @@ def _volume(
     return ["-v", f"{path}:{target or path}{mode}"]
 
 
-def _external_tool_mounts(
+def _external_tool_mount_targets(
     output_base: pathlib.Path,
     mounted_paths: Sequence[pathlib.Path],
-) -> list[str]:
-    """Mount external repository symlink targets that are outside the output base.
+) -> list[pathlib.Path]:
+    """Return external repository symlink targets that are outside the output base.
 
     Bazel keeps a few built-in repositories outside the output base and exposes them through
     absolute symlinks in ``execroot/external``. The action container sees the symlink, but not its
     target, unless the target is mounted explicitly. Workspace and output-base repositories are
     already covered by the normal mounts and must not be mounted a second time.
+
+    This only sees repositories that exist when the container starts, so it is a fallback for
+    targets outside the roots mounted by _mount_specs, not the primary mechanism.
     """
-    mounts: list[str] = []
+    targets: list[pathlib.Path] = []
     mounted_targets: set[pathlib.Path] = set()
     external_roots = [output_base / "external"]
     execroot = output_base / "execroot"
@@ -536,8 +548,87 @@ def _external_tool_mounts(
             ):
                 continue
             mounted_targets.add(target)
-            mounts.extend(_volume(target, target, read_only=True))
-    return mounts
+            targets.append(target)
+    return targets
+
+
+def _mount_specs(
+    config: dict,
+    output_base: pathlib.Path,
+    config_path: pathlib.Path | None = None,
+) -> list[tuple[pathlib.Path, pathlib.PurePath | None, bool]]:
+    """Return every (source, target, read_only) bind mount the action container needs.
+
+    Single source of truth for both the `docker run` command line and the container identity in
+    _container_name, so a container whose mounts no longer match the host is renamed rather than
+    silently reused.
+    """
+    config_path = config_path or output_base / _CONFIG_FILENAME
+    action_temp_root = _action_temp_root(output_base)
+    # _container_name digests this for partially populated configs too, so treat the configured
+    # paths as optional here rather than requiring them as _start_container does.
+    repo_root = pathlib.Path(config["repo_root"]) if config.get("repo_root") else None
+    action_sandbox_root = (
+        _configured_path(config, "sandbox_base") if config.get("sandbox_base") else None
+    )
+    shared_install_dir = (
+        _configured_path(config, "shared_install_dir") if config.get("shared_install_dir") else None
+    )
+
+    # Bazel materializes fetched repositories in the repo contents cache and its own built-in
+    # repositories in the install base. Both are siblings of the output base rather than children,
+    # so the output-base mount does not cover them, and both gain entries whenever a repository is
+    # fetched or the Bazel binary changes. Mount the roots instead of the individual repositories:
+    # a root also covers repositories fetched after this container started, which enumerating
+    # symlink targets cannot.
+    output_user_root = output_base.parent
+    fixed_roots = [
+        path
+        for path in (output_user_root / _REPO_CACHE_DIRNAME, output_user_root / _INSTALL_DIRNAME)
+        if path.is_dir()
+    ]
+
+    optional: list[tuple[pathlib.Path | None, pathlib.PurePath | None, bool]] = [
+        (repo_root, None, True),
+        (output_base, None, True),
+        # processwrapper-sandbox creates one child directory per action below this
+        # separate sandbox base. Keep it writable while the Bazel output base,
+        # including cache and execroot state, remains read-only.
+        (action_sandbox_root, None, False),
+        (shared_install_dir, None, False),
+        (config_path, None, True),
+        (action_temp_root, _CONTAINER_ACTION_TEMP_ROOT, False),
+    ]
+    specs: list[tuple[pathlib.Path, pathlib.PurePath | None, bool]] = [
+        (source, target, read_only) for source, target, read_only in optional if source is not None
+    ]
+    specs.extend((root, None, True) for root in fixed_roots)
+
+    covered = [
+        path
+        for path in (
+            repo_root,
+            output_base,
+            action_sandbox_root,
+            shared_install_dir,
+            action_temp_root,
+            *fixed_roots,
+        )
+        if path is not None
+    ]
+    specs.extend(
+        (target, target, True) for target in _external_tool_mount_targets(output_base, covered)
+    )
+    return specs
+
+
+def _mount_digest(specs: Sequence[tuple[pathlib.Path, pathlib.PurePath | None, bool]]) -> str:
+    """Digest of the mount set, so a change to it yields a different container name."""
+    rendered = "\0".join(
+        f"{source}:{target or source}:{'ro' if read_only else 'rw'}"
+        for source, target, read_only in sorted(specs, key=lambda spec: str(spec[0]))
+    )
+    return hashlib.sha256(rendered.encode()).hexdigest()[:12]
 
 
 def _configured_path(config: dict, key: str) -> pathlib.Path:
@@ -612,18 +703,10 @@ def _start_container(
         str(repo_root),
         "-e",
         f"{_ACTION_CONTAINER_ENV}=1",
-        *_volume(repo_root, read_only=True),
-        *_volume(output_base, read_only=True),
-        # processwrapper-sandbox creates one child directory per action below this
-        # separate sandbox base. Keep it writable while the Bazel output base,
-        # including cache and execroot state, remains read-only.
-        *_volume(action_sandbox_root),
-        *_volume(shared_install_dir),
-        *_volume(config_path, read_only=True),
-        *_volume(action_temp_root, _CONTAINER_ACTION_TEMP_ROOT),
-        *_external_tool_mounts(
-            output_base,
-            [repo_root, output_base, action_sandbox_root, shared_install_dir, action_temp_root],
+        *(
+            arg
+            for source, target, read_only in _mount_specs(config, output_base, config_path)
+            for arg in _volume(source, target, read_only=read_only)
         ),
     ]
 
@@ -928,15 +1011,13 @@ def _find_libvoidstar_directory(
 
     candidates.extend(external_root / "libvoidstar" for external_root in external_roots)
 
-    # Bzlmod may only expose the canonical repository directory, for example
-    # ``_main~setup_mongo_toolchains~libvoidstar``, without creating the usual
-    # ``external/libvoidstar`` alias in this output base.
     for external_root in external_roots:
         try:
             candidates.extend(
                 entry
                 for entry in sorted(external_root.iterdir(), key=lambda path: path.name)
-                if entry.name == "libvoidstar" or entry.name.endswith("~libvoidstar")
+                if entry.name == "libvoidstar"
+                or entry.name.endswith(("~libvoidstar", "+libvoidstar"))
             )
         except OSError:
             continue

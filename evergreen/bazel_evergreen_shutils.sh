@@ -36,6 +36,17 @@ bazel_evergreen_shutils::is_macos() {
     [[ "${os}" == "darwin" ]] && return 0 || return 1
 }
 
+# Evergreen's Windows hosts run these scripts under a Cygwin/MSYS bash, but the Bazel server
+# they talk to is a native Win32 process. That mismatch matters for any PID handling: see
+# bazel_evergreen_shutils::pid_is_live.
+bazel_evergreen_shutils::is_windows() {
+    local -r os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    case "${os}" in
+    cygwin* | mingw* | msys*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
 bazel_evergreen_shutils::is_ppc64le() {
     local -r arch="$(uname -m)"
     [[ "${arch}" == "ppc64le" || "${arch}" == "ppc64" || "${arch}" == "ppc" ]] && return 0 || return 1
@@ -288,6 +299,50 @@ bazel_evergreen_shutils::bazel_pidfile_path() {
     echo "${ob}/server/server.pid.txt"
 }
 
+# Answers "is this PID alive?" in a way that works on every platform we build on.
+#
+# server.pid.txt holds a *native* PID. On Windows that is a Win32 PID with no entry in the
+# Cygwin/MSYS PID table, so `kill -0` fails for a perfectly healthy server -- which used to make
+# the retry loop diagnose a phantom server death, shut the live server down mid-build, and corrupt
+# in-flight external repository fetches. Use tasklist there instead.
+#
+# Return codes are deliberately three-valued:
+#   0 - positively alive
+#   1 - positively dead
+#   2 - could not determine
+# Callers must not treat 2 as death; killing or restarting on an unknown is what caused the
+# original bug.
+bazel_evergreen_shutils::pid_is_live() {
+    local pid="$1"
+
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+
+    if bazel_evergreen_shutils::is_windows; then
+        if ! command -v tasklist >/dev/null 2>&1; then
+            return 2
+        fi
+        # Capture tasklist's own status rather than the pipeline's: piping straight into grep
+        # would report a *failed* tasklist as "no match", i.e. positively dead, which is exactly
+        # the false negative this helper exists to prevent.
+        local listing listing_status
+        listing="$(tasklist /FI "PID eq ${pid}" /NH 2>/dev/null)"
+        listing_status=$?
+        if [[ "$listing_status" -ne 0 ]]; then
+            return 2
+        fi
+        # /NH drops the column header; a missing PID yields "INFO: No tasks are running...".
+        if grep -q "\b${pid}\b" <<<"$listing"; then
+            return 0
+        fi
+        return 1
+    fi
+
+    if kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 bazel_evergreen_shutils::bazel_server_pid() {
     local BAZEL_BINARY="$1"
     local pf pid
@@ -303,11 +358,14 @@ bazel_evergreen_shutils::is_bazel_server_running() {
     local pid
     pid="$(bazel_evergreen_shutils::bazel_server_pid "$BAZEL_BINARY" 2>/dev/null || true)"
     [[ -n "$pid" ]] || return 1
-    if kill -0 "$pid" 2>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
+    bazel_evergreen_shutils::pid_is_live "$pid"
+    case "$?" in
+    0) return 0 ;;
+    # Undetermined: assume the server is up. A false "dead" here triggers a shutdown of a
+    # healthy server, which is far more destructive than skipping a restart we did not need.
+    2) return 0 ;;
+    *) return 1 ;;
+    esac
 }
 
 bazel_evergreen_shutils::print_bazel_server_pid() {
@@ -325,6 +383,24 @@ bazel_evergreen_shutils::print_bazel_server_pid() {
     fi
 }
 
+# Emits candidate server PIDs by scanning the process table. `pgrep -f "java.*bazel"` only works
+# where the server is a child of this PID namespace; on Windows it never matches the native server,
+# so this yields nothing there and callers fall back to the pidfile.
+bazel_evergreen_shutils::scan_server_pids() {
+    if bazel_evergreen_shutils::is_windows; then
+        return 0
+    fi
+    pgrep -f "java.*bazel" 2>/dev/null || true
+}
+
+# Keeps a PID if it is alive or if liveness could not be determined; see pid_is_live for why
+# "unknown" must not be read as dead.
+bazel_evergreen_shutils::_keep_if_not_dead() {
+    local pid="$1"
+    bazel_evergreen_shutils::pid_is_live "$pid"
+    [[ "$?" -ne 1 ]]
+}
+
 bazel_evergreen_shutils::fast_bazel_server_pids() {
     local pid
     local -a live_pids=()
@@ -335,10 +411,10 @@ bazel_evergreen_shutils::fast_bazel_server_pids() {
             continue
         fi
         seen_pids["$pid"]=1
-        if kill -0 "$pid" 2>/dev/null; then
+        if bazel_evergreen_shutils::_keep_if_not_dead "$pid"; then
             live_pids+=("$pid")
         fi
-    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+    done < <(bazel_evergreen_shutils::scan_server_pids)
 
     if [[ ${#live_pids[@]} -eq 0 ]]; then
         return 1
@@ -366,14 +442,14 @@ bazel_evergreen_shutils::bazel_server_pids() {
         if [[ "$pid" =~ ^[0-9]+$ ]]; then
             candidate_pids+=("$pid")
         fi
-    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+    done < <(bazel_evergreen_shutils::scan_server_pids)
 
     for pid in "${candidate_pids[@]}"; do
         if [[ -n "${seen_pids[$pid]:-}" ]]; then
             continue
         fi
         seen_pids["$pid"]=1
-        if kill -0 "$pid" 2>/dev/null; then
+        if bazel_evergreen_shutils::_keep_if_not_dead "$pid"; then
             live_pids+=("$pid")
         fi
     done

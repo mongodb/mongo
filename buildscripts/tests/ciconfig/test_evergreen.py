@@ -2,7 +2,9 @@
 
 import datetime
 import os
+import tempfile
 import unittest
+import unittest.mock
 
 import buildscripts.ciconfig.evergreen as _evergreen
 
@@ -588,6 +590,78 @@ class TestVariant(unittest.TestCase):
         variant_amazon = self.conf.get_variant("amazon")
         self.assertEqual(3, len(variant_amazon.tasks))
         self.assertIn("compile", variant_amazon.task_names)
+
+
+class TestFindEvergreenBinary(unittest.TestCase):
+    """Unit tests for find_evergreen_binary."""
+
+    def setUp(self):
+        self._prev_environ = os.environ.copy()
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._prev_environ)
+
+    def test_ignores_bazel_test_home_override(self):
+        """Bazel 9 points HOME at TEST_TMPDIR; the real home still has the binary."""
+        with (
+            tempfile.TemporaryDirectory() as real_home,
+            tempfile.TemporaryDirectory() as test_tmpdir,
+        ):
+            evergreen_path = os.path.join(real_home, "evergreen")
+            with open(evergreen_path, "w", encoding="utf8"):
+                pass
+
+            os.environ["HOME"] = test_tmpdir
+            os.environ["TEST_TMPDIR"] = test_tmpdir
+
+            with unittest.mock.patch.object(
+                _evergreen, "_passwd_home_directory", return_value=real_home
+            ):
+                self.assertEqual(
+                    evergreen_path, _evergreen.find_evergreen_binary("does_not_exist_on_path")
+                )
+
+    def test_uses_home_when_not_under_test_tmpdir(self):
+        """Outside a Bazel test action HOME is authoritative."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as test_tmpdir:
+            evergreen_path = os.path.join(home, "evergreen")
+            with open(evergreen_path, "w", encoding="utf8"):
+                pass
+
+            os.environ["HOME"] = home
+            os.environ["TEST_TMPDIR"] = test_tmpdir
+
+            self.assertEqual(
+                evergreen_path, _evergreen.find_evergreen_binary("does_not_exist_on_path")
+            )
+
+
+class TestStripEvergreenLogPrefix(unittest.TestCase):
+    """Unit tests for _strip_evergreen_log_prefix."""
+
+    def test_strips_leading_log_lines(self):
+        """The evergreen CLI writes its own log lines to stdout before the YAML."""
+        output = (
+            "[evergreen] 2026/09/11 19:00:42 [p=warning]: something happened\n"
+            "[evergreen] 2026/09/11 19:00:42 [p=info]: more chatter\n"
+            "functions:\n"
+            "  f_noop: []\n"
+        )
+        self.assertEqual(
+            "functions:\n  f_noop: []\n", _evergreen._strip_evergreen_log_prefix(output)
+        )
+
+    def test_leaves_plain_yaml_untouched(self):
+        output = "functions:\n  f_noop: []\n"
+        self.assertEqual(output, _evergreen._strip_evergreen_log_prefix(output))
+
+    def test_does_not_strip_inside_the_document(self):
+        """Only the leading log block is dropped; YAML content is never touched."""
+        output = (
+            "functions:\n" '  f_echo: "[evergreen] 2026/09/11 19:00:42 [p=info]: inside a string"\n'
+        )
+        self.assertEqual(output, _evergreen._strip_evergreen_log_prefix(output))
 
 
 if __name__ == "__main__":

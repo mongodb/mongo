@@ -9,6 +9,14 @@
 REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
 
+# Redirect Python bytecode caches out of Bazel-managed trees. The toolchain repo
+# ships a usercustomize.py that sets sys.pycache_prefix, but that only runs during
+# site initialization -- after the interpreter has already imported `encodings`,
+# whose .pyc files then land in the fetched python toolchain repo and make Bazel
+# re-fetch it ("will be fetched again since the file ... has been modified
+# externally"). PYTHONPYCACHEPREFIX is honored from startup, so it covers those.
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-${TMPDIR:-/tmp}/bazel_pycache}"
+
 if [[ "${MONGO_BAZEL_IN_HERMETIC_CONTAINER:-}" == "1" ]]; then
   exec "$bazel_real" "$@"
 fi
@@ -98,6 +106,29 @@ python_works() {
   local candidate="$1"
   [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || return 1
   "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)' >/dev/null 2>&1
+}
+
+# Locate the py_host interpreter under an output base, given one of the convenience
+# symlinks (bazel-<repo> or .compiledb/compiledb-<repo>) that points into it. Bazel 7
+# mangled canonical repo names with "~" and named the main repo "_main"; Bazel 9 uses
+# "+" and an empty main-repo segment. Try both so the wrapper works either way.
+find_py_host_python() {
+  local convenience_symlink="$1"
+  [[ -L "$convenience_symlink" || -d "$convenience_symlink" ]] || return 1
+
+  local external_dir
+  external_dir="$(readlink "$convenience_symlink")/../../external"
+
+  local candidate mangled
+  for mangled in "+setup_mongo_python_toolchains+py_host" "_main~setup_mongo_python_toolchains~py_host"; do
+    candidate="$external_dir/$mangled/dist/bin/python3"
+    if python_works "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 find_repo_python() {
@@ -333,10 +364,10 @@ fi
 cur_dir=$(basename $REPO_ROOT)
 python=""
 if [ -d $REPO_ROOT/bazel-$cur_dir ]; then
-  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
+  python=$(find_py_host_python "$REPO_ROOT/bazel-$cur_dir") || python=""
 else
   if [ -d $REPO_ROOT/.compiledb/compiledb-$cur_dir ]; then
-    python="$(readlink "$REPO_ROOT/.compiledb/compiledb-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
+    python=$(find_py_host_python "$REPO_ROOT/.compiledb/compiledb-$cur_dir") || python=""
   fi
 fi
 
@@ -366,7 +397,7 @@ fi
 
 # update python location if it was missing and we had to install it
 if [[ "$python" = "" ]]; then
-  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
+  python=$(find_py_host_python "$REPO_ROOT/bazel-$cur_dir") || python=""
 fi
 if ! python_works "$python"; then
   if ! python=$(find_local_python); then

@@ -175,10 +175,6 @@ if defined hook_python (
     "!hook_python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
     if !ERRORLEVEL! NEQ 0 set "hook_python="
 )
-if not defined hook_python if defined python (
-    "!python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
-    if !ERRORLEVEL! EQU 0 set "hook_python=!python!"
-)
 if not defined hook_python (
     for %%P in (python3.exe python3 python.exe python py.exe) do (
         where %%P >nul 2>&1
@@ -188,9 +184,19 @@ if not defined hook_python (
         )
     )
 )
+rem Prefer a copy of the py_host interpreter over the interpreter *inside* the py_host external
+rem repo. wrapper_hook.py runs Bazel, which may decide py_host is dirty and re-extract it; Windows
+rem cannot overwrite a DLL that a running process has mapped, so using the in-repo python.exe makes
+rem the fetch fail with "dist/DLLs/libcrypto-3-x64.dll (Permission denied)". POSIX platforms are
+rem immune (unlink-then-replace), which is why this only ever bit Windows.
 if not defined hook_python (
     call :copy_pyhost_python
     if defined copied_python set "hook_python=!copied_python!"
+)
+rem Last resort only: running from the repo risks the DLL-locking failure described above.
+if not defined hook_python if defined python (
+    "!python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+    if !ERRORLEVEL! EQU 0 set "hook_python=!python!"
 )
 if defined hook_python (
     "!hook_python!" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
@@ -207,7 +213,7 @@ if not defined hook_python (
 ) >> "%LOGFILE%" 2>&1
 set "exit_code=!ERRORLEVEL!"
 if !exit_code! NEQ 0 (
-    echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
+    echo %ESC%[1;31mERROR:%ESC%[0m wrapper hook failed:
     type "%LOGFILE%"
     call :cleanup_logfile
     exit /b !exit_code!
@@ -314,8 +320,16 @@ dir %REPO_ROOT% | C:\Windows\System32\find.exe "bazel-%cur_dir%" > %REPO_ROOT%\t
 for /f "tokens=2 delims=[" %%i in (%REPO_ROOT%\tmp_bazel_symlink_dir.txt) do set bazel_real_dir=%%i
 del %REPO_ROOT%\tmp_bazel_symlink_dir.txt
 set bazel_real_dir=!bazel_real_dir:~0,-1!
-set "python=!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_host\dist\python.exe"
-exit /b 0  
+rem Bazel 7 mangled canonical repo names with "~" and named the main repo "_main"; Bazel 9 uses
+rem "+" with an empty main-repo segment. Try both so the wrapper works either way.
+set "python="
+for %%m in ("+setup_mongo_python_toolchains+py_host" "_main~setup_mongo_python_toolchains~py_host") do (
+    if not defined python (
+        set "py_candidate=!bazel_real_dir!\..\..\external\%%~m\dist\python.exe"
+        if exist "!py_candidate!" set "python=!py_candidate!"
+    )
+)
+exit /b 0
 
 :cleanup_logfile
 if defined LOGFILE if exist "!LOGFILE!" del "!LOGFILE!" >nul 2>&1
