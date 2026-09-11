@@ -165,24 +165,6 @@ py_library(
     ],
 )
 
-py_binary(
-    name = "sbom_linter",
-    srcs = [
-        "sbom_linter.py",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "jsonschema",
-            group = "build-metrics",
-        ),
-        dependency(
-            "license-expression",
-            group = "lint",
-        ),
-    ],
-)
-
 bin.eslint_binary(
     name = "eslint_binary",
     # Allow the binary to be run outside bazel
