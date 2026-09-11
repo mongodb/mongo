@@ -16,6 +16,16 @@ if [[ "${resmoke_rbe_mirror_reenabled}" != "true" && "${build_variant}" == "ente
     exit 0
 fi
 
+# An auto-revert patch only needs to run the task that failed, so restrict the (variant-wide)
+# resmoke_test_targets the task was configured with down to that single target.
+if [[ -n "${auto_reverter_context:-}" ]]; then
+    auto_reverter_target="$(jq -r '.failing_task // empty' <<<"${auto_reverter_context}")"
+    if [[ -n "${auto_reverter_target}" ]]; then
+        echo "auto_reverter_context set; running only ${auto_reverter_target}."
+        targets="${auto_reverter_target}"
+    fi
+fi
+
 # Result tasks re-invoke this script to conditionally re-execute the test. The test should
 # execute unless the task was activated by the resmoke_tests task that already ran all tests.
 exit_early_if_result_task() {

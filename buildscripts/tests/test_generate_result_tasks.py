@@ -215,6 +215,25 @@ class TestResolveLargeHostDistro(unittest.TestCase):
             g.resolve_large_host_distro(variant, "//local:xl", tags)
 
 
+class _FakeTask:
+    raw = {"commands": []}
+
+
+class TestVariantCqueryFlagsAutoReverter(unittest.TestCase):
+    def test_auto_reverter_context_overrides_resmoke_test_targets(self):
+        expansions = {
+            "resmoke_test_targets": "//jstests/suites/replication:...",
+            "auto_reverter_context": '{"failing_task": "//jstests/suites/query-execution:core"}',
+        }
+        _, _, pattern = g._variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
+        self.assertEqual(pattern, "//jstests/suites/query-execution:core")
+
+    def test_resmoke_test_targets_used_without_auto_reverter_context(self):
+        expansions = {"resmoke_test_targets": "//jstests/suites/replication:..."}
+        _, _, pattern = g._variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
+        self.assertEqual(pattern, "//jstests/suites/replication:...")
+
+
 class TestQueryTargetTags(unittest.TestCase):
     def test_parses_streamed_jsonproto_tags(self):
         lines = [
