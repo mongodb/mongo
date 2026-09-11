@@ -703,6 +703,12 @@ private:
                               const RemoteCursorPtr& remote);
 
     /**
+     * Schedules a retry loop generated callback. Needs to take caution to avoid problems like
+     * deadlocks and referencing a stale opCtx.
+     */
+    void _scheduleRetryCallback(std::function<void(Status)> callback, Milliseconds delay);
+
+    /**
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
      * parsing the batch.
      */
