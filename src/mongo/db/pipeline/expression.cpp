@@ -5183,6 +5183,15 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
                       << typeName(expr.type()),
         expr.type() == BSONType::object);
 
+    // A collection validator's (and profile filter's) ExpressionContext outlives the request that
+    // created it and runs with a null OperationContext. $_internalKeyStringValue dereferences the
+    // OperationContext when a 'collation' argument is present, so reject it in these contexts to
+    // avoid a null dereference at evaluation time.
+    uassert(10131412,
+            "$_internalKeyStringValue is not allowed inside collection validators or profile "
+            "filters",
+            !expCtx->getIsParsingCollectionValidator() && !expCtx->getIsProfileFilter());
+
     boost::intrusive_ptr<Expression> inputExpr;
     boost::intrusive_ptr<Expression> collationExpr;
 

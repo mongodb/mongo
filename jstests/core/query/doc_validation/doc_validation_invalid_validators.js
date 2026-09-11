@@ -33,6 +33,14 @@ assert.commandFailed(
 assert.commandFailed(
     db.createCollection(collName, {validator: {$expr: {$coerceToBool: {$eq: ["$_id", 15]}}}}),
 );
+// $_internalKeyStringValue dereferences a null OperationContext when evaluated as a stored
+// validator, so it must be rejected at parse time.
+assert.commandFailedWithCode(
+    db.createCollection(collName, {
+        validator: {$expr: {$_internalKeyStringValue: {input: "$a", collation: {locale: "en"}}}},
+    }),
+    10131412,
+);
 
 // Verify we fail on admin, local and config databases.
 assert.commandFailed(
@@ -76,6 +84,13 @@ assert.commandFailedWithCode(
         "validator": {$expr: {$_internalJsEmit: {eval: "function() {}", this: {}}}},
     }),
     4660801,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        "collMod": collName,
+        "validator": {$expr: {$_internalKeyStringValue: {input: "$a", collation: {locale: "en"}}}},
+    }),
+    10131412,
 );
 assert.commandFailed(db.runCommand({"collMod": collName, "validator": {$near: {place: "holder"}}}));
 assert.commandFailed(

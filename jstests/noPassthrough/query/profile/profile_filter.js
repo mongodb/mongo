@@ -141,6 +141,19 @@ function runTest(conn) {
     assert.commandWorked(db.setProfilingLevel(0, {filter: "unset"}));
     assert.eq(0, db.getProfilingLevel());
 
+    // $_internalKeyStringValue dereferences a null OperationContext when evaluated as a profile
+    // filter, so it must be rejected at parse time.
+    assert.commandFailedWithCode(
+        db.runCommand({
+            profile: isMongos ? 0 : 1,
+            filter: {
+                $expr: {$_internalKeyStringValue: {input: "$millis", collation: {locale: "en"}}},
+            },
+        }),
+        10131412,
+    );
+    assert.eq(0, db.getProfilingLevel());
+
     // To catch mistakes, it's not allowed for the filter to reference fields that don't exist.
     // setProfilingLevel throws an error, and prevents you from setting an invalid filter like this.
     assert.throws(() => db.setProfilingLevel(isMongos ? 0 : 1, {filter: {no_such_field: 23}}));
