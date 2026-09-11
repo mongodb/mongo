@@ -74,6 +74,23 @@ py_test(
 )
 
 py_test(
+    name = "test_idl_lib",
+    srcs = ["test_idl_lib.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/idl",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "pymongo",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_activate_task",
     srcs = ["test_activate_task.py"],
     visibility = ["//visibility:public"],

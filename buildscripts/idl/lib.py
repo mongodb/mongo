@@ -30,7 +30,13 @@ def list_idls(directory: str) -> set[str]:
         if result.returncode == 0:
             idls = {os.path.join(directory, p) for p in result.stdout.splitlines()}
             # git ls-files can report files that have been removed from the working tree. Omit those.
-            return {idl for idl in idls if os.path.isfile(idl)}
+            idls = {idl for idl in idls if os.path.isfile(idl)}
+            if idls:
+                return idls
+            # Fall through to the directory walk when git reports nothing. A repo
+            # discovered above `directory` can hide the whole untracked subtree behind
+            # its own ignore rules (e.g. a source tree downloaded into a subdirectory
+            # of another git clone), making git ls-files report no files.
     return {
         os.path.join(dirpath, filename)
         for dirpath, _, filenames in os.walk(directory)
