@@ -357,42 +357,46 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
     // latency reflects what the caller actually waited, including any StaleConfig-triggered
     // routing refresh + retry.
     Timer timer;
-    LookupResult outcome = _localEligibility->run(
-        expCtx,
-        nss,
-        documentKey,
-        _acquisitionState,
-        [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
-            // The document does not live on the local shard. Early exit.
-            if (!LocalLookupEligibility::isLocal(decision)) {
-                LOGV2_DEBUG(13408000,
-                            3,
-                            "SbeSingleDocumentLookupExecutor: documentKey is not locally owned, "
-                            "falling back",
-                            "nss"_attr = nss,
-                            "documentKey"_attr = redact(documentKey.toBson()));
-                return {LookupResult::HandledStatus::kNotHandled, boost::none};
-            }
+    // The whole eligibility run (not just the acquisition below) is wrapped: on a sharded cluster,
+    // routing itself can throw NamespaceNotFound (e.g. the database was dropped) before the
+    // acquisition body ever runs, and that must be mapped to kDocumentNotFound the same way a
+    // dropped collection is.
+    LookupResult outcome = withCollectionGoneMappedToNotFound([&]() -> LookupResult {
+        return _localEligibility->run(
+            expCtx,
+            nss,
+            documentKey,
+            _acquisitionState,
+            [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
+                // The document does not live on the local shard. Early exit.
+                if (!LocalLookupEligibility::isLocal(decision)) {
+                    LOGV2_DEBUG(13408000,
+                                3,
+                                "SbeSingleDocumentLookupExecutor: documentKey is not locally "
+                                "owned, falling back",
+                                "nss"_attr = nss,
+                                "documentKey"_attr = redact(documentKey.toBson()));
+                    return {LookupResult::HandledStatus::kNotHandled, boost::none};
+                }
 
-            // Single cleanup point: in case of unexpected exit (e.g. exception) drops all cached
-            // state so the next lookup rebuilds.
-            ScopeGuard resetOnException([&] { resetCachedState(); });
+                // Single cleanup point: in case of unexpected exit (e.g. exception) drops all
+                // cached state so the next lookup rebuilds.
+                ScopeGuard resetOnException([&] { resetCachedState(); });
 
-            // The planner sees an _id-only filter even when the documentKey carries shard-key
-            // fields too: _id is unique per shard and the lookup runs locally, so it returns
-            // exactly the right document.
-            const auto idFilter = makeIdEqualityFilter(documentKey);
-            if (!idFilter || !canLookupId(*idFilter)) {
-                LOGV2_DEBUG(12952803,
-                            1,
-                            "SbeSingleDocumentLookupExecutor: documentKey has no seekable _id",
-                            "documentKey"_attr = redact(documentKey.toBson()));
-                return {LookupResult::HandledStatus::kNotHandled, boost::none};
-            }
+                // The planner sees an _id-only filter even when the documentKey carries shard-key
+                // fields too: _id is unique per shard and the lookup runs locally, so it returns
+                // exactly the right document.
+                const auto idFilter = makeIdEqualityFilter(documentKey);
+                if (!idFilter || !canLookupId(*idFilter)) {
+                    LOGV2_DEBUG(12952803,
+                                1,
+                                "SbeSingleDocumentLookupExecutor: documentKey has no seekable _id",
+                                "documentKey"_attr = redact(documentKey.toBson()));
+                    return {LookupResult::HandledStatus::kNotHandled, boost::none};
+                }
 
-            const auto& local = std::get<LocalLookupEligibility::Local>(decision);
-            auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
-            return withCollectionGoneMappedToNotFound([&]() -> LookupResult {
+                const auto& local = std::get<LocalLookupEligibility::Local>(decision);
+                auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
                 const CollectionAcquirer::Handle& coll =
                     getOrAcquireCollection(opCtx, nss, collectionUUID);
                 if (!coll.exists()) {
@@ -427,7 +431,7 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
                 resetOnException.dismiss();
                 return result;
             });
-        });
+    });
 
     if (_recorder) {
         switch (outcome.status) {

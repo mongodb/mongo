@@ -99,23 +99,25 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
     // routing refresh + retry.
     Timer timer;
 
-    // Express executor does not cache the acquisition and eligibility check is done before
-    // acquiring the collection and therefore we always pass NoHeldAcquisition.
-    LookupResult result = _localEligibility->run(
-        expCtx,
-        nss,
-        documentKey,
-        LocalLookupEligibility::NoHeldAcquisition{},
-        [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
-            // The document does not live on local shard. Early exit.
-            if (!LocalLookupEligibility::isLocal(decision)) {
-                return {LookupResult::HandledStatus::kNotHandled, boost::none};
-            }
+    // Wrap the code behind withCollectionGoneMappedToNotFound() to ensure relevant exceptions are
+    // mapped to LookupResult::HandledStatus::kDocumentNotFound.
+    LookupResult result = withCollectionGoneMappedToNotFound([&]() -> LookupResult {
+        // Express executor does not cache the acquisition and eligibility check is done before
+        // acquiring the collection and therefore we always pass NoHeldAcquisition.
+        return _localEligibility->run(
+            expCtx,
+            nss,
+            documentKey,
+            LocalLookupEligibility::NoHeldAcquisition{},
+            [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
+                // The document does not live on local shard. Early exit.
+                if (!LocalLookupEligibility::isLocal(decision)) {
+                    return {LookupResult::HandledStatus::kNotHandled, boost::none};
+                }
 
-            // Create ScopedSetShardRole given the local routing decision.
-            const auto& local = std::get<LocalLookupEligibility::Local>(decision);
-            auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
-            return withCollectionGoneMappedToNotFound([&]() -> LookupResult {
+                // Create ScopedSetShardRole given the local routing decision.
+                const auto& local = std::get<LocalLookupEligibility::Local>(decision);
+                auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
                 auto coll = _collectionAcquirer->acquireCollection(opCtx, nss, collectionUUID);
                 if (!coll.exists()) {
                     return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
@@ -147,7 +149,7 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
                                          "ExpressSingleDocumentLookupExecutor::performLookup");
                 }
             });
-        });
+    });
 
     if (_recorder) {
         switch (result.status) {

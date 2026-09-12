@@ -261,6 +261,22 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForMissingCollection) {
     ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
 }
 
+// On a sharded cluster, eligibility routing (not just collection acquisition) can throw
+// NamespaceNotFound when the *database* has been dropped, before the acquisition body ever runs.
+// That must also be mapped to kDocumentNotFound rather than propagating out of performLookup.
+TEST_F(SbeSingleDocumentLookupExecutorTest, EligibilityRunThrowsNamespaceNotFound) {
+    auto eligibility = std::make_unique<MockLocalLookupEligibility>(
+        [](const boost::intrusive_ptr<ExpressionContext>&,
+           const NamespaceString&,
+           const Document&) -> LocalLookupEligibility::Decision {
+            uasserted(ErrorCodes::NamespaceNotFound, "database not found");
+        });
+    SbeSingleDocumentLookupExecutor strategy(makeOnDemandAcquirer(), std::move(eligibility));
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentNotFound);
+}
+
 TEST_F(SbeSingleDocumentLookupExecutorTest, NotFoundForEmptyCollection) {
     createCollection();
 
