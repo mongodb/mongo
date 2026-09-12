@@ -314,6 +314,88 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
             });
         }
 
+        // The cases above each relocate a single document in isolation, so the primary executor
+        // only ever declines once per drain. This interleaves a local doc, a relocated doc, and
+        // another local doc within the same batch of change events, to stress that a decline
+        // mid-batch doesn't corrupt the primary's cached plan/acquisition for the local lookups
+        // that follow it. Scoped to range {_id: 1} sharding, since isolating one document's
+        // chunk by exact value (rather than moving a whole shard-key range) doesn't generalize
+        // cleanly to the hashed / non-_id shard-key configs above.
+        it(`interleaved local/relocated/local docs in one batch [${watchModeToString(watchMode)}]: primary handles the local docs, aggregation catches the relocated one`, function () {
+            const coll = shardedCollectionOnShard0("interleavedRelocation", {_id: 1}, {});
+            assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
+
+            // The single pre-split chunk covering all three documents starts on shard0, the
+            // same way every config above ensures.
+            ensureStartsOnShard0(coll, {_id: 0});
+
+            // Isolate _id:1 into its own chunk, distinct from _id:0 and _id:2, so only its data
+            // can be relocated without dragging the other two documents along with it.
+            assert.commandWorked(
+                mongosDB.adminCommand({split: coll.getFullName(), middle: {_id: 1}}),
+            );
+            assert.commandWorked(
+                mongosDB.adminCommand({split: coll.getFullName(), middle: {_id: 2}}),
+            );
+
+            const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(mongosDB, () => {
+                withUpdateLookupStream(watchMode, coll, (cst, cursor) => {
+                    // Record all three updates on shard0's oplog while every document is still
+                    // local, then relocate only _id:1's chunk, so in interleaved order the first
+                    // and third post-image lookups resolve locally via the primary and the
+                    // second is forced through the aggregation fallback.
+                    assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
+                    assert.commandWorked(coll.update({_id: 1}, {$set: {v: 1}}));
+                    assert.commandWorked(coll.update({_id: 2}, {$set: {v: 1}}));
+                    assert.commandWorked(
+                        mongosDB.adminCommand({
+                            moveChunk: coll.getFullName(),
+                            find: {_id: 1},
+                            to: st.shard1.shardName,
+                        }),
+                    );
+                    assertCollDataDistribution(mongosDB, coll, [
+                        [st.shard0, 2],
+                        [st.shard1, 1],
+                    ]);
+
+                    const ns = {db: mongosDB.getName(), coll: coll.getName()};
+                    cst.assertNextChangesEqual({
+                        cursor,
+                        expectedChanges: [
+                            {
+                                operationType: "update",
+                                ns,
+                                documentKey: {_id: 0},
+                                fullDocument: {_id: 0, v: 1},
+                            },
+                            {
+                                operationType: "update",
+                                ns,
+                                documentKey: {_id: 1},
+                                fullDocument: {_id: 1, v: 1},
+                            },
+                            {
+                                operationType: "update",
+                                ns,
+                                documentKey: {_id: 2},
+                                fullDocument: {_id: 2, v: 1},
+                            },
+                        ],
+                    });
+                });
+            });
+
+            const byEngine = readUpdateLookupDelta(delta);
+            const primary = byEngine[expectedUpdateLookupEngine(watchMode)];
+            // The two local docs resolve directly through the primary; the relocated one is
+            // declined by the primary and found instead by the aggregation fallback.
+            assert.eq(primary.found, 2, {byEngine, delta});
+            assert.eq(primary.notHandled, 1, {byEngine, delta});
+            assert.eq(byEngine[UpdateLookupExecutor.kAggregation].found, 1, {byEngine, delta});
+            assert.eq(byEngine[UpdateLookupExecutor.kAggregation].notFound, 0, {byEngine, delta});
+        });
+
         // moveCollection/movePrimary operate on unsplittable/untracked collections, which (unlike
         // classic shardCollection) do accept a non-simple default collation, so they're the only
         // place in this suite that can exercise collation as a dimension.

@@ -202,9 +202,7 @@ describe("$_internalSearchIdLookup with compound (object) _id", function () {
     });
 
     for (const {name, knobs} of knobConfigs) {
-        // TODO: SERVER-134080 Support non-scalar _id lookups in SbeSingleDocumentLookupExecutor.
-        // Until then, every lookup here declines to the aggregation fallback, across every window.
-        it(`returns identical results and opens the expected number of batches, all declined to aggregation [${name}]`, function () {
+        it(`returns identical results and opens the expected number of batches [${name}]`, function () {
             let actual;
             const idLookup = idLookupMetricsDelta(() => {
                 actual = runAggWithMockMongotResults(internalDB, collName, lookupIds, {
@@ -220,14 +218,12 @@ describe("$_internalSearchIdLookup with compound (object) _id", function () {
             );
             const sbe = idLookup.sbe || {};
             const aggregation = idLookup.aggregation || {};
-            assert.eq(sbe.notHandled, numDocs, {sbe});
-            assert.eq(sbe.found, 0, {sbe});
-            assert.eq(sbe.notFound, 0, {sbe});
-            assert.eq(aggregation.found, expectedFoundDocs.length, {aggregation});
-            assert.eq(aggregation.notFound, numDocs - expectedFoundDocs.length, {aggregation});
+            assert.eq(sbe.found, expectedFoundDocs.length, {sbe, aggregation});
+            assert.eq(sbe.notFound, numDocs - expectedFoundDocs.length, {sbe, aggregation});
+            assert.eq(sbe.notHandled, 0, {sbe, aggregation});
+            assert.eq(aggregation.found + aggregation.notFound, 0, {sbe, aggregation});
         });
 
-        // Compound _id always declines, so the "stopped early" proof lives in aggregation, not sbe.
         it(`honors idLookupSpec.limit under every batching knob, stopping the pull early rather than truncating downstream [${name}]`, function () {
             let limited;
             const idLookup = idLookupMetricsDelta(() => {
@@ -238,23 +234,23 @@ describe("$_internalSearchIdLookup with compound (object) _id", function () {
             });
             assert.eq(expectedFoundDocs.slice(0, 2), limited);
 
+            const sbe = idLookup.sbe || {};
+            assert.eq(sbe.found, 2, {sbe});
+            assert.eq(sbe.notFound, 0, {sbe});
+            assert.eq(sbe.notHandled, 0, {sbe});
             const aggregation = idLookup.aggregation || {};
-            assert.eq(aggregation.found, 2, {aggregation});
-            assert.eq(aggregation.notFound, 0, {aggregation});
+            assert.eq(aggregation.found + aggregation.notFound, 0, {sbe, aggregation});
         });
     }
 });
 
-// Neither block above touches both cells in the same query: scalar only writes sbe, compound
-// only writes aggregation. This is the only place proving the two cells accumulate correctly at
-// the same time, across multiple windows, rather than in isolation.
+// Neither block above mixes _id shapes within one batch. With SBE handling every legal _id
+// shape, a genuinely mixed scalar/compound batch is an all-sbe batch: every
+// window below is a mixed pair by construction, one scalar id and one compound id, both found
+// through the same cached plan.
 describe("$_internalSearchIdLookup with mixed scalar/compound _id in the same batch", function () {
     const collName = jsTestName() + "_mixed";
 
-    // TODO: SERVER-134080 Support non-scalar _id lookups in SbeSingleDocumentLookupExecutor.
-    // Until then, the compound docs below always decline, making this a genuine sbe/aggregation
-    // mix rather than an all-sbe batch. Every window is a mixed pair by construction: one scalar
-    // id, one compound id, both found.
     const docs = [
         {_id: 1, x: "doc1"},
         {_id: compoundId(2), x: "doc2"},
@@ -266,7 +262,7 @@ describe("$_internalSearchIdLookup with mixed scalar/compound _id in the same ba
     const coll = assertDropAndRecreateCollection(testDB, collName);
     assert.writeOK(coll.insert(docs));
 
-    it("accumulates into both the sbe and aggregation cells without cross-contaminating each other across repeated windows", function () {
+    it("resolves every mixed-shape pair through sbe, without cross-contaminating outcomes across repeated windows", function () {
         let actual;
         const idLookup = idLookupMetricsDelta(() => {
             actual = runAggWithMockMongotResults(internalDB, collName, lookupIds, {
@@ -276,14 +272,11 @@ describe("$_internalSearchIdLookup with mixed scalar/compound _id in the same ba
         assert.eq(docs, actual);
         assert.eq(2, idLookup.enrichBatchesStarted, {idLookup});
 
-        // The 2 compound docs decline: sbe.notHandled records the decline, and the aggregation
-        // fallback records its own found outcome for the same 2 documents.
         const sbe = idLookup.sbe || {};
         const aggregation = idLookup.aggregation || {};
-        assert.eq(sbe.found, 2, {sbe});
-        assert.eq(sbe.notFound, 0, {sbe});
-        assert.eq(sbe.notHandled, 2, {sbe});
-        assert.eq(aggregation.found, 2, {aggregation});
-        assert.eq(aggregation.notFound, 0, {aggregation});
+        assert.eq(sbe.found, docs.length, {sbe, aggregation});
+        assert.eq(sbe.notFound, 0, {sbe, aggregation});
+        assert.eq(sbe.notHandled, 0, {sbe, aggregation});
+        assert.eq(aggregation.found + aggregation.notFound, 0, {sbe, aggregation});
     });
 });

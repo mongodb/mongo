@@ -6,11 +6,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 #include "mongo/db/exec/single_doc_lookup/local_lookup_util.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -21,6 +21,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
+#include "mongo/db/query/util/validate_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -40,6 +41,29 @@ using namespace std::literals::string_view_literals;
 namespace mongo::exec::agg {
 namespace {
 
+// True when the _id value can be resolved through the SBE fast path. validIdField() refuses
+// regex, array and undefined (the same check an _id passed at insert time; a real
+// documentKey._id always passes, so this only guards a malformed caller).
+//
+// isEligibleForComparisonAutoParameterization() additionally refuses any type whose equality
+// cannot be answered from the bounds slots alone. This executor caches one plan and rebinds only
+// the bounds slots per lookup, so it needs the same "safe to substitute a different literal of this
+// type" guarantee auto-parameterization relies on.
+//
+// Compound (object) _id is carved back in. The shared predicate,
+// isEligibleForComparisonAutoParameterization(), is applied to all of $eq/$lt/$gt, etc, and is
+// built for cross-query SBE plan sharing, for the case where bools, empty strings, or object
+// bounds can change which/how many intervals the bounds can have. This executor only builds $eq,
+// and a top-level object _id is a single literal seeked as one exact KeyString/RecordId bound, so
+// none of the above motives apply.
+bool canLookupId(const BSONObj& idFilter) {
+    const BSONElement& idElem = idFilter.firstElement();
+    if (!validIdField(idElem).isOK()) {
+        return false;
+    }
+    return isEligibleForComparisonAutoParameterization(idElem) || idElem.type() == BSONType::object;
+}
+
 // Builds the CanonicalQuery once for a lookup against 'nss'.
 std::unique_ptr<CanonicalQuery> buildCanonicalQuery(OperationContext* opCtx,
                                                     const NamespaceString& nss,
@@ -58,10 +82,20 @@ std::unique_ptr<CanonicalQuery> buildCanonicalQuery(OperationContext* opCtx,
         cq->setCollator(defaultCollator->clone());
     }
 
-    // Parameterize the match expression so the SBE bounds builder assigns stable InputParamIds to
-    // each comparison leaf; SlotBinder::bind later rebinds those slots per documentKey.
-    auto inputParamIdToExpression = parameterizeMatchExpression(cq->getPrimaryMatchExpression());
-    cq->addMatchParams(inputParamIdToExpression);
+    // The match expression is always an _id equality (built by hand), so use static_cast to get
+    // the EqualityMatchExpression and assign it a stable InputParamId. This makes the SBE plan
+    // compiler create a rebindable slot; SlotBinder::bind later rebinds it per documentKey.
+    auto* root = cq->getPrimaryMatchExpression();
+    if (!root || root->matchType() != MatchExpression::EQ) {
+        LOGV2_WARNING(13408004,
+                      "SbeSingleDocumentLookupExecutor: unexpected filter shape, cannot "
+                      "parameterize for SBE fast path; falling back to aggregation engine",
+                      "filter"_attr = filter);
+        return nullptr;
+    }
+    auto* eqExpr = static_cast<EqualityMatchExpression*>(root);
+    eqExpr->setInputParamId(0);
+    cq->addMatchParams({eqExpr});
     return cq;
 }
 
@@ -162,18 +196,10 @@ SbeSingleDocumentLookupExecutor::SlotBinder::make(const stage_builder::PlanStage
     };
 }
 
-bool SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem,
+void SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem,
                                                        sbe::RuntimeEnvironment* env) const {
     switch (kind) {
         case Kind::kIxscanKeyPair: {
-            if (MONGO_unlikely(
-                    !IndexBoundsBuilder::isDirectlyEncodableEqualityType(idElem.type()))) {
-                // Non-scalar literal (regex, array, undefined) would widen the bounds beyond a
-                // single point. documentKey._id is never these in practice; refuse rather than
-                // produce wrong bounds.
-                return false;
-            }
-
             // Encode collation comparison keys when the _id index is collation-aware (no-op for a
             // simple index: appends the value as-is). This makes the seek bounds match the index's
             // key encoding, mirroring the classic/Express _id path.
@@ -195,7 +221,7 @@ bool SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem
                            sbe::value::TypeTags::keyString,
                            sbe::value::makeKeyString(std::move(highKs)).second,
                            /*owned=*/true);
-            return true;
+            return;
         }
         case Kind::kClusteredRecordIdPair: {
             // record_id_helpers::keyForElem handles both scalar and compound BSON _id. For a point
@@ -215,7 +241,7 @@ bool SbeSingleDocumentLookupExecutor::SlotBinder::bind(const BSONElement& idElem
             env->resetSlot(slotA, minTag, minVal, /*owned=*/true);
             auto [maxTag, maxVal] = sbe::value::makeCopyRecordId(rid);
             env->resetSlot(slotB, maxTag, maxVal, /*owned=*/true);
-            return true;
+            return;
         }
     }
     MONGO_UNREACHABLE_TASSERT(12952806);
@@ -339,6 +365,12 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
         [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
             // The document does not live on the local shard. Early exit.
             if (!LocalLookupEligibility::isLocal(decision)) {
+                LOGV2_DEBUG(13408000,
+                            3,
+                            "SbeSingleDocumentLookupExecutor: documentKey is not locally owned, "
+                            "falling back",
+                            "nss"_attr = nss,
+                            "documentKey"_attr = redact(documentKey.toBson()));
                 return {LookupResult::HandledStatus::kNotHandled, boost::none};
             }
 
@@ -350,10 +382,10 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
             // fields too: _id is unique per shard and the lookup runs locally, so it returns
             // exactly the right document.
             const auto idFilter = makeIdEqualityFilter(documentKey);
-            if (!idFilter) {
+            if (!idFilter || !canLookupId(*idFilter)) {
                 LOGV2_DEBUG(12952803,
                             1,
-                            "SbeSingleDocumentLookupExecutor: documentKey has no _id, falling back",
+                            "SbeSingleDocumentLookupExecutor: documentKey has no seekable _id",
                             "documentKey"_attr = redact(documentKey.toBson()));
                 return {LookupResult::HandledStatus::kNotHandled, boost::none};
             }
@@ -372,18 +404,19 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::perf
                 if (!getOrMakeExecutor(
                         opCtx, coll, nss, *idFilter, !_eligibilityChecksShardKeyOwnership)) {
                     // Planning failed or plan shape is not one SlotBinder supports.
+                    LOGV2_DEBUG(13408001,
+                                2,
+                                "SbeSingleDocumentLookupExecutor: planning failed or produced a "
+                                "plan shape SlotBinder does not support, falling back",
+                                "nss"_attr = nss,
+                                "idFilter"_attr = redact(*idFilter));
                     return {LookupResult::HandledStatus::kNotHandled, boost::none};
                 }
 
-                // Rebind the cached executor's bounds slots to this _id. A false return means the
-                // _id value type can't be expressed as a single bound pair. This is a per-document
-                // encoding failure, not a plan defect. Dismiss the ScopeGuard so the cached plan
-                // survives for the next event in the same window.
-                if (!_preparedExecutor->slotBinder.bind(idFilter->firstElement(),
-                                                        _preparedExecutor->data.env.runtimeEnv)) {
-                    resetOnException.dismiss();
-                    return {LookupResult::HandledStatus::kNotHandled, boost::none};
-                }
+                // Rebind the cached executor's bounds slots to this _id. The value is
+                // pre-validated by canLookupId(), so the encoding cannot fail.
+                _preparedExecutor->slotBinder.bind(idFilter->firstElement(),
+                                                   _preparedExecutor->data.env.runtimeEnv);
 
                 // Publish this lookup to $indexStats. The executor (hence the index used) is known
                 // statically, so this needs no runtime stats walk. Keys/docs examined for the sink
@@ -442,11 +475,13 @@ bool SbeSingleDocumentLookupExecutor::getOrMakeExecutor(OperationContext* opCtx,
         isExecutorInvalidated(
             coll, _preparedExecutor->collectionUUID, _preparedExecutor->collectionVersion)) {
         resetPlan();
-        _preparedExecutor = PreparedExecutor::make(
-            opCtx,
-            coll,
-            buildCanonicalQuery(opCtx, nss, filter, coll.getCollectionPtr()->getDefaultCollator()),
-            shouldApplyShardFilter);
+        auto cq =
+            buildCanonicalQuery(opCtx, nss, filter, coll.getCollectionPtr()->getDefaultCollator());
+        if (!cq) {
+            return false;
+        }
+        _preparedExecutor =
+            PreparedExecutor::make(opCtx, coll, std::move(cq), shouldApplyShardFilter);
         if (!_preparedExecutor) {
             return false;
         }
