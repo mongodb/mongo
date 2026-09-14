@@ -49,5 +49,40 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            threshold_limit: 900
+            threshold_limit: 300
+            bound_direction: upper
+  CrudBenchmarkFixture/BM_INSERT_ONE:
+    al2023-arm64-sep-benchmark:
+      - thread_level: 1
+        metrics:
+          - name: instructions_per_iteration_mean
+            threshold_limit: 400
+            bound_direction: upper
+  CrudBenchmarkFixture/BM_DELETE_ONE:
+    al2023-arm64-sep-benchmark:
+      - thread_level: 1
+        metrics:
+          - name: instructions_per_iteration_mean
+            threshold_limit: 400
+            bound_direction: upper
+  CrudBenchmarkFixture/BM_AGG_MATCH_ONE:
+    al2023-arm64-sep-benchmark:
+      - thread_level: 1
+        metrics:
+          - name: instructions_per_iteration_mean
+            threshold_limit: 800
+            bound_direction: upper
+  CrudBenchmarkFixture/BM_UPDATE_ONE:
+    al2023-arm64-sep-benchmark:
+      - thread_level: 1
+        metrics:
+          - name: instructions_per_iteration_mean
+            threshold_limit: 1500
+            bound_direction: upper
+  CrudBenchmarkFixture/BM_FIND_AND_MODIFY:
+    al2023-arm64-sep-benchmark:
+      - thread_level: 1
+        metrics:
+          - name: instructions_per_iteration_mean
+            threshold_limit: 2000
             bound_direction: upper
