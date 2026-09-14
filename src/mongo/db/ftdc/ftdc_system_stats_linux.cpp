@@ -221,9 +221,12 @@ public:
         // Some Linux interfaces cannot be found by ethtool IOCTL.
         // Some Linux interfaces have no stats (i.e. the "bridge" driver used by containers).
         if (!drvinfo.has_value() || drvinfo->n_stats == 0) {
-            LOGV2_WARNING(10985540,
-                          "Skipping Ethtool stats collection for interface",
-                          "interface"_attr = interface);
+            LOGV2_DEBUG(10985540,
+                        1,
+                        "Skipping Ethtool stats collection for interface",
+                        "interface"_attr = interface,
+                        "reason"_attr = !drvinfo.has_value() ? "driver info unavailable"sv
+                                                             : "interface reports no stats"sv);
             return nullptr;
         }
 
