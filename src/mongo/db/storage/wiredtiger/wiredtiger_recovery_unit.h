@@ -220,10 +220,6 @@ public:
      * set. Failing to do this makes publish() fail, which is a fatal error, so we need to be able
      * to detect if a stepdown epoch was set in between create() and when we allocate a schema
      * epoch, and roll back the operation if that happens.
-     *
-     * IF the stepdown epoch is set concurrently with a table creation then WiredTiger doesn't tell
-     * us which side of the boundary the create landed on, so we have to always roll back the
-     * operation.
      */
     enum class StepdownState {
         // The table was created before a stepdown epoch was set. This includes the case where no
@@ -233,9 +229,6 @@ public:
         // The table was created after a stepdown epoch was set. At commit time the table's
         // schema epoch must be greater than the stepdown epoch.
         after,
-        // The table was created concurrently with a stepdown epoch being set, and so we cannot
-        // validate its schema epoch and must assume it is invalid.
-        invalid,
     };
 
     /**
