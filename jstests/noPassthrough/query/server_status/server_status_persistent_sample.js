@@ -581,7 +581,7 @@ describe("persistent sample serverStatus metrics", function () {
             );
             const pages = PersistentSamplesUtils.getSamplesColl(db)
                 .find()
-                .sort({"_id.pageNo": 1})
+                .sort({[PersistentSamplesUtils.sampleDocFieldNames.pageNoField]: 1})
                 .toArray();
             assert.gt(pages.length, 1, "setup should persist a multi-page sample", {
                 numPages: pages.length,

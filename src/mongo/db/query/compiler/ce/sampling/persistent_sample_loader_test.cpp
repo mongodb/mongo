@@ -449,7 +449,7 @@ TEST(ParsePersistentSample, RejectsNonObjectEntryInDocsArray) {
 // ── reassemblePersistentSample ────────────────────────────────────────────────────────────────
 
 // Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
-// same identity fields and differ only in `_id.pageNo` and their slice of `docs`.
+// same identity fields and differ only in page number and the docs they contain.
 BSONObj buildPage(const UUID& uuid,
                   SamplingTechniqueEnum method,
                   size_t sampleSize,

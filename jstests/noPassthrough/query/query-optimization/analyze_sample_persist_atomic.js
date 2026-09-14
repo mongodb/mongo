@@ -53,7 +53,11 @@ describe("analyze sample persist atomicity under interruption", function () {
         assert.commandWorked(db.runCommand(analyzeCmd));
 
         const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
-        const initialSample = samplesColl.find().sort({"_id.pageNo": 1}).toArray();
+        const pageNoField = PersistentSamplesUtils.sampleDocFieldNames.pageNoField;
+        const initialSample = samplesColl
+            .find()
+            .sort({[pageNoField]: 1})
+            .toArray();
         assert.gt(
             initialSample.length,
             1,
@@ -77,7 +81,10 @@ describe("analyze sample persist atomicity under interruption", function () {
         fp.off();
 
         // Verify that the original sample is unchanged
-        const newSample = samplesColl.find().sort({"_id.pageNo": 1}).toArray();
+        const newSample = samplesColl
+            .find()
+            .sort({[pageNoField]: 1})
+            .toArray();
         assert.eq(
             newSample.length,
             initialSample.length,
@@ -90,8 +97,9 @@ describe("analyze sample persist atomicity under interruption", function () {
             "interrupted analyze changed the persisted sample",
         );
         assert.sameMembers(
-            initialSample.map((p) => p._id.pageNo),
-            newSample.map((p) => p._id.pageNo),
+            initialSample.map((p) => p[pageNoField]),
+            newSample.map((p) => p[pageNoField]),
+            "interrupted analyze changed the persisted sample's page numbers",
         );
 
         const createdAtField = PersistentSamplesUtils.sampleDocFieldNames.createdAtField;
