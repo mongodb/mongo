@@ -34,6 +34,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/shard_role",
+        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -47,6 +48,20 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/dependency_analysis",
         "//src/mongo/db/query/query_knobs:query_knob_configuration",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "expression_text_test",
+    srcs = [
+        "expression_text_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":expressions_mongod_only",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/util:fail_point",
     ],
 )
 
