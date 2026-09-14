@@ -120,6 +120,8 @@ last-continuous:
       ticket: SERVER-131540
     - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
+    - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
+      ticket: SERVER-130759
     - test_file: jstests/replsets/clean_shutdown_log.js
       ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_clean_shutdown_sync_source.js
@@ -195,6 +197,8 @@ last-lts:
       ticket: SERVER-131540
     - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
+    - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
+      ticket: SERVER-130759
     - test_file: jstests/replsets/clean_shutdown_log.js
       ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_clean_shutdown_sync_source.js
