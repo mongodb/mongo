@@ -1,17 +1,13 @@
 /*
  * Helpers for running a function with query knobs and/or failpoints temporarily set.
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {retryOnStorageChangeInterrupt} from "jstests/libs/run_with_retries.js";
 
-function runSetParamCommand(adminDb, knobToVal) {
-    FixtureHelpers.runCommandOnAllShards({db: adminDb, cmdObj: {setParameter: 1, ...knobToVal}});
-}
-
-function runSetFailpointCommand(adminDb, fpName, fpMode) {
-    FixtureHelpers.runCommandOnAllShards({
-        db: adminDb,
-        cmdObj: {configureFailPoint: fpName, mode: fpMode},
-    });
+function configureServerParameter(conn, name, value) {
+    const {was} = assert.commandWorked(conn.adminCommand({setParameter: 1, [name]: value}));
+    return () => configureServerParameter(conn, name, was);
 }
 
 /*
@@ -21,58 +17,47 @@ function runSetFailpointCommand(adminDb, fpName, fpMode) {
  * reset the knobs to their original state even if the function throws an exception.
  */
 export function runWithKnobs(db, fn, knobToVal = {}, failPointToMode = {}) {
-    const adminDb = db.getSiblingDB("admin");
-    const knobNames = Object.keys(knobToVal);
-    const failPointNames = Object.keys(failPointToMode);
+    const empty = (obj) => Object.keys(obj).length === 0;
+
     // If there are no knobs or failpoints to change, return the result of the function since
     // there's no other work to do.
-    if (knobNames.length === 0 && failPointNames.length === 0) {
+    if (empty(knobToVal) && empty(failPointToMode)) {
         return fn();
     }
 
-    // Get the previous knob settings, so we can undo our changes after setting the knobs from
-    // `knobToVal`.
-    const priorKnobSettings = {};
-    if (knobNames.length > 0) {
-        const getParamObj = {getParameter: 1};
-        for (const key of knobNames) {
-            getParamObj[key] = 1;
-        }
-        const getParamResult = assert.commandWorked(adminDb.adminCommand(getParamObj));
-        for (const key of knobNames) {
-            priorKnobSettings[key] = getParamResult[key];
-        }
+    let rollbacks = [];
+    function setUp() {
+        rollbacks = [];
+        for (const host of DiscoverTopology.findNonConfigNodes(db.getMongo())) {
+            // Establish the connection and mark it for cleanup.
+            const conn = new Mongo(host);
+            rollbacks.push(() => conn.close());
 
-        // Set the requested knobs.
-        runSetParamCommand(adminDb, knobToVal);
-    }
+            // Configure the failpoints and knobs on the connection, and mark them for cleanup.
+            for (const [name, mode] of Object.entries(failPointToMode)) {
+                const fp = configureFailPoint(conn, name, {} /* data */, mode);
+                rollbacks.push(() => fp.off());
+            }
 
-    // Capture the prior failpoint modes so we can restore them, then turn on the requested
-    // failpoints.
-    const priorFailPointModes = {};
-    for (const fpName of failPointNames) {
-        const paramName = `failpoint.${fpName}`;
-        const getParamResult = assert.commandWorked(
-            adminDb.adminCommand({getParameter: 1, [paramName]: 1}),
-        );
-        // Mode is a 1 or 0 for on or off failpoint status.
-        const priorModeStr = getParamResult[paramName].mode ? "alwaysOn" : "off";
-        priorFailPointModes[fpName] = priorModeStr;
-
-        runSetFailpointCommand(adminDb, fpName, failPointToMode[fpName]);
-    }
-
-    // With the finally block, we'll always revert the parameters back to their original settings,
-    // even if an exception is thrown.
-    try {
-        return fn();
-    } finally {
-        // Reset to the original settings.
-        if (knobNames.length > 0) {
-            runSetParamCommand(adminDb, priorKnobSettings);
-        }
-        for (const fpName of failPointNames) {
-            runSetFailpointCommand(adminDb, fpName, priorFailPointModes[fpName]);
+            // Configure the knobs and mark them for cleanup.
+            for (const [name, value] of Object.entries(knobToVal)) {
+                const rollback = configureServerParameter(conn, name, value);
+                rollbacks.push(rollback);
+            }
         }
     }
+
+    // Perform the rollbacks in reverse order to ensure that we clean up in the opposite order of setup.
+    function tearDown() {
+        rollbacks.reverse().forEach((rollback) => rollback());
+    }
+
+    return retryOnStorageChangeInterrupt(() => {
+        try {
+            setUp();
+            return fn();
+        } finally {
+            tearDown();
+        }
+    });
 }

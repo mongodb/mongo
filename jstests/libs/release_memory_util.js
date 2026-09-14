@@ -1,5 +1,5 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {runWithRetries} from "jstests/libs/run_with_retries.js";
+import {retryOnStorageChangeInterrupt, runWithRetries} from "jstests/libs/run_with_retries.js";
 
 // Helper function to retry a test.
 // This is useful because the spilling stats are global and can be affected by spuriously
@@ -73,25 +73,20 @@ export function assertReleaseMemoryWorked(result, cursorId) {
  * Accumulate metric from a server status
  */
 export function accumulateServerStatusMetric(db, metricGetter) {
-    return retryOnRetryableError(
-        () => {
-            let total = 0;
-            FixtureHelpers.mapOnEachShardNode({
-                db: db,
-                func: (db) => {
-                    const serverStatus = db.serverStatus();
-                    if (!serverStatus.hasOwnProperty("metrics")) {
-                        return;
-                    }
-                    total += metricGetter(serverStatus.metrics);
-                },
-            });
-            return total;
-        },
-        10,
-        100,
-        [ErrorCodes.InterruptedDueToStorageChange],
-    );
+    return retryOnStorageChangeInterrupt(() => {
+        let total = 0;
+        FixtureHelpers.mapOnEachShardNode({
+            db: db,
+            func: (db) => {
+                const serverStatus = db.serverStatus();
+                if (!serverStatus.hasOwnProperty("metrics")) {
+                    return;
+                }
+                total += metricGetter(serverStatus.metrics);
+            },
+        });
+        return total;
+    });
 }
 
 // Sets the mode of the simulateAvailableDiskSpace failpoint.
