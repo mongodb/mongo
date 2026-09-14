@@ -15,6 +15,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/modules.h"
 
+#include <vector>
+
 namespace mongo::repl {
 
 /**
@@ -44,15 +46,21 @@ private:
     StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
                                         std::vector<OplogEntry> ops) override;
 
+    /**
+     * Classifies and hash-routes one batch onto the workers, enqueuing one work item per
+     * participating worker per batch. Expands any single ops that may contain multiple ops to
+     * different keys if needed (e.g. container writes or applyOps)
+     */
+    void _dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops);
+
     ReplicationCoordinator* const _replCoord;
     StorageInterface* const _storageInterface;
 
     // Persistent worker threads that consume dispatched work items.
     PipelinedApplierWorkerPool _workerPool;
 
-    // Classifies each oplog entry as pipelined or requiring inline
-    // application, and selects the worker for pipelined entries by hash so ops on one document
-    // are applied in order.
+    // Classifies each oplog entry as pipelined or requiring inline application, and selects the
+    // worker for pipelined entries by hash so ops on one document are applied in order.
     PipelinedOpRouter _router;
 };
 
