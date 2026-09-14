@@ -7,6 +7,7 @@ import {
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 // Runs the given test case with join optimization enabled and disabled, verifies that the results
 // match expectedResults with UNORDERED comparison, and checks whether the join optimizer was used as expected.
@@ -186,6 +187,28 @@ function hookFsyncForJoinOpt() {
         unhookAggregate();
         unhookExplain();
     };
+}
+
+/**
+ * Runs 'pipeline' on 'coll' and returns its results along with the plan summary the server recorded
+ * for the execution, as reported in the slow query log and the profiler.
+ */
+export function runPipelineAndGetPlanSummary(coll, pipeline) {
+    const db = coll.getDB();
+    const previousProfilingLevel = assert.commandWorked(db.setProfilingLevel(2)).was;
+    try {
+        const results = coll.aggregate(pipeline).toArray();
+        const entry = getLatestProfilerEntry(db, {
+            op: "command",
+            ns: coll.getFullName(),
+            "command.aggregate": coll.getName(),
+            "command.pipeline": {$exists: true},
+        });
+        assert(entry.hasOwnProperty("planSummary"), "no planSummary was profiled", {entry});
+        return {results, planSummary: entry.planSummary};
+    } finally {
+        assert.commandWorked(db.setProfilingLevel(previousProfilingLevel));
+    }
 }
 
 /**

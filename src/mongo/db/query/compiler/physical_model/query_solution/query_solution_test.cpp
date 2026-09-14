@@ -18,6 +18,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
@@ -2126,4 +2127,174 @@ TEST(QuerySolutionTest, ShouldCacheEofPlanTree) {
 
     ASSERT_TRUE(solution2->isEligibleForPlanCache());
 }
+namespace {
+const NamespaceString kNssA = NamespaceString::createNamespaceString_forTest("db.a");
+const NamespaceString kNssB = NamespaceString::createNamespaceString_forTest("db.b");
+const NamespaceString kNssC = NamespaceString::createNamespaceString_forTest("db.c");
+
+std::vector<QSNJoinPredicate> makeJoinPredicates(std::string leftField, std::string rightField) {
+    return {QSNJoinPredicate{QSNJoinPredicate::ComparisonOp::Eq,
+                             FieldPath{std::move(leftField)},
+                             FieldPath{std::move(rightField)}}};
+}
+}  // namespace
+
+TEST(QuerySolutionTest, SummaryStringForNonJoinPlan) {
+    auto ixscan =
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    auto fetch = std::make_unique<FetchNode>(kNssA);
+    fetch->children.push_back(std::move(ixscan));
+
+    QuerySolution solution;
+    solution.setRoot(std::move(fetch));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "IXSCAN { a: 1, b: 1 }",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForHashJoinPlan) {
+    auto ixscan = std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1)));
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
+                                                            std::move(collscan),
+                                                            makeJoinPredicates("a", "b"),
+                                                            boost::none /* leftEmbeddingField */,
+                                                            FieldPath{"out"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 } ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForNestedJoinPlan) {
+    auto ixscan = std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1)));
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto probe =
+        std::make_unique<IndexProbeNode>(kNssC, buildSimpleIndexEntry(BSON("c" << 1 << "d" << -1)));
+    auto inlj =
+        std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(collscan),
+                                                             std::move(probe),
+                                                             makeJoinPredicates("b", "c"),
+                                                             boost::none /* leftEmbeddingField */,
+                                                             FieldPath{"cOut"});
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
+                                                            std::move(inlj),
+                                                            makeJoinPredicates("a", "b"),
+                                                            boost::none /* leftEmbeddingField */,
+                                                            FieldPath{"bOut"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 } ), bOut = ( INLJ( _ = ( COLLSCAN [db.b] ), cOut = ( "
+        "IXPROBE [db.c] { c: 1, d: -1 } ) ) ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringSkipsNonJoinNodesAboveJoin) {
+    auto collscanA = std::make_unique<CollectionScanNode>(kNssA);
+    auto collscanB = std::make_unique<CollectionScanNode>(kNssB);
+    auto nlj = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(collscanA),
+                                                             std::move(collscanB),
+                                                             makeJoinPredicates("a", "b"),
+                                                             boost::none /* leftEmbeddingField */,
+                                                             FieldPath{"out"});
+    auto skip = std::make_unique<SkipNode>(
+        std::move(nlj), 10 /* skip */, LimitSkipParameterization::Disabled);
+
+    QuerySolution solution;
+    solution.setRoot(std::move(skip));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForNonJoinSubtreeAboveLeaves) {
+    // The subtree on the left of the join contains no join stage, so it is summarized using the
+    // short form, which lists each of its leaves. The whole operand is then wrapped in parentheses
+    // so that it remains a single element of the join's argument list.
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1))));
+    orChildren.push_back(
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("b" << 1))));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(orNode),
+                                                            std::move(collscan),
+                                                            makeJoinPredicates("a", "b"),
+                                                            boost::none /* leftEmbeddingField */,
+                                                            FieldPath{"out"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 }, IXSCAN [db.a] { b: 1 } ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForMultipleJoinSubtreesUnderNonJoinNode) {
+    // A non-join node with more than one child which each contain a join contributes nothing to the
+    // summary itself; the summary of each of its children is listed instead.
+    auto makeJoin = [](const NamespaceString& leftNss, const NamespaceString& rightNss) {
+        return std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(leftNss),
+            std::make_unique<CollectionScanNode>(rightNss),
+            makeJoinPredicates("a", "b"),
+            boost::none /* leftEmbeddingField */,
+            FieldPath{"out"});
+    };
+
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(makeJoin(kNssA, kNssB));
+    orChildren.push_back(makeJoin(kNssA, kNssC));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    QuerySolution solution;
+    solution.setRoot(std::move(orNode));
+    ASSERT_STR_EQ_AUTO(
+        "NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) ), NLJ( _ = ( COLLSCAN [db.a] ), "
+        "out = ( COLLSCAN [db.c] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput) {
+    // Same as above, but with the multi-child non-join node as the input of another join, so that
+    // its two elements are wrapped in parentheses to remain a single element of that join's
+    // argument list.
+    auto makeJoin = [](const NamespaceString& leftNss, const NamespaceString& rightNss) {
+        return std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(leftNss),
+            std::make_unique<CollectionScanNode>(rightNss),
+            makeJoinPredicates("a", "b"),
+            boost::none /* leftEmbeddingField */,
+            FieldPath{"out"});
+    };
+
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(makeJoin(kNssA, kNssB));
+    orChildren.push_back(makeJoin(kNssA, kNssC));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(orNode),
+        std::make_unique<IndexScanNode>(kNssC, buildSimpleIndexEntry(BSON("c" << 1))),
+        makeJoinPredicates("a", "c"),
+        boost::none /* leftEmbeddingField */,
+        FieldPath{"cOut"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(
+        "HJ( _ = ( NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) ), NLJ( _ = ( "
+        "COLLSCAN [db.a] ), out = ( COLLSCAN [db.c] ) ) ), cOut = ( IXSCAN [db.c] { c: 1 } ) )",
+        solution.summaryString());
+}
+
 }  // namespace

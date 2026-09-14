@@ -1,6 +1,7 @@
 ## 1. 3-Node graph, base node fully connected
 ### No join opt
 ### Random reordering with seed 0
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
@@ -20,6 +21,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
@@ -39,6 +41,7 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "y"
@@ -58,6 +61,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "y"
@@ -77,6 +81,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 5
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "x"
@@ -96,6 +101,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"HJ( _ = ( NLJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
@@ -115,6 +121,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( NLJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "x"
@@ -134,6 +141,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 10
+`"HJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
@@ -153,6 +161,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 11
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
@@ -175,6 +184,7 @@ rightEmbeddingField: "y"
 ## 2. 3-Node graph, base node connected to one node
 ### No join opt
 ### Random reordering with seed 0
+`"HJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 HASH_JOIN_EMBEDDING [x.a = a]
 leftEmbeddingField: "none"
@@ -194,6 +204,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [x.b = b]
 leftEmbeddingField: "none"
@@ -213,6 +224,7 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"NLJ( _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.b = b]
 leftEmbeddingField: "none"
@@ -232,6 +244,7 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [a = x.a]
 leftEmbeddingField: "none"
@@ -251,6 +264,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 4
+`"NLJ( _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.a = a]
 leftEmbeddingField: "none"
@@ -270,6 +284,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"HJ( _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 HASH_JOIN_EMBEDDING [x.a = a]
 leftEmbeddingField: "none"
@@ -289,6 +304,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = x.b]
 leftEmbeddingField: "y"
@@ -308,6 +324,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 9
+`"NLJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.a = a]
 leftEmbeddingField: "none"
@@ -327,6 +344,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 10
+`"HJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 HASH_JOIN_EMBEDDING [x.a = a]
 leftEmbeddingField: "none"
@@ -346,6 +364,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 11
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [x.b = b]
 leftEmbeddingField: "none"
@@ -368,6 +387,7 @@ rightEmbeddingField: "y"
 ## 3. 3-Node graph + potentially inferred edge
 ### No join opt
 ### Random reordering with seed 0
+`"HJ( _ = ( HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,y.base = base]
 leftEmbeddingField: "none"
@@ -387,6 +407,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,x.base = base]
 leftEmbeddingField: "none"
@@ -406,6 +427,7 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,base = x.base]
 leftEmbeddingField: "y"
@@ -425,6 +447,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = x.base,base = y.base]
 leftEmbeddingField: "none"
@@ -444,6 +467,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 4
+`"NLJ( _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.base = base,y.base = base]
 leftEmbeddingField: "none"
@@ -463,6 +487,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 5
+`"HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = x.base,base = y.base]
 leftEmbeddingField: "none"
@@ -482,6 +507,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base,y.base = base]
 leftEmbeddingField: "none"
@@ -501,6 +527,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 7
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,y.base = base]
 leftEmbeddingField: "none"
@@ -520,6 +547,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( NLJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,base = y.base]
 leftEmbeddingField: "x"
@@ -539,6 +567,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 9
+`"NLJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.base = base,y.base = base]
 leftEmbeddingField: "none"
@@ -558,6 +587,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 11
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base,x.base = base]
 leftEmbeddingField: "none"
@@ -580,6 +610,7 @@ rightEmbeddingField: "y"
 ## 4. 3-Node graph + intermediate exclusion projection & rename
 ### No join opt
 ### Random reordering with seed 0
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [m = x]
 leftEmbeddingField: "none"
@@ -608,6 +639,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [z = b]
 leftEmbeddingField: "none"
@@ -636,6 +668,7 @@ rightEmbeddingField: "y"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = z]
 leftEmbeddingField: "y"
@@ -664,6 +697,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [b = z]
 leftEmbeddingField: "y"
@@ -692,6 +726,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 5
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [x = m]
 leftEmbeddingField: "x"
@@ -720,6 +755,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"HJ( _ = ( NLJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [m = x]
 leftEmbeddingField: "none"
@@ -748,6 +784,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( NLJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [x = m]
 leftEmbeddingField: "x"
@@ -776,6 +813,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 10
+`"HJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 HASH_JOIN_EMBEDDING [m = x]
 leftEmbeddingField: "none"
@@ -804,6 +842,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 11
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [z = b]
 leftEmbeddingField: "none"
@@ -835,6 +874,7 @@ rightEmbeddingField: "y"
 ## 5. 4-Node graph + potentially inferred edges & filters
 ### No join opt
 ### Random reordering with seed 0
+`"NLJ( _ = ( HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base,y.base = base,z.base = base]
 leftEmbeddingField: "none"
@@ -863,6 +903,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,base = z.base,base = x.base]
 leftEmbeddingField: "y"
@@ -891,6 +932,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"NLJ( _ = ( HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base,y.base = base,z.base = base]
 leftEmbeddingField: "none"
@@ -919,6 +961,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = y.base,base = base,base = x.base]
 leftEmbeddingField: "z"
@@ -947,6 +990,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 4
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) ) ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [y.base = base,base = base,x.base = base]
 leftEmbeddingField: "none"
@@ -975,6 +1019,7 @@ rightEmbeddingField: "z"
   direction: "forward"
 ```
 ### Random reordering with seed 5
+`"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,base = z.base,base = x.base]
 leftEmbeddingField: "y"
@@ -1003,6 +1048,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = x.base,base = y.base,base = z.base]
 leftEmbeddingField: "none"
@@ -1031,6 +1077,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 7
+`"NLJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [x.base = base,y.base = base,z.base = base]
 leftEmbeddingField: "none"
@@ -1059,6 +1106,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base,y.base = base,z.base = base]
 leftEmbeddingField: "none"
@@ -1087,6 +1135,7 @@ rightEmbeddingField: "x"
   direction: "forward"
 ```
 ### Random reordering with seed 9
+`"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base,base = y.base,base = z.base]
 leftEmbeddingField: "x"
@@ -1115,6 +1164,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 10
+`"HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( NLJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = y.base,base = base,base = x.base]
 leftEmbeddingField: "z"
@@ -1146,6 +1196,7 @@ rightEmbeddingField: "none"
 ## 6. 5-Node graph + filters
 ### No join opt
 ### Random reordering with seed 0
+`"NLJ( _ = ( HJ( _ = ( HJ( _ = ( HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
@@ -1184,6 +1235,7 @@ rightEmbeddingField: "bbb"
   direction: "forward"
 ```
 ### Random reordering with seed 1
+`"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "ddd"
@@ -1222,6 +1274,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 2
+`"NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "none"
@@ -1260,6 +1313,7 @@ rightEmbeddingField: "ddd"
   direction: "forward"
 ```
 ### Random reordering with seed 3
+`"HJ( _ = ( NLJ( _ = ( HJ( _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "none"
@@ -1298,6 +1352,7 @@ rightEmbeddingField: "ddd"
   direction: "forward"
 ```
 ### Random reordering with seed 4
+`"NLJ( _ = ( HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "none"
@@ -1336,6 +1391,7 @@ rightEmbeddingField: "ddd"
   direction: "forward"
 ```
 ### Random reordering with seed 5
+`"NLJ( _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "none"
@@ -1374,6 +1430,7 @@ rightEmbeddingField: "ddd"
   direction: "forward"
 ```
 ### Random reordering with seed 6
+`"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) ) ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "ddd"
@@ -1412,6 +1469,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 7
+`"NLJ( _ = ( NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
@@ -1450,6 +1508,7 @@ rightEmbeddingField: "bbb"
   direction: "forward"
 ```
 ### Random reordering with seed 8
+`"NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
 ```
 NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
@@ -1488,6 +1547,7 @@ rightEmbeddingField: "bbb"
   direction: "forward"
 ```
 ### Random reordering with seed 9
+`"HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = aaa.base]
 leftEmbeddingField: "ccc"
@@ -1526,6 +1586,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 10
+`"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = base]
 leftEmbeddingField: "ddd"
@@ -1564,6 +1625,7 @@ rightEmbeddingField: "none"
   direction: "forward"
 ```
 ### Random reordering with seed 11
+`"HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
 ```
 HASH_JOIN_EMBEDDING [base = aaa.base]
 leftEmbeddingField: "ccc"

@@ -151,6 +151,6 @@ inline bool isSortStageType(StageType stageType) {
 
 struct QuerySolutionNode;
 
-std::string_view nodeStageTypeToString(const QuerySolutionNode* node);
+std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief = false);
 
 }  // namespace mongo

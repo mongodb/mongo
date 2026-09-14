@@ -9,7 +9,7 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
-std::string_view nodeStageTypeToString(const QuerySolutionNode* node) {
+std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief) {
     switch (node->getType()) {
         case STAGE_AND_HASH:
             return "AND_HASH"sv;
@@ -119,13 +119,13 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node) {
         case STAGE_WINDOW:
             return "WINDOW"sv;
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
-            return "HASH_JOIN_EMBEDDING"sv;
+            return brief ? "HJ"sv : "HASH_JOIN_EMBEDDING"sv;
         case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
-            return "NESTED_LOOP_JOIN_EMBEDDING"sv;
+            return brief ? "NLJ"sv : "NESTED_LOOP_JOIN_EMBEDDING"sv;
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
-            return "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"sv;
+            return brief ? "INLJ"sv : "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"sv;
         case STAGE_INDEX_PROBE_NODE:
-            return "INDEX_PROBE_NODE"sv;
+            return brief ? "IXPROBE"sv : "INDEX_PROBE_NODE"sv;
         default:
             return "UNKNOWN"sv;
     }

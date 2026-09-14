@@ -6,12 +6,9 @@
  *   requires_sbe,
  * ]
  */
-import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {
-    prettyPrintWinningPlan,
-    getWinningJoinOrderOneLine,
-} from "jstests/query_golden/libs/pretty_plan.js";
-import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
+import {linebreak, section, subSection, codeOneLine} from "jstests/libs/query/pretty_md.js";
+import {prettyPrintWinningPlan} from "jstests/query_golden/libs/pretty_plan.js";
+import {joinTestWrapper, runPipelineAndGetPlanSummary} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName() + "_base"];
 coll.drop();
@@ -55,20 +52,19 @@ assert.commandWorked(
 assert.commandWorked(b.createIndex({dummy: 1, base: -1, a: 1, b: 1}));
 
 function runSingleTest(subtitle, pipeline, seen = undefined) {
-    let joinOrder = undefined;
-    const explain = coll.explain().aggregate(pipeline);
+    const {results, planSummary} = runPipelineAndGetPlanSummary(coll, pipeline);
     if (seen) {
-        joinOrder = getWinningJoinOrderOneLine(explain);
-        if (seen.has(joinOrder)) {
+        if (seen.has(planSummary)) {
             return undefined;
         }
-        seen.add(joinOrder);
+        seen.add(planSummary);
     }
     subSection(subtitle);
-    if (joinOrder) {
-        prettyPrintWinningPlan(explain);
+    if (seen) {
+        codeOneLine(planSummary);
+        prettyPrintWinningPlan(coll.explain().aggregate(pipeline));
     }
-    return coll.aggregate(pipeline).toArray();
+    return results;
 }
 
 function runRandomReorderTests(pipeline) {

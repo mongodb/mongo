@@ -811,6 +811,13 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         execs.emplace_back(std::move(exec));
     }
 
+    if (!execs.empty()) {
+        auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
+        std::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
+        CurOp::get(aggExState.getOpCtx())->setPlanSummary(lk, std::move(planSummary));
+        CurOp::get(aggExState.getOpCtx())->debug().queryFramework = execs[0]->getQueryFramework();
+    }
+
     return execs;
 }
 
@@ -844,13 +851,6 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
                                              std::move(additionalExecutors),
                                              hasGeoNearStage);
     tassert(6624353, "No executors", !execs.empty());
-
-    {
-        auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
-        std::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-        CurOp::get(aggExState.getOpCtx())->setPlanSummary(lk, std::move(planSummary));
-        CurOp::get(aggExState.getOpCtx())->debug().queryFramework = execs[0]->getQueryFramework();
-    }
 
     hangAfterCreatingAggregationPlan.executeIf(
         [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
