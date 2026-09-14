@@ -20,12 +20,16 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <cstddef>
 #include <memory>
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(forceAggregationSingleDocumentLookupExecutor);
+
 /**
  * Computes the batch limits for the updateLookup stage. Batching only pays off behind a caching
  * executor, which is the collection-level SBE path; database- and cluster-wide streams run Express
@@ -61,6 +65,7 @@ exec::agg::BatchedEnrichmentStage::Limits buildUpdateLookupLimits(
 std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
     OperationContext* opCtx, bool isOptimized, bool isCollectionStream) {
     using namespace exec::agg;
+
     auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>(
         exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder());
 
@@ -110,7 +115,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
         const auto& expCtx = changeStreamAddPostImageDS->getExpCtx();
         auto ifrCtx = expCtx->getIfrContext();
         const bool isOptimized = ifrCtx &&
-            ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup);
+            ifrCtx->getSavedFlagValue(
+                feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup) &&
+            !forceAggregationSingleDocumentLookupExecutor.shouldFail();
         const bool isCollectionStream =
             ChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
             ChangeStreamType::kCollection;

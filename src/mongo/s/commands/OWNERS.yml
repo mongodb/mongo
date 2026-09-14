@@ -27,7 +27,10 @@ filters:
   - "cluster_fle2*":
     approvers:
       - 10gen/server-security
-  - "document_shard_key*":
+  - "document_shard_key_query_*":
+    approvers:
+      - 10gen/query-execution
+  - "document_shard_key_update*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*fsync_unlock*":
