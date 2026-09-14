@@ -39,11 +39,4 @@ StatusWith<std::string> icuX509DNPrep(std::string_view str);
 // Similar to mk_wcswidth, but use the larger unicode database for character lookup.
 int icuGetStringWidth(std::string_view str, bool ambiguousAsFullWidth, bool expandEmojiSequence);
 
-/**
- * Returns a Unicode case-folded copy of `str`.
- * Case folding maps characters to a canonical lowercase form suitable for case-insensitive
- * comparison.
- */
-std::string icuCaseFold(std::string_view str);
-
 }  // namespace mongo
