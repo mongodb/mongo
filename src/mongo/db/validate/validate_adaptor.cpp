@@ -268,24 +268,29 @@ void _validateFastCountAndSize(OperationContext* opCtx,
         if (const auto fastCount = coll.latestSizeCount(opCtx).count; fastCount != numRecords) {
             results.addError(
                 fmt::format("fast count ({}) does not match number of "
-                            "records ({}) for collection '{}' with fast count store type '{}'",
+                            "records ({}) for collection '{}' with fast count store type '{}'. A "
+                            "diff of ({}) should be used for repair",
                             fastCount,
                             numRecords,
                             coll.ns().toStringForErrorMsg(),
-                            toString(fastCountType)),
+                            toString(fastCountType),
+                            numRecords - fastCount),
                 /*stopValidation=*/false);
         }
     }
 
     if (validateState.shouldEnforceFastSize(opCtx, fastCountType)) {
         if (const auto fastSize = coll.latestSizeCount(opCtx).size; fastSize != dataSizeTotal) {
-            results.addError(fmt::format("fast size ({}) does not match data size ({}) "
-                                         "for collection '{}' with fast count store type '{}'",
-                                         fastSize,
-                                         dataSizeTotal,
-                                         coll.ns().toStringForErrorMsg(),
-                                         toString(fastCountType)),
-                             /*stopValidation=*/false);
+            results.addError(
+                fmt::format("fast size ({}) does not match data size ({}) "
+                            "for collection '{}' with fast count store type '{}'. A diff of ({}) "
+                            "should be used for repair",
+                            fastSize,
+                            dataSizeTotal,
+                            coll.ns().toStringForErrorMsg(),
+                            toString(fastCountType),
+                            dataSizeTotal - fastSize),
+                /*stopValidation=*/false);
         }
     }
 }
