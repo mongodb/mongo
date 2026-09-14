@@ -799,10 +799,12 @@ def _resmoke_test_impl(ctx):
     if gcov:
         bindir = gcov.rsplit("/", 1)[0]
 
-        # LLVM source-based coverage (.profraw): COVERAGE_GCOV_PATH is the merge tool
-        # (the clang toolchain maps the "gcov" tool_path to llvm-profdata) and LLVM_COV
-        # does the lcov export.
+        # LLVM source-based coverage (.profraw): LLVM_PROFDATA is the merge tool and
+        # LLVM_COV does the lcov export. Bazel 8's collect_cc_coverage.sh merged with
+        # COVERAGE_GCOV_PATH; Bazel 9 switched to LLVM_PROFDATA, so set both (the script
+        # runs under `set -u` and still requires COVERAGE_GCOV_PATH for the gcov path).
         expanded_env["COVERAGE_GCOV_PATH"] = gcov
+        expanded_env["LLVM_PROFDATA"] = bindir + "/llvm-profdata"
         expanded_env["LLVM_COV"] = bindir + "/llvm-cov"
 
     env_exports = "".join(

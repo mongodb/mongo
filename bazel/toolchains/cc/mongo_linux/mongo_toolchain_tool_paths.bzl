@@ -35,6 +35,7 @@ def get_mongo_toolchain_tool_paths(version, compiler):
             "strip": version + "/bin/strip",
             "gcov": version + "/bin/gcov",
             "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+            "llvm-profdata": "/bin/false",  # /bin/false = we're not using llvm-profdata
         }
     if compiler == "clang":
         # TODO(SERVER-87211): The `gcc` and `g++` entries below are using paths that help
@@ -55,5 +56,10 @@ def get_mongo_toolchain_tool_paths(version, compiler):
             "strip": version + "/bin/strip",
             "gcov": version + "/bin/llvm-profdata",
             "llvm-cov": version + "/bin/llvm-cov",
+            # Bazel 9's collect_cc_coverage.sh merges .profraw files with $LLVM_PROFDATA
+            # rather than $COVERAGE_GCOV_PATH (which is what Bazel 8 used). The env var is
+            # only exported when the toolchain declares an "llvm-profdata" tool_path, and
+            # the script runs under `set -u`, so omitting this breaks coverage collection.
+            "llvm-profdata": version + "/bin/llvm-profdata",
         }
     fail("Unknown mongo_linux toolchain compiler: " + compiler)
