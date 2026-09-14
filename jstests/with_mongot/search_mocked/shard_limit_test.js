@@ -1,8 +1,8 @@
 /**
  * Test that a $limit gets pushed to the shards.
  *
- * TODO (SERVER-131069): Mock-only explain format (mongotDocsRequested, limit absorption). Cannot
- * migrate to real-mongot E2E.
+ * TODO (SERVER-131069): Mock-only explain format (limit absorption). Cannot migrate to
+ * real-mongot E2E.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
@@ -108,10 +108,6 @@ function assertLimitAbsorbed(explainRes, query) {
             } else {
                 assert.eq(stages[1]["$_internalSearchIdLookup"].limit, 7, explainRes);
             }
-            // Assert limit and skip were pushed down to mongot in the form of
-            // 'mongotRequestedDocs'. Both need to be pushed down so that after mongos skips first
-            // documents in sort order, the limit can then be applied.
-            assert.eq(7, stages[0]["$_internalSearchMongotRemote"].mongotDocsRequested, explainRes);
         }
     }
 }

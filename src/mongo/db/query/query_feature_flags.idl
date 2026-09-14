@@ -67,12 +67,6 @@ feature_flags:
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
 
-    featureFlagSearchBatchSizeTuning:
-        description: "Feature flag to enable batchSize tuning for search queries."
-        cpp_varname: gFeatureFlagSearchBatchSizeTuning
-        default: true
-        fcv_gated: false
-
     featureFlagAllowMergeOnNullishValues:
         description: "Feature flag to support null and missing values for 'on' fields in $merge."
         cpp_varname: gFeatureFlagAllowMergeOnNullishValues

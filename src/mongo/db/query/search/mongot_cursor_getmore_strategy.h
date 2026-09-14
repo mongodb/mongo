@@ -50,7 +50,8 @@ public:
     /**
      * For the mongot cursor, we want to prefetch the next batch if we know we'll need another batch
      * (see _mustNeedAnotherBatch()), or if the maximum docsNeededBounds for this query is Unknown
-     * and we've already received 3 batches.
+     * and we've already received 3 batches. If we haven't computed a batchSize at all (i.e. the
+     * docsNeededBounds are unknown), we prefetch unless we know a discrete maximum bound.
      */
     bool shouldPrefetch(long long totalNumReceived, long long numBatchesReceived) const final;
 
@@ -77,12 +78,6 @@ private:
      * Otherwise, we'll apply tuning strategies to optimize batchSize of each batch requested.
      */
     long long _getNextBatchSize(long long prevBatchNumReceived);
-
-    /**
-     * Computes the next docsRequested value when the docsRequested option is enabled for mongot
-     * requests.
-     */
-    boost::optional<long long> _getNextDocsRequested(long long totalNumReceived);
 
     // Set to boost::none if batchSize should not be set on getMore requests.
     boost::optional<long long> _currentBatchSize;

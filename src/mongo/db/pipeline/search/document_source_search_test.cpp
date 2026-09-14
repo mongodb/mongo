@@ -51,7 +51,6 @@ static const std::vector<std::pair<std::string, std::string>> kInternalSearchFie
      R"({$search: {view: {name: "secretView", effectivePipeline: [{$match: {leaked: true}}]}}})"},
     {"limit", R"({$search: {limit: 100}})"},
     {"sortSpec", R"({$search: {sortSpec: {field: 1}}})"},
-    {"mongotDocsRequested", R"({$search: {mongotDocsRequested: 50}})"},
     {"docsNeededBounds", R"({$search: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
 };
 

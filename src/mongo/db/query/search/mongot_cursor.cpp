@@ -29,7 +29,6 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const OptimizationFlags& optimizationFlags,
     const boost::optional<SearchQueryViewSpec> view = boost::none,
     const boost::optional<int> protocolVersion = boost::none,
-    const boost::optional<long long> docsRequested = boost::none,
     const boost::optional<long long> batchSize = boost::none,
     const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
@@ -62,18 +61,10 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         cmdBob.append(kOptimizationFlagsField, optimizationFlags.serialize());
     }
 
-    if (docsRequested.has_value() || batchSize.has_value() || requiresSearchSequenceToken) {
-        tassert(
-            8953001,
-            "Only one of docsRequested or batchSize should be set on the initial mongot request.",
-            !docsRequested.has_value() || !batchSize.has_value());
-
+    if (batchSize.has_value() || requiresSearchSequenceToken) {
         BSONObjBuilder cursorOptionsBob(cmdBob.subobjStart(kCursorOptionsField));
         if (batchSize.has_value()) {
             cursorOptionsBob.append(kBatchSizeField, batchSize.get());
-        }
-        if (docsRequested.has_value()) {
-            cursorOptionsBob.append(kDocsRequestedField, docsRequested.get());
         }
         if (requiresSearchSequenceToken) {
             // Indicate to mongot that the user wants to paginate so mongot returns pagination
@@ -214,26 +205,11 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
 
     auto bounds = spec.getDocsNeededBounds();
     boost::optional<long long> batchSize = boost::none;
-    // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
-    // is enabled and we've already computed min/max bounds.
-    if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled() && bounds.has_value()) {
+    // We should only use batchSize if we've already computed min/max bounds.
+    if (bounds.has_value()) {
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
         batchSize = computeInitialBatchSize(expCtx, *bounds, userBatchSize, isStoredSource);
-    }
-
-    boost::optional<long long> docsRequested = spec.getMongotDocsRequested().has_value()
-        ? boost::make_optional<long long>(*spec.getMongotDocsRequested())
-        : boost::none;
-
-    // TODO SERVER-92576 Remove docsRequested.
-    if (batchSize.has_value()) {
-        // We disable setting docsRequested if we're already setting batchSize.
-        docsRequested = boost::none;
-    } else if (docsRequested.has_value()) {
-        // If we're enabling the docsRequested option, min/max bounds can be set to the
-        // docsRequested value.
-        bounds = DocsNeededBounds(*docsRequested, *docsRequested);
     }
 
     auto getMoreStrategy = std::make_unique<executor::MongotTaskExecutorCursorGetMoreStrategy>(
@@ -261,7 +237,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               getOptimizationFlagsForSearch(),
                                               view,
                                               protocolVersion,
-                                              docsRequested,
                                               batchSize,
                                               spec.getRequiresSearchSequenceToken()),
         taskExecutor,

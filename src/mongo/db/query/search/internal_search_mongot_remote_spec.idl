@@ -32,7 +32,6 @@ structs:
                 description: An optional pipeline to apply to the collection being unioned.
                 optional: true
                 type: array<object>
-            # TODO SERVER-92576 We may be able to remove limit alongside docsRequested.
             limit:
                 description: A limit copied from the merging part of the pipeline.
                 optional: true
@@ -45,10 +44,6 @@ structs:
                 description: "The sort specification for this query."
                 optional: true
                 type: object
-            mongotDocsRequested:
-                description: "The number of documents that mongod requests mongot should return; mongot can choose to return more."
-                optional: true
-                type: long
             requiresSearchMetaCursor:
                 description: >-
                     Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable. If false, we will

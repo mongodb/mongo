@@ -28,7 +28,6 @@ static constexpr std::string_view kExplainField = "explain"sv;
 static constexpr std::string_view kVerbosityField = "verbosity"sv;
 static constexpr std::string_view kIntermediateField = "intermediate"sv;
 static constexpr std::string_view kCursorOptionsField = "cursorOptions"sv;
-static constexpr std::string_view kDocsRequestedField = "docsRequested"sv;
 static constexpr std::string_view kBatchSizeField = "batchSize"sv;
 static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"sv;
 static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"sv;

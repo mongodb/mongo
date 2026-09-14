@@ -46,7 +46,6 @@ static const std::vector<std::pair<std::string, std::string>> kInternalSearchMet
      R"({$searchMeta: {view: {name: "secretView", effectivePipeline: [{$match: {leaked: true}}]}}})"},
     {"limit", R"({$searchMeta: {limit: 100}})"},
     {"sortSpec", R"({$searchMeta: {sortSpec: {field: 1}}})"},
-    {"mongotDocsRequested", R"({$searchMeta: {mongotDocsRequested: 50}})"},
     {"docsNeededBounds", R"({$searchMeta: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
 };
 

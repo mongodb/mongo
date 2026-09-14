@@ -204,7 +204,6 @@ static const std::vector<std::string_view>& getInternalOnlyFieldNames() {
         InternalSearchMongotRemoteSpec::kLimitFieldName,
         InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
         InternalSearchMongotRemoteSpec::kSortSpecFieldName,
-        InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
         InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
         InternalSearchMongotRemoteSpec::kDocsNeededBoundsFieldName,
         InternalSearchMongotRemoteSpec::kViewFieldName,

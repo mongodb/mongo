@@ -100,182 +100,10 @@ public:
         return Base::tryWaitUntilReadyRequests();
     }
 
-    /**
-     * Tests that the TaskExecutorCursor with mongot options applies the docsRequested option on
-     * getMore requests, whenever batchSize is disabled.
-     */
-    void BasicDocsRequestedTest() {
-        // Asserting within a spawned thread could crash the unit test due to an uncaught exception.
-        // We wrap the test with the threadAssertionMonitoredTest, which will do the work to track
-        // assertions not in the main thread and propogate errors.
-        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-            CursorId cursorId = 1;
-            RemoteCommandRequest rcr(HostAndPort("localhost"),
-                                     DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search" << "foo"),
-                                     opCtx.get());
-
-
-            // Mock lookup id metrics as batches are processed.
-            std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-                searchIdLookupMetrics =
-                    std::make_shared<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>();
-            // Construction of the TaskExecutorCursor enqueues a request in the
-            // NetworkInterfaceMock.
-            auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ boost::none,
-                                        DocsNeededBounds(10, 10),
-                                        searchIdLookupMetrics);
-
-            // Mock the response for the first batch.
-            scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 2, cursorId, /*expectedPrefetch*/ false);
-
-            // Exhaust the first batch.
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
-
-            // Increment lookup id metrics. Simulate that neither of the docs are found so that
-            // docsRequested stays at 10.
-            for (int i = 0; i < 2; ++i) {
-                searchIdLookupMetrics->incrementDocsSeenByIdLookup();
-            }
-
-            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
-            ASSERT_FALSE(hasReadyRequests());
-
-            // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore
-            // and that will block this thread in the NetworkInterfaceMock until there is a
-            // scheduled response. However, we cannot schedule the cursor response on the main
-            // thread before we call 'getNext()' as that will cause the NetworkInterfaceMock to
-            // block until there is request enqueued ('getNext()' is the function which will enqueue
-            // such as request). To avoid this deadlock, we start a new thread which will schedule a
-            // response on the NetworkInterfaceMock.
-            auto responseSchedulerThread = monitor.spawn([&] {
-                auto recievedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 3, 4, 0, /*expectedPrefetch*/ false);
-
-                // Assert that the command processed for the above response matches with the
-                // lambda to augment the getMore command used during construction of the TEC
-                // above.
-                const auto expectedGetMoreCmd =
-                    BSON("getMore" << 1LL << "collection"
-                                   << "test"
-                                   << "cursorOptions" << BSON("docsRequested" << 10));
-                ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, recievedGetMoreCmd);
-            });
-
-            // Schedules the GetMore request and exhausts the cursor.
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 3);
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 4);
-            ASSERT_FALSE(tec->getNext(opCtx.get()));
-
-            // Joining the thread which schedules the cursor response for the GetMore here forces
-            // the destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
-            // 'NetworkInterfaceMock' stops executing as the network thread. This is required before
-            // we invoke 'hasReadyRequests()' which enters the network again.
-            responseSchedulerThread.join();
-
-            // Assert no GetMore is requested.
-            ASSERT_FALSE(hasReadyRequests());
-        });
-    }
-
-    /**
-     * Tests that the TaskExecutorCursor properly computes the docsRequested option using the
-     * idLookup metrics across GetMore requests.
-     */
-    void DecreasingDocsRequestedTest() {
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
-        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-            CursorId cursorId = 1;
-            RemoteCommandRequest rcr(HostAndPort("localhost"),
-                                     DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                     BSON("search" << "foo"),
-                                     opCtx.get());
-
-            // Mock lookup id metrics as batches are processed.
-            std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-                searchIdLookupMetrics =
-                    std::make_shared<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>();
-            // Construction of the TaskExecutorCursor enqueues a request in the
-            // NetworkInterfaceMock.
-            auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ boost::none,
-                                        DocsNeededBounds(50, 50),
-                                        searchIdLookupMetrics);
-            // Mock the response for the first batch.
-            scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 50, cursorId, /*expectedPrefetch*/ false);
-
-            // Exhaust the first batch.
-            for (int docNum = 1; docNum <= 50; docNum++) {
-                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
-            }
-
-            // Increment lookup id metrics. Simulate that 20/50 of the docs are found so that
-            // docsRequested decreases to 30.
-            for (int i = 0; i < 50; ++i) {
-                searchIdLookupMetrics->incrementDocsSeenByIdLookup();
-            }
-            for (int i = 0; i < 20; ++i) {
-                searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
-            }
-
-            // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
-            ASSERT_FALSE(hasReadyRequests());
-
-            // Schedule another batch, where docsRequested should be set to 50 - 20 = 30;
-            auto responseSchedulerThread = monitor.spawn([&] {
-                auto recievedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 51, 80, cursorId, /*expectedPrefetch*/ false);
-                const auto expectedGetMoreCmd =
-                    BSON("getMore" << 1LL << "collection"
-                                   << "test"
-                                   << "cursorOptions" << BSON("docsRequested" << 30));
-                ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, recievedGetMoreCmd);
-            });
-
-            // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 51; docNum <= 80; docNum++) {
-                ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
-            }
-
-            // Increment lookup id metrics. Simulate that 20/30 of the docs are found so that
-            // docsRequested decreases to 10.
-            for (int i = 0; i < 30; ++i) {
-                searchIdLookupMetrics->incrementDocsSeenByIdLookup();
-            }
-            for (int i = 0; i < 20; ++i) {
-                searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
-            }
-            responseSchedulerThread.join();
-
-            // Schedule another batch, where docsRequested should be set to 30 - 20 = 10;
-            responseSchedulerThread = monitor.spawn([&] {
-                auto recievedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 81, 81, 0, /*expectedPrefetch*/ false);
-                const auto expectedGetMoreCmd =
-                    BSON("getMore" << 1LL << "collection"
-                                   << "test"
-                                   << "cursorOptions" << BSON("docsRequested" << 10));
-                ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, recievedGetMoreCmd);
-            });
-
-            // Schedules the GetMore request and exhausts the cursor.
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 81);
-            ASSERT_FALSE(tec->getNext(opCtx.get()));
-            responseSchedulerThread.join();
-
-            // Assert no GetMore is requested.
-            ASSERT_FALSE(hasReadyRequests());
-        });
-    }
-
     void BatchSizeGrowsExponentiallyFromDefaultStartingSizeTest() {
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
+        // Asserting within a spawned thread could crash the unit test due to an uncaught
+        // exception. We wrap the test with the threadAssertionMonitoredTest, which will do the
+        // work to track assertions not in the main thread and propogate errors.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -341,8 +169,9 @@ public:
     }
 
     void BatchSizeGrowsExponentiallyFromCustomStartingSizeTest() {
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
+        // Asserting within a spawned thread could crash the unit test due to an uncaught
+        // exception. We wrap the test with the threadAssertionMonitoredTest, which will do the
+        // work to track assertions not in the main thread and propogate errors.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -408,8 +237,9 @@ public:
     }
 
     void BatchSizePausesGrowthWhenBatchNotFilledTest() {
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
+        // Asserting within a spawned thread could crash the unit test due to an uncaught
+        // exception. We wrap the test with the threadAssertionMonitoredTest, which will do the
+        // work to track assertions not in the main thread and propogate errors.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -474,8 +304,9 @@ public:
     }
 
     void BatchSizeGrowthPausesThenResumesTest() {
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
+        // Asserting within a spawned thread could crash the unit test due to an uncaught
+        // exception. We wrap the test with the threadAssertionMonitoredTest, which will do the
+        // work to track assertions not in the main thread and propogate errors.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -606,8 +437,9 @@ public:
     void DefaultStartPrefetchAfterThreeBatchesTest() {
         std::shared_ptr<executor::TaskExecutor> pinnedExecutor;
 
-        // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
-        // throughout the test.
+        // Asserting within a spawned thread could crash the unit test due to an uncaught
+        // exception. We wrap the test with the threadAssertionMonitoredTest, which will do the
+        // work to track assertions not in the main thread and propogate errors.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
@@ -777,22 +609,6 @@ using NonPinningMongotCursorTestFixture =
     MongotCursorTestFixture<NonPinningTaskExecutorCursorTestFixture>;
 using PinnedConnMongotCursorTestFixture =
     MongotCursorTestFixture<PinnedConnTaskExecutorCursorTestFixture>;
-
-TEST_F(NonPinningMongotCursorTestFixture, BasicDocsRequestedTest) {
-    BasicDocsRequestedTest();
-}
-
-TEST_F(PinnedConnMongotCursorTestFixture, BasicDocsRequestedTest) {
-    BasicDocsRequestedTest();
-}
-
-TEST_F(NonPinningMongotCursorTestFixture, DecreasingDocsRequestedTest) {
-    DecreasingDocsRequestedTest();
-}
-
-TEST_F(PinnedConnMongotCursorTestFixture, DecreasingDocsRequestedTest) {
-    DecreasingDocsRequestedTest();
-}
 
 TEST_F(PinnedConnMongotCursorTestFixture, BatchSizeGrowsExponentiallyFromDefaultStartingSizeTest) {
     BatchSizeGrowsExponentiallyFromDefaultStartingSizeTest();

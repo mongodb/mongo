@@ -157,10 +157,6 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
         mDoc.addField(InternalSearchMongotRemoteSpec::kSortSpecFieldName,
                       opts.serializeLiteral(*_spec.getSortSpec()));
     }
-    if (_spec.getMongotDocsRequested().has_value()) {
-        mDoc.addField(InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
-                      opts.serializeLiteral((long long)*_spec.getMongotDocsRequested()));
-    }
     mDoc.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
                   opts.serializeLiteral(_spec.getRequiresSearchMetaCursor()));
 

@@ -38,19 +38,12 @@ BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     long long totalNumReceived) {
     GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
 
-    boost::optional<long long> docsNeeded = _getNextDocsRequested(totalNumReceived);
-
-    // TODO SERVER-92576 Remove docsRequested.
-    if (_currentBatchSize.has_value() || docsNeeded.has_value()) {
+    if (_currentBatchSize.has_value()) {
         BSONObjBuilder getMoreBob;
         getMoreRequest.serialize(&getMoreBob);
         BSONObjBuilder cursorOptionsBob(getMoreBob.subobjStart(mongot_cursor::kCursorOptionsField));
-        if (_currentBatchSize.has_value()) {
-            cursorOptionsBob.append(mongot_cursor::kBatchSizeField,
-                                    _getNextBatchSize(prevBatchNumReceived));
-        } else {
-            cursorOptionsBob.append(mongot_cursor::kDocsRequestedField, docsNeeded.get());
-        }
+        cursorOptionsBob.append(mongot_cursor::kBatchSizeField,
+                                _getNextBatchSize(prevBatchNumReceived));
         cursorOptionsBob.doneFast();
         return getMoreBob.obj();
     }
@@ -107,26 +100,6 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     return *_currentBatchSize;
 }
 
-boost::optional<long long> MongotTaskExecutorCursorGetMoreStrategy::_getNextDocsRequested(
-    long long totalNumReceived) {
-    auto extractableLimit = docs_needed_bounds::calcExtractableLimit(_docsNeededBounds);
-    if (!extractableLimit.has_value()) {
-        return boost::none;
-    }
-
-    if (_searchIdLookupMetrics) {
-        // The return value will start at _mongotDocsRequested and will decrease by one
-        // for each document that gets returned by the $idLookup stage. If a document gets
-        // filtered out, docsReturnedByIdLookup will not change and so docsNeeded will stay the
-        // same.
-        return extractableLimit.get() - _searchIdLookupMetrics->getDocsReturnedByIdLookup();
-    } else {
-        // In the stored source case, the return value will start at _mongotDocsRequested and
-        // will decrease by one for each document returned by this stage.
-        return extractableLimit.get() - totalNumReceived;
-    }
-}
-
 bool MongotTaskExecutorCursorGetMoreStrategy::_mustNeedAnotherBatch(
     long long totalNumReceived) const {
     return visit(
@@ -140,12 +113,12 @@ bool MongotTaskExecutorCursorGetMoreStrategy::_mustNeedAnotherBatch(
 
 bool MongotTaskExecutorCursorGetMoreStrategy::shouldPrefetch(long long totalNumReceived,
                                                              long long numBatchesReceived) const {
-    // If we aren't sending batchSize to mongot, then we prefetch the next batch, unless we have a
-    // discrete maximum bounds used to set docsRequested. When docsRequested is set, we
-    // optimistically assume that we will only need a single batch and attempt to avoid doing
-    // unnecessary work on mongot. If $idLookup filters out enough documents such that we are not
-    // able to satisfy the limit, then we will fetch the next batch syncronously on the subsequent
-    // 'getNext()' call.
+    // If we haven't computed a batchSize (i.e. the docsNeededBounds are unknown), then we prefetch
+    // the next batch, unless we have a discrete maximum bound. When a discrete maximum bound is
+    // known, we optimistically assume that we will only need a single batch and attempt to avoid
+    // doing unnecessary work on mongot. If $idLookup filters out enough documents such that we are
+    // not able to satisfy the limit, then we will fetch the next batch syncronously on the
+    // subsequent 'getNext()' call.
     if (!_currentBatchSize.has_value()) {
         return !std::holds_alternative<long long>(_docsNeededBounds.getMaxBounds());
     }

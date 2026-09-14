@@ -2024,9 +2024,8 @@ struct SearchNode : public QuerySolutionNode {
     const BSONObj searchQuery;
 
     /**
-     * This will populate the docsRequested field of the cursorOptions document sent as part of the
-     * command to mongot in the case where the query has an extractable limit that can guide the
-     * number of documents that mongot returns to mongod.
+     * The extractable limit from the user pipeline, if any. Used to feed the 'searchLimit' slot
+     * for SBE limit pushdown/parameterization.
      */
     boost::optional<long long> limit;
 

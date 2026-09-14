@@ -115,9 +115,7 @@ function ensureNoResponses() {
     assert.commandWorked(
         testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}),
     );
-    assert.commandWorked(
-        testDB.runCommand({search: "a UUID", cursorOptions: {docsRequested: 1, batchSize: 1}}),
-    );
+    assert.commandWorked(testDB.runCommand({search: "a UUID", cursorOptions: {batchSize: 1}}));
 
     // Reset the state associated with the cursor id and run a search command which
     // succeeds.
