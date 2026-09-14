@@ -16,7 +16,6 @@ Options:
     --outfile           File path for the generated task config.
 """
 
-import glob
 import json
 import os
 import re
@@ -27,7 +26,6 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import cache
 from typing import Optional
 
-import runfiles
 import typer
 import yaml
 from shrub.v2 import BuildVariant, FunctionCall, Task, TaskGroup
@@ -397,44 +395,15 @@ def resolve_assignment_tags_from_s3(
     return assignment_tags
 
 
-# TODO(DEVPROD-41449): Remove this fallback once the S3 export is stable, prior to YAML deletion.
-def resolve_assignment_tags_from_clone() -> dict[str, str]:
-    """Read the Mothra team YAMLs cloned into the workspace and exposed as @mothra//:teams."""
-    # Find the teams directory in the runfiles. Unfortunately, resolving the
-    # directory requires resolving a specific file within the runfiles, so
-    # an arbitrary team's YAML is used.
-    r = runfiles.Create()
-    teams_dir = os.path.dirname(r.Rlocation("mothra/mothra/teams/devprod.yaml"))
-
-    teams = []
-    for file in glob.glob(teams_dir + "/*.yaml"):
-        with open(file, "rt") as f:
-            teams += yaml.safe_load(f).get("teams", [])
-
-    return assignment_tags_from_teams(teams)
-
-
 @cache
 def resolve_assignment_tags() -> dict[str, str]:
-    """Resolve assignment tags from the Mothra S3 export, falling back to the Mothra clone."""
+    """Resolve assignment tags from the Mothra S3 export."""
     try:
         return resolve_assignment_tags_from_s3()
     except Exception as e:
-        # The S3 export requires credentials that not every caller has, and the export
-        # could change out from under us. Fall back to the clone rather than failing.
-        print(
-            f"Failed to resolve assignment tags from S3, falling back to the Mothra clone: {e}",
-            file=sys.stderr,
-        )
-
-    # TODO(DEVPROD-41449): Remove the fallback once the S3 export is stable, prior to YAML deletion.
-    try:
-        return resolve_assignment_tags_from_clone()
-    except Exception as e:
-        # Conservatively except any exception here. In the worst case, the contents/format from
-        # Mothra repo could change out from under us, and it should not completely fail
-        # task generation.
-        print(f"Failed to resolve assignment tags: {e}", file=sys.stderr)
+        # Conservatively except any exception here. The S3 export requires credentials that not every caller has,
+        # and the export could change out from under us.
+        print(f"Failed to resolve assignment tags from S3: {e}", file=sys.stderr)
         return {}
 
 

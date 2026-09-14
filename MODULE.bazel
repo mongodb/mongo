@@ -565,12 +565,6 @@ setup_bolt_data = use_repo_rule("//bazel/repository_rules:bolt_data.bzl", "setup
 
 setup_bolt_data(name = "bolt_data")
 
-mothra_repository = use_repo_rule("//bazel/repository_rules:mothra.bzl", "mothra_repository")
-
-# This repository is created in CI setup or by manually cloning the 10gen/mothra repo to ./mothra.
-# If the directory doesn't exist, a stub with empty teams will be created.
-mothra_repository(name = "mothra")
-
 jstestfuzz_repository = use_extension(
     "//bazel/repository_rules:jstestfuzz_repository.bzl",
     "jstestfuzz_repository",
