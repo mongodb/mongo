@@ -79,10 +79,12 @@ class test_cross_checkpoint_caching(wttest.WiredTigerTestCase):
         session_follow = conn_follow.open_session('')
         session_follow.create(self.uri, table_cfg)
 
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(self.nrows):
             cursor[str(i).zfill(5)] = 'value_' + str(i)
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # The follower's first scan caches every read from disk.
@@ -93,9 +95,11 @@ class test_cross_checkpoint_caching(wttest.WiredTigerTestCase):
 
         # Update one row, keeping the value size unchanged so no page splits.
         # The next checkpoint modifies only that row's root-to-leaf path.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         cursor[str(0).zfill(5)] = 'updated'
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
 
         # Scanning the new checkpoint misses on the rewritten path and hits on

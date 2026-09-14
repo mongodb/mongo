@@ -138,18 +138,22 @@ class test_disagg_checkpoint_size09(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Step 1: initial full-image write + checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=1')
         self.session.checkpoint()
         size_baseline = self.get_checkpoint_size()
         self.assertGreater(size_baseline, 0)
 
         # Step 2: partial update + checkpoint to build a delta chain so
         # the chain's cumulative size > 0 on disk.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows // 2, 'B')
         c.close()
+        self.session.commit_transaction('commit_timestamp=2')
         self.session.checkpoint()
         size_with_delta = self.get_checkpoint_size()
         self.assertGreater(size_with_delta, size_baseline,
@@ -190,9 +194,11 @@ class test_disagg_checkpoint_size09(DisaggSizeTestMixin, wttest.WiredTigerTestCa
                 'page_delta=(delta_pct=1),'
                 'timing_stress_for_test=[failpoint_rec_before_wrapup]'
             )
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, chr(ord('D') + (i % 20)))
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + i))
             self.evict_page('key000000')
             self.conn.reconfigure('timing_stress_for_test=[]')
 

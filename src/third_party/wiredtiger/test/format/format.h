@@ -501,6 +501,7 @@ WT_THREAD_RET timestamp(void *);
 
 uint32_t atou32(const char *, const char *, int);
 uint64_t checksum_database(WT_SESSION *);
+void abort_with_state_dump(WT_CONNECTION *, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 void config_clear(void);
 void config_compat(const char **);
 void config_error(void);

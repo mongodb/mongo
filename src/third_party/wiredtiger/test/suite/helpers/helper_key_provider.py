@@ -32,6 +32,7 @@ from run import wt_builddir
 from helper_disagg import DisaggConfigMixin, get_shard_id
 
 # Shared base for the key-provider tests.
+@wttest.prevent(["timestamp"])  # these tests choose their own commit timestamps
 class KeyProviderBase(wttest.WiredTigerTestCase):
     # Per-test knobs.
     key_provider_version = 1   # 0 = pull (get_key), 1 = push (set_key)
@@ -47,6 +48,13 @@ class KeyProviderBase(wttest.WiredTigerTestCase):
     TURTLE_KEK_VERSION = 1
     turtle_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_TURTLE_FILE_ID):02d}.db'
     key_provider_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID):02d}.db'
+
+    def next_commit_ts(self):
+        """Return the next commit timestamp, above stable and the last commit."""
+        stable = int(self.conn.query_timestamp('get=stable_timestamp'), 16)
+        ts = max(getattr(self, '_next_commit_ts_val', 0) + 1, stable + 1)
+        self._next_commit_ts_val = ts
+        return ts
 
     def setUp(self):
         # The tests inspect the persisted pages, which only PALite exposes.

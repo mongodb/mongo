@@ -263,15 +263,15 @@ class test_layered_tombstone_modify(wttest.WiredTigerTestCase):
     def test_modify_namespace_transitions_leader_stable(self):
         """Modify on the leader, where the values exist only in the stable table."""
         for key, case in enumerate(self.modify_cases, 1):
-            self.write_value(self.session, key, case.base_value)
-            self.apply_modify(self.session, key, case.modifications)
+            self.write_value(self.session, key, case.base_value, commit_ts=1)
+            self.apply_modify(self.session, key, case.modifications, commit_ts=2)
             self.check_value(self.session, key, case.expected_value)
 
     def test_modify_namespace_transitions_follower_ingest(self):
         """Modify on the follower, where the values exist only in its ingest table."""
         for key, case in enumerate(self.modify_cases, 1):
-            self.write_value(self.follow, key, case.base_value)
-            self.apply_modify(self.follow, key, case.modifications)
+            self.write_value(self.follow, key, case.base_value, commit_ts=1)
+            self.apply_modify(self.follow, key, case.modifications, commit_ts=2)
             self.check_value(self.follow, key, case.expected_value)
 
     def test_modify_namespace_transitions_follower_stable(self):
@@ -309,8 +309,8 @@ class test_layered_tombstone_modify(wttest.WiredTigerTestCase):
     def test_modify_deleted_key_follower_ingest(self):
         """A modify on a removed key returns WT_NOTFOUND rather than resurrecting the value."""
         key = 1
-        self.write_value(self.follow, key, b"value")
-        self.remove_value(self.follow, key)
+        self.write_value(self.follow, key, b"value", commit_ts=1)
+        self.remove_value(self.follow, key, commit_ts=2)
 
         # A removal stores the reserved tombstone marker in ingest; a modify cannot build on it.
         with closing(self.follow.open_cursor(self.uri)) as cursor:

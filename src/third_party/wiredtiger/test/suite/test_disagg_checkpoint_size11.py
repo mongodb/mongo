@@ -136,18 +136,22 @@ class test_disagg_checkpoint_size11(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Step 1: Initial full-image checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=1')
         self.session.checkpoint()
         size_initial = self.get_checkpoint_size()
         self.assertGreater(size_initial, 0)
 
 
         # Step 2: Append a delta to build a chain with the chain's cumulative size > 0 on disk.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows // 2, 'B')
         c.close()
+        self.session.commit_transaction('commit_timestamp=2')
         self.session.checkpoint()
         size_with_delta = self.get_checkpoint_size()
         self.assertGreater(size_with_delta, size_initial,
@@ -178,11 +182,13 @@ class test_disagg_checkpoint_size11(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         stat_key = stat.dsrc.rec_free_page_id_due_to_failed_replacement_reconciliation
         max_iters = 500
         for i in range(max_iters):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             # Update only half the rows so the delta is ~50% of the full image,
             # well below the delta_pct=90 threshold, keeping writes as deltas.
             self.insert_rows(c, 0, nrows // 2, chr(ord('C') + (i % 20)))
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + i))
             self.evict_page('key000000')
             if self.get_stat(stat_key) > 0:
 

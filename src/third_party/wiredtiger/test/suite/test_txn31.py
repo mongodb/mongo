@@ -71,9 +71,11 @@ class test_txn31(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # An existing durable key, so the table has an on-disk checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         c['key1'] = 'A'
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Start a snapshot-isolation reader with no read timestamp and take its snapshot
@@ -93,7 +95,7 @@ class test_txn31(wttest.WiredTigerTestCase):
         wc = writer.open_cursor(self.uri)
         wc['key2'] = 'B'
         wc.close()
-        writer.commit_transaction()
+        writer.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Make 'key2' durable and wait for the now-idle table handle to be closed.
         self.session.checkpoint()

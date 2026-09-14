@@ -72,10 +72,13 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         return self.conn_base_config + self.conn_delta_config
 
     def insert_or_update(self, ids, vals):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None, None)
         for id, val in zip(ids, vals):
             cursor[self.init_key * id] = val.encode()
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def verify(self, dict):
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -86,11 +89,14 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         cursor.close()
 
     def delete(self, ids):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in ids:
             cursor.set_key(self.init_key * i)
             cursor.remove()
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         self.session.checkpoint()
 
     def verify_delete(self, ids):

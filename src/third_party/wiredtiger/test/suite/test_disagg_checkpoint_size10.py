@@ -122,17 +122,21 @@ class test_disagg_checkpoint_size10(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Step 1: initial full-image write + checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=1')
         self.session.checkpoint()
         size_baseline = self.get_checkpoint_size()
         self.assertGreater(size_baseline, 0)
 
         # Step 2: partial update + checkpoint to build a delta chain.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows // 2, 'B')
         c.close()
+        self.session.commit_transaction('commit_timestamp=2')
         self.session.checkpoint()
         size_with_delta = self.get_checkpoint_size()
         self.assertGreater(size_with_delta, size_baseline,
@@ -157,9 +161,11 @@ class test_disagg_checkpoint_size10(DisaggSizeTestMixin, wttest.WiredTigerTestCa
             # (c) Force a full-image write (delta_pct=1) and checkpoint.
             #     Writes committed data to dirty the page, then checkpoints.
             self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, chr(ord('D') + (i % 20)))
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + i))
             self.session.checkpoint()
             self.conn.reconfigure(
                 'page_delta=(delta_pct=90,leaf_page_delta=true,max_consecutive_delta=10)'
@@ -176,11 +182,13 @@ class test_disagg_checkpoint_size10(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         # Step 4: run a few more full-image checkpoints to confirm size stability.
         # If the multiblock old-state path failed to subtract the old cumulative S1,
         # the running total would grow on every cycle, making size_final >> size_with_delta.
-        for _ in range(5):
+        for n in range(5):
             self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, 'Z')
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + max_iters + n))
             self.session.checkpoint()
             self.conn.reconfigure(
                 'page_delta=(delta_pct=90,leaf_page_delta=true,max_consecutive_delta=10)'

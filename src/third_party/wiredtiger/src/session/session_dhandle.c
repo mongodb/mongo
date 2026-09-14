@@ -1124,6 +1124,7 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
     WT_DATA_HANDLE *saved_dhandle;
     WT_DECL_RET;
+    bool evict_off;
 
     WT_ASSERT(session, WT_META_TRACKING(session));
     saved_dhandle = session->dhandle;
@@ -1144,10 +1145,21 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
      * (we are about to re-write the checkpoint which will mean cached pages no longer have valid
      * contents). This is especially noticeable with memory mapped files, since changes to the
      * underlying file are visible to the in-memory pages.
+     *
+     * Nothing here opens the tree. The handle above is taken only to lock the checkpoint, so there
+     * is no root page and the flush below does nothing. Turning eviction off is expensive. It holds
+     * the connection-wide eviction walk lock, interrupts the eviction server, and scans every
+     * eviction queue. A checkpoint pays that for every handle it gathers. That slows the checkpoint
+     * and starves other threads that need eviction off. The sweep server needs the lock most often,
+     * so it waits most. Only turn eviction off when the handle is open. The flush asserts the same
+     * thing: only an open handle needs it.
      */
-    WT_ERR(__wt_evict_file_exclusive_on(session));
+    evict_off = F_ISSET(session->dhandle, WT_DHANDLE_OPEN);
+    if (evict_off)
+        WT_ERR(__wt_evict_file_exclusive_on(session));
     ret = __wt_evict_file(session, WT_SYNC_DISCARD);
-    __wt_evict_file_exclusive_off(session);
+    if (evict_off)
+        __wt_evict_file_exclusive_off(session);
     WT_ERR(ret);
 
     /*

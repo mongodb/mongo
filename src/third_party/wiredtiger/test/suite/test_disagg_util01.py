@@ -58,8 +58,11 @@ class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
         # Leader: create a table, write some rows, checkpoint.
         self.session.create(self.uri, self.create_session_config)
         cursor = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
         self.session.checkpoint()
 
@@ -82,8 +85,11 @@ class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
         # The new leader should be able to drive the next checkpoint
         cursor = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows, self.nrows + 10):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
         self.session.checkpoint()
 
@@ -126,8 +132,11 @@ class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
         # Leader: create a table, write some rows, checkpoint.
         self.session.create(self.uri, self.create_session_config)
         cursor = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
         self.session.checkpoint()
 
@@ -146,15 +155,21 @@ class test_disagg_util01(wttest.WiredTigerTestCase, suite_subprocess):
         # Leader: write initial values and checkpoint.
         self.session.create(self.uri, self.create_session_config)
         cursor = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             cursor[i] = 'old' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
         self.session.checkpoint()
 
         # Overwrite values and checkpoint again; the follower must see these.
         cursor = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             cursor[i] = 'new' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
         self.session.checkpoint()
 

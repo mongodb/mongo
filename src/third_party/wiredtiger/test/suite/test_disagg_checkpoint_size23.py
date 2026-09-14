@@ -99,8 +99,11 @@ class test_disagg_checkpoint_size23(DisaggConfigMixin, wttest.WiredTigerTestCase
         if session is None:
             session = self.session
         cursor = session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        session.begin_transaction()
         for i in range(rows):
             cursor[i] = 'a' * 500
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         cursor.close()
 
     # A dropped table's size must leave the database size even when the name is taken again before

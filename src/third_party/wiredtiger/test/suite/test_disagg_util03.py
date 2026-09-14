@@ -66,9 +66,12 @@ class test_disagg_util03(wttest.WiredTigerTestCase, suite_subprocess,
     def _populate(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.nrows):
             c[f"k{i:08}"] = f"v{i:08}"
+        self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(1)}")
         c.close()
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(1)}")
         self.session.checkpoint()
 
     def test_tool_starts_with_corrupt_checkpoint(self):

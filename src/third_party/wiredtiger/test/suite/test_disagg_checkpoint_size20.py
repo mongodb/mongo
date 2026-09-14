@@ -84,8 +84,11 @@ class test_disagg_checkpoint_size20(wttest.WiredTigerTestCase):
 
     def insert_rows(self, start, count, value_char):
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(start, start + count):
             c[f'key{i:08d}'] = value_char * 100
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
 
     def test_root_size_consistent_across_restart(self):

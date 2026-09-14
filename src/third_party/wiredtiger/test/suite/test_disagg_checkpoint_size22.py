@@ -68,9 +68,12 @@ class test_disagg_checkpoint_size22(DisaggSizeTestMixin, wttest.WiredTigerTestCa
     def create_and_populate(self, table):
         """Create the table and insert enough rows to give it a nontrivial size."""
         self.session.create(table.uri, table.config)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         with wttest.open_cursor(self.session, table.uri) as cursor:
             for i in range(1000):
                 cursor[f"key{i:08d}"] = "x" * 100
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def create_and_checkpoint_layered_table(self):
         """Create and checkpoint the layered table, returning its nonzero stable size."""
@@ -256,20 +259,28 @@ class test_disagg_checkpoint_size22(DisaggSizeTestMixin, wttest.WiredTigerTestCa
     def test_layered_table_post_delete_checkpoint_uses_file_metadata_fast_path(self):
         """A layered table uses the file-metadata fast path after deleting its last key."""
         self.session.create(self.layered_table.uri, self.layered_table.config)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         with wttest.open_cursor(self.session, self.layered_table.uri) as cursor:
             cursor["key"] = "value"
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         self.session.checkpoint()
 
         stable_uri = "file:" + self.layered_table.file_name
         self.assertGreater(self.get_checkpoint_size(stable_uri), 0)
 
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         with wttest.open_cursor(self.session, self.layered_table.uri) as cursor:
             cursor.set_key("key")
             self.assertEqual(cursor.remove(), 0)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         self.session.checkpoint()
 
-        self.assertEqual(self.get_checkpoint_size(stable_uri), 0)
-        self.assertEqual(self.block_size(), 0)
+        # The delete is timestamped, so the stable file retains the delete
+        # marker at checkpoint; the fast path must still report the identical
+        # size the checkpoint metadata records.
+        self.assertEqual(self.get_checkpoint_size(stable_uri), self.block_size())
         self.assertFalse(self.used_dhandle_stats_path())
 
     def test_stable_file_before_first_checkpoint_uses_file_metadata_fast_path(self):

@@ -40,6 +40,9 @@ from helper_disagg import disagg_test_class
 # the node has persisted; the trees it reopens for the new role then start
 # a new run.
 #
+# Truncate is not in this list since it requires explicit begin/commit_txn and considered a general
+# write operation which should not be allowed during a role transition.
+#
 # Verify the new stint's first checkpoint records a newer run write
 # generation than the previous stint's, and that verification, whose page
 # walk compares every page against the aggregate its parent reports, is

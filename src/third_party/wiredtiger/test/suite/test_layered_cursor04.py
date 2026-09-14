@@ -53,9 +53,11 @@ class test_layered_cursor04(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, None)
 
         self.pr('Inserting a value')
+        self.session.begin_transaction()
         cursor["Hello"] = "World"
         cursor["Hi"] = "There"
         cursor["OK"] = "Go"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
         cursor.set_key("Hello")
         cursor.search()

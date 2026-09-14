@@ -53,14 +53,14 @@ class test_layered_cursor07(wttest.WiredTigerTestCase):
         # Insert a full value.
         self.session.begin_transaction()
         cursor[str(1)] = value1
-        self.session.commit_transaction()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
         # Insert a modify
         self.session.begin_transaction()
         cursor.set_key(str(1))
         cursor.modify([wiredtiger.Modify('A', 130, 0)])
         self.assertEqual(cursor.get_value(),  value1 + 'A')
-        self.session.commit_transaction()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
 
         # Validate that we do see the correct value.
         self.assertEqual(cursor[str(1)],  value1 + 'A')
@@ -70,7 +70,7 @@ class test_layered_cursor07(wttest.WiredTigerTestCase):
         cursor.set_key(str(1))
         cursor.modify([wiredtiger.Modify('B', 131, 0)])
         self.assertEqual(cursor.get_value(),  value1 + 'AB')
-        self.session.commit_transaction()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(3))
 
         # Validate that we do see the correct value.
         self.assertEqual(cursor[str(1)],  value1 + 'AB')

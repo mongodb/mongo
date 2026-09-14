@@ -171,5 +171,18 @@ class test_layered_txn03(wttest.WiredTigerTestCase):
         # The refused commits left nothing behind.
         self.assertEqual(self.read_at('k', 30), 'v30')
 
+    # A commit without a commit timestamp is refused; layered content is ordered across the
+    # step-down boundary by timestamp, so untimestamped writes have no correct place to land.
+    def test_commit_without_timestamp_is_refused(self):
+        _, session = self.target()
+        cursor = session.open_cursor(self.uri)
+        session.begin_transaction()
+        cursor['k'] = 'v'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: session.commit_transaction(),
+            '/commit timestamp is required for writes to disaggregated tables/')
+        # The refused commit already resolved the transaction.
+        cursor.close()
+
 if __name__ == '__main__':
     wttest.run()

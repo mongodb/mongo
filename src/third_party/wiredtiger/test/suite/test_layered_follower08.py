@@ -56,12 +56,16 @@ class test_layered_follower08(wttest.WiredTigerTestCase):
         self.session.create(uri, f'key_format=S,value_format={self.value_format}')
 
         cursor = self.session.open_cursor(uri, None, None)
+        self.session.begin_transaction()
         for i in range(0, 100):
             cursor[str(i)] = self.value(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
+        self.session.begin_transaction()
         for i in range(0, 100):
             cursor.set_key(str(i))
             self.assertEqual(cursor.remove(), 0)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         cursor.reset()
 

@@ -51,6 +51,9 @@ class test_layered_checkpoint02(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
+    # Keep track of the timestamps this test uses.
+    timestamp = 0
+
     # Reset a cursor on the follower.  Generally, the test will open a layered: uri,
     # and a reset is a signal have the cursor move to the next checkpoint. This works
     # for layered cursors but not cursors in general.
@@ -61,11 +64,15 @@ class test_layered_checkpoint02(wttest.WiredTigerTestCase):
     def put_data(self, value_prefix, low = 0, high = nitems, session = None):
         if session == None:
             session = self.session   # leader by default
+        self.timestamp += 1
         for uri in self.all_uris:
             cursor = session.open_cursor(uri, None, None)
+            session.begin_transaction()
             for i in range(low, high):
                 cursor[str(i)] = value_prefix + str(i)
+            session.commit_transaction("commit_timestamp=" + self.timestamp_str(self.timestamp))
             cursor.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(self.timestamp))
 
     def check_data_follower(self, value_prefix, low = 0, high = nitems, cursors = None, uris = all_uris):
         result_cursors = dict()

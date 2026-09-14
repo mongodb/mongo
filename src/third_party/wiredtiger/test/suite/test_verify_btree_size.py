@@ -53,10 +53,13 @@ class test_verify_btree_size(wttest.WiredTigerTestCase):
     correcting_pattern = r'WT_VERB_VERIFY.*size mismatch detected.*correcting'
 
     def populate(self, uri=None):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri or self.uri, None)
         for i in range(self.nentries):
             cursor[str(i)] = str(i) * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         self.session.checkpoint()
 
     def get_ckpt_size(self, stable_uri=None):

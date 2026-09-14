@@ -52,10 +52,13 @@ class test_layered_checkpoint12(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 

@@ -74,7 +74,7 @@ class test_layered_fast_truncate07(LayeredFastTruncateConfigMixin, wttest.WiredT
         for i in range(lo, hi + 1):
             self.session.begin_transaction()
             c[self.key(i)] = 'v'
-            self.session.commit_transaction()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         c.close()
 
     def follower_visible_keys(self, forward=True):

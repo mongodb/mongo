@@ -56,6 +56,7 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Insert some data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         nrows = 1000
         value_size = 100  # Each value is 100 bytes.
@@ -63,6 +64,7 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
             value = 'x' * value_size
             cursor[str(i)] = value
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Take a checkpoint to persist the data.
         self.session.checkpoint()
@@ -89,6 +91,7 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
 
 
         # Insert some data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         nrows = 1000
         value_size = 100  # Each value is 100 bytes.
@@ -96,6 +99,7 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
             value = 'x' * value_size
             cursor[str(i)] = value
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Take a checkpoint to persist the data.
         self.session.checkpoint()
@@ -119,10 +123,12 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Insert some initial data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(500):
             cursor[str(i)] = 'x' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Take a checkpoint.
         self.session.checkpoint()
@@ -137,10 +143,12 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
         meta_cursor.close()
 
         # Insert more data
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(500, 1500):
             cursor[str(i)] = 'y' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Take another checkpoint.
         self.session.checkpoint()
@@ -161,10 +169,12 @@ class test_disagg_checkpoint_size(wttest.WiredTigerTestCase):
         # Create a layered table and insert data.
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(1000):
             cursor[f'key{i:06d}'] = 'x' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Take a checkpoint.
         self.session.checkpoint()

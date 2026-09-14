@@ -57,8 +57,11 @@ class test_disagg_checkpoint_size21(DisaggSizeTestMixin, wttest.WiredTigerTestCa
     stable_uri = 'file:' + uri_base + '.wt_stable'
 
     def insert_rows(self, cursor, start, count, value_char):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(start, start + count):
             cursor[f'key{i:06d}'] = value_char * 200
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def evict_page(self, key):
         evict = self.session.open_cursor(self.uri, None, 'debug=(release_evict)')

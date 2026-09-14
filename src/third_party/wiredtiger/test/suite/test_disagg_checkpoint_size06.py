@@ -97,18 +97,22 @@ class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Baseline: write initial data and checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
         self.assertGreater(baseline, 0)
 
         for cycle in range(ncycles):
             # Step 12: Partial update + delta checkpoint.
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows // 2, 'B')
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2 + 2 * cycle))
             self.session.checkpoint()
 
             deltas = self.get_stat(stat.dsrc.rec_page_delta_leaf, uri=self.stable_uri)
@@ -120,9 +124,11 @@ class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
             # Step 46: Force full-image, update all rows, checkpoint.
             self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, 'C')
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + 2 * cycle))
             self.session.checkpoint()
 
             size_after_full = self.get_checkpoint_size()
@@ -163,17 +169,21 @@ class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Step 1: Write initial data, establish a baseline checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         size_baseline = self.get_checkpoint_size()
         self.assertGreater(size_baseline, 0)
 
         # Step 2: Write a delta on top (partial update).
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows // 2, 'B')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
         size_after_delta = self.get_checkpoint_size()
 
@@ -192,9 +202,11 @@ class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         # With delta_pct=1 and a full update of all rows, the reconciliation should
         # produce a full image (delta count == 0), which terminates the chain.
         self.conn.reconfigure('page_delta=(delta_pct=1)')
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'C')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         self.session.checkpoint()
         size_after_full = self.get_checkpoint_size()
 
@@ -228,33 +240,41 @@ class test_disagg_checkpoint_size06(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'A')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Build the delta chain.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows // 2, 'B')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
         size_with_delta = self.get_checkpoint_size()
 
         # Evict and force full image to terminate the chain.
         self.evict_page('key000000')
         self.conn.reconfigure('page_delta=(delta_pct=1)')
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         self.insert_rows(c, 0, nrows, 'C')
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         self.session.checkpoint()
         size_first_full = self.get_checkpoint_size()
 
         # The chain was terminated; repeated full-image checkpoints of the same data
         # should not grow the size.
         for cycle in range(ncycles):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, chr(ord('D') + cycle))
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4 + cycle))
             self.session.checkpoint()
 
             size_cycle = self.get_checkpoint_size()

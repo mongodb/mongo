@@ -43,7 +43,9 @@ class test_key_provider_disagg03(KeyProviderBase):
 
     def test_set_key_persists(self):
         ds = SimpleDataSet(self, self.uri, 10)
+        self.session.begin_transaction()
         ds.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
 
         # Push a key at timestamp 1, then advance stable to it so the checkpoint selects and
         # persists the pushed key to the key-provider page.

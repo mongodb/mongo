@@ -46,10 +46,12 @@ class test_disagg_checkpoint_size04(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         size_empty = self.get_database_size()
 
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000):
             cursor[i] = 'a' * 500
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_with_data = self.get_database_size()
@@ -84,11 +86,13 @@ class test_disagg_checkpoint_size04(wttest.WiredTigerTestCase):
         size_empty = self.get_database_size()
 
         # Insert roughly equal amounts of data into both tables.
+        self.session.begin_transaction()
         for uri in [uri1, uri2]:
             cursor = self.session.open_cursor(uri)
             for i in range(1000):
                 cursor[i] = 'a' * 500
             cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_both = self.get_database_size()

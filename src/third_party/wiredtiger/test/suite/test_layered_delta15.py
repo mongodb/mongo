@@ -95,10 +95,7 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
         for k, v in kv.items():
             self.session.begin_transaction()
             cursor[k] = v
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts))
         cursor.close()
 
     def verify(self, expected_kv, expected_initial_val):

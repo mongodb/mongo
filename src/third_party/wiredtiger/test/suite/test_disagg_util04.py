@@ -59,9 +59,12 @@ class test_disagg_util04(wttest.WiredTigerTestCase, suite_subprocess, DisaggConf
     def _populate_and_checkpoint(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.nrows):
             c[f"k{i:08}"] = f"v{i:08}"
+        self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(1)}")
         c.close()
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(1)}")
         self.session.checkpoint()
 
     def test_latest_turtle(self):
@@ -88,9 +91,12 @@ class test_disagg_util04(wttest.WiredTigerTestCase, suite_subprocess, DisaggConf
 
         self.reopen_conn(config=self.conn_config)
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.nrows):
             c[f"k{i:08}"] = f"updated{i:08}"
+        self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(2)}")
         c.close()
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(2)}")
         self.session.checkpoint()
         self.close_conn()
 

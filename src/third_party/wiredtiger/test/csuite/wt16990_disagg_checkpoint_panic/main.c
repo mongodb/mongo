@@ -119,6 +119,7 @@ static void WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn)) subtest_run(TEST_OPTS *opts)
     /* Create a table and insert data. */
     testutil_check(session->create(session, URI1, TABLE_CONFIG));
     testutil_check(session->open_cursor(session, URI1, NULL, NULL, &cursor));
+    testutil_check(session->begin_transaction(session, NULL));
     for (i = 0; i < 100; i++) {
         testutil_snprintf(key, sizeof(key), "key%d", i);
         testutil_snprintf(value, sizeof(value), "value%d", i);
@@ -126,6 +127,8 @@ static void WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn)) subtest_run(TEST_OPTS *opts)
         cursor->set_value(cursor, value);
         testutil_check(cursor->insert(cursor));
     }
+    /* Disaggregated tables require a commit timestamp; keep it below the stable timestamp. */
+    testutil_check(session->commit_transaction(session, "commit_timestamp=5"));
     testutil_check(cursor->close(cursor));
 
     /* Set stable timestamp and do a successful checkpoint. */
@@ -139,6 +142,7 @@ static void WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn)) subtest_run(TEST_OPTS *opts)
     /* Create a second table to ensure metadata queue entries exist for the next checkpoint. */
     testutil_check(session->create(session, URI2, TABLE_CONFIG));
     testutil_check(session->open_cursor(session, URI2, NULL, NULL, &cursor));
+    testutil_check(session->begin_transaction(session, NULL));
     for (i = 0; i < 10; i++) {
         testutil_snprintf(key, sizeof(key), "key%d", i);
         testutil_snprintf(value, sizeof(value), "value%d", i);
@@ -146,6 +150,8 @@ static void WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn)) subtest_run(TEST_OPTS *opts)
         cursor->set_value(cursor, value);
         testutil_check(cursor->insert(cursor));
     }
+    /* Above the previous stable timestamp and below the new one, so the checkpoint includes it. */
+    testutil_check(session->commit_transaction(session, "commit_timestamp=15"));
     testutil_check(cursor->close(cursor));
 
     testutil_check(conn->set_timestamp(conn, "stable_timestamp=20"));

@@ -30,6 +30,7 @@ import os, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
+from wttimestamp import WiredTigerTimeStamp
 
 # Test the basic ability to insert on a follower.
 @disagg_test_class
@@ -55,7 +56,9 @@ class test_layered_stepup02(wttest.WiredTigerTestCase):
 
         # No matter what the role, we should be able to insert and
         # see the results.
-        ds = SimpleDataSet(self, self.uri, self.nentries)
+        # Writes to layered tables require commit timestamps; use a
+        # timestamp generator so the inserts carry them.
+        ds = SimpleDataSet(self, self.uri, self.nentries, timestamp=WiredTigerTimeStamp())
         ds.populate()
         ds.check()
 

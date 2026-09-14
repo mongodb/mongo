@@ -91,16 +91,22 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
     def _populate(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             c[f"k{i:08}"] = f"v{i:08}"
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
         self.session.checkpoint()
 
     def _dirty_and_checkpoint(self):
         # Update a scattered subset of keys so palite emits delta entries.
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(0, self.nrows, max(1, self.nrows // 8)):
             c[f"k{i:08}"] = f"V{i:08}"
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
         self.session.checkpoint()
 
@@ -183,16 +189,28 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
         self._skip_if_not_diagnostic()
         self._populate()
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        delete_ts = self.ts_count
+        self.session.begin_transaction()
+        ndeletes = 0
         for i in range(0, self.nrows, max(1, self.nrows // 8)):
             c.set_key(f"k{i:08}")
             self.assertEqual(c.remove(), 0)
+            ndeletes += 1
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(delete_ts))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(delete_ts))
         c.close()
         self.session.checkpoint()
         page = self._find_delta_page()
         stdout, _ = self._run_wt_page(
             "-p", str(page.page_id), "-l", str(page.lsn), self.stable_uri)
         self.assertGreater(self._assert_chain_header(stdout, page), 1)
-        self.assertIn("delta_op: delete", stdout)
+        # A commit-timestamped delete cannot be packed into a leaf page delta
+        # (the delta delete op requires a globally-visible, untimestamped
+        # tombstone); each delete instead appears as a delta update cell whose
+        # stop window carries the timestamp of the delete.
+        self.assertEqual(stdout.count(
+            f'stop: durable_timestamp=(0, {delete_ts}) timestamp=(0, {delete_ts})'), ndeletes)
 
     def test_delta_chain_compressed(self):
         self._skip_if_not_diagnostic()
@@ -204,13 +222,19 @@ class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggCon
             "key_format=S,value_format=S,block_compressor=zstd,"
             "leaf_page_max=10MB,memory_page_max=10MB")
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nrows):
             c[f"k{i:08}"] = "v" * 100
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
         self.session.checkpoint()
         c = self.session.open_cursor(self.uri)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(100):
             c[f"k{i:08}"] = "V" * 100
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
         self.session.checkpoint()
 

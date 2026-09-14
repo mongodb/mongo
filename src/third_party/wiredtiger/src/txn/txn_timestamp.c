@@ -905,7 +905,7 @@ static int
 __txn_validate_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts)
 {
     WT_TXN *txn;
-    wt_timestamp_t oldest_ts, stable_ts;
+    wt_timestamp_t oldest_ts, stable_ts, step_down_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     txn = session->txn;
@@ -945,6 +945,17 @@ __txn_validate_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durabl
           "transaction",
           __wt_timestamp_to_string(durable_ts, ts_string[0]),
           __wt_timestamp_to_string(txn->time_point.prepare_timestamp, ts_string[1]));
+
+    /*
+     * A transaction that began after the step-down timestamp was set commits to the ingest
+     * constituent, which lives strictly above that timestamp, so supplying a durable timestamp at
+     * or below it is a contradiction.
+     */
+    step_down_ts = __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp);
+    if (txn->stepdown_ts_set && durable_ts <= step_down_ts)
+        WT_RET_MSG(session, EINVAL, "durable timestamp %s must be after the step down timestamp %s",
+          __wt_timestamp_to_string(durable_ts, ts_string[0]),
+          __wt_timestamp_to_string(step_down_ts, ts_string[1]));
 
     return (0);
 }

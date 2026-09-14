@@ -52,9 +52,11 @@ class test_verify_disagg02(wttest.WiredTigerTestCase):
         """
         # Create a layered table on the leader with data, then checkpoint.
         self.session.create(self.uri, self.table_cfg)
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None, None)
         cursor['key'] = 'value'
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Create a follower and advance it to pick up the checkpoint.

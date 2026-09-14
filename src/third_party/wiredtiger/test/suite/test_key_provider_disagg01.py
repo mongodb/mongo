@@ -68,7 +68,9 @@ class test_key_provider_disagg01(KeyProviderBase):
     def test_key_provider_disagg01(self):
         # Populate table.
         ds = SimpleDataSet(self, self.uri, self.nentries)
+        self.session.begin_transaction()
         ds.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         ds.check()
 
         # Initiate checkpoint to trigger key provider semantics.
@@ -80,7 +82,9 @@ class test_key_provider_disagg01(KeyProviderBase):
         self.validate_meta_file()
 
         first_row = ds.rows + 1
+        self.session.begin_transaction()
         ds.populate(first_row=first_row)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         ds.check()
 
         # Validate that key persists after crash/restart.
@@ -95,7 +99,9 @@ class test_key_provider_disagg01(KeyProviderBase):
             self.validate_number_elements()
 
         first_row = ds.rows + 1
+        self.session.begin_transaction()
         ds.populate(first_row=first_row)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         ds.check()
 
         # Initiate checkpoint and check for new key expiry.

@@ -62,10 +62,13 @@ class test_verify_disagg(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor[str(i)] = value_prefix + str(i)
             self.timestamp += 1
-            # Setting the commit timestamp to fill the history store if required
-            ts_cfg = "commit_timestamp=" + self.timestamp_str(self.timestamp) if self.fill_hs else None
-            self.session.commit_transaction(ts_cfg)
+            # Writes to disaggregated tables require a commit timestamp.
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(self.timestamp))
         cursor.close()
+        # With the commits timestamped, overwritten versions would otherwise be retained in the
+        # history store at checkpoint; advance the oldest timestamp to keep it empty when requested.
+        if not self.fill_hs:
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.timestamp))
 
     def verify(self, sessions, expected_error = None):
         for session in sessions:

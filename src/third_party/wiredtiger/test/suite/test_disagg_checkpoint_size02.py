@@ -69,10 +69,12 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
         initial_size = self.get_database_size()
 
         # Insert data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000):
             cursor[i] = 'a' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Take checkpoint
         self.session.checkpoint()
@@ -83,10 +85,12 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
             f"Database size should increase after insert: {initial_size} -> {next_size}")
 
         # Insert more data
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000, 3000):
             cursor[i] = 'b' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Take another checkpoint
         self.session.checkpoint()
@@ -105,10 +109,12 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
         initial_size = self.get_database_size()
 
         # Insert data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000):
             cursor[i] = 'a' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_with_data = self.get_database_size()
@@ -124,7 +130,11 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
             cursor.set_key(i)
             cursor.remove()
         cursor.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        # The removed rows are only reclaimed once both timestamps pass them; separately the
+        # removed data remains retained for readers below the removal timestamp.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2) +
+            ',stable_timestamp=' + self.timestamp_str(2))
 
         # Checkpoint after truncation
         self.session.checkpoint()
@@ -150,30 +160,36 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
         initial_size = self.get_database_size()
 
         # Insert data into first table.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri1)
         for i in range(500):
             cursor[i] = 'a' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_after_t1 = self.get_database_size()
         delta1 = size_after_t1 - initial_size
 
         # Insert data into second table.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri2)
         for i in range(500):
             cursor[i] = 'b' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         self.session.checkpoint()
         size_after_t2 = self.get_database_size()
         delta2 = size_after_t2 - size_after_t1
 
         # Insert data into third table.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri3)
         for i in range(500):
             cursor[i] = 'c' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.session.checkpoint()
         size_after_t3 = self.get_database_size()
@@ -195,10 +211,12 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=i,value_format=S')
 
         # Insert data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000):
             cursor[i] = 'a' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_before_restart = self.get_database_size()
@@ -219,19 +237,23 @@ class test_disagg_checkpoint_size02(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=i,value_format=S')
 
         # Insert data.
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(1000):
             cursor[i] = 'a' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
         size_before_crash = self.get_database_size()
 
         # Insert more data
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(100, 200):
             cursor[i] = 'b' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         with self.expectedStdoutPattern("Removing local file"):
             simulate_crash_restart(self, ".", "RESTART")

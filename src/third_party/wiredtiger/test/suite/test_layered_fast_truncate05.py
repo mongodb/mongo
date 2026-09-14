@@ -94,7 +94,7 @@ class test_layered_fast_truncate05(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session.begin_transaction()
         for i in range(200, 401):
             cursor[self.key(i)] = 'updated'
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         cursor.close()
 
         self.truncate(100, 700)

@@ -118,7 +118,7 @@ class test_layered_fast_truncate04(LayeredFastTruncateConfigMixin, wttest.WiredT
         cursor.set_key(self.key(600))
         cursor.remove()
         cursor[self.key(400)] = 'ingest-live'
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         cursor.close()
 
         self.assertEqual(self.search_near(500), (-1, self.key(400)), 'backward scenario')

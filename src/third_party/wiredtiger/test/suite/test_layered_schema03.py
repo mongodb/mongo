@@ -97,8 +97,10 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         self.session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         self.session.checkpoint()
@@ -121,8 +123,10 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         custom_session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         custom_session.checkpoint()
@@ -143,8 +147,10 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         self.session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         self.session.checkpoint()

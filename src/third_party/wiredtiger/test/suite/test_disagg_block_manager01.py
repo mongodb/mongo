@@ -116,9 +116,11 @@ class test_disagg_block_manager01_reopen(wttest.WiredTigerTestCase):
     def test_reopen_rejected(self):
         uri = 'table:disagg'
         self.session.create(uri, 'key_format=S,value_format=S,block_manager=disagg')
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         cursor['key'] = 'value'
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # The connection itself has no reason to fail: only the tables that need the page log do.

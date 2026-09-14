@@ -68,7 +68,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
         cursor.close()
         self.session.checkpoint()
 
@@ -94,7 +94,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.assertEqual(cursor2.search(), 0)
         session2.rollback_transaction()
 
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.nitems + 1))
 
         # After commit, the keys should not found.
         session2.begin_transaction()
@@ -119,7 +119,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
         cursor.close()
 
         self.session.checkpoint()
@@ -157,7 +157,7 @@ class test_layered_fast_truncate01(LayeredFastTruncateConfigMixin, wttest.WiredT
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
         cursor.close()
 
         self.session.checkpoint()

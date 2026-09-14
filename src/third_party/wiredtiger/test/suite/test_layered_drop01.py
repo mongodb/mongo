@@ -53,8 +53,10 @@ class test_layered_drop01(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor['key ' + str(i)] = 'value ' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         self.session.checkpoint()

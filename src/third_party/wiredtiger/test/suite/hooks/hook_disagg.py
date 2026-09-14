@@ -133,7 +133,33 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     else:
         disagg_verbose_config = ',verbose=[layered]'
 
-    disagg_config = disagg_verbose_config \
+    # Tests running under the hook predate the commit-timestamp requirement for disaggregated
+    # tables; dedicated disagg tests set their own connection config and keep the check.
+    # Merge into an existing debug_mode category: a duplicate key would override, and a regex
+    # stops at the first ')' so nested subcategories need a scan for the matching close.
+    debug_key = 'debug_mode=('
+    start = conn_config.find(debug_key)
+    if start >= 0:
+        open_paren = start + len(debug_key) - 1
+        depth = 0
+        close_paren = -1
+        for i in range(open_paren, len(conn_config)):
+            if conn_config[i] == '(':
+                depth += 1
+            elif conn_config[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    close_paren = i
+                    break
+        if close_paren < 0:
+            raise Exception('hook_disagg: bad debug_mode in config "%s"' % conn_config)
+        conn_config = conn_config[:close_paren] + ',disagg_commit_ts_optional=true' + \
+            conn_config[close_paren:]
+        disagg_debug_config = ''
+    else:
+        disagg_debug_config = ',debug_mode=(disagg_commit_ts_optional=true)'
+
+    disagg_config = disagg_verbose_config + disagg_debug_config \
         + f',disaggregated=(role="{disagg_parameters.role}"' \
         + f',page_log={page_log_name})'
 

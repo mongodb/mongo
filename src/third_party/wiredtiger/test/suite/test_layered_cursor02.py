@@ -57,6 +57,7 @@ class test_layered_cursor02(wttest.WiredTigerTestCase, DisaggConfigMixin):
         c = self.session.open_cursor(self.uri)
 
         old_vals = []
+        self.session.begin_transaction()
         for k in range(1000):
             size = r.randint(1000, 10000)
             repeats = r.randint(1, size)
@@ -66,6 +67,8 @@ class test_layered_cursor02(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
             c[k] = oldv
             old_vals.append(oldv)
+
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
         self.session.checkpoint()
 

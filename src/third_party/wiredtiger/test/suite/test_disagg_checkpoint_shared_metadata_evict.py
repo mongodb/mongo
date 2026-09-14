@@ -68,9 +68,13 @@ class test_disagg_checkpoint_shared_metadata_evict(wttest.WiredTigerTestCase):
         for uri in uris:
             self.session.create(uri,
                 f'key_format=S,value_format=S,app_metadata="{self.padding}"')
+
+        self.session.begin_transaction()
+        for uri in uris:
             cursor = self.session.open_cursor(uri)
             cursor['key'] = 'value'
             cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         before = self.forced_evictions()
         self.session.checkpoint()
@@ -82,10 +86,12 @@ class test_disagg_checkpoint_shared_metadata_evict(wttest.WiredTigerTestCase):
 
         # The connection must remain usable, and a second checkpoint must be able to write more
         # shared metadata on top of what the first one wrote.
+        self.session.begin_transaction()
         for uri in uris:
             cursor = self.session.open_cursor(uri)
             self.assertEqual(cursor['key'], 'value')
             cursor['key2'] = 'value2'
             cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         self.session.checkpoint()

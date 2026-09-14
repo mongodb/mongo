@@ -72,6 +72,26 @@ signal_timer(int signo)
 }
 
 /*
+ * abort_with_state_dump --
+ *     Dump transaction and cache state, then abort the process. The two-minute alarm limits our
+ *     exposure: if the library is deadlocked, the dump might just join the mess.
+ */
+void
+abort_with_state_dump(WT_CONNECTION *conn, const char *reason)
+{
+    fprintf(stderr, "%s\n", reason);
+    fprintf(stderr, "%s\n", "dumping cache and transaction state, then aborting the process");
+
+    set_alarm(120);
+
+    (void)conn->debug_info(conn, "txn");
+    (void)conn->debug_info(conn, "cache");
+
+    __wt_abort(NULL);
+    /* NOTREACHED */
+}
+
+/*
  * set_alarm --
  *     Set a timer.
  */

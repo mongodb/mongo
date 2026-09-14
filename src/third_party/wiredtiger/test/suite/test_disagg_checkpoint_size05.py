@@ -52,10 +52,14 @@ class test_disagg_checkpoint_size05(wttest.WiredTigerTestCase):
     stable_uri = "file:" + uri_base + ".wt_stable"
 
     def insert_rows(self, n, value='x', start=0, uri=None):
+        ts = getattr(self, '_insert_ts', 0) + 1
+        self._insert_ts = ts
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri or self.uri)
         for i in range(start, start + n):
             cursor[f'key{i:08d}'] = value * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
 
     # Read block_size from a statistics cursor using the slow path that opens the dhandle.
     def get_block_size_slow(self):

@@ -55,10 +55,12 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     def populate(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(1000):
             cursor['key%06d' % i] = 'v' * 100
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
     def reported_size(self):
@@ -162,17 +164,21 @@ class test_repair01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # recompute has to reflect real change, not just replay the old total.
         extra_uri = 'layered:tbl_fix_size_extra'
         self.session.create(extra_uri, 'key_format=S,value_format=S')
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(extra_uri)
         for i in range(50):
             cursor['key%06d' % i] = 'v' * 500
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()  # settle first, or dropping it can hit its own dirty data
 
         pre_change_size = self.get_stat(wiredtiger.stat.conn.disagg_database_size)
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         for i in range(1000, 4000):
             cursor['key%06d' % i] = 'v' * 200
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         self.session.drop(extra_uri)
 
         self.checkpoint_size_fix(expect_triggered=True)

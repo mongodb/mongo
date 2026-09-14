@@ -59,9 +59,12 @@ class test_layered_config10(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     def add_data(self, uri, nitems):
         cursor = self.session.open_cursor(uri, None, None)
+        self.session.begin_transaction()
         for i in range(nitems):
             cursor["Key " + str(i)] = str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
 

@@ -27,6 +27,7 @@
  */
 
 #include "format.h"
+#include <poll.h>
 #include <sys/mman.h>
 
 /*
@@ -137,12 +138,16 @@ disagg_setup_multi_node(void)
 
 /*
  * disagg_multi_sync_point --
- *     Synchronization point in disagg multi-node setup for leader-follower.
+ *     Synchronization point in disagg multi-node setup for leader-follower. The wait is bounded: if
+ *     the other process never arrives (its workers are stalled), waiting forever would surface only
+ *     as a silent CI idle-timeout with no diagnostics, so dump state and abort instead.
  */
 static void
-disagg_multi_sync_point(void)
+disagg_multi_sync_point(WT_SESSION *session)
 {
+    struct pollfd pfd;
     char send = 'S'; /* S for sync */
+    int ret;
     char recv;
 
     /* Signal from leader or follower to synchronize. */
@@ -151,9 +156,28 @@ disagg_multi_sync_point(void)
 
     track("Reached sync point. Waiting for other process...", 0ULL);
 
-    /* Wait for synchronization signal from the other process. */
-    if (read(g.disagg_multi_sync_socket, &recv, 1) != 1)
-        testutil_die(errno, "disagg_multi_sync_point: read");
+    /*
+     * Wait for synchronization signal from the other process, with a 30-minute bound. The bound is
+     * deliberately far above the lag we expect: followers have been seen trailing the leader by
+     * more than ten minutes even in release builds (FIXME-WT-18605), and this guard exists to turn
+     * a permanent stall into a failure with diagnostics, not to police lag.
+     */
+    pfd.fd = g.disagg_multi_sync_socket;
+    pfd.events = POLLIN;
+    do {
+        ret = poll(&pfd, 1, 30 * 60 * WT_THOUSAND);
+    } while (ret == -1 && errno == EINTR);
+
+    if (ret == 1) {
+        if (read(g.disagg_multi_sync_socket, &recv, 1) != 1)
+            testutil_die(errno, "disagg_multi_sync_point: wrong read content");
+        return;
+    }
+    if (ret == -1)
+        testutil_die(errno, "disagg_multi_sync_point: poll failure");
+
+    abort_with_state_dump(
+      session->connection, "multi-node sync point not reached within 30 minutes");
 }
 
 /*
@@ -176,7 +200,7 @@ disagg_sync_multi_node(WT_SESSION *session)
     }
 
     /* Initial synchronization between leader and follower processes. */
-    disagg_multi_sync_point();
+    disagg_multi_sync_point(session);
 
     if (GV(DISAGG_MULTI_VALIDATION)) {
         /*
@@ -190,7 +214,7 @@ disagg_sync_multi_node(WT_SESSION *session)
             testutil_disagg_preserve(session->connection, "preserve", g.stable_timestamp);
 
         /* Exit synchronization between leader and follower processes. */
-        disagg_multi_sync_point();
+        disagg_multi_sync_point(session);
 
         /* Assert after sync point to ensure both nodes have preserved the data. */
         testutil_assert(hash_match);

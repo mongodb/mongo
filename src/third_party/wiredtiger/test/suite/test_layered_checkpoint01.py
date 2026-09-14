@@ -51,10 +51,12 @@ class test_layered_checkpoint01(wttest.WiredTigerTestCase):
         self.pr('opening cursor')
         cursor = self.session.open_cursor(self.uri, None, None)
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
         cursor.reset()
 

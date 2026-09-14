@@ -33,7 +33,7 @@
 #       race a step-up, so they hit the "ongoing step-up" guard and abort the process. A step-down
 #       holds the schema lock for the whole transition, so the same ops serialize against it and
 #       never abort.
-#     - Schema ops that take the checkpoint lock first (truncate, verify, and drop with
+#     - Schema ops that take the checkpoint lock first (verify, and drop with
 #       checkpoint_wait=true) are serialized against the transition by that lock - it is held for
 #       the whole step up/down - so they never observe the transition and do not abort.
 #     - Opening a statistics cursor acquires the schema lock to open a data handle, but a handle
@@ -70,8 +70,6 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
             dict(op='create',                                       expect_abort=True)),
         ('drop_checkpoint_wait',
             dict(op='drop', checkpoint_wait=True,  lock_wait=True,  expect_abort=False)),
-        ('truncate',
-            dict(op='truncate',                                     expect_abort=False)),
         ('verify',
             dict(op='verify',                                       expect_abort=False)),
         ('stat_cursor',
@@ -86,8 +84,10 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri,
                             'key_format=i,value_format=S,block_manager=disagg,type=layered')
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.num_rows):
             c[i] = 'value'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         c.close()
         self.close_conn()
 
@@ -131,8 +131,6 @@ class test_layered_stepup12(wttest.WiredTigerTestCase, suite_subprocess):
             case 'create':
                 session.create(self.new_uri,
                                 'key_format=i,value_format=S,block_manager=disagg,type=layered')
-            case 'truncate':
-                session.truncate(self.uri, None, None, None)
             case 'verify':
                 session.verify(self.uri, None)
             case 'stat_cursor':

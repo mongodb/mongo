@@ -49,10 +49,13 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
 
         # Insert a key.
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         cursor[1] = 'value1'
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
         # Do a checkpoint.
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         self.verifyUntilSuccess()
@@ -62,11 +65,14 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
 
         # Insert data.
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(10):
             cursor[i] = 'a' * 100
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
         # Do a checkpoint.
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         self.verifyUntilSuccess()
@@ -76,11 +82,14 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
 
         # Insert data.
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100000):
             cursor[i] = 'a' * 100
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
         # Do a checkpoint.
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         self.verifyUntilSuccess()
@@ -92,26 +101,35 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         self.session.create(self.uri, session_config)
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(nitems):
             cursor["Key " + str(i)] = str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(nitems):
             if i % 2 == 0:
                 cursor["Key " + str(i)] = str(i) + "_even"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(2))
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(nitems):
             if i % 100 == 0:
                 cursor["Key " + str(i)] = str(i) + "_hundred"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(3))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(3))
         self.session.checkpoint()
 
         self.verifyUntilSuccess()
@@ -120,10 +138,13 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Verify the disaggregated database size by reopening with verify_metadata=true.
@@ -137,8 +158,10 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
         # Step down to follower before closing so WiredTiger skips the implicit shutdown
@@ -155,8 +178,10 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
         self.conn.reconfigure('disaggregated=(role="follower")')
@@ -172,9 +197,12 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         # apply the btree size delta on top.
         self.session.create(self.uri, self.create_session_config)
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Verify that the stored database_size now correctly reflects the fixed overhead
@@ -185,9 +213,12 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
         self.close_conn()
 
@@ -211,41 +242,54 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
         cursor_a = self.session.open_cursor(uris[0])
         cursor_b = self.session.open_cursor(uris[1])
         cursor_c = self.session.open_cursor(uris[2])
+        self.session.begin_transaction()
         for i in range(500):
             cursor_a[i] = 'a' * 50
         for i in range(1000):
             cursor_b[i] = 'b' * 200
         for i in range(200):
             cursor_c[i] = 'c' * 10
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor_a.close()
         cursor_b.close()
         cursor_c.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         # Checkpoint 2: update some rows in table_a, delete rows from table_b, leave table_c
         # untouched. This exercises negative deltas in the database_size accounting.
         cursor_a = self.session.open_cursor(uris[0])
+        self.session.begin_transaction()
         for i in range(0, 500, 2):
             cursor_a[i] = 'a' * 150
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
         cursor_a.close()
 
         cursor_b = self.session.open_cursor(uris[1])
+        self.session.begin_transaction()
         for i in range(0, 500):
             cursor_b.set_key(i)
             cursor_b.remove()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
         cursor_b.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(2))
         self.session.checkpoint()
 
         # Checkpoint 3: add a large batch to table_c and overwrite all of table_a.
         cursor_a = self.session.open_cursor(uris[0])
+        self.session.begin_transaction()
         for i in range(500):
             cursor_a[i] = 'x' * 300
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(3))
         cursor_a.close()
 
         cursor_c = self.session.open_cursor(uris[2])
+        self.session.begin_transaction()
         for i in range(200, 1000):
             cursor_c[i] = 'c' * 100
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(3))
         cursor_c.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(3))
         self.session.checkpoint()
 
         # Reopen with verify_metadata=true. The stored database_size must equal the sum of

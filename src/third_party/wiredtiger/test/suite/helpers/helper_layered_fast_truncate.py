@@ -71,10 +71,16 @@ class LayeredFastTruncateConfigMixin:
         """Return a cursor that auto-closes as it goes out of scope."""
         return closing(self.session.open_cursor(self.uri, None, config))
 
+    def next_commit_ts(self):
+        """Return the next monotonically increasing commit timestamp."""
+        ts = getattr(self, '_next_commit_ts_val', 0) + 1
+        self._next_commit_ts_val = ts
+        return ts
+
     def populate(self, keys, value='v'):
         """Insert each key with a placeholder value in a single transaction."""
         with self.auto_closing_cursor() as cursor:
-            with self.transaction():
+            with self.transaction(commit_timestamp=self.next_commit_ts()):
                 for key in keys:
                     cursor[self.key(key)] = value
 
@@ -98,7 +104,8 @@ class LayeredFastTruncateConfigMixin:
         """
         Truncate [start_key, stop_key] inclusive on self.uri. Either bound
         may be None for an open-ended side. If commit_timestamp is set,
-        the truncate transaction commits at that timestamp.
+        the truncate transaction commits at that timestamp, otherwise it
+        commits at the next auto-generated timestamp.
         """
         start = stop = None
         try:
@@ -110,6 +117,8 @@ class LayeredFastTruncateConfigMixin:
                 stop.set_key(self.key(stop_key))
             # session.truncate() needs a URI iff both cursors are NULL.
             uri = self.uri if (start is None and stop is None) else None
+            if commit_timestamp is None:
+                commit_timestamp = self.next_commit_ts()
             with self.transaction(commit_timestamp=commit_timestamp):
                 self.session.truncate(uri, start, stop, None)
         finally:

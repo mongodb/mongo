@@ -1522,6 +1522,15 @@ config_disagg_storage(void)
             if (config_explicit(NULL, "ops.truncate"))
                 WARN("%s", "turning off ops.truncate to work with disagg.stepdown_async");
             config_off_all("ops.truncate");
+
+            /*
+             * The step-down checkpoint's duration counts against the same wall clock as the drain
+             * and pause timeouts above; slowing every dirty internal page it writes can run the
+             * total past the run's abort timer with no workload progress to show for it.
+             */
+            if (config_explicit(NULL, "debug.slow_checkpoint"))
+                WARN("%s", "turning off debug.slow_checkpoint to work with disagg.stepdown_async");
+            config_off(NULL, "debug.slow_checkpoint");
         }
     } else {
         g.disagg_leader = strcmp(mode, "leader") == 0;

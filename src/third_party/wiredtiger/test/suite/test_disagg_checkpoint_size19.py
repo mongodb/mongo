@@ -76,8 +76,11 @@ class test_disagg_checkpoint_size19(DisaggConfigMixin, wttest.WiredTigerTestCase
     def insert_rows(self, session, start, count, value_char):
         c = session.open_cursor(self.uri)
         value = value_char * 1024
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        session.begin_transaction()
         for i in range(start, start + count):
             c[f'key{i:08d}'] = value
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
 
     def evict_page(self, session, key):

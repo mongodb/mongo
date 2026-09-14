@@ -229,7 +229,13 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
 
     conn = S2C(session);
 
-    TAILQ_FOREACH (dhandle, &conn->dhqh, q) {
+    /*
+     * Walk backwards. Checkpoint and statistics logging walk this list forwards and read-lock each
+     * handle in turn, while closing a handle holds its write lock for a long time. Two walks going
+     * the same way at similar speeds stay alongside each other, so the forward walk waits behind
+     * one closing handle after another. Walking the other way, the two cross once per pass.
+     */
+    TAILQ_FOREACH_REVERSE (dhandle, &conn->dhqh, __wt_dhandle_qh, q) {
         bool sweep_non_outdated_handle =
           __wt_atomic_load_uint32_relaxed(&conn->open_btree_count) >= conn->sweep.handles_min;
         /*

@@ -106,7 +106,9 @@ class test_key_provider_disagg04(KeyProviderBase):
         self.ignoreStdoutPatternIfExists(r'Loading persisted crypt key: lsn=\d+, timestamp=0')
 
         ds1 = SimpleDataSet(self, self.uri, self.nentries)
+        self.session.begin_transaction()
         ds1.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds1.check()
 
@@ -115,7 +117,9 @@ class test_key_provider_disagg04(KeyProviderBase):
         ds1.check()
 
         ds2 = SimpleDataSet(self, self.uri, self.nentries * 2)
+        self.session.begin_transaction()
         ds2.populate(first_row=self.nentries + 1)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds2.check()
 
@@ -124,7 +128,9 @@ class test_key_provider_disagg04(KeyProviderBase):
         ds2.check()
 
         ds3 = SimpleDataSet(self, self.uri, self.nentries * 3)
+        self.session.begin_transaction()
         ds3.populate(first_row=self.nentries * 2 + 1)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds3.check()
 

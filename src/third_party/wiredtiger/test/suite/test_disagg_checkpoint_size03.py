@@ -61,20 +61,24 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         val_size = 10
 
         # Insert data and take the baseline checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(nrows):
             c[f'key{i:06d}'] = 'a' * val_size
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
 
         # Rewrite every row three times, checkpointing each time.
         # Each cycle rewrites all leaf, internal, and root pages.
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(nrows):
                 c[f'key{i:06d}'] = ch * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()
@@ -100,10 +104,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial page with multiple keys
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(10):
             c[f'key{i:02d}'] = f'value{i}'
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # The size of the first page we wrote + its root page.
@@ -111,11 +117,13 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
 
         # Multiple iterations: first create deltas, then force full page writes
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f', 'g', 'h'], start=1):#, 'h', 'i', 'j', 'k', 'l', 'm'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             # Update existing keys to create deltas
             for i in range(0, 10, 2):
                 c[f'key{i:02d}'] = f'newvalue{cycle}{i}'
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()
@@ -133,20 +141,24 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial page with multiple keys
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(10):
             c[f'key{i:02d}'] = f'value{i}'
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
 
         # Multiple iterations updating existing keys to create deltas
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             # Update existing keys instead of inserting new ones
             for i in range(0, 10, 2):  # Update every other key
                 c[f'key{i:02d}'] = f'newvalue{cycle}{i}'
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
             # Verify deltas were created
@@ -167,7 +179,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(nrows):
             c['key' + str(i)] = 'A' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
         self.pr(f"Baseline checkpoint size: {baseline}")
@@ -178,7 +190,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(0, nrows, 5):
             c['key' + str(i)] = 'x' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
 
         size_after_delta = self.get_checkpoint_size()
@@ -201,7 +213,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(nrows):
             c['key' + str(i)] = 'y' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         self.session.checkpoint()
 
         final = self.get_checkpoint_size()
@@ -221,10 +233,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial data. Small enough for a single leaf page 4K.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(nrows):
             c['key' + str(i)] = 'A' * val_size
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
         self.pr(f"Baseline checkpoint size: {baseline}")
@@ -232,10 +246,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         prev_delta_count = 0
         for cycle in range(ncycles):
             # Step 1: Create a delta on top of the current page.
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(0, nrows, 5):
                 c['key' + str(i)] = 'x' * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2 + 2 * cycle))
             self.session.checkpoint()
 
             size_after_delta = self.get_checkpoint_size()
@@ -258,10 +274,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
 
             # Step 3: Force a full page rewrite to terminate the delta chain.
             self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(nrows):
                 c['key' + str(i)] = 'y' * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + 2 * cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()

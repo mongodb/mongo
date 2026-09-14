@@ -51,9 +51,6 @@ class test_layered_checkpoint13(wttest.WiredTigerTestCase):
 
     # Test creating an empty table.
     def test_layered_checkpoint13(self):
-        # Avoid checkpoint error with precise checkpoint
-        self.conn.set_timestamp('stable_timestamp=1')
-
         page_log = self.conn.get_page_log(self.vars.page_log)
 
         # The node started as a follower, so step it up as the leader
@@ -66,8 +63,13 @@ class test_layered_checkpoint13(wttest.WiredTigerTestCase):
 
         # Add some data and create a checkpoint
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         cursor['a'] = last_value = 'b'
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
+
+        # Avoid checkpoint error with precise checkpoint
+        self.conn.set_timestamp('stable_timestamp=1')
         self.session.checkpoint()
 
         (ret, checkpoint1_last_lsn) = page_log.pl_get_last_lsn(self.session)
@@ -75,8 +77,11 @@ class test_layered_checkpoint13(wttest.WiredTigerTestCase):
 
         # Add more data and create another checkpoint
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         cursor['a'] = last_value = 'c'
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
         cursor.close()
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
 
         (ret, checkpoint2_last_lsn) = page_log.pl_get_last_lsn(self.session)

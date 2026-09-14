@@ -40,9 +40,13 @@ do_in_committed_transaction(WT_SESSION_IMPL *session, const Op operation)
 {
     auto *iface = &session->iface;
 
+    // Writes to disaggregated tables must carry a commit timestamp.
+    static int commit_ts = 0;
+    const std::string ts_config = "commit_timestamp=" + std::to_string(++commit_ts);
+
     CHECK(iface->begin_transaction(iface, nullptr) == 0);
     const int ret = operation();
-    CHECK(iface->commit_transaction(iface, nullptr) == 0);
+    CHECK(iface->commit_transaction(iface, ts_config.c_str()) == 0);
 
     return ret;
 }

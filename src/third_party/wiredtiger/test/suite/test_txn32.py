@@ -50,6 +50,12 @@ class test_txn32(wttest.WiredTigerTestCase):
     churn = 'layered:txn32_churn'
     nrows = 50
 
+    # Commit timestamps for layered writes, drawn here so they rise across the test.
+    def next_commit_ts(self):
+        ts = getattr(self, '_commit_ts', 0) + 1
+        self._commit_ts = ts
+        return ts
+
     def check(self, session, uri, expected):
         c = session.open_cursor(uri)
         for i in range(self.nrows):
@@ -67,16 +73,22 @@ class test_txn32(wttest.WiredTigerTestCase):
         self.session.create(self.churn, 'key_format=i,value_format=S')
         sfollow.create(self.churn, 'key_format=i,value_format=S')
 
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.stable)
         for i in range(self.nrows):
             c['k%d' % i] = 'value'
         c.close()
+        self.session.commit_transaction(
+            'commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.session.checkpoint()
 
         for round in range(10):
             cc = self.session.open_cursor(self.churn)
+            self.session.begin_transaction()
             cc[round] = 'churn'
             cc.close()
+            self.session.commit_transaction(
+                'commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
             self.session.checkpoint()
 
     def test_follower_reads_table_untouched_by_latest_checkpoint(self):
@@ -96,18 +108,24 @@ class test_txn32(wttest.WiredTigerTestCase):
 
     def test_primary_reopen_reads_its_data(self):
         self.session.create(self.stable, 'key_format=S,value_format=S')
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.stable)
         for i in range(self.nrows):
             c['k%d' % i] = 'value'
         c.close()
+        self.session.commit_transaction(
+            'commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.session.checkpoint()
 
         # Churn a different table so write generations climb before the reopen.
         self.session.create(self.churn, 'key_format=i,value_format=S')
         for round in range(10):
             cc = self.session.open_cursor(self.churn)
+            self.session.begin_transaction()
             cc[round] = 'churn'
             cc.close()
+            self.session.commit_transaction(
+                'commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
             self.session.checkpoint()
 
         # Reopen directly as primary. The pick-up on reopen must re-establish the base write
@@ -131,9 +149,12 @@ class test_txn32(wttest.WiredTigerTestCase):
         # The new leader must read the untouched table in full, and a checkpoint it takes
         # (using the base write generation established at step-up) must keep it readable.
         self.check(sfollow, self.stable, 'value')
+        sfollow.begin_transaction()
         cc = sfollow.open_cursor(self.churn)
         cc[999] = 'churn'
         cc.close()
+        sfollow.commit_transaction(
+            'commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         sfollow.checkpoint()
         self.check(sfollow, self.stable, 'value')
 

@@ -92,10 +92,7 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -104,10 +101,7 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
                 if i % 10 == 0:
                     self.session.begin_transaction()
                     cursor[str(i)] = str(10 + 5 * j)
-                    if self.ts:
-                        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10 + 5 * j))
-                    else:
-                        self.session.commit_transaction()
+                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10 + 5 * j))
 
             self.session.checkpoint()
 
