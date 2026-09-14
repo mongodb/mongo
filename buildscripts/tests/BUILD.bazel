@@ -353,6 +353,15 @@ py_test(
 )
 
 py_test(
+    name = "test_sbom_files_pr",
+    srcs = ["test_sbom_files_pr.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/sbom:sbom_files_pr",
+    ],
+)
+
+py_test(
     name = "test_generate_sbom",
     srcs = ["test_generate_sbom.py"],
     data = [
