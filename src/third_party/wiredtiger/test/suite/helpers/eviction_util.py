@@ -26,11 +26,37 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import time
+
 import wttest
+from wiredtiger import stat
 
 # eviction_util.py
 # Shared base class used by eviction tests.
 class eviction_util(wttest.WiredTigerTestCase):
+
+    def scrub_images(self):
+        """The (pages, bytes) gauges of the images checkpoint scrub currently retains."""
+        return (self.get_stat(stat.conn.cache_scrub_image_pages),
+          self.get_stat(stat.conn.cache_scrub_image_bytes))
+
+    def wait_for_scrub_images_released(self, timeout=30):
+        """Wait until no retained scrub image is accounted for anywhere in the connection.
+
+        Freeing the pages that hold the images is not always finished by the time the call that
+        triggers it returns: dropping a clean tree marks its handle dead and leaves the discard to
+        the sweep server. Requiring both gauges to reach zero is also what checks that they drain
+        together rather than one outrunning the other. Callers wanting this to resolve promptly
+        rather than on the default scan interval should shorten file_manager.close_scan_interval."""
+        deadline = time.time() + timeout
+        while True:
+            pages, nbytes = self.scrub_images()
+            if (pages, nbytes) == (0, 0):
+                return
+            self.assertLess(time.time(), deadline,
+                'retained scrub images were not released within {}s: '
+                'pages={}, bytes={}'.format(timeout, pages, nbytes))
+            time.sleep(0.1)
 
     def evict_cursor_tw_cleanup(self, uri, nrows):
         # Configure debug behavior at the session level to evict the page when released.

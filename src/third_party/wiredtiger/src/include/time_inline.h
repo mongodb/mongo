@@ -199,15 +199,15 @@ __wt_op_timer_stop(WT_SESSION_IMPL *session)
 
 /*
  * __wt_op_timer_fired --
- *     Check the operations timers.
+ *     Check the operations timers. The timeout belongs to the current API call, so it still applies
+ *     after the transaction has been released.
  */
 static WT_INLINE bool
 __wt_op_timer_fired(WT_SESSION_IMPL *session)
 {
     uint64_t diff, now;
 
-    if (!F_ISSET(session->txn, WT_TXN_RUNNING) || session->operation_start_us == 0 ||
-      session->operation_timeout_us == 0)
+    if (session->operation_start_us == 0 || session->operation_timeout_us == 0)
         return (false);
 
     now = __wt_clock(session);

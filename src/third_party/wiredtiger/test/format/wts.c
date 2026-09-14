@@ -133,18 +133,22 @@ static int
 handle_progress(
   WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *operation, uint64_t progress)
 {
+    WT_DECL_RET;
     char buf[256];
+    const char *msg;
 
     (void)handler;
 
     if (session->app_private != NULL) {
         testutil_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation);
-        track(buf, progress);
-        return (0);
-    }
+        msg = buf;
+    } else
+        msg = operation;
 
-    track(operation, progress);
-    return (0);
+    int bytes_written =
+      progress == 0 ? printf("%s\n", msg) : printf("%s: %" PRIu64 "\n", msg, progress);
+    ret = fflush(stdout);
+    return (bytes_written < 0 ? EIO : (ret == EOF ? errno : 0));
 }
 
 static WT_EVENT_HANDLER event_handler = {NULL, handle_message, handle_progress, NULL, NULL};
@@ -438,6 +442,17 @@ configure_obsolete_cleanup(char **p, size_t max)
     CONFIG_APPEND(*p, "]");
 }
 
+/*
+ * configure_verbose --
+ *     Configure verbose messaging. WT_VERBOSE_INFO adds the lifecycle markers that identify which
+ *     phase the run had reached.
+ */
+static void
+configure_verbose(char **p, size_t max)
+{
+    CONFIG_APPEND(*p, ",verbose=[all:0]");
+}
+
 #define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")
 
 /*
@@ -577,6 +592,9 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Extensions. */
     configure_extensions(&p, max, disagg_ext_cfg, tiered_ext_cfg);
+
+    /* Verbose messaging. */
+    configure_verbose(&p, max);
 
     /*
      * Put configuration file configuration options second to last. Put command line configuration
@@ -814,6 +832,9 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 
     /* Extensions. */
     configure_extensions(&p, max, disagg_ext_cfg, tiered_ext_cfg);
+
+    /* Verbose messaging. */
+    configure_verbose(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)

@@ -26,11 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wttest, unittest
+import os
+import wttest
+from suite_subprocess import suite_subprocess
 
 # Test WT_SESSION->drop should clean up history store.
-class test_drop01(wttest.WiredTigerTestCase):
+class test_drop01(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
+    dump_data_header = 'Data\n'
+    # Each history store record dumps as a key line followed by a value line.
+    lines_per_record = 2
+
     def add_timestamp_data(self, uri, key, val1, val2, timestamp):
         self.session.begin_transaction()
         cursor = self.session.open_cursor(uri, None, None)
@@ -39,16 +45,17 @@ class test_drop01(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(timestamp))
 
     def get_hs_size(self):
-        cursor = self.session.open_cursor("file:WiredTigerHS.wt")
-        size = 0
-        while cursor.next() == 0:
-            size += 1
-        cursor.close()
-        return size
+        # Opening a cursor directly on the history store file isn't a supported
+        # operation, so use the dump utility to inspect its contents instead.
+        dump_file = 'hs_dump.out'
+        self.runWt(['dump', 'file:WiredTigerHS.wt'], outfilename=dump_file)
+        lines = open(dump_file).readlines()
+        data_start = lines.index(self.dump_data_header)
+        os.remove(dump_file)
+        return (len(lines) - data_start - 1) // self.lines_per_record
 
     uri = f'table:{test_name}'
     name = test_name
-    @unittest.skip('FIXME-WT-16857, Test has known bug.')
     def test_drop_hs_truncate(self):
         # Create the table with two column groups.
         self.session.create(self.uri, "key_format=S,value_format=SS,"

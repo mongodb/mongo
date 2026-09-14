@@ -157,8 +157,9 @@ class test_sweep03(sweep_util, suite_subprocess):
         close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
 
-        # The sweep server should not be involved in regular drop cleanup
-        self.assertEqual(close2, close1)
+        # A drop of a clean tree marks its handle dead and defers the close to sweep, the same as
+        # a forced drop of a clean tree already does.
+        self.assertEqual(close2, close1 + 1)
         # Ensure that any space was reclaimed from cache.
         self.assertLess(cache2, cache1)
 

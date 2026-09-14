@@ -10,7 +10,8 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
-static bool __evict_page_victim_cache_eligible(WT_SESSION_IMPL *, WT_REF *);
+static bool __evict_page_victim_cache_eligible(
+  WT_SESSION_IMPL *, WT_REF *, const WT_PAGE_HEADER **);
 static int __evict_reconcile(WT_SESSION_IMPL *, WT_REF *, uint32_t, WT_RECONCILE_TIMELINE *);
 static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
 
@@ -79,12 +80,47 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  */
 
 /*
+ * __evict_page_disagg_image --
+ *     Return the on-disk-format image that matches the page's current disaggregated block metadata,
+ *     or NULL if there is no such image available to cache. The block metadata itself always comes
+ *     straight from the page, unconditionally; only the image needs this care, since it is the one
+ *     piece that a reconciliation can leave stale.
+ *
+ * The page's own image matches its metadata only while nothing has reconciled the page since it was
+ *     read. Once reconciliation replaces the page with a single new block, the metadata is advanced
+ *     to describe that block immediately, but the page's own image is left as it was; clearing a
+ *     page's dirty flag on its own does not undo a reconciliation result already sitting on it, so
+ *     a page can reach here still carrying such a replacement. Use the replacement's own retained
+ *     image in that case, for the same reason a page carrying an unwritten reconciliation result is
+ *     re-instantiated from it elsewhere rather than discarded. A page whose reconciliation result
+ *     is a split or a deletion, or a replacement whose image was not retained in memory, cannot be
+ *     represented by a single cached image at all.
+ */
+static WT_INLINE const WT_PAGE_HEADER *
+__evict_page_disagg_image(WT_PAGE *page)
+{
+    WT_PAGE_MODIFY *mod = page->modify;
+
+    if (mod == NULL || mod->rec_result == 0)
+        return (page->dsk);
+
+    if (mod->rec_result == WT_PM_REC_REPLACE)
+        return ((const WT_PAGE_HEADER *)mod->mod_disk_image);
+
+    return (NULL);
+}
+
+/*
  * __evict_page_victim_cache_eligible --
- *     Check whether a page is eligible to be put in the victim cache.
+ *     Check whether a page is eligible to be put in the victim cache. On success, also return the
+ *     image to cache, resolved here so the caller does not need to redo the same check.
  */
 static bool
-__evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
+__evict_page_victim_cache_eligible(
+  WT_SESSION_IMPL *session, WT_REF *ref, const WT_PAGE_HEADER **diskp)
 {
+    *diskp = NULL;
+
     if (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
         return (false);
 
@@ -110,12 +146,16 @@ __evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
 
     WT_PAGE *page = ref->page;
 
-    /* Only cache clean pages without modify. */
-    if (__wt_page_is_modified(page))
+    /* Must be a leaf page with disagg info. */
+    if (!F_ISSET(ref, WT_REF_FLAG_LEAF) || page->disagg_info == NULL)
         return (false);
 
-    /* Must be a leaf page with disagg info and disk image. */
-    if (!F_ISSET(ref, WT_REF_FLAG_LEAF) || page->disagg_info == NULL || page->dsk == NULL)
+    /*
+     * Only cache a page whose in-memory image is consistent with its block metadata: either it was
+     * never reconciled since being read, or reconciliation replaced it and retained the new image.
+     */
+    const WT_PAGE_HEADER *disk_image = __evict_page_disagg_image(page);
+    if (disk_image == NULL)
         return (false);
 
     if (page->disagg_info->block_meta.page_id == WT_BLOCK_INVALID_PAGE_ID)
@@ -135,6 +175,7 @@ __evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
     }
 
+    *diskp = disk_image;
     return (true);
 }
 
@@ -145,12 +186,15 @@ __evict_page_victim_cache_eligible(WT_SESSION_IMPL *session, WT_REF *ref)
 static void
 __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-    if (!__evict_page_victim_cache_eligible(session, ref))
+    const WT_PAGE_HEADER *disk_image;
+    if (!__evict_page_victim_cache_eligible(session, ref, &disk_image))
         return;
+    WT_ASSERT(session, disk_image != NULL);
 
     /* Eligibility has already confirmed the disagg page log handle exists. */
     WT_PAGE_LOG_HANDLE *plh = ((WT_BLOCK_DISAGG *)S2BT(session)->bm->block)->plhandle;
     WT_PAGE *page = ref->page;
+    WT_PAGE_BLOCK_META *block_meta = &page->disagg_info->block_meta;
 
     /*
      * Time the victim-cache work - compression, checksum and put - and count the pages cached.
@@ -165,10 +209,10 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
      * path expects: WT_PAGE_HEADER + WT_BLOCK_DISAGG_HEADER + data
      */
     WT_ITEM buf_orig = {
-      .data = page->dsk,
-      .size = page->dsk->mem_size,
-      .mem = (void *)page->dsk,
-      .memsize = page->dsk->mem_size,
+      .data = disk_image,
+      .size = disk_image->mem_size,
+      .mem = (void *)disk_image,
+      .memsize = disk_image->mem_size,
       .flags = 0,
     };
     WT_ITEM *cache_buf = &buf_orig;
@@ -228,7 +272,7 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
     blk->version = WT_BLOCK_DISAGG_VERSION;
     blk->compatible_version = WT_BLOCK_DISAGG_COMPATIBLE_VERSION;
     blk->header_size = WT_BLOCK_DISAGG_HEADER_BYTE_SIZE;
-    blk->previous_checksum = page->disagg_info->block_meta.checksum;
+    blk->previous_checksum = block_meta->checksum;
     blk->flags = 0;
     if (data_checksum)
         F_SET(blk, WT_BLOCK_DISAGG_DATA_CKSUM);
@@ -249,18 +293,18 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
     __wt_page_header_byteswap(dsk);
 
     WT_PAGE_LOG_PUT_ARGS args = {
-      .backlink_lsn = page->disagg_info->block_meta.backlink_lsn,
-      .base_lsn = page->disagg_info->block_meta.base_lsn,
+      .backlink_lsn = block_meta->backlink_lsn,
+      .base_lsn = block_meta->base_lsn,
       .backlink_checkpoint_id = 0,
       .base_checkpoint_id = 0,
-      .delta_count = page->disagg_info->block_meta.delta_count,
-      .image_size = page->dsk->mem_size,
+      .delta_count = block_meta->delta_count,
+      .image_size = disk_image->mem_size,
       .flags = compressed ? WT_PAGE_LOG_COMPRESSED : 0,
-      .lsn = page->disagg_info->block_meta.disagg_lsn,
+      .lsn = block_meta->disagg_lsn,
     };
 
-    WT_IGNORE_RET(plh->plh_cache_put(
-      plh, &session->iface, page->disagg_info->block_meta.page_id, 0, &args, cache_buf));
+    WT_IGNORE_RET(
+      plh->plh_cache_put(plh, &session->iface, block_meta->page_id, 0, &args, cache_buf));
 
     if (compressed_buf != NULL)
         __wt_scr_free(session, &compressed_buf);
@@ -1603,3 +1647,11 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags,
 
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+const WT_PAGE_HEADER *
+__ut_evict_page_disagg_image(WT_PAGE *page)
+{
+    return (__evict_page_disagg_image(page));
+}
+#endif

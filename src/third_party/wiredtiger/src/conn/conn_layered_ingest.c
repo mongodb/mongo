@@ -950,6 +950,15 @@ __layered_queue_ingest_dhandles(WT_SESSION_IMPL *session)
 
         if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
             continue;
+
+        /*
+         * A dead handle stays marked open until sweep's own close call clears it: its table (and
+         * the stable pair a drain would need) may already be gone, so skip it rather than queue a
+         * drain that can only fail to reopen it.
+         */
+        if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+            continue;
+
         if (!WT_URI_IS_INGEST(dhandle->name))
             continue;
 
