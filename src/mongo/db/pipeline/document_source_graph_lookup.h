@@ -219,6 +219,9 @@ private:
      */
     bool foreignShardedGraphLookupAllowed() const;
 
+    std::pair<Value, Value> serializeFromAndInternalFromPipeline(
+        const query_shape::SerializationOptions& opts) const;
+
     GraphLookUpParams _params;
 
     // The ExpressionContext used when performing aggregation pipelines against the '_from'
