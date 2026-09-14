@@ -38,9 +38,7 @@ using boost::intrusive_ptr;
  * avoids hitting QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests
  * ($scoreFusion is gated behind the same feature flag).
  */
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(score,
-                                     ScoreLiteParsed::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(score, ScoreLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
 REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(score,
                                                              DocumentSourceScore,

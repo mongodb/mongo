@@ -3405,13 +3405,7 @@ intrusive_ptr<Expression> ExpressionSigmoid::parseExpressionSigmoid(
     return make_intrusive<ExpressionDivide>(expCtx, std::move(divideChildren));
 }
 
-REGISTER_EXPRESSION_CONDITIONALLY(sigmoid,
-                                  ExpressionSigmoid::parseExpressionSigmoid,
-                                  AllowedWithApiStrict::kNeverInVersion1,
-                                  AllowedWithClientType::kAny,
-                                  nullptr, /* featureFlag */
-                                  false,   /* shouldOmitDiagnosticInformation */
-                                  true);
+REGISTER_STABLE_EXPRESSION(sigmoid, ExpressionSigmoid::parseExpressionSigmoid);
 
 /* ----------------------- ExpressionSize ---------------------------- */
 

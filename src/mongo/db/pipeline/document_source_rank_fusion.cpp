@@ -23,7 +23,7 @@ namespace mongo {
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(rankFusion,
                                      LiteParsedRankFusion::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
+                                     AllowedWithApiStrict::kAlways);
 
 namespace {
 DocumentSourceContainer rankFusionStageParamsToDocumentSourceFn(
