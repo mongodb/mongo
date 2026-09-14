@@ -2045,7 +2045,11 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     }
 
     if (!status.isOK()) {
-        LOGV2_ERROR(21199, "Failed to apply batch", "error"_attr = redact(status));
+        LOGV2_ERROR(21199,
+                    "Failed to apply batch",
+                    "error"_attr = redact(status),
+                    "batchLastOpTime"_attr = lastApplied.opTime,
+                    "numOpsInBatch"_attr = numApplied);
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
     }
