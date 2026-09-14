@@ -1802,9 +1802,10 @@ jstestfuzz_generate(
     extra_args = [
         "--diffTestingMode",
         "wildcard",
+        "--numPipelines=2000",
     ],
     npm_command = "agg-fuzzer",
-    num_generated_files = 400,
+    num_generated_files = 800,
 )
 
 resmoke_suite_test(
