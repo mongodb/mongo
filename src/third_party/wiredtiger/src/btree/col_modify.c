@@ -15,7 +15,7 @@ static int __col_insert_alloc(WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, 
  *     Column-store delete, insert, and update.
  */
 int
-__wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_UPDATE *upd_arg,
+__wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_UPDATE **updp_arg,
   u_int modify_type, bool exclusive, bool restore)
 {
     WT_BTREE *btree;
@@ -25,7 +25,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SESSION_IMPL *session;
-    WT_UPDATE *last_upd, *old_upd, *upd;
+    WT_UPDATE *last_upd, *old_upd, *upd, *upd_arg;
     wt_timestamp_t prev_upd_ts;
     size_t ins_size, upd_size;
     u_int i, skipdepth;
@@ -36,6 +36,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     page = cbt->ref->page;
     session = CUR2S(cbt);
     last_upd = NULL;
+    upd_arg = updp_arg == NULL ? NULL : *updp_arg;
     upd = upd_arg;
     prev_upd_ts = WT_TS_NONE;
     added_to_txn = append = inserted_to_update_chain = false;
@@ -308,6 +309,13 @@ err:
             if (last_upd != NULL)
                 last_upd->next = NULL;
         }
+
+        /*
+         * If upd was freed or if we know that its ownership was moved to a page, set the update
+         * argument to NULL to prevent future use by the caller.
+         */
+        if (upd == NULL && updp_arg != NULL)
+            *updp_arg = NULL;
     }
 
     return (ret);
