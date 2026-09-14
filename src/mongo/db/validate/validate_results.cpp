@@ -189,6 +189,11 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     if (_numRecords.has_value()) {
         resultObj->appendNumber("nrecords", _numRecords.value());
     }
+    // Only present when the record store traversal was split across slices, so that the output of a
+    // single-threaded validation is unchanged.
+    if (_numRecordStoreSlices.has_value()) {
+        resultObj->appendNumber("nParallelSlices", _numRecordStoreSlices.value());
+    }
 
     if (_collectionHash.has_value()) {
         resultObj->append("all", _collectionHash->toHexString());

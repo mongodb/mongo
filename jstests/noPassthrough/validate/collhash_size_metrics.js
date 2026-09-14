@@ -76,7 +76,7 @@ const dbName = jsTestName();
 const collName = jsTestName();
 
 // Enough sizeable documents to span many leaf pages and force an internal page.
-const kNumDocs = 5000;
+const kNumDocs = 20_000;
 const padding = "x".repeat(120);
 {
     const coll = conn.getDB(dbName).getCollection(collName);
@@ -126,10 +126,6 @@ function runModalValidate(innerOptions) {
         `validateCollectionName=${collName}`,
         "--setParameter",
         `collectionValidateOptions={options: ${innerOptions}}`,
-        // TODO(SERVER-133839): Support size metrics under parallel validation and drop this
-        // override.
-        "--setParameter",
-        "validateParallelTargetRecordsPerSlice=0",
     );
     assert.eq(
         MongoRunner.EXIT_CLEAN,

@@ -119,6 +119,19 @@ public:
     FastCountType getDetectedFastCountType(OperationContext* opCtx) const;
 
     /**
+     * Returns true if the collection can be written to while foreground validation holds its
+     * collection X lock, so that record counts taken at different points during validation are
+     * allowed to disagree.
+     *
+     * Oplog writers only take a global IX lock, so the oplog can still be written to even during
+     * full validation despite its collection X lock. The oplog entries are also written to the
+     * change stream pre-images collection, so it is subject to the same races.
+     */
+    bool isConcurrentlyWritable() const {
+        return _nss.isOplog() || _nss.isChangeStreamPreImagesCollection();
+    }
+
+    /**
      * Returns the fast count type that is expected for this node.
      *
      * If the persistence provider uses replicated fast count, returns FastCountType::replicated.

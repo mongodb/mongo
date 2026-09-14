@@ -151,13 +151,9 @@ Status ValidateState::_checkUnreplicatedFastCountCollectionExists(OperationConte
 }
 
 bool ValidateState::_isNSEligibleForSizeStorerValidation() const {
-    if (_nss.isOplog() || _nss.isChangeStreamPreImagesCollection()) {
-        // Oplog writers only take a global IX lock, so the oplog can still be written to even
-        // during full validation despite its collection X lock. This can cause validate to
-        // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
-        // mode.
-        // The oplog entries are also written to the change stream pre-images collection. This
-        // collection is also prone to fast count failures.
+    if (isConcurrentlyWritable()) {
+        // Writes racing with validation can cause validate to incorrectly report an incorrect fast
+        // count when run in enforceFastCount mode.
         return false;
     } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
         // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an

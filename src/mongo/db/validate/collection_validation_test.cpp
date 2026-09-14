@@ -350,6 +350,59 @@ TEST_F(CollectionValidationTest, Validate) {
                         .numErrors = 0});
 }
 
+// Enough records that a small target per slice yields many slices, and that the RecordId stride
+// between pivots stays above one so computeSlicePivots() does not collapse them into one slice.
+constexpr int64_t kRecordsForParallelTraversal{300};
+constexpr int64_t kTargetRecordsPerSliceForTest{10};
+
+/**
+ * Runs a foreground validation of kNss, requesting 'targetRecordsPerSlice' records per record store
+ * slice. A value of boost::none keeps the traversal single-threaded.
+ */
+ValidateResults validateWithSliceTarget(OperationContext* opCtx,
+                                        boost::optional<int64_t> targetRecordsPerSlice) {
+    ValidateResults results;
+    ASSERT_OK(collection_validation::validate(
+        opCtx,
+        kNss,
+        collection_validation::ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                                 collection_validation::RepairMode::kNone,
+                                                 /*logDiagnostics=*/false,
+                                                 currentValidationVersion,
+                                                 /*verifyConfigurationOverride=*/boost::none,
+                                                 /*readTimestamp=*/boost::none,
+                                                 /*hashPrefixes=*/boost::none,
+                                                 /*revealHashedIds=*/boost::none,
+                                                 targetRecordsPerSlice},
+        &results));
+    return results;
+}
+
+// Slicing the record store across worker threads must not change what validation reports. Each
+// slice traverses on an OperationContext of its own, and the slice totals are cross-checked against
+// a separate counting traversal on the caller's snapshot, so a gap or an overlap between slices --
+// or a worker reading from a snapshot other than the caller's -- shows up as a count mismatch and
+// an invalid result.
+TEST_F(CollectionValidationDiskTest, ParallelTraversalAgreesWithSerialTraversal) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kRecordsForParallelTraversal,
+              insertDataRange(opCtx, 0, static_cast<int>(kRecordsForParallelTraversal)));
+
+    const auto serialResults = validateWithSliceTarget(opCtx, boost::none);
+    ASSERT_TRUE(serialResults.isValid());
+    ASSERT_EQ(kRecordsForParallelTraversal, serialResults.getNumRecords().value_or(-1));
+    // Without a slice target the traversal is single-threaded, so no slice count is reported.
+    ASSERT_FALSE(serialResults.getNumRecordStoreSlices().has_value());
+
+    const auto parallelResults = validateWithSliceTarget(opCtx, kTargetRecordsPerSliceForTest);
+    ASSERT_TRUE(parallelResults.isValid());
+    ASSERT_EQ(kRecordsForParallelTraversal, parallelResults.getNumRecords().value_or(-1));
+    // Guards against this test silently degrading into a second serial traversal, which would
+    // exercise none of the parallel path.
+    ASSERT_EQ(kRecordsForParallelTraversal / kTargetRecordsPerSliceForTest,
+              parallelResults.getNumRecordStoreSlices().value_or(-1));
+}
+
 // Verify calling validate() on a collection with an invalid document.
 TEST_F(CollectionValidationTest, ValidateError) {
     auto opCtx = operationContext();

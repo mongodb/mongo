@@ -348,6 +348,43 @@ private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
 };
 
+/**
+ * The snapshot settings a slice worker has to adopt from the thread that started the validation.
+ *
+ * Each worker runs on an OperationContext of its own, so its RecoveryUnit starts out with the
+ * defaults (untimestamped, latest committed data, no oplog visibility barrier) rather than whatever
+ * the caller established. Left alone, every slice would read from a snapshot of its own, taken at
+ * whatever point in time the worker happened to start, and the slices would neither agree with each
+ * other nor with the counting traversal that runs on the caller's snapshot.
+ */
+struct SnapshotSettings {
+    static SnapshotSettings from(RecoveryUnit& ru) {
+        return {.readSource = ru.getTimestampReadSource(),
+                .readTimestamp = ru.getPointInTimeReadTimestamp(),
+                .prepareConflictBehavior = ru.getPrepareConflictBehavior(),
+                .oplogVisibilityTs = ru.getOplogVisibilityTs()};
+    }
+
+    void applyTo(RecoveryUnit& ru) const {
+        // Must happen before the slice cursor opens a transaction on this RecoveryUnit.
+        invariant(!ru.isActive());
+        ru.setPrepareConflictBehavior(prepareConflictBehavior);
+        ru.setOplogVisibilityTs(oplogVisibilityTs);
+        // A point-in-time read source is reproduced as kProvided so that every worker pins the
+        // same timestamp instead of independently re-deriving one that may have advanced.
+        if (readTimestamp) {
+            ru.setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, *readTimestamp);
+        } else {
+            ru.setTimestampReadSource(readSource);
+        }
+    }
+
+    RecoveryUnit::ReadSource readSource;
+    boost::optional<Timestamp> readTimestamp;
+    PrepareConflictBehavior prepareConflictBehavior;
+    boost::optional<int64_t> oplogVisibilityTs;
+};
+
 }  // namespace
 
 auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -733,33 +770,54 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                           getGlobalServiceContext()->getService());
                                    }});
             threadPool.startup();
+            const auto snapshotSettings =
+                SnapshotSettings::from(*shard_role_details::getRecoveryUnit(opCtx));
             for (size_t i = 0; i < trsOpts.size(); ++i) {
-                threadPool.schedule(
-                    [this, &rsSliceResults, i, validationVersion, opts = trsOpts[i]](
-                        Status status) {
-                        if (!status.isOK()) {
-                            rsSliceResults[i].promise.setError(status);
-                            return;
-                        }
-                        try {
-                            auto workerOpCtxHolder = cc().makeOperationContext();
-                            auto* workerOpCtx = workerOpCtxHolder.get();
-                            // Slice starts from an empty ValidateResults rather than the
-                            // caller's; traverseRecordStoreImpl() stamps the identity fields that
-                            // merge() requires to match.
-                            auto innerResults = traverseRecordStoreImpl(workerOpCtx,
-                                                                        ValidateResults{},
-                                                                        _keyBasedIndexConsistency,
-                                                                        opts,
-                                                                        _progress,
-                                                                        validationVersion);
-                            rsSliceResults[i].promise.emplaceValue(std::move(innerResults));
+                threadPool.schedule([this,
+                                     &rsSliceResults,
+                                     i,
+                                     validationVersion,
+                                     snapshotSettings,
+                                     opts = trsOpts[i]](Status status) {
+                    if (!status.isOK()) {
+                        rsSliceResults[i].promise.setError(status);
+                        return;
+                    }
+                    try {
+                        auto workerOpCtxHolder = cc().makeOperationContext();
+                        auto* workerOpCtx = workerOpCtxHolder.get();
+                        snapshotSettings.applyTo(*shard_role_details::getRecoveryUnit(workerOpCtx));
+                        // Slice starts from an empty ValidateResults rather than the
+                        // caller's; traverseRecordStoreImpl() stamps the identity fields that
+                        // merge() requires to match.
+                        auto innerResults = traverseRecordStoreImpl(workerOpCtx,
+                                                                    ValidateResults{},
+                                                                    _keyBasedIndexConsistency,
+                                                                    opts,
+                                                                    _progress,
+                                                                    validationVersion);
+                        rsSliceResults[i].promise.emplaceValue(std::move(innerResults));
 
-                        } catch (const DBException& e) {
-                            rsSliceResults[i].promise.setError(e.toStatus());
-                        }
-                    });
+                    } catch (const DBException& e) {
+                        rsSliceResults[i].promise.setError(e.toStatus());
+                    }
+                });
             }
+
+            // Run an additional record store traversal using the cursor owned by validateState.
+            // This serves as a check for record count and ensures that size stats logs can be
+            // emitted if configured.
+            const int64_t exactRecordCount = std::invoke([this, opCtx] {
+                size_t rc{0};
+                auto sizeCountingCursor = _validateState->getTraverseRecordStoreCursor();
+                for (auto maybeRecord =
+                         sizeCountingCursor->seekExact(opCtx, _validateState->getFirstRecordId());
+                     maybeRecord;
+                     maybeRecord = sizeCountingCursor->next(opCtx)) {
+                    ++rc;
+                }
+                return rc;
+            });
             threadPool.waitForIdle();
             threadPool.shutdown();
             threadPool.join();
@@ -784,6 +842,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 dataSizeTotal += ir.dataSizeTotal;
                 numRecords += ir.validateResults.getNumRecords().value_or(0);
             }
+
             for (const auto& ir : implResults) {
                 if (!ir.status.isOK()) {
                     sliceFailures.push_back(ir.status);
@@ -817,16 +876,25 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                       fmt::join(reasons, "; ")));
             }
 
-            // Sanity check on slice coverage; fast count is an approximation, so this is a warning
-            // rather than an error.
-            if (const auto fastCount = coll->numRecords(opCtx); fastCount != numRecords) {
-                LOGV2_WARNING(11157100,
-                              "Parallel validation traversed a different number of records than "
-                              "the collection's fast count",
-                              logAttrs(coll->ns()),
-                              "recordsTraversed"_attr = numRecords,
-                              "fastCount"_attr = fastCount,
-                              "numSlices"_attr = trsOpts.size());
+            // The size-counting cursor traverses the whole record store, so its count is exact and
+            // any disagreement with the slices means the slices did not cover every record.
+            //
+            // Collections that can be written to underneath validation are exempt: the slices and
+            // the counting traversal read from snapshots established at different points in time,
+            // so on those namespaces a disagreement is expected rather than evidence of a gap.
+            if (exactRecordCount != numRecords && !_validateState->isConcurrentlyWritable()) {
+                LOGV2_ERROR(11157102,
+                            "Parallel validation slices did not cover every record in the record "
+                            "store",
+                            logAttrs(coll->ns()),
+                            "recordsTraversed"_attr = numRecords,
+                            "exactCount"_attr = exactRecordCount,
+                            "numSlices"_attr = trsOpts.size());
+                uasserted(13383900,
+                          fmt::format("Parallel validation traversed {} records but the record "
+                                      "store contains {}",
+                                      numRecords,
+                                      exactRecordCount));
             }
         }
     }
