@@ -34,7 +34,6 @@ function idLookupAgg(internalDB, collectionName, pipeline, shardVersion) {
     return new DBCommandCursor(internalDB, res);
 }
 
-// TODO SERVER-130493 Remove optimizedIdLookup when no-ff search variant exists.
 for (const optimizedIdLookup of [false, true]) {
     describe(
         `$_internalSearchIdLookup shard filtering ` +
