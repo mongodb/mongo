@@ -302,6 +302,14 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
         const auto& ns = NamespaceStringUtil::deserialize(boost::none,
                                                           cmd.firstElement().valueStringData(),
                                                           SerializationContext::stateDefault());
+        // During PIT restore, applying truncateRange oplog entries can cause enough cache pressure
+        // to stall oplog application. For that reason we want them to be processed individually so
+        // that the commit point can be moved forward in between applying truncateRange entries to
+        // relieve cache pressure.
+        if (storageGlobalParams.magicRestore) {
+            return OplogApplierBatcher::BatchAction::kProcessIndividually;
+        }
+
         if (ns.isChangeStreamPreImagesCollection()) {
             auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
             const auto& maxRecordId = truncateRangeEntry.getMaxRecordId();

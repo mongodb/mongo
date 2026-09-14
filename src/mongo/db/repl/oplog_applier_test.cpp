@@ -11,6 +11,7 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
@@ -19,6 +20,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <limits>
@@ -642,6 +644,31 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithTruncateRangeOnNorm
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[2], batch[0]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchProcessesTruncateRangeIndividuallyDuringMagicRestore) {
+    storageGlobalParams.magicRestore = true;
+    ScopeGuard resetMagicRestore([] { storageGlobalParams.magicRestore = false; });
+
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    int oplogTs = 0;
+
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+    // Without magicRestore this would batch with the entry above.
+    srcOps.push_back(makeTruncateRangeOnPreImagesEntry(++oplogTs, 0));
+    // Without magicRestore, these entries would sit with each other.
+    srcOps.push_back(makeTruncateRangeOnOplogEntry(++oplogTs, 1));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+
+    for (int i = 0; i < 4; i++) {
+        auto batch =
+            unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+        ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+        ASSERT_EQUALS(srcOps[i], batch[0]);
+    }
 }
 
 class OplogApplierDelayTest : public OplogApplierTest {
