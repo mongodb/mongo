@@ -51,7 +51,11 @@ describe("plan summary for join plans", function () {
         assert.commandWorked(this.foreign2.createIndex({b: 1, d: 1}));
 
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}),
+            db.adminCommand({
+                setParameter: 1,
+                internalEnableJoinOptimization: true,
+                internalEnableJoinPlanCache: true,
+            }),
         );
 
         this.singleJoinPipeline = [
@@ -84,31 +88,48 @@ describe("plan summary for join plans", function () {
 
         this.planSummaryCommentCounter = 0;
 
-        this.assertPlanSummaryInSlowLog = (comment, expectedPlanSummary) => {
+        this.assertSlowLogShape = (shape) => {
             const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
             assert(
                 findMatchingLogLine(log, {
                     msg: "Slow query",
-                    comment,
-                    planSummary: expectedPlanSummary,
+                    ...shape,
                 }),
                 "the slow query log did not report the expected plan summary",
-                {comment, planSummary: expectedPlanSummary},
+                {shape},
             );
         };
 
-        this.getPlanSummaryForPipeline = (pipeline) => {
+        this.assertProfilerAndSlowLogForPipeline = (pipeline, shape) => {
             const comment = `plan_summary_${this.planSummaryCommentCounter++}`;
             assert.gt(this.coll.aggregate(pipeline, {comment}).toArray().length, 0);
 
-            // Validates that both slow query log & profiler use the same summary, then return it.
-            const summary = getLatestProfilerEntry(db, {
+            // Validates that both slow query log & profiler use the same summary as expected.
+            const entry = getLatestProfilerEntry(db, {
                 op: "command",
                 ns: this.coll.getFullName(),
                 "command.comment": comment,
-            }).planSummary;
-            this.assertPlanSummaryInSlowLog(comment, summary);
-            return summary;
+            });
+            assert.eq(
+                entry.planSummary,
+                shape.planSummary,
+                `Expected plan summary to equal ${shape.planSummary}`,
+                entry,
+            );
+            assert.eq(
+                entry.usedJoinOptimization,
+                shape.usedJoinOptimization,
+                `Expected usedJoinOptimization to equal ${shape.usedJoinOptimization}`,
+                entry,
+            );
+            assert.eq(
+                entry.fromPlanCache,
+                shape.fromPlanCache,
+                `Expected fromPlanCache to equal ${shape.fromPlanCache}`,
+                entry,
+            );
+
+            this.assertSlowLogShape(shape);
         };
     });
 
@@ -116,22 +137,47 @@ describe("plan summary for join plans", function () {
         MongoRunner.stopMongod(this.conn);
     });
 
-    it("logs a plan summary for a single join", function () {
+    it("logs relevant fields for a single join", function () {
         const local = this.coll.getFullName();
         const foreign1 = this.foreign1.getFullName();
-        assert.eq(
-            `HJ( f1 = ( COLLSCAN [${foreign1}] ), _ = ( COLLSCAN [${local}] ) )`,
-            this.getPlanSummaryForPipeline(this.singleJoinPipeline),
-        );
+        const planSummary = `HJ( f1 = ( COLLSCAN [${foreign1}] ), _ = ( COLLSCAN [${local}] ) )`;
+        // Note: fromPlanCache is omitted when its false.
+        this.assertProfilerAndSlowLogForPipeline(this.singleJoinPipeline, {
+            planSummary,
+            usedJoinOptimization: true,
+        });
+        this.assertProfilerAndSlowLogForPipeline(this.singleJoinPipeline, {
+            planSummary,
+            usedJoinOptimization: true,
+            fromPlanCache: true,
+        });
     });
 
-    it("logs a plan summary for two joins", function () {
+    it("logs relevant fields for two joins", function () {
         const local = this.coll.getFullName();
         const foreign1 = this.foreign1.getFullName();
         const foreign2 = this.foreign2.getFullName();
-        assert.eq(
-            `HJ( f2 = ( COLLSCAN [${foreign2}] ), _ = ( HJ( f1 = ( COLLSCAN [${foreign1}] ), _ = ( COLLSCAN [${local}] ) ) ) )`,
-            this.getPlanSummaryForPipeline(this.twoJoinPipeline),
-        );
+        const planSummary = `HJ( f2 = ( COLLSCAN [${foreign2}] ), _ = ( HJ( f1 = ( COLLSCAN [${foreign1}] ), _ = ( COLLSCAN [${local}] ) ) ) )`;
+        this.assertProfilerAndSlowLogForPipeline(this.twoJoinPipeline, {
+            planSummary,
+            usedJoinOptimization: true,
+        });
+        this.assertProfilerAndSlowLogForPipeline(this.twoJoinPipeline, {
+            planSummary,
+            usedJoinOptimization: true,
+            fromPlanCache: true,
+        });
+    });
+
+    it("logs as normal for a non-join query", function () {
+        // That means no 'usedJoinOptimization' and 'fromPlanCache' is only set after the entry is activated.
+        const pipeline = [{$match: {a: 1}}];
+        const planSummary = "IXSCAN { a: 1 }";
+        this.assertProfilerAndSlowLogForPipeline(pipeline, {planSummary});
+        this.assertProfilerAndSlowLogForPipeline(pipeline, {planSummary});
+        this.assertProfilerAndSlowLogForPipeline(pipeline, {
+            planSummary,
+            fromPlanCache: true,
+        });
     });
 });

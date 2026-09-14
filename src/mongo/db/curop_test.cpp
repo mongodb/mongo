@@ -14,6 +14,7 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -924,6 +925,105 @@ TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
 
     curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cachedPlan");
+}
+
+TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    BSONObj command = BSON("a" << 3);
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("myDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
+    curop->ensureStarted();
+    curop->done();
+
+    // Profiler output.
+    auto appendAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        BSONObjBuilder builder;
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        auto bs = builder.done();
+        if (auto elem = bs["usedJoinOptimization"]) {
+            return elem.Bool();
+        }
+        return boost::none;
+    };
+
+    // Slow query log output.
+    auto reportAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        logv2::DynamicAttributes pAttrs;
+        Date_t deadline = opCtx->getDeadline();
+        curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
+        logv2::TypeErasedAttributeStorage attrs{pAttrs};
+        for (auto it = attrs.begin(); it != attrs.end(); ++it) {
+            if (it->name == "usedJoinOptimization"sv) {
+                return std::get<bool>(it->value);
+            }
+        }
+        return boost::none;
+    };
+
+    // Profile filter evaluation.
+    auto stagedAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        auto fn = OpDebug::appendStaged(
+            opCtx.get(), {"usedJoinOptimization"}, false /*needWholeDocument*/);
+        OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
+        BSONObj result = fn(args);
+        if (auto elem = result["usedJoinOptimization"]) {
+            return elem.Bool();
+        }
+        return boost::none;
+    };
+
+    // The field is omitted when the join optimizer was not used, so that the vast majority of
+    // queries don't pay for an extra field.
+    ASSERT_FALSE(appendAndGetUsedJoinOptimization().has_value());
+    ASSERT_FALSE(reportAndGetUsedJoinOptimization().has_value());
+    ASSERT_FALSE(stagedAndGetUsedJoinOptimization().has_value());
+
+    curop->debug().usedJoinOptimization = true;
+    ASSERT_EQ(appendAndGetUsedJoinOptimization().value_or(false), true);
+    ASSERT_EQ(reportAndGetUsedJoinOptimization().value_or(false), true);
+    ASSERT_EQ(stagedAndGetUsedJoinOptimization().value_or(false), true);
+}
+
+TEST(CurOpTest, UsedJoinOptimizationPropagatedFromPlanSummaryStats) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    ASSERT_FALSE(curop->debug().usedJoinOptimization);
+
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = false;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_FALSE(curop->debug().usedJoinOptimization);
+
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = true;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_TRUE(curop->debug().usedJoinOptimization);
+
+    // Once any part of the operation used the join optimizer, a subsequent plan which did not must
+    // not clear the flag.
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = false;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_TRUE(curop->debug().usedJoinOptimization);
 }
 
 TEST(CurOpTest, ShouldUpdateMemoryStats) {

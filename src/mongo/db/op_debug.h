@@ -763,6 +763,10 @@ public:
     // Reported as "none" when no plan selection took place.
     boost::optional<PlanSelectionStrategy> planSelectionStrategy;
 
+    // Whether the winning plan was produced by the join optimizer. Written by
+    // setPlanSummaryMetrics. Only ever true when join optimization is enabled.
+    bool usedJoinOptimization{false};
+
     // Tracks the amount of dynamic indexed loop joins in a pushed down stage.
     int lookupDynamicIndexedLoopJoin{0};
 

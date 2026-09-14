@@ -319,6 +319,7 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("usedDisk", additiveMetrics.usedDisk);
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromMultiPlanner", additiveMetrics.fromMultiPlanner);
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("usedJoinOptimization", usedJoinOptimization);
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_TOATTR_HELP_BOOL(replanned);
@@ -628,6 +629,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_BOOL2(b, "fromMultiPlanner", additiveMetrics.fromMultiPlanner);
     OPDEBUG_APPEND_BOOL2(b, "failedPlanningWithQuerySettings", failedPlanningWithQuerySettings);
     OPDEBUG_APPEND_BOOL2(b, "fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
+    OPDEBUG_APPEND_BOOL2(b, "usedJoinOptimization", usedJoinOptimization);
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_APPEND_BOOL(b, replanned);
@@ -1000,6 +1002,9 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
     addIfNeeded("fromPlanCache", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_BOOL2(b, field, args.op.getAdditiveMetrics().fromPlanCache.value_or(false));
     });
+    addIfNeeded("usedJoinOptimization", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.usedJoinOptimization);
+    });
     addIfNeeded("replanned", [](auto field, auto args, auto& b) {
         if (args.op.replanReason) {
             OPDEBUG_APPEND_BOOL2(b, field, true);
@@ -1327,6 +1332,8 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
     if (planSummaryStats.planSelectionStrategy) {
         planSelectionStrategy = planSummaryStats.planSelectionStrategy;
     }
+
+    usedJoinOptimization = usedJoinOptimization || planSummaryStats.usedJoinOptimization;
 }
 
 BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) {

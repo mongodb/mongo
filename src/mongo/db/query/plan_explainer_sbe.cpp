@@ -612,8 +612,9 @@ std::string PlanExplainerSBEBase::getPlanSummary() const {
 void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(6466201, "statsOut should be a valid pointer", statsOut);
 
-    // Known at construction and independent of the exec tree, so report it even without a _root.
+    // Known at construction and independent of the exec tree, so report them even without a _root.
     statsOut->planSelectionStrategy = _planSelectionStrategy;
+    statsOut->usedJoinOptimization = _usedJoinOpt;
 
     if (!_root) {
         return;

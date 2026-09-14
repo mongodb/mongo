@@ -126,6 +126,9 @@ struct [[MONGO_MOD_PUBLIC]] PlanSummaryStats {
     // Was this plan recovered from the cache?
     bool fromPlanCache = false;
 
+    // Was this plan produced by the join optimizer?
+    bool usedJoinOptimization = false;
+
     // Strategy that selected the winning plan; attributes per-strategy query latency
     // (queryLatencies serverStatus).
     boost::optional<PlanSelectionStrategy> planSelectionStrategy;
