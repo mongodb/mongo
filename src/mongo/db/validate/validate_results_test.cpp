@@ -150,31 +150,32 @@ TEST(ValidateResultsTest, MissingAndExtraEntriesKeepsAtLeastOne) {
     ASSERT_BSONOBJ_EQ(obj2, vr.getExtraIndexEntries().front());
 }
 
-TEST(ValidateResultsTest, MissingAndExtraEntriesCreateErrorsWhenSizeExceeded) {
+TEST(ValidateResultsTest, MissingAndExtraEntriesCreateWarningsWhenSizeExceeded) {
     ValidateResults vr;
     auto obj = BSON("x" << std::string(2 * 1024 * 1024, 'a'));
 
     // First addition, no evictions.
     vr.addMissingIndexEntry(obj);
     vr.addExtraIndexEntry(obj);
-    ASSERT_TRUE(vr.getErrors().empty());
+    ASSERT_TRUE(vr.getWarnings().empty());
 
     // Now we evict something.
     vr.addMissingIndexEntry(obj);
-    ASSERT_EQ(1, vr.getErrors().size());
-    ASSERT_TRUE(vr.getErrors().contains(
+    ASSERT_EQ(1, vr.getWarnings().size());
+    ASSERT_TRUE(vr.getWarnings().contains(
         "Not all missing index entry inconsistencies are listed due to size limitations."));
 
     // Multiple evictions -> still 1 error.
     vr.addMissingIndexEntry(obj);
-    ASSERT_EQ(1, vr.getErrors().size());
+    ASSERT_EQ(1, vr.getWarnings().size());
 
     // But 1 for each missing/extra
     vr.addExtraIndexEntry(obj);
-    ASSERT_EQ(2, vr.getErrors().size());
-    ASSERT_TRUE(vr.getErrors().contains(
+    ASSERT_TRUE(vr.getErrors().empty());
+    ASSERT_EQ(2, vr.getWarnings().size());
+    ASSERT_TRUE(vr.getWarnings().contains(
         "Not all missing index entry inconsistencies are listed due to size limitations."));
-    ASSERT_TRUE(vr.getErrors().contains(
+    ASSERT_TRUE(vr.getWarnings().contains(
         "Not all extra index entry inconsistencies are listed due to size limitations."));
 }
 

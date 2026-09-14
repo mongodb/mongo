@@ -16,6 +16,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/progress_meter.h"
 
+#include <regex>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
@@ -38,6 +40,20 @@ ValidateResults validate(OperationContext* opCtx) {
     ASSERT_OK(
         collection_validation::validate(opCtx, kNss, kDefaultValidateOptions, &validateResults));
     return validateResults;
+}
+
+// Parses the count out of the "Detected N <kind> index entries." warning, which reports the real
+// number of inconsistencies even when memory limits cut down how many are individually reported.
+int getDetectedEntryCount(const ValidateResults& results, const std::string& kind) {
+    const std::regex re{"Detected ([0-9]+) " + kind + " index entries\\."};
+    for (const std::string& warning : results.getWarnings()) {
+        std::smatch match;
+        if (std::regex_search(warning, match, re)) {
+            return std::stoi(match[1].str());
+        }
+    }
+    FAIL("No 'Detected N " + kind + " index entries.' warning found");
+    MONGO_UNREACHABLE;
 }
 
 // Clears the collection without updating indexes, this creates extra index entries.
@@ -187,10 +203,7 @@ TEST_F(KeyStringIndexConsistencyTest, ExtraEntryPartialFindingsWithNonzeroMemory
     // Due to the very large keystrings, the number of reported entries will be smaller than the
     // real number. But we can still parse the real number out of a particular warning.
     auto getRealExtraEntryCount = [](const ValidateResults& results) {
-        const std::string& firstWarning = *results.getWarnings().begin();
-        // It's "Detected XX extra index entries.", so get the number between the first two spaces.
-        auto firstSpace = firstWarning.find(' ');
-        return std::stoi(firstWarning.substr(firstSpace, firstWarning.find(firstSpace + 1)));
+        return getDetectedEntryCount(results, "extra");
     };
 
     {
@@ -244,11 +257,7 @@ TEST_F(KeyStringIndexConsistencyTest, MissingEntryPartialFindingsWithNonzeroMemo
     // Due to the very large keystrings, the number of reported entries will be smaller than the
     // real number. But we can still parse the real number out of a particular warning.
     auto getRealMissingEntryCount = [](const ValidateResults& results) {
-        const std::string& firstWarning = *results.getWarnings().begin();
-        // It's "Detected XX missing index entries.", so get the number between the first two
-        // spaces.
-        auto firstSpace = firstWarning.find(' ');
-        return std::stoi(firstWarning.substr(firstSpace, firstWarning.find(firstSpace + 1)));
+        return getDetectedEntryCount(results, "missing");
     };
 
     {
