@@ -139,7 +139,7 @@ struct __wt_data_handle {
     wt_shared uint32_t references;   /* References to this handle */
     wt_shared int32_t session_inuse; /* Sessions using this handle */
     uint32_t excl_ref;               /* Refs of handle by excl_session */
-    uint64_t timeofdeath;            /* Use count went to 0 */
+    wt_shared uint64_t timeofdeath;  /* Use count went to 0 */
     WT_SESSION_IMPL *excl_session;   /* Session with exclusive use, if any */
 
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
