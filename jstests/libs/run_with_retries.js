@@ -35,21 +35,3 @@ export function runWithRetries(fn, shouldRetry, maxRetries = 3, initialBackoffMs
     // Cannot get here.
     throw new Error("runWithRetries: unreachable error");
 }
-
-/**
- * Executes the callback function 'fn', retrying if it fails with InterruptedDueToStorageChange in
- * addition to the usual retryable errors. A node performing a file copy based initial sync kills
- * in-flight commands with that code, which belongs to the Interruption and CancellationError
- * categories but not to RetriableError, so no other command helper retries it.
- *
- * @param {function} fn the callback to execute
- * @param {number} numRetries number of retries allowed after the first attempt
- * @param {number} sleepMs sleep time in milliseconds between retries
- *
- * @return {any} the result of the callback function 'fn' on success.
- */
-export function retryOnStorageChangeInterrupt(fn, numRetries = 10, sleepMs = 100) {
-    return retryOnRetryableError(fn, numRetries, sleepMs, [
-        ErrorCodes.InterruptedDueToStorageChange,
-    ]);
-}
