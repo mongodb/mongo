@@ -103,7 +103,7 @@ describe("join optimization timing metrics in query stats", function () {
         const before = getJoinMetrics(orders.getName());
         const fp = configureFailPoint(conn, failPointName, {ms: kSleepMillis});
         try {
-            assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+            assert.eq(orders.aggregate(pipeline).itcount(), 1000);
         } finally {
             fp.off();
         }

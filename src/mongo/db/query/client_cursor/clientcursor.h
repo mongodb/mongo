@@ -21,6 +21,7 @@
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
@@ -43,6 +44,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -179,6 +181,20 @@ public:
     }
 
     /**
+     * Captures supplemental query stats metrics from the planning operation's OpDebug and stashes
+     * them on the cursor. Later flushed by takeSupplementalMetrics() when the cursor is disposed
+     * or when query stats are first written for change streams.
+     */
+    void captureSupplementalMetricsIfNeeded(const OpDebug& opDebug);
+
+    /**
+     * Returns the stashed supplemental metrics, leaving the stash empty. The optional stays engaged
+     * (see _supplementalMetrics) so re-capture on getMores is still guarded. Used to attach the
+     * metrics captured during planning to the final writeQueryStats() call for this cursor.
+     */
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> takeSupplementalMetrics();
+
+    /**
      * Returns a pointer to the underlying query plan executor. All cursors manage a PlanExecutor,
      * so this method never returns a null pointer.
      */
@@ -240,6 +256,17 @@ public:
      * Updates cursor metrics specific to change streams every time the cursor is unpinned.
      */
     void updateMetricsOnUnpin(const ChangeStreamCursorMetrics& csMetrics);
+
+    /**
+     * Updates all per-batch cursor metrics from 'opDebug' every time the cursor is unpinned.
+     *
+     * Note: Supplemental metrics are not included here because they are a one-time planning
+     * capture. See captureSupplementalMetricsIfNeeded().
+     */
+    void updateMetricsOnUnpin(const OpDebug& opDebug) {
+        updateMetricsOnUnpin(opDebug.getAdditiveMetrics());
+        updateMetricsOnUnpin(opDebug.changeStreamMetrics);
+    }
 
     /**
      * Updates the cursor metrics on cursor disposal. Only supposed to be called once per cursor.
@@ -515,6 +542,12 @@ private:
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
+
+    // Supplemental query stats metrics captured during planning from OpDebug on the initial batch.
+    // boost::none means "not yet captured". After being captured and moved out, the optional still
+    // holds a non-none value so has_value() keeps guarding against re-capturing on getMores.
+    boost::optional<std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>>
+        _supplementalMetrics;
 
     // Flag if the current cursor is used for a change stream query.
     bool _isChangeStreamQuery{false};

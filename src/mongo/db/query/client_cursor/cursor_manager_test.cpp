@@ -27,6 +27,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
@@ -1241,6 +1242,33 @@ TEST_F(CursorManagerTest, UpdateMetricsOnUnpinIgnoredForRegularCursor) {
 
     auto gc = cursorPin->toGenericCursor();
     ASSERT_FALSE(gc.getChangeStreams());
+}
+
+TEST_F(CursorManagerTest, SupplementalMetricsCapturedOnceAndFlushedOnTake) {
+    // Supplemental metrics describe planning-time work and are captured once from the planning
+    // OpDebug, then stashed on the cursor to be flushed by takeSupplementalMetrics() at dispose.
+    auto& opDebug = CurOp::get(_opCtx.get())->debug();
+    opDebug.vectorSearchMetrics = OpDebug::VectorSearchMetrics{5, 2.0};
+
+    auto cursorPin = makeCursor(_opCtx.get());
+
+    // The first capture computes supplemental metrics from the planning OpDebug.
+    cursorPin->captureSupplementalMetricsIfNeeded(opDebug);
+    auto firstTake = cursorPin->takeSupplementalMetrics();
+    ASSERT_EQ(firstTake.size(), 1u);
+    ASSERT_EQ(firstTake[0]->metricType, query_stats::SupplementalMetricType::VectorSearch);
+
+    // A second take returns nothing since the stash was moved out, and the optional stays engaged
+    // so has_value() keeps guarding re-capture across getMores.
+    auto secondTake = cursorPin->takeSupplementalMetrics();
+    ASSERT_TRUE(secondTake.empty());
+
+    // Re-capture is a no-op even with a populated OpDebug, because the optional is still engaged
+    // from the first capture.
+    opDebug.vectorSearchMetrics = OpDebug::VectorSearchMetrics{99, 9.0};
+    cursorPin->captureSupplementalMetricsIfNeeded(opDebug);
+    auto thirdTake = cursorPin->takeSupplementalMetrics();
+    ASSERT_TRUE(thirdTake.empty());
 }
 
 }  // namespace

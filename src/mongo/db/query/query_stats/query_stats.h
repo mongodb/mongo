@@ -303,11 +303,13 @@ void writeQueryStats(OperationContext* opCtx,
  * Called from ClientCursor::dispose/ClusterClientCursorImpl::kill to set up and writeQueryStats()
  * at the end of life of a cursor.
  */
-void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
-                                          boost::optional<size_t> queryStatsKeyHash,
-                                          std::unique_ptr<Key> key,
-                                          bool isChangeStreamQuery,
-                                          boost::optional<Microseconds> firstResponseExecutionTime,
-                                          OpDebug::AdditiveMetrics metrics);
+void writeQueryStatsOnCursorDisposeOrKill(
+    OperationContext* opCtx,
+    boost::optional<size_t> queryStatsKeyHash,
+    std::unique_ptr<Key> key,
+    bool isChangeStreamQuery,
+    boost::optional<Microseconds> firstResponseExecutionTime,
+    OpDebug::AdditiveMetrics metrics,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics = {});
 
 }  // namespace mongo::query_stats

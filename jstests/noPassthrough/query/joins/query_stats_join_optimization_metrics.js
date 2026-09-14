@@ -225,7 +225,7 @@ const pipeline = [
     },
     {$unwind: "$item"},
 ];
-assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
 // With join optimization disabled, no JoinOptimization supplemental metrics should be present.
 {
@@ -244,7 +244,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 
 // Run the query so that it is registered in the query stats store.
-assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
 // With join optimization enabled, we expect to see some metrics.
 {
@@ -260,7 +260,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinPlanCache: true}));
 
 // Run the query again!
-assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
 // We expect to see updated metrics.
 {
@@ -274,7 +274,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 }
 
 // Now repeat, but the plan should be cached.
-assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
 {
     const stats = getQueryStats(conn, {collName: orders.getName()});
@@ -299,7 +299,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
     kPerQueryMetrics.numSuffixSourcesPushedToSbe = 1;
     kPerQueryMetrics.numResidualClassicSources = 2;
 
-    assert.eq(orders.aggregate(suffixPipeline, {cursor: {batchSize: 100000}}).itcount(), 10);
+    assert.eq(orders.aggregate(suffixPipeline).itcount(), 10);
 
     const stats = getQueryStats(conn, {collName: orders.getName()});
     const matching = stats.filter((s) => tojson(s.key.queryShape).includes("$group"));
@@ -334,7 +334,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
     kPerQueryMetrics.numResidualClassicSources = 0;
     kPerEnumerationExpectedMetrics.numUniqueIndexesUsedForNDV = 1;
 
-    assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+    assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
     const stats = getQueryStats(conn, {collName: orders.getName()});
     assert.eq(1, stats.length, tojson(stats));
@@ -366,10 +366,7 @@ assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1
 
     kPerEnumerationExpectedMetrics.numPersistentNDVStatsUsed = 1;
 
-    // TODO SERVER-134077: the single large batch is load-bearing. Supplemental query stats
-    // metrics are only recorded when the initial batch exhausts the cursor; with the default
-    // batch size the JoinOptimization section would be missing entirely.
-    assert.eq(orders.aggregate(pipeline, {cursor: {batchSize: 100000}}).itcount(), 1000);
+    assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
     const stats = getQueryStats(conn, {collName: orders.getName()});
     assert.eq(1, stats.length, tojson(stats));

@@ -626,12 +626,14 @@ void writeQueryStats(OperationContext* opCtx,
                                  std::move(supplementalMetrics));
 }
 
-void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
-                                          boost::optional<size_t> queryStatsKeyHash,
-                                          std::unique_ptr<Key> key,
-                                          bool isChangeStreamQuery,
-                                          boost::optional<Microseconds> firstResponseExecutionTime,
-                                          OpDebug::AdditiveMetrics metrics) {
+void writeQueryStatsOnCursorDisposeOrKill(
+    OperationContext* opCtx,
+    boost::optional<size_t> queryStatsKeyHash,
+    std::unique_ptr<Key> key,
+    bool isChangeStreamQuery,
+    boost::optional<Microseconds> firstResponseExecutionTime,
+    OpDebug::AdditiveMetrics metrics,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
     // It is discouraged but technically possible for a user to enable queryStats on the mongods of
     // a replica set. In this case, a cursor will be created for each mongod. However, the
     // queryStatsKey is behind a unique_ptr on CurOp. The ClientCursor constructor std::moves the
@@ -648,7 +650,8 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(firstResponseExecutionTime), metrics);
 
-        query_stats::writeQueryStats(opCtx, queryStatsKeyHash, std::move(key), snapshot);
+        query_stats::writeQueryStats(
+            opCtx, queryStatsKeyHash, std::move(key), snapshot, std::move(supplementalMetrics));
     } else if (isChangeStreamQuery && opCtx) {
         // Since we already recorded information about the possible getMores associated with a
         // cursor that never ends, the only information left to record is about the kill/dispose
