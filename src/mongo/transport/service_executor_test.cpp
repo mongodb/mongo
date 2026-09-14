@@ -12,8 +12,10 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -48,6 +50,10 @@
 // IWYU pragma: no_include "asio/impl/io_context.hpp"
 // IWYU pragma: no_include "asio/impl/post.hpp"
 // IWYU pragma: no_include "asio/impl/system_executor.hpp"
+
+#ifdef __linux__
+#include <sys/resource.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -271,6 +277,79 @@ TEST_F(ServiceExecutorSynchronousTest, TaskPostQueueing) {
 TEST_F(ServiceExecutorInlineTest, TaskPostQueueing) {
     doTestTaskPostQueueing(&executor);
 }
+
+class ClientThreadNiceValueTest : public unittest::Test {
+public:
+    void tearDown() override {
+        // Restore the "nothing registered" default state so other test suites in this binary
+        // are unaffected.
+        registerClientThreadNiceEligibilityPredicate({});
+        registerClientThreadNiceValueProvider({});
+    }
+};
+
+TEST_F(ClientThreadNiceValueTest, DefaultIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 0; });
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+    const auto before = getClientThreadsRenicedCount();
+    const auto failedBefore = getClientThreadReniceFailedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+    ASSERT_EQ(getClientThreadReniceFailedCount(), failedBefore);
+}
+
+TEST_F(ClientThreadNiceValueTest, NoProviderRegisteredIsNoOp) {
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+TEST_F(ClientThreadNiceValueTest, NoPredicateRegisteredIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 5; });
+    registerClientThreadNiceEligibilityPredicate({});
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+TEST_F(ClientThreadNiceValueTest, PredicateDecliningIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 5; });
+    registerClientThreadNiceEligibilityPredicate([] { return false; });
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+#ifdef __linux__
+TEST_F(ClientThreadNiceValueTest, AppliesToCallingThreadOnlyWhenPredicateAccepts) {
+    constexpr int kNice = 5;
+    registerClientThreadNiceValueProvider([] { return kNice; });
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+
+    const auto before = getClientThreadsRenicedCount();
+    int nicedThreadValue = 0;
+    int otherThreadValue = 0;
+
+    unittest::JoinThread niced{[&] {
+        applyClientThreadNiceValue();
+        errno = 0;
+        nicedThreadValue = getpriority(PRIO_PROCESS, 0);
+    }};
+    niced.join();
+
+    unittest::JoinThread other{[&] {
+        errno = 0;
+        otherThreadValue = getpriority(PRIO_PROCESS, 0);
+    }};
+    other.join();
+
+    ASSERT_EQ(nicedThreadValue, kNice);
+    // A thread that never calls the helper (and is not spawned by a niced thread) is unaffected.
+    ASSERT_EQ(otherThreadValue, 0);
+    ASSERT_EQ(getClientThreadsRenicedCount(), before + 1);
+}
+#endif
 
 }  // namespace
 }  // namespace mongo::transport
