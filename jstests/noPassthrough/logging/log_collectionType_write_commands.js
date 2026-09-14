@@ -8,7 +8,6 @@ import {checkCollectionType} from "jstests/noPassthrough/logging/log_collectionT
 const dbName = jsTestName();
 const collName = "testColl";
 
-// TODO SERVER-122926 Add more coverage for different collection types, topologies, and command types, if applicable.
 describe("collectionType in write command slow query logs", function () {
     before(function () {
         this.conn = MongoRunner.runMongod({});

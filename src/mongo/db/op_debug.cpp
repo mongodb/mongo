@@ -196,8 +196,6 @@ void OpDebug::report(OperationContext* opCtx,
     // OpDebug without an indicator from the command layer. Non-read commands handle views
     // differently (i.e. they don't resolve them in the same way), and should be logged
     // unconditionally.
-    // TODO SERVER-122926 Determine whether it is always correct to bypass setting/using
-    // collectionType for non-read commands and document accordingly.
     if (collectionType || curop.getReadWriteType() != Command::ReadWriteType::kRead) {
         pAttrs->addDeepCopy("collectionType", getCollectionTypeFromNamespaceString(curop.getNSS()));
     }
