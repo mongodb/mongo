@@ -433,6 +433,29 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
 }
 
 /**
+ * Builds an accessor with only the collections the join graph references. The full 'mca' also
+ * carries suffix $lookup namespaces, which are not in the join graph; excluding them keeps an
+ * entry's collection tags aligned with its join tree.
+ */
+MultipleCollectionAccessor makeGraphOnlyCollectionAccessor(const MultipleCollectionAccessor& mca,
+                                                           const JoinGraph& graph) {
+    auto mainAcq =
+        CollectionOrViewAcquisition(CollectionAcquisition(mca.getMainCollectionAcquisition()));
+    CollectionOrViewAcquisitionMap secondaries;
+    for (size_t i = 0; i < graph.numNodes(); ++i) {
+        const auto nss = graph.getNode(static_cast<NodeId>(i)).collectionName;
+        if (nss == mca.getMainCollection()->ns()) {
+            continue;
+        }
+        if (auto it = mca.getSecondaryCollectionAcquisitions().find(nss);
+            it != mca.getSecondaryCollectionAcquisitions().end()) {
+            secondaries.emplace(nss, it->second);
+        }
+    }
+    return MultipleCollectionAccessor(std::move(mainAcq), std::move(secondaries), false);
+}
+
+/**
  * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
  * if it is stale and the query must be replanned.
  *
@@ -445,13 +468,13 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
  * cases apart from an index change that does matter.
  */
 bool validateCacheEntry(JoinPlanCacheEntry& hit,
-                        const MultipleCollectionAccessor& mca,
+                        const MultipleCollectionAccessor& graphOnlyMca,
                         const AggJoinModel& model,
                         const AvailableIndexes& perCollIdxs,
                         const JoinPlanCacheKey& cacheKey,
                         std::string& planCacheKeyHex) {
     auto cachedTags = hit.getCollectionTags();
-    auto validation = classifyCollectionTags(cachedTags, mca);
+    auto validation = classifyCollectionTags(cachedTags, graphOnlyMca);
 
     // The formatted plan cache key costs a hash pass over the whole key plus an allocation, so only
     // compute it when a log line will actually be emitted; the value lands in 'planCacheKeyHex' so
@@ -516,7 +539,7 @@ bool validateCacheEntry(JoinPlanCacheEntry& hit,
     // does not use, so the entry is valid against the current collection state. Adopt that state's
     // version tags so subsequent lookups take the fast path above instead of re-fingerprinting on
     // every query.
-    auto currentTags = makeCollectionTags(mca);
+    auto currentTags = makeCollectionTags(graphOnlyMca);
     hit.refreshCollectionTags(currentTags);
 
     LOGV2_DEBUG(13036803,
@@ -532,6 +555,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     OperationContext* opCtx,
     const JoinPlanCacheKey& cacheKey,
     const MultipleCollectionAccessor& mca,
+    const MultipleCollectionAccessor& graphOnlyMca,
     const AggJoinModel& model,
     const AvailableIndexes& perCollIdxs,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
@@ -545,7 +569,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     // validateCacheEntry fills 'planCacheKeyHex' lazily while deciding the entry is stale, so the
     // failure path below reuses it instead of hashing the key a second time.
     std::string planCacheKeyHex;
-    if (!validateCacheEntry(*hit, mca, model, perCollIdxs, cacheKey, planCacheKeyHex)) {
+    if (!validateCacheEntry(*hit, graphOnlyMca, model, perCollIdxs, cacheKey, planCacheKeyHex)) {
         if (planCacheKeyHex.empty()) {
             planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
         }
@@ -563,10 +587,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     }
 
     LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
-    auto qsn = fromCachedJoinPlan(opCtx, model.getGraph(), mca, perCollIdxs, *hit->joinTree);
+    auto qsn =
+        fromCachedJoinPlan(opCtx, model.getGraph(), graphOnlyMca, perCollIdxs, *hit->joinTree);
     auto winnerSoln = std::make_unique<QuerySolution>();
     winnerSoln->setRoot(std::move(qsn));
 
+    // Use 'mca' instead of 'graphOnlyMca' for SBE lowering because non-join eligible stages may
+    // reference other collections.
     pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
 
     // Merge join-field non-array path learnings into the chosen base node's expCtx so the
@@ -696,6 +723,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "graph"_attr = swModel.getValue().toBSON());
     auto model = std::move(swModel.getValue());
 
+    // Snapshot only the join-graph collections so the entry's tags match its join tree, and the
+    // cache invalidates only on DDL affecting the join graph.
+    const auto graphOnlyMca = makeGraphOnlyCollectionAccessor(mca, model.getGraph());
+
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     // Retrieve a copy of the hint if present.
@@ -718,12 +749,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Set iff 'useJoinPlanCache' is true and the lookup missed.
     boost::optional<std::vector<CollectionTag>> collectionTags;
 
-    const auto eligibleIdxs = extractINLJEligibleIndexes(model.getGraph(), mca);
+    const auto eligibleIdxs = extractINLJEligibleIndexes(model.getGraph(), graphOnlyMca);
 
     if (useJoinPlanCache) {
-        cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
-        auto exec =
-            checkPlanCacheForPlan(opCtx, *cacheKey, mca, model, eligibleIdxs, yieldPolicy, metrics);
+        cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
+        auto exec = checkPlanCacheForPlan(
+            opCtx, *cacheKey, mca, graphOnlyMca, model, eligibleIdxs, yieldPolicy, metrics);
         if (exec) {
             joinPlanCacheHits.increment(1);
             return JoinReorderedExecutorResult{.executor = std::move(exec),
@@ -731,7 +762,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         }
         // Capture the tags before sampling: a yield re-acquires collections from the latest
         // catalog, which would tag the entry with a newer state than the plan is built from.
-        collectionTags = makeCollectionTags(mca);
+        collectionTags = makeCollectionTags(graphOnlyMca);
         joinPlanCacheMisses.increment(1);
         LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
     }
@@ -743,11 +774,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Acquire the samples that CE (both here and in CBR below) will consult.
     samplingEstimators = makeSamplingEstimators(
-        mca, model.getGraph(), yieldPolicy, model.getJoinExpCtx(), peMetrics);
+        graphOnlyMca, model.getGraph(), yieldPolicy, model.getJoinExpCtx(), peMetrics);
 
     // Select access plans for each table in the join.
-    auto swAccessPlans =
-        singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators, peMetrics);
+    auto swAccessPlans = singleTableAccessPlans(
+        opCtx, graphOnlyMca, model.getGraph(), samplingEstimators, peMetrics);
     if (!swAccessPlans.isOK()) {
         metrics.fallbackReason = JoinFallbackReason::kFailedToGetSingleTableAccessViaCBR;
         return swAccessPlans.getStatus();
@@ -769,7 +800,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .resolvedPaths = model.getResolvedPaths(),
                               .singleTableAccess = std::move(singleTableAccess),
                               .perCollIdxs = eligibleIdxs,
-                              .catStats = createCatalogStats(opCtx, mca),
+                              .catStats = createCatalogStats(opCtx, graphOnlyMca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
@@ -881,6 +912,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the
     // SBE executor with the join-reordered prefix.
+    // Note: this uses the original MCA with all collections, not just the join-graph collections in
+    // 'graphOnlyMca' because the SBE executor needs access to all collections pushed down to SBE.
     pushDownSbeEligibleSuffix(opCtx, mca, model, reordered.baseNode, reordered.soln, metrics);
 
     // Test hook: all sampling and join reordering is complete at this point.
@@ -959,7 +992,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         // Compute the join plan cache key hash for explain regardless of whether the join plan
         // cache is enabled.
         if (!cacheKey.has_value()) {
-            cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), mca);
+            cacheKey =
+                makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
         }
         explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(*cacheKey);
         maybeExplainData = std::move(explainData);

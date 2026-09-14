@@ -9,6 +9,58 @@ import {
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
+/**
+ * Returns {hits, misses, invalidations} from serverStatus.metrics.query.planCache.join.
+ */
+export function joinPlanCacheStats(db) {
+    const planCache = db.serverStatus().metrics.query.planCache;
+    assert(planCache.hasOwnProperty("join"), "missing metrics.query.planCache.join", {planCache});
+    const join = planCache.join;
+    return {hits: join.hits, misses: join.misses, invalidations: join.invalidations};
+}
+
+/**
+ * Runs 'fn' and returns the change in the join plan cache counters during its execution:
+ * {hitDelta, missDelta, invalidationDelta}.
+ */
+export function joinPlanCacheStatsDelta(db, fn) {
+    const before = joinPlanCacheStats(db);
+    fn();
+    const after = joinPlanCacheStats(db);
+    return {
+        hitDelta: after.hits - before.hits,
+        missDelta: after.misses - before.misses,
+        invalidationDelta: after.invalidations - before.invalidations,
+    };
+}
+
+/**
+ * Asserts that the join plan cache stats change by the expected amounts during the execution of 'fn'.
+ */
+export function assertJoinPlanCacheStats({
+    db,
+    fn,
+    expectedHits,
+    expectedMisses,
+    expectedInvalidations = 0,
+}) {
+    const {hitDelta, missDelta, invalidationDelta} = joinPlanCacheStatsDelta(db, fn);
+    assert.eq(hitDelta, expectedHits, "unexpected join plan cache hits", {
+        expectedHits,
+        hitDelta,
+    });
+    assert.eq(missDelta, expectedMisses, "unexpected join plan cache misses", {
+        expectedMisses,
+        missDelta,
+    });
+    assert.eq(
+        invalidationDelta,
+        expectedInvalidations,
+        "unexpected join plan cache invalidations",
+        {expectedInvalidations, invalidationDelta},
+    );
+}
+
 // Runs the given test case with join optimization enabled and disabled, verifies that the results
 // match expectedResults with UNORDERED comparison, and checks whether the join optimizer was used as expected.
 export function runTestWithUnorderedComparison({
