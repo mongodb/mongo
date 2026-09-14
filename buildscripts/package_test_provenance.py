@@ -26,6 +26,7 @@ RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME = "Release Binary Provenance"
 RELEASE_EXECUTION_LOG_ARTIFACT_NAME = "Release Execution Log"
 RELEASE_BINARY_NAMES = ("mongod", "mongos")
 CRYPT_RELEASE_BINARY_NAMES = ("mongo_crypt_v1.so",)
+ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH = ".bazel_provenance_build_invocation"
 DISALLOWED_EXECUTION_LOG_RUNNERS = {"remote", "remote cache hit"}
 SERVER_RELEASE_PROJECT_PREFIX = "mongo-release"
 RELEASE_BRANCH_PROJECT_PATTERN = re.compile(r"mongodb-mongo-v\d+\.\d+(?:-staging)?")
@@ -166,6 +167,34 @@ def fetch_task_artifact_to_file(task: Any, artifact_name: str, output_path: Path
                 file_handle.write(chunk)
 
     return output_path
+
+
+def extract_file_from_tar_by_basename(
+    artifacts_path: Path, artifact_basename: str, output_dir: Path
+) -> Path:
+    """Extract a file from a tar archive by basename."""
+
+    output_path = output_dir / artifact_basename
+    with tarfile.open(artifacts_path, "r:*") as artifacts:
+        for member in artifacts.getmembers():
+            if not member.isfile():
+                continue
+            if Path(member.name).name != artifact_basename:
+                continue
+
+            extracted = artifacts.extractfile(member)
+            if extracted is None:
+                continue
+
+            try:
+                with output_path.open("wb") as output:
+                    while chunk := extracted.read(1024 * 1024):
+                        output.write(chunk)
+            finally:
+                extracted.close()
+            return output_path
+
+    raise RuntimeError(f"Could not find {artifact_basename} in {artifacts_path}")
 
 
 def fetch_release_binary_provenance_from_tasks(tasks: list[Any], task_display_name: str) -> str:

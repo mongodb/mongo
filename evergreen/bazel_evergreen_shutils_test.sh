@@ -88,6 +88,29 @@ test_cache_bazel_output_base_uses_plain_info_once() {
     assert_eq "info output_base" "${invocations[0]}" "output_base lookup should use plain bazel info"
 }
 
+test_provenance_build_invocation_file_selection() {
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file archive_dist_test mongodb-mongo-v8.3-staging)" \
+        "archive_dist_test should create the provenance invocation file"
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongo-release)" \
+        "release package should create the provenance invocation file"
+    assert_eq \
+        "" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongodb-mongo-v8.3-staging)" \
+        "non-server-release package should not create the provenance invocation file"
+    assert_eq \
+        ".bazel_crypt_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file crypt_create_lib mongo-release)" \
+        "crypt_create_lib should create its dedicated invocation file"
+    assert_eq \
+        "" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file unit_tests mongo-release)" \
+        "unrelated tasks should not create a provenance invocation file"
+}
+
 test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
     local tmpdir
     local fake_bazel
@@ -122,4 +145,5 @@ test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
 }
 
 test_cache_bazel_output_base_uses_plain_info_once
+test_provenance_build_invocation_file_selection
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
