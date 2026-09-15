@@ -32,6 +32,7 @@ import {
     UpdateLookupExecutor,
 } from "jstests/libs/query/change_stream_metrics_util.js";
 import {withClusteredColl, withCollation} from "jstests/libs/query/collection_config_decorators.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // A compound _id with a Timestamp component (to exercise non-scalar key encoding), fully derived
 // from 'seed' so equal seeds yield equal ids and no field is collation-sensitive.
@@ -241,11 +242,21 @@ describe("change stream updateLookup single-document-lookup metrics", function (
                             }
                         }
 
-                        // A change stream cursor never signals EOF; drain exactly the expected count.
+                        // A change stream cursor never signals EOF; drain exactly the expected
+                        // count. On a sharded topology a getMore can legitimately return an empty
+                        // batch (e.g. while merging per-shard cursors), so hasNext() alone can't
+                        // tell "no more events yet" from "done": keep polling until the expected
+                        // count is drained.
                         actualChanges = [];
-                        for (let i = 0; i < expectedChanges.length; i++) {
-                            actualChanges.push(cursor.next());
-                        }
+                        assert.soon(() => {
+                            while (
+                                actualChanges.length < expectedChanges.length &&
+                                cursor.hasNext()
+                            ) {
+                                actualChanges.push(cursor.next());
+                            }
+                            return actualChanges.length >= expectedChanges.length;
+                        });
                         cursor.close();
                     },
                 );
@@ -262,12 +273,22 @@ describe("change stream updateLookup single-document-lookup metrics", function (
                 // is set (its stop-after-one break), so 2 windows over 5 events means window 1 was the
                 // warmer alone and window 2 held all three updates plus the delete. Batching is a
                 // property of the SBE primary, not of the collection.
-                const batchingApplies = engine === UpdateLookupExecutor.kSBE;
-                assert.eq(
-                    delta.changeStreams.updateLookup.enrichBatchesStarted,
-                    batchingApplies ? 2 : expectedChanges.length,
-                    {delta},
-                );
+                //
+                // 'enrichBatchesStarted' is counted per enrichment pipeline, and a sharded change
+                // stream runs one pipeline per targeted shard: the exact count above only holds
+                // when a single shard sees the events, so only assert it there. With more than one
+                // shard, which _id lands on which shard (and so how many pipelines run) depends on
+                // hashed placement, making the count non-deterministic from the test's perspective.
+                if (FixtureHelpers.numberOfShardsForCollection(testColl) === 1) {
+                    const batchingApplies = engine === UpdateLookupExecutor.kSBE;
+                    assert.eq(
+                        delta.changeStreams.updateLookup.enrichBatchesStarted,
+                        batchingApplies ? 2 : expectedChanges.length,
+                        {delta},
+                    );
+                } else {
+                    assert.gte(delta.changeStreams.updateLookup.enrichBatchesStarted, 1, {delta});
+                }
 
                 const lookup = delta.changeStreams.updateLookup[engine];
                 const fallbackLookup =
