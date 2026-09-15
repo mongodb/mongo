@@ -1304,7 +1304,6 @@ mongo_cc_library(
         "pipelined_oplog_applier.h",
     ],
     deps = [
-        ":apply_ops_command_info",
         ":oplog_application",
         ":oplog_application_interface",
         ":oplog_entry",
@@ -2193,7 +2192,6 @@ mongo_cc_unit_test(
     deps = [
         ":oplog",
         ":oplog_application_interface",
-        ":oplog_applier_batcher_test_fixture",
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry",
         ":oplog_entry_test_helpers",
@@ -2202,12 +2200,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/admission/ticketing:admission_context",
-        "//src/mongo/db/shard_role",
-        "//src/mongo/db/storage/kv:kv_engine",
-        "//src/mongo/executor:network_interface_mock",
-        "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/unittest",
-        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 

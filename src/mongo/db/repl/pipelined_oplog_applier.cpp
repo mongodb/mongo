@@ -6,7 +6,6 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
@@ -16,7 +15,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
-#include <utility>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -56,125 +54,13 @@ PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
 PipelinedOplogApplier::~PipelinedOplogApplier() = default;
 
 void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
-    // The batcher may stop producing work before the workers shut down, so worker shutdown should
-    // be last.
     ON_BLOCK_EXIT([this] { _workerPool.shutdownAndJoin(); });
-
-    _oplogBatcher->startup(_storageInterface);
-    ON_BLOCK_EXIT([this] { _oplogBatcher->shutdown(); });
-
-    // Every batch must start after the last op dispatched before it. lastApplied sets the initial
-    // bound: it trails dispatch, since batches still on the workers have not been published yet.
-    OpTime lastDispatchedOpTime = _replCoord->getMyLastAppliedOpTime();
-
-    while (true) {
-        // An operation context is allocated per batch so that catalog lookups made while routing
-        // use the current snapshot. The collection properties cached by _router persist across
-        // batches; the router clears and refetches them itself when it classifies an op as
-        // requiring inline application, as the op may invalidate the cached properties.
-        const auto opCtxPtr = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
-        auto* opCtx = opCtxPtr.get();
-        ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
-            opCtx, AdmissionContext::Priority::kExempt);
-
-        auto batch = _oplogBatcher->getNextBatch(Seconds(1));
-        if (batch.empty()) {
-            if (batch.mustShutdown()) {
-                return;
-            }
-            if (batch.termWhenExhausted()) {
-                MONGO_UNIMPLEMENTED;
-            }
-            continue;
-        }
-
-        const auto firstOpTimeInBatch = batch.front().getOpTime();
-        const auto lastOpTimeInBatch = batch.back().getOpTime();
-        if (firstOpTimeInBatch <= lastDispatchedOpTime) {
-            LOGV2_FATAL(13322700,
-                        "Pipelined oplog applier received a batch that does not follow the last "
-                        "dispatched op",
-                        "firstOpTimeInBatch"_attr = firstOpTimeInBatch,
-                        "lastDispatchedOpTime"_attr = lastDispatchedOpTime,
-                        "lastAppliedOpTime"_attr = _replCoord->getMyLastAppliedOpTime(),
-                        "firstOperation"_attr = redact(batch.front().toBSONForLogging()));
-        }
-
-        const auto numOpsInBatch = batch.count();
-        try {
-            _dispatchOps(opCtx, batch.releaseBatch());
-        } catch (const DBException& ex) {
-            LOGV2_FATAL(13322701,
-                        "Pipelined oplog applier failed to dispatch a batch",
-                        "error"_attr = redact(ex),
-                        "firstOpTimeInBatch"_attr = firstOpTimeInBatch,
-                        "numOperationsInBatch"_attr = numOpsInBatch);
-        }
-        lastDispatchedOpTime = lastOpTimeInBatch;
-    }
+    MONGO_UNIMPLEMENTED;
 }
 
 StatusWith<OpTime> PipelinedOplogApplier::_applyOplogBatch(OperationContext* opCtx,
                                                            std::vector<OplogEntry> ops) {
     MONGO_UNIMPLEMENTED;
-}
-
-void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops) {
-    using OpClass = PipelinedOpRouter::OpClass;
-    using WorkItem = PipelinedApplierWorkerPool::WorkItem;
-    const size_t numWorkers = _workerPool.numWorkers();
-
-    // Packed container ops write several keys in one entry; hashing the whole entry would not
-    // agree with the hash of any single key, so a packed op and a later op on one of its keys
-    // could land on different workers and be applied concurrently. Split them into single-key ops
-    // first so each key is hashed and routed independently.
-    OplogApplierUtils::expandBatchedContainerOps(ops);
-
-    // The ops to dispatch, in oplog order, each paired with its worker. Inner ops extracted from an
-    // applyOps entry are owned by 'derivedOps'; everything else points into 'ops'.
-    std::vector<std::pair<size_t, OplogEntry*>> routedOps;
-    routedOps.reserve(ops.size());
-    std::vector<std::vector<OplogEntry>> derivedOps;
-    std::vector<size_t> opsPerWorker(numWorkers, 0);
-    auto route = [&](OplogEntry* op) {
-        auto workerIdx = _router.selectWorker(opCtx, op);
-        routedOps.emplace_back(workerIdx, op);
-        ++opsPerWorker[workerIdx];
-    };
-
-    for (auto& op : ops) {
-        switch (_router.classify(op)) {
-            case OpClass::kPipelined:
-                route(&op);
-                break;
-            case OpClass::kPipelinedApplyOps: {
-                auto& innerOps = derivedOps.emplace_back(ApplyOps::extractOperations(op));
-                OplogApplierUtils::expandBatchedContainerOps(innerOps);
-                for (auto& innerOp : innerOps) {
-                    route(&innerOp);
-                }
-                break;
-            }
-            case OpClass::kRequiresInline:
-                MONGO_UNIMPLEMENTED;
-        }
-    }
-
-    // Each worker slice of ops is sized before any op is moved into it, so it never reallocates
-    // upon insertion.
-    std::vector<WorkItem> items(numWorkers);
-    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-        items[workerIdx].ops.reserve(opsPerWorker[workerIdx]);
-    }
-    for (auto& [workerIdx, op] : routedOps) {
-        items[workerIdx].ops.push_back(std::move(*op));
-    }
-
-    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-        if (!items[workerIdx].ops.empty()) {
-            _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
-        }
-    }
 }
 
 Status applyWorkItem(OperationContext* opCtx,
