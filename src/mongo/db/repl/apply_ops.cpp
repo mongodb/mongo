@@ -190,6 +190,13 @@ Status _applyOps(OperationContext* opCtx,
                         case OpTypeEnum::kContainerInsert:
                         case OpTypeEnum::kContainerUpdate:
                         case OpTypeEnum::kContainerDelete: {
+                            // Container ops (ci/cu/cd) are internal-only. A direct applyOps
+                            // invocation may still run them when the container-writes feature flag
+                            // and test commands are both enabled. Every other oplogApplicationMode
+                            // is client-controlled and must not be trusted to indicate real oplog
+                            // application, so it is only permitted when
+                            // opCtx->writesAreReplicated() is false, i.e. this is genuinely not a
+                            // user-issued applyOps.
                             if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
                                 uassert(ErrorCodes::InvalidOptions,
                                         "Container ops are not enabled",
@@ -199,6 +206,10 @@ Status _applyOps(OperationContext* opCtx,
                                                     serverGlobalParams.featureCompatibility
                                                         .acquireFCVSnapshot()) &&
                                             getTestCommandsEnabled());
+                            } else {
+                                uassert(ErrorCodes::InvalidOptions,
+                                        "Container ops are not enabled",
+                                        !opCtx->writesAreReplicated());
                             }
                             auto op = ApplierOperation{&entry};
                             uassertStatusOK(

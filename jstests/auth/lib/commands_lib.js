@@ -427,7 +427,7 @@ export const authCommandsLib = {
                 {
                     runOnDb: firstDbName,
                     privileges: [
-                        {resource: {db: firstDbName, collection: ""}, actions: ["containerInsert"]},
+                        {resource: {anyResource: true}, actions: ["containerInsert"]},
                         {resource: {cluster: true}, actions: ["applyOps"]},
                     ],
                 },
@@ -471,7 +471,7 @@ export const authCommandsLib = {
                 {
                     runOnDb: firstDbName,
                     privileges: [
-                        {resource: {db: firstDbName, collection: ""}, actions: ["containerDelete"]},
+                        {resource: {anyResource: true}, actions: ["containerDelete"]},
                         {resource: {cluster: true}, actions: ["applyOps"]},
                     ],
                     expectFail: true,
@@ -516,7 +516,7 @@ export const authCommandsLib = {
                 {
                     runOnDb: firstDbName,
                     privileges: [
-                        {resource: {db: firstDbName, collection: ""}, actions: ["containerUpdate"]},
+                        {resource: {anyResource: true}, actions: ["containerUpdate"]},
                         {resource: {cluster: true}, actions: ["applyOps"]},
                     ],
                     expectFail: true,
