@@ -1729,7 +1729,7 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                            repl::ContainerVal(std::vector(vals.begin(), vals.end())),
                            *_operationLogger);
     } else {
-        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        // TODO SERVER-134951 Remove fallback to key-by-key insert
         for (size_t i = 0; i < vals.size(); ++i) {
             _onContainerInsert(opCtx,
                                ident,
@@ -1751,7 +1751,7 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                            repl::ContainerVal(value),
                            *_operationLogger);
     } else {
-        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        // TODO SERVER-134951 Remove fallback to key-by-key insert
         for (auto key : keys) {
             _onContainerInsert(opCtx,
                                ident,
@@ -1799,7 +1799,7 @@ void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                            repl::ContainerKey(std::vector(keys.begin(), keys.end())),
                            *_operationLogger);
     } else {
-        // TODO SERVER-130660 Remove fallback to key-by-key insert
+        // TODO SERVER-134951 Remove fallback to key-by-key delete
         for (auto key : keys) {
             _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
         }

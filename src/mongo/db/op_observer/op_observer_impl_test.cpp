@@ -8463,7 +8463,7 @@ TEST_F(OpObserverTest, OnContainerInsert) {
 }
 
 TEST_F(OpObserverTest, OnContainerInsertRange) {
-    // TODO SERVER-130660 Remove check for enable
+    // TODO SERVER-134951 Remove check for enable
     unittest::ServerParameterGuard batchedContainerWritesEnabled{
         "featureFlagBatchedContainerWrites", true};
 
@@ -8514,7 +8514,7 @@ TEST_F(OpObserverTest, OnContainerInsertRange) {
     }
 }
 
-// TODO SERVER-130660 Remove feature disabled test
+// TODO SERVER-134951 Remove feature disabled test
 TEST_F(OpObserverTest, OnContainerInsertRangeFeatureFlagDisabled) {
     unittest::ServerParameterGuard batchedContainerWritesDisabled{
         "featureFlagBatchedContainerWrites", false};
@@ -8562,7 +8562,7 @@ TEST_F(OpObserverTest, OnContainerInsertRangeFeatureFlagDisabled) {
 }
 
 TEST_F(OpObserverTest, OnContainerInsertKeyArray) {
-    // TODO SERVER-130660 Remove check for enable
+    // TODO SERVER-134951 Remove check for enable
     unittest::ServerParameterGuard batchedContainerWritesEnabled{
         "featureFlagBatchedContainerWrites", true};
 
@@ -8612,7 +8612,7 @@ TEST_F(OpObserverTest, OnContainerInsertKeyArray) {
     ASSERT_TRUE(o["v"].eoo()) << o;
 }
 
-// TODO SERVER-130660 Remove feature disabled test
+// TODO SERVER-134951 Remove feature disabled test
 TEST_F(OpObserverTest, OnContainerInsertKeyArrayFeatureFlagDisabled) {
     unittest::ServerParameterGuard batchedContainerWritesDisabled{
         "featureFlagBatchedContainerWrites", false};
@@ -8668,7 +8668,7 @@ TEST_F(OpObserverTest, OnContainerInsertKeyArrayFeatureFlagDisabled) {
 }
 
 TEST_F(OpObserverTest, OnContainerDeleteKeyArray) {
-    // TODO SERVER-130660 Remove check for enable
+    // TODO SERVER-134951 Remove check for enable
     unittest::ServerParameterGuard batchedContainerWritesEnabled{
         "featureFlagBatchedContainerWrites", true};
 
@@ -8714,7 +8714,7 @@ TEST_F(OpObserverTest, OnContainerDeleteKeyArray) {
     }
 }
 
-// TODO SERVER-130660 Remove feature disabled test
+// TODO SERVER-134951 Remove feature disabled test
 TEST_F(OpObserverTest, OnContainerDeleteKeyArrayFeatureFlagDisabled) {
     unittest::ServerParameterGuard batchedContainerWritesDisabled{
         "featureFlagBatchedContainerWrites", false};
