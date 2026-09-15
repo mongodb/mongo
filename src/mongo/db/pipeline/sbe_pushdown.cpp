@@ -430,12 +430,7 @@ void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stag
 
 // Limit the number of aggregation pipeline stages that can be "pushed down" to the SBE stage
 // builders. Compiling too many pipeline stages during stage building would overflow the call stack.
-// The limit is higher for optimized builds, because optimization reduces the size of stack frames.
-#ifdef MONGO_CONFIG_OPTIMIZED_BUILD
-constexpr size_t kSbeMaxPipelineStages = 400;
-#else
 constexpr size_t kSbeMaxPipelineStages = 100;
-#endif
 
 size_t getNumSbeCompatibleStagesForPushdown(
     const DocumentSourceContainer& sources,

@@ -1046,6 +1046,12 @@ private:
     std::pair<SbStage, PlanStageSlots> buildGroup(const QuerySolutionNode* root,
                                                   const PlanStageReqs& reqs);
 
+    MONGO_COMPILER_NOINLINE
+    std::pair<SbStage, PlanStageSlots> buildGroupFinalizeOutputs(const PlanStageReqs& reqs,
+                                                                 const GroupNode* groupNode,
+                                                                 SbStage stage,
+                                                                 PlanStageSlots childOutputs);
+
     std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buildGroupImpl(
         SbStage stage,
         const PlanStageReqs& reqs,
