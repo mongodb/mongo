@@ -27,8 +27,10 @@ from retry.api import retry_call
 
 from buildscripts.package_test.package_test_commands import (
     PACKAGE_MANAGER_COMMANDS,
+    build_os_setup_commands,
     build_package_test_internal_args,
     build_python_setup_commands,
+    build_update_command,
 )
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
@@ -590,7 +592,7 @@ class Test:
         self.base_packages = sorted(set(OS_DOCKER_LOOKUP[self.os_name][2]) | {"binutils"})
         self.python_command = OS_DOCKER_LOOKUP[self.os_name][3]
 
-        self.update_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["update"]
+        self.update_command = build_update_command(self.package_manager, self.os_name)
         self.install_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["install"]
 
     def __repr__(self) -> str:
@@ -702,6 +704,8 @@ def run_test(test: Test, client: DockerClient) -> Result:
                 -e 's|security.debian.org|archive.debian.org/|g' \
                 -e '/stretch-updates/d' /etc/apt/sources.list",
         ]
+
+    commands += build_os_setup_commands(test.os_name)
 
     commands += [
         test.update_command,

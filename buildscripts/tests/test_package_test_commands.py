@@ -31,6 +31,36 @@ class PackageTestCommandsTest(unittest.TestCase):
             f"apt-get -o Acquire::Retries={under_test.APT_RETRIES}", apt_commands["install"]
         )
 
+    def test_debian11_update_disables_expired_release_metadata_check(self) -> None:
+        update_command = under_test.build_update_command("apt", "debian11")
+
+        self.assertIn(under_test.DEBIAN11_APT_UPDATE_OPTION, update_command)
+
+    def test_other_os_update_command_is_unchanged(self) -> None:
+        self.assertEqual(
+            under_test.PACKAGE_MANAGER_COMMANDS["apt"]["update"],
+            under_test.build_update_command("apt", "debian12"),
+        )
+
+    def test_debian11_setup_uses_complete_security_repository_fallback(self) -> None:
+        self.assertEqual(
+            [
+                "sed -i 's|deb.debian.org/debian-security|"
+                f"{under_test.DEBIAN11_ARCHIVE_SECURITY_REPOSITORY}|g' /etc/apt/sources.list",
+                f"apt-get {under_test.DEBIAN11_APT_UPDATE_OPTION} update || true",
+                "if ! ls /var/lib/apt/lists/*archive.debian.org_debian-security_dists_"
+                "bullseye-security* > /dev/null 2>&1; then "
+                "sed -i 's|"
+                f"{under_test.DEBIAN11_ARCHIVE_SECURITY_REPOSITORY}|"
+                f"{under_test.DEBIAN11_SNAPSHOT_SECURITY_REPOSITORY}"
+                "|g' /etc/apt/sources.list; fi",
+            ],
+            under_test.build_os_setup_commands("debian11"),
+        )
+
+    def test_other_os_repository_setup_is_unchanged(self) -> None:
+        self.assertEqual([], under_test.build_os_setup_commands("debian12"))
+
     def test_release_package_test_args_include_system_library_skip(self):
         self.assertEqual(
             [
