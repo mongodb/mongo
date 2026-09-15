@@ -8,10 +8,17 @@
 namespace mongo::exec::agg {
 
 /**
- * Factory responsible for LocalLookupEligibility based on ShardingState:
- *   - disabled (replica set / not initialized): AlwaysLocalEligibility.
- *   - enabled (sharded): ShardedClusterLocalLookupEligibility, which routes each lookup to decide
- *     locality against this shard.
+ * Factory responsible for LocalLookupEligibility based on ShardingState and how the current
+ * client connected:
+ *   - ShardingState disabled (replica set / not initialized): AlwaysLocalEligibility.
+ *   - ShardingState enabled, but the client connected directly to this shard rather than via
+ *     mongos (not an internal thread/client): AlwaysLocalEligibility, mirroring
+ *     mongod_process_interface_factory.cpp's MongoProcessInterface selection for the same reason
+ *     -- such a connection bypassed the routing protocol, so there is no safe way to reason about
+ *     cross-shard placement for it.
+ *   - ShardingState enabled and routed (internal client, e.g. mongos or another shard):
+ *     ShardedClusterLocalLookupEligibility, which routes each lookup to decide locality against
+ *     this shard.
  */
 class LocalLookupEligibilityFactoryImpl final : public LocalLookupEligibilityFactoryInterface {
 public:

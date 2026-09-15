@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/single_doc_lookup/local_lookup_eligibility_factory_impl.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/exec/single_doc_lookup/sharded_cluster_local_lookup_eligibility.h"
 #include "mongo/db/topology/sharding_state.h"
 
@@ -16,7 +17,17 @@ LocalLookupEligibilityFactoryImpl::makeLocalLookupEligibility(OperationContext* 
         return std::make_unique<AlwaysLocalEligibility>();
     }
 
-    // Sharded: route each lookup through the catalog cache to decide locality against this shard.
+    // A client that connected directly to this shard (rather than via mongos) bypassed the routing
+    // protocol entirely, mirroring the MongoProcessInterface selection. Such connections are
+    // treated as replica-set-like Every lookup is local by construction here too.
+    const bool isInternalThreadOrClient =
+        !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient();
+    if (!isInternalThreadOrClient) {
+        return std::make_unique<AlwaysLocalEligibility>();
+    }
+
+    // Sharded, routed connection: route each lookup through the catalog cache to decide locality
+    // against this shard.
     return std::make_unique<ShardedClusterLocalLookupEligibility>(shardingState->shardId());
 }
 
