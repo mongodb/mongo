@@ -15,7 +15,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_tier_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
@@ -23,7 +22,6 @@
 #include <compare>
 #include <initializer_list>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -736,23 +734,15 @@ public:
     /**
      * Sets the cutover timestamp for a planned step-down of disaggregated storage. Only valid on a
      * disaggregated leader that does not already have a step-down timestamp set; violating either
-     * precondition is fatal. The caller must hold the stepdown lock acquired via lockStepDown().
+     * precondition is fatal.
      */
-    virtual void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) = 0;
+    virtual void setStepDownTimestamp(Timestamp stepDownTimestamp) = 0;
 
     /**
      * Returns the step-down (cutover) timestamp last set via setStepDownTimestamp(), or a null
      * timestamp if none has been set.
      */
     virtual Timestamp getStepDownTimestamp() const = 0;
-
-    /**
-     * Returns a lock which must be held across operations which cannot be rolled back if a stepdown
-     * cutover is set concurrently with the operation. The stepdown lock must be acquired after
-     * GlobalLock if a global lock is also needed, and before the replication Optime lock if that
-     * is needed.
-     */
-    virtual std::unique_lock<std::mutex> lockStepDown() = 0;
 
     /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history

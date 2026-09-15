@@ -126,13 +126,9 @@ public:
 
     Timestamp getStableTimestamp() const override;
 
-    void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) override;
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override;
 
     Timestamp getStepDownTimestamp() const override;
-
-    std::unique_lock<std::mutex> lockStepDown() override {
-        return _engine->lockStepDown();
-    }
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 

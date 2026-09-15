@@ -1646,22 +1646,24 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
     auto& session = *ru.getSession();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
 
-    const bool publishCreate =
+    const bool checkStepdown =
         kvEngine && kvEngine->usesSchemaEpochs() && gFeatureFlagEnableSchemaEpochs.isEnabled();
-    std::unique_lock<std::mutex> lock;
-    bool inStepdown = false;
-    if (publishCreate) {
-        lock = kvEngine->lockStepDown();
-        inStepdown = !kvEngine->getStepDownTimestamp().isNull();
-    }
-
+    const Timestamp stepdownBefore = checkStepdown ? kvEngine->getStepDownTimestamp() : Timestamp();
     const auto status = wtRCToStatus(session.create(uri, config), session);
-    if (status.isOK() && publishCreate) {
-        using StepdownState = WiredTigerRecoveryUnit::StepdownState;
-        auto state = inStepdown ? StepdownState::after : StepdownState::before;
-        ru.onCreateTable(uri, state);
+    if (!status.isOK()) {
+        return status;
     }
 
+    using StepdownState = WiredTigerRecoveryUnit::StepdownState;
+    auto state = StepdownState::before;
+    if (checkStepdown) {
+        if (kvEngine->getStepDownTimestamp() != stepdownBefore) {
+            state = StepdownState::invalid;
+        } else if (!stepdownBefore.isNull()) {
+            state = StepdownState::after;
+        }
+    }
+    ru.onCreateTable(uri, state);
     return status;
 }
 

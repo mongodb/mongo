@@ -86,11 +86,6 @@ public:
         return checkpointIteration;
     }
 
-    std::unique_lock<std::mutex> lockStepDown() override {
-        ++stepdownLockCount;
-        return std::unique_lock(_stepdownMutex);
-    }
-
     std::vector<std::string> getDroppedIdentNames() const {
         std::vector<std::string> names;
         for (const auto& droppedIdent : droppedIdents) {
@@ -109,12 +104,6 @@ public:
     };
 
     StorageEngine::CheckpointIteration checkpointIteration{0};
-
-    // Number of times lockStepDown() was called.
-    int stepdownLockCount = 0;
-
-private:
-    std::mutex _stepdownMutex;
 };
 
 class KVDropPendingIdentReaperTest : public ServiceContextTest {
@@ -938,7 +927,6 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_ASCPrimaryAndSecondaryD
 
     EXPECT_EQ((std::vector<std::string>{"ident-1", "ident-2"}), engine->getDroppedIdentNames());
     ASSERT_EQUALS(2U, engine->droppedIdents.size());
-    EXPECT_EQ(0, engine->stepdownLockCount);
     EXPECT_FALSE(engine->droppedIdents[0].schemaEpoch);
     EXPECT_FALSE(engine->droppedIdents[1].schemaEpoch);
 }
@@ -966,7 +954,6 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryReplicatesIde
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
     EXPECT_EQ(identName, engine->droppedIdents.front().identName);
     EXPECT_EQ(expectedSchemaEpoch, engine->droppedIdents.front().schemaEpoch.value());
-    EXPECT_EQ(1, engine->stepdownLockCount);
 }
 
 // Replicating a primary ident drop writes an oplog entry, which can throw a transient

@@ -2018,7 +2018,20 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
     // schemaEpoch may be none even if schema epochs are in use if this is an unreplicated drop
     if (_usesSchemaEpochs && schemaEpoch) {
-        publishIdent(wtRu, uri, *schemaEpoch);
+        int ret = _publishIdent(wtRu, uri, *schemaEpoch);
+        // If the stepdown epoch was set in between when we acquire a timestamp/schema epoch and
+        // when we call drop(), we cannot publish using the reserved schema epoch and WT will return
+        // EINVAL. When this happens, we need to retry the drop with a new schema epoch. The drop
+        // retry will succeed because we consider ENOENT success, and then the publish will succeed
+        // with a post-stepdown epoch. If we get EINVAL for any other reason it's a fatal error.
+        // Note that this check works because boost::none is less than any non-none value.
+        if (ret == EINVAL && getStepDownEpoch() > *schemaEpoch) {
+            return Status(ErrorCodes::WriteConflict,
+                          "Stepdown started after the drop timestamp was reserved but before "
+                          "the drop happened. This drop timestamp cannot be used for a drop "
+                          "performed after a stepdown timestamp is set.");
+        }
+        invariantWTOK(ret, *wtRu.getSessionNoTxn());
     }
 
     return status;
@@ -2339,12 +2352,11 @@ void WiredTigerKVEngine::promoteToLeader() {
 }
 
 void WiredTigerKVEngine::demoteToFollower() {
-    std::lock_guard lock(_stepdownMutex);
     static constexpr char followerConfig[] = "disaggregated=(role=\"follower\")";
     invariantWTOK(_conn->reconfigure(_conn, followerConfig), nullptr);
     // Stepping down to follower clears WiredTiger's own step-down timestamp; keep our cached copy
     // (returned by getStepDownTimestamp()) in sync so a later leader term starts with none set.
-    _stepDownTimestamp.store(Timestamp{});
+    _stepDownTimestamp = Timestamp{};
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
@@ -2422,7 +2434,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     setOldestTimestamp(newOldestTimestamp, false);
 }
 
-void WiredTigerKVEngine::setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) {
+void WiredTigerKVEngine::setStepDownTimestamp(Timestamp stepDownTimestamp) {
     invariant(!stepDownTimestamp.isNull());
 
     // WiredTiger rejects this unless we are a disaggregated leader with no step-down timestamp
@@ -2437,8 +2449,11 @@ void WiredTigerKVEngine::setStepDownTimestamp(WithLock, Timestamp stepDownTimest
                        _provider.getSchemaEpochForTimestamp(stepDownTimestamp));
     }
 
-    invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
-    _stepDownTimestamp.store(stepDownTimestamp);
+    {
+        auto guard = _stepDownTimestamp.synchronize();
+        invariantWTOK(_conn->set_timestamp(_conn, stepDownTSConfigString.c_str()), nullptr);
+        *guard = stepDownTimestamp;
+    }
 
     LOGV2(13113700,
           "Set step-down (cutover) timestamp",
@@ -3109,7 +3124,7 @@ Timestamp WiredTigerKVEngine::getStableTimestamp() const {
 }
 
 Timestamp WiredTigerKVEngine::getStepDownTimestamp() const {
-    return _stepDownTimestamp.load();
+    return _stepDownTimestamp.get();
 }
 
 boost::optional<uint64_t> WiredTigerKVEngine::getStepDownEpoch() const {

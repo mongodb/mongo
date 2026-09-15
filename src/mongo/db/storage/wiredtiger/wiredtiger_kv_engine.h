@@ -561,7 +561,7 @@ public:
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force) override;
 
-    void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) override;
+    void setStepDownTimestamp(Timestamp stepDownTimestamp) override;
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
@@ -818,10 +818,6 @@ public:
         return _eventHandler.isWtConnReadyForStatsCollection();
     }
 
-    std::unique_lock<std::mutex> lockStepDown() override {
-        return std::unique_lock(_stepdownMutex);
-    }
-
 private:
     Status _reconfigureAutoCompact(RecoveryUnit& ru, const AutoCompactOptions& options);
 
@@ -941,8 +937,7 @@ private:
     Atomic<std::uint64_t> _stableTimestamp;
 
     // The last stepdown timestamp we've set for the storage engine, if any.
-    Atomic<Timestamp> _stepDownTimestamp;
-    std::mutex _stepdownMutex;
+    synchronized_value<Timestamp> _stepDownTimestamp;
 
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.
