@@ -584,6 +584,14 @@ public:
         return _params.mergeType;
     }
 
+    bool forceShardFilter() const {
+        return _params.forceShardFilter;
+    }
+
+    void setForceShardFilter(bool forceShardFilter) {
+        _params.forceShardFilter = forceShardFilter;
+    }
+
     bool getInRouter() const {
         return _params.inRouter;
     }
@@ -1226,6 +1234,9 @@ protected:
         // if this value is 'unsortedMerge', then group accumulators need to output partial results,
         // so they can be combined by the merging pipeline.
         MergeType mergeType = MergeType::noMerge;
+        // When true, a shard-filter stage must always be included when building a query executor
+        // against this context (see forceShardFilter() above).
+        bool forceShardFilter = false;
         bool forPerShardCursor = false;
         bool allowDiskUse = false;
         bool allowPartialResults = false;

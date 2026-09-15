@@ -711,8 +711,13 @@ bool QueryPlannerParams::requiresShardFiltering(const CanonicalQuery& canonicalQ
         return false;
     }
 
-    // Check whether the query is running over multiple shards and will require merging.
     const auto expCtx = canonicalQuery.getExpCtx();
+    if (expCtx->forceShardFilter()) {
+        // The caller specified that we must always include the shard filter.
+        return true;
+    }
+
+    // Check whether the query is running over multiple shards and will require merging.
     if (expCtx->needsUnsortedMerge() || expCtx->needsSortedMerge()) {
         return true;
     }

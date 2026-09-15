@@ -1227,7 +1227,15 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
 
     // If the feature flag is disabled, preserve the old behavior where we reset planner options
     // when constructing an executor for distinct.
-    plannerOpts = isDistinctMultiplanningEnabled ? plannerOpts : QueryPlannerParams::DEFAULT;
+    if (!isDistinctMultiplanningEnabled) {
+        // A forced shard-filter read (e.g. a never-routed local _id lookup) can't use the legacy
+        // DISTINCT_SCAN path, which resets planner options without the mandatory shard-filter bit;
+        // fall through to the ordinary executor.
+        if (expCtx->forceShardFilter()) {
+            return StatusWith{std::move(cq)};
+        }
+        plannerOpts = QueryPlannerParams::DEFAULT;
+    }
     plannerOpts |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
 
     if (!*shouldProduceEmptyDocs) {
@@ -1843,6 +1851,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // and perform the rewrite here.
     const bool timeseriesBoundedSortOptimization = unpack && sort && (su.unpackIdx < su.sortIdx);
     std::size_t plannerOpts = QueryPlannerParams::DEFAULT;
+    if (expCtx->forceShardFilter() &&
+        collections.getMainCollectionAcquisition().getShardingDescription().isSharded()) {
+        // Shard-local read that was never routed by a mongos: keep the shard-filter stage even
+        // when the query extracts the full shard key (see
+        // QueryPlannerParams::requiresShardFiltering, which consults forceShardFilter() on the
+        // expCtx).
+        plannerOpts |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    }
     boost::optional<TraversalPreference> traversalPreference = boost::none;
     if (timeseriesBoundedSortOptimization) {
         traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
