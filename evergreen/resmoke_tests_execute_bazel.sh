@@ -151,7 +151,7 @@ maybe_generate_burn_in_targets() {
     fi
     echo "Generating burn-in test targets..."
     base_revision="$(git merge-base ${revision} HEAD)"
-    ${BAZEL_BINARY} build ${CONFIG_FLAGS} //... --build_tag_filters=resmoke_config
+    ${BAZEL_BINARY} build ${CONFIG_FLAGS} --remote_download_outputs=toplevel //... --build_tag_filters=resmoke_config
     bazel_evergreen_shutils::query_resmoke_configs "${BAZEL_BINARY}" "${CONFIG_FLAGS}" "resmoke_suite_configs.yml"
     ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:bazel_burn_in -- generate-targets "$base_revision" || echo "Failed to generate burn-in targets"
 }
