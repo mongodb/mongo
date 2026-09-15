@@ -2200,14 +2200,9 @@ def _impl(ctx):
                     "-Wno-shorten-64-to-32",
                     "-Wno-unused-but-set-variable",
                     "-Wno-nullability-completeness",
-                ] + ([
-                    # Abseil's PPC64LE implementations trigger these Clang
-                    # diagnostics. Keep the suppressions on the third-party feature
-                    # and restrict them to the PPC64LE cross toolchain so first-party
-                    # and native builds retain the warnings.
                     "-Wno-sign-conversion",
                     "-Wno-deprecate-lax-vec-conv-all",
-                ] if target_is_ppc64le and ctx.attr.target_triple else []))],
+                ])],
             ),
         ],
     )
