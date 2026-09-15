@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -1233,6 +1234,10 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
 // static
 bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                           std::unique_ptr<QuerySolutionNode>* solnRoot) {
+    // Upper bound the number of scan leaves is capped at, so it can't overflow and wrap past the
+    // cap.
+    static constexpr size_t kMaxValue = std::numeric_limits<size_t>::max();
+
     vector<QuerySolutionNode*> explodableNodes;
 
     std::unique_ptr<QuerySolutionNode>* toReplace = structureOKForExplode(solnRoot);
@@ -1294,7 +1299,16 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             if (!isOilExplodable(oil, iet)) {
                 break;
             }
-            numScans *= oil.intervals.size();
+
+            // If multiplying would overflow size_t, use the max value so the cap below still
+            // catches it.
+            const size_t numIntervals = oil.intervals.size();
+            if (numIntervals != 0 && numScans > kMaxValue / numIntervals) {
+                numScans = kMaxValue;
+            } else {
+                numScans *= numIntervals;
+            }
+
             kpIt.next();
             ++boundsIdx;
         }
@@ -1355,8 +1369,13 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             }
         }
 
-        // Do some bookkeeping to see how many ixscans we'll create total.
-        totalNumScans += numScans;
+        // Do some bookkeeping to see how many ixscans we'll create total. If addition would
+        // overflow size_t, use the max value so the cap below still catches it.
+        if (totalNumScans > kMaxValue - numScans) {
+            totalNumScans = kMaxValue;
+        } else {
+            totalNumScans += numScans;
+        }
 
         // And for this scan how many fields we expand.
         fieldsToExplode.push_back(boundsIdx);
