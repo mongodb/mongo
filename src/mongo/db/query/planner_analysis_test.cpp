@@ -16,8 +16,10 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <map>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -602,5 +604,33 @@ TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_InvalidData) {
     // Non-number sort direction
     ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
         makeTraversalPreference(fromjson("{a: 'foo'}")), fromjson("{a: 'foo'}"), {}));
+}
+
+TEST_F(QueryPlannerTest,
+       DetermineLookupStrategyLogsRejectionWhenForeignCollectionExceedsScanBytes) {
+    // determineLookupStrategy() has its own COLLECTION_EXCEEDS_SCAN_BYTES rejection path, separate
+    // from the ones in query_planner.cpp, with its own LOGV2 id.
+    runQuery(fromjson("{}"));
+
+    auto foreignNss = NamespaceString::createNamespaceString_forTest("test.foreign");
+    std::map<NamespaceString, CollectionInfo> secondaryCollInfos;
+    auto& foreignInfo = secondaryCollInfos[foreignNss];
+    foreignInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    foreignInfo.maxEstimatedScanBytesCollectionSize = 4000;
+    foreignInfo.maxEstimatedScanBytesThreshold = 2000;
+    // No index on the foreign field, so neither an indexed nor a hash join is eligible and the
+    // nested loop join path evaluates and rejects the unbounded foreign COLLSCAN.
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_THROWS_CODE(
+        QueryPlannerAnalysis::determineLookupStrategy(*cq, foreignNss, "b", secondaryCollInfos),
+        DBException,
+        ErrorCodes::NoQueryExecutionPlans);
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466403)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.foreign" << "estimatedSize" << 4000
+                                                  << "threshold" << 2000))),
+              1);
 }
 }  // namespace

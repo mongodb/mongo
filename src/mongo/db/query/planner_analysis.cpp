@@ -1139,6 +1139,14 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
                       "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
                 maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
             } else {
+                LOGV2(13466403,
+                      "Query rejected by maxEstimatedScanBytes: $lookup foreign collection scan "
+                      "requires an unbounded COLLSCAN on a collection that exceeds the "
+                      "configured size threshold",
+                      "namespace"_attr = foreignCollName.toStringForErrorMsg(),
+                      "estimatedSize"_attr =
+                          foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
+                      "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
                 maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
                 uasserted(ErrorCodes::NoQueryExecutionPlans,
                           "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
