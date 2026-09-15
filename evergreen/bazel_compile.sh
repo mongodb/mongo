@@ -29,8 +29,25 @@ if [[ -n "${mongo_openssl_root:-}" ]]; then
   export MONGO_OPENSSL_ROOT="${mongo_openssl_root}"
 fi
 
-# if build_patch_id is passed, try to download binaries from specified evergreen patch.
+# These files are generated only for tasks that consume a provenance invocation. Remove any
+# leftover copies before deciding whether this compile should create one.
+rm -f .bazel_provenance_build_invocation .bazel_crypt_build_invocation
+
+# if build_patch_id is passed, try to download binaries from specified
+# evergreen patch.
 build_patch_id="${build_patch_id:-${reuse_compile_from}}"
+
+PROVENANCE_BUILD_INVOCATION_FILE="$(
+  bazel_evergreen_shutils::get_provenance_build_invocation_file "${task_name:-}" "${project:-}"
+)"
+
+# A reused binary does not bring along the Bazel invocation that created it. Disable reuse for
+# tasks that need a provenance invocation so the task can compile normally and create one.
+if [[ -n "${build_patch_id}" && -n "${PROVENANCE_BUILD_INVOCATION_FILE}" ]]; then
+  echo "Skipping compile reuse for ${task_name:-<unknown>} because provenance requires a Bazel invocation."
+  build_patch_id=""
+fi
+
 if [[ -n "${build_patch_id}" ]]; then
   echo "build_patch_id detected (${build_patch_id}), attempting to skip ${task_name:-<unknown>} compile via cached artifacts."
 
@@ -205,7 +222,12 @@ ALL_FLAGS+=" ${RELEASE_EXECUTION_LOG_FLAGS}"
 echo "${ALL_FLAGS}" > .bazel_build_flags
 
 # Save the entire bazel build invocation to attach to the task for re-running locally
-echo "bazel build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}" > .bazel_build_invocation
+BUILD_INVOCATION="bazel build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}"
+echo "${BUILD_INVOCATION}" > .bazel_build_invocation
+
+if [[ -n "${PROVENANCE_BUILD_INVOCATION_FILE}" ]]; then
+  echo "${BUILD_INVOCATION}" > "${PROVENANCE_BUILD_INVOCATION_FILE}"
+fi
 
 set +o errexit
 
