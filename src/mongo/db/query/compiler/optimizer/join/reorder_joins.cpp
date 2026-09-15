@@ -17,7 +17,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryJoin
 
 namespace mongo::join_ordering {
 
