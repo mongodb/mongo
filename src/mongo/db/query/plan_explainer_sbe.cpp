@@ -175,8 +175,16 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     bool isCached,
     bool printBytecode,
     bool usedJoinOpt = false,
-    const cost_based_ranker::EstimateMap& _estimates = {}) {
+    const cost_based_ranker::EstimateMap& _estimates = {},
+    boost::optional<size_t> preExtensionSolutionHash = boost::none) {
     BSONObjBuilder bob;
+
+    // The winning solution may have been extended with a pushed-down pipeline, which changes its
+    // hash(). Report the pre-extension hash if stored, so a later command using this hash as
+    // forcedPlanSolutionHash still matches this plan.
+    const auto forceableHash = [&] {
+        return (long long)preExtensionSolutionHash.value_or(solution->hash());
+    };
 
     const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     if (explainPolicy.hasExecStats()) {
@@ -184,7 +192,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         if (solution != nullptr && explainPolicy.hasAllPlansStats()) {
             summary.score = solution->score;
             if (internalQueryAllowForcedPlanByHash.load()) {
-                bob.append("solutionHashUnstable", (long long)solution->hash());
+                bob.append("solutionHashUnstable", forceableHash());
             }
         }
         statsToBSON(&stats, &bob, &bob);
@@ -200,7 +208,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     if (solution != nullptr) {
         statsToBSON(solution->root(), &bob, &bob, _estimates);
         if (internalQueryAllowForcedPlanByHash.load()) {
-            bob.append("solutionHashUnstable", (long long)solution->hash());
+            bob.append("solutionHashUnstable", forceableHash());
         }
     }
 
@@ -585,7 +593,8 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     bool usedJoinOpt,
     cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
-    boost::optional<PlanSelectionStrategy> planSelectionStrategy)
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy,
+    boost::optional<size_t> preExtensionWinningPlanHash)
     : PlanExplainer{solution},
       _root{root},
       _rootData{data},
@@ -595,6 +604,7 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
       _usedJoinOpt{usedJoinOpt},
       _planSelectionStrategy{planSelectionStrategy},
       _cachedPlanHash{cachedPlanHash},
+      _preExtensionWinningPlanHash{preExtensionWinningPlanHash},
       _debugInfo{debugInfo},
       _remoteExplains{remoteExplains},
       _rejectedPlansForJoinOpt{std::move(rejectedPlans)} {
@@ -602,7 +612,10 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
 }
 
 bool PlanExplainerSBEBase::matchesCachedPlan() const {
-    return _cachedPlanHash && (*_cachedPlanHash == _solution->hash());
+    // Compare against the pre-extension hash: a pushed-down winner's hash() reflects the extension,
+    // but the plan cache stores the pre-extension hash.
+    return _cachedPlanHash &&
+        (*_cachedPlanHash == _preExtensionWinningPlanHash.value_or(_solution->hash()));
 }
 
 std::string PlanExplainerSBEBase::getPlanSummary() const {
@@ -675,7 +688,10 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
                                  buildRemotePlanInfo(),
                                  verbosity,
                                  matchesCachedPlan(),
-                                 false /*printBytecode*/);
+                                 false /*printBytecode*/,
+                                 _usedJoinOpt,
+                                 _estimates,
+                                 _preExtensionWinningPlanHash);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStatsQueryPlanner(
@@ -695,7 +711,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStatsQueryPl
                                  matchesCachedPlan(),
                                  printBytecode,
                                  _usedJoinOpt,
-                                 _estimates);
+                                 _estimates,
+                                 _preExtensionWinningPlanHash);
 }
 
 boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
@@ -735,7 +752,9 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            usedJoinOpt,
                            std::move(estimates),
                            std::move(rejectedPlans),
-                           planSelectionStrategy},
+                           planSelectionStrategy,
+                           maybeExplainData ? maybeExplainData->preExtensionWinningPlanHash
+                                            : boost::none},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
       // TODO SERVER-129170: Refactor to avoid copying on the explain path.
       _ceSamplingMetadata{maybeExplainData

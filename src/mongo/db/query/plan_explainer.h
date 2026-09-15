@@ -77,6 +77,10 @@ struct PlanExplainerData {
     // queryPlanner.rankerChoice.reason value. boost::none when no strategy recorded a decision.
     // Explain derives "singlePlan" for the no-ranking (kNone) case instead.
     boost::optional<PlanRankerReason> planRankerReason;
+    // Hash of the winning solution before it was extended with a pushed-down pipeline. Explain
+    // reports this as 'solutionHashUnstable'. This is required to allow forcedPlanSolutionHash to
+    // work, as that is applied before the winning solution is extended too.
+    boost::optional<size_t> preExtensionWinningPlanHash;
 };
 
 inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&& rhs) {

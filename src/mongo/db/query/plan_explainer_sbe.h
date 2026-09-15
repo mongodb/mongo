@@ -46,19 +46,19 @@ struct JoinOptPlan {
 
 class PlanExplainerSBEBase : public PlanExplainer {
 public:
-    PlanExplainerSBEBase(
-        const sbe::PlanStage* root,
-        const stage_builder::PlanStageData* data,
-        const QuerySolution* solution,
-        bool isMultiPlan,
-        bool isCachedPlan,
-        boost::optional<size_t> cachedPlanHash,
-        std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-        RemoteExplainVector* remoteExplains,
-        bool usedJoinOpt = false,
-        cost_based_ranker::EstimateMap estimates = {},
-        std::vector<JoinOptPlan> rejectedPlans = {},
-        boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
+    PlanExplainerSBEBase(const sbe::PlanStage* root,
+                         const stage_builder::PlanStageData* data,
+                         const QuerySolution* solution,
+                         bool isMultiPlan,
+                         bool isCachedPlan,
+                         boost::optional<size_t> cachedPlanHash,
+                         std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+                         RemoteExplainVector* remoteExplains,
+                         bool usedJoinOpt = false,
+                         cost_based_ranker::EstimateMap estimates = {},
+                         std::vector<JoinOptPlan> rejectedPlans = {},
+                         boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none,
+                         boost::optional<size_t> preExtensionWinningPlanHash = boost::none);
 
     bool isSbeExplainer() const final {
         return true;
@@ -123,6 +123,9 @@ protected:
     const bool _usedJoinOpt{false};
     const boost::optional<PlanSelectionStrategy> _planSelectionStrategy{boost::none};
     const boost::optional<size_t> _cachedPlanHash{boost::none};
+    // Winning solution's hash before pipeline extension; see PlanExplainerData. Reported as
+    // 'solutionHashUnstable' so the winning plan can be re-selected with forcedPlanSolutionHash.
+    const boost::optional<size_t> _preExtensionWinningPlanHash{boost::none};
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
     const std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> _debugInfo;

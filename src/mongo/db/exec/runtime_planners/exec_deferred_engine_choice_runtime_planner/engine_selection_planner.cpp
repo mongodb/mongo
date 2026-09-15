@@ -4,6 +4,7 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/query/engine_selection.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 
 namespace mongo::exec_deferred_engine_choice {
 namespace {
@@ -68,6 +69,15 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
     if (solution->root()->getType() == STAGE_EOF || useEofOptimization(_result, cq, pipeline)) {
         _result.engineSelection = EngineChoice::kClassic;
         return;
+    }
+
+    // On explain, snapshot the winning solution's hash before it is extended with a pushed-down
+    // pipeline, so explain can report the value forcedPlanSolutionHash matches against.
+    if (internalQueryAllowForcedPlanByHash.load() && cq->getExpCtxRaw()->getExplain()) {
+        if (!_result.maybeExplainData) {
+            _result.maybeExplainData.emplace();
+        }
+        _result.maybeExplainData->preExtensionWinningPlanHash = solution->hash();
     }
 
     _result.engineSelection = extendSolutionAndSelectEngine(
