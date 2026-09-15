@@ -50,6 +50,7 @@
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/session_workflow_p.h"
@@ -64,6 +65,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -782,9 +784,6 @@ TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisab
 }
 
 TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
-    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
-    unittest::ServerParameterGuard burstCapacitySecs{
-        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
     unittest::ServerParameterGuard maxQueueDepth{"ingressConnectionEstablishmentMaxQueueDepth", 10};
     const auto initialAvailable = getConnectionStats()["available"].numberLong();
 
@@ -793,7 +792,12 @@ TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
 
-    // The next session fails to get a token and queues until it is interrupted.
+    // Configure the failpoint to make the next session fail to get a token and stay queued until it
+    // is interrupted.
+    FailPointEnableBlock hangInRateLimiterFp(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
+
     initializeNewSession();
     startSession();
 
@@ -854,15 +858,18 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
  * Verifies that rateLimitInterrupted is incremented when a queued session's client disconnects.
  */
 TEST_F(ConnectionEstablishmentQueueingTest, RateLimitInterruptedOnClientDisconnect) {
-    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
-    unittest::ServerParameterGuard burstCapacitySecs{
-        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
     unittest::ServerParameterGuard maxQueueDepth{"ingressConnectionEstablishmentMaxQueueDepth", 10};
 
     // First session consumes the burst token.
     startSession();
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
+
+    // Configure the failpoint to make the next session fail to get a token and stay queued until
+    // it disconnects.
+    FailPointEnableBlock hangInLimiterFp(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
 
     // Capture the second session's client when it connects.
     Client* queuedClient = nullptr;
