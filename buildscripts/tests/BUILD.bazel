@@ -35,6 +35,19 @@ py_test(
 )
 
 py_test(
+    name = "test_multiversion_downloads_filter",
+    srcs = ["test_multiversion_downloads_filter.py"],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:multiversion_downloads_filter",
+    ],
+)
+
+py_test(
     name = "test_mongo_toolchain",
     srcs = ["test_mongo_toolchain.py"],
     data = ["//bazel:bazelisk"],

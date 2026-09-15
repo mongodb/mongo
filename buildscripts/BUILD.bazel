@@ -48,6 +48,16 @@ py_binary(
 )
 
 py_library(
+    name = "multiversion_downloads_filter",
+    srcs = ["multiversion_downloads_filter.py"],
+    data = ["//src/mongo/util/version:releases.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_library(
     name = "build_system_options",
     srcs = ["build_system_options.py"],
     visibility = ["//visibility:public"],
