@@ -437,11 +437,16 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
-
-        // Randomly skip moveCollections if there are sharded collections that could be balanced.
+        // Don't issue moveCollection if there are only two non-draining shards, as that would
+        // consume both, leaving the draining shard unable to migrate chunks off in this round.
         auto drainingShardIter = std::find_if(
             allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
         bool isDraining = drainingShardIter != allShards.end();
+        if (isDraining && randomizedAvailableShards.size() <= 2) {
+            return result;
+        }
+
+        // Randomly skip moveCollections if there are sharded collections that could be balanced.
         if (opCtx->getClient()->getPrng().trueWithProbability(skipMoveCollectionThreshold) &&
             clusterHasShardedCollections(opCtx, isDraining)) {
             return result;
