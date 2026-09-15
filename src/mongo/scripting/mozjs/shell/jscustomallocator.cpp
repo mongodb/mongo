@@ -107,6 +107,18 @@ void signal_oom() {
     }
 }
 
+void signal_recoverable_oom() {
+    auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
+    if (scope) {
+        // Deliberately only records where we are. SpiderMonkey has not given up on this
+        // allocation yet -- JSRuntime::onOutOfMemory() is about to collect and retry, and that
+        // retry often succeeds -- so poisoning the scope here would turn recoverable memory
+        // pressure into a hard failure. 'overwrite' is false so this breadcrumb never displaces
+        // the site of an allocation that actually proved fatal.
+        scope->captureOOMLocation(false /* overwrite */);
+    }
+}
+
 /**
  * Called after an mmap allocation to update memory bookkeeping and check whether an oom signal is
  * required. If track_mmap_bytes is disabled we fall back to legacy logic and completely bypass this
@@ -215,6 +227,13 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 #endif
 
     if (!p) {
+        // The underlying allocator failed, as opposed to us refusing the allocation above. This is
+        // the only signal we get when no jsHeapLimitMB budget is configured, which is how the test
+        // shell runs by default. It is not necessarily fatal -- JSRuntime::onOutOfMemory() is
+        // about to collect and retry, and that retry often succeeds -- so record where we were
+        // and let SpiderMonkey decide. Failing the scope here would turn recoverable pressure
+        // into a hard failure.
+        signal_recoverable_oom();
         return nullptr;
     }
 

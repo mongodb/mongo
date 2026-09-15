@@ -430,7 +430,19 @@ public:
     static const char* const kInvokeResult;
 
     static MozJSImplScope* getThreadScope();
+
+    /**
+     * Handles an out-of-memory condition this scope cannot come back from: records where
+     * JavaScript was, marks the scope poisoned, and interrupts execution.
+     */
     void setOOM();
+
+    /**
+     * Records "file:line" of the currently running JavaScript frame, for a later report to
+     * describe. Must be called while the frames are still live -- by the time an error reaches
+     * _checkErrorState() the stack has unwound and there is nothing left to capture.
+     */
+    void captureOOMLocation(bool overwrite);
     void setParentStack(std::string);
     const std::string& getParentStack() const;
 
@@ -463,6 +475,15 @@ public:
     }
 
     std::string buildStackString();
+
+    /**
+     * "file:line" of the JavaScript frame that was running when SpiderMonkey first reported an
+     * out-of-memory condition, or empty if no OOM has been reported (or it happened outside any
+     * scripted frame). Points into storage owned by this scope.
+     */
+    std::string_view getOOMLocation() const {
+        return _hasOOMLocation ? std::string_view{_oomLocation} : std::string_view{};
+    }
 
     template <typename T, typename... Args>
     T* trackedNew(Args&&... args) {
@@ -547,6 +568,8 @@ public:
         return _global;
     }
 
+    static constexpr size_t kMaxOOMLocationSize = 256;
+
 private:
     template <typename ImplScopeFunction>
     auto _runSafely(ImplScopeFunction&& functionToRun) -> decltype(functionToRun());
@@ -579,6 +602,14 @@ private:
 
     static bool _interruptCallback(JSContext* cx);
     static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
+
+    /**
+     * Records where JavaScript execution was when SpiderMonkey reported an out-of-memory
+     * condition.
+     */
+    static void _outOfMemoryCallback(JSContext* cx, void* data);
+
+
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
     Status _checkForPendingException();
 
@@ -633,6 +664,12 @@ private:
     bool _requireOwnedObjects;
     Deferred<std::string (*)(const MozJSImplScope&)> _baseURL;
     bool _hasOutOfMemoryException;
+
+    // "file:line" of the frame that was running when SpiderMonkey first reported OOM, filled in
+    // by _outOfMemoryCallback. A fixed buffer rather than a std::string because the callback runs
+    // at the OOM site under AutoSuppressGC, where allocating is precisely what just failed.
+    char _oomLocation[kMaxOOMLocationSize] = {};
+    bool _hasOOMLocation = false;
 
     const std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;

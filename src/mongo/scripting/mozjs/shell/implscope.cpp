@@ -23,6 +23,9 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -50,6 +53,7 @@
 #include <js/GCAPI.h>
 #include <js/GCVector.h>
 #include <js/Initialization.h>
+#include <js/MemoryCallbacks.h>
 #include <js/Modules.h>
 #include <js/Object.h>
 #include <js/Promise.h>
@@ -177,9 +181,34 @@ bool isLogFormatJson(MozJSScriptEngine* engine,
 }
 
 /**
+ * A snapshot of the shell's JavaScript memory accounting, plus where execution was when it was
+ * taken.
+ */
+struct JSMemoryStats {
+    size_t totalBytes;
+    size_t mallocBytes;
+    size_t mmapBytes;
+    size_t maxBytes;
+    uint64_t gcHeapBytes;
+    std::string_view site;
+    std::string jsStack;
+};
+
+JSMemoryStats collectJSMemoryStats(JSContext* cx) {
+    auto* scope = getScope(cx);
+    return {mongo::sm::get_total_bytes(),
+            mongo::sm::get_malloc_bytes(),
+            mongo::sm::get_mmap_bytes(),
+            mongo::sm::get_max_bytes(),
+            js::GetGCHeapUsage(cx),
+            scope ? scope->getOOMLocation() : std::string_view{},
+            scope ? scope->buildStackString() : std::string{}};
+}
+
+/**
  * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
  */
-void logStatus(const Status& status, bool plainShell) {
+void logStatus(JSContext* cx, const Status& status, bool reportMemoryDiagnostics, bool plainShell) {
     if (plainShell) {
         str::stream ss;
         ss << redact(status.reason());
@@ -188,6 +217,20 @@ void logStatus(const Status& status, bool plainShell) {
                 ss << " : " << extraInfo->extraAttr;
             }
             ss << " :\n" << extraInfo->stack;
+        }
+
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            ss << " :: JS heap:"
+               << " totalBytes=" << mem.totalBytes << " mallocBytes=" << mem.mallocBytes
+               << " mmapBytes=" << mem.mmapBytes << " gcHeapBytes=" << mem.gcHeapBytes
+               << " maxBytes=" << mem.maxBytes;
+            if (!mem.site.empty()) {
+                ss << " :: JS memory site: " << mem.site;
+            }
+            if (!mem.jsStack.empty()) {
+                ss << " :\n" << mem.jsStack;
+            }
         }
 
         LOGV2_INFO_OPTIONS(
@@ -212,6 +255,23 @@ void logStatus(const Status& status, bool plainShell) {
             }
             if (!extraInfo->extraAttr.isEmpty()) {
                 attrs.add("extra", extraInfo->extraAttr);
+            }
+        }
+
+        BSONArray jsStackArr;
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            attrs.add("totalBytes", mem.totalBytes);
+            attrs.add("mallocBytes", mem.mallocBytes);
+            attrs.add("mmapBytes", mem.mmapBytes);
+            attrs.add("gcHeapBytes", mem.gcHeapBytes);
+            attrs.add("maxBytes", mem.maxBytes);
+            if (!mem.site.empty()) {
+                attrs.add("jsMemorySite", mem.site);
+            }
+            if (!mem.jsStack.empty()) {
+                jsStackArr = splitToBSONArray(mem.jsStack, '\n');
+                attrs.add("jsStack", jsStackArr);
             }
         }
         if (status.reason().starts_with(ErrorMessage::kUncaughtException)) {
@@ -357,6 +417,57 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     }
 
     return scope->_status.isOK();
+}
+
+void MozJSImplScope::captureOOMLocation(bool overwrite) {
+    if (_hasOOMLocation && !overwrite) {
+        // A recoverable report never displaces what is already recorded: the first one is the
+        // deepest frame, closest to the allocation that failed, and later ones unwind toward
+        // progressively less specific callers. An unrecoverable report does overwrite, because
+        // it is the allocation that actually killed the scope -- any earlier breadcrumb was from
+        // pressure SpiderMonkey went on to recover from.
+        return;
+    }
+
+    // This runs at the OOM site -- either inside the allocator on a failed allocation, or from
+    // JSContext::onOutOfMemory() under gc::AutoSuppressGC -- so it has to tolerate both. Minimize
+    // needing to do anything that could allocate, and don't assert on failure. This is best
+    // effort, as for example, SpiderMonkey may do its own allocation. If this does fail, we simply
+    // lose the location, which the caller treats as unremarkable.
+    JS::AutoFilename filename;
+    uint32_t lineno = 0;
+    if (!JS::DescribeScriptedCaller(&filename, _context, &lineno)) {
+        // No scripted frame -- the OOM happened in engine or embedding code.
+        return;
+    }
+
+    const char* name = filename.get();
+    if (!name) {
+        return;
+    }
+
+    const int needed = snprintf(_oomLocation, sizeof(_oomLocation), "%s:%u", name, lineno);
+    if (needed < 0) {
+        return;
+    }
+    if (static_cast<size_t>(needed) >= sizeof(_oomLocation)) {
+        // Truncated. The line number is at the end, so it is what gets cut: a path long enough to
+        // truncate would otherwise report "<file>:100" for what is really line 1000. Mark it so
+        // the reader can see the value is incomplete rather than trusting it.
+        static constexpr std::string_view kTruncationMarker = "...";
+        std::memcpy(_oomLocation + sizeof(_oomLocation) - kTruncationMarker.size() - 1,
+                    kTruncationMarker.data(),
+                    kTruncationMarker.size());
+    }
+    _hasOOMLocation = true;
+}
+
+void MozJSImplScope::_outOfMemoryCallback(JSContext* cx, void* data) {
+    // SpiderMonkey has exhausted its own recovery and is about to report the OOM, so this is
+    // unrecoverable; see setOOM().
+    if (auto* scope = getScope(cx)) {
+        scope->setOOM();
+    }
 }
 
 void MozJSImplScope::_gcCallback(JSContext* rt,
@@ -609,6 +720,9 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, static_cast<MozJSCommonRuntimeInterface*>(this));
+        // Must come after JS_SetContextPrivate: the callback resolves its scope through the
+        // context private.
+        JS::SetOutOfMemoryCallback(_context, _outOfMemoryCallback, nullptr);
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
@@ -1318,8 +1432,45 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     // expected to report and clear the errors before returning.
     JS_ClearPendingException(_context);
 
-    if (reportError)
-        logStatus(_status, !isLogFormatJson(_engine, _context, _global));
+    // Requiring _inOp keeps this to OOMs raised while JavaScript was executing
+    const bool abortForOOM = _hasOutOfMemoryException && _inOp > 0 &&
+        _engine->executionEnvironment() == ExecutionEnvironment::TestRunner &&
+        _engine->getJSAbortOnOutOfMemory();
+
+    if (reportError || abortForOOM) {
+        // logStatus() allocates -- it builds strings and, for an OOM, walks the JavaScript stack --
+        // so under the very condition it is most wanted for it can itself fail to allocate and
+        // throw. Losing the report is acceptable; losing the core dump because the report threw on
+        // the way to it is not, since the core contains everything the report would have said and
+        // costs no allocation. So when a dump is pending, a failed report is swallowed rather than
+        // propagated. Otherwise it propagates as before.
+        try {
+            logStatus(_context,
+                      _status,
+                      _hasOutOfMemoryException,
+                      !isLogFormatJson(_engine, _context, _global));
+        } catch (...) {
+            if (!abortForOOM) {
+                throw;
+            }
+        }
+    }
+
+    if (abortForOOM) {
+        // Aborting produces a core dump of the whole process, every thread included, and needs no
+        // allocation to do it. The shell exits immediately after reporting an unrecoverable OOM
+        // anyway, so there is no execution left to preserve.
+        LOGV2_FATAL_CONTINUE(13403900,
+                             "JavaScript out of memory; aborting to capture a core dump",
+                             "errmsg"_attr = redact(_status.reason()));
+
+        // TODO SERVER-100809: abort() on Windows reaches MiniDumpWriteDump() on this same process
+        // which is a known deadlock. Re-enable once the dump is taken out of process.
+#ifndef _WIN32
+        std::abort();
+#else
+#endif
+    }
 
     // Clear the status state
     auto status = std::move(_status);
@@ -1392,6 +1543,7 @@ MozJSImplScope* MozJSImplScope::getThreadScope() {
 }
 
 void MozJSImplScope::setOOM() {
+    captureOOMLocation(true /* overwrite */);
     _hasOutOfMemoryException = true;
     JS_RequestInterruptCallbackCanWait(_context);
 }

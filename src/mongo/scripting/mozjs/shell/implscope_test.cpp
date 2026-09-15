@@ -9,6 +9,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string>
 
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <js/RootingAPI.h>
@@ -19,6 +20,109 @@ namespace mozjs {
 namespace {
 
 class MozJSImplScopeTest : public unittest::Test {};
+
+std::string gCapturedJSStack;
+
+BSONObj captureJSStackHook(const BSONObj& args, void* data) {
+    auto* implscope = static_cast<mongo::mozjs::MozJSImplScope*>(data);
+    gCapturedJSStack = implscope->buildStackString();
+    return BSONObj();
+}
+
+// captureOOMLocation() formats "<file>:<line>" into a fixed buffer, so a long enough script name
+// pushes the line number off the end. Truncating silently would be worse than useless: the reader
+// would see "<file>:100" and have no way to know the real line was 1000. Drive it from a native
+// hook so the capture happens with a live scripted frame, exactly as it does at an OOM.
+BSONObj captureOOMLocationHook(const BSONObj& args, void* data) {
+    static_cast<mongo::mozjs::MozJSImplScope*>(data)->captureOOMLocation(true /* overwrite */);
+    return BSONObj();
+}
+
+TEST_F(MozJSImplScopeTest, OOMLocationIsMarkedWhenTruncated) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+        scope->injectNative("__captureOOMLocation", captureOOMLocationHook, implscope);
+
+        // A short name leaves the line number intact, so nothing should be marked.
+        scope->exec("__captureOOMLocation();",
+                    "shortName.js",
+                    false /* printResult */,
+                    true /* reportError */,
+                    true /* assertOnError */);
+        const auto untruncated = implscope->getOOMLocation();
+        ASSERT_FALSE(untruncated.empty());
+        ASSERT_TRUE(untruncated.ends_with(":1")) << untruncated;
+        ASSERT_FALSE(untruncated.ends_with("...")) << untruncated;
+
+        // A name longer than the buffer must be reported as incomplete rather than as a plausible
+        // but wrong "<file>:<line>".
+        const std::string longName(2 * MozJSImplScope::kMaxOOMLocationSize, 'x');
+        scope->exec("__captureOOMLocation();",
+                    longName,
+                    false /* printResult */,
+                    true /* reportError */,
+                    true /* assertOnError */);
+        const auto truncated = implscope->getOOMLocation();
+        ASSERT_EQ(truncated.size(), MozJSImplScope::kMaxOOMLocationSize - 1);
+        ASSERT_TRUE(truncated.ends_with("...")) << truncated;
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+// The out-of-memory abort must key off the engine's own signal, not the error message. Matching
+// the message let ordinary JavaScript reach the abort with `throw new Error("out of memory")`,
+// which would dump core on a script the user wrote. hasOutOfMemoryException() is only set by
+// setOOM(), from the allocator and SpiderMonkey's callback, so JavaScript cannot forge it.
+TEST_F(MozJSImplScopeTest, JsThrownOutOfMemoryMessageIsNotTreatedAsRealOOM) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        ASSERT_THROWS(scope->exec("throw new Error('out of memory');",
+                                  "jsThrownOOM",
+                                  false /* printResult */,
+                                  true /* reportError */,
+                                  true /* assertOnError */),
+                      DBException);
+
+        // The message says "out of memory", but the engine never reported one.
+        ASSERT_FALSE(implscope->hasOutOfMemoryException());
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, BuildStackStringResolvesJSFramesDuringExecution) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        gCapturedJSStack.clear();
+        scope->injectNative("__captureJSStack", captureJSStackHook, implscope);
+        scope->exec(
+            "function aDistinctlyNamedFrame() { __captureJSStack(); }"
+            "aDistinctlyNamedFrame();",
+            "buildStackStringTest",
+            false /* printResult */,
+            true /* reportError */,
+            true /* assertOnError */);
+
+        // The captured stack must name the JS function that was on the stack; an empty or
+        // frameless string would make the OOM report no more useful than it is today.
+        ASSERT_FALSE(gCapturedJSStack.empty());
+        ASSERT_STRING_CONTAINS(gCapturedJSStack, "aDistinctlyNamedFrame");
+    }
+    setGlobalScriptEngine(nullptr);
+}
 
 TEST_F(MozJSImplScopeTest, JsExceptionToStatusOutOfMemoryCheck) {
     mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);

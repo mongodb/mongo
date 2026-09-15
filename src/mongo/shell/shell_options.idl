@@ -110,6 +110,14 @@ configs:
     "jsHeapLimitMB":
         description: "set the js scope's heap size limit"
         arg_vartype: Int
+    "jsAbortOnOutOfMemory":
+        description:
+            "abort on an unrecoverable JavaScript out-of-memory condition, so that the kernel
+            writes a core dump of the exhausted heap. The shell exits immediately after reporting
+            such an OOM regardless, so this trades a reported error for a core containing the
+            memory that caused it."
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.jsAbortOnOutOfMemory
 
     "setShellParameter":
         description: "Set a configurable parameter"

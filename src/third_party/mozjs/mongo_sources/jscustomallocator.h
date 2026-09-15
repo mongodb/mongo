@@ -46,6 +46,12 @@ size_t get_malloc_bytes();
 size_t get_mmap_bytes();
 void signal_oom();
 
+/**
+ * Called when an allocation failed but SpiderMonkey may still recover from it by collecting and
+ * retrying. Records diagnostics without failing the scope.
+ */
+void signal_recoverable_oom();
+
 // Force the N-th and all subsequent allocations through the MozJS custom
 // allocator to return nullptr. Pass -1 to disable. Test-only; no-op in
 // release builds.

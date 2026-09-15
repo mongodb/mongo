@@ -83,6 +83,7 @@ struct ShellGlobalParams {
     bool jsDebugMode = false;
 
     int jsHeapLimitMB = 0;
+    bool jsAbortOnOutOfMemory = false;
     AssignableAtomicBool nokillop{false};
     Seconds idleSessionTimeout = Seconds{0};
 
