@@ -103,6 +103,28 @@ protected:
             .getOwned();
     }
 
+    // Builds the o2 of a repairReplicatedMetadata no-op entry.
+    BSONObj makeRepairO2(const test_helpers::NsAndUUID& coll, int64_t sz, int64_t ct) {
+        return BSON("type" << "repairReplicatedMetadata"
+                           << "uuid" << coll.uuid << "m" << BSON("sz" << sz << "ct" << ct));
+    }
+
+    // Builds a noop (`n`) oplog BSON carrying the supplied `o2`, mirroring the
+    // repairReplicatedMetadata entry shape: {op: "n", o: {msg: ...}, o2: {...}}.
+    BSONObj makeNoopWithO2Bson(Timestamp ts, BSONObj o2) {
+        return repl::DurableOplogEntry{
+            repl::DurableOplogEntryParams{
+                .opTime = opTimeAt(ts),
+                .opType = repl::OpTypeEnum::kNoop,
+                .nss = NamespaceString(),
+                .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+                .o2Field = std::move(o2),
+                .wallClockTime = Date_t::now(),
+            }}
+            .toBSON()
+            .getOwned();
+    }
+
     // Builds a `c` (command) oplog BSON whose first o-field is a known no-delta command
     // (createIndexes). Layer 1 returns kCountedNoDelta.
     BSONObj makeUnrelatedCommandBson(Timestamp ts) {
@@ -699,6 +721,112 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudHashWithoutSz_FallsThrou
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
               (CollectionSizeCount{.size = 0, .count = 0}));
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_RecordsExplicitDiff) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, makeRepairO2(collA, 100, 5))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 5}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepair_FoldsWithCrudDeltaForSameCollection) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const auto result =
+        runAccumulatorRaw({makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10)),
+                           makeNoopWithO2Bson(ts2, makeRepairO2(collA, -3, -1))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 7, .count = 0}));
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_PreservesExistingHashFromPriorCrud) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash)),
+         makeNoopWithO2Bson(ts2, makeRepairO2(collA, -3, -1))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 7, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopWithUnrelatedO2Type_NoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(ts,
+                            BSON("type" << "someOtherNoopKind" << "uuid" << collA.uuid << "m"
+                                        << BSON("sz" << 1 << "ct" << 1)))});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairMissingUuid_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata"
+                                << "m" << BSON("sz" << 100 << "ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_MissingCtDefaultsToZero) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 0}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_MissingSzDefaultsToZero) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 5}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericSz_Ignored) {
+    // `sz` is present but malformed: the whole entry is ignored, even though `ct` is well-formed.
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << "notanumber" << "ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericCt_Ignored) {
+    // `ct` is present but malformed: the whole entry is ignored, even though `sz` is well-formed.
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "ct" << "notanumber"));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairEmptyM_NoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto o2 =
+        BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m" << BSONObj());
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
 }
 
 // ----- Death tests for unsupported data shapes -----

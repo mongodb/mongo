@@ -28,10 +28,12 @@ using namespace std::literals::string_view_literals;
 //
 // Layer 1 catches "no delta possible" entries from raw BSON: noop / km / container ops and
 // commands whose `o.firstElement` isn't in the set we dispatch on. Direct CRUD on a fast-count-
-// store namespace lands here too.
+// store namespace lands here too. A noop whose o2 identifies a repairReplicatedMetadata entry is
+// routed to Layer 2 instead, since it carries explicit metadata diff.
 //
 // Layer 2 handles single-op CRUD (`i`/`u`/`d`) on user collections that carry an `m` size-
-// metadata object. It computes the delta and records it directly.
+// metadata object, and repairReplicatedMetadata noop entries. It computes the delta and records
+// it directly.
 //
 // Anything else (importCollection, kCreate-from-migrate, partial-txn chain members, malformed
 // entries) falls through to the Layer 3 OplogEntry::parse path inside DeltaAccumulator.
@@ -53,7 +55,7 @@ void recordCollectionReplicatedMetadataDelta(
 // Fields we read from a raw oplog BSON during the fast lanes. References live inside `raw`. The
 // caller must keep that BSONObj alive.
 struct ScanFields {
-    BSONElement op, ns, ui, m, o, ts, container;
+    BSONElement op, ns, ui, m, o, o2, ts, container;
 };
 
 // Single forward iteration over `raw`, capturing only the fields the fast lanes need. Also
@@ -76,6 +78,8 @@ ScanFields extractScanFields(const BSONObj& raw) {
                 const char a = fname[0], b = fname[1];
                 if (a == 'o' && b == 'p') {
                     v.op = elem;
+                } else if (a == 'o' && b == '2') {
+                    v.o2 = elem;
                 } else if (a == 'n' && b == 's') {
                     v.ns = elem;
                 } else if (a == 'u' && b == 'i') {
@@ -153,8 +157,20 @@ enum class FastDecision {
     kCrud,
     kApplyOps,
     kCommitTxn,
+    kNoopRepair,
     kNeedsParse,
 };
+
+// The `type` discriminator value carried in the o2 of a no-op oplog entry that repairs a
+// collection's replicated metadata with explicit size/count diffs.
+constexpr std::string_view kRepairReplicatedMetadataType = "repairReplicatedMetadata"sv;
+
+// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
+bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
+    const auto typeElem = o2.getField("type"sv);
+    return typeElem.type() == BSONType::string &&
+        typeElem.valueStringData() == kRepairReplicatedMetadataType;
+}
 
 FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
     if (f.op.type() != BSONType::string) {
@@ -169,6 +185,9 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
             case 'd':
                 return FastDecision::kCrud;
             case 'n':
+                if (f.o2.type() == BSONType::object && isRepairReplicatedMetadataO2(f.o2.Obj())) {
+                    return FastDecision::kNoopRepair;
+                }
                 return FastDecision::kCountedNoDelta;
             case 'c':
                 switch (classifyCommand(f.o, raw)) {
@@ -444,6 +463,54 @@ boost::optional<int> tryFastCommitTxn(const ScanFields& f,
     return processed;
 }
 
+// Extracts the collection uuid and metadata diff from a repairReplicatedMetadata o2 object.
+// Returns boost::none if the shape is malformed (missing/non-numeric fields, unparsable uuid).
+// Unlike CRUD's `m`, a no-op's o2 isn't otherwise validated by replication, so a malformed repair
+// entry is ignored (no delta) rather than treated as fatal.
+boost::optional<std::pair<UUID, CollectionSizeCount>> tryExtractNoopRepairDiff(
+    const BSONObj& o2Obj) {
+    const auto uuidElem = o2Obj.getField("uuid"sv);
+    const auto mElem = o2Obj.getField("m"sv);
+    if (uuidElem.eoo() || !mElem.isABSONObj()) {
+        return boost::none;
+    }
+    const auto mObj = mElem.Obj();
+    const auto szElem = mObj.getField("sz"sv);
+    const auto ctElem = mObj.getField("ct"sv);
+    if (szElem.eoo() && ctElem.eoo()) {
+        return boost::none;
+    }
+    // `sz` and `ct` are each optional but a present field must be numeric; malformed input
+    // invalidates the whole entry rather than partially applying it.
+    if ((!szElem.eoo() && !szElem.isNumber()) || (!ctElem.eoo() && !ctElem.isNumber())) {
+        return boost::none;
+    }
+    auto uuid = UUID::parse(uuidElem);
+    if (!uuid.isOK()) {
+        return boost::none;
+    }
+    return std::make_pair(uuid.getValue(),
+                          CollectionSizeCount{.size = szElem.eoo() ? 0 : szElem.safeNumberLong(),
+                                              .count = ctElem.eoo() ? 0 : ctElem.safeNumberLong()});
+}
+
+// Layer 2: handle a no-op entry whose o2 repairs a collection's replicated metadata. A malformed
+// o2 is ignored (no delta) rather than surfaced as an error. Always fully handled.
+int tryRecordFastNoopRepair(const ScanFields& f,
+                            ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    if (auto diff = tryExtractNoopRepairDiff(f.o2.Obj())) {
+        recordCollectionReplicatedMetadataDelta(
+            diff->first,
+            CollectionReplicatedMetadata{
+                .sizeCount =
+                    CollectionSizeCount{.size = diff->second.size, .count = diff->second.count},
+                .hash = kEmptyCollectionValidationHash},
+            replicatedMetadataDeltasOut);
+        return 1;
+    }
+    return 0;
+}
+
 // Returns true if the oplog entry is a container operation on a replicated fast count ident.
 bool isContainerOpOnFastCountIdent(const repl::OplogEntry& oplogEntry) {
     auto container = oplogEntry.getContainer();
@@ -596,6 +663,17 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
                     recordCheckpointSizeCountEntryProcessed(outcome.processed);
+                }
+                return;
+            }
+            case FastDecision::kNoopRepair: {
+                const int handled = tryRecordFastNoopRepair(fields, _result.deltas);
+                if (fields.ts.type() == BSONType::timestamp) {
+                    _result.lastTimestamp = fields.ts.timestamp();
+                }
+                if (_options.isCheckpoint) {
+                    recordCheckpointOplogEntryProcessed();
+                    recordCheckpointSizeCountEntryProcessed(handled);
                 }
                 return;
             }
