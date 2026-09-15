@@ -102,6 +102,45 @@ protected:
     };
 };
 
+TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushFailureIncrementsFlushFailureCountMetric) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+    }
+
+    // Configure failpoint before starting the flusher and tailer threads.
+    FailPointEnableBlock failFp("failDuringFlush");
+    _coordinator->startup(getServiceContext());
+
+    // Write an oplog entry so the flusher has something to flush.
+    writeInsert(Timestamp(1, 1));
+
+    // Spawn a separate thread to requestFlush() until the failpoint is reached.
+    Atomic<bool> stop{false};
+    stdx::thread driver([&] {
+        while (!stop.load()) {
+            repl::signalOplogWaiters();
+            _coordinator->requestFlush();
+            sleepmillis(10);
+        }
+    });
+    failFp->waitForTimesEntered(failFp.initialTimesEntered() + 1);
+    stop.store(true);
+    driver.join();
+
+    // The destructor joins the flush thread. The join cannot return until the thread has run the
+    // loop's catch (incrementing the failure metric) and exited, so the assertions need no
+    // polling.
+    _coordinator.reset();
+
+    // The flusher may receive several signals before the driver thread stops, and each iteration
+    // will increment the failure metric. The failpoint is never disabled, though, so the other
+    // metrics must be zero.
+    EXPECT_GE(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 0);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 0);
+}
+
 TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
        FlushSyncWithNoNewDataPreservesPersistedTimestamp) {
     const Timestamp persistedTs(10, 5);
@@ -132,33 +171,6 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushSyncAdvancesTimestampAf
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(ts));
 }
 
-TEST_F(SizeCountCheckpointCoordinatorTest, FlushFailureIncrementsFlushFailureCountMetric) {
-    OtelMetricsCapturer capturer;
-    if (!capturer.canReadMetrics()) {
-        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
-    }
-
-    // The failure metric is incremented by the flush thread's run() loop, which the synchronous
-    // flushSync_ForTest path does not exercise, so drive the real flush thread.
-    FailPointEnableBlock failFp("failDuringFlush");
-    _coordinator->startup(getServiceContext());
-    _coordinator->requestFlush();
-
-    // Wait until the flush has reached the failpoint, so destruction cannot preempt the flush
-    // before run()'s catch classifies the failure and increments the metric.
-    failFp->waitForTimesEntered(failFp.initialTimesEntered() + 1);
-
-    // The destructor joins the flush thread. The join cannot return until the thread has run
-    // run()'s catch (incrementing the metric) and exited, so the assertion needs no polling.
-    _coordinator.reset();
-
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
-
-    // A failed flush does not increment success metrics.
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 0);
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 0);
-}
-
 TEST_F(SizeCountCheckpointCoordinatorTest,
        DestructorJoinsBackgroundThreadsWithoutExplicitShutdown) {
     {
@@ -181,13 +193,13 @@ TEST_F(SizeCountCheckpointCoordinatorTest, DestructorDuringFlushCycleInterruptsA
         _coordinator->requestFlush();
         hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
 
-        // Destroy the coordinator while the flush thread is stalled inside _runOneFlushCycle.
+        // Destroy the coordinator while the flush thread is stalled inside flush().
         // The destructor interrupts the flush thread's opCtx, but the thread cannot unblock
         // until the failpoint is disabled (pauseWhileSet does not check the opCtx).
         destroyer = stdx::thread([&] { _coordinator.reset(); });
 
         // Scope exit: disables failpoint. The flush thread then observes the interrupted opCtx
-        // and surfaces InterruptedDueToReplStateChange, which run() treats as a benign
+        // and surfaces InterruptedDueToReplStateChange, which the flush loop treats as a benign
         // replication-state change (not a flush failure) before exiting the loop.
     }
 
@@ -222,7 +234,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndDestructorNe
 
 /**
  * Round-trip coverage for the validation hash over the production flush path: the tailer scans the
- * oplog, the buffer accumulates, and `SizeCountCheckpointFlusher::_doFlush()` persists.
+ * oplog, the buffer accumulates, and `flusher::flush()` persists.
  */
 class SizeCountCheckpointCoordinatorHashTest : public CatalogTestFixture {
 public:

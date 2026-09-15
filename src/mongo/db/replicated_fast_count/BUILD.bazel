@@ -203,7 +203,6 @@ mongo_cc_library(
         "replicated_fast_count_advance_checkpoint",
         "replicated_fast_count_metrics",
         "replicated_fast_count_streaming_oplog_delta_accumulator",
-        "size_count_checkpoint_buffer",
         "size_count_store",
         "size_count_timestamp_store",
         "//src/mongo/db/shard_role",
@@ -511,6 +510,30 @@ mongo_cc_unit_test(
         "replicated_fast_count_test_helpers",
         "size_count_checkpoint_buffer",
         "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "size_count_checkpoint_flusher_test",
+    srcs = [
+        "size_count_checkpoint_flusher_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "replicated_fast_count_init",
+        "replicated_fast_count_metrics",
+        "replicated_fast_count_test_helpers",
+        "size_count_checkpoint_flusher",
+        "size_count_store",
+        "size_count_timestamp_store",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:record_store_write_conflict_fail_points",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/util:fail_point",
     ],
 )
 

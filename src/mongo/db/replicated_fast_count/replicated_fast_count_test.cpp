@@ -493,67 +493,6 @@ TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
         applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
-TEST_F(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-
-    const int64_t numInitialDocs = 5;
-    const int64_t initialSize = numInitialDocs * sampleDocForInsert.objsize();
-    const int64_t numExtraDocs = 5;
-    const int64_t numTotalDocs = numInitialDocs + numExtraDocs;
-    const int64_t totalSize = numTotalDocs * sampleDocForInsert.objsize();
-
-    test_helpers::insertDocs(_opCtx,
-                             _fastCountManager,
-                             _nss1,
-                             numInitialDocs,
-                             0,
-                             0,
-                             docGeneratorForInsert,
-                             sampleDocForInsert);
-
-    checkCommittedSizeCount(_opCtx, _uuid1, {.size = initialSize, .count = numInitialDocs});
-    stdx::thread iterThread;
-
-    {
-        FailPointEnableBlock fp("hangAfterReplicatedFastCountSnapshot");
-        auto initialTimesEntered = fp.initialTimesEntered();
-
-        iterThread = stdx::thread([this] {
-            auto clientForThread = getService()->makeClient("ReplicatedFastCountBackground");
-            auto opCtxHolder = clientForThread->makeOperationContext();
-            auto* opCtxForThread = opCtxHolder.get();
-            // Hang after we make a copy of the _metadata map which should include our initial
-            // inserts to the collection, but before we actually write to disk and change our dirty
-            // flag for the collection we wrote to.
-            _fastCountManager->flushSync_ForTest(opCtxForThread);
-        });
-
-        fp->waitForTimesEntered(initialTimesEntered + 1);
-
-        test_helpers::insertDocs(_opCtx,
-                                 _fastCountManager,
-                                 _nss1,
-                                 numExtraDocs,
-                                 numInitialDocs,
-                                 numInitialDocs * sampleDocForInsert.objsize(),
-                                 docGeneratorForInsert,
-                                 sampleDocForInsert);
-
-        checkCommittedSizeCount(_opCtx, _uuid1, {.size = totalSize, .count = numTotalDocs});
-        // Disable failpoint by letting it go out of scope.
-    }
-
-    iterThread.join();
-
-    // If the dirty metadata wasn't incorrectly cleared, this flush should persist our second batch
-    // of inserts.
-    _fastCountManager->flushSync_ForTest(_opCtx);
-
-    // Verify that all of our writes were persisted to disk.
-    test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx, _uuid1, true, numTotalDocs, totalSize);
-}
-
 // TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
 // counts. Test for drop, create.
 

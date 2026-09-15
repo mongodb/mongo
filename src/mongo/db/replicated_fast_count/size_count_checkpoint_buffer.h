@@ -54,9 +54,9 @@ public:
     void scanToNoHolesEOF(SeekableRecordCursor& cursor);
 
     /**
-     * Acknowledges that the _inFlight result has been persisted and is safe to clear.
+     * Acknowledges that the _inFlight result is safe to clear.
      */
-    void acknowledgeFlushSuccess();
+    void acknowledgeFlush();
 
 private:
     // The options used to build every pending accumulator.

@@ -46,11 +46,11 @@ void bufferNewOplogEntries(OperationContext* opCtx, SizeCountCheckpointBuffer& b
 }
 
 void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
-    LOGV2(13215701, "SizeCountCheckpointOplogTailer thread started");
+    LOGV2(13215701, "Replicated fast count oplog tailer thread started");
     setTailerIsRunning(true);
     ON_BLOCK_EXIT([] {
         setTailerIsRunning(false);
-        LOGV2(13215702, "SizeCountCheckpointOplogTailer thread exiting");
+        LOGV2(13215702, "Replicated fast count oplog tailer thread exiting");
     });
 
     std::shared_ptr<CappedInsertNotifier> notifier;
@@ -74,13 +74,13 @@ void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
                 // The tailer is a primary-only thread. Stop the thread when stepping down or
                 // shutting down.
                 LOGV2(12917802,
-                      "SizeCountCheckpointOplogTailer interrupted",
+                      "Replicated fast count oplog tailer interrupted",
                       "error"_attr = ex.toStatus());
                 return;
             }
             incrementTailerFailureCount();
             LOGV2_WARNING(12917803,
-                          "Unexpected exception handled in SizeCountCheckpointOplogTailer::run()",
+                          "Unexpected exception handled in oplog_tailer::run()",
                           "error"_attr = ex.toStatus());
         }
     }

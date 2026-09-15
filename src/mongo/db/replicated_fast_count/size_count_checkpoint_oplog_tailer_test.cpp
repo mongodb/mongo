@@ -81,7 +81,7 @@ TEST_F(OplogTailerTest, ScanFromBeginningAccountsAllVisibleEntries) {
         .lastTimestamp = Timestamp(1, 2)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
-    buffer.acknowledgeFlushSuccess();
+    buffer.acknowledgeFlush();
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 }
 
@@ -142,7 +142,7 @@ TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
         .lastTimestamp = Timestamp(1, 3)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
-    buffer.acknowledgeFlushSuccess();
+    buffer.acknowledgeFlush();
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 
     bufferNewOplogEntries(_opCtx, buffer);
@@ -212,7 +212,7 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
         .lastTimestamp = Timestamp(1, 2)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
-    buffer.acknowledgeFlushSuccess();
+    buffer.acknowledgeFlush();
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 
     if (capturer.canReadMetrics()) {

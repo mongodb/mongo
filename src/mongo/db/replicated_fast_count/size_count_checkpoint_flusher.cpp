@@ -5,13 +5,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -19,112 +20,17 @@
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
-MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
 MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
-MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 }  // namespace
 
-namespace mongo::replicated_fast_count {
+namespace mongo::replicated_fast_count::flusher {
 
-SizeCountCheckpointFlusher::SizeCountCheckpointFlusher(SizeCountStore* sizeCountStore,
-                                                       SizeCountTimestampStore* timestampStore)
-    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore) {}
-
-void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
-    LOGV2(13215703, "SizeCountCheckpointFlusher thread started");
-    setFlusherIsRunning(true);
-    ON_BLOCK_EXIT([&] {
-        setFlusherIsRunning(false);
-        LOGV2(13215704, "SizeCountCheckpointFlusher thread exiting");
-        std::lock_guard lk(_mutex);
-        _flushRequested = false;
-    });
-
-    while (true) {
-        try {
-            {
-                std::unique_lock lk(_mutex);
-                opCtx->waitForConditionOrInterrupt(
-                    _flushCv, lk, [this] { return _flushRequested; });
-                _flushRequested = false;
-            }
-            _runOneFlushCycle(opCtx, buffer);
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                ErrorCodes::isShutdownError(ex.code())) {
-                // The flusher is a primary-only thread. Stop the thread when stepping down or
-                // shutting down.
-                LOGV2(12917804,
-                      "SizeCountCheckpointFlusher interrupted",
-                      "error"_attr = ex.toStatus());
-                return;
-            } else {
-                incrementFlushFailureCount();
-                LOGV2_WARNING(12917805,
-                              "Exception handled in SizeCountCheckpointFlusher::run()",
-                              "error"_attr = ex.toStatus());
-            }
-        }
-    }
-}
-
-void SizeCountCheckpointFlusher::requestFlush() {
-    {
-        std::lock_guard lk(_mutex);
-        _flushRequested = true;
-    }
-    _flushCv.notify_one();
-}
-
-bool SizeCountCheckpointFlusher::isFlushRequested_ForTest() const {
-    std::lock_guard lk(_mutex);
-    return _flushRequested;
-}
-
-void SizeCountCheckpointFlusher::runOneFlushCycle_ForTest(OperationContext* opCtx,
-                                                          SizeCountCheckpointBuffer& buffer) {
-    _runOneFlushCycle(opCtx, buffer);
-}
-
-void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
-                                                   SizeCountCheckpointBuffer& buffer) {
-    const Date_t flushStart = Date_t::now();
-    const boost::optional<FlushResult> result = _doFlush(opCtx, buffer);
-
-    sleepAfterFlush.execute([](const BSONObj& data) {
-        if (auto elem = data["sleepMs"]; elem) {
-            sleepmillis(elem.numberInt());
-        }
-    });
-
-    const Milliseconds duration = Date_t::now() - flushStart;
-    if (result.has_value()) {
-        LOGV2(13195100,
-              "SizeCountCheckpointFlusher flushed successfully",
-              "previousValidAsOfTS"_attr = result->previousValidAsOfTS,
-              "newValidAsOfTS"_attr = result->newValidAsOfTS,
-              "checkpointBufferSize"_attr = result->checkpointBufferSize,
-              "entryWriteCount"_attr = result->entryWriteCount,
-              "flushAttempts"_attr = result->flushAttempts,
-              "duration"_attr = duration);
-        recordFlush(flushStart, result->entryWriteCount);
-    } else {
-        LOGV2_DEBUG(
-            13195101, 3, "SizeCountCheckpointFlusher did not flush", "duration"_attr = duration);
-    }
-}
-
-boost::optional<SizeCountCheckpointFlusher::FlushResult> SizeCountCheckpointFlusher::_doFlush(
-    OperationContext* opCtx, SizeCountCheckpointBuffer& buffer) {
+boost::optional<FlushResult> flush(OperationContext* opCtx,
+                                   SizeCountStore& sizeCountStore,
+                                   SizeCountTimestampStore& timestampStore,
+                                   const OplogScanResult& batch) {
     if (MONGO_unlikely(failDuringFlush.shouldFail())) {
-        uasserted(12101802, "Injected failure in _runOneFlushCycle for testing");
-    }
-
-    auto batch = buffer.checkoutForFlush();
-    hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
-
-    if (!batch) {
-        return boost::none;
+        uasserted(12101802, "Injected failure in flush for testing");
     }
 
     boost::optional<FlushResult> result;
@@ -136,14 +42,13 @@ boost::optional<SizeCountCheckpointFlusher::FlushResult> SizeCountCheckpointFlus
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
 
         // Source of truth for the last durable checkpoint, replacing batch.startAfter.
-        const Timestamp currentValidAsOf = _timestampStore->read(opCtx).value_or(Timestamp{});
+        const Timestamp currentValidAsOf = timestampStore.read(opCtx).value_or(Timestamp{});
         const auto checkpoint =
-            materializeCheckpointSnapshot(opCtx, *_sizeCountStore, *batch, currentValidAsOf);
+            materializeCheckpointSnapshot(opCtx, sizeCountStore, batch, currentValidAsOf);
 
         if (currentValidAsOf == checkpoint.validAsOf) {
             tassert(12101801,
-                    "Logical size count checkpoint found size count deltas in oplog "
-                    "entries, but "
+                    "Logical size count checkpoint found size count deltas in oplog entries, but "
                     "global valid-as-of did not advance",
                     checkpoint.updatedCollections.empty());
             return;
@@ -153,21 +58,18 @@ boost::optional<SizeCountCheckpointFlusher::FlushResult> SizeCountCheckpointFlus
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         const size_t entryWriteCount =
-            persistCheckpointSnapshot(opCtx, checkpoint, *_sizeCountStore, *_timestampStore);
+            persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
         wuow.commit();
 
         result = FlushResult{
             .previousValidAsOfTS = currentValidAsOf,
             .newValidAsOfTS = checkpoint.validAsOf,
-            .checkpointBufferSize = batch->deltas.size(),
+            .checkpointBufferSize = batch.deltas.size(),
             .entryWriteCount = entryWriteCount,
             .flushAttempts = flushAttempts,
         };
     });
 
-    buffer.acknowledgeFlushSuccess();
-
     return result;
 }
-
-}  // namespace mongo::replicated_fast_count
+}  // namespace mongo::replicated_fast_count::flusher

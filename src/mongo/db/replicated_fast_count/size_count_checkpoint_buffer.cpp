@@ -75,7 +75,7 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
     }
 }
 
-void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {
+void SizeCountCheckpointBuffer::acknowledgeFlush() {
     _inFlight.reset();
 }
 }  // namespace mongo::replicated_fast_count

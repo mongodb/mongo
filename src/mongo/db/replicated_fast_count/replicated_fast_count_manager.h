@@ -198,6 +198,7 @@ public:
      * Flushes data synchronously on the caller's thread. The calling thread must be able to take a
      * MODE_IX lock. Requires periodic writes to be disabled.
      */
+    // TODO(SERVER-134965): Remove.
     void flushSync_ForTest(OperationContext* opCtx);
 
     /**

@@ -100,6 +100,68 @@ TEST(SizeCountCheckpointBufferTest, MultipleScansAccumulateIntoOneCheckout) {
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
 
+TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBatch) {
+    const UUID oplogUuid = UUID::gen();
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+
+    // Accumulate first batch and check it out, but do not acknowledge it yet.
+    {
+        const std::list<repl::OplogEntry> entries{
+            makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25)};
+        OplogCursorMock cursor(entries);
+
+        buffer.scanToNoHolesEOF(cursor);
+
+        const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
+        ASSERT_TRUE(checkedOutBuffer.has_value());
+
+        const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
+        const OplogScanResult expectedCheckedOutBuffer{
+            .deltas =
+                ReplicatedMetadataDeltas{
+                    {coll.uuid,
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1}}}},
+                    {oplogUuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
+            .lastTimestamp = Timestamp(3, 3)};
+
+        EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
+    }
+
+    // Write another entry, which should be accumulated in scanToNoHolesEOF().
+    {
+        const std::list<repl::OplogEntry> entries{
+            makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25),
+            makeOplogEntry(Timestamp(4, 4), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/14)};
+        OplogCursorMock cursor(entries);
+
+        buffer.scanToNoHolesEOF(cursor);
+
+        // Acknowledge previous batch so checkout can return the new write.
+        buffer.acknowledgeFlush();
+
+        const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
+        ASSERT_TRUE(checkedOutBuffer.has_value());
+
+        const CollectionSizeCount expectedOplogSizeCount =
+            calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
+        const OplogScanResult expectedCheckedOutBuffer{
+            .deltas =
+                ReplicatedMetadataDeltas{
+                    {coll.uuid,
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 14, .count = 1}}}},
+                    {oplogUuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
+            .lastTimestamp = Timestamp(4, 4)};
+
+        EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
+    }
+}
+
 TEST(SizeCountCheckpointBufferTest, InFlightBatchIsRetriedUntilAcknowledged) {
     const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
@@ -144,7 +206,7 @@ TEST(SizeCountCheckpointBufferTest, AcknowledgeFlushSuccessClearsInFlight) {
 
     EXPECT_TRUE(buffer.checkoutForFlush().has_value());
 
-    buffer.acknowledgeFlushSuccess();
+    buffer.acknowledgeFlush();
 
     // Pending was reset when the batch was cut, so there is nothing left to flush.
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
@@ -182,7 +244,7 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
     }
 
-    buffer.acknowledgeFlushSuccess();
+    buffer.acknowledgeFlush();
 
     // Second scan.
     {

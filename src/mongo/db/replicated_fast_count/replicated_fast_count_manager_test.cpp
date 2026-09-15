@@ -202,9 +202,9 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
 }
 
 // Stronger variant of the above: a repeated initializeContainerStores() while the flusher thread
-// is stalled mid-flush inside _doFlush() must leave the coordinator running and the bound stores
-// untouched. If the call instead destroyed and replaced the store objects, the resumed flusher
-// would dereference freed store pointers.
+// is stalled mid-flush must leave the coordinator running and the bound stores untouched. If the
+// call instead destroyed and replaced the store objects, the resumed flusher would dereference
+// freed store pointers.
 TEST_F(ReplicatedFastCountManagerRebindContainerTest,
        InitializeContainerStoresIdempotentDuringInFlightFlush) {
     ASSERT_OK(storageInterface()->createCollection(
@@ -229,7 +229,7 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
     manager->flushAsync();
     hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
 
-    // The flusher is now parked inside _doFlush holding pointers to the bound stores. A repeated
+    // The flusher is now parked holding pointers to the bound stores. A repeated
     // initializeContainerStores() returns immediately without touching the stores or the
     // coordinator; the flusher resumes against the same live store objects.
     auto [metadataRS2, timestampsRS2] = makeContainerStores();

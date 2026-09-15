@@ -6,16 +6,18 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
-#include "mongo/db/replicated_fast_count/size_count_checkpoint_flusher.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_oplog_tailer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/uuid.h"
 
-#include <memory>
 #include <mutex>
 
 namespace mongo::replicated_fast_count {
+
+class SizeCountStore;
+class SizeCountTimestampStore;
 
 /**
  * Central point for checkpointing replicated size and count. Manages the coordination between
@@ -49,6 +51,7 @@ public:
     /**
      * Performs a synchronous oplog tailing iteration then flush iteration.
      */
+    // TODO(SERVER-134965): Remove.
     void flushSync_ForTest(OperationContext* opCtx);
 
     bool isRunning_ForTest() const;
@@ -67,7 +70,8 @@ private:
      */
     void _runFlushThread(ServiceContext* service);
 
-    std::unique_ptr<SizeCountCheckpointFlusher> _flusher;
+    SizeCountStore& _sizeCountStore;
+    SizeCountTimestampStore& _timestampStore;
 
     /**
      * Written to by the tailing thread and read / cleared by the flushing thread, holds the
@@ -75,7 +79,7 @@ private:
      *
      * Snapshotting logic allows for flushes to do I/O while tailing continues in the background.
      */
-    std::unique_ptr<SizeCountCheckpointBuffer> _buffer;
+    SizeCountCheckpointBuffer _buffer;
 
     stdx::thread _tailerThread;
     stdx::thread _flushThread;
@@ -88,6 +92,10 @@ private:
      * creating new opCtxs after the destructor has interrupted the opCtx group.
      */
     bool _shutdownRequested{false};
+
+    mutable std::mutex _flushRequestMutex;
+    stdx::condition_variable _flushRequestCv;
+    bool _flushRequested{false};
 };
 
 }  // namespace mongo::replicated_fast_count
