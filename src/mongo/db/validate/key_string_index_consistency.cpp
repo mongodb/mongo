@@ -673,48 +673,49 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
 namespace {
 // Ensures that index entries are in increasing or decreasing order.
 void _validateKeyOrder(OperationContext* opCtx,
-                       const IndexCatalogEntry* index,
-                       const boost::optional<KeyStringEntry>& currKey,
-                       const boost::optional<KeyStringEntry>& prevKey,
-                       IndexValidateResults* results) {
-    invariant(currKey);
-    invariant(prevKey);
-    const auto descriptor = index->descriptor();
-    const bool unique = descriptor->unique();
+                       const IndexCatalogEntry& index,
+                       const KeyStringEntry& currKey,
+                       const KeyStringEntry& prevKey,
+                       IndexValidateResults& results) {
+    const auto& descriptor = *index.descriptor();
+    const bool unique = descriptor.unique();
 
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
     // in the format (Key, RID), and all RecordIDs are unique.
-    if (currKey->keyString.compare(prevKey->keyString) <= 0 ||
+    if (currKey.keyString.compare(prevKey.keyString) <= 0 ||
         MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
-        if (results) {
-            results->addError(str::stream() << "index '" << descriptor->indexName()
-                                            << "' is not in strictly ascending or descending order",
-                              false);
-        }
+        results.addError(str::stream() << "index '" << descriptor.indexName()
+                                       << "' is not in strictly ascending or descending order",
+                         false);
         return;
     }
 
     if (unique) {
         // Unique indexes must not have duplicate keys.
         const int cmp =
-            currKey->keyString.compareWithoutRecordId(prevKey->keyString, currKey->loc.keyFormat());
+            currKey.keyString.compareWithoutRecordId(prevKey.keyString, currKey.loc.keyFormat());
         if (cmp != 0) {
             return;
         }
 
-        if (results) {
-            const auto bsonKey =
-                key_string::toBson(currKey->keyString, Ordering::make(descriptor->keyPattern()));
-            results->addError(str::stream() << "Unique index '" << descriptor->indexName()
-                                            << "' has duplicate key: " << bsonKey
-                                            << ", first record: " << prevKey->loc
-                                            << ", second record: " << currKey->loc,
-                              false);
-        }
+        const auto bsonKey =
+            key_string::toBson(currKey.keyString, Ordering::make(descriptor.keyPattern()));
+        const std::array records{prevKey.loc, currKey.loc};
+        LOGV2_ERROR(13457600,
+                    "Unique index has duplicate key",
+                    "indexName"_attr = redact(descriptor.indexName()),
+                    "bsonKey"_attr = redact(bsonKey),
+                    "records"_attr = logv2::seqLog(records));
+        results.addError(
+            fmt::format("Unique index '{}' has duplicate key. See logs with ID 13457600 "
+                        "for more information.",
+                        redact(descriptor.indexName())),
+            /*stopValidation=*/false);
     }
 }
 }  // namespace
 
+// TODO SERVER-134900 make ConcurrentProgressMeterHolder a nullable pointer argument
 int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                                                  const IndexCatalogEntry* index,
                                                  ConcurrentProgressMeterHolder& progress,
@@ -736,10 +737,10 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
     boost::optional<KeyStringEntry> prevIndexKeyStringEntry;
 
     // Ensure that this index has an open index cursor.
-    const auto indexCursorIt = _validateState->getIndexCursors().find(indexName);
+    auto indexCursorIt = _validateState->getIndexCursors().find(indexName);
     invariant(indexCursorIt != _validateState->getIndexCursors().end());
 
-    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor = indexCursorIt->second;
+    auto* indexCursor = indexCursorIt->second.get();
 
     boost::optional<KeyStringEntry> indexEntry;
     try {
@@ -773,7 +774,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
 
     while (indexEntry) {
         if (prevIndexKeyStringEntry) {
-            _validateKeyOrder(opCtx, index, indexEntry, prevIndexKeyStringEntry, &indexResults);
+            _validateKeyOrder(opCtx, *index, *indexEntry, *prevIndexKeyStringEntry, indexResults);
         }
 
         if (!foundOldUniqueIndexKeys && !descriptor->isIdIndex() && descriptor->unique() &&

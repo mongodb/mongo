@@ -741,4 +741,100 @@ TEST_F(KeyStringIndexConsistencyTest, CopyAssignmentPreservesSecondPhaseInconsis
                        assignedResults.getExtraIndexEntries());
 }
 
+TEST_F(KeyStringIndexConsistencyTest, TraverseIndexReportsDuplicateKeys) {
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto uniqueIndexName{"x_1"sv};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    const auto indexSpec =
+        BSON("v" << IndexDescriptor::IndexVersion::kV2 << "name" << uniqueIndexName << "key"
+                 << BSON("x" << 1) << "unique" << true);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collWriter, indexSpec));
+        ASSERT_OK(Helpers::insert(opCtx, writer.get(), BSON("_id" << 1 << "x" << 1)));
+        wuow.commit();
+    }
+
+    const auto* entry = coll->getIndexCatalog()->findIndexByName(opCtx, uniqueIndexName);
+    auto* iam = entry->accessMethod()->asSortedData();
+
+    // Plant a second entry for the same key under a different RecordId. The keys stay strictly
+    // increasing because the RecordId is appended, so _validateKeyOrder() reaches the uniqueness
+    // check rather than bailing out on the ordering check first.
+
+    const KeyStringSet keys = std::invoke([&] {
+        WriteUnitOfWork wuow(opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+        KeyStringSet keys;
+        iam->getKeys(opCtx,
+                     *coll,
+                     entry,
+                     pooledBuilder,
+                     BSON("x" << 1),
+                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                     &keys,
+                     nullptr,
+                     nullptr,
+                     RecordId(2));
+        int64_t numInserted = 0;
+        ASSERT_OK(iam->insertKeys(opCtx,
+                                  *shard_role_details::getRecoveryUnit(opCtx),
+                                  *coll,
+                                  entry,
+                                  keys,
+                                  InsertDeleteOptions{.dupsAllowed = true},
+                                  nullptr,
+                                  &numInserted));
+        ASSERT_EQ(1, numInserted);
+        wuow.commit();
+        return keys;
+    });
+
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    ASSERT_OK(state.initializeCollection(opCtx));
+    state.initializeCursors(opCtx);
+
+    ValidateResults results;
+    auto& indexResults = results.getIndexValidateResult(std::string{uniqueIndexName});
+
+    KeyStringIndexConsistency ksic(opCtx, &state);
+
+    // TODO SERVER-134900 make ConcurrentProgressMeterHolder a nullable pointer argument
+    ConcurrentProgressMeterHolder progress;
+    {
+        std::unique_lock<Client> lk(*opCtx->getClient());
+        progress.set(lk, CurOp::get(opCtx)->setProgress(lk, "test validate", 1), opCtx);
+    }
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_EQ(2, ksic.traverseIndex(opCtx, entry, progress, &results));
+    logs.stop();
+
+    const auto& errors = indexResults.getErrors();
+    ASSERT_EQ(1, errors.size());
+    const auto& error = *errors.begin();
+    EXPECT_THAT(error, testing::HasSubstr("Unique index 'x_1' has duplicate key"sv));
+    EXPECT_THAT(error, testing::HasSubstr("13457600"));
+
+    // getText() keeps only each line's "msg", so the key has to be matched against the structured
+    // "attr" subtree instead.
+    const auto ord = Ordering::make(entry->descriptor()->keyPattern());
+    for (const auto& key : keys) {
+        EXPECT_EQ(1,
+                  logs.countBSONContainingSubset(
+                      BSON("id" << 13457600 << "attr"
+                                << BSON("indexName" << uniqueIndexName << "bsonKey"
+                                                    << key_string::toBson(key, ord) << "records"
+                                                    << BSON_ARRAY("1" << "2")))));
+    }
+}
+
 }  // namespace mongo
