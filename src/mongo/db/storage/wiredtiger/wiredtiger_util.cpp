@@ -703,8 +703,6 @@ logv2::LogComponent getWTLogComponent(const BSONObj& obj) {
             return logv2::LogComponent::kWiredTigerRTS;
         case WT_VERB_SALVAGE:
             return logv2::LogComponent::kWiredTigerSalvage;
-        case WT_VERB_TIERED:
-            return logv2::LogComponent::kWiredTigerTiered;
         case WT_VERB_TIMESTAMP:
             return logv2::LogComponent::kWiredTigerTimestamp;
         case WT_VERB_TRANSACTION:
@@ -1437,7 +1435,6 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         {logv2::LogComponent::kWiredTigerRecovery, "recovery"},
         {logv2::LogComponent::kWiredTigerRTS, "rts"},
         {logv2::LogComponent::kWiredTigerSalvage, "salvage"},
-        {logv2::LogComponent::kWiredTigerTiered, "tiered"},
         {logv2::LogComponent::kWiredTigerTimestamp, "timestamp"},
         {logv2::LogComponent::kWiredTigerTransaction, "transaction"},
         {logv2::LogComponent::kWiredTigerVerify, "verify"},

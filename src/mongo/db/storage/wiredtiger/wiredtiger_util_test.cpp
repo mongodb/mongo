@@ -381,6 +381,10 @@ TEST_F(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // severity levels.
 
     {
+        std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
+        ASSERT_TRUE(config.find("tiered") == std::string::npos);
+    }
+    {
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};

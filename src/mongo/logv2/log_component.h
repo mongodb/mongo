@@ -70,7 +70,6 @@ namespace [[MONGO_MOD_PUBLIC]] logv2 {
     X(kWiredTigerRecovery,     , "wtRecovery"            , "WTRECOV"         , kWiredTiger) \
     X(kWiredTigerRTS,          , "wtRTS"                 , "WTRTS"           , kWiredTiger) \
     X(kWiredTigerSalvage,      , "wtSalvage"             , "WTSLVG"          , kWiredTiger) \
-    X(kWiredTigerTiered,       , "wtTiered"              , "WTTIER"          , kWiredTiger) \
     X(kWiredTigerTimestamp,    , "wtTimestamp"           , "WTTS"            , kWiredTiger) \
     X(kWiredTigerTransaction,  , "wtTransaction"         , "WTTXN"           , kWiredTiger) \
     X(kWiredTigerVerify,       , "wtVerify"              , "WTVRFY"          , kWiredTiger) \
