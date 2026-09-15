@@ -5,18 +5,22 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/platform/source_location.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
-#include <array>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <vector>
 
+#include <boost/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -226,66 +230,87 @@ TEST(AtomicWaitableTests, TryToInduceRaces_WaitableAtomic) {
     tryToInduceRaces<WaitableAtomic<bool>>();
 }
 
-TEST(AtomicWaitableTests, NotifyOneOnlyWakesOneThread) {
+TEST(AtomicWaitableNotifyOneTest, NotifyOneOnlyWakesOneThread) {
     // We don't guarantee this in part because it is impossible to distinguish from spurious wakeup
     // and races. But it should generally be the case that notifyOne only wakes one thread. This
     // test is mostly to ensure that we are passing the right flags to the OS. It uses sleeps
     // because it isn't possible to reliably wait for threads to reach the blocking point or know
     // when all accidentally woken threads would have woken. Since it has some risk of failing,
-    // retry a bit. It if consistently passes, even after retrying, then we are very likely passing
+    // retry a bit. If this can pass, even if it takes a few tries, then we are very likely passing
     // the right flags to the OS.
-    int tries = 10;
-    while (true) {
-        try {
-            constexpr int nThreads = 10;  // takes at least 100ms + 10ms per thread.
-            auto keepWaiting = BasicWaitableAtomic<int>(true);
-            auto numWoken = Atomic<int>(0);
-            JoinThread threads[nThreads];
-            ON_BLOCK_EXIT([&] {
-                keepWaiting.store(false);  // should be false already, but to be safe.
-                keepWaiting.notifyAll();
-            });
+    static constexpr int numAttempts = 10;
+    static constexpr size_t numThreads = 10;
+    static constexpr Milliseconds initialPause{100};
+    static constexpr Milliseconds notifyWakeTimeout{100};
+    static constexpr Milliseconds pollPeriod{1};
 
-            for (int i = 0; i < nThreads; i++) {
-                threads[i] = JoinThread([&] {
-                    keepWaiting.wait(true);
-                    numWoken.fetchAndAdd(1);
+    for (int attempt = 0; attempt < numAttempts; ++attempt) {
+        struct FailedAttempt : std::logic_error {
+            FailedAttempt() : std::logic_error{""} {}
+        };
+        try {
+            Atomic<int> wakes(0);
+
+            BasicWaitableAtomic<int> stop{0};
+
+            std::vector<JoinThread> threads;
+            ScopeGuard unblockStragglers = [&] {
+                stop.store(1);
+                stop.notifyAll();
+            };
+
+            unittest::Barrier allThreadsStarted{numThreads + 1};
+            for (auto i = numThreads; i--;) {
+                threads.emplace_back([&] {
+                    allThreadsStarted.countDownAndWait();
+                    stop.wait(0);
+                    wakes.fetchAndAdd(1);
                 });
             }
+            allThreadsStarted.countDownAndWait();
+            sleepFor(initialPause);  // Let all threads enter wait.
 
-            sleepmillis(100);  // Hopefully wait for all threads to be blocked in kernel.
+            stop.store(1);
 
-            keepWaiting.store(false);
+            // Polls until `wakes != from` or `notifyWakeTimeout` passes, whichever happens first.
+            // After that, if the `wakes` value is anything other than `to`, throws
+            // `FailedAttempt`.
+            auto expectTransition =
+                [&](int from, int to, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+                    Milliseconds napTotal{0};
+                    int w;
 
-            // Not waking anyone yet. Lets check if anyone wasn't blocked in the kernel.
-            sleepmillis(10);
-            ASSERT_EQUALS(numWoken.load(), 0);
+                    for (;;) {
+                        if ((w = wakes.load()) != from || napTotal >= notifyWakeTimeout)
+                            break;
+                        sleepFor(pollPeriod);
+                        napTotal += pollPeriod;
+                    }
 
-            // Now wake one thread at a time.
-            for (int i = 0; i < nThreads; i++) {
-                keepWaiting.notifyOne();
+                    if (w != to) {
+                        LOGV2_ERROR(8179702,
+                                    "Unexpected wakes",
+                                    "from"_attr = from,
+                                    "to"_attr = to,
+                                    "wakes"_attr = w,
+                                    "loc"_attr = loc);
+                        throw FailedAttempt{};
+                    }
+                };
 
-                // Wait up to 100ms for a thread to wake.
-                for (int j = 0; numWoken.load() == i && j < 100; j++) {
-                    sleepmillis(1);
-                }
-                ASSERT_EQUALS(numWoken.load(), i + 1);
-
-                // Wait 10ms to see if any other threads wake.
-                sleepmillis(10);
-                ASSERT_EQUALS(numWoken.load(), i + 1);
+            int sent = 0;
+            expectTransition(sent, sent);
+            for (auto&& _ : threads) {
+                stop.notifyOne();
+                ++sent;
+                expectTransition(sent - 1, sent);
             }
-
-            return;  // success!
-        } catch (const unittest::TestAssertionFailureException& ex) {
-            if (--tries == 0)
-                throw;  // give up
-            LOGV2_ERROR(8179702,
-                        "Test can fail spuriously, retrying",
-                        "attemptsLeft"_attr = tries,
-                        "error"_attr = ex.what());
+            expectTransition(sent, sent);
+            return;
+        } catch (const FailedAttempt&) {
         }
     }
+    FAIL("Out of retries.");
 }
 
 }  // namespace
