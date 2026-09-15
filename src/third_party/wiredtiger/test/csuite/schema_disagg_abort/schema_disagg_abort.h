@@ -86,8 +86,11 @@
 #define SWITCH_DONE_FMT "switch_done.%" PRIu32 /* the n-th switch completed */
 #define STOP_FILE "stop_run"                   /* parent directs a graceful stop */
 
-/* The follower's latest adopted checkpoint LSN; a stepping-down leader polls it. */
-#define ADOPTED_LSN_FILE "ckpt_adopted"
+/*
+ * The follower's latest adopted checkpoint, its LSN and its schema epoch: a stepping-down leader
+ * polls the LSN, and a leading generator the epoch.
+ */
+#define ADOPTED_CKPT_FILE "ckpt_adopted"
 
 /* Connection config. */
 #define ENV_CONFIG_DEF "create,statistics=(all),statistics_log=(json,on_close,wait=1)"
@@ -227,7 +230,9 @@ typedef struct {
     bool handover_received;    /* the term was handed over this phase; atomic access */
     uint32_t stop_stage;       /* how far the phase's shutdown has progressed; atomic access */
     uint64_t adopted_ckpt_lsn; /* skip re-adopting the same checkpoint; reset on role change */
-    uint32_t switch_gen;       /* how many role transitions this node has completed */
+    uint64_t adopted_ckpt_epoch; /* latest adopted checkpoint epoch (on follower); atomic access. */
+
+    uint32_t switch_gen; /* how many role transitions this node has completed */
 
     /* Step-down state, zero outside a transition; atomic access. */
     uint64_t stepdown_ts;       /* while set, the timestamp and checkpoint threads hold */
@@ -256,6 +261,8 @@ typedef struct {
             TABLE_STATE state;
             /* Advanced by every create under -q, so a slot's table name is never reused. */
             uint32_t gen;
+            /* Published create's epoch once its publish applies, else 0; atomic access. */
+            uint64_t create_epoch;
             /* Published drop's epoch once its publish applies, else 0; atomic access. */
             uint64_t drop_epoch;
             /* Inserted data is uncovered yet. Not droppable until a checkpoint. */
@@ -299,8 +306,8 @@ typedef struct {
 void println(const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
 uint64_t query_ts(WT_CONNECTION *conn, uint8_t bit);
 void set_ts(const TEST_CONFIG *cfg, WT_CONNECTION *conn, uint8_t mask, uint64_t ts);
-void adopted_lsn_publish(uint32_t node_id, uint64_t lsn);
-uint64_t adopted_lsn_read(void);
+void adopted_ckpt_publish(uint32_t node_id, uint64_t lsn, uint64_t schema_epoch);
+uint64_t adopted_ckpt_read(uint64_t *schema_epochp);
 
 /* parent.c */
 void parent_main(TEST_CONFIG *cfg, const char *self_path);

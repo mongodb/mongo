@@ -74,6 +74,34 @@ struct __wti_evict_queue {
         WT_WITH_LOCK_WAIT(session, &evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, op); \
     } while (0)
 
+/*
+ * WTI_EVICT_VICTIM_REASON --
+ *	Why a page was, or was not, admitted to the disaggregated victim cache.
+ *
+ * Each gate in the eligibility check has its own value rather than folding into a single "not
+ * eligible". Two main benefits with this approach: a page that was expected to be cached and was
+ * not can be explained from a verbose log instead of by bisecting the gate by hand. And every
+ * switch over this enum is written without a default label, adding a gate here fails the build
+ * until both the caller and the unit tests account for it, rather than leaving the new gate
+ * silently untested.
+ */
+typedef enum {
+    WTI_EVICT_VICTIM_CACHE_UNAVAILABLE, /* The page log's cache is not currently accepting puts. */
+    WTI_EVICT_VICTIM_CHECKPOINT_CURSOR, /* The btree is open under a checkpoint cursor. */
+    WTI_EVICT_VICTIM_COLD_TIER,         /* Cold collections must not displace hot pages. */
+    WTI_EVICT_VICTIM_INVALID_PAGE_ID,   /* The block metadata holds no valid page id. */
+    WTI_EVICT_VICTIM_NO_BLOCK_MANAGER,  /* The btree has no disaggregated block manager. */
+    WTI_EVICT_VICTIM_NO_DISAGG_INFO,    /* The page carries no disaggregated block metadata. */
+    WTI_EVICT_VICTIM_NO_IMAGE,          /* No image matches the page's current block metadata. */
+    WTI_EVICT_VICTIM_NO_PAGE_LOG,       /* No page log handle, or it cannot cache at all. */
+    WTI_EVICT_VICTIM_NOT_DISAGG,        /* The btree is not disaggregated. */
+    WTI_EVICT_VICTIM_NOT_LEAF,          /* Internal pages are never cached. */
+    WTI_EVICT_VICTIM_OK,                /* Eligible: the resolved image is returned. */
+    WTI_EVICT_VICTIM_ROOT,              /* Root pages are never cached. */
+
+    WTI_EVICT_VICTIM_COUNT /* Number of reasons; must stay last. */
+} WTI_EVICT_VICTIM_REASON;
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern bool __wti_evict_push_candidate(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue,

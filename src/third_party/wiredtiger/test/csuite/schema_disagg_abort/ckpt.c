@@ -266,6 +266,21 @@ ckpt_take_stepdown(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 }
 
 /*
+ * ckpt_update_adopted_epoch --
+ *     Track how far the peer's pick-ups have come: the generator gates its drops on it.
+ */
+static void
+ckpt_update_adopted_epoch(WORKLOAD_STATE *state)
+{
+    if (node_is_lone(state->cfg))
+        return; /* no one adopts checkpoints */
+
+    uint64_t peer_epoch;
+    (void)adopted_ckpt_read(&peer_epoch);
+    __wt_atomic_store_uint64(&state->adopted_ckpt_epoch, peer_epoch);
+}
+
+/*
  * leader_checkpoint --
  *     The leader's checkpoint duty: a step-down replaces the cadence with one final checkpoint, and
  *     nothing else is checkpointed until the transition completes.
@@ -273,6 +288,8 @@ ckpt_take_stepdown(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 void
 leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
 {
+    ckpt_update_adopted_epoch(state);
+
     if (__wt_atomic_load_uint64(&state->stepdown_ts) != 0)
         ckpt_take_stepdown(state, session, ckpt);
     else
@@ -309,8 +326,9 @@ follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
           state->cfg->node_id, ckpt_args.checkpoint_timestamp, ckpt_args.checkpoint_lsn,
           frontier_ts);
 
-        /* Each pick-up is reported for a stepping-down peer. */
-        adopted_lsn_publish(state->cfg->node_id, state->adopted_ckpt_lsn);
+        /* Each pick-up is reported for the peer: a stepping-down leader and its generator. */
+        adopted_ckpt_publish(state->cfg->node_id, state->adopted_ckpt_lsn,
+          query_ts(state->conn, TS_LAST_SCHEMA_EPOCH));
 
         /* The first picked up checkpoint: follower is ready. */
         if (first_ckpt)

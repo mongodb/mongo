@@ -32,6 +32,7 @@
 # step-up, which uses the metadata operation queue populated while the node
 # was a follower.
 
+import os
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
 from suite_subprocess import suite_subprocess
@@ -75,6 +76,20 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """
         self.conn.reconfigure('disaggregated=(role="follower")')
         conn_follower.reconfigure('disaggregated=(role="leader")')
+
+    def assert_panicked(self, subdir, funcname, expected):
+        """
+        Run funcname in a subprocess and assert it panicked with the expected message.
+
+        Checking the message matters: an abort anywhere earlier in the body also exits non-zero,
+        so a return code alone cannot tell a reached panic from a mis-set up test.
+        """
+        [returncode, home] = self.run_subprocess_function(subdir,
+            f'{self.test_name}.{self.test_name}.{funcname}', silent=True)
+        self.assertNotEqual(returncode, 0)
+        with open(os.path.join(home, 'stderr.txt'), 'r') as f:
+            stderr = f.read()
+        self.assertIn(expected, stderr)
 
     def checkpoint_and_advance(self, epoch, stable_ts, conn_leader):
         """
@@ -278,7 +293,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """Subprocess body for the split-epochs panic test; expected to panic/abort."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -319,12 +334,104 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_with_epoch()
-        subdir = 'SUBPROCESS_create_drop_split_epochs'
-        [returncode, _] = self.run_subprocess_function(subdir,
-            f'{self.test_name}.{self.test_name}.subprocess_create_drop_split_epochs',
-            silent=True)
-        self.assertNotEqual(returncode, 0)
+        self.assert_panicked('SUBPROCESS_create_drop_split_epochs',
+            'subprocess_create_drop_split_epochs',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
+            'epoch 30')
 
+    def subprocess_create_unpublished_drop(self):
+        """Subprocess body for the unpublished-drop panic test; expected to panic/abort."""
+        self.setup_leader_with_epoch()
+
+        conn_follow, session_follow = self.open_follower_epoch()
+
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        # Drop without publishing: this is the state a peer inherits when the leader that would
+        # have published the drop is killed between relaying the drop and relaying its publish.
+        session_follow.drop(self.uri)
+        session_follow.close()
+
+        # Pre-swap state:
+        # Shared metadata: empty (no schema operations on the initial leader).
+        # Follower: uri was created then dropped; queue holds CREATE uri (epoch 20) followed
+        #   by REMOVE uri at the unpublished sentinel epoch.
+        self.swap_roles(conn_follow)
+
+        # After step-up: the REMOVE makes step-up skip the stable constituent whatever the
+        # REMOVE's epoch, so the CREATE keeps no stable value.
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
+
+        # Checkpoint at epoch=20: the CREATE is at the checkpoint's epoch, so the table must be
+        # visible in shared metadata. The REMOVE sits at the unpublished sentinel, above every
+        # finite epoch, so it is deferred and can never cancel the CREATE. The stable constituent
+        # was never created, so WiredTiger panics.
+        self.set_stable_epoch(20, conn_follow)
+        conn_follow.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(2) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        session_ck = conn_follow.open_session('')
+        session_ck.checkpoint()  # Expected to panic.
+
+    def subprocess_recreated_drop_split_epochs(self):
+        """Subprocess body for the recreated-table panic test; expected to panic/abort."""
+        self.setup_leader_with_epoch()
+
+        conn_follow, session_follow = self.open_follower_epoch()
+
+        # Two incarnations of the same name, so the queue holds CREATE, REMOVE, CREATE, REMOVE.
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        session_follow.drop(self.uri)
+        self.publish(self.uri, 30, session_follow)
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 40, session_follow)
+        session_follow.drop(self.uri)
+        self.publish(self.uri, 50, session_follow)
+        session_follow.close()
+
+        self.swap_roles(conn_follow)
+
+        # Checkpoint at epoch=25: only the first CREATE is at or below it, so only it is parked.
+        # The DROP blocking it is the first incarnation's, at epoch 30, not the second's at 50.
+        self.set_stable_epoch(25, conn_follow)
+        conn_follow.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(2) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        session_ck = conn_follow.open_session('')
+        session_ck.checkpoint()  # Expected to panic.
+
+    def test_recreated_drop_split_epochs(self):
+        """
+        The reported DROP is the one that blocks the parked CREATE, not the table's newest.
+
+        With two incarnations queued the table has two DROPs above the checkpoint's epoch. Only the
+        first incarnation's CREATE is parked, so only its own DROP explains the violation.
+        """
+        self.setup_leader_with_epoch()
+        self.assert_panicked('SUBPROCESS_recreated_drop_split_epochs',
+            'subprocess_recreated_drop_split_epochs',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
+            'epoch 30')
+
+    def test_create_unpublished_drop(self):
+        """
+        A step-up that inherits an unpublished DROP panics its first covering checkpoint.
+
+        The CREATE is published at epoch 20 and the DROP is never published, so the checkpoint at
+        epoch 20 must include the table in shared metadata while the DROP, parked at the
+        unpublished sentinel, can never cancel it. Unlike the published-DROP case the application
+        has no epoch it could have published the DROP at to avoid the window: a node inheriting
+        the window from a killed peer cannot publish for the term that opened it.
+        """
+        # Initialize self.conn so the test fixture can close it cleanly; the real test runs
+        # in a subprocess so that the panic/abort does not kill the test runner.
+        self.setup_leader_with_epoch()
+        self.assert_panicked('SUBPROCESS_create_unpublished_drop',
+            'subprocess_create_unpublished_drop',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP was '
+            'never published')
     def test_unpublished_create_not_flushed(self):
         """
         A table created on a follower but never published does not appear in shared metadata

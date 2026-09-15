@@ -239,7 +239,11 @@ static WT_INLINE void __wt_evict_touch_page(
   WT_SESSION_IMPL *session, WT_PAGE *page, bool internal_only, bool wont_need);
 
 #ifdef HAVE_UNITTEST
+extern WTI_EVICT_VICTIM_REASON __ut_evict_page_victim_cache_eligible(WT_SESSION_IMPL *session,
+  WT_REF *ref, const WT_PAGE_HEADER **diskp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const WT_PAGE_HEADER *__ut_evict_page_disagg_image(WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern const char *__ut_evict_page_victim_cache_reason_str(WTI_EVICT_VICTIM_REASON reason)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 
 #endif

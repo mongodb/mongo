@@ -35,7 +35,7 @@ WT_TEST.foo/
 ├── switch_request                │ coordination protocol
 ├── switch_done.<k>               │
 ├── stop_run                      ┘
-└── ckpt_adopted                  latest follower checkpoint LSN
+└── ckpt_adopted                  latest follower checkpoint LSN and schema epoch
 WT_TEST.foo.SAVE/                 pre-verification copy of the home
 ```
 
@@ -61,7 +61,7 @@ stateDiagram-v2
     CREATED --> PUBLISHED : publish create
     CREATED --> NONE : cancel with drop
     PUBLISHED --> PUBLISHED : insert or linger
-    PUBLISHED --> DROPPED : drop
+    PUBLISHED --> DROPPED : drop, once the peer covers the create
     DROPPED --> DROPPED : linger
     DROPPED --> REMOVED : publish drop
     REMOVED --> REMOVED : await coverage

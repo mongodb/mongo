@@ -937,6 +937,96 @@ __disagg_remove_is_checkpoint_violation(WT_SESSION_IMPL *session, WT_CONNECTION_
 }
 
 /*
+ * __disagg_parked_create_drop_epoch --
+ *     Return the schema epoch of the DROP that blocks a parked CREATE, or WT_SCHEMA_EPOCH_NONE when
+ *     no such DROP exists.
+ */
+static wt_timestamp_t
+__disagg_parked_create_drop_epoch(
+  WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn, WT_DISAGG_METADATA_OP *parked)
+{
+    WT_DISAGG_METADATA_OP *entry;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q)
+        if (entry->metadata_op == WT_SHARED_METADATA_REMOVE &&
+          WT_STREQ(entry->stable_uri, parked->stable_uri))
+            return (entry->schema_epoch);
+
+    return (WT_SCHEMA_EPOCH_NONE);
+}
+
+/*
+ * __disagg_check_epoch_deferral --
+ *     Check that leaving an entry queued for a later checkpoint is legal, and count it.
+ */
+static int
+__disagg_check_epoch_deferral(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn,
+  WT_DISAGG_METADATA_OP *entry, wt_timestamp_t cur_schema_epoch)
+{
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    if (__disagg_remove_is_checkpoint_violation(session, conn, entry, cur_schema_epoch)) {
+        __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+          "API violation: table \"%s\" was dropped at schema epoch %" PRIu64
+          " and recreated, above the checkpoint's schema epoch %" PRIu64
+          ": the checkpoint refers to the dropped generation",
+          entry->table_name, entry->schema_epoch, cur_schema_epoch);
+        WT_RET_PANIC(session, EINVAL,
+          "API violation: checkpoint schema epoch refers to a dropped and recreated table");
+    }
+
+    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Defer metadata operation %s for table \"%s\" with schema epoch %" PRIu64,
+      __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
+      entry->schema_epoch);
+    WT_STAT_CONN_INCR(session, checkpoint_disagg_metadata_unstable);
+
+    return (0);
+}
+
+/*
+ * __disagg_parked_creates_panic --
+ *     Panic on the creates this checkpoint parked, naming the DROP that blocks each one.
+ *
+ * The checkpoint's epoch is at or above the create's and below the drop's, so this checkpoint must
+ *     include the table in shared metadata. But the table was dropped and its stable constituent
+ *     was never created, so we have no data to write. Drop the table only once a checkpoint covers
+ *     its create, to avoid this window.
+ */
+static int
+__disagg_parked_creates_panic(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn,
+  struct __wt_disagg_shared_metadata_qh *skipped_creates, wt_timestamp_t cur_schema_epoch)
+{
+    WT_DISAGG_METADATA_OP *skipped;
+    wt_timestamp_t drop_epoch;
+    char drop_desc[64];
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    TAILQ_FOREACH (skipped, skipped_creates, q) {
+        drop_epoch = __disagg_parked_create_drop_epoch(session, conn, skipped);
+        if (drop_epoch == WT_SCHEMA_EPOCH_NONE)
+            WT_IGNORE_RET(__wt_snprintf(drop_desc, sizeof(drop_desc), "no DROP is queued for it"));
+        else if (drop_epoch == WT_SCHEMA_EPOCH_UNPUBLISHED)
+            WT_IGNORE_RET(
+              __wt_snprintf(drop_desc, sizeof(drop_desc), "its DROP was never published"));
+        else
+            WT_IGNORE_RET(__wt_snprintf(
+              drop_desc, sizeof(drop_desc), "its DROP is at epoch %" PRIu64, drop_epoch));
+        __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+          "API violation: Table \"%s\" was published with CREATE at epoch %" PRIu64
+          " and %s. This checkpoint must include the table in shared metadata, but the table was "
+          "dropped and we have no data to write.",
+          skipped->table_name, skipped->schema_epoch, drop_desc);
+    }
+
+    WT_RET_PANIC(session, EINVAL,
+      "API violation: See above for details. Current schema epoch: %" PRIu64 ".", cur_schema_epoch);
+}
+
+/*
  * __disagg_requeue_skipped_creates --
  *     Return parked create entries to the head of the shared metadata queue, restoring their
  *     original order, so a later checkpoint revisits them.
@@ -961,8 +1051,10 @@ __disagg_requeue_skipped_creates(
 
 /*
  * __wt_disagg_shared_metadata_queue_process --
- *     Process the update metadata list, returning the total checkpoint size of the shared rows the
- *     REMOVE entries deleted so the caller can reduce the database size accordingly.
+ *     Drain the shared metadata queue into the shared metadata table: apply every entry the
+ *     checkpoint's schema epoch covers, leave the rest queued for a later checkpoint, and resolve
+ *     the creates parked along the way. Returns the total checkpoint size of the shared rows the
+ *     REMOVE entries deleted, so the caller can reduce the database size accordingly.
  */
 int
 __wt_disagg_shared_metadata_queue_process(
@@ -971,7 +1063,7 @@ __wt_disagg_shared_metadata_queue_process(
     struct __wt_disagg_shared_metadata_qh skipped_creates;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_DISAGG_METADATA_OP *entry, *skipped, *tmp;
+    WT_DISAGG_METADATA_OP *entry, *tmp;
     uint64_t entry_drop_size;
 
     WT_ASSERT(session, drop_sizep != NULL);
@@ -1000,20 +1092,7 @@ __wt_disagg_shared_metadata_queue_process(
 
         /* Defer entries based on the schema epoch. */
         if (cur_schema_epoch != WT_SCHEMA_EPOCH_NONE && entry->schema_epoch > cur_schema_epoch) {
-            if (__disagg_remove_is_checkpoint_violation(session, conn, entry, cur_schema_epoch)) {
-                __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
-                  "API violation: table \"%s\" was dropped at schema epoch %" PRIu64
-                  " and recreated, above the checkpoint's schema epoch %" PRIu64
-                  ": the checkpoint refers to the dropped generation",
-                  entry->table_name, entry->schema_epoch, cur_schema_epoch);
-                WT_ERR_PANIC(session, EINVAL,
-                  "API violation: checkpoint schema epoch refers to a dropped and recreated table");
-            }
-            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
-              "Defer metadata operation %s for table \"%s\" with schema epoch %" PRIu64,
-              __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
-              entry->schema_epoch);
-            WT_STAT_CONN_INCR(session, checkpoint_disagg_metadata_unstable);
+            WT_ERR(__disagg_check_epoch_deferral(session, conn, entry, cur_schema_epoch));
             continue;
         }
 
@@ -1036,35 +1115,18 @@ __wt_disagg_shared_metadata_queue_process(
         __disagg_shared_metadata_queue_free(session, &entry);
     }
 
+    /*
+     * A parked CREATE left while a step-down timestamp is set belongs to the era the pending
+     * step-down begins, so put it back for a later leader era to complete. A violation parked
+     * meanwhile is caught by the next era's drain. The schema lock held here serializes the
+     * timestamp, making the relaxed load safe. Anything else is an API violation.
+     */
     if (!TAILQ_EMPTY(&skipped_creates)) {
-        /*
-         * A parked CREATE left while a step-down timestamp is set belongs to the era the pending
-         * step-down begins, so put it back for a later leader era to complete. A violation parked
-         * meanwhile is caught by the next era's drain. The schema lock held here serializes the
-         * timestamp, making the relaxed load safe.
-         */
         if (__wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)
             __disagg_requeue_skipped_creates(session, &skipped_creates);
-        else {
-            /*
-             * Otherwise the stable epoch falls between the CREATE and DROP epochs, so this
-             * checkpoint must include the table in shared metadata. But the table was dropped and
-             * its stable constituent was never created, so we have no data to write. Publish CREATE
-             * and DROP at the same epoch to avoid this window.
-             *
-             * FIXME-WT-18272: Confirm a pending DROP for the same table really is queued behind the
-             * parked CREATE before panicking, and report the epoch of that DROP in the message.
-             */
-            TAILQ_FOREACH (skipped, &skipped_creates, q)
-                __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
-                  "API violation: Table \"%s\" was published with CREATE at epoch %" PRIu64
-                  " and DROP at a later epoch. This checkpoint must include the table in shared "
-                  "metadata, but the table was dropped and we have no data to write.",
-                  skipped->table_name, skipped->schema_epoch);
-            WT_ERR_PANIC(session, EINVAL,
-              "API violation: See above for details. Current schema epoch: %" PRIu64 ".",
-              cur_schema_epoch);
-        }
+        else
+            WT_ERR(
+              __disagg_parked_creates_panic(session, conn, &skipped_creates, cur_schema_epoch));
     }
 
 err:
@@ -1074,13 +1136,10 @@ err:
      */
     if (ret != 0)
         __disagg_requeue_skipped_creates(session, &skipped_creates);
+    /* By this point, the local list should no longer own any skipped creates. */
+    WT_ASSERT(session, TAILQ_EMPTY(&skipped_creates));
 
     __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
-    while (!TAILQ_EMPTY(&skipped_creates)) {
-        skipped = TAILQ_FIRST(&skipped_creates);
-        TAILQ_REMOVE(&skipped_creates, skipped, q);
-        __disagg_shared_metadata_queue_free(session, &skipped);
-    }
     return (ret);
 }
 
@@ -1887,8 +1946,8 @@ __disagg_step_down(WT_SESSION_IMPL *session)
     /*
      * The schema lock serializes two things against the step-down.
      *
-     * First, application schema operations: the step-down clears the shared metadata queue and
-     * changes layered-table state underneath them.
+     * First, application schema operations: the step-down changes layered-table state underneath
+     * them. The shared metadata queue survives it, for a later leader era to drain.
      *
      * Second, cursor opens: every btree open runs under the schema lock, so holding it here means
      * an open either completes before the step-down, and the walk below sees the handle and marks

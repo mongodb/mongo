@@ -38,6 +38,26 @@ generator_emit(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev)
 }
 
 /*
+ * generator_slot_droppable --
+ *     Whether this slot's table can be dropped now.
+ */
+static bool
+generator_slot_droppable(WORKLOAD_STATE *state, uint32_t t, uint32_t slot)
+{
+    if (state->workers[t].table[slot].uncovered_insert)
+        return (false);
+
+    /* Legacy mode has no epochs to cover, and a lone node or a dead peer has nobody to protect. */
+    if (state->cfg->epoch_less || node_is_lone(state->cfg) || !state->cfg->peer_alive)
+        return (true);
+
+    const uint64_t create_epoch =
+      __wt_atomic_load_uint64(&state->workers[t].table[slot].create_epoch);
+    return (create_epoch != WT_SCHEMA_EPOCH_NONE &&
+      __wt_atomic_load_uint64(&state->adopted_ckpt_epoch) >= create_epoch);
+}
+
+/*
  * generator_op --
  *     Advance one slot of the given worker thread through the table lifecycle, taking one of its
  *     state's valid moves at random. Reports whether an event was emitted; taking no move is valid,
@@ -51,6 +71,7 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
     WT_RAND_STATE *rnd = &state->workers[t].rnd;
     const uint32_t slot = __wt_random(rnd) % state->cfg->pool_size;
     TABLE_STATE *slot_state = &state->workers[t].table[slot].state;
+    uint64_t *create_epoch = &state->workers[t].table[slot].create_epoch;
     uint64_t *drop_epoch = &state->workers[t].table[slot].drop_epoch;
     /* Set when no checkpoint of this phase can cover the insert; such a slot is not droppable. */
     bool *uncovered_insert = &state->workers[t].table[slot].uncovered_insert;
@@ -84,11 +105,14 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         /* Take (more) data, drop the table, or linger. */
         if (__wt_random(rnd) % GEN_INSERT_ODDS == 0) {
             ev.type = EVENT_INSERT;
+            /* No checkpoint of this phase can cover it, so the slot stops being droppable. */
             if (stepping_down || !state->leads)
                 *uncovered_insert = true;
-        } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 && !*uncovered_insert) {
-            /* Such a drop would wait on a checkpoint this phase cannot take. */
+        } else if (__wt_random(rnd) % GEN_DROP_ODDS == 0 &&
+          generator_slot_droppable(state, t, slot)) {
             ev.type = EVENT_DROP;
+            /* Consume the create's epoch: the next table in this slot publishes its own. */
+            __wt_atomic_store_uint64(create_epoch, WT_SCHEMA_EPOCH_NONE);
             *slot_state = state->cfg->epoch_less ? TABLE_NONE : TABLE_DROPPED;
         }
         break;
@@ -101,12 +125,13 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         }
         break;
     case TABLE_REMOVED: {
-        /* Free the slot once the stable epoch passes the published drop; zero is not applied yet.
+        /*
+         * Free the slot once the stable epoch passes the published drop; zero is not applied yet.
          */
         const uint64_t published_drop = __wt_atomic_load_uint64(drop_epoch);
-        if (published_drop != 0 &&
+        if (published_drop != WT_SCHEMA_EPOCH_NONE &&
           __wt_atomic_load_uint64(&state->stable_epoch) >= published_drop) {
-            __wt_atomic_store_uint64(drop_epoch, 0);
+            __wt_atomic_store_uint64(drop_epoch, WT_SCHEMA_EPOCH_NONE);
             *slot_state = TABLE_NONE;
         }
         break;
@@ -194,9 +219,6 @@ generator_switch_requested(GENERATOR_PACING *pacing)
 /*
  * generator_publish_pending --
  *     Emit the pending publish for every slot in an unpublished state.
- *
- * FIXME-WT-18272 FIXME-WT-18284: Consider removing this function and GEN_PUBLISH_PENDING once these
- *     are fixed.
  */
 static void
 generator_publish_pending(WORKLOAD_STATE *state)
@@ -247,7 +269,7 @@ generator_stepdown_ended(WORKLOAD_STATE *state, GENERATOR_PACING *pacing)
     const uint64_t stepdown_events = state->emitted - pacing->stepdown_emitted;
     /* Lone node exhausted step-down events or peer adopted the checkpoint. */
     const bool ended = ckpt_lsn != 0 &&
-      (lone ? stepdown_events >= GEN_STEPDOWN_MIN_EVENTS : adopted_lsn_read() >= ckpt_lsn);
+      (lone ? stepdown_events >= GEN_STEPDOWN_MIN_EVENTS : adopted_ckpt_read(NULL) >= ckpt_lsn);
 
     if (ended)
         return (true);

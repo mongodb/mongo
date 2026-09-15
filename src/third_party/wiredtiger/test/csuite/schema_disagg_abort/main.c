@@ -104,38 +104,41 @@ set_ts(const TEST_CONFIG *cfg, WT_CONNECTION *conn, uint8_t mask, uint64_t ts)
 }
 
 /*
- * adopted_lsn_publish --
- *     Report the latest adopted checkpoint LSN for a stepping-down peer to wait on.
+ * adopted_ckpt_publish --
+ *     Report the latest adopted checkpoint's LSN and schema epoch for the peer to wait on.
  */
 void
-adopted_lsn_publish(uint32_t node_id, uint64_t lsn)
+adopted_ckpt_publish(uint32_t node_id, uint64_t lsn, uint64_t schema_epoch)
 {
     /* Write to a temporary file first, so a reader never sees a partial value */
     char tmp[64];
-    testutil_snprintf(tmp, sizeof(tmp), ADOPTED_LSN_FILE ".%" PRIu32, node_id);
+    testutil_snprintf(tmp, sizeof(tmp), ADOPTED_CKPT_FILE ".%" PRIu32, node_id);
 
     FILE *fp;
     testutil_assert_errno((fp = fopen(tmp, "w")) != NULL);
-    testutil_assert(fprintf(fp, "%" PRIu64 "\n", lsn) > 0);
+    testutil_assert(fprintf(fp, "%" PRIu64 " %" PRIu64 "\n", lsn, schema_epoch) > 0);
     testutil_check(fclose(fp));
-    /* Publish the LSN. */
-    testutil_assert_errno(rename(tmp, ADOPTED_LSN_FILE) == 0);
+    /* Publish the pair. */
+    testutil_assert_errno(rename(tmp, ADOPTED_CKPT_FILE) == 0);
 }
 
 /*
- * adopted_lsn_read --
- *     Return the peer's last reported adopted checkpoint LSN; zero when none yet.
+ * adopted_ckpt_read --
+ *     Return the peer's last reported adopted checkpoint LSN and its schema epoch.
  */
 uint64_t
-adopted_lsn_read(void)
+adopted_ckpt_read(uint64_t *schema_epochp)
 {
-    FILE *fp = fopen(ADOPTED_LSN_FILE, "r");
-    if (fp == NULL)
-        return (0);
+    uint64_t lsn = 0, schema_epoch = 0;
 
-    uint64_t lsn = 0;
-    testutil_ignore_ret(fscanf(fp, "%" SCNu64, &lsn));
-    testutil_check(fclose(fp));
+    FILE *fp = fopen(ADOPTED_CKPT_FILE, "r");
+    if (fp != NULL) {
+        testutil_ignore_ret(fscanf(fp, "%" SCNu64 " %" SCNu64, &lsn, &schema_epoch));
+        testutil_check(fclose(fp));
+    }
+
+    if (schema_epochp != NULL)
+        *schema_epochp = schema_epoch;
     return (lsn);
 }
 
