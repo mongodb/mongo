@@ -17,7 +17,7 @@ from bazel.wrapper_hook.compiledb import (
     generate_compiledb,
     prepare_compiledb_posthook_args,
 )
-from bazel.wrapper_hook.hermetic_container_integration import (
+from bazel.wrapper_hook.hermetic_container.env import (
     CROSS_HOST_FLAGS_WITH_SEPARATE_VALUE,
 )
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug

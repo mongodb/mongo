@@ -9,7 +9,7 @@ about multi-file diff separation.
 @@ -159,6 +159,36 @@
      else:
          create_venv(rctx, python_executable, venv_path, [pycross_path] + wheel_paths)
- 
+
 +
 +    # Windows fix: extract the installer wheel at repo-rule time so it can
 +    # be exposed as a normal py_library rather than via

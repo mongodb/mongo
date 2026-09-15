@@ -1,0 +1,31 @@
+diff --git a/pycross/private/tools/crossenv/scripts/sys-patch.py.tmpl b/pycross/private/tools/crossenv/scripts/sys-patch.py.tmpl
+index 75cb8e5..2558bf1 100644
+--- a/pycross/private/tools/crossenv/scripts/sys-patch.py.tmpl
++++ b/pycross/private/tools/crossenv/scripts/sys-patch.py.tmpl
+@@ -22,20 +22,19 @@ def __getattr__(name):
+     if name != 'platform':
+         raise AttributeError(name)
+ 
+-    import traceback
+-    frames = traceback.extract_stack(limit=2)
+-    assert len(frames) == 2
+-    frame = frames[0]
++    # Avoid importing traceback here: Python may ask for sys.platform while
++    # traceback/linecache is importing, which would recurse into this method.
++    filename = __import__("sys")._getframe(1).f_code.co_filename
+ 
+     # frozen modules - part of the interpreter itself? Report exec platform.
+-    if frame.filename.startswith("<frozen"):
++    if filename.startswith("<frozen"):
+         return exec_platform
+     # Report cross platform to distutils
+-    elif "distutils/" in frame.filename:
++    elif "distutils/" in filename:
+         return target_platform
+     # Report the target platform to anything local
+     # (e.g., setup.py in the module we're building)
+-    elif not frame.filename.startswith("/"):
++    elif not filename.startswith("/"):
+         return target_platform
+     # Report exec platform to everything else
+     else:

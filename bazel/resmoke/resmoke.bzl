@@ -1,6 +1,7 @@
 """Resmoke suite test infrastructure for Bazel."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
@@ -445,6 +446,10 @@ def resmoke_suite_test(
         name = historic_runtimes,
         out = historic_runtimes + ".json",
         suite = "//{pkg}:{name}".format(pkg = native.package_name(), name = name),
+        # This action needs the invoking host's network. Constrain its exec
+        # configuration to that host as well, so cfg = "exec" tools do not
+        # resolve for a foreign RBE worker and then fall back to local execution.
+        exec_compatible_with = HOST_CONSTRAINTS,
     )
 
     # Collect Python imports from data dependencies
@@ -476,6 +481,7 @@ def resmoke_suite_test(
             name = seed_target,
             suite_name = name,
             tags = ["manual"],
+            exec_compatible_with = HOST_CONSTRAINTS,
         )
         seed_target_data = [":%s" % seed_target]
         seed_env = {"CONFIG_FUZZ_SEED_FILE": "$(location :%s)" % seed_target}
@@ -618,6 +624,7 @@ def resmoke_suite_test(
         ]),
         stamp = True,
         tools = ["//bazel/resmoke:generate_tss_test_list"],
+        exec_compatible_with = HOST_CONSTRAINTS,
         # Must run on the Evergreen host, not a remote worker: a later step will call the
         # Test Selection Services API from here (required Mesh),
         # which needs the host's credentials and network. no-sandbox

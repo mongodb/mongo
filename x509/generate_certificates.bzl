@@ -2,6 +2,7 @@ load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
 load("//bazel/config:render_template.bzl", "render_template")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 def _generate_certificates(ctx):
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
@@ -135,4 +136,8 @@ generate_certificates = rule(
         ),
     },
     toolchains = ["@rules_python//python:toolchain_type"],
+    # Certificate generation is a host-local provenance input.  Keep its Python
+    # interpreter native even when the surrounding build uses a foreign RBE
+    # execution platform for cross compilation.
+    exec_compatible_with = HOST_CONSTRAINTS,
 )

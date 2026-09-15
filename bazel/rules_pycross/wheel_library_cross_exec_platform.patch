@@ -1,0 +1,72 @@
+Resolve WheelInstall actions and Python toolchains from the selected execution group.
+
+--- a/pycross/private/wheel_library.bzl
++++ b/pycross/private/wheel_library.bzl
+@@ -42,21 +42,30 @@
+     # directory (where python313.dll lives, co-located with python.exe
+     # in the python-build-standalone layout) on PATH so the loader
+     # finds it. No-op on Linux/macOS.
+-    _py = ctx.toolchains["@rules_python//python:toolchain_type"]
++    exec_group = "cross" if (
++        ctx.target_platform_has_constraint(
++            ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++        ) or ctx.var.get("MONGO_IBM_CROSS") == "1"
++    ) else None
++    toolchain_ctx = ctx.exec_groups[exec_group] if exec_group else ctx
++    _py = toolchain_ctx.toolchains["@rules_python//python:toolchain_type"]
+     if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
+         _interp = _py.py3_runtime.interpreter
+         if _interp.basename.endswith(".exe"):
+             env["PATH"] = _interp.dirname
+
+-    ctx.actions.run(
+-        inputs = inputs,
+-        outputs = [out],
+-        executable = ctx.executable._tool,
+-        arguments = [args],
+-        env = env,
+-        mnemonic = "WheelInstall",
+-        progress_message = "Installing %s" % ctx.file.wheel.basename,
+-    )
++    action_kwargs = {
++        "inputs": inputs,
++        "outputs": [out],
++        "executable": ctx.executable._cross_tool if exec_group else ctx.executable._tool,
++        "arguments": [args],
++        "env": env,
++        "mnemonic": "WheelInstall",
++        "progress_message": "Installing %s" % ctx.file.wheel.basename,
++    }
++    if exec_group:
++        action_kwargs["exec_group"] = exec_group
++    ctx.actions.run(**action_kwargs)
+
+     has_py2_only_sources = ctx.attr.python_version == "PY2"
+     has_py3_only_sources = ctx.attr.python_version == "PY3"
+@@ -142,6 +149,26 @@
+             cfg = "exec",
+             executable = True,
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++        "_cross_tool": attr.label(
++            default = Label("//pycross/private/tools:wheel_installer"),
++            cfg = config.exec(exec_group = "cross"),
++            executable = True,
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [config_common.toolchain_type(
++                Label("@rules_python//python:toolchain_type"),
++                mandatory = True,
++            )],
++            exec_compatible_with = [
++                "@@//bazel/platforms:use_mongo_linux_cross_execution",
++            ],
++        ),
+     },
+     toolchains = ["@rules_python//python:toolchain_type"],
+ )

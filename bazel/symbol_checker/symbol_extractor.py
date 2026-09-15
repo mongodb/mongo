@@ -3,7 +3,7 @@ import argparse
 import json
 import sys
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(fromfile_prefix_chars="@")
 parser.add_argument("--obj", action="append", required=True)
 parser.add_argument("--nm", required=True)
 parser.add_argument("--out", required=True)

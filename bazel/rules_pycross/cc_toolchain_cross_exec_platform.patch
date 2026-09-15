@@ -1,0 +1,84 @@
+Resolve C++ toolchain information from the selected execution group.
+
+--- a/pycross/private/cc_toolchain_util.bzl
++++ b/pycross/private/cc_toolchain_util.bzl
+@@ -6,6 +6,27 @@
+ load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+ load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+ 
++CPP_TOOLCHAIN_TYPE = Label("@bazel_tools//tools/cpp:toolchain_type")
++MONGO_PYCROSS_CPP_TOOLCHAIN_TYPE = Label("@@//bazel/toolchains:mongo_pycross_cc_toolchain_type")
++
++def _find_cpp_toolchain(ctx, exec_group):
++    if not exec_group:
++        return find_cpp_toolchain(ctx)
++
++    toolchains = ctx.exec_groups[exec_group].toolchains
++
++    # IBM cross WheelBuild actions use a dedicated toolchain type so that the
++    # target C++ toolchain cannot shadow the execution toolchain used by
++    # ordinary bootstrap/code-generation tools.
++    toolchain_info = toolchains[MONGO_PYCROSS_CPP_TOOLCHAIN_TYPE] if MONGO_PYCROSS_CPP_TOOLCHAIN_TYPE in toolchains else None
++    if toolchain_info == None:
++        toolchain_info = toolchains[CPP_TOOLCHAIN_TYPE] if CPP_TOOLCHAIN_TYPE in toolchains else None
++    if toolchain_info == None:
++        fail("Unable to find a C++ toolchain for execution group %s" % exec_group)
++    if hasattr(toolchain_info, "cc"):
++        return toolchain_info.cc
++    return toolchain_info
++
+ CxxToolsInfo = provider(
+     doc = "Paths to the C/C++ tools, taken from the toolchain",
+     fields = dict(
+@@ -57,7 +78,7 @@
+ def _defines_from_deps(ctx):
+     return depset(transitive = [dep[CcInfo].compilation_context.defines for dep in getattr(ctx.attr, "deps", []) if CcInfo in dep])
+ 
+-def get_env_vars(ctx):
++def get_env_vars(ctx, exec_group = None):
+     """Returns environment variables for C tools
+ 
+     Args:
+@@ -65,7 +86,7 @@
+     Returns:
+         environment variables
+     """
+-    cc_toolchain = find_cpp_toolchain(ctx)
++    cc_toolchain = _find_cpp_toolchain(ctx, exec_group)
+     feature_configuration = _configure_features(
+         ctx = ctx,
+         cc_toolchain = cc_toolchain,
+@@ -91,13 +112,13 @@
+         ))
+     return vars
+ 
+-def get_tools_info(ctx):
++def get_tools_info(ctx, exec_group = None):
+     """Takes information about tools paths from cc_toolchain, returns CxxToolsInfo
+ 
+     Args:
+         ctx: rule context
+     """
+-    cc_toolchain = find_cpp_toolchain(ctx)
++    cc_toolchain = _find_cpp_toolchain(ctx, exec_group)
+     feature_configuration = _configure_features(
+         ctx = ctx,
+         cc_toolchain = cc_toolchain,
+@@ -122,7 +143,7 @@
+         ),
+     )
+ 
+-def get_flags_info(ctx, copts = [], linkopts = [], link_output_file = None):
++def get_flags_info(ctx, copts = [], linkopts = [], link_output_file = None, exec_group = None):
+     """Takes information about flags from cc_toolchain, returns CxxFlagsInfo
+ 
+     Args:
+@@ -135,7 +156,7 @@
+     Returns:
+         CxxFlagsInfo: A provider containing Cxx flags
+     """
+-    cc_toolchain_ = find_cpp_toolchain(ctx)
++    cc_toolchain_ = _find_cpp_toolchain(ctx, exec_group)
+     feature_configuration = _configure_features(
+         ctx = ctx,
+         cc_toolchain = cc_toolchain_,

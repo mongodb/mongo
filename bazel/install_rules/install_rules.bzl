@@ -6,6 +6,7 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 load("@rules_pkg//:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:providers.bzl", "PackageFilesInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("//bazel:mongo_src_rules.bzl", "SANITIZER_DATA", "SANITIZER_ENV")
 load("//bazel:separate_debug.bzl", "TagInfo")
 load("//bazel/install_rules:pretty_printer_tests.bzl", "mongo_pretty_printer_test")
@@ -835,6 +836,10 @@ def mongo_install(
                 "//conditions:default": seperate_debug_incompat,
             }),
             publish_debug_in_stripped = publish_debug_in_stripped,
+            # This no-remote action publishes the shared install tree. Resolve
+            # its exec-config Python for the invoking machine as well, rather
+            # than for the foreign RBE execution platform.
+            exec_compatible_with = HOST_CONSTRAINTS,
             testonly = testonly,
             **kwargs
         )
@@ -865,6 +870,7 @@ def mongo_install(
                 "no-remote": "1",
                 "local": "1",
             },
+            exec_compatible_with = HOST_CONSTRAINTS,
             testonly = testonly,
             target_compatible_with = select({
                 "@platforms//os:windows": [],
@@ -882,6 +888,7 @@ def mongo_install(
         pkg_tar(
             name = "archive-" + name + install_type + "_tar",
             srcs = [install_target + "_files", install_target + "_licenses"],
+            build_tar_tool = "//bazel/rules_pkg:build_tar_host",
             compressor = compressor,
             package_dir = package_extract_name,
             package_file_name = name + install_type + ".tgz",
@@ -892,6 +899,7 @@ def mongo_install(
                 "no-remote": "1",
                 "local": "1",
             },
+            exec_compatible_with = HOST_CONSTRAINTS,
             preserve_mtime = True,
             testonly = testonly,
             target_compatible_with = select({
@@ -904,6 +912,7 @@ def mongo_install(
             pkg_tar(
                 name = "archive-" + name + install_type + "_zst",
                 srcs = [install_target + "_files", install_target + "_licenses"],
+                build_tar_tool = "//bazel/rules_pkg:build_tar_host",
                 compressor = "@zstd//:bin",
                 package_dir = package_extract_name,
                 package_file_name = name + install_type + ".zst",
@@ -914,6 +923,7 @@ def mongo_install(
                     "no-remote": "1",
                     "local": "1",
                 },
+                exec_compatible_with = HOST_CONSTRAINTS,
                 preserve_mtime = True,
                 testonly = testonly,
                 target_compatible_with = select({

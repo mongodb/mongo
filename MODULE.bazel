@@ -112,6 +112,8 @@ single_version_override(
 #     into sdist builds — third-party build systems aren't held to mongo's
 #     warning policy (clang otherwise fatals on the harmless -L../lib that
 #     python-build-standalone's sysconfig adds to compile lines).
+#   crossenv_glibc_teller: compile rules_pycross's glibc probe as C because
+#     WheelBuild forwards CFLAGS with -std=c11.
 bazel_dep(name = "rules_pycross", version = "0.8.3")
 single_version_override(
     module_name = "rules_pycross",
@@ -123,6 +125,12 @@ single_version_override(
         "//bazel/rules_pycross:installer_tools_build.patch",
         "//bazel/rules_pycross:wheel_build_cargo_home.patch",
         "//bazel/rules_pycross:wheel_build_no_werror.patch",
+        "//bazel/rules_pycross:crossenv_glibc_teller.patch",
+        "//bazel/rules_pycross:crossenv_sys_platform_recursion.patch",
+        "//bazel/rules_pycross:cc_toolchain_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_build_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_library_cross_exec_platform.patch",
+        "//bazel/rules_pycross:target_environment_cross_exec_platform.patch",
     ],
     version = "0.8.3",
 )
@@ -133,7 +141,11 @@ bazel_dep(name = "rules_pkg", version = "1.2.0")
 single_version_override(
     module_name = "rules_pkg",
     patch_strip = 1,
-    patches = ["//bazel/rules_pkg:pkg_zip_windows_dll_path.patch"],
+    patches = [
+        "//bazel/rules_pkg:pkg_tar_host_tool.patch",
+        "//bazel/rules_pkg:pkg_tar_tool_override.patch",
+        "//bazel/rules_pkg:pkg_zip_windows_dll_path.patch",
+    ],
     version = "1.2.0",
 )
 
@@ -308,7 +320,17 @@ setup_local_config_platform = use_repo_rule("//bazel/platforms:local_config_plat
 
 setup_local_config_platform(name = "internal_platforms_do_not_use")
 
-register_execution_platforms("@internal_platforms_do_not_use//host:host")
+# Keep the IBM cross execution platforms registered even for ordinary analysis.
+# rules_pycross's cross execution groups are optional at action time, but Bazel
+# resolves every declared group while analyzing a target. Registering these
+# platforms avoids making non-IBM targets fail resolution merely because the
+# group carries the cross-execution constraint; the groups are selected only
+# when an IBM target platform has that constraint.
+register_execution_platforms(
+    "@internal_platforms_do_not_use//host:host",
+    "//bazel/platforms:rhel9_amd64_cross",
+    "//bazel/platforms:rhel9_arm64_cross",
+)
 
 # The hermetic C/C++ toolchain, plus the gdb build that is pinned against it.
 setup_mongo_toolchains_extension = use_extension("//bazel:bzlmod.bzl", "setup_mongo_toolchains")
@@ -363,7 +385,7 @@ setup_zstd(name = "zstd")
 
 # mongot extension public signing key, embedded into secure builds.
 mongot_extension_signing_key_repo = use_repo_rule(
-    "//bazel/mongot_extension_signing_key:mongot_extension_signing_key.bzl",
+    "//bazel/mongot_extension_signing_key:repository.bzl",
     "mongot_extension_signing_key_repo",
 )
 
@@ -492,6 +514,10 @@ setup_mongo_linux_cross_toolchains_extension = use_extension(
 )
 use_repo(
     setup_mongo_linux_cross_toolchains_extension,
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64",
     "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64",
     "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64",
     "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64",
@@ -511,6 +537,22 @@ register_toolchains(
     "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
 )
 
 setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
@@ -604,6 +646,17 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 # Make sure this version is set to one of those, or specify the hashes yourself
 rust.toolchain(
     edition = "2024",
+    extra_target_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "powerpc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+        "wasm32-unknown-unknown",
+        "wasm32-wasip1",
+        "wasm32-wasip2",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+    ],
     versions = ["nightly/2026-02-12"],
 )
 
@@ -803,7 +856,13 @@ wasi_deps = use_repo_rule(
     "setup_wasi_deps",
 )
 
-wasi_deps(name = "wasi_sdk")
+wasi_deps(
+    name = "wasi_sdk",
+    # Bump this whenever the host/execution SDK selection changes. The value
+    # is part of the repository key and prevents reuse of a stale archive
+    # hydrated for an IBM target architecture.
+    selection_version = "portable-exec-arch-v3",
+)
 
 spidermonkey_repo = use_repo_rule(
     "//src/mongo/scripting/mozjs/wasm:spidermonkey_repo.bzl",

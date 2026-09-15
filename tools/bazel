@@ -169,6 +169,293 @@ find_local_python() {
   return 1
 }
 
+# The wrapper bootstraps @py_host before wrapper_hook.py can inspect the full
+# Bazel command line.  Cross-RBE repository rules can nevertheless be loaded
+# during that bootstrap, so forward the execution architecture explicitly.
+# Keep the last cross config, matching the effective-config behavior in the
+# Python wrapper hook when users provide more than one --config option.
+linux_cross_rbe_exec_arch_from_args() {
+  local arg config selected="" expecting_config_value=0 local_release=0
+
+  for arg in "$@"; do
+    # Arguments after `--` belong to `bazel run`'s program, not Bazel's
+    # configuration, and must not influence SDK selection.
+    if [[ "$arg" == "--" ]]; then
+      break
+    fi
+    if [[ "$expecting_config_value" == "1" ]]; then
+      config="$arg"
+      expecting_config_value=0
+    elif [[ "$arg" == "--config" ]]; then
+      expecting_config_value=1
+      continue
+    elif [[ "$arg" == --config=* ]]; then
+      config="${arg#--config=}"
+    else
+      continue
+    fi
+
+    if [[ "$config" == "public-release-local" ]]; then
+      local_release=1
+      continue
+    fi
+
+    if [[ "$config" =~ ^linux-(ppc64le|s390x)(-rhel(8|9|10))?-cross-rbe(-arm64|-aarch64)?$ ]]; then
+      case "$config" in
+        *-cross-rbe-arm64|*-cross-rbe-aarch64)
+          selected="aarch64"
+          ;;
+        *)
+          selected="x86_64"
+          ;;
+      esac
+    fi
+  done
+
+  if [[ "$local_release" == "0" && -n "$selected" ]]; then
+    printf '%s\n' "$selected"
+    return 0
+  fi
+
+  return 1
+}
+
+linux_cross_rbe_local_release_requested() {
+  local arg config expecting_config_value=0
+  for arg in "$@"; do
+    if [[ "$arg" == "--" ]]; then
+      break
+    fi
+    if [[ "$expecting_config_value" == "1" ]]; then
+      config="$arg"
+      expecting_config_value=0
+    elif [[ "$arg" == "--config" ]]; then
+      expecting_config_value=1
+      continue
+    elif [[ "$arg" == --config=* ]]; then
+      config="${arg#--config=}"
+    else
+      continue
+    fi
+    [[ "$config" == "public-release-local" ]] && return 0
+  done
+  return 1
+}
+
+# Repository rules can run before hermetic_container_integration.py has a chance
+# to construct the final Bazel environment.  IBM tasks always use the rootless
+# Podman runtime, so make the task-scoped storage visible during that bootstrap
+# as well.  Without this, sysroot_dump.bzl can attach to the host's shared
+# ~/.local/share/containers store and fail when a stale overlay layer is gone.
+linux_cross_rbe_podman_repo_env() {
+  local podman_required="${MONGO_PODMAN_REQUIRED:-}"
+  local container_actions="${MONGO_LINUX_CONTAINER_ACTIONS:-}"
+  local task_id="${MONGO_PODMAN_TASK_ID:-}"
+  local podman_command docker_command docker_version safe_task_id task_root uid runtime_dir
+
+  [[ -n "$task_id" ]] || return 1
+  if [[ "$podman_required" != "1" && "$podman_required" != "true" &&
+    "$podman_required" != "TRUE" && "$podman_required" != "True" &&
+    "$container_actions" =~ ^(0|false|no|off)$ ]]; then
+    return 1
+  fi
+
+  podman_command="$(command -v podman 2>/dev/null || true)"
+  [[ -n "$podman_command" ]] || return 1
+
+  # If Podman is not explicitly required, mirror the runtime selection rule:
+  # use task-scoped state when Docker is absent or is Podman's compatibility shim.
+  if [[ "$podman_required" != "1" && "$podman_required" != "true" &&
+    "$podman_required" != "TRUE" && "$podman_required" != "True" ]]; then
+    docker_command="$(command -v docker 2>/dev/null || true)"
+    if [[ -n "$docker_command" ]]; then
+      docker_version="$("$docker_command" --version 2>&1 || true)"
+      if ! printf '%s\n' "$docker_version" | grep -Eiq \
+        'emulate docker cli using podman|podman version'; then
+        return 1
+      fi
+    fi
+  fi
+
+  safe_task_id="$(printf '%s' "$task_id" | sed 's/[^A-Za-z0-9_.-]/_/g')"
+  task_root="/tmp/mongo-linux-podman-task-${safe_task_id}"
+  uid="$(id -u)"
+  runtime_dir="${task_root}/mongo-linux-podman-runtime-${uid}"
+  mkdir -p -m 700 "$runtime_dir"
+
+  # Keep the task-scoped values for Bazel repository rules, but do not export
+  # them into the Bazel client/server process.  Host actions (for example the
+  # local GPG signing action) inherit TMPDIR and Bazel's sandbox tries to bind
+  # mount it.  Podman cleanup/recovery can remove its runtime directory while
+  # the Bazel server is still alive, leaving those host actions with a stale
+  # temporary path.  --repo_env below scopes these values to repository rules;
+  # the Podman action wrappers set them only on actual Podman subprocesses.
+  podman_repo_storage_conf="${task_root}/mongo-linux-podman-storage-${uid}/storage.conf"
+  podman_repo_config="${CONTAINERS_CONF:-${runtime_dir}/containers.conf}"
+  if [[ -z "${CONTAINERS_CONF:-}" ]]; then
+    # Harden the task-scoped paths the same way the Python Podman helper does
+    # (_ensure_owned_directory): refuse paths that are symlinks or not owned by
+    # this uid, so a pre-planted /tmp entry cannot redirect the write.
+    if [[ -L "$runtime_dir" ]]; then
+      echo "Refusing symlinked Podman runtime dir: ${runtime_dir}" >&2
+      return 1
+    fi
+    local runtime_dir_owner_uid
+    runtime_dir_owner_uid="$(stat -c %u "$runtime_dir" 2>/dev/null || true)"
+    if [[ "$runtime_dir_owner_uid" != "$uid" ]]; then
+      echo "Refusing Podman runtime dir not owned by uid ${uid}: ${runtime_dir}" >&2
+      return 1
+    fi
+    if [[ -L "$podman_repo_config" ]]; then
+      echo "Refusing symlinked Podman config path: ${podman_repo_config}" >&2
+      return 1
+    fi
+    if [[ -e "$podman_repo_config" && ! -f "$podman_repo_config" ]]; then
+      echo "Refusing non-regular-file Podman config path: ${podman_repo_config}" >&2
+      return 1
+    fi
+    # Repository rules can invoke Podman before the Python preparation hook has
+    # created the task config. Write it during bootstrap so Podman never probes
+    # the unavailable systemd user session and emits the cgroup-manager warning.
+    local podman_repo_config_tmp="${podman_repo_config}.tmp.$$"
+    printf '[engine]\ncgroup_manager = "cgroupfs"\n' >"$podman_repo_config_tmp"
+    chmod 600 "$podman_repo_config_tmp"
+    mv -f "$podman_repo_config_tmp" "$podman_repo_config"
+  fi
+
+  # Preserve an explicit auth path, then mirror the standard locations used by
+  # the Python Podman helper. Only the path is forwarded; credentials remain in
+  # the host-owned file.
+  podman_repo_auth_file="${REGISTRY_AUTH_FILE:-}"
+  if [[ -n "$podman_repo_auth_file" && ! -f "$podman_repo_auth_file" ]]; then
+    podman_repo_auth_file=""
+  fi
+  if [[ -z "$podman_repo_auth_file" && -n "${XDG_RUNTIME_DIR:-}" &&
+    -f "${XDG_RUNTIME_DIR}/containers/auth.json" ]]; then
+    podman_repo_auth_file="${XDG_RUNTIME_DIR}/containers/auth.json"
+  elif [[ -z "$podman_repo_auth_file" && -n "${XDG_CONFIG_HOME:-}" &&
+    -f "${XDG_CONFIG_HOME}/containers/auth.json" ]]; then
+    podman_repo_auth_file="${XDG_CONFIG_HOME}/containers/auth.json"
+  elif [[ -z "$podman_repo_auth_file" && -n "${DOCKER_CONFIG:-}" &&
+    -f "${DOCKER_CONFIG}/config.json" ]]; then
+    podman_repo_auth_file="${DOCKER_CONFIG}/config.json"
+  elif [[ -z "$podman_repo_auth_file" && -n "${HOME:-}" &&
+    -f "${HOME}/.config/containers/auth.json" ]]; then
+    podman_repo_auth_file="${HOME}/.config/containers/auth.json"
+  elif [[ -z "$podman_repo_auth_file" && -n "${HOME:-}" &&
+    -f "${HOME}/.docker/config.json" ]]; then
+    podman_repo_auth_file="${HOME}/.docker/config.json"
+  fi
+  podman_repo_runtime_dir="$runtime_dir"
+  podman_repo_tmpdir="$runtime_dir"
+  return 0
+}
+
+# Repository rules can be evaluated by the Bazel client before the wrapper hook
+# has a chance to add command-line options.  Export this value as well as
+# forwarding it with --repo_env so both the bootstrap and the long-lived Bazel
+# server select an executable WASI SDK (rather than the target IBM archive).
+cross_rbe_exec_arch=""
+wasi_sdk_repo_env=""
+cross_toolchain_repo_env=""
+cross_python_repo_env=()
+podman_repo_env_args=()
+podman_repo_config=""
+podman_repo_auth_file=""
+if cross_rbe_exec_arch=$(linux_cross_rbe_exec_arch_from_args "$@"); then
+  export MONGO_WASI_SDK_EXEC_ARCH="$cross_rbe_exec_arch"
+  wasi_sdk_repo_env="--repo_env=MONGO_WASI_SDK_EXEC_ARCH=$cross_rbe_exec_arch"
+  # Python repository rules run during the bootstrap before the wrapper hook
+  # can add the cross-RBE action policy. On an IBM host, the execution platform
+  # is x86_64/aarch64, so download that executable Python runtime instead of
+  # leaving the execution toolchain as a host-architecture stub.
+  cross_python_repo_env=(
+    "--repo_env=MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON=1"
+    "--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=$cross_rbe_exec_arch"
+  )
+elif linux_cross_rbe_local_release_requested "$@"; then
+  # A release-local IBM build must not inherit a stale selector from the
+  # Evergreen shell or a previous cross invocation. Otherwise WASI hydration
+  # can download an SDK for the foreign execution pool and execute it on the
+  # native IBM host.
+  unset \
+    MONGO_WASI_SDK_EXEC_ARCH \
+    MONGO_LINUX_CROSS_TOOLCHAIN \
+    MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON \
+    MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH
+  # Override the cross config's .bazelrc value during @py_host bootstrap as
+  # well as during the final wrapper invocation.
+  wasi_sdk_repo_env="--repo_env=MONGO_WASI_SDK_EXEC_ARCH="
+  cross_toolchain_repo_env="--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN="
+  cross_python_repo_env=(
+    "--repo_env=MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON="
+    "--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH="
+  )
+fi
+
+# Keep task-scoped Podman state on the original argument vector too.  This is
+# needed by Bazel's bootstrap repository fetches, which happen before the
+# Python wrapper hook can inject its cross-RBE options.
+if linux_cross_rbe_podman_repo_env; then
+  podman_repo_env_args=(
+    "--repo_env=CONTAINERS_STORAGE_CONF=$podman_repo_storage_conf"
+    "--repo_env=CONTAINERS_CONF=$podman_repo_config"
+    "--repo_env=XDG_RUNTIME_DIR=$podman_repo_runtime_dir"
+    "--repo_env=TMPDIR=$podman_repo_tmpdir"
+    "--repo_env=TMP=$podman_repo_tmpdir"
+    "--repo_env=TEMP=$podman_repo_tmpdir"
+  )
+  if [[ -n "$podman_repo_auth_file" ]]; then
+    podman_repo_env_args+=("--repo_env=REGISTRY_AUTH_FILE=$podman_repo_auth_file")
+  fi
+fi
+
+# Keep the execution architecture on the original Bazel argument vector too.
+# The wrapper hook performs a few cquery/module-bootstrap operations before it
+# constructs the final cross-RBE arguments.  A repository rule can be hydrated
+# by one of those operations, so relying only on the later hook-injected
+# --repo_env leaves a window in which an IBM-host WASI executable is selected
+# for an amd64/aarch64 action.  A command-line repo_env is visible to every
+# Bazel invocation (including fallback calls) and its final value wins over a
+# stale value inherited from a host-level bazelrc.  Keep Evergreen's four
+# release-safety flags as the final argv suffix; provenance validation relies on
+# their exact position.
+bazel_wrapper_args=("$@")
+repo_env_args=("${podman_repo_env_args[@]}")
+if [[ -n "$cross_toolchain_repo_env" ]]; then
+  repo_env_args=("$cross_toolchain_repo_env" "${repo_env_args[@]}")
+fi
+if [[ -n "$wasi_sdk_repo_env" ]]; then
+  repo_env_args=("$wasi_sdk_repo_env" "${repo_env_args[@]}")
+fi
+if [[ "${#cross_python_repo_env[@]}" -gt 0 ]]; then
+  repo_env_args=("${cross_python_repo_env[@]}" "${repo_env_args[@]}")
+fi
+if [[ "${#repo_env_args[@]}" -gt 0 ]]; then
+  release_suffix_length=4
+  release_suffix_start=$((${#bazel_wrapper_args[@]} - release_suffix_length))
+  if [[ "$release_suffix_start" -ge 0 &&
+    "${bazel_wrapper_args[$release_suffix_start]}" == "--remote_executor="* &&
+    "${bazel_wrapper_args[$((release_suffix_start + 1))]}" == "--noremote_accept_cached" &&
+    "${bazel_wrapper_args[$((release_suffix_start + 2))]}" == "--remote_upload_local_results=false" &&
+    "${bazel_wrapper_args[$((release_suffix_start + 3))]}" == "--modify_execution_info=.*=+no-cache" ]]; then
+    repo_env_insert_at="$release_suffix_start"
+  else
+    repo_env_insert_at="${#bazel_wrapper_args[@]}"
+    for arg_index in "${!bazel_wrapper_args[@]}"; do
+      if [[ "${bazel_wrapper_args[$arg_index]}" == "--" ]]; then
+        repo_env_insert_at="$arg_index"
+        break
+      fi
+    done
+  fi
+  bazel_wrapper_args=(
+    "${bazel_wrapper_args[@]:0:repo_env_insert_at}"
+    "${repo_env_args[@]}"
+    "${bazel_wrapper_args[@]:repo_env_insert_at}"
+  )
+fi
+
 run_native_bazel() {
   local real_bazel="$1"
   shift
@@ -380,13 +667,44 @@ fi
 # if no python use bazel to install one
 if [[ "$python" = "" ]]; then
   >&2 echo "python prereq missing, using bazel to install python..."
-  >&2 $bazel_real build --bes_backend= --bes_results_url= --workspace_status_command= @py_host//:all 
+  bootstrap_bazel_args=(
+    build
+    --bes_backend=
+    --bes_results_url=
+    --workspace_status_command=
+  )
+  if [[ -n "$wasi_sdk_repo_env" ]]; then
+    bootstrap_bazel_args+=("$wasi_sdk_repo_env")
+  fi
+  if [[ -n "$cross_toolchain_repo_env" ]]; then
+    bootstrap_bazel_args+=("$cross_toolchain_repo_env")
+  fi
+  bootstrap_bazel_args+=("${cross_python_repo_env[@]}")
+  bootstrap_bazel_args+=("${podman_repo_env_args[@]}")
+  bootstrap_bazel_args+=("@py_host//:all")
+
+  >&2 "$bazel_real" "${bootstrap_bazel_args[@]}"
   if [[ $? != 0 ]]; then
-    >&2 $bazel_real build --config=local --workspace_status_command= @py_host//:all 
+    local_bootstrap_bazel_args=(
+      build
+      --config=local
+      --workspace_status_command=
+    )
+    if [[ -n "$wasi_sdk_repo_env" ]]; then
+      local_bootstrap_bazel_args+=("$wasi_sdk_repo_env")
+    fi
+    if [[ -n "$cross_toolchain_repo_env" ]]; then
+      local_bootstrap_bazel_args+=("$cross_toolchain_repo_env")
+    fi
+    local_bootstrap_bazel_args+=("${cross_python_repo_env[@]}")
+    local_bootstrap_bazel_args+=("${podman_repo_env_args[@]}")
+    local_bootstrap_bazel_args+=("@py_host//:all")
+
+    >&2 "$bazel_real" "${local_bootstrap_bazel_args[@]}"
     if [[ $? != 0 ]]; then
       if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
         >&2 echo "wrapper script failed to install python! falling back to final bazel call..."
-        run_final_bazel "$bazel_real" "$@"
+        run_final_bazel "$bazel_real" "${bazel_wrapper_args[@]}"
         exit $?
       else
         exit $?
@@ -432,7 +750,7 @@ MONGO_BAZEL_WRAPPER_ARGS="$MONGO_BAZEL_WRAPPER_ARGS" \
 MONGO_BAZEL_WRAPPER_STATUS="$MONGO_BAZEL_WRAPPER_STATUS" \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 PYTHON3="$python" \
->&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
+>&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "${bazel_wrapper_args[@]}"
 wrapper_exit_code=$?
 
 handled=0
@@ -481,7 +799,7 @@ if [[ $exit_code != 0 ]]; then
   rm -f "$MONGO_BAZEL_WRAPPER_ARGS"
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
-    run_final_bazel "$bazel_real" "$@"
+    run_final_bazel "$bazel_real" "${bazel_wrapper_args[@]}"
     exit $?
   else
     exit "$exit_code"

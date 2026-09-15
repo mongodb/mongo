@@ -5,6 +5,8 @@ made every query over //... (cquery, `bazel build //...`) liable to
 pull multiple GB of private test data that is only needed for test execution.
 """
 
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
+
 def _query_correctness_corpus_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name + "/generated_tests")
 
@@ -35,7 +37,7 @@ def _query_correctness_corpus_impl(ctx):
 
     return [DefaultInfo(files = depset([out]))]
 
-query_correctness_corpus = rule(
+_query_correctness_corpus_rule = rule(
     implementation = _query_correctness_corpus_impl,
     attrs = {
         "repo": attr.string(
@@ -60,3 +62,11 @@ query_correctness_corpus = rule(
         "network and system GitHub credentials."
     ),
 )
+
+def query_correctness_corpus(name, exec_compatible_with = HOST_CONSTRAINTS, **kwargs):
+    """Creates a host-local query correctness corpus download action."""
+    _query_correctness_corpus_rule(
+        name = name,
+        exec_compatible_with = exec_compatible_with,
+        **kwargs
+    )

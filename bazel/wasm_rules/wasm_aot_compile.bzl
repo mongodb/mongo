@@ -10,15 +10,30 @@ from the Rust toolchain's target_triple (the platform we are building for).
 If you do not pass --target it will only work on the current machine you run it on.
 """
 
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
+
+def _native_tool_transition_impl(_settings, _attr):
+    # Rustc must not invoke the IBM linker on an x86/ARM worker. Split the
+    # target-built CLI into remote Rust compilation and a native CppLink action.
+    return {"@rules_rust//rust/settings:experimental_use_cc_common_link": True}
+
+_native_tool_transition = transition(
+    implementation = _native_tool_transition_impl,
+    inputs = [],
+    outputs = ["@rules_rust//rust/settings:experimental_use_cc_common_link"],
+)
+
 def _aot_compile_wasm_impl(ctx):
-    tool = ctx.executable.tool
+    native_tool = ctx.executable.native_tool
+    tool = native_tool or ctx.executable.tool
     input_file = ctx.file.src
     output_file = ctx.outputs.out
 
     toolchain = ctx.toolchains["@rules_rust//rust:toolchain_type"]
     triple_str = toolchain.target_triple.str
 
-    tool_inputs = ctx.attr.tool[DefaultInfo].default_runfiles.files
+    tool_target = ctx.attr.native_tool[0] if native_tool else ctx.attr.tool
+    tool_inputs = tool_target[DefaultInfo].default_runfiles.files
 
     ctx.actions.run(
         inputs = depset([input_file], transitive = [tool_inputs]),
@@ -39,18 +54,30 @@ def _aot_compile_wasm_impl(ctx):
             "-W",
             "epoch-interruption=y,exceptions=y",
         ],
+        # The target-built CLI is executable on the native s390x host, not on
+        # its x86/ARM RBE workers. The wrapper routes this action into the
+        # native persistent container.
+        execution_requirements = {"no-remote": "1"} if native_tool else {},
+        exec_group = "native" if native_tool else None,
         mnemonic = "WasmAotCompile",
         progress_message = "AOT compiling %s" % input_file.short_path,
     )
 
-aot_compile_wasm = rule(
+_aot_compile_wasm_rule = rule(
     implementation = _aot_compile_wasm_impl,
     attrs = {
         "tool": attr.label(
-            default = Label("@crates//:wasmtime-cli__wasmtime"),
             executable = True,
             cfg = "exec",
             doc = "Executable that performs AOT compile (default: wasmtime CLI). Built for exec platform.",
+        ),
+        "native_tool": attr.label(
+            executable = True,
+            cfg = _native_tool_transition,
+            doc = "Target-built Wasmtime for native s390x AOT execution during cross builds.",
+        ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
         "src": attr.label(
             allow_single_file = True,
@@ -63,4 +90,20 @@ aot_compile_wasm = rule(
         ),
     },
     toolchains = ["@rules_rust//rust:toolchain_type"],
+    exec_groups = {"native": exec_group(exec_compatible_with = HOST_CONSTRAINTS)},
 )
+
+def aot_compile_wasm(name, tool = "@crates//:wasmtime-cli__wasmtime", **kwargs):
+    """AOT compile with a native s390x CLI when cross-compiling on an IBM host."""
+    _aot_compile_wasm_rule(
+        name = name,
+        tool = select({
+            "//bazel/config:linux_s390x_cross": None,
+            "//conditions:default": tool,
+        }),
+        native_tool = select({
+            "//bazel/config:linux_s390x_cross": tool,
+            "//conditions:default": None,
+        }),
+        **kwargs
+    )

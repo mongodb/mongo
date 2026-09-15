@@ -30,6 +30,7 @@ the multiversion directory, which is preserved in bazel-testlogs after each test
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo", "string_flag")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 def _multiversion_setup_impl(ctx):
     output_dir = ctx.actions.declare_directory(ctx.label.name)
@@ -96,7 +97,7 @@ _multiversion_setup_rule = rule(
         "_resmoke": attr.label(
             executable = True,
             cfg = "exec",
-            default = "//buildscripts:resmoke",
+            default = "//buildscripts:resmoke_local_host_tool",
         ),
         "_mongo_version": attr.label(
             allow_single_file = True,
@@ -182,7 +183,7 @@ _multiversion_exclude_tags = rule(
         "_resmoke": attr.label(
             executable = True,
             cfg = "exec",
-            default = "//buildscripts:resmoke",
+            default = "//buildscripts:resmoke_local_host_tool",
         ),
         "_mongo_version": attr.label(
             allow_single_file = True,
@@ -201,7 +202,7 @@ _VERSION_TO_OLD_BIN_VERSION = {
     "last-patch": "last_patch",
 }
 
-def multiversion_setup(name, version, **kwargs):
+def multiversion_setup(name, version, exec_compatible_with = HOST_CONSTRAINTS, **kwargs):
     """Downloads old MongoDB binaries and generates companion exclude-tags targets.
 
     Also creates a per-target string_flag <name>-pin that can be set on
@@ -233,6 +234,7 @@ def multiversion_setup(name, version, **kwargs):
         version = version,
         edition = edition,
         evg_version_flag = ":" + name + "-pin",
+        exec_compatible_with = exec_compatible_with,
         **kwargs
     )
 
@@ -242,6 +244,7 @@ def multiversion_setup(name, version, **kwargs):
             name = name + "_exclude_tags",
             multiversion_setup = ":" + name,
             old_bin_version = old_bin_version,
+            exec_compatible_with = exec_compatible_with,
         )
     else:
         native.genrule(

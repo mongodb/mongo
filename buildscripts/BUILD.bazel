@@ -1,3 +1,4 @@
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("@npm//:eslint/package_json.bzl", "bin")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
@@ -87,6 +88,30 @@ py_binary(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+# Build-time resmoke helper for actions that must execute on the invoking host
+# because they need its network and credentials. Keep this separate from the
+# normal resmoke target, whose execution platform may be a remote worker.
+py_binary(
+    name = "resmoke_local_host_tool",
+    srcs = ["resmoke.py"],
+    data = [
+        "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
+        "//buildscripts/resmokeconfig:resmoke_modules.yml",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+        "//src/mongo/util/version:releases.yml",
+    ],
+    exec_compatible_with = HOST_CONSTRAINTS,
+    main = "resmoke.py",
+    visibility = ["//bazel/resmoke:__subpackages__"],
     deps = [
         "//buildscripts/resmokelib",
         dependency(
@@ -306,13 +331,8 @@ py_binary(
     srcs = ["gather_failed_tests.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts/util",
         dependency(
             "typer",
-            group = "core",
-        ),
-        dependency(
-            "pyyaml",
             group = "core",
         ),
     ],
@@ -528,6 +548,11 @@ py_binary(
 py_binary(
     name = "archive_artifacts",
     srcs = ["archive_artifacts.py"],
+    # This target is invoked by `bazel run` after cross-compilation to package
+    # the source tree on the invoking Evergreen host.  Its launcher must use
+    # the host Python, not the foreign execution-platform Python selected for
+    # remote compile actions (for example, x86_64 Python on a PPC64LE host).
+    exec_compatible_with = HOST_CONSTRAINTS,
     deps = [
         dependency(
             "cffi",
@@ -571,6 +596,9 @@ py_binary(
     srcs = ["prepare_podman_for_bazel.py"],
     main = "prepare_podman_for_bazel.py",
     visibility = ["//buildscripts/tests:__pkg__"],
+    deps = [
+        "//bazel/wrapper_hook",
+    ],
 )
 
 py_binary(

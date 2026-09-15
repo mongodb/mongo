@@ -61,19 +61,74 @@ lto_index_actions = [
 ]
 
 def _impl(ctx):
+    # Cross-RBE builds may compile with an execution-architecture compiler (for
+    # example x86_64) and then link on the native IBM host. Keep the regular
+    # tool paths as the default, but allow link actions to use a separate
+    # host-executable driver and its accompanying search paths.
+    # The same split is needed for output tools: local archive/debug actions
+    # must use the native host's ar/dwp/objcopy/strip, while remote compilation
+    # keeps the execution-architecture tools from the cross archive.
+    #
+    # A C++ toolchain is analyzed in its execution configuration.  For a
+    # cross-toolchain that means the select()-based linux_* settings below can
+    # describe the x86/aarch64 RBE worker even though the compiler is targeting
+    # IBM.  The cross repository supplies target_triple explicitly; use it for
+    # architecture-sensitive flags and features so the target never inherits
+    # host-only options such as -march=sandybridge.
+    target_is_aarch64 = ctx.attr.is_aarch64
+    target_is_ppc64le = ctx.attr.is_ppc64le
+    target_is_s390x = ctx.attr.is_s390x
+    target_is_x86_64 = ctx.attr.is_x86_64
+    if ctx.attr.target_triple:
+        target_is_aarch64 = ctx.attr.target_triple == "aarch64-mongodb-linux"
+        target_is_ppc64le = ctx.attr.target_triple == "ppc64le-mongodb-linux"
+        target_is_s390x = ctx.attr.target_triple == "s390x-mongodb-linux"
+        target_is_x86_64 = ctx.attr.target_triple == "x86_64-mongodb-linux"
+
+    tool_paths = dict(ctx.attr.tool_paths)
+    for tool_name, host_tool_path in (
+        ("ar", ctx.attr.host_ar_tool_path),
+        ("dwp", ctx.attr.host_dwp_tool_path),
+        ("objcopy", ctx.attr.host_objcopy_tool_path),
+        ("strip", ctx.attr.host_strip_tool_path),
+    ):
+        if host_tool_path:
+            tool_paths[tool_name] = host_tool_path
+
+    linker_tool = ctx.attr.linker_tool_path or tool_paths["g++"]
+    linker_bin_dirs = (
+        ctx.attr.linker_bin_dirs if ctx.attr.linker_bin_dirs != None and len(ctx.attr.linker_bin_dirs) > 0 else ctx.attr.bin_dirs
+    )
+    linker_resource_dir = ctx.attr.linker_resource_dir or ctx.attr.clang_resource_dir
+    linker_toolchain_repo_dir = (
+        ctx.attr.linker_toolchain_repo_dir or ctx.attr.toolchain_repo_dir
+    )
+
     action_configs = [
-        action_config(action_name = "objcopy_embed_data", tools = [tool(path = ctx.attr.tool_paths["objcopy"])]),
+        action_config(action_name = "objcopy_embed_data", tools = [tool(path = tool_paths["objcopy"])]),
     ] + [
-        action_config(action_name = ACTION_NAMES.llvm_cov, tools = [tool(path = ctx.attr.tool_paths["llvm-cov"])]),
+        action_config(action_name = ACTION_NAMES.llvm_cov, tools = [tool(path = tool_paths["llvm-cov"])]),
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = ctx.attr.tool_paths["gcc"])])
+        action_config(action_name = name, enabled = True, tools = [tool(path = tool_paths["gcc"])])
         for name in all_c_compile_actions
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = ctx.attr.tool_paths["g++"])])
+        action_config(action_name = name, enabled = True, tools = [tool(path = tool_paths["g++"])])
         for name in all_cpp_compile_actions
     ] + [
-        action_config(action_name = name, enabled = True, tools = [tool(path = ctx.attr.tool_paths["g++"])])
+        action_config(action_name = name, enabled = True, tools = [tool(path = linker_tool)])
         for name in all_link_actions
+    ] + [
+        # DTLTO's lto-backend actions are distributed to the RBE executor, so
+        # they must run the execution-architecture compiler from the cross
+        # archive even when link actions use the host-native linker. LTO
+        # indexing, by contrast, reuses the link action's tool (Bazel binds
+        # both to the cpp-link-* action configs), so it runs wherever the link
+        # runs and must not be pinned here.
+        action_config(
+            action_name = ACTION_NAMES.lto_backend,
+            enabled = True,
+            tools = [tool(path = tool_paths["gcc"])],
+        ),
     ]
 
     opt_feature = feature(name = "opt")
@@ -360,7 +415,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_compile_actions + all_link_actions + lto_index_actions,
+                actions = all_compile_actions,
                 flag_groups = [flag_group(flags = [
                     # -B and the bin dirs need to be separate strings in the array
                     # as things like rules_rust parse each flag individually
@@ -370,6 +425,21 @@ def _impl(ctx):
                 ])],
             ),
         ] if ctx.attr.bin_dirs != None and len(ctx.attr.bin_dirs) > 0 else [],
+    )
+
+    linker_bin_dirs_feature = feature(
+        name = "linker_bin_dirs",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions + lto_index_actions,
+                flag_groups = [flag_group(flags = [
+                    final_bin_dir
+                    for bin_dir in linker_bin_dirs
+                    for final_bin_dir in ["-B", bin_dir]
+                ])],
+            ),
+        ] if linker_bin_dirs != None and len(linker_bin_dirs) > 0 else [],
     )
 
     extra_ldflags_feature = feature(
@@ -419,6 +489,19 @@ def _impl(ctx):
                         flags = ["--sysroot", "%{sysroot}"],
                         expand_if_available = "sysroot",
                     ),
+                ],
+            ),
+        ],
+    )
+
+    target_triple_feature = feature(
+        name = "target_triple",
+        enabled = bool(ctx.attr.target_triple),
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions + all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(flags = ["--target=" + ctx.attr.target_triple]),
                 ],
             ),
         ],
@@ -1069,7 +1152,7 @@ def _impl(ctx):
                 actions = common_page_size_link_actions,
                 flag_groups = [flag_group(flags = ["-Wl,-z,common-page-size=0x10000"])],
             ),
-        ] if ctx.attr.is_aarch64 or ctx.attr.is_ppc64le else []),
+        ] if target_is_aarch64 or target_is_ppc64le else []),
     )
 
     build_id_feature = feature(
@@ -1086,6 +1169,15 @@ def _impl(ctx):
         ],
     )
 
+    # Link libatomic statically (-l:libatomic.a) rather than -latomic. The
+    # shared archive only participates in the link when a target actually
+    # references __atomic symbols (unlike a shared library, whose soname is
+    # recorded as DT_NEEDED once it resolves any symbol). x86_64 and aarch64
+    # inline their atomics and see no change, but s390x and ppc64le targets
+    # call into libatomic, which would otherwise leave a runtime dependency on
+    # libatomic.so.1 — e.g. extension .so files, which must only depend on
+    # libraries the server already provides (see
+    # evergreen/verify_extension_visibility_test.sh).
     global_libs_feature = feature(
         name = "global_libs",
         enabled = True,
@@ -1095,7 +1187,7 @@ def _impl(ctx):
                 flag_groups = [flag_group(flags = [
                     "-lm",
                     "-lresolv",
-                    "-latomic",
+                    "-l:libatomic.a",
                 ])],
             ),
         ],
@@ -1178,13 +1270,13 @@ def _impl(ctx):
     # A native clang finds its own resource dir, so this is hermetic-only.
     clang_toolchain_resource_dir_feature = feature(
         name = "clang_toolchain_resource_dir",
-        enabled = ctx.attr.hermetic and ctx.attr.compiler == COMPILERS.CLANG,
+        enabled = ctx.attr.hermetic and ctx.attr.compiler == COMPILERS.CLANG and bool(linker_resource_dir),
         flag_sets = [
             flag_set(
                 actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
-                        flags = ["-resource-dir=" + clang_resource_dir(ctx.attr.toolchain_repo_dir)],
+                        flags = ["-resource-dir=" + linker_resource_dir],
                     ),
                 ],
             ),
@@ -1203,7 +1295,7 @@ def _impl(ctx):
     # Some of the linux versions are missing libatomic.so.1. When using mold, prefer the copy in the
     # mongo toolchain rather than relying on one being installed on the host.
     mold_linker_env_entries = [
-        env_entry(key = "LD_LIBRARY_PATH", value = ctx.attr.toolchain_repo_dir + "/stow/gcc-v5/lib64/"),
+        env_entry(key = "LD_LIBRARY_PATH", value = linker_toolchain_repo_dir + "/stow/gcc-v5/lib64/"),
     ] if ctx.attr.hermetic else []
 
     default_linker_lld_feature = feature(
@@ -1244,7 +1336,7 @@ def _impl(ctx):
         name = "linker_lld",
         enabled = False,
         provides = ["linker_override"],
-        flag_sets = [] if ctx.attr.is_s390x else [
+        flag_sets = [
             flag_set(
                 actions = all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = ["-fuse-ld=lld"])],
@@ -1939,13 +2031,13 @@ def _impl(ctx):
     )
 
     mtune_flags = []
-    if ctx.attr.is_aarch64:
+    if target_is_aarch64:
         mtune_flags += ["-march=armv8.2-a", "-mtune=generic"]
-    if ctx.attr.is_ppc64le:
+    if target_is_ppc64le:
         mtune_flags += ["-mcpu=power8", "-mtune=power8", "-mcmodel=medium"]
-    if ctx.attr.is_s390x:
+    if target_is_s390x:
         mtune_flags += ["-march=z196", "-mtune=zEC12"]
-    if ctx.attr.is_x86_64:
+    if target_is_x86_64:
         mtune_flags += ["-march=sandybridge", "-mtune=generic", "-mprefer-vector-width=128"]
 
     mtune_march_feature = feature(
@@ -1957,6 +2049,29 @@ def _impl(ctx):
                 flag_groups = [
                     flag_group(
                         flags = mtune_flags,
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    # LLVM's PPC compare optimization has produced incorrect code for the
+    # PowerPC target (SERVER-111421). Keep this scoped to Clang C/C++ actions
+    # that target PPC64LE: cross-RBE actions execute the compiler on x86/arm,
+    # but still need the target-side workaround. DTLTO also moves LTO code
+    # generation into lto-backend actions, so they need it too.
+    ppc_disable_cmp_opt_feature = feature(
+        name = "ppc_disable_cmp_opt",
+        enabled = target_is_ppc64le and ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions + [ACTION_NAMES.lto_backend],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-mllvm",
+                            "-disable-ppc-cmp-opt",
+                        ],
                     ),
                 ],
             ),
@@ -2085,7 +2200,14 @@ def _impl(ctx):
                     "-Wno-shorten-64-to-32",
                     "-Wno-unused-but-set-variable",
                     "-Wno-nullability-completeness",
-                ])],
+                ] + ([
+                    # Abseil's PPC64LE implementations trigger these Clang
+                    # diagnostics. Keep the suppressions on the third-party feature
+                    # and restrict them to the PPC64LE cross toolchain so first-party
+                    # and native builds retain the warnings.
+                    "-Wno-sign-conversion",
+                    "-Wno-deprecate-lax-vec-conv-all",
+                ] if target_is_ppc64le and ctx.attr.target_triple else []))],
             ),
         ],
     )
@@ -2147,6 +2269,7 @@ def _impl(ctx):
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
         bin_dirs_feature,
+        linker_bin_dirs_feature,
         default_compile_flags_feature,
         include_paths_feature,
         external_include_paths_feature,
@@ -2163,6 +2286,7 @@ def _impl(ctx):
         opt_feature,
         dbg_feature,
         sysroot_feature,
+        target_triple_feature,
         unfiltered_compile_flags_feature,
         omitted_timestamps_feature,
         thin_archive_feature,
@@ -2231,6 +2355,7 @@ def _impl(ctx):
         ubsan_feature,
         ubsan_third_party_feature,
         mtune_march_feature,
+        ppc_disable_cmp_opt_feature,
         compress_debug_disable_feature,
         rpath_override_feature,
         warnings_as_errors_link_feature,
@@ -2272,11 +2397,11 @@ def _impl(ctx):
             make_variables = [],
             target_cpu = ctx.attr.cpu,
             target_libc = "local",
-            target_system_name = "local",
+            target_system_name = ctx.attr.target_triple or "local",
             toolchain_identifier = ctx.attr.toolchain_identifier,
             tool_paths = [
                 tool_path(name = name, path = path)
-                for name, path in ctx.attr.tool_paths.items()
+                for name, path in tool_paths.items()
             ],
         ),
     ]
@@ -2285,6 +2410,7 @@ mongo_linux_cc_toolchain_config = rule(
     implementation = _impl,
     attrs = {
         "builtin_sysroot": attr.string(),
+        "clang_resource_dir": attr.string(mandatory = False),
         "hermetic": attr.bool(default = True, mandatory = False),
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
@@ -2303,9 +2429,25 @@ mongo_linux_cc_toolchain_config = rule(
         "includes": attr.string_list(mandatory = False),
         "cpp_includes": attr.string_list(mandatory = False),
         "bin_dirs": attr.string_list(mandatory = False),
+        # Optional host-native link settings used by Linux cross-RBE builds.
+        # Compile actions continue to use tool_paths/bin_dirs while link-family
+        # actions can execute a linker from the native host archive.
+        "linker_bin_dirs": attr.string_list(mandatory = False),
+        "linker_resource_dir": attr.string(mandatory = False),
+        "linker_tool_path": attr.string(mandatory = False),
+        "linker_toolchain_repo_dir": attr.string(mandatory = False),
+        # Optional host-native output tools used by Linux cross-RBE builds.
+        # These are configurable strings so the generated cross toolchain can
+        # select them only for the local-link/output branch while leaving the
+        # execution-architecture compiler branch untouched.
+        "host_ar_tool_path": attr.string(mandatory = False),
+        "host_dwp_tool_path": attr.string(mandatory = False),
+        "host_objcopy_tool_path": attr.string(mandatory = False),
+        "host_strip_tool_path": attr.string(mandatory = False),
         "tool_paths": attr.string_dict(mandatory = True),
         "toolchain_repo_name": attr.string(mandatory = True),
         "toolchain_identifier": attr.string(mandatory = True),
+        "target_triple": attr.string(mandatory = False),
         "verbose": attr.bool(mandatory = False),
         "linkstatic": attr.bool(mandatory = True),
         "shared_archive": attr.bool(mandatory = True),

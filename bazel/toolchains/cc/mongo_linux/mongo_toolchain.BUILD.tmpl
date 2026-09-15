@@ -7,14 +7,16 @@ load(
     "@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_tool_paths.bzl",
     "get_mongo_toolchain_tool_paths",
 )
-load("@{toolchain_repo_name}//:mongo_toolchain_flags.bzl",
+load(":mongo_toolchain_flags.bzl",
     "CLANG_INCLUDE_DIRS",
     "COMMON_BINDIRS",
     "COMMON_BUILTIN_INCLUDE_DIRECTORIES",
     "COMMON_INCLUDE_DIRECTORIES",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
+    "clang_resource_dir",
 )
+{extra_loads}
 {sysroot_load}
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
@@ -214,7 +216,17 @@ LIBVOIDSTAR_FILES = select({
 
 MOLD_BIN_DIR = "./{toolchain_repo_dir}/" + MOLD_MAP["{arch}"]["bin_dir"]
 
-LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS]
+# IBM target archives carry the C++ runtime that was used to build the target
+# libraries.  Keep it out of the target's DT_NEEDED set: otherwise a native
+# IBM host can resolve libstdc++.so.6 from its older system installation when
+# it runs a cross-built mongod (or one of mongod's _solib dependencies).  This
+# is a toolchain flag, rather than a flag on just the final executable, so every
+# target shared library is self-contained as well.
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + select({
+    "@//bazel/config:linux_ppc64le": ["-static-libstdc++"],
+    "@//bazel/config:linux_s390x": ["-static-libstdc++"],
+    "//conditions:default": [],
+})
 
 {sysroot_defs}
 
@@ -241,6 +253,15 @@ filegroup(
         "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
     }){sysroot_all_files}
+)
+
+# Native output tools exposed by a composed Linux cross repository. The
+# cross-repository rule creates these symlinks to the host mongo toolchain so
+# local archive/debug actions can use host-executable ar/objcopy/strip tools
+# without relying on a non-normalized ``..`` tool path.
+filegroup(
+    name = "host_output_tools",
+    srcs = glob(["host_tools/v5/bin/*"]),
 )
 
 filegroup(
@@ -272,7 +293,7 @@ filegroup(
 
 filegroup(
     name = "linker_files",
-    srcs = [":all_files"] + LIBVOIDSTAR_FILES,
+    srcs = [":all_files"] + LIBVOIDSTAR_FILES + {host_linker_files},
 )
 
 feature_attrs = get_common_features_attrs()
@@ -290,7 +311,15 @@ mongo_linux_cc_toolchain_config(
     builtin_sysroot = BUILTIN_SYSROOT,
     cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
     extra_ldflags = LINK_FLAGS,
-    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    linker_bin_dirs = {host_linker_bin_dirs},
+    linker_resource_dir = {host_linker_resource_dir},
+    linker_tool_path = {host_linker_tool_path},
+    linker_toolchain_repo_dir = {host_linker_toolchain_repo_dir},
+    host_ar_tool_path = {host_ar_tool_path},
+    host_dwp_tool_path = {host_dwp_tool_path},
+    host_objcopy_tool_path = {host_objcopy_tool_path},
+    host_strip_tool_path = {host_strip_tool_path},
+    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + EFFECTIVE_SYSTEM_INCLUDE_DIRS,
     tool_paths = get_mongo_toolchain_tool_paths("{version}", "gcc"),
     toolchain_repo_name = "{toolchain_repo_name}",
     toolchain_identifier = "gcc_toolchain",
@@ -338,14 +367,24 @@ mongo_linux_cc_toolchain_config(
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     builtin_sysroot = BUILTIN_SYSROOT,
+    clang_resource_dir = clang_resource_dir("{toolchain_repo_dir}"),
     cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
     extra_ldflags = LINK_FLAGS,
+    linker_bin_dirs = {host_linker_bin_dirs},
+    linker_resource_dir = {host_linker_resource_dir},
+    linker_tool_path = {host_linker_tool_path},
+    linker_toolchain_repo_dir = {host_linker_toolchain_repo_dir},
+    host_ar_tool_path = {host_ar_tool_path},
+    host_dwp_tool_path = {host_dwp_tool_path},
+    host_objcopy_tool_path = {host_objcopy_tool_path},
+    host_strip_tool_path = {host_strip_tool_path},
     # Note that CLANG_INCLUDE_DIRS needs to be searched after the common ones, otherwise some files
     # will have include_next chains going backwards from the intended order.
-    includes = COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES + CLANG_INCLUDE_DIRS,
+    includes = COMMON_INCLUDE_DIRECTORIES + EFFECTIVE_SYSTEM_INCLUDE_DIRS + CLANG_INCLUDE_DIRS,
     tool_paths = get_mongo_toolchain_tool_paths("{version}", "clang"),
     toolchain_repo_name = "{toolchain_repo_name}",
     toolchain_identifier = "clang_toolchain",
+    target_triple = "{target_triple}",
     verbose = True,
     libvoidstar = LIBVOIDSTAR,
     linkstatic = LINKSTATIC_ENABLED,
@@ -385,12 +424,12 @@ mongo_linux_cc_toolchain_config(
 cc_toolchain(
     name = "cc_mongo_toolchain",
     all_files = ":all_files",
-    ar_files = ":all_files",
+    ar_files = {host_ar_files},
     compiler_files = ":all_files",
-    dwp_files = ":all_files",
+    dwp_files = {host_dwp_files},
     linker_files = ":linker_files",
-    objcopy_files = ":all_files",
-    strip_files = ":all_files",
+    objcopy_files = {host_objcopy_files},
+    strip_files = {host_strip_files},
     toolchain_config = select({
         "@//bazel/config:compiler_type_clang": ":cc_clang_toolchain_config",
         "@//bazel/config:compiler_type_gcc": ":cc_gcc_toolchain_config",
@@ -413,10 +452,13 @@ toolchain(
     ],
     target_settings = [
         "@//bazel/config:mongo_toolchain_{version}",
+        {extra_target_settings}
     ],
     toolchain = ":cc_mongo_toolchain",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
+
+{extra_toolchains}
 
 
 # This file group makes it possible to set the clang-tidy configuration setting:

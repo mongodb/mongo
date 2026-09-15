@@ -35,9 +35,13 @@ filegroup(name = "gpg_libs", srcs = glob([]))
         )
         return
 
-    arch = ctx.os.arch
     os_constraint = OS_NORMALIZE_MAP[os]
-    arch_constraint = ARCH_NORMALIZE_MAP[arch]
+
+    # GPG signs release/provenance artifacts and is deliberately kept local in
+    # IBM cross builds. Select the host-native bundle even when the C++ compiler
+    # uses a foreign execution platform; otherwise an x86/aarch64 GPG binary
+    # would be hydrated and then executed by the IBM host container.
+    arch_constraint = ARCH_NORMALIZE_MAP[ctx.os.arch]
     platform_key = "{os}_{arch}".format(os = os_constraint, arch = arch_constraint)
 
     if platform_key not in URLS_MAP:

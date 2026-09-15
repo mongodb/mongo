@@ -1,0 +1,13 @@
+diff --git a/pycross/private/tools/crossenv/__init__.py b/pycross/private/tools/crossenv/__init__.py
+index 919ba12..38b9d50 100644
+--- a/pycross/private/tools/crossenv/__init__.py
++++ b/pycross/private/tools/crossenv/__init__.py
+@@ -150,7 +150,7 @@ def determine_glibc_version(sysconfig_vars: Dict[str, Any]) -> Optional[str]:
+     cmd = sysconfig_vars["CC"].split() + sysconfig_vars["CFLAGS"].split()
+     with tempfile.TemporaryDirectory() as tmp:
+         tmp = Path(tmp)
+-        teller_src = tmp / "teller.cc"
++        teller_src = tmp / "teller.c"
+         teller_out = tmp / "teller"
+ 
+         with open(teller_src, "w") as f:

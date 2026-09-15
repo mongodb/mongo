@@ -1,5 +1,6 @@
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
+load(":wasi_repo_test.bzl", "wasi_repo_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -39,6 +40,8 @@ toolchain(
 
 # Empty group to satisfy cc_toolchain’s file sets we don’t use.
 filegroup(name = "empty")
+
+wasi_repo_test_suite(name = "wasi_repo_test")
 
 # Files the toolchain “has”; pointing at the repo we fetched.
 filegroup(

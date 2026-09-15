@@ -209,6 +209,20 @@ mongo_cc_unit_test(
     }) + select({
         "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
         "//conditions:default": [],
+    }) + select({
+        # The fixture extensions are signed with the test key. Secure builds
+        # intentionally hard-code the production key, so this test cannot
+        # validate or load those fixtures in either release or secure mode.
+        "//bazel/config:extensions_signature_verification_secure_enabled_release": [
+            "@platforms//:incompatible",
+        ],
+        "//bazel/config:extensions_signature_verification_secure_disabled_release": [
+            "@platforms//:incompatible",
+        ],
+        "//bazel/config:extensions_signature_verification_secure_enabled_no_release": [
+            "@platforms//:incompatible",
+        ],
+        "//conditions:default": [],
     }),
     deps = [
         ":extension_loader",

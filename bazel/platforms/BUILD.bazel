@@ -27,6 +27,18 @@ constraint_value(
     constraint_setting = ":mongo_linux_cross_toolchain",
 )
 
+# Marks execution platforms reserved for tools in an IBM cross build.  Keeping
+# this separate from the ordinary RHEL execution platforms is important: an
+# unconstrained host action must continue to use the native IBM platform, while
+# WheelBuild/protoc and the cross compiler tools must be forced onto the foreign
+# RBE architecture.
+constraint_setting(name = "mongo_linux_cross_execution")
+
+constraint_value(
+    name = "use_mongo_linux_cross_execution",
+    constraint_setting = ":mongo_linux_cross_execution",
+)
+
 constraint_setting(name = "distro")
 
 [
@@ -79,6 +91,24 @@ constraint_setting(name = "distro")
     for cache_silo in [
         "",
         "_cache_silo",
+    ]
+]
+
+# The normal RHEL execution platforms remain available to native builds.  IBM
+# cross-RBE actions use these equivalent platforms with an additional
+# constraint, allowing rules whose tools are foreign-architecture executables
+# to opt into the cross execution platform without changing native builds.
+[
+    setup_platform(
+        arch,
+        "rhel9",
+        "",
+        extra_constraints = [":use_mongo_linux_cross_execution"],
+        name_suffix = "_cross",
+    )
+    for arch in [
+        "arm64",
+        "amd64",
     ]
 ]
 
@@ -261,6 +291,7 @@ platform(
     for distro in [
         "rhel8",
         "rhel9",
+        "rhel10",
     ]
     for arch in [
         "ppc64le",

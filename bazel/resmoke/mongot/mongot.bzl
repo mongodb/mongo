@@ -31,6 +31,7 @@ supplied, which is downloaded instead of invoking db-contrib-tool:
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 def _mongot_setup_impl(ctx):
     output_dir = ctx.actions.declare_directory(ctx.label.name)
@@ -64,7 +65,7 @@ def _mongot_setup_impl(ctx):
 
     return [DefaultInfo(files = depset([output_dir]))]
 
-mongot_setup = rule(
+_mongot_setup_rule = rule(
     implementation = _mongot_setup_impl,
     attrs = {
         "version_flag": attr.label(
@@ -99,3 +100,11 @@ the resmoke shim places it at mongot-localdev/ in the working directory where
 resmoke expects it.
 """,
 )
+
+def mongot_setup(name, exec_compatible_with = HOST_CONSTRAINTS, **kwargs):
+    """Creates a host-local mongot download action and its output tree."""
+    _mongot_setup_rule(
+        name = name,
+        exec_compatible_with = exec_compatible_with,
+        **kwargs
+    )

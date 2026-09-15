@@ -55,9 +55,9 @@ jvolkman/rules_pycross.
      else:
          raise AssertionError("file entry has no file or url member")
 @@ -367,9 +374,37 @@
- 
+
              dependencies.add(Requirement(dep_string))
- 
+
 +        # When a package is sourced via `[tool.uv.sources] pkg = { url = ... }`,
 +        # uv writes `source = { url = "..." }` at the package level and
 +        # `sdist = { hash = "..." }` without a url (the source URL doubles as
@@ -90,6 +90,6 @@ jvolkman/rules_pycross.
          if lock_pkg.get("sdist"):
 -            files.append(lock_pkg.get("sdist"))
 +            files.append(_sdist_raw if _sdist_raw is not None else lock_pkg.get("sdist"))
- 
+
          files = {parse_file_info(f) for f in files}
- 
+

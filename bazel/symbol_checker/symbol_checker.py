@@ -2,7 +2,7 @@ import sys
 import argparse
 import json
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(fromfile_prefix_chars="@")
 parser.add_argument("--sym", required=True)
 parser.add_argument("--dep", action="append")
 parser.add_argument("--out", required=True)

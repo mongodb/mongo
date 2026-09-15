@@ -13,6 +13,22 @@ fi
 
 binary="$1"
 output_file="$2"
+# MongoInstallRule's declared output remains available below bazel-bin even when the host-side
+# convenience symlink cannot be recreated after a persistent container action. Prefer that
+# declared output for this metadata-only probe instead of failing the entire debug archive task.
+if [[ ! -e "$binary" ]]; then
+    for fallback_binary in \
+        "./bazel-bin/install-dist-test/bin/mongod" \
+        "./bazel-bin/install-dist-test-debug/bin/mongod" \
+        ./bazel-out/*/bin/install-dist-test/bin/mongod \
+        ./bazel-out/*/bin/install-dist-test-debug/bin/mongod; do
+        if [[ -e "$fallback_binary" ]]; then
+            echo "INFO: $binary is unavailable; recording version from $fallback_binary" >&2
+            binary="$fallback_binary"
+            break
+        fi
+    done
+fi
 stderr_file="$(mktemp "${TMPDIR:-/tmp}/mongodb-version-stderr.XXXXXX")"
 trap 'rm -f "$stderr_file"' EXIT
 

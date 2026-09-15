@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/resmoke:resmoke.bzl", "tss_settings_file")
@@ -26,16 +27,17 @@ export GIT_DIR=$$(dirname "$$(readlink -f MODULE.bazel)")/.git
 # setup, but this invocation does not execute any Git commands. The hermetic
 # Linux action image intentionally omits git.
 export GIT_PYTHON_REFRESH=quiet
-$(location //buildscripts:resmoke) \
+$(location //buildscripts:resmoke_local_host_tool) \
     --mongoVersionFile $(location :resmoke_mongo_version) \
     multiversion-config \
     --config-file-output $@ > /dev/null
 """,
+    exec_compatible_with = HOST_CONSTRAINTS,
     tags = [
         "no-cache",
         "no-remote",
     ],
-    tools = ["//buildscripts:resmoke"],
+    tools = ["//buildscripts:resmoke_local_host_tool"],
     visibility = ["//visibility:public"],
 )
 
@@ -211,6 +213,7 @@ tss_settings_file(
 py_binary(
     name = "download_historic_runtimes",
     srcs = ["download_historic_runtimes.py"],
+    exec_compatible_with = HOST_CONSTRAINTS,
     main = "download_historic_runtimes.py",
     visibility = ["//visibility:public"],
 )
@@ -226,10 +229,11 @@ py_binary(
         "//buildscripts/resmokeconfig/evg_task_doc:all_files",
         "//buildscripts/resmokeconfig/loggers:all_files",
     ],
+    exec_compatible_with = HOST_CONSTRAINTS,
     main = "generate_tss_test_list.py",
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:resmoke",
+        "//buildscripts:resmoke_local_host_tool",
         "//buildscripts/util",
         dependency(
             "requests",
@@ -322,6 +326,7 @@ py_binary(
 py_binary(
     name = "query_correctness_corpus_fetch",
     srcs = ["query_correctness_corpus_fetch.py"],
+    exec_compatible_with = HOST_CONSTRAINTS,
     main = "query_correctness_corpus_fetch.py",
     visibility = ["//visibility:public"],
 )

@@ -2,4 +2,5 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "mongo_linux_cross_toolchain.bzl",
+    "mongo_linux_cross_toolchain_flags_v5.bzl",
 ])

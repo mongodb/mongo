@@ -8,21 +8,58 @@ import os
 import pathlib
 import platform
 import re
-import shlex
 import shutil
 import stat
 import subprocess
 import sys
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
-_PODMAN_RUNTIME_DIR_PREFIX = "mongo-linux-podman-runtime-"
-_PODMAN_STORAGE_DIR_PREFIX = "mongo-linux-podman-storage-"
-_PODMAN_TASK_ID_ENV = "MONGO_PODMAN_TASK_ID"
-_PODMAN_AUTH_FILE_ENV = "REGISTRY_AUTH_FILE"
-_PODMAN_CONFIG_ENV = "CONTAINERS_CONF"
-_COMMAND_TIMEOUT_SECONDS = 60
-_CONTAINER_ACTIONS_DISABLED_VALUES = {"0", "false", "no", "off"}
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from bazel.wrapper_hook.hermetic_container.podman_common import (  # noqa: E402
+    COMMAND_TIMEOUT_SECONDS as _COMMAND_TIMEOUT_SECONDS,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    CONTAINER_ACTIONS_DISABLED_VALUES as _CONTAINER_ACTIONS_DISABLED_VALUES,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_AUTH_FILE_ENV as _PODMAN_AUTH_FILE_ENV,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_CONFIG_ENV as _PODMAN_CONFIG_ENV,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_REQUIRED_ENV as _PODMAN_REQUIRED_ENV,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_RUNTIME_DIR_PREFIX as _PODMAN_RUNTIME_DIR_PREFIX,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_STORAGE_DIR_PREFIX as _PODMAN_STORAGE_DIR_PREFIX,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    PODMAN_TASK_ID_ENV as _PODMAN_TASK_ID_ENV,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    Runner,
+    Which,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    command_name as _command_name,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    env_is_true as _env_is_true,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    is_podman_docker_shim as _is_podman_docker_shim,
+)
+from bazel.wrapper_hook.hermetic_container.podman_common import (
+    run as _run,
+)
+
 _PODMAN_RECOVERY_MARKERS = (
     "invalid internal status",
     "conmon exited prematurely",
@@ -30,39 +67,6 @@ _PODMAN_RECOVERY_MARKERS = (
     "mount",
     "permission denied",
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
-Which = Callable[[str], str | None]
-
-
-def _run(argv: Sequence[str], **kwargs) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(list(argv), check=False, text=True, **kwargs)
-
-
-def _command_name(command: str) -> str | None:
-    try:
-        argv = shlex.split(command)
-    except ValueError:
-        return None
-    return pathlib.Path(argv[0]).name if argv else None
-
-
-def _is_podman_docker_shim(command: str, runner: Runner = _run) -> bool:
-    if _command_name(command) in {None, "podman"}:
-        return False
-
-    try:
-        result = runner(
-            [*shlex.split(command), "--version"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=_COMMAND_TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired, ValueError):
-        return False
-
-    version_output = f"{result.stdout}\n{result.stderr}".lower()
-    return "emulate docker cli using podman" in version_output or "podman version" in version_output
 
 
 def podman_is_in_use(
@@ -76,12 +80,29 @@ def podman_is_in_use(
 
     if (system or platform.system()) != "Linux":
         return False
-    if env.get("MONGO_LINUX_CONTAINER_ACTIONS", "").lower() in _CONTAINER_ACTIONS_DISABLED_VALUES:
+    podman_required = _env_is_true(env.get(_PODMAN_REQUIRED_ENV))
+    # A task id scopes the runtime and cleanup paths, but it does not mean that
+    # the task actually selected Podman. Keep the generic container-action opt-out
+    # authoritative unless the IBM cross-link policy explicitly requires Podman.
+    if (
+        env.get("MONGO_LINUX_CONTAINER_ACTIONS", "").lower() in _CONTAINER_ACTIONS_DISABLED_VALUES
+        and not podman_required
+    ):
         return False
 
     podman = which("podman")
     if podman is None:
-        return False
+        # An IBM cross task opts into Podman explicitly.  Do not silently fall
+        # back to Docker when Podman is absent; returning true lets the
+        # preparation step surface the missing runtime as a hard failure.
+        return podman_required
+    # IBM cross-RBE sets this flag because the local action container is backed by
+    # Podman even when the generic container-action setting is disabled. Do not
+    # run Docker health checks in this mode: on Evergreen, ``docker`` can point at
+    # Podman's compatibility shim and report a healthy daemon, which would make
+    # the preflight skip the required Podman storage/runtime setup.
+    if podman_required:
+        return True
 
     explicit_runtime = env.get("HERMETIC_CONTAINER_DOCKER_COMMAND")
     if explicit_runtime:

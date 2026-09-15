@@ -20,7 +20,7 @@ in //MODULE.bazel. Candidate for upstreaming to jvolkman/rules_pycross.
 @@ -31,16 +31,29 @@
      for install_exclude_glob in ctx.attr.install_exclude_globs:
          args.add("--install-exclude-glob", install_exclude_glob)
- 
+
 +    # Set environment variables to make generated .pyc files reproducible.
 +    env = {
 +        "SOURCE_DATE_EPOCH": "315532800",

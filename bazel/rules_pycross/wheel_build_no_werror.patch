@@ -26,7 +26,7 @@ Applied via `single_version_override(patches=...)` on rules_pycross in
 @@ -33,6 +33,19 @@
  def _join_flags_list(workspace_name, flags):
      return " ".join([absolutize_path_in_str(workspace_name, "$$EXT_BUILD_ROOT$$/", flag) for flag in flags])
- 
+
 +def _drop_werror(flag_list):
 +    """Third-party sdist builds shouldn't inherit the workspace's -Werror.
 +

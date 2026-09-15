@@ -269,7 +269,7 @@ def execinfo_backtrace_present_flag() -> list[HeaderDefinition]:
         return []
 
 
-def extended_alignment_flag() -> list[HeaderDefinition]:
+def extended_alignment_flag(target_arch: str) -> list[HeaderDefinition]:
     def check_extended_alignment(size: int) -> bool:
         log_check(
             f"[MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT] Checking for extended alignment {size} for concurrency types..."
@@ -324,70 +324,23 @@ def extended_alignment_flag() -> list[HeaderDefinition]:
     }
 
     for size in extended_alignment_search_sequence.get(
-        platform.machine().lower(), default_alignment_search_sequence
+        target_arch.lower(), default_alignment_search_sequence
     ):
         if check_extended_alignment(size):
             return [HeaderDefinition("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)]
     return []
 
 
-def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
-    if platform.machine().lower() != "ppc64le":
+def altivec_vbpermq_output_flag(target_arch: str) -> list[HeaderDefinition]:
+    if target_arch.lower() != "ppc64le":
         return []
 
-    # This checks for an altivec optimization we use in full text search.
-    # Different versions of gcc appear to put output bytes in different
-    # parts of the output vector produced by vec_vbpermq.  This configure
-    # check looks to see which format the compiler produces.
-    #
-    # NOTE: This breaks cross compiles, as it relies on checking runtime functionality for the
-    # environment we're in.  A flag to choose the index, or the possibility that we don't have
-    # multiple versions to support (after a compiler upgrade) could solve the problem if we
-    # eventually need them.
-    def check_altivec_vbpermq_output(index: int) -> bool:
-        log_check(
-            f"[MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX] Checking for vec_vbperm output in index {index}..."
-        )
-
-        return compile_check(
-            """
-                #include <altivec.h>
-                #include <cstring>
-                #include <cstdint>
-                #include <cstdlib>
-
-                int main() {{
-                    using Native = __vector signed char;
-                    const size_t size = sizeof(Native);
-                    const Native bits = {{ 120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0 }};
-
-                    uint8_t inputBuf[size];
-                    std::memset(inputBuf, 0xFF, sizeof(inputBuf));
-
-                    for (size_t offset = 0; offset <= size; offset++) {{
-                        Native vec = vec_vsx_ld(0, reinterpret_cast<const Native*>(inputBuf));
-
-                        uint64_t mask = vec_extract(vec_vbpermq(vec, bits), {0});
-
-                        size_t initialZeros = (mask == 0 ? size : __builtin_ctzll(mask));
-                        if (initialZeros != offset) {{
-			    return 1;
-                        }}
-
-                        if (offset < size) {{
-                            inputBuf[offset] = 0;  // Add an initial 0 for the next loop.
-                        }}
-                    }}
-
-		    return 0;
-            }}
-            """.format(index)
-        )
-
-    for index in [0, 1]:
-        if check_altivec_vbpermq_output(index):
-            return [HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", index)]
-    return []
+    # ppc64le is always little-endian. Both supported modern toolchains (GCC 14
+    # and Clang 19) expose vec_vbpermq's useful 64-bit result in element 1, as
+    # their own _mm_movemask_epi8 implementations do. The former runtime probe
+    # cannot work while cross-compiling and compile_check() never executes its
+    # input, so make the supported ABI explicit.
+    return [HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", 1)]
 
 
 def usdt_provider_flags() -> list[HeaderDefinition]:
@@ -480,15 +433,19 @@ def generate_config_header(
         definitions += ssl_ec_key_new_present_flag()
     definitions += posix_monotonic_clock_present_flag()
     definitions += execinfo_backtrace_present_flag()
-    definitions += extended_alignment_flag()
-    definitions += altivec_vbpermq_output_flag()
+    target_arch = extra_definitions_dict.get("TARGET_ARCH") or platform.machine()
+    definitions += extended_alignment_flag(target_arch)
+    definitions += altivec_vbpermq_output_flag(target_arch)
     definitions += usdt_provider_flags()
     # New checks can be added here
 
     for key, value in extra_definitions_dict.items():
         definitions.append(HeaderDefinition(key, value))
 
-    define_map = {definition.key: definition.value or "1" for definition in definitions}
+    define_map = {
+        definition.key: "1" if definition.value is None else str(definition.value)
+        for definition in definitions
+    }
     subst_map = {}
     for subst, define in get_config_header_substs():
         if define not in define_map:

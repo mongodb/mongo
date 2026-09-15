@@ -56,6 +56,11 @@ sh_binary(
 )
 
 sh_binary(
+    name = "materialize_ibm_test_install",
+    srcs = ["materialize_ibm_test_install.sh"],
+)
+
+sh_binary(
     name = "bazel_evergreen_shutils",
     srcs = ["bazel_evergreen_shutils.sh"],
 )

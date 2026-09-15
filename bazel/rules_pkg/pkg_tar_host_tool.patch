@@ -1,0 +1,69 @@
+Linux cross-RBE fix: export build_tar for the main repo's host-constrained helper.
+
+MongoDB's install archives preserve source mtimes and therefore run locally on
+the client host. During PPC64LE and s390x cross-RBE builds, rules_pkg otherwise
+builds build_tar's Python launcher for the x86_64 execution platform and then
+tries to execute it on the native IBM host.
+
+rules_pkg exports build_tar.py so the main repository can define a
+host-constrained build_tar_host helper (see //bazel/rules_pkg/BUILD) from the
+local host constraints of its own generated platform repository. Bazel 9
+bzlmod cannot resolve @local_config_platform from inside a module repository —
+the legacy built-in is gone and root-module repos are invisible to module
+repos — so the helper must live in the main repository. The internal py_libraries it
+depends on are widened to public visibility so the main repo can depend on
+them. Callers pass the helper via the new build_tar_tool attribute (see
+pkg_tar_tool_override.patch).
+
+Applied via `single_version_override(patches=...)` on rules_pkg in
+//MODULE.bazel. Candidate for upstreaming to bazelbuild/rules_pkg.
+
+--- a/pkg/private/tar/BUILD
++++ b/pkg/private/tar/BUILD
+@@ -19,3 +19,8 @@
+ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+ 
++exports_files(
++    ["build_tar.py"],
++    visibility = ["//visibility:public"],
++)
++
+ package(
+ 
+--- a/pkg/private/BUILD
++++ b/pkg/private/BUILD
+@@ -68,6 +68,7 @@
+     imports = ["../.."],
+     srcs_version = "PY3",
+     visibility = [
++        "//visibility:public",
+         "//:__subpackages__",
+         "//tests:__pkg__",
+     ],
+@@ -82,6 +83,7 @@
+     imports = ["../.."],
+     srcs_version = "PY3",
+     visibility = [
++        "//visibility:public",
+         "//:__subpackages__",
+         "//tests:__subpackages__",
+     ],
+@@ -96,6 +98,7 @@
+     imports = ["../.."],
+     srcs_version = "PY3",
+     visibility = [
++        "//visibility:public",
+         "//:__subpackages__",
+         "//tests:__pkg__",
+     ],
+
+--- a/pkg/private/tar/BUILD
++++ b/pkg/private/tar/BUILD
+@@ -73,6 +73,7 @@
+     imports = ["../../.."],
+     srcs_version = "PY3",
+     visibility = [
++        "//visibility:public",
+         "//tests:__subpackages__",
+     ],
+ )

@@ -1,5 +1,6 @@
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 # This will not currently work under bazel test/run until we have a version of gdb to use in bazel
 def mongo_pretty_printer_test_impl(ctx):
@@ -126,6 +127,11 @@ mongo_pretty_printer_test = rule(
     },
     doc = "Create pretty printer tests",
     toolchains = ["@rules_python//python:toolchain_type"],
+    # This action only generates the test launcher and embeds paths; it must run
+    # with the host Python even when the build's execution platform is a foreign
+    # cross-RBE platform.  Otherwise the local persistent container attempts to
+    # execute (for example) the x86_64 Python runtime on an IBM host.
+    exec_compatible_with = HOST_CONSTRAINTS,
     executable = True,
     test = True,
 )

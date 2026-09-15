@@ -138,16 +138,21 @@ bazel_evergreen_shutils::compute_local_arg() {
     fi
 
     if bazel_evergreen_shutils::is_ppc64le; then
-        local_arg+=" --jobs=48"
+        # Keep local links/tests bounded without overriding the common --jobs=300
+        # limit used to feed remote execution.
+        local_arg+=" --local_resources=cpu=48"
     fi
     if bazel_evergreen_shutils::is_s390x; then
-        local_arg+=" --jobs=16"
+        local_arg+=" --local_resources=cpu=16"
     fi
 
-    # For run-mode, if RBE isn't supported or is disabled explicitly, force local config.
+    # For run-mode, force the local config when remote execution is disabled or when
+    # the host cannot use either native RBE or the IBM cross-RBE toolchains.
     if [[ "$mode" == "run" ]]; then
-        if ! bazel_evergreen_shutils::bazel_rbe_supported || [[ "${evergreen_remote_exec:-}" != "on" ]]; then
-            # Keep compatibility with existing pattern:
+        if [[ "${evergreen_remote_exec:-}" != "on" ]]; then
+            local_arg+=" --config=local"
+        elif ! bazel_evergreen_shutils::bazel_rbe_supported &&
+            ! bazel_evergreen_shutils::is_s390x_or_ppc64le; then
             local_arg+=" --config=local"
         fi
     fi
@@ -245,6 +250,33 @@ bazel_evergreen_shutils::timeout_prefix() {
     else
         echo ""
     fi
+}
+
+# Release artifact commands on IBM waterfall variants use the host-native
+# ``public-release-local`` policy.  Those variants intentionally keep the
+# Evergreen remote-exec expansion enabled for test/compile tasks, but must not
+# inherit the one-hour remote-build fallback timeout while a native release
+# link or package is running.
+bazel_evergreen_shutils::command_uses_local_release() {
+    local arg
+    local next
+    while [[ "$#" -gt 0 ]]; do
+        arg="$1"
+        shift
+        case "$arg" in
+        --config=public-release-local | --remote_executor=)
+            return 0
+            ;;
+        --config | --remote_executor)
+            if [[ "$#" -gt 0 ]]; then
+                next="$1"
+                shift
+                [[ "$next" == "public-release-local" || -z "$next" ]] && return 0
+            fi
+            ;;
+        esac
+    done
+    return 1
 }
 
 bazel_evergreen_shutils::is_timeout_exit_code() {
@@ -733,8 +765,16 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     local BAZEL_BINARY="$1"
     shift
 
+    # Keep explicit build_timeout_seconds intact, but suppress the remote-mode
+    # fallback for host-native release commands. Their Evergreen execution
+    # timeout (6h PPC / 24h s390x) is the appropriate upper bound.
     local bazel_command="${1:-}"
-    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}" "$bazel_command")"
+    local timeout_remote_exec="${evergreen_remote_exec:-}"
+    local raw_rest=("$@")
+    if bazel_evergreen_shutils::command_uses_local_release "${raw_rest[@]}"; then
+        timeout_remote_exec=""
+    fi
+    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "$timeout_remote_exec" "$bazel_command")"
     local timeout_duration=""
     if [[ -n "$timeout_str" ]]; then
         timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
@@ -751,8 +791,6 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
     # Everything else is the Bazel subcommand + flags (and possibly redirections/pipes).
     # We *intentionally* keep it as raw words and reassemble to a single string for eval.
-    local raw_rest=("$@")
-
     # Once we detect an OOM/server-death, we enable the guard for subsequent attempts.
     local use_oom_guard=false
     local -r OOM_GUARD_FLAG='--local_resources=cpu=HOST_CPUS*.5'

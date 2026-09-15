@@ -1,6 +1,9 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-_WASI_SDK_DIST = {
+_WASI_SDK_EXEC_ARCH_ENV = "MONGO_WASI_SDK_EXEC_ARCH"
+_LINUX_CROSS_TOOLCHAIN_ENV = "MONGO_LINUX_CROSS_TOOLCHAIN"
+
+WASI_SDK_DIST = {
     ("linux", "aarch64"): {
         "url": "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-arm64-linux.tar.gz",
         "sha256": "4f98ee738c7abb45c81a94d1461fc53cc569d1cd01498951c8184d841a027844",
@@ -50,21 +53,121 @@ def _normalize_arch(arch):
         return "aarch64"
     return arch
 
+def _normalize_execution_arch(arch, os):
+    """Normalize an execution-platform architecture for the SDK archive."""
+    arch = _normalize_arch(arch)
+    if os == "linux" and arch == "x86_64":
+        return "amd64"
+    if os == "macos" and arch == "amd64":
+        return "x86_64"
+    return arch
+
+def cross_execution_arch(selector):
+    """Return the executable architecture encoded in a Linux cross selector.
+
+    The cross-toolchain selector is already required by the Linux cross-RBE
+    repository rules.  Using it as a fallback makes WASI selection robust when
+    Bazel evaluates this repository before a command-line ``--repo_env`` value
+    has been forwarded to the repository rule.
+    """
+    if not selector:
+        return None
+
+    target_and_exec = selector.split("_on_")
+    if len(target_and_exec) != 2:
+        return None
+
+    execution_platform = target_and_exec[1]
+    if execution_platform.endswith("_x86_64"):
+        return "amd64"
+    if execution_platform.endswith("_aarch64"):
+        return "aarch64"
+    return None
+
+def wasi_execution_arch(rctx):
+    """Select an SDK executable architecture, independent of the target CPU."""
+
+    os = _normalize_os(rctx.os.name)
+
+    # The explicit execution override is authoritative.  tools/bazel adds it
+    # before bootstrap and the cross-RBE hook adds it to the final invocation,
+    # so it remains deterministic even if a long-lived Bazel server has a
+    # stale cross-toolchain selector in its environment.
+    configured_arch = rctx.os.environ.get(_WASI_SDK_EXEC_ARCH_ENV, "")
+    if configured_arch:
+        return _normalize_execution_arch(configured_arch, os)
+
+    # Keep the selector as a fallback for repository hydration paths that do
+    # not receive the direct override (for example, an older caller invoking
+    # the repository rule directly).
+    cross_arch = cross_execution_arch(
+        rctx.os.environ.get(_LINUX_CROSS_TOOLCHAIN_ENV, ""),
+    )
+    if cross_arch:
+        return cross_arch
+
+    # Without an explicit cross execution selector, repository hydration is
+    # native. This is the path used by public-release-local on IBM hosts, where
+    # WASI actions run in the host-native hermetic container. Do not silently
+    # substitute an x86_64/aarch64 executable for a native IBM SDK.
+    return _normalize_execution_arch(_normalize_arch(rctx.os.arch), os)
+
 def _setup_wasi_deps(rctx):
     os = _normalize_os(rctx.os.name)
-    arch = _normalize_arch(rctx.os.arch)
+    arch = wasi_execution_arch(rctx)
     key = (os, arch)
 
-    if key not in _WASI_SDK_DIST:
+    if key not in WASI_SDK_DIST:
         fail("Unsupported platform for wasi-sdk: os={}, arch={}".format(os, arch))
 
-    dist = _WASI_SDK_DIST[key]
+    dist = WASI_SDK_DIST[key]
     rctx.download_and_extract(
         dist["url"],
         output = "",
         sha256 = dist["sha256"],
         stripPrefix = dist["stripPrefix"],
     )
+
+    if os == "linux" and rctx.os.arch in ("ppc64le", "s390x"):
+        # CppArchive actions for the WASI SpiderMonkey libraries run in the
+        # native IBM persistent container, while WASI compile/tool actions run
+        # on the configured x86_64/aarch64 RBE execution platform.  A single
+        # ELF llvm-ar cannot execute in both places. Keep the portable SDK
+        # binary for RBE and dispatch to the native Mongo toolchain ar when the
+        # action is actually running on an IBM host.
+        move_result = rctx.execute([
+            "mv",
+            str(rctx.path("bin/llvm-ar")),
+            str(rctx.path("bin/llvm-ar.sdk")),
+        ])
+        if move_result.return_code != 0:
+            fail("Unable to prepare the portable WASI llvm-ar wrapper: {}".format(move_result.stderr))
+        rctx.symlink(
+            Label("@mongo_toolchain_v5//:v5/bin/llvm-ar"),
+            "bin/llvm-ar.native",
+        )
+        rctx.file(
+            "bin/llvm-ar",
+            content = """#!/bin/sh
+set -eu
+case "$(uname -m)" in
+    ppc64le|s390x)
+        exec "$(dirname "$0")/llvm-ar.native" "$@"
+        ;;
+    *)
+        exec "$(dirname "$0")/llvm-ar.sdk" "$@"
+        ;;
+esac
+""",
+            executable = True,
+        )
+
+    # Keep the repository key tied to the executable-selection contract.  The
+    # SDK contains host executables, so reusing a repository hydrated before a
+    # cross-execution setting changed can leave an IBM-target binary in an
+    # amd64 RBE action and fail with ``Exec format error``.  The marker also
+    # makes the selected rule version visible when diagnosing a sandbox.
+    rctx.file("SELECTION_VERSION", rctx.attr.selection_version + "\n")
 
     # This results from bazel not being able to copy empty directories.
     rctx.file(
@@ -95,4 +198,15 @@ alias(name = "llvm-ar",               actual = "bin/llvm-ar{exe}")
 
 setup_wasi_deps = repository_rule(
     implementation = _setup_wasi_deps,
+    attrs = {
+        "selection_version": attr.string(
+            mandatory = True,
+            doc = "Version of the SDK executable-selection contract.",
+        ),
+    },
+    # The selected SDK is executable tooling, so this repository must be
+    # re-evaluated when the cross execution platform changes even though the
+    # target platform remains wasm32.
+    configure = True,
+    environ = [_LINUX_CROSS_TOOLCHAIN_ENV, _WASI_SDK_EXEC_ARCH_ENV],
 )

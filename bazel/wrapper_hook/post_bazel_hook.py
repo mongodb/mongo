@@ -17,7 +17,7 @@ def main():
 
     from bazel.wrapper_hook.compiledb import finalize_compiledb_posthook
     from bazel.wrapper_hook.flag_sync import sync_flags
-    from bazel.wrapper_hook.hermetic_container_integration import (
+    from bazel.wrapper_hook.hermetic_container.symlinks import (
         restore_hermetic_container_convenience_symlinks_from_env,
     )
 

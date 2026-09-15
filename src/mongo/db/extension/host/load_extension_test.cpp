@@ -49,16 +49,20 @@ protected:
     static inline const std::string kMatchTopNLibExtensionPath = "libmatch_topN_mongo_extension.so";
 
     void setUp() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         _previousExtensionsSignaturePublicKeyPath =
             serverGlobalParams.extensionsSignaturePublicKeyPath;
         serverGlobalParams.extensionsSignaturePublicKeyPath =
             mongo::extension::host::test_util::getPublicKeyPath();
+#endif
     }
     void tearDown() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         if (!_previousExtensionsSignaturePublicKeyPath.empty()) {
             serverGlobalParams.extensionsSignaturePublicKeyPath =
                 _previousExtensionsSignaturePublicKeyPath;
         }
+#endif
         LiteParsedDocumentSource::unregisterParser_forTest(kTestFooStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kDesugarFooStageName);
         ExtensionLoader::unload_forTest("foo");

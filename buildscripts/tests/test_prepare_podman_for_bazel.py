@@ -33,6 +33,56 @@ class PreparePodmanForBazelTest(unittest.TestCase):
             )
         )
 
+    def test_cross_rbe_task_prepares_podman_when_explicitly_required(self) -> None:
+        self.assertTrue(
+            prepare_podman_for_bazel.podman_is_in_use(
+                {
+                    "MONGO_LINUX_CONTAINER_ACTIONS": "0",
+                    "MONGO_PODMAN_TASK_ID": "task-123",
+                    "MONGO_PODMAN_REQUIRED": "true",
+                },
+                system="Linux",
+                which=mock.Mock(return_value="/usr/bin/podman"),
+            )
+        )
+
+    def test_cross_rbe_required_ignores_docker_compatibility_shim(self) -> None:
+        """An explicit Podman task must not be hidden by a healthy Docker shim."""
+
+        def which(command: str) -> str | None:
+            return {"docker": "/usr/bin/docker", "podman": "/usr/bin/podman"}.get(command)
+
+        runner = mock.Mock(
+            side_effect=AssertionError(
+                "Docker health checks must be skipped when Podman is required"
+            )
+        )
+        self.assertTrue(
+            prepare_podman_for_bazel.podman_is_in_use(
+                {
+                    "MONGO_LINUX_CONTAINER_ACTIONS": "0",
+                    "MONGO_PODMAN_TASK_ID": "task-123",
+                    "MONGO_PODMAN_REQUIRED": "true",
+                },
+                system="Linux",
+                which=which,
+                runner=runner,
+            )
+        )
+        runner.assert_not_called()
+
+    def test_cross_rbe_required_fails_closed_when_podman_is_missing(self) -> None:
+        self.assertTrue(
+            prepare_podman_for_bazel.podman_is_in_use(
+                {
+                    "MONGO_LINUX_CONTAINER_ACTIONS": "0",
+                    "MONGO_PODMAN_REQUIRED": "true",
+                },
+                system="Linux",
+                which=mock.Mock(return_value=None),
+            )
+        )
+
     def test_healthy_docker_is_selected_over_podman(self) -> None:
         def which(command: str) -> str | None:
             return {"docker": "/usr/bin/docker", "podman": "/usr/bin/podman"}.get(command)

@@ -3,7 +3,12 @@
 load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
-load("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "SYSROOT_ENV_VAR", "sysroot_dump_disabled_reason")
+load(
+    "//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl",
+    "LINUX_CROSS_TOOLCHAIN_ENV_VAR",
+    "SYSROOT_ENV_VAR",
+    "sysroot_dump_disabled_reason",
+)
 
 SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE = "no_c++_toolchain"
 
@@ -22,8 +27,15 @@ _SYSROOT_DEFS_ENABLED = """# When the RBE sysroot is enabled, Bazel needs to kno
 # cxx_builtin_include_directories lets Bazel validate either form.
 SYSROOT_BUILTIN_INCLUDE_DIRECTORIES = (
     COMMON_BUILTIN_INCLUDE_DIRECTORIES +
-    ["%sysroot%" + d for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES if d.startswith("/")]
+    ["%sysroot%" + d for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES if d.startswith("/")] +
+    [SYSROOT_PATH + d for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES if d.startswith("/")]
 )
+
+SYSROOT_SYSTEM_INCLUDE_DIRECTORIES = [
+    SYSROOT_PATH + d
+    for d in COMMON_BUILTIN_INCLUDE_DIRECTORIES
+    if d.startswith("/")
+]
 
 BUILTIN_SYSROOT = select({
     "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_PATH,
@@ -33,13 +45,19 @@ BUILTIN_SYSROOT = select({
 EFFECTIVE_BUILTIN_INCLUDE_DIRS = select({
     "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_BUILTIN_INCLUDE_DIRECTORIES,
     "//conditions:default": COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+})
+
+EFFECTIVE_SYSTEM_INCLUDE_DIRS = select({
+    "@//bazel/config:use_rbe_sysroot_enabled": SYSROOT_SYSTEM_INCLUDE_DIRECTORIES,
+    "//conditions:default": COMMON_BUILTIN_INCLUDE_DIRECTORIES,
 })"""
 
 _SYSROOT_DEFS_DISABLED = """# The RBE sysroot dump is disabled on this host (see sysroot_dump.bzl), so
 # the toolchain uses the plain no-sysroot configuration.
 BUILTIN_SYSROOT = ""
 
-EFFECTIVE_BUILTIN_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES"""
+EFFECTIVE_BUILTIN_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES
+EFFECTIVE_SYSTEM_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES"""
 
 _SYSROOT_ALL_FILES_ENABLED = """ + select ({
         "@//bazel/config:use_rbe_sysroot_enabled": ["@rbe_sysroot//:sysroot_files"],
@@ -47,6 +65,18 @@ _SYSROOT_ALL_FILES_ENABLED = """ + select ({
     })"""
 
 def _sysroot_substitutions(ctx):
+    # A Linux cross config owns its target sysroot through the selected cross
+    # toolchain repository. The host-native toolchain is still registered for
+    # exec configurations, but must not acquire the foreign target sysroot.
+    # MONGO_LINUX_CROSS_TOOLCHAIN must be set via --repo_env (as the cross-RBE
+    # wrapper does), never exported in a shell: it flips the native toolchain
+    # repos into cross mode for whoever runs Bazel in that environment.
+    if ctx.os.environ.get(LINUX_CROSS_TOOLCHAIN_ENV_VAR, ""):
+        return {
+            "{sysroot_load}": "",
+            "{sysroot_defs}": _SYSROOT_DEFS_DISABLED,
+            "{sysroot_all_files}": "",
+        }
     if sysroot_dump_disabled_reason(ctx) == None:
         return {
             "{sysroot_load}": _SYSROOT_LOAD_ENABLED,
@@ -140,6 +170,7 @@ toolchain_download = repository_rule(
         # The generated BUILD file's sysroot fragments depend on whether the
         # RBE sysroot dump is enabled, which is keyed on this variable.
         SYSROOT_ENV_VAR,
+        LINUX_CROSS_TOOLCHAIN_ENV_VAR,
         "MONGO_OPENSSL_ROOT",
     ],
     attrs = {

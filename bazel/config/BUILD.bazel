@@ -122,6 +122,16 @@ config_setting(
     },
 )
 
+# The IBM cross wrapper sets this define only for patch/test cross builds. It
+# gates the pycross target C++ toolchain without changing native or local
+# release toolchain resolution.
+config_setting(
+    name = "mongo_ibm_cross",
+    define_values = {
+        "MONGO_IBM_CROSS": "1",
+    },
+)
+
 selects.config_setting_group(
     name = "gcc_or_clang",
     match_any = [
@@ -2550,6 +2560,11 @@ config_setting(
     },
 )
 
+# DTLTO is supported by the Clang cross toolchains as well as native Linux
+# toolchains. The target platform supplies the IBM code-generation flags. The
+# lto-backend actions are routed to the selected RBE executor with the
+# execution-architecture compiler; LTO indexing shares the link action's tool
+# and runs in the native IBM container beside the link.
 selects.config_setting_group(
     name = "dtlto_linux_clang_enabled_fission_disabled_linkstatic_enabled",
     match_all = [
@@ -2557,7 +2572,6 @@ selects.config_setting_group(
         ":linkstatic_enabled",
         ":dtlto_enabled",
         ":fission_disabled",
-        ":not_s390x_or_ppc",
     ],
 )
 
@@ -2639,12 +2653,15 @@ config_setting(
     },
 )
 
+# LLVM instrumentation PGO data is source/IR keyed, so the published Clang
+# profdata can be shared by the IBM targets temporarily. Keep the architecture
+# restrictions on GCC PGO and CSPGO. BOLT remains architecture-gated by its
+# profile-use selectors below because it is not yet enabled for IBM targets.
 selects.config_setting_group(
     name = "pgo_profile_use_clang_enabled_linkstatic_enabled",
     match_all = [
         ":linux_clang",
         ":linkstatic_enabled",
-        ":not_s390x_or_ppc",
         ":pgo_profile_use_enabled",
     ],
 )
@@ -3030,6 +3047,17 @@ config_setting(
     flag_values = {
         "//bazel/config:js_engine": "wasm",
     },
+)
+
+# Cranelift supports s390x, including native AOT execution during cross-RBE
+# builds. PPC64LE remains unsupported by the WASM engine, as before cross-RBE.
+config_setting(
+    name = "linux_s390x_cross",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+        "//bazel/platforms:use_mongo_linux_cross_toolchain",
+    ],
 )
 
 selects.config_setting_group(

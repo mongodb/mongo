@@ -491,6 +491,115 @@ test_retry_bazel_cmd_does_not_retry_test_timeouts() {
     PATH="$old_path"
 }
 
+test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode() {
+    local ppc_args
+    local s390x_args
+
+    ppc_args="$({
+        evergreen_remote_exec="on"
+        bazel_evergreen_shutils::bazel_rbe_supported() { return 1; }
+        bazel_evergreen_shutils::is_ppc64le() { return 0; }
+        bazel_evergreen_shutils::is_s390x() { return 1; }
+        bazel_evergreen_shutils::compute_local_arg run
+    })"
+    assert_contains "$ppc_args" "--local_resources=cpu=48" "PPC run mode should retain its local CPU limit"
+    assert_not_contains "$ppc_args" "--jobs=" "PPC cross-RBE should retain the common remote job limit"
+    assert_not_contains "$ppc_args" "--config=local" "PPC run mode should retain cross-RBE configuration"
+
+    s390x_args="$({
+        evergreen_remote_exec="on"
+        bazel_evergreen_shutils::bazel_rbe_supported() { return 1; }
+        bazel_evergreen_shutils::is_ppc64le() { return 1; }
+        bazel_evergreen_shutils::is_s390x() { return 0; }
+        bazel_evergreen_shutils::compute_local_arg run
+    })"
+    assert_contains "$s390x_args" "--local_resources=cpu=16" "s390x run mode should retain its local CPU limit"
+    assert_not_contains "$s390x_args" "--jobs=" "s390x cross-RBE should retain the common remote job limit"
+    assert_not_contains "$s390x_args" "--config=local" "s390x run mode should retain cross-RBE configuration"
+}
+
+test_compute_local_arg_uses_local_for_non_rbe_run_mode() {
+    local remote_unsupported_args
+    local remote_disabled_args
+
+    remote_unsupported_args="$({
+        evergreen_remote_exec="on"
+        bazel_evergreen_shutils::bazel_rbe_supported() { return 1; }
+        bazel_evergreen_shutils::is_ppc64le() { return 1; }
+        bazel_evergreen_shutils::is_s390x() { return 1; }
+        bazel_evergreen_shutils::compute_local_arg run
+    })"
+    assert_contains "$remote_unsupported_args" "--config=local" "unsupported run hosts should use local configuration"
+
+    remote_disabled_args="$({
+        evergreen_remote_exec="off"
+        bazel_evergreen_shutils::bazel_rbe_supported() { return 0; }
+        bazel_evergreen_shutils::is_ppc64le() { return 1; }
+        bazel_evergreen_shutils::is_s390x() { return 1; }
+        bazel_evergreen_shutils::compute_local_arg run
+    })"
+    assert_contains "$remote_disabled_args" "--config=local" "run mode should use local configuration when remote execution is disabled"
+}
+
+test_maybe_release_flag_classifies_patch_test_and_release_tasks() {
+    local output
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="true"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "patch builds should not select a release config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "test tasks should not select a release config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release-local" "release artifacts should use local release mode"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="true"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release-rbe" "explicit release RBE should remain enabled"
+}
+
+test_local_release_command_disables_remote_fallback_timeout() {
+    if ! bazel_evergreen_shutils::command_uses_local_release \
+        build //evergreen:fake_target --config=public-release-local; then
+        fail "public-release-local should disable the remote fallback timeout"
+    fi
+    if ! bazel_evergreen_shutils::command_uses_local_release \
+        build //evergreen:fake_target --remote_executor=; then
+        fail "an empty remote executor should disable the remote fallback timeout"
+    fi
+    if bazel_evergreen_shutils::command_uses_local_release \
+        build //evergreen:fake_target --config=evg; then
+        fail "ordinary test commands should retain the remote fallback timeout"
+    fi
+}
+
 test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
     local tmpdir
     local fake_bazel
@@ -615,6 +724,10 @@ test_query_resmoke_configs_filters_target_universe
 test_provenance_build_invocation_file_selection
 test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts
+test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode
+test_compute_local_arg_uses_local_for_non_rbe_run_mode
+test_maybe_release_flag_classifies_patch_test_and_release_tasks
+test_local_release_command_disables_remote_fallback_timeout
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
 test_retry_bazel_cmd_reuses_healthy_server_after_regular_failure
 test_retry_bazel_cmd_starts_missing_server_with_neutral_message

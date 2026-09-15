@@ -1,28 +1,14 @@
 """Rules for downloading and embedding mongot_extension_signing_key"""
 
-# This is the mongot-extension's signing public key. It is managed by garasign, and used by the
-# SignatureValidator in secure builds (i.e MONGO_CONFIG_EXT_SIG_SECURE) to verify the authenticity
-# of extensions before loading them into the server process. Whenever the remote file changes, the
-# corresponding sha256 must be changed.
-
-def _impl(ctx):
-    ctx.download(
-        url = "https://pgp.mongodb.com/mongot-extension.pub",
-        sha256 = "2a15e6a2d9f6c0d8141dad515d9360f6cf01e1a11f7e2c3bc0820e18c5e9d0b7",
-        output = "mongot-extension.pub",
-    )
-    ctx.file("BUILD.bazel", 'exports_files(["mongot-extension.pub"])')
-
-mongot_extension_signing_key_repo = repository_rule(implementation = _impl)
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 def _gpg_export_armored_key_impl(ctx):
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-
     key = ctx.file.key
     armored_key_output_file = ctx.outputs.armored_key_output_file
+    host_python = ctx.exec_groups["host"].toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     # Inputs to this action
-    inputs = [key, ctx.file.script]
+    inputs = [key, ctx.file.script] + host_python.files.to_list()
 
     pass_file = ""
     if ctx.file.passphrase:
@@ -51,11 +37,10 @@ def _gpg_export_armored_key_impl(ctx):
 
     # Needed for remote execution: gpg binaries use RUNPATH=$ORIGIN/../libs.
     inputs += ctx.files.gpg_libs
-    inputs += python.files.to_list()
 
     # Arguments your Python helper expects: <gpg> <key> <passphrase_or_empty> <armored_key_output_file>
     ctx.actions.run(
-        executable = python.interpreter.path,
+        executable = host_python.interpreter.path,
         arguments = [
             ctx.file.script.path,
             gpg_bin.path,
@@ -67,6 +52,7 @@ def _gpg_export_armored_key_impl(ctx):
         tools = [],
         outputs = [armored_key_output_file],
         env = env,
+        exec_group = "host",
         mnemonic = "GpgExportArmored",
         progress_message = "Export armored key to %s" % armored_key_output_file.path,
     )
@@ -88,21 +74,23 @@ gpg_export_armored_key = rule(
             default = Label("@gpg//:gpg_libs"),
         ),
     },
-    toolchains = ["@rules_python//python:toolchain_type"],
-    fragments = ["py"],
+    exec_groups = {
+        "host": exec_group(
+            exec_compatible_with = HOST_CONSTRAINTS,
+            toolchains = ["@rules_python//python:toolchain_type"],
+        ),
+    },
 )
 
 def _generate_embedded_public_key_header_impl(ctx):
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-
     script = ctx.file.script
     public_key_path = ctx.file.public_key_path
     embedded_key_header_path = ctx.outputs.embedded_key_header_path
-    inputs = [script, public_key_path]
-    inputs += python.files.to_list()
+    host_python = ctx.exec_groups["host"].toolchains["@rules_python//python:toolchain_type"].py3_runtime
+    inputs = host_python.files.to_list() + [script, public_key_path]
 
     ctx.actions.run(
-        executable = python.interpreter.path,
+        executable = host_python.interpreter.path,
         arguments = [
             script.path,
             "--public_key_path",
@@ -113,6 +101,7 @@ def _generate_embedded_public_key_header_impl(ctx):
         inputs = inputs,
         tools = [],
         outputs = [embedded_key_header_path],
+        exec_group = "host",
         mnemonic = "EmbedPublicKeyHeader",
         progress_message = "Generate embedded key to %s" % embedded_key_header_path.path,
     )
@@ -127,6 +116,10 @@ generate_embedded_public_key_header = rule(
             allow_single_file = True,
         ),
     },
-    toolchains = ["@rules_python//python:toolchain_type"],
-    fragments = ["py"],
+    exec_groups = {
+        "host": exec_group(
+            exec_compatible_with = HOST_CONSTRAINTS,
+            toolchains = ["@rules_python//python:toolchain_type"],
+        ),
+    },
 )

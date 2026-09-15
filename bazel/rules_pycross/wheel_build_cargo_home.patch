@@ -23,7 +23,7 @@ Applied via `single_version_override(patches=...)` on rules_pycross in
 @@ -348,6 +348,15 @@
      env = dict(cc_vars)
      env.update(ctx.configuration.default_shell_env)
- 
+
 +    # Keep Rust-backed sdist builds (cargo, invoked by build backends like
 +    # setuptools-rust / maturin) inside the action's writable sandbox.
 +    # Without CARGO_HOME, cargo resolves $HOME/.cargo — unwritable in the

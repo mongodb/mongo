@@ -12,6 +12,25 @@ py_library(
         "engflow_check.py",
         "generate_common_bes_bazelrc.py",
         "git_age_check.py",
+        "hermetic_container/bazelrc.py",
+        "hermetic_container/cleanup.py",
+        "hermetic_container/config.py",
+        "hermetic_container/constants.py",
+        "hermetic_container/cross/common.py",
+        "hermetic_container/cross/linux.py",
+        "hermetic_container/cross/macos.py",
+        "hermetic_container/cross/windows.py",
+        "hermetic_container/distro.py",
+        "hermetic_container/docker.py",
+        "hermetic_container/download.py",
+        "hermetic_container/engflow.py",
+        "hermetic_container/env.py",
+        "hermetic_container/fsutil.py",
+        "hermetic_container/podman.py",
+        "hermetic_container/podman_common.py",
+        "hermetic_container/runner.py",
+        "hermetic_container/symlinks.py",
+        "hermetic_container/volumes.py",
         "hermetic_container_integration.py",
         "install_modules.py",
         "lint.py",
@@ -58,6 +77,9 @@ py_test(
     srcs = [
         "lint_test.py",
     ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":wrapper_hook",
@@ -65,9 +87,9 @@ py_test(
 )
 
 py_test(
-    name = "hermetic_container_integration_test",
+    name = "runner_test",
     srcs = [
-        "hermetic_container_integration_test.py",
+        "hermetic_container/runner_test.py",
     ],
     data = [
         "//bazel:hermetic_container/hermetic_container.py",
@@ -82,9 +104,183 @@ py_test(
 )
 
 py_test(
+    name = "cross_linux_test",
+    srcs = [
+        "hermetic_container/cross/linux_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    main = "hermetic_container/cross/linux_test.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "cross_macos_test",
+    srcs = [
+        "hermetic_container/cross/macos_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    main = "hermetic_container/cross/macos_test.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "cross_windows_test",
+    srcs = [
+        "hermetic_container/cross/windows_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    main = "hermetic_container/cross/windows_test.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "config_test",
+    srcs = [
+        "hermetic_container/config_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "download_test",
+    srcs = [
+        "hermetic_container/download_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "env_test",
+    srcs = [
+        "hermetic_container/env_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "distro_test",
+    srcs = [
+        "hermetic_container/distro_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+        "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "docker_test",
+    srcs = [
+        "hermetic_container/docker_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "cleanup_test",
+    srcs = [
+        "hermetic_container/cleanup_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "symlinks_test",
+    srcs = [
+        "hermetic_container/symlinks_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "volumes_test",
+    srcs = [
+        "hermetic_container/volumes_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
+)
+
+py_test(
     name = "quality_checks_test",
     srcs = [
         "quality_checks_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -109,6 +305,9 @@ py_test(
     srcs = [
         "install_modules_test.py",
     ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":wrapper_hook",
@@ -119,6 +318,9 @@ py_test(
     name = "compiledb_test",
     srcs = [
         "compiledb_test.py",
+    ],
+    data = [
+        "//bazel:hermetic_container/hermetic_container.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
