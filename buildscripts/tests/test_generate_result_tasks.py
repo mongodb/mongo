@@ -225,12 +225,12 @@ class TestVariantCqueryFlagsAutoReverter(unittest.TestCase):
             "resmoke_test_targets": "//jstests/suites/replication:...",
             "auto_reverter_context": '{"failing_task": "//jstests/suites/query-execution:core"}',
         }
-        _, _, pattern = g._variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
+        _, _, pattern = g.variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
         self.assertEqual(pattern, "//jstests/suites/query-execution:core")
 
     def test_resmoke_test_targets_used_without_auto_reverter_context(self):
         expansions = {"resmoke_test_targets": "//jstests/suites/replication:..."}
-        _, _, pattern = g._variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
+        _, _, pattern = g.variant_cquery_flags(_FakeVariant("v"), _FakeTask(), expansions)
         self.assertEqual(pattern, "//jstests/suites/replication:...")
 
 

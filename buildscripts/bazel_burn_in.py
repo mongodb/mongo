@@ -48,7 +48,11 @@ from buildscripts.burn_in_tests import (
     MockFileChangeDetector,
 )
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-from buildscripts.generate_result_tasks import make_results_task, make_task_group
+from buildscripts.generate_result_tasks import (
+    make_results_task,
+    make_task_group,
+    variant_cquery_flags,
+)
 from buildscripts.util import buildozer_utils as buildozer
 from buildscripts.util.read_config import read_config_file
 
@@ -342,6 +346,57 @@ def get_targets_matching_tag_filter(tag_filter: str) -> set[str]:
     return included - excluded
 
 
+@cache
+def get_platform_compatible_targets(
+    variant_name: str, cquery_flags: tuple[str, ...], targets: tuple[str, ...]
+) -> set[str]:
+    """Filter targets to those compatible with the variant's target platform."""
+    if not targets:
+        return set()
+
+    candidate_set = "set(" + " ".join(sorted(set(targets))) + ")"
+    try:
+        result = subprocess.run(
+            ["bazel", "cquery", "--config=no-remote-exec"]
+            + list(cquery_flags)
+            + [
+                candidate_set,
+                "--output=starlark",
+                "--starlark:expr",
+                "str(target.label) + ("
+                '" INCOMPATIBLE" if "IncompatiblePlatformProvider" in providers(target)'
+                ' else " OK")',
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to cquery targets for platform compatibility on {variant_name}: {e}")
+        print(f"stdout: {e.stdout}")
+        print(f"stderr: {e.stderr}")
+        raise
+
+    compatible = set()
+    for line in result.stdout.splitlines():
+        label, _, verdict = line.strip().rpartition(" ")
+        if verdict == "OK":
+            compatible.add(label.removeprefix("@@").removeprefix("@"))
+    return compatible
+
+
+def filter_burn_in_targets(
+    targets: set[BurnInTargetInfo], targets_with_tag: set[str], compatible_originals: set[str]
+) -> list[str]:
+    """Return the burn-in targets to run for a variant."""
+    return [
+        target.burn_in_target
+        for target in targets
+        if target.original_target in targets_with_tag
+        and target.original_target in compatible_originals
+    ]
+
+
 def make_task(targets_to_run, variant_name):
     task = Task(
         name=f"resmoke_tests_burn_in_{variant_name}",
@@ -444,11 +499,19 @@ def generate_tasks(
                 variant.expansion("resmoke_tests_tag_filter")
             )
 
-            burn_in_targets_to_run = [
-                target.burn_in_target
+            _, cquery_flags, _ = variant_cquery_flags(variant, task, expansions)
+            candidate_originals = tuple(
+                target.original_target
                 for target in targets
                 if target.original_target in targets_with_tag
-            ]
+            )
+            compatible_originals = get_platform_compatible_targets(
+                variant_name, tuple(cquery_flags), candidate_originals
+            )
+
+            burn_in_targets_to_run = filter_burn_in_targets(
+                targets, targets_with_tag, compatible_originals
+            )
             if burn_in_targets_to_run:
                 targets_all.update(burn_in_targets_to_run)
 

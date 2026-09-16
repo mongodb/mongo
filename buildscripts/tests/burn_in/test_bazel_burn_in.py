@@ -335,5 +335,64 @@ class TestGetTargetsMatchingTagFilter(unittest.TestCase):
         )
 
 
+class TestGetPlatformCompatibleTargets(unittest.TestCase):
+    """Tests for get_platform_compatible_targets function."""
+
+    @patch(ns("subprocess.run"))
+    def test_incompatible_targets_are_dropped(self, mock_run):
+        """Targets excluded by target_compatible_with must not be scheduled for burn-in."""
+        mock_run.return_value.stdout = "//s:ok OK\n//s:incompatible INCOMPATIBLE\n"
+
+        result = under_test.get_platform_compatible_targets(
+            "variant", ("--flag",), ("//s:ok", "//s:incompatible")
+        )
+
+        self.assertEqual(result, {"//s:ok"})
+
+    @patch(ns("subprocess.run"))
+    def test_cquery_receives_variant_flags(self, mock_run):
+        """The cquery must be configured with the variant's own flags, not generic ones."""
+        mock_run.return_value.stdout = "//s:ok OK\n"
+
+        under_test.get_platform_compatible_targets("variant", ("--define=FOO=1",), ("//s:ok",))
+
+        command = mock_run.call_args[0][0]
+        self.assertIn("--define=FOO=1", command)
+        # Variant flags are forwarded as-is; the caller gets them from variant_cquery_flags.
+        self.assertNotIn("--//bazel/resmoke:skip_deps_for_cquery", command)
+
+
+class TestFilterBurnInTargets(unittest.TestCase):
+    """Tests for filter_burn_in_targets function."""
+
+    TARGETS = {
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:compatible_burn_in_jstests_foo.js",
+            original_target="//s:compatible",
+            test="jstests/foo.js",
+        ),
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:incompatible_burn_in_jstests_foo.js",
+            original_target="//s:incompatible",
+            test="jstests/foo.js",
+        ),
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:untagged_burn_in_jstests_foo.js",
+            original_target="//s:untagged",
+            test="jstests/foo.js",
+        ),
+    }
+
+    def test_incompatible_and_untagged_suites_are_skipped(self):
+        """Only suites matching the tag filter AND compatible with the platform run burn-in."""
+        result = under_test.filter_burn_in_targets(
+            self.TARGETS,
+            targets_with_tag={"//s:compatible", "//s:incompatible"},
+            compatible_originals={"//s:compatible", "//s:untagged"},
+        )
+
+        self.assertEqual(result, ["//s:compatible_burn_in_jstests_foo.js"])
+
+
 if __name__ == "__main__":
     unittest.main()

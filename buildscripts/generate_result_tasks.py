@@ -564,7 +564,7 @@ def select_resmoke_variant_tasks(
     return variant_tasks
 
 
-def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str], list[str], str]:
+def variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str], list[str], str]:
     """Compute (tags, cquery_flags, target_pattern) for a variant."""
     target_pattern = expansions.get("resmoke_test_targets", "//...")
     # An auto-revert patch only runs the task that failed; restrict the query to it.
@@ -602,7 +602,7 @@ def query_targets(
     expansions,
     resmoke_disable_rbe: bool = False,
 ) -> list[str]:
-    tags, cquery_flags, target_pattern = _variant_cquery_flags(variant, resmoke_task, expansions)
+    tags, cquery_flags, target_pattern = variant_cquery_flags(variant, resmoke_task, expansions)
     if not tags:
         print(f"Warning: No tag filter for variant {variant.name}", file=sys.stderr)
         return []
