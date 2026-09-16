@@ -768,7 +768,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 std::min(trsOpts.size(), static_cast<size_t>(ProcessInfo::getNumAvailableCores()));
 
             ThreadPool threadPool({.poolName = "ValidateRecordStore",
-                                   .threadNamePrefix = "vrs",
+                                   .threadNamePrefix = "ValidateRecordStoreWorker",
                                    .maxThreads = maxThreads,
                                    .onCreateThread = [](const std::string& threadName) {
                                        Client::initThread(threadName,

@@ -1,5 +1,5 @@
 /**
- * Tests that '--validateParallel' dispatches collections largest-first, so that a large collection
+ * Tests that parallel modal validation dispatches collections largest-first, so that a large collection
  * is never left as a long tail after the smaller ones have already completed.
  *
  * @tags: [
@@ -96,12 +96,15 @@ for (const testCase of kTestCases) {
                 MongoRunner.EXIT_CLEAN,
                 runMongoProgram(
                     "mongod",
-                    "--validateParallel",
-                    1,
+                    "--validate",
                     "--port",
                     allocatePort(),
                     "--dbpath",
                     dbpath,
+                    "--setParameter",
+                    "featureFlagParallelCollectionValidation=true",
+                    "--setParameter",
+                    "validateParallelMaxConcurrentNamespaces=1",
                     ...dbNameParameter,
                 ),
             );

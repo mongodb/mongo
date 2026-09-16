@@ -129,8 +129,20 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
     // Validation is a diagnostic mode, so it reports the database it cannot open and validates the
     // rest instead of ending startup at the first corrupt name.
     const validateModes = {
-        "--validate": {args: ["--validate"], expectSummary: true},
-        "--validateParallel": {args: ["--validateParallel", "2"], expectSummary: false},
+        serial: {
+            args: ["--validate", "--setParameter", "featureFlagParallelCollectionValidation=false"],
+            expectSummary: true,
+        },
+        parallel: {
+            args: [
+                "--validate",
+                "--setParameter",
+                "featureFlagParallelCollectionValidation=true",
+                "--setParameter",
+                "validateParallelMaxConcurrentNamespaces=2",
+            ],
+            expectSummary: false,
+        },
     };
 
     for (const [mode, {args, expectSummary}] of Object.entries(validateModes)) {

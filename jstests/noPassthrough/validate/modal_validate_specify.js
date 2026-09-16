@@ -20,15 +20,34 @@ function setupCollections(db) {
     assert.commandWorked(db["cheese"].createIndex({b: 1}));
 }
 
-function generateResults(dbpath, opts, validateCommand = {validate: ""}) {
+function generateResults(dbpath, opts) {
     MongoRunner.runMongod({
         dbpath: dbpath,
-        ...validateCommand,
+        validate: "",
         setParameter: opts,
         noCleanData: true,
     });
     return parseValidateOutputsFromLogs();
 }
+
+// TODO SERVER-76346 reconfigure modes when feature flag is not used to switch.
+const kValidateModes = [
+    {
+        name: "serial validation",
+        params: {featureFlagParallelCollectionValidation: false},
+    },
+    {
+        name: "parallel validation using all cores",
+        params: {featureFlagParallelCollectionValidation: true},
+    },
+    {
+        name: "parallel validation limited to 8 namespaces",
+        params: {
+            featureFlagParallelCollectionValidation: true,
+            validateParallelMaxConcurrentNamespaces: 8,
+        },
+    },
+];
 
 const dbpath = MongoRunner.dataPath + "modal_validate_specify";
 let port;
@@ -53,9 +72,9 @@ describe("Modal Validate can specify target Databases and Collections", () => {
 
     beforeEach(() => clearRawMongoProgramOutput());
 
-    for (const validateCommand of [{validate: ""}, {validateParallel: ""}, {validateParallel: 8}]) {
-        it(`Command validates every namespace with ${tojson(validateCommand)}`, () => {
-            const validateLogs = generateResults(dbpath, {}, validateCommand);
+    for (const validateMode of kValidateModes) {
+        it(`Command validates every namespace with ${validateMode.name}`, () => {
+            const validateLogs = generateResults(dbpath, validateMode.params);
             jsTest.log.info("Validate logs", {validateLogs});
             const validatedNss = new Set(validateLogs.map((log) => log.attr.results.ns));
             for (const ns of [
@@ -70,8 +89,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
             }
         });
 
-        it(`Command validates everything in the specified DB with ${tojson(validateCommand)}`, () => {
-            const validateLogs = generateResults(dbpath, {validateDbName: "test"}, validateCommand);
+        it(`Command validates everything in the specified DB with ${validateMode.name}`, () => {
+            const validateLogs = generateResults(dbpath, {
+                ...validateMode.params,
+                validateDbName: "test",
+            });
             jsTest.log.info(validateLogs);
             assert.eq(2, validateLogs.length);
             const firstResult = validateLogs[0].attr.results;

@@ -874,9 +874,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     // Must have global write lock before beginning offlineValidateParallel
     invariant(globalWriteLock && globalWriteLock->isLocked());
 
-    const size_t numCores = ProcessInfo::getNumAvailableCores();
-    maxThreadCount = maxThreadCount == 0 ? numCores : std::min(maxThreadCount, numCores);
-
     // Must only be called before the server accepts network connections. The lighter per-worker
     // lock mode (IX at global, X at collection) relies on there being no concurrent writers or
     // DDL operations — a guarantee that only holds at startup.
@@ -887,10 +884,19 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 
     auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
     serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
+    const auto dbNames = std::invoke([opCtx]() -> std::vector<DatabaseName> {
+        if (gValidateDbName.empty()) {
+            return CollectionCatalog::get(opCtx)->getAllDbNames();
+        }
+        return std::vector{DatabaseNameUtil::deserialize(
+            /*tenantId=*/boost::none,
+            gValidateDbName.data(),
+            SerializationContext(SerializationContext::Source::Catalog))};
+    });
     auto databaseHolder = DatabaseHolder::get(opCtx);
     const auto unopenedDbNames = std::invoke([&] {
         stdx::unordered_set<DatabaseName> unopenedDbNames;
-        for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
+        for (const auto& dbName : dbNames) {
             if (MONGO_unlikely(!openDbForOfflineValidation(opCtx, dbName, databaseHolder))) {
                 unopenedDbNames.insert(dbName);
             }
@@ -898,21 +904,26 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
         return unopenedDbNames;
     });
 
-    SingleProducerMultiConsumerQueue<NamespaceString> queue{
-        {.maxQueueDepth = maxThreadCount * 4ULL}};
-
     globalWriteLock.reset();
+    Lock::GlobalLock catalogLock(opCtx, MODE_IS);
+    const auto catalog = CollectionCatalog::get(opCtx);
 
-    auto threadPool = ThreadPool::make({
-        .poolName = "ParallelOfflineValidate",
-        .threadNamePrefix = "ov",
-        .maxThreads = maxThreadCount,
-        .onCreateThread =
-            [](const auto& threadName) {
-                Client::initThread(threadName, getGlobalServiceContext()->getService());
-            },
-    });
-    threadPool->startup();
+    // Collect every namespace to validate along with its data size, so that the largest
+    // collections can be dispatched first. Scheduling longest-processing-time-first keeps a
+    // large collection from being picked up late and running as a long tail.
+    std::vector<std::pair<long long, NamespaceString>> collectionsBySize;
+    for (const auto& dbName : dbNames) {
+        if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
+            continue;
+        }
+        for (const auto& coll : catalog->range(dbName)) {
+            collectionsBySize.emplace_back(coll->dataSize(opCtx), NamespaceString{coll->ns()});
+        }
+    }
+
+    // Sort descending by data size, breaking ties by namespace to keep dispatch order
+    // deterministic.
+    std::sort(collectionsBySize.begin(), collectionsBySize.end(), std::greater<>());
 
     // A database that could not be opened was not examined, so validation neither completed nor
     // came back clean.
@@ -920,6 +931,28 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
         .allValidationComplete = unopenedDbNames.empty(),
         .allResultsValid = unopenedDbNames.empty(),
     }};
+
+    if (collectionsBySize.empty()) {
+        return results.get();
+    }
+
+    const size_t numCores = ProcessInfo::getNumAvailableCores();
+    maxThreadCount = maxThreadCount == 0 ? numCores : std::min(maxThreadCount, numCores);
+    // Do not exceed the number of collections
+    maxThreadCount = std::min(maxThreadCount, collectionsBySize.size());
+    SingleProducerMultiConsumerQueue<NamespaceString> queue{
+        {.maxQueueDepth = maxThreadCount * 4ULL}};
+
+    auto threadPool = ThreadPool::make({
+        .poolName = "ParallelOfflineValidate",
+        .threadNamePrefix = "NamespaceValidationWorker",
+        .maxThreads = maxThreadCount,
+        .onCreateThread =
+            [](const auto& threadName) {
+                Client::initThread(threadName, getGlobalServiceContext()->getService());
+            },
+    });
+    threadPool->startup();
 
     // Create worker threads
     for (size_t i = 0; i < maxThreadCount; ++i) {
@@ -959,41 +992,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
             }
         });
     }
-
-    Lock::GlobalLock catalogLock(opCtx, MODE_IS);
-    const auto catalog = CollectionCatalog::get(opCtx);
-
-    // Collect every namespace to validate along with its data size, so that the largest
-    // collections can be dispatched first. Scheduling longest-processing-time-first keeps a
-    // large collection from being picked up late and running as a long tail.
-    std::vector<std::pair<long long, NamespaceString>> collectionsBySize;
-    auto collectDb = [&](const DatabaseName& dbName) {
-        for (const auto& coll : catalog->range(dbName)) {
-            collectionsBySize.emplace_back(coll->dataSize(opCtx), NamespaceString{coll->ns()});
-        }
-    };
-
-    if (!gValidateDbName.empty()) {
-        const boost::optional<TenantId>& tenantId = boost::none;
-        const auto dbName = DatabaseNameUtil::deserialize(
-            tenantId,
-            gValidateDbName.data(),
-            SerializationContext(SerializationContext::Source::Catalog));
-        if (!MONGO_unlikely(unopenedDbNames.contains(dbName))) {
-            collectDb(dbName);
-        }
-    } else {
-        for (const auto& dbName : catalog->getAllDbNames()) {
-            if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
-                continue;
-            }
-            collectDb(dbName);
-        }
-    }
-
-    // Sort descending by data size, breaking ties by namespace to keep dispatch order
-    // deterministic.
-    std::sort(collectionsBySize.begin(), collectionsBySize.end(), std::greater<>());
 
     // The queue is FIFO and bounded, so pushing in sorted order is enough to control the order
     // work is picked up in; `maxQueueDepth` only throttles how far ahead this producer may run.
@@ -1210,18 +1208,23 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
-    } else if (storageGlobalParams.validateParallel) {
-        const auto offlineValidateResults =
-            offlineValidateParallel(opCtx, std::move(lk), *storageGlobalParams.validateParallel);
-        if (!offlineValidateResults.allValidationComplete) {
-            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                             "Offline validation didn't complete for some collections"});
-        }
     } else if (storageGlobalParams.validate) {
-        const auto offlineValidateResults = offlineValidate(opCtx);
-        if (!offlineValidateResults.allValidationComplete) {
-            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                             "Offline validation didn't complete for some collections"});
+        // If the feature flag is enabled and a collection is not specified, run concurrent
+        // validations across the database instance.
+        if (gFeatureFlagParallelCollectionValidation.isEnabled() &&
+            gValidateCollectionName.empty()) {
+            const auto offlineValidateResults = offlineValidateParallel(
+                opCtx, std::move(lk), gValidateParallelMaxConcurrentNamespaces.load());
+            if (!offlineValidateResults.allValidationComplete) {
+                uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                                 "Offline validation didn't complete for some collections"});
+            }
+        } else {
+            const auto offlineValidateResults = offlineValidate(opCtx);
+            if (!offlineValidateResults.allValidationComplete) {
+                uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                                 "Offline validation didn't complete for some collections"});
+            }
         }
     } else {
         startupRecovery(opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);

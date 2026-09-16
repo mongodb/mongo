@@ -92,6 +92,18 @@ server_parameters:
             override_set: true
         redact: false
 
+    validateParallelMaxConcurrentNamespaces:
+        description:
+            "Upper bound on the number of namespaces to validate in parallel. When this parameter
+            is not set or set to 0, it will use all available cores. This parameter can only be used
+            with --validate and featureFlagParallelCollectionValidation=true, otherwise it has no effect."
+        set_at: [startup]
+        cpp_varname: gValidateParallelMaxConcurrentNamespaces
+        cpp_vartype: Atomic<int>
+        validator: {gte: 0}
+        default: 0
+        redact: false
+
 configs:
     "storage.engine":
         description: "What storage engine to use - defaults to wiredTiger if no data files present"
@@ -161,16 +173,6 @@ configs:
         description: "Run validation on all collections"
         arg_vartype: Switch
         source: [cli, ini]
-
-    validateParallel:
-        description: >-
-            Run validation on all collections in parallel; optional thread count clamped to the
-            number of available cores (default: number of available cores)
-        arg_vartype: Int
-        source: [cli, ini]
-        implicit: 0
-        validator:
-            gte: 0
 
     restore:
         description: >-
