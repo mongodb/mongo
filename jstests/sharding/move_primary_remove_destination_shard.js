@@ -1,14 +1,18 @@
 /**
- * Tests that if during movePrimary the destination shard starts draining in a separate session,
- * the movePrimary aborts with ShardNotFound.
+ * Tests that movePrimary runs to completion if its destination shard starts draining once the
+ * coordinator has already reached the commit phase.
  *
- * The test pauses movePrimary just before it commits the database-primary metadata to the config
- * server, then marks the destination shard as draining via startShardDraining. When movePrimary
- * resumes, ConfigsvrCommitMovePrimary validates that the destination shard is in draining mode and
- * throws ShardNotFound.
+ * The MovePrimaryCoordinator only refuses a draining destination while the operation can still be
+ * rolled back, that is, before the commit phase. The test pauses movePrimary just before it commits
+ * the database-primary metadata to the config server and marks the destination shard as draining
+ * via startShardDraining while it is paused. From that point on the coordinator must roll forward:
+ * aborting would skip the remaining phases, leaving the donor's stale collections behind and the
+ * shard catalogs disagreeing with the global one. The database primary therefore ends up on the
+ * draining shard, and it is up to the drain to report it as remaining work to move.
  *
  * @tags: [
  *   does_not_support_stepdowns,
+ *   assumes_balancer_off,
  *   requires_fcv_90,
  * ]
  */
@@ -18,7 +22,7 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-describe("movePrimary with destination shard remove", function () {
+describe("movePrimary with a destination shard that starts draining", function () {
     let st;
     let primaryShard;
     let drainingShard;
@@ -52,16 +56,13 @@ describe("movePrimary with destination shard remove", function () {
         st.stop();
     });
 
-    it("aborts when destination shard starts draining before metadata commit", function () {
+    it("completes when destination shard starts draining before metadata commit", function () {
         const fp = configureFailPoint(st.rs0.getPrimary(), "hangBeforeMovePrimaryCommitDbMetadata");
 
         const awaitMovePrimary = startParallelShell(
             funWithArgs(
                 function (dbName, toShard) {
-                    assert.commandFailedWithCode(
-                        db.adminCommand({movePrimary: dbName, to: toShard}),
-                        ErrorCodes.ShardNotFound,
-                    );
+                    assert.commandWorked(db.adminCommand({movePrimary: dbName, to: toShard}));
                 },
                 dbName,
                 drainingShard.shardName,
@@ -97,18 +98,20 @@ describe("movePrimary with destination shard remove", function () {
         jsTest.log("Resuming movePrimary after destination shard started draining");
         fp.off();
 
-        // When movePrimary resumes it should detect that destination shard is draining and abort
+        // The coordinator is past the point where a draining destination can stop it, so it rolls
+        // forward through the remaining phases instead of aborting.
         awaitMovePrimary();
 
-        // Primary didn't change
+        // The primary moved to the draining shard.
         const dbEntry = st.s.getDB("config").databases.findOne({_id: dbName});
-        assert.eq(dbEntry.primary, st.shard0.shardName);
+        assert.eq(dbEntry.primary, drainingShard.shardName);
 
-        assert.eq(drainingShard.getCollection(untrackedCollNs).find().itcount(), 0);
+        // The clean phase dropped the donor's now-stale copy, so the recipient holds the only one.
         assert.eq(
-            primaryShard.getCollection(untrackedCollNs).find().itcount(),
+            drainingShard.getCollection(untrackedCollNs).find().itcount(),
             expectedDocs.length,
         );
+        assert.eq(primaryShard.getCollection(untrackedCollNs).find().itcount(), 0);
 
         // Verify that both collections return the expected docs
         assert.sameMembers(
@@ -119,6 +122,12 @@ describe("movePrimary with destination shard remove", function () {
             st.s.getCollection(shardedCollNs).find({}, {_id: 0}).toArray(),
             expectedDocs,
         );
+
+        // Rolling forward must not leave the catalogs inconsistent.
+        const inconsistencies = st.s.getDB(dbName).checkMetadataConsistency().toArray();
+        assert.eq(0, inconsistencies.length, "unexpected metadata inconsistencies", {
+            inconsistencies,
+        });
 
         assert.commandWorked(st.s.adminCommand({stopShardDraining: drainingShard.shardName}));
     });
