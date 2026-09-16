@@ -5,6 +5,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -75,7 +76,8 @@ protected:
     /**
      * Checks whether the critical section is acquired for the coordinator's namespace, throwing
      * StaleConfig in case it is taken.
-     * TODO (SERVER-133735): remove this function.
+     * TODO (SERVER-133881): remove this function once chunk operations can acquire the critical
+     * section without risking a conflict.
      */
     void _checkCriticalSection() {
         if (getDoc().getGenericPhase() != CoordinatorGenericPhase::kUnset) {
@@ -83,6 +85,15 @@ protected:
         }
         auto opCtxHolder = this->makeOperationContext();
         auto* opCtx = opCtxHolder.get();
+
+        // With gCreateRenameNewSetAllowChunkOperationsBehavior enabled, there are no known ways in
+        // which the critical section could be taken, as no DDL coordinator holds the CS on a
+        // namespace with `allowChunkOperations: true`. In that case, this function becomes a no-op.
+        if (feature_flags::gCreateRenameNewSetAllowChunkOperationsBehavior.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            return;
+        }
 
         const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss());
 

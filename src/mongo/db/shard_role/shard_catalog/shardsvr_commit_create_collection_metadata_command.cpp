@@ -9,8 +9,10 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 
 
@@ -71,8 +73,15 @@ public:
 
                 bool isPrimaryDbShard =
                     ShardingState::get(newOpCtx.get())->shardId() == request().getPrimaryShardId();
+                // The create coordinator may commit the collection with chunk operations
+                // disallowed, so the flag must be propagated to this node's in-memory state and to
+                // the secondaries.
+                const bool commitAllowChunkOperations =
+                    feature_flags::gCreateRenameNewSetAllowChunkOperationsBehavior.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
                 shard_catalog_commit::commitCollectionMetadataLocally(
-                    newOpCtx.get(), ns(), isPrimaryDbShard);
+                    newOpCtx.get(), ns(), isPrimaryDbShard, commitAllowChunkOperations);
             }
 
             LOGV2_INFO(
