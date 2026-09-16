@@ -295,6 +295,16 @@ selector:
     - jstests/sharding/query/change_streams/change_streams_new_shard_new_database.js
     - jstests/sharding/query/change_streams/change_streams_unsharded_update_resume.js
     - jstests/sharding/query/change_streams/change_streams_update_lookup_shard_metadata_missing.js
+    - jstests/sharding/query/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_documentKey_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocumentBeforeChange_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocument_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_namespace_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_operation_type_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_to_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_updateDescription_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_wallTime_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
     - jstests/sharding/query/change_streams/lookup_change_stream_post_image_compound_shard_key.js
     - jstests/sharding/query/change_streams/lookup_change_stream_post_image_id_shard_key.js
     - jstests/sharding/query/agg/agg_write_stages_cannot_run_on_mongos.js
