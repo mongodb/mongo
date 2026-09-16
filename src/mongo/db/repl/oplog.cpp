@@ -1641,6 +1641,17 @@ boost::optional<int64_t> getValidationHash(const OplogEntry& op) {
     return singleOpMeta->getH();
 }
 
+// Renders one of the images a validation hash was taken over for logging. The pre-image of an
+// insert and the post-image of a delete do not exist, so there is nothing to render for them.
+std::string renderValidationHashImage(boost::optional<const BSONObj&> image) {
+    return image ? redact(*image).toString() : std::string("<not applicable>");
+}
+
+// Hashes one of the images a validation hash was taken over, where there is such an image.
+boost::optional<int64_t> hashValidationHashImage(boost::optional<const BSONObj&> image) {
+    return image ? boost::make_optional(computeDocValidationHash(*image)) : boost::none;
+}
+
 // A clustered collection's record id is derived from its document rather than carried on the oplog
 // entry, so the insert appliers have no record id to hand to verifyValidationHash().
 RecordId resolveRecordIdForDiagnostics(const CollectionPtr& collection,
@@ -1654,11 +1665,18 @@ RecordId resolveRecordIdForDiagnostics(const CollectionPtr& collection,
     return swRecordId.isOK() ? swRecordId.getValue() : RecordId();
 }
 
-// Compares 'actualHash', recomputed by this non-primary, against the hash the primary recorded on
-// 'op'. Every mismatch is logged. It is then fatal, unless
+// Compares 'actualHash', recomputed by this non-primary over 'preImage' and 'postImage', against
+// the hash the primary recorded on 'op'. Every mismatch is logged. It is then fatal, unless
 // 'continuousInternodeValidationFatalOnMismatch' is disabled or the node is still starting up.
-// 'diagnosticDoc' is only used to compute the field-level diff. It is the post-image for inserts,
-// and the pre-image for deletes and updates.
+//
+// An update hashes both of its images and XOR-es the two together, so it passes both. An insert
+// hashes only the document it inserts and a delete only the document it removes, so those pass that
+// one image and nothing for the side they do not have.
+//
+// A mismatch is reported with both images and with each one's hash, which is only rehashed on that
+// path. The hash an update carries is a XOR, so the composite alone cannot show which of the two
+// images this node disagrees with, and the images themselves are what an investigation has to
+// compare against a node that did not diverge.
 //
 // A mismatch that reproduces from the last checkpoint would otherwise be hit again on every
 // restart. Making it fatal during startup turns it into a crash loop that no restart can clear,
@@ -1669,7 +1687,8 @@ RecordId resolveRecordIdForDiagnostics(const CollectionPtr& collection,
 void verifyValidationHash(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const RecordId& recordId,
-                          const BSONObj& diagnosticDoc,
+                          boost::optional<const BSONObj&> preImage,
+                          boost::optional<const BSONObj&> postImage,
                           int64_t actualHash,
                           const OplogEntry& op) {
     const boost::optional<int64_t> expectedHash = getValidationHash(op);
@@ -1684,6 +1703,10 @@ void verifyValidationHash(OperationContext* opCtx,
     incrementDocumentHashMismatchCount(op.getOpType());
 
     // Read back the document we just persisted to compare against what this node actually stored.
+    // The record id and the diff are derived from the pre-image wherever there is one, and from the
+    // inserted document otherwise.
+    invariant(preImage || postImage);
+    const auto diagnosticDoc = preImage ? *preImage : *postImage;
     const RecordId resolvedRecordId =
         resolveRecordIdForDiagnostics(collection, recordId, diagnosticDoc);
     Snapshotted<BSONObj> readBack;
@@ -1711,6 +1734,10 @@ void verifyValidationHash(OperationContext* opCtx,
                 "Document validation hash mismatch",
                 "expectedHash"_attr = *expectedHash,
                 "actualHash"_attr = actualHash,
+                "preImageHash"_attr = hashValidationHashImage(preImage),
+                "postImageHash"_attr = hashValidationHashImage(postImage),
+                "preImage"_attr = renderValidationHashImage(preImage),
+                "postImage"_attr = renderValidationHashImage(postImage),
                 logAttrs(op.getNss()),
                 "id"_attr = redact(op.getIdElement().wrap()),
                 "recordId"_attr = resolvedRecordId,
@@ -2034,8 +2061,13 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
     // The update only reads 'obj', so it is still the pre-image here.
     if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
         const BSONObj& preImage = obj.value();
-        verifyValidationHash(
-            opCtx, collPtr, rid, preImage, computeUpdateValidationHash(preImage, postImage), op);
+        verifyValidationHash(opCtx,
+                             collPtr,
+                             rid,
+                             preImage,
+                             postImage,
+                             computeUpdateValidationHash(preImage, postImage),
+                             op);
     }
 
     // On secondaries, verify that the size delta recorded in the oplog matches the actual size
@@ -2205,8 +2237,13 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
     }
 
     if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
-        verifyValidationHash(
-            opCtx, collPtr, rid, preImage.value(), computeDocValidationHash(preImage.value()), op);
+        verifyValidationHash(opCtx,
+                             collPtr,
+                             rid,
+                             preImage.value(),
+                             /*postImage=*/boost::none,
+                             computeDocValidationHash(preImage.value()),
+                             op);
     }
 
     // Perform the delete.
@@ -2638,6 +2675,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             verifyValidationHash(opCtx,
                                                  collection,
                                                  insertObjs[i].replicatedRecordId,
+                                                 /*preImage=*/boost::none,
                                                  doc,
                                                  computeDocValidationHash(doc),
                                                  *insertOps[i]);
@@ -2750,6 +2788,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             verifyValidationHash(opCtx,
                                                  collection,
                                                  insertStmt.replicatedRecordId,
+                                                 /*preImage=*/boost::none,
                                                  o,
                                                  computeDocValidationHash(o),
                                                  op);

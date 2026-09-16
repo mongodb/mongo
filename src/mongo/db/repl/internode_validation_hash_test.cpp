@@ -57,6 +57,9 @@ constexpr int32_t kContinuingStartupLogId = 13445800;
 constexpr std::string_view kEmptyFieldLevelDiff = "{}";
 // The 'fieldLevelDiff' logged for deletes, where no diff can be derived.
 constexpr std::string_view kNoFieldLevelDiff = "<not derivable>";
+// The image logged where the operation has none: the pre-image of an insert, and the post-image of
+// a delete.
+constexpr std::string_view kNoImage = "<not applicable>";
 
 /**
  * Returns the hash-mismatch counter that mismatches of 'opType' feed.
@@ -257,34 +260,60 @@ protected:
         int64_t actualHash;
         std::string_view opType;
         std::string fieldLevelDiff;
+        // The images the hash was taken over and their individual hashes. An operation that has no
+        // image on one side logs 'kNoImage' and no hash for it.
+        std::string preImage;
+        std::string postImage;
+        boost::optional<int64_t> preImageHash;
+        boost::optional<int64_t> postImageHash;
     };
 
     /**
-     * The mismatch expected from an insert of 'doc' whose hash was corrupted.
+     * The mismatch expected from an insert of 'doc' whose hash was corrupted. An insert hashes only
+     * the document it inserts, so that document is the whole of the recomputed hash.
      */
     static ExpectedMismatch insertMismatch(const BSONObj& doc) {
         const int64_t actualHash = computeDocValidationHash(doc);
-        return {corrupt(actualHash), actualHash, "i", std::string{kEmptyFieldLevelDiff}};
+        return {.expectedHash = corrupt(actualHash),
+                .actualHash = actualHash,
+                .opType = "i",
+                .fieldLevelDiff = std::string{kEmptyFieldLevelDiff},
+                .preImage = std::string{kNoImage},
+                .postImage = doc.toString(),
+                .postImageHash = actualHash};
     }
 
     /**
-     * The mismatch expected from a delete of 'doc' whose hash was corrupted.
+     * The mismatch expected from a delete of 'doc' whose hash was corrupted. A delete hashes only
+     * the document it removes, so that document is the whole of the recomputed hash.
      */
     static ExpectedMismatch deleteMismatch(const BSONObj& doc) {
         const int64_t actualHash = computeDocValidationHash(doc);
-        return {corrupt(actualHash), actualHash, "d", std::string{kNoFieldLevelDiff}};
+        return {.expectedHash = corrupt(actualHash),
+                .actualHash = actualHash,
+                .opType = "d",
+                .fieldLevelDiff = std::string{kNoFieldLevelDiff},
+                .preImage = doc.toString(),
+                .postImage = std::string{kNoImage},
+                .preImageHash = actualHash};
     }
 
     /**
      * The mismatch expected from an update whose hash was corrupted. 'preImage' is what this node
-     * held, which is what the logged field-level diff is taken against.
+     * held, which is what the logged field-level diff is taken against. Both images are hashed and
+     * XOR-ed together, so both are reported along with their component hashes.
      */
     static ExpectedMismatch updateMismatch(const BSONObj& preImage, const BSONObj& postImage) {
-        const int64_t actualHash = computeUpdateValidationHash(preImage, postImage);
-        return {corrupt(actualHash),
-                actualHash,
-                "u",
-                doc_diff::computeInlineDiff(preImage, postImage)->toString()};
+        const int64_t preImageHash = computeDocValidationHash(preImage);
+        const int64_t postImageHash = computeDocValidationHash(postImage);
+        return {.expectedHash = corrupt(preImageHash ^ postImageHash),
+                .actualHash = preImageHash ^ postImageHash,
+                .opType = "u",
+                .fieldLevelDiff = doc_diff::computeInlineDiff(preImage, postImage)->toString(),
+                .preImage = preImage.toString(),
+                .postImage = postImage.toString(),
+                .preImageHash = preImageHash,
+                .postImageHash = postImageHash};
     }
 
     /**
@@ -338,12 +367,24 @@ protected:
         logs.stop();
 
         for (const auto& mismatch : expected) {
+            BSONObjBuilder attr;
+            attr.append("expectedHash", mismatch.expectedHash);
+            attr.append("actualHash", mismatch.actualHash);
+            // An operation with no image on one side logs no hash for that side, so the attribute
+            // is only expected where there is an image to have hashed.
+            if (mismatch.preImageHash) {
+                attr.append("preImageHash", *mismatch.preImageHash);
+            }
+            if (mismatch.postImageHash) {
+                attr.append("postImageHash", *mismatch.postImageHash);
+            }
+            attr.append("preImage", mismatch.preImage);
+            attr.append("postImage", mismatch.postImage);
+            attr.append("opType", mismatch.opType);
+            attr.append("fieldLevelDiff", mismatch.fieldLevelDiff);
+
             EXPECT_EQ(logs.countBSONContainingSubset(
-                          BSON("id" << kMismatchLogId << "attr"
-                                    << BSON("expectedHash" << mismatch.expectedHash << "actualHash"
-                                                           << mismatch.actualHash << "opType"
-                                                           << mismatch.opType << "fieldLevelDiff"
-                                                           << mismatch.fieldLevelDiff))),
+                          BSON("id" << kMismatchLogId << "attr" << attr.obj())),
                       1)
                 << "opType: " << mismatch.opType << ", expectedHash: " << mismatch.expectedHash;
         }
@@ -1059,13 +1100,25 @@ TEST_F(VerifyValidationHashLogOnlyTest, UpdateWithDeltaDivergentPreImageOnlyLogs
                                                 primaryHash);
 
     // The primary's hash is not this node's hash with a bit flipped, so the expectation cannot come
-    // from updateMismatch().
+    // from updateMismatch(). The two nodes agree on the post-image and disagree only on the
+    // pre-image, so the logged post-image hash is the one the primary folded into 'primaryHash'
+    // while the logged pre-image hash is not, which is what tells the two cases apart.
     assertOnlyLogsMismatches(
         [&] { return runOpSteadyState(op); },
-        {{primaryHash,
-          computeUpdateValidationHash(localPreImage, sharedPostImage),
-          "u",
-          doc_diff::computeInlineDiff(localPreImage, sharedPostImage)->toString()}});
+        {{.expectedHash = primaryHash,
+          .actualHash = computeUpdateValidationHash(localPreImage, sharedPostImage),
+          .opType = "u",
+          .fieldLevelDiff = doc_diff::computeInlineDiff(localPreImage, sharedPostImage)->toString(),
+          .preImage = localPreImage.toString(),
+          .postImage = sharedPostImage.toString(),
+          .preImageHash = computeDocValidationHash(localPreImage),
+          .postImageHash = computeDocValidationHash(sharedPostImage)}});
+
+    // The primary's hash is this node's post-image hash XOR-ed with the primary's own pre-image
+    // hash, so the logged components isolate the divergence to the pre-image.
+    EXPECT_EQ(primaryHash ^ computeDocValidationHash(sharedPostImage),
+              computeDocValidationHash(primaryPreImage));
+    EXPECT_NE(computeDocValidationHash(localPreImage), computeDocValidationHash(primaryPreImage));
 
     assertDocumentIs(rid, sharedPostImage);
 }
