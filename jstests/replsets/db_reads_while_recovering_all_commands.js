@@ -422,6 +422,7 @@ const allCommands = {
     reIndex: {skip: isNotAUserDataRead},
     releaseMemory: {skip: isNotAUserDataRead},
     renameCollection: {skip: isPrimaryOnly},
+    repairReplicatedMetadata: {skip: isPrimaryOnly},
     replSetAbortPrimaryCatchUp: {skip: isNotAUserDataRead},
     replSetFreeze: {skip: isNotAUserDataRead},
     replSetGetConfig: {skip: isNotAUserDataRead},

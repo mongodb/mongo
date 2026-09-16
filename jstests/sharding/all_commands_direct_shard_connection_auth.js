@@ -1159,6 +1159,12 @@ const allCommands = {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    repairReplicatedMetadata: {
+        // TODO SERVER-134907: flip to shouldFail: false once the action is granted to clusterAdmin.
+        command: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {}},
+        isAdminCommand: true,
+        shouldFail: true,
+    },
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},
     replSetFreeze: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},

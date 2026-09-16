@@ -153,6 +153,7 @@ enums:
             renameCollection: "renameCollection" # ID only
             renameCollectionSameDB: "renameCollectionSameDB"
             repairDatabase: "repairDatabase" # Deprecated (backwards compatibility)
+            repairReplicatedMetadata: "repairReplicatedMetadata"
             replSetConfigure: "replSetConfigure"
             replSetGetConfig: "replSetGetConfig"
             replSetGetStatus: "replSetGetStatus"

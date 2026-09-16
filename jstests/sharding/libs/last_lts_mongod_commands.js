@@ -105,4 +105,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "getMetricsFilteringAllowlist",
     "updateMetricsFilteringAllowlist",
     "clearJoinPlanCache",
+    "repairReplicatedMetadata",
 ];

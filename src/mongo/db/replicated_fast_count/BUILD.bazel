@@ -65,6 +65,37 @@ idl_generator(
     src = "replicated_fast_count_max_oplog_scan_lag_secs.idl",
 )
 
+idl_generator(
+    name = "repair_replicated_metadata_gen",
+    src = "repair_replicated_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "repair_replicated_metadata_command",
+    srcs = [
+        "repair_replicated_metadata_command.cpp",
+        ":repair_replicated_metadata_gen",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/storage:write_unit_of_work",
+    ],
+)
+
 mongo_cc_library(
     name = "replicated_fast_count_manager",
     srcs = [

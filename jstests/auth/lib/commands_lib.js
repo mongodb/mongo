@@ -7836,6 +7836,22 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "repairReplicatedMetadata",
+            command: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {}},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    privileges: [
+                        {resource: {cluster: true}, actions: ["repairReplicatedMetadata"]},
+                    ],
+                    expectFail: true,
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
             testname: "replSetFreeze",
             command: {replSetFreeze: "x"},
             skipSharded: true,

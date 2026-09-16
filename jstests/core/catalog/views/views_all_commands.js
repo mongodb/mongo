@@ -702,6 +702,7 @@ let viewsCommandTests = {
             skipSharded: true,
         },
     ],
+    repairReplicatedMetadata: {skip: isUnrelated},
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
