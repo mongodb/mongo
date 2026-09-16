@@ -9,6 +9,8 @@
  *   does_not_support_stepdowns,
  *   requires_fcv_63,
  *   requires_timeseries,
+ *   # The test assumes that the collection will remain on a single shard.
+ *   assumes_balancer_off,
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
