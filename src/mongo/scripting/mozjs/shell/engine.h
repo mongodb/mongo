@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "mongo/platform/atomic.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/modules.h"
@@ -44,9 +43,6 @@ public:
     int getJSHeapLimitMB() const override;
     void setJSHeapLimitMB(int limit) override;
 
-    bool getJSAbortOnOutOfMemory() const override;
-    void setJSAbortOnOutOfMemory(bool value) override;
-
     bool getJSUseLegacyMemoryTracking() const override;
     void setJSUseLegacyMemoryTracking(bool shouldUseLegacyEngine) override;
 
@@ -71,8 +67,6 @@ protected:
     mongo::Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) override;
 
 private:
-    Atomic<bool> _abortOnOutOfMemory{false};
-
     DeadlineMonitor<MozJSImplScope> _deadlineMonitor;
     ExecutionEnvironment _executionEnvironment;
     std::string _loadPath;

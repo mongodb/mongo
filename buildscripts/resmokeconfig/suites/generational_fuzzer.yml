@@ -10,9 +10,6 @@ executor:
   config:
     shell_options:
       nodb: ""
-      # BF-45258: these suites are where the shell runs out of memory, and the heap at that moment
-      # is the evidence we lack. Abort so the kernel writes a core of it.
-      jsAbortOnOutOfMemory: ""
       global_vars:
         TestData:
           clusterType: "standalone"

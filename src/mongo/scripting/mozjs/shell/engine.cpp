@@ -117,14 +117,6 @@ void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
     gJSHeapLimitMB.store(limit);
 }
 
-bool MozJSScriptEngine::getJSAbortOnOutOfMemory() const {
-    return _abortOnOutOfMemory.load();
-}
-
-void MozJSScriptEngine::setJSAbortOnOutOfMemory(bool value) {
-    _abortOnOutOfMemory.store(value);
-}
-
 bool MozJSScriptEngine::getJSUseLegacyMemoryTracking() const {
     return gJSUseLegacyMemoryTracking.load();
 }
