@@ -105,11 +105,6 @@ common --define=LOCAL_RESOURCES="port_block=20000,20250,20500,20750,21000,21250,
 common --default_test_resources=memory=3584,3584,7168,14336
 common --default_test_resources=cpu=1,1,2,4
 
-# Reserve 40GB against the local resource manager for every C++ link action. Bazel's built-in
-# estimate for CppLink is far below what linking our larger binaries actually costs, so without
-# this the scheduler runs too many links concurrently and the machine OOMs. Memory is in MB.
-common --modify_execution_info=CppLink=+resources:memory:40960
-
 # Pin down the OSS LLVM Clang version for MacOS builds.
 common:macos --repo_env=LLVM_VERSION=19
 

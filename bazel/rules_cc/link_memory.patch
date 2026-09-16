@@ -1,0 +1,63 @@
+--- a/cc/private/link/finalize_link_action.bzl
++++ b/cc/private/link/finalize_link_action.bzl
+@@ -384,7 +384,7 @@
+         inputs = inputs,
+         outputs = outputs,
+         progress_message = progress_message,
+-        resource_set = _resource_set,
++        resource_set = _resource_set_lto if feature_configuration.is_enabled("thin_lto") else _resource_set,
+         env = env,
+         use_default_shell_env = True,
+         execution_requirements = execution_info,
+@@ -459,10 +459,48 @@
+         return s
+     return s.replace("\\", "\\\\").replace("$", "\\$")
+ 
++# MongoDB: the upstream estimates below are roughly 8x low for our links, which
++# let the local scheduler run far too many at once and OOM the machine. Measured
++# peak linker RSS (cgroup v2 memory.peak over the whole link process tree; note
++# /usr/bin/time only sees the clang driver, not the mold it execs):
++#
++#   link                        inputs   output      peak   upstream estimate
++#   small shared library             5   3.4 MB    78 MB              50 MB
++#   base_test                    1,085    76 MB   326 MB              50 MB
++#   mongos                       6,225  1083 MB  4009 MB             522 MB
++#   db_repl_coordinator_test     6,726  1154 MB  4991 MB             573 MB
++#   mongod                       7,413  1547 MB  5593 MB             641 MB
++#   mongod (thin/distributed LTO)  213  2141 MB  6559 MB              50 MB
++#
++# 0.85 MB per input over a 150 MB floor covers every non-LTO link measured with
++# 1.1x-2.8x headroom. LTO is handled separately: the linker also runs codegen
++# there, so cost decouples from input count entirely - mongod under LTO has the
++# fewest inputs of anything here and the highest peak, which any input-derived
++# estimate underestimates by two orders of magnitude.
++_MONGO_LINK_MEMORY_FLOOR_MB = 150
++_MONGO_LINK_MEMORY_PER_INPUT_MB = 0.85
++
++# Covers mongod under --config=opt_profiled at 6559 MB.
++_MONGO_LTO_LINK_MEMORY_MB = 8192
++
++# MSVC's link.exe is far hungrier than mold and fails hard rather than degrading:
++# unit tests died with "LINK : fatal error LNK1102: out of memory".
++_MONGO_WINDOWS_LINK_MEMORY_MB = 40960
++
+ def _resource_set(os, inputs):
+-    if os == "osx":
+-        return {"memory": 15 + 0.05 * inputs, "cpu": 1}
++    if os == "windows":
++        return {"memory": _MONGO_WINDOWS_LINK_MEMORY_MB, "cpu": 1}
++    elif os == "osx":
++        return {"memory": max(_MONGO_LINK_MEMORY_FLOOR_MB, _MONGO_LINK_MEMORY_PER_INPUT_MB * inputs), "cpu": 1}
+     elif os == "linux":
+-        return {"memory": max(50, -100 + 0.1 * inputs), "cpu": 1}
++        return {"memory": max(_MONGO_LINK_MEMORY_FLOOR_MB, _MONGO_LINK_MEMORY_PER_INPUT_MB * inputs), "cpu": 1}
++    else:
++        return {"memory": 1500 + inputs, "cpu": 1}
++
++def _resource_set_lto(os, inputs):
++    if os == "windows":
++        return {"memory": _MONGO_WINDOWS_LINK_MEMORY_MB, "cpu": 1}
++    elif os == "osx" or os == "linux":
++        return {"memory": _MONGO_LTO_LINK_MEMORY_MB, "cpu": 1}
+     else:
+         return {"memory": 1500 + inputs, "cpu": 1}

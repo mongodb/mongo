@@ -53,6 +53,25 @@ spidermonkey_wasi_repo(
 )
 
 bazel_dep(name = "rules_cc", version = "0.2.18")
+
+# rules_cc's built-in resource estimate for link actions is roughly 8x below what
+# linking our binaries actually costs, and two orders of magnitude below an LTO
+# link, so the local scheduler runs too many at once and OOMs the machine. The
+# patch replaces that estimate with one measured against our links. See
+# bazel/rules_cc/link_memory.patch for the measurements.
+#
+# This has to be a patch rather than a build setting: resource_set is only
+# settable by whoever creates the action. Setting it from our side would mean
+# per-target exec_properties, whose "cpp_link." prefix names an exec group that
+# also covers CppArchive and CppLTOIndexing - and those are forwarded to the
+# remote executor as platform properties, which EngFlow rejects outright.
+single_version_override(
+    module_name = "rules_cc",
+    patch_strip = 1,
+    patches = ["//bazel/rules_cc:link_memory.patch"],
+    version = "0.2.18",
+)
+
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
