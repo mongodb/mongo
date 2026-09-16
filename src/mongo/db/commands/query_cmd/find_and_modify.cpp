@@ -469,10 +469,13 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     const auto stmtId = req.getStmtId().value_or(0);
     if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         if (auto entry = txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - entry->getWallClockTime());
 
             // Use a SideTransactionBlock since 'parseOplogEntryForFindAndModify' might need to
             // fetch a pre/post image from the oplog and if this is a retry inside an in-progress
