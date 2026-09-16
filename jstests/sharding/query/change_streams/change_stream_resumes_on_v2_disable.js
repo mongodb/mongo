@@ -6,6 +6,7 @@
  *
  * @tags: [
  *   assumes_balancer_off,
+ *   featureFlagChangeStreamReaderV2,
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
