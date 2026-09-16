@@ -67,7 +67,8 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
  */
 void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     bool isDbPrimaryShard = false);
+                                     bool isDbPrimaryShard = false,
+                                     bool commitAllowChunkOperations = false);
 
 /**
  * Persists collection and chunk metadata into the durable shard catalog during the setFCV

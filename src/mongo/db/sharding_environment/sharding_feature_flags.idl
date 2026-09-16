@@ -246,3 +246,15 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+    # TODO (SERVER-133881): Remove this flag once 10.0 becomes last LTS.
+    featureFlagCreateRenameNewSetAllowChunkOperationsBehavior:
+        description: >-
+            When enabled, the create and rename collection DDL coordinators commit the new
+            (splittable) collection with 'allowChunkOperations: false' and only re-enable chunk
+            operations after the critical section has been released. This prevents a chunk
+            operation from acquiring the critical section of a collection while the DDL
+            coordinator is still holding it.
+        cpp_varname: feature_flags::gCreateRenameNewSetAllowChunkOperationsBehavior
+        default: true
+        version: 9.1
+        fcv_gated: true
