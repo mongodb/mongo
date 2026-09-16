@@ -996,6 +996,74 @@ TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {
     ASSERT_EQ(stagedAndGetUsedJoinOptimization().value_or(false), true);
 }
 
+TEST(CurOpTest, JoinOptimizationFallbackReasonExposedInAllOutputs) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    BSONObj command = BSON("a" << 3);
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("myDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
+    curop->ensureStarted();
+    curop->done();
+
+    auto setFallbackReason = [&](join_ordering::JoinFallbackReason reason) {
+        curop->debug().joinOptimizationMetrics.emplace();
+        curop->debug().joinOptimizationMetrics->fallbackReason = reason;
+    };
+
+    auto appendAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        BSONObjBuilder builder;
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        auto bs = builder.done();
+        if (auto elem = bs["fallbackReason"]) {
+            return elem.String();
+        }
+        return boost::none;
+    };
+
+    auto reportAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        logv2::DynamicAttributes pAttrs;
+        Date_t deadline = opCtx->getDeadline();
+        curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
+        logv2::TypeErasedAttributeStorage attrs{pAttrs};
+        for (auto it = attrs.begin(); it != attrs.end(); ++it) {
+            if (it->name == "fallbackReason"sv) {
+                return std::string{std::get<std::string_view>(it->value)};
+            }
+        }
+        return boost::none;
+    };
+
+    auto stagedAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        auto fn =
+            OpDebug::appendStaged(opCtx.get(), {"fallbackReason"}, false /*needWholeDocument*/);
+        OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
+        BSONObj result = fn(args);
+        if (auto elem = result["fallbackReason"]) {
+            return elem.String();
+        }
+        return boost::none;
+    };
+
+    ASSERT_FALSE(appendAndGetFallbackReason().has_value());
+    ASSERT_FALSE(reportAndGetFallbackReason().has_value());
+    ASSERT_FALSE(stagedAndGetFallbackReason().has_value());
+
+    setFallbackReason(join_ordering::JoinFallbackReason::kGraphDisconnected);
+    ASSERT_EQ(appendAndGetFallbackReason().value_or(""), "graphDisconnected");
+    ASSERT_EQ(reportAndGetFallbackReason().value_or(""), "graphDisconnected");
+    ASSERT_EQ(stagedAndGetFallbackReason().value_or(""), "graphDisconnected");
+}
+
 TEST(CurOpTest, UsedJoinOptimizationPropagatedFromPlanSummaryStats) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

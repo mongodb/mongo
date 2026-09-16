@@ -318,6 +318,11 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromMultiPlanner", additiveMetrics.fromMultiPlanner);
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
     OPDEBUG_TOATTR_HELP_BOOL_NAMED("usedJoinOptimization", usedJoinOptimization);
+    if (const auto& joinMetrics = joinOptimizationMetrics) {
+        if (const auto& reason = joinMetrics->fallbackReason) {
+            pAttrs->addDeepCopy("fallbackReason", join_ordering::toReasonName(*reason));
+        }
+    }
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_TOATTR_HELP_BOOL(replanned);
@@ -628,6 +633,11 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_BOOL2(b, "failedPlanningWithQuerySettings", failedPlanningWithQuerySettings);
     OPDEBUG_APPEND_BOOL2(b, "fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
     OPDEBUG_APPEND_BOOL2(b, "usedJoinOptimization", usedJoinOptimization);
+    if (const auto& joinMetrics = joinOptimizationMetrics) {
+        if (const auto& reason = joinMetrics->fallbackReason) {
+            b.append("fallbackReason", join_ordering::toReasonName(*reason));
+        }
+    }
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_APPEND_BOOL(b, replanned);
@@ -1002,6 +1012,13 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
     });
     addIfNeeded("usedJoinOptimization", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_BOOL2(b, field, args.op.usedJoinOptimization);
+    });
+    addIfNeeded("fallbackReason", [](auto field, auto args, auto& b) {
+        if (const auto& joinMetrics = args.op.joinOptimizationMetrics) {
+            if (const auto& reason = joinMetrics->fallbackReason) {
+                b.append(field, join_ordering::toReasonName(*reason));
+            }
+        }
     });
     addIfNeeded("replanned", [](auto field, auto args, auto& b) {
         if (args.op.replanReason) {

@@ -128,6 +128,12 @@ describe("plan summary for join plans", function () {
                 `Expected fromPlanCache to equal ${shape.fromPlanCache}`,
                 entry,
             );
+            assert.eq(
+                entry.fallbackReason,
+                shape.fallbackReason,
+                `Expected fallbackReason to equal ${shape.fallbackReason}`,
+                entry,
+            );
 
             this.assertSlowLogShape(shape);
         };
@@ -150,6 +156,26 @@ describe("plan summary for join plans", function () {
             planSummary,
             usedJoinOptimization: true,
             fromPlanCache: true,
+        });
+
+        // Now repeat for where we end the prefix early & log the reason. Should reuse plan cache.
+        const pipeline = [
+            ...this.singleJoinPipeline,
+            {
+                $lookup: {
+                    from: this.foreign2.getName(),
+                    as: "f2",
+                    localField: "b",
+                    foreignField: "b",
+                },
+            },
+            {$unwind: {path: "$f2", preserveNullAndEmptyArrays: true}},
+        ];
+        this.assertProfilerAndSlowLogForPipeline(pipeline, {
+            planSummary: `HJ( f1 = ( COLLSCAN [${foreign1}] ), _ = ( COLLSCAN [${local}] ) ), IXSCAN { b: 1, d: 1 }`,
+            usedJoinOptimization: true,
+            fromPlanCache: true,
+            fallbackReason: "outerJoinUnwind",
         });
     });
 
@@ -178,6 +204,23 @@ describe("plan summary for join plans", function () {
         this.assertProfilerAndSlowLogForPipeline(pipeline, {
             planSummary,
             fromPlanCache: true,
+        });
+    });
+
+    it("logs the fallback reason when a query falls back from join optimization", function () {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: this.foreign1.getName(),
+                    pipeline: [{$match: {a: {$gte: 0}}}],
+                    as: "f1",
+                },
+            },
+            {$unwind: "$f1"},
+        ];
+        this.assertProfilerAndSlowLogForPipeline(pipeline, {
+            planSummary: "COLLSCAN",
+            fallbackReason: "graphDisconnected",
         });
     });
 });
