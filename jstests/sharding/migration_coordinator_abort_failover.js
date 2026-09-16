@@ -5,9 +5,6 @@
  * @tags [requires_fcv_71]
  */
 
-// This test induces failovers on shards.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {
     runMoveChunkMakeDonorStepDownAfterFailpoint
 } from "jstests/sharding/migration_coordinator_failover_include.js";

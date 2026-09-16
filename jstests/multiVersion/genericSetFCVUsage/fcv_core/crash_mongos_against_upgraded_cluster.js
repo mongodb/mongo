@@ -7,8 +7,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 function runTest(downgradeVersion) {
     jsTestLog("Running test with downgradeVersion: " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);

@@ -3,7 +3,6 @@
 // not the shell detects the new primary before issuing the command is nondeterministic, skip the
 // consistency check for this test.
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";

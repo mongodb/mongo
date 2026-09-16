@@ -13,7 +13,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 // Do not check metadata consistency as mongos is stopped for testing purposes.
 TestData.skipCheckMetadataConsistency = true;
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 let path = "jstests/libs/";
 let pemKeyFile = path + "server.pem";

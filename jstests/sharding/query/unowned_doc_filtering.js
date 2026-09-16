@@ -7,9 +7,6 @@
  * @tags: [requires_persistence]
  */
 
-// This test shuts down shards.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Test deliberately inserts orphans.
 TestData.skipCheckOrphans = true;
 

@@ -7,7 +7,6 @@ import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Checking UUID consistency involves talking to shards, but this test shuts down shards.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 

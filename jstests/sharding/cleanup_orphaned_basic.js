@@ -6,9 +6,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// This test restarts a shard.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
     /*****************************************************************************

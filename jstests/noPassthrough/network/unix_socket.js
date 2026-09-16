@@ -34,7 +34,6 @@ TestData.ignoreUnterminatedProcesses = true;
 // Do not check metadata or UUID consistency as it would require a connection to the mongos and this
 // is bound to a specific socket for testing purposes.
 TestData.skipCheckMetadataConsistency = true;
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 let doesLogMatchRegex = function (logArray, regex) {
     for (let i = logArray.length - 1; i >= 0; i--) {

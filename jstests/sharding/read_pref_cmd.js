@@ -26,7 +26,6 @@ const allowedOnSecondary = Object.freeze({kNever: 0, kAlways: 1});
 
 // Checking UUID and index consistency involves reading from the config server through mongos, but
 // this test sets an invalid readPreference on the connection to the mongos.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 /**

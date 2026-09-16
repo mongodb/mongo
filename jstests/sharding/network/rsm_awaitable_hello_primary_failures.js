@@ -9,7 +9,6 @@
 
 // Checking UUID consistency and orphans involves talking to a shard node, which in this test is
 // shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

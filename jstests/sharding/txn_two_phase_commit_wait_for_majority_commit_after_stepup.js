@@ -5,10 +5,6 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
-// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
-// test causes failovers on a shard, so the cached connection is not usable.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {stopServerReplication, restartReplSetReplication} from "jstests/libs/write_concern_util.js";

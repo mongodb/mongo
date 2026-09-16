@@ -23,8 +23,6 @@
  * ]
  */
 
-// Restarts cause issues with authentication for awaiting replication.
-TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 // Restarts shard nodes with no keyFile.
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

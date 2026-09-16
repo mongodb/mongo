@@ -18,8 +18,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Helper to add generic txn fields to a command.
 function addTxnFieldsToCmd(cmd, lsid, txnNumber) {
     return Object.extend(cmd, {

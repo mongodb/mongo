@@ -8,8 +8,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

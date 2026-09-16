@@ -11,9 +11,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
 for (let test = 0; test < 2; test++) {
     let killWith = test == 0 ? 15 : 9;

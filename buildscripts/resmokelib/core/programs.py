@@ -573,11 +573,6 @@ def mongo_shell_program(
         'await import("jstests/libs/override_methods/validate_collections_on_shutdown.js")'
     )
 
-    # Load a callback to check UUID consistency before shutting down a ShardingTest.
-    eval_sb.append(
-        'await import("jstests/libs/override_methods/check_uuids_consistent_across_cluster.js")'
-    )
-
     # Load a callback to check index consistency before shutting down a ShardingTest.
     eval_sb.append(
         'await import("jstests/libs/override_methods/check_indexes_consistent_across_cluster.js")'

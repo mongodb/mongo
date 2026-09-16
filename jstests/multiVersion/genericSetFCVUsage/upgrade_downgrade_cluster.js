@@ -13,13 +13,6 @@ import {
 } from "jstests/multiVersion/libs/upgrade_downgrade_cluster_shared.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
-// When checking UUID consistency, the shell attempts to run a command on the node it believes is
-// primary in each shard. However, this test restarts shards, and the node that is elected primary
-// after the restart may be different from the original primary. Since the shell does not retry on
-// NotWritablePrimary errors, and whether or not it detects the new primary before issuing the
-// command is nondeterministic, skip the consistency check for this test.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Test upgrade/downgrade between "latest" and "last-lts"/"last-continuous".
 for (let oldVersion of ["last-lts", "last-continuous"]) {
     let st = new ShardingTest({

@@ -6,7 +6,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // Test deliberately keeps range deletion in pending state.
 TestData.skipCheckOrphans = true;
 

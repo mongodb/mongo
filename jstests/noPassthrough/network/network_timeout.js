@@ -13,7 +13,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Skip various checks that require talking to shard primaries (a primary is dropped as part
 // of the test).
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

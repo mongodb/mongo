@@ -7,10 +7,6 @@
  * ]
  */
 
-// Checking UUID consistency uses cached connections, which are not valid across restarts or
-// stepdowns.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {ChangeStreamWatchMode, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -14,7 +14,6 @@ import {stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // The following checks use connections to shards cached on the ShardingTest object, but this test
 // restarts a shard, so the cached connection is not usable.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 let st = new ShardingTest({

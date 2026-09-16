@@ -8,7 +8,6 @@ import {reconfig, reconnect} from "jstests/replsets/rslib.js";
 
 // Skip the following checks since the removed node has wrong config and is still alive.
 TestData.skipCheckDBHashes = true;
-TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 let NODE_COUNT = 3;

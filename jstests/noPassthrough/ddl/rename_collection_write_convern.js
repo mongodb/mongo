@@ -2,7 +2,6 @@
 // node.
 
 // The following checks involve talking to a shard node, which in this test is shutdown.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckMetadataConsistency = true;

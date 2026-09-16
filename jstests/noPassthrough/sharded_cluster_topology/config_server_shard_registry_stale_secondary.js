@@ -14,7 +14,6 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 
 // Skip consistency checks that read from the config server, since this test intentionally degrades
 // the config RS by stopping replication and killing members.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;

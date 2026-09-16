@@ -6,9 +6,6 @@
  * not.
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 function assertBinVersionsEqual(v1, v2) {
     assert(
         MongoRunner.areBinVersionsTheSame(v1, v2),

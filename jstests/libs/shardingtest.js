@@ -217,7 +217,6 @@ export class ShardingTest {
 
     stop(opts = {}) {
         this.checkMetadataConsistency();
-        this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
         this.checkRoutingTableConsistency();
@@ -2058,10 +2057,6 @@ export class ShardingTest {
 ShardingTest.prototype.checkMetadataConsistency = function() {
     jsTest.log.info("Unhooked checkMetadataConsistency function");
 };
-
-// Stub for a hook to check that collection UUIDs are consistent across shards and the config
-// server.
-ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {};
 
 // Stub for a hook to check that indexes are consistent across shards.
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};

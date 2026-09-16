@@ -19,7 +19,6 @@ TestData.disableImplicitSessions = true;
 TestData.skipGossipingClusterTime = true;
 
 // Skip the following checks across the cluster at the end, since the test shuts down a shard.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 

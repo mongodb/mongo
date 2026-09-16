@@ -15,7 +15,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The following checks involve talking to shard primaries, as by the end of this test, one shard
 // does not have a primary.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
