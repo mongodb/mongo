@@ -413,6 +413,12 @@ TEST(SerializeExtendedJsonUtilsTest, DeserializeFailsWithConversionFailureOnInva
     }
 }
 
+TEST(SerializeExtendedJsonUtilsTest, DeserializeEmptyFieldName) {
+    auto input = Value(BSON("" << 1));
+    auto output = deserializeFromExtendedJson(input);
+    ASSERT_VALUE_EQ(input, output);
+}
+
 TEST(SerializeExtendedJsonUtilsTest, DeserializeThrowsOnMissingValues) {
     ASSERT_THROWS_CODE(deserializeFromExtendedJson(Value()), DBException, ErrorCodes::BadValue);
 }
