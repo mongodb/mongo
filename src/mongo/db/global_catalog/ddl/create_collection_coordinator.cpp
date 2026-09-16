@@ -1350,21 +1350,6 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
 }
 
-// TODO (SERVER-133881): without the feature flag check, this function reduces to just checking
-// `isUnsplittable`, so just remove the function as it doesn't make much sense anymore.
-bool shouldDisallowChunkOperations(OperationContext* opCtx, bool isUnsplittable) {
-    if (!feature_flags::gCreateRenameNewSetAllowChunkOperationsBehavior.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return false;
-    }
-
-    // Chunk operations are disallowed on unsplittable collections, there is no need to explicitly
-    // block them with `allowChunkOperations: false`. Not doing it saves an `allowChunkOperations:
-    // true` command later.
-    return !isUnsplittable;
-}
-
 /**
  * Does the following writes:
  * 1. Replaces the config.chunks entries for the new collection;
@@ -1381,8 +1366,7 @@ void commit(OperationContext* opCtx,
             const NamespaceString& nss,
             const std::set<ShardId>& shardsHoldingData,
             const TranslatedRequestParams& translatedRequestParams,
-            std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder,
-            AuthoritativeMetadataAccessLevelEnum authMetadataAccessLevel) {
+            std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
     if (MONGO_unlikely(nss == NamespaceString::kLogicalSessionsNamespace)) {
@@ -1404,12 +1388,8 @@ void commit(OperationContext* opCtx,
                                Date_t::now(),
                                *collectionUUID,
                                translatedRequestParams.getKeyPattern());
-
-    auto const unsplittable = isUnsplittable(request);
-
-    if (unsplittable) {
-        coll.setUnsplittable(unsplittable);
-    }
+    if (isUnsplittable(request))
+        coll.setUnsplittable(isUnsplittable(request));
 
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
@@ -1423,10 +1403,6 @@ void commit(OperationContext* opCtx,
 
     if (request.getUnique()) {
         coll.setUnique(*request.getUnique());
-    }
-
-    if (shouldDisallowChunkOperations(opCtx, unsplittable)) {
-        coll.setAllowChunkOperations(false);
     }
 
     auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
@@ -2267,17 +2243,15 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
         involvedShards.emplace(chunk.getShard());
     }
 
-    commit(
-        opCtx,
-        **executor,
-        _request,
-        _initialChunks,
-        _uuid,
-        nss(),
-        involvedShards,
-        *_doc.getTranslatedRequestParams(),
-        [this](OperationContext* opCtx) { return getNewSession(opCtx); },
-        _doc.getAuthoritativeMetadataAccessLevel());
+    commit(opCtx,
+           **executor,
+           _request,
+           _initialChunks,
+           _uuid,
+           nss(),
+           involvedShards,
+           *_doc.getTranslatedRequestParams(),
+           [this](OperationContext* opCtx) { return getNewSession(opCtx); });
     const auto& commitTime = _initialChunks->chunks.back().getVersion().getTimestamp();
     _notifyChangeStreamReadersOnPlacementChanged(opCtx, commitTime, executor, token);
 
@@ -2425,20 +2399,6 @@ void CreateCollectionCoordinator::_exitCriticalSection(
                                       _firstExecution /* throwIfReasonDiffers */,
                                       _critSecReason,
                                       originalNss());
-
-    if (shouldDisallowChunkOperations(opCtx, isUnsplittable(_request))) {
-        // The commit creates the collection with allowChunkOperations set to false. After the
-        // critical section is released, we need to enable chunk operations.
-        if (!_firstExecution && !_uuid) {
-            _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-        }
-        sharding_ddl_util::resumeMigrations(
-            opCtx,
-            nss(),
-            _uuid,
-            [&] { return getNewSession(opCtx); },
-            _doc.getAuthoritativeMetadataAccessLevel());
-    }
 }
 
 ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(

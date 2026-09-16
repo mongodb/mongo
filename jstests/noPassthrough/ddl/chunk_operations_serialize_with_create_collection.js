@@ -1,13 +1,11 @@
 /**
- * Checks that splitChunk, mergeChunks and mergeAllChunksOnShard fail with
- * ConflictingOperationInProgress while a create collection DDL coordinator still holds the critical
- * section (parked on the createCollectionHangBeforeExitCriticalSection failpoint). The create
- * coordinator commits the new collection with `allowChunkOperations: false` and only re-enables
- * chunk operations after releasing the critical section, so no chunk operation may commit in
- * between, and all of them must be accepted again once the critical section has been released.
+ * Checks that splitChunk, mergeChunks and mergeAllChunksOnShard serialize with a concurrent create
+ * collection DDL coordinator. While the create coordinator still holds the critical section (parked
+ * on the createCollectionHangBeforeExitCriticalSection failpoint) no chunk operation may commit,
+ * and each of them must complete successfully once the critical section is released.
  *
  * @tags: [
- *   featureFlagCreateRenameNewSetAllowChunkOperationsBehavior,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPoint, configureFailPointForRS} from "jstests/libs/fail_point_util.js";
@@ -85,17 +83,21 @@ describe("chunk operations serialize with the create collection critical section
         this.countChunks = (ns) =>
             findChunksUtil.findChunksByNs(this.st.s.getDB("config"), ns).itcount();
 
+        this.chunkBounds = (ns) =>
+            findChunksUtil
+                .findChunksByNs(this.st.s.getDB("config"), ns)
+                .sort({min: 1})
+                .toArray()
+                .map((chunk) => [chunk.min.x, chunk.max.x]);
+
         /**
          * Parks a `shardCollection` on `this.ns` right before it exits the critical section, runs
          * `chunkOpCmd` through mongos while the critical section is still held, and asserts that:
-         *   - the chunk operation fails with ConflictingOperationInProgress without altering the
-         *     chunk layout, and
-         *   - chunk operations are accepted again once the critical section has been released.
-         *
-         * The chunk operation is run synchronously from this shell: it is expected to fail fast
-         * rather than block, which is what makes the test deterministic (no sleeping involved).
+         *   - the chunk operation does not commit while the critical section is held, and
+         *   - it completes successfully once the critical section is released, leaving
+         *     `expectedNumChunksAfterwards` chunks behind.
          */
-        this.assertRejectedByCreateCriticalSection = (chunkOpCmd, expectedNumChunksAfterwards) => {
+        this.assertSerializesWithCreate = (chunkOpCmd, expectedNumChunksAfterwards) => {
             const hangCreate = configureFailPoint(
                 this.st.rs0.getPrimary(),
                 "createCollectionHangBeforeExitCriticalSection",
@@ -108,10 +110,17 @@ describe("chunk operations serialize with the create collection critical section
                 this.st.s.port,
             );
 
+            let chunkOpShell = undefined;
+
             try {
                 hangCreate.wait();
 
                 assert.eq(kNumInitialChunks, this.countChunks(this.ns));
+                assert.eq(
+                    kInitialChunkBounds,
+                    this.chunkBounds(this.ns),
+                    "unexpected initial chunk layout, the test's split/merge bounds are stale",
+                );
 
                 // The zones have served their purpose. Drop them now that the chunks exist:
                 // mergeAllChunksOnShard never merges across zone boundaries, and with one zone per
@@ -119,11 +128,18 @@ describe("chunk operations serialize with the create collection critical section
                 // is unaffected by the critical section held on the shard.
                 this.removeZoneRanges(this.ns);
 
-                assert.commandFailedWithCode(
-                    this.st.s.adminCommand(chunkOpCmd),
-                    ErrorCodes.ConflictingOperationInProgress,
+                chunkOpShell = startParallelShell(
+                    funWithArgs(function (cmd) {
+                        // TODO (SERVER-133735): with setAllowChunkOperations: false, the chunk
+                        // operations will likely fail instead of serializing.
+                        assert.commandWorked(db.adminCommand(cmd));
+                    }, chunkOpCmd),
+                    this.st.s.port,
                 );
 
+                // The chunk operation must wait for the critical section instead of committing or
+                // giving up.
+                sleep(kBlockedWindowMS);
                 assert.eq(
                     kNumInitialChunks,
                     this.countChunks(this.ns),
@@ -132,10 +148,13 @@ describe("chunk operations serialize with the create collection critical section
             } finally {
                 hangCreate.off();
                 createShell();
+                if (chunkOpShell) {
+                    chunkOpShell();
+                }
             }
 
-            // After create finishes, the chunk operation does work.
-            assert.commandWorked(this.st.s.adminCommand(chunkOpCmd));
+            // TODO (SERVER-133735): with setAllowChunkOperations: false, the chunk operations will
+            // likely fail instead of serializing.
             assert.eq(expectedNumChunksAfterwards, this.countChunks(this.ns));
         };
     });
@@ -173,31 +192,24 @@ describe("chunk operations serialize with the create collection critical section
             this.st.s.getDB(this.dbName).runCommand({drop: this.collName}),
             ErrorCodes.NamespaceNotFound,
         );
+        // No-op unless the test bailed out before the helper removed them.
+        this.removeZoneRanges(this.ns);
     });
 
-    it("rejects splitChunk while the create collection critical section is held", () => {
-        this.assertRejectedByCreateCriticalSection(
-            {split: this.ns, middle: {x: 5}},
-            kNumInitialChunks + 1,
-        );
+    it("serializes splitChunk with the create collection critical section", () => {
+        this.assertSerializesWithCreate({split: this.ns, middle: {x: 5}}, kNumInitialChunks + 1);
     });
 
-    it("rejects mergeChunks while the create collection critical section is held", () => {
-        this.assertRejectedByCreateCriticalSection(
-            {
-                mergeChunks: this.ns,
-                bounds: [{x: 0}, {x: 20}],
-            },
+    it("serializes mergeChunks with the create collection critical section", () => {
+        this.assertSerializesWithCreate(
+            {mergeChunks: this.ns, bounds: [{x: 0}, {x: 20}]},
             kNumInitialChunks - 1,
         );
     });
 
-    it("rejects mergeAllChunksOnShard while the create collection critical section is held", () => {
-        this.assertRejectedByCreateCriticalSection(
-            {
-                mergeAllChunksOnShard: this.ns,
-                shard: this.st.shard0.shardName,
-            },
+    it("serializes mergeAllChunksOnShard with the create collection critical section", () => {
+        this.assertSerializesWithCreate(
+            {mergeAllChunksOnShard: this.ns, shard: this.st.shard0.shardName},
             1,
         );
     });
