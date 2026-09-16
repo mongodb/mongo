@@ -120,8 +120,6 @@ last-continuous:
       ticket: SERVER-125555
     - test_file: jstests/core/query/where/where_system_js.js
       ticket: SERVER-130167
-    - test_file: jstests/core/repro/dbcase2.js
-      ticket: SERVER-95530
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/query/timeseries_explain_delete.js
@@ -515,8 +513,6 @@ last-lts:
       ticket: SERVER-103960
     - test_file: jstests/core/query/where/where_system_js.js
       ticket: SERVER-130167
-    - test_file: jstests/core/repro/dbcase2.js
-      ticket: SERVER-95530
     - test_file: jstests/core/sparse_index_supports_ne_null.js
       ticket: SERVER-37164
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
