@@ -40,7 +40,6 @@ rollout:
   featureFlagSbeTransformStages: {}
 
 release:
-  featureFlagChangeStreamOptimizedUpdateLookup: {}
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}
