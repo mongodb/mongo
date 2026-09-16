@@ -16,6 +16,7 @@
 #include "mongo/util/shared_buffer.h"
 
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
@@ -448,13 +449,20 @@ public:
     /**
      * See `StorageEngine::setStepDownTimestamp`
      */
-    virtual void setStepDownTimestamp(Timestamp stepDownTimestamp) {}
+    virtual void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) {}
 
     /**
      * See `StorageEngine::getStepDownTimestamp`
      */
     virtual Timestamp getStepDownTimestamp() const {
         return Timestamp();
+    }
+
+    /**
+     * See `StorageEngine::lockStepDown`
+     */
+    virtual std::unique_lock<std::mutex> lockStepDown() {
+        return {};
     }
 
     /**

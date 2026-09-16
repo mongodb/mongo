@@ -525,6 +525,13 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                     return Status(ErrorCodes::ObjectIsBusy,
                                   "skipCompletingReplicatedPrimaryIdentDrop failpoint enabled");
                 }
+
+                // We cannot handle the case where the stepdown cutoff is set in between when we
+                // drop a table and when we commit, as we can't roll back the drop but we also can't
+                // replicate the drop at the correct timestamp. As a result we must block setting
+                // the stepdown cutoff for the entire drop process.
+                auto stepdownLock = _engine->lockStepDown();
+
                 try {
                     WriteUnitOfWork wuow(opCtx);
                     repl::OpTime reservedIdentDropTimestamp;

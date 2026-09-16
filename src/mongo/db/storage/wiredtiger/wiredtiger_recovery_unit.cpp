@@ -146,8 +146,6 @@ void WiredTigerRecoveryUnit::_validateTableTimestamps(WiredTigerKVEngineBase* kv
                         "table created after the stepdown epoch was set cannot "
                         "publish at or below it");
                 break;
-            case StepdownState::invalid:
-                throwWriteConflictException("stepdown timestamp changed while creating a table");
         }
     }
 }
