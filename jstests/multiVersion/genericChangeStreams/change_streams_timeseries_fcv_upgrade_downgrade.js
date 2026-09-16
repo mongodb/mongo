@@ -5,6 +5,7 @@
 //   requires_replication,
 //   requires_timeseries,
 //   featureFlagChangeStreamPreciseShardTargeting,
+//   featureFlagChangeStreamReaderV2,
 //   requires_fcv_90,
 // ]
 

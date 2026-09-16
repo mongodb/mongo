@@ -14,6 +14,7 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   featureFlagChangeStreamReaderV2,
  *   tsan_incompatible,
  *   incompatible_aubsan,
  *   requires_fcv_90,

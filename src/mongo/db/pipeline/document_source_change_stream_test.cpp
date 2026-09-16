@@ -562,6 +562,8 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -684,6 +686,8 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForAllDatabasesC
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -706,6 +710,8 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForDatabaseLevel
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -726,6 +732,8 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
     // Intentionally set the global 'ChangeStreamReaderBuilder' instance to a nullptr.
@@ -748,6 +756,8 @@ DEATH_TEST_REGEX_F(
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     // Intentionally set the global 'DataToShardsAllocationQueryService' instance to a nullptr.
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(nullptr);
@@ -767,6 +777,8 @@ DEATH_TEST_REGEX_F(
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -814,6 +826,8 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterForSupportedEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -863,6 +877,8 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForDataShard) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -4391,6 +4407,8 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -4426,6 +4444,8 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5636,6 +5656,8 @@ TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5666,6 +5688,8 @@ TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5695,6 +5719,8 @@ TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5749,6 +5775,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5804,6 +5832,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5865,6 +5895,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5925,6 +5957,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5980,6 +6014,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(

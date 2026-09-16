@@ -8,6 +8,7 @@
  *   requires_sharding,
  *   uses_change_streams,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   featureFlagChangeStreamReaderV2,
  *   requires_fcv_90,
  * ]
  */
