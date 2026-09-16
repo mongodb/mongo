@@ -1292,6 +1292,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "pipelined_applier_batch_tracker",
+    srcs = [
+        "pipelined_applier_batch_tracker.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_batch_tracker.h",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+        "//src/mongo/stdx",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
     name = "pipelined_oplog_applier",
     srcs = [
         "pipelined_applier_worker_pool.cpp",
@@ -1308,6 +1324,7 @@ mongo_cc_library(
         ":oplog_application",
         ":oplog_application_interface",
         ":oplog_entry",
+        ":pipelined_applier_batch_tracker",
         ":repl_coordinator_interface",
         ":storage_interface",
         "//src/mongo:base",
@@ -2208,6 +2225,21 @@ mongo_cc_unit_test(
         "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/unittest",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipelined_applier_batch_tracker_test",
+    srcs = [
+        "pipelined_applier_batch_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":pipelined_applier_batch_tracker",
+        "//src/mongo:base",
+        "//src/mongo/stdx",
+        "//src/mongo/unittest",
+        "//src/mongo/util:fail_point",
     ],
 )
 

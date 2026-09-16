@@ -38,6 +38,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -122,14 +123,25 @@ protected:
     // Consumes the items on a single production worker thread, in order, and waits for it to
     // finish.
     void consumeOnWorker(const OplogApplier::Options& options, std::vector<WorkItem> items) {
+        PipelinedApplierBatchTracker tracker;
         PipelinedApplierWorkerPool pool(1 /* numWorkers */,
                                         [&](size_t workerIdx, const WorkItem& item) {
-                                            consumeWorkItem(workerIdx, options, item);
+                                            consumeWorkItem(workerIdx, options, item, tracker);
                                         });
         for (auto& item : items) {
+            item.batchRemainingWorkers = tracker.addBatch(
+                item.ops.empty() ? OpTimeAndWallTime{}
+                                 : OpTimeAndWallTime{item.ops.back().getOpTime(),
+                                                     item.ops.back().getWallClockTime()},
+                1);
             pool.enqueue(0, std::move(item));
         }
         pool.shutdownAndJoin();
+        // Every successfully consumed item completes its batch exactly once.
+        for (size_t i = 0; i < items.size(); ++i) {
+            ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
+        }
+        ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
     }
 
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_apply");
@@ -172,7 +184,7 @@ TEST_F(PipelinedWorkItemTest, GroupsConsecutiveInsertsOnTheSameCollection) {
     ASSERT_EQ(countDocs(kNss), 3);
 }
 
-TEST_F(PipelinedWorkItemTest, RetriesWriteConflicts) {
+TEST_F(PipelinedWorkItemTest, WriteConflictRetryCompletesBatchOnce) {
     createCollectionWithUuid(_opCtx.get(), kNss);
     const auto options = secondaryOptions();
 
@@ -184,7 +196,7 @@ TEST_F(PipelinedWorkItemTest, RetriesWriteConflicts) {
             }
         };
 
-    ASSERT_OK(applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))})));
+    consumeOnWorker(options, {makeItem({insertOp(kNss, BSON("_id" << 0))})});
 
     ASSERT_EQ(insertAttempts, 2);
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0)));
@@ -290,6 +302,94 @@ TEST_F(PipelinedWorkItemTest, WorkerAppliesItemsInFifoOrder) {
 
     ASSERT_EQ(countDocs(kNss), 1);
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0 << "a" << 1)));
+}
+
+TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto item = makeItem({insertOp(kNss, BSON("_id" << 0)), deleteOp(kNss, BSON("_id" << 0))});
+    PipelinedApplierBatchTracker tracker;
+    const OpTimeAndWallTime lastOpTime{item.ops.back().getOpTime(),
+                                       item.ops.back().getWallClockTime()};
+    auto counter = tracker.addBatch(lastOpTime, 1);
+    item.batchRemainingWorkers = counter;
+    Notification<void> reached;
+    Notification<void> release;
+    _opObserver->onDeleteFn = [&](OperationContext*,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        if (!reached) {
+            reached.set();
+        }
+        release.get();
+    };
+    PipelinedApplierWorkerPool pool(1, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!release) {
+            release.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(item));
+
+    // If reached is set, the applier has processed the delete operation, but is waiting on release
+    // to be set.
+    ASSERT_TRUE(reached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    release.set();
+    // The pool will wait on the worker completing its work item.
+    pool.shutdownAndJoin();
+
+    auto completed = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime, lastOpTime);
+    ASSERT_EQ(counter->load(), 0);
+    ASSERT_EQ(countDocs(kNss), 0);
+}
+
+TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto item = makeItem({insertOp(kNss, BSON("_id" << 0))});
+    auto peer = makeItem({insertOp(kNss, BSON("_id" << 1))});
+    auto later = makeItem({insertOp(kNss, BSON("_id" << 2))});
+    PipelinedApplierBatchTracker tracker;
+    // item and peer are slices of the first batch, so they share a counter initialized to two
+    // workers.
+    auto counter =
+        tracker.addBatch({peer.ops.back().getOpTime(), peer.ops.back().getWallClockTime()}, 2);
+    item.batchRemainingWorkers = counter;
+    peer.batchRemainingWorkers = counter;
+    // later belongs to a second batch that only needs one worker to finish.
+    auto laterCounter =
+        tracker.addBatch({later.ops.back().getOpTime(), later.ops.back().getWallClockTime()}, 1);
+    later.batchRemainingWorkers = laterCounter;
+    // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
+    // finish.
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    PipelinedApplierWorkerPool pool(2, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
+    });
+    // Worker 0 abandons item, while worker 1 applies peer and then later.
+    pool.enqueue(0, std::move(item));
+    pool.enqueue(1, std::move(peer));
+    pool.enqueue(1, std::move(later));
+    // Wait until both workers have finished handling their queued items.
+    pool.shutdownAndJoin();
+
+    // Only peer decremented the first batch's counter; the abandoned item must leave it at one.
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_EQ(laterCounter->load(), 0);
+    // The completed second batch cannot be popped ahead of the incomplete first batch.
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
 }
 
 using PipelinedWorkItemDeathTest = PipelinedWorkItemTest;

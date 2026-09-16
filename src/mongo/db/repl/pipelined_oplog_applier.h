@@ -9,6 +9,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/pipelined_applier_batch_tracker.h"
 #include "mongo/db/repl/pipelined_applier_worker_pool.h"
 #include "mongo/db/repl/pipelined_op_router.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -56,6 +57,9 @@ private:
     ReplicationCoordinator* const _replCoord;
     StorageInterface* const _storageInterface;
 
+    // Tracks dispatched batches in FIFO order and signals when their workers finish.
+    PipelinedApplierBatchTracker _batchTracker;
+
     // Persistent worker threads that consume dispatched work items.
     PipelinedApplierWorkerPool _workerPool;
 
@@ -76,6 +80,7 @@ private:
  */
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
-                     const PipelinedApplierWorkerPool::WorkItem& item);
+                     const PipelinedApplierWorkerPool::WorkItem& item,
+                     PipelinedApplierBatchTracker& batchTracker);
 
 }  // namespace mongo::repl

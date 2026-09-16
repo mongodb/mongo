@@ -16,6 +16,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -49,7 +50,7 @@ PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
       _storageInterface(storageInterface),
       _workerPool(numWorkers,
                   [this](size_t workerIdx, const PipelinedApplierWorkerPool::WorkItem& item) {
-                      consumeWorkItem(workerIdx, getOptions(), item);
+                      consumeWorkItem(workerIdx, getOptions(), item, _batchTracker);
                   }),
       _router(numWorkers) {}
 
@@ -123,6 +124,9 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
     using OpClass = PipelinedOpRouter::OpClass;
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
     const size_t numWorkers = _workerPool.numWorkers();
+    invariant(!ops.empty());
+    // Preserve the original batch boundary before expansion can remove the final entry.
+    const OpTimeAndWallTime lastOpTime{ops.back().getOpTime(), ops.back().getWallClockTime()};
 
     // Packed container ops write several keys in one entry; hashing the whole entry would not
     // agree with the hash of any single key, so a packed op and a later op on one of its keys
@@ -135,6 +139,8 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
     std::vector<std::pair<size_t, OplogEntry*>> routedOps;
     routedOps.reserve(ops.size());
     std::vector<std::vector<OplogEntry>> derivedOps;
+    // opsPerWorker tracks the number of ops a particular worker will receive. The index corresponds
+    // to the worker thread.
     std::vector<size_t> opsPerWorker(numWorkers, 0);
     auto route = [&](OplogEntry* op) {
         auto workerIdx = _router.selectWorker(opCtx, op);
@@ -170,8 +176,14 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
         items[workerIdx].ops.push_back(std::move(*op));
     }
 
+    // Count worker slices assigned ops in this batch, as not all workers may have received ops.
+    const auto participatingWorkers = std::count_if(
+        opsPerWorker.begin(), opsPerWorker.end(), [](size_t count) { return count != 0; });
+    auto remainingWorkers =
+        _batchTracker.addBatch(lastOpTime, static_cast<uint32_t>(participatingWorkers));
     for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
         if (!items[workerIdx].ops.empty()) {
+            items[workerIdx].batchRemainingWorkers = remainingWorkers;
             _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
         }
     }
@@ -205,8 +217,10 @@ Status applyWorkItem(OperationContext* opCtx,
 
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
-                     const PipelinedApplierWorkerPool::WorkItem& item) {
+                     const PipelinedApplierWorkerPool::WorkItem& item,
+                     PipelinedApplierBatchTracker& batchTracker) {
     invariant(!item.ops.empty());
+    invariant(item.batchRemainingWorkers);
     Status status = Status::OK();
     try {
         auto opCtx = cc().makeOperationContext();
@@ -216,6 +230,7 @@ void consumeWorkItem(size_t workerIdx,
         status = ex.toStatus();
     }
     if (MONGO_likely(status.isOK())) {
+        batchTracker.onWorkerCompletion(item.batchRemainingWorkers);
         return;
     }
     // A global-shutdown interrupt abandons the item unapplied; lastApplied stays below this

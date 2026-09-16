@@ -9,9 +9,12 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <vector>
 
 namespace mongo::repl {
@@ -35,6 +38,7 @@ public:
      */
     struct WorkItem {
         std::vector<OplogEntry> ops;
+        std::shared_ptr<std::atomic<uint32_t>> batchRemainingWorkers;
     };
 
     /**
