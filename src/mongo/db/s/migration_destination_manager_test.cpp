@@ -478,6 +478,21 @@ TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkMergedSpanCovers
     ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k100)));
 }
 
+// Several entries start within the span and only the last one extends past its max. The lookup only
+// reads the entry with the greatest min within the span, which is exactly that one, so the conflict
+// is still detected.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkLastSubRangeExtendsPastSpanMax) {
+    const auto collUuid = UUID::gen();
+    const std::vector<std::pair<Timestamp, ShardId>> history{{Timestamp(20, 0), kOtherShard},
+                                                             {Timestamp(10, 0), kRecipientShard}};
+    insertShardCatalogChunk(collUuid, k0, k50, kOtherShard, history);
+    insertShardCatalogChunk(collUuid, k50, k100, kOtherShard, history);
+    insertShardCatalogChunk(collUuid, k100, k300, kOtherShard, history);
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k0, k200)));
+}
+
 // A reachable unowned entry strictly contained within the span is fully refreshed, so it is not a
 // conflict.
 TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkContainedInSpan) {

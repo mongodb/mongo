@@ -2484,29 +2484,27 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
     DBDirectClient client(opCtx);
 
     const auto findsConflict = [&](FindCommandRequest findOp) {
-        auto cursor = client.find(std::move(findOp));
-        while (cursor->more()) {
-            const auto chunk = uassertStatusOK(
-                ChunkType::parseFromConfigBSON(cursor->nextSafe().getOwned(), OID(), Timestamp()));
-            if (isConflict(chunk)) {
-                return true;
-            }
+        auto bson = client.findOne(std::move(findOp));
+        if (bson.isEmpty()) {
+            return false;
         }
-        return false;
+        const auto chunk =
+            uassertStatusOK(ChunkType::parseFromConfigBSON(bson, OID(), Timestamp()));
+        return isConflict(chunk);
     };
 
-    // Stored chunks are non-overlapping and indexed by {collectionUUID, min}, so only the few
-    // chunks near 'enclosingChunk' can overlap it. Read them with two bounded queries instead of
-    // scanning the whole collection (mirrors reconcileOverlappingChunks()): the single chunk whose
-    // min is below the enclosingChunk but whose range may extend into it, and every chunk whose min
-    // falls within the enclosingChunk.
+    // Stored chunks are non-overlapping and indexed by {collectionUUID, min}, so at most two chunks
+    // could be "broken" by the given `enclosingChunk`: one broken by the lower boundary and one by
+    // the upper boundary. Read them with two bounded queries instead of scanning the whole
+    // collection (mirrors reconcileOverlappingChunks()): the single chunk whose `min` is below the
+    // enclosingChunk but whose range may extend into it, and the chunk with the greatest `min`
+    // falling within 'enclosingChunk', which is the only one of those that may extend past its max.
     {
         FindCommandRequest findOp{NamespaceString::kConfigShardCatalogChunksNamespace};
         findOp.setFilter(BSON(ChunkType::collectionUUID()
                               << collUuid << ChunkType::min()
                               << BSON("$lt" << enclosingChunk.getMin())));
         findOp.setSort(BSON(ChunkType::min() << -1));
-        findOp.setLimit(1);
         if (findsConflict(std::move(findOp))) {
             return true;
         }
@@ -2518,6 +2516,7 @@ bool MigrationDestinationManager::migrationWouldDropPITHistory(OperationContext*
             BSON(ChunkType::collectionUUID()
                  << collUuid << ChunkType::min()
                  << BSON("$gte" << enclosingChunk.getMin() << "$lt" << enclosingChunk.getMax())));
+        findOp.setSort(BSON(ChunkType::min() << -1));
         if (findsConflict(std::move(findOp))) {
             return true;
         }
