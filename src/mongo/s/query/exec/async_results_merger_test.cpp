@@ -3457,7 +3457,7 @@ TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
                                .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
         bob.appendBool("readOnly", true);
         std::vector<BSONObj> additionalParticipants = {
-            BSON("shardId" << kTestShardIds[1] << "readOnly" << true)};
+            BSON("shardId" << kTestShardIds[1] << "readOnly" << true << "term" << 5LL)};
         bob.appendElements(
             BSON(TxnResponseMetadata::kAdditionalParticipantsFieldName << additionalParticipants));
         return bob.obj();
@@ -3469,10 +3469,298 @@ TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
     arm->reattachToOperationContext(operationContext());
     arm->kill(operationContext()).wait();
 
-    // We now have killed the ARM. Additional participants should be processed.
+    // We now have killed the ARM. Additional participants should be processed, including the
+    // replication term the sub-router observed for them, and the queue should be empty.
     addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
     ASSERT(addedShard);
     ASSERT_EQ(addedShard->readOnly, TransactionRouter::Participant::ReadOnly::kReadOnly);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+}
+
+/**
+ * Common preamble for the buffered-participant-metadata tests below: turns on the
+ * additional-participants feature flag, gives 'opCtx' a session and txnNumber, checks the router
+ * session out and starts the transaction. Destroying it checks the session back in.
+ */
+class TransactionForBufferedParticipantTest {
+public:
+    TransactionForBufferedParticipantTest(OperationContext* opCtx, TxnNumber txnNumber)
+        : _flagGuard("featureFlagAllowAdditionalParticipants", true) {
+        opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+        opCtx->setTxnNumber(txnNumber);
+        opCtx->setInMultiDocumentTransaction();
+        _session.emplace(opCtx);
+
+        auto txnRouter = TransactionRouter::get(opCtx);
+        txnRouter.beginOrContinueTxn(
+            opCtx, txnNumber, TransactionRouter::TransactionActions::kStart);
+        txnRouter.setDefaultAtClusterTime(opCtx);
+    }
+
+private:
+    unittest::ServerParameterGuard _flagGuard;
+    boost::optional<RouterOperationContextSession> _session;
+};
+
+/**
+ * Builds a getMore reply that announces 'participant' as an additional transaction participant at
+ * replication term 'term'. 'nextCursorId' of 0 exhausts the remote cursor.
+ */
+BSONObj makeGetMoreReplyAnnouncingParticipant(const NamespaceString& nss,
+                                              CursorId nextCursorId,
+                                              BSONObj doc,
+                                              const ShardId& participant,
+                                              long long term) {
+    BSONObjBuilder bob{CursorResponse(nss, nextCursorId, {std::move(doc)})
+                           .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+    bob.appendBool("readOnly", true);
+    std::vector<BSONObj> additionalParticipants = {
+        BSON("shardId" << participant << "readOnly" << true << "term" << term)};
+    bob.appendElements(
+        BSON(TxnResponseMetadata::kAdditionalParticipantsFieldName << additionalParticipants));
+    return bob.obj();
+}
+
+TEST_F(AsyncResultsMergerTest, TermMismatchOnNextReadyDoesNotReRaiseOnCleanup) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // First getMore: shard0 reports an additional participant (shard1) with term 5. shard1 is
+    // enrolled and its term is recorded (first observation does not raise).
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 1LL, BSON("x" << 1), kTestShardIds[1], 5LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+
+    // Second getMore: shard0 reports shard1 with a different term (6), meaning shard1 changed
+    // primaries mid-transaction. The active path raises NoSuchTransaction exactly once.
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 0LL, BSON("x" << 2), kTestShardIds[1], 6LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_THROWS_CODE(arm->nextReady(), AssertionException, ErrorCodes::NoSuchTransaction);
+
+    // The poisoned response was dequeued before processing, so the queue is empty and the
+    // cleanup drains cannot re-raise the same mismatch while the original exception is active.
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+    arm->detachFromOperationContext();
+    arm->reattachToOperationContext(operationContext());
+    arm->kill(operationContext()).wait();
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+
+    // shard1 stays enrolled so a follow-up abort still reaches it.
+    addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+}
+
+TEST_F(AsyncResultsMergerTest, TermMismatchDiscoveredOnCleanupLatchesDeferredAbort) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // First getMore: shard0 announces shard1 with term 5; the active drain enrolls it.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 1LL, BSON("x" << 1), kTestShardIds[1], 5LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+
+    // Second getMore: shard0 announces shard1 with a changed term (6). The callback buffers the
+    // metadata, but no nextReady() runs, so the mismatch is still queued at teardown time.
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 1LL, BSON("x" << 2), kTestShardIds[1], 6LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    // The cleanup drain must not throw; it dequeues the mismatch and latches it on the router.
+    arm->detachFromOperationContext();
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+
+    // shard1 stays enrolled with the originally recorded term, so the deferred abort reaches it.
+    addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+
+    // Mirror the strategy.cpp hook: the raise surfaces the latched status, then the command's
+    // error path runs the implicit abort, which fans out to every enrolled participant and
+    // consumes the latch.
+    ASSERT_THROWS_CODE(TransactionRouter::get(operationContext()).raiseDeferredAbortIfNeeded(),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    auto future = launchAsync([&] {
+        TransactionRouter::get(operationContext())
+            .implicitlyAbortTransaction(
+                operationContext(),
+                Status(ErrorCodes::NoSuchTransaction,
+                       "Participant changed primaries during the transaction"));
+    });
+    const std::set<HostAndPort> expectedAbortHosts{kTestShardHosts[0], kTestShardHosts[1]};
+    std::set<HostAndPort> seenAbortHosts;
+    for (size_t i = 0; i < expectedAbortHosts.size(); i++) {
+        onCommandForPoolExecutor([&](const auto& request) {
+            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), "abortTransaction");
+            seenAbortHosts.insert(request.target);
+            return BSON("ok" << 1 << "readOnly" << false);
+        });
+    }
+    future.default_timed_get();
+    ASSERT_EQ(expectedAbortHosts, seenAbortHosts);
+}
+
+TEST_F(AsyncResultsMergerTest, PostKillDrainProcessesResponsesLeftUnprocessedByKill) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // A getMore announces shard1; the callback queues the metadata but no nextReady() drains it.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 0LL, BSON("x" << 1), kTestShardIds[1], 5LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 1u);
+
+    // Kill from an opCtx outside the cursor's transaction: the kill-time drain is guarded out, so
+    // the queued response survives the kill unprocessed. This stages the production window — a
+    // callback completing after kill()'s one-shot drain — which the mock network cannot produce:
+    // a cancelled callback delivers a non-OK response, which is never buffered.
+    {
+        auto foreignClient = getServiceContext()->getService()->makeClient("foreignKillClient");
+        AlternativeClientRegion acr(foreignClient);
+        auto foreignOpCtx = cc().makeOperationContext();
+        arm->kill(foreignOpCtx.get()).wait();
+    }
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 1u);
+    ASSERT_FALSE(TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]));
+
+    // The owning transaction's post-kill drain processes what was left behind.
+    arm->drainAdditionalTransactionParticipantsAfterKill(operationContext());
+
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT_EQ(addedShard->readOnly, TransactionRouter::Participant::ReadOnly::kReadOnly);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+
+    // Draining again on an already-empty queue is a no-op rather than a re-raise.
+    arm->drainAdditionalTransactionParticipantsAfterKill(operationContext());
+    ASSERT(TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]));
+}
+
+TEST_F(AsyncResultsMergerTest, PostKillDrainLatchesTermMismatch) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // First getMore: shard0 announces shard1 with term 5; the active drain enrolls and records it.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 1LL, BSON("x" << 1), kTestShardIds[1], 5LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+
+    // Second getMore: shard0 announces shard1 with a changed term (6); no nextReady() drains it.
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyAnnouncingParticipant(
+            kTestNss, 1LL, BSON("x" << 2), kTestShardIds[1], 6LL);
+    });
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 1u);
+
+    // Kill from an opCtx outside the cursor's transaction so the queued mismatch survives the kill.
+    {
+        auto foreignClient = getServiceContext()->getService()->makeClient("foreignKillClient");
+        AlternativeClientRegion acr(foreignClient);
+        auto foreignOpCtx = cc().makeOperationContext();
+        arm->kill(foreignOpCtx.get()).wait();
+    }
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 1u);
+
+    // The owning transaction's post-kill drain observes the mismatch and latches it; the recorded
+    // term stays the original one (validation raises before recording).
+    arm->drainAdditionalTransactionParticipantsAfterKill(operationContext());
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+    auto addedShard = TransactionRouter::get(operationContext()).getParticipant(kTestShardIds[1]);
+    ASSERT(addedShard);
+    ASSERT(addedShard->term);
+    ASSERT_EQ(*addedShard->term, 5);
+
+    // Mirror the strategy.cpp hook: the raise surfaces the latched status, then the command's
+    // error path runs the implicit abort, which fans out to every enrolled participant and
+    // consumes the latch.
+    ASSERT_THROWS_CODE(TransactionRouter::get(operationContext()).raiseDeferredAbortIfNeeded(),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    auto future = launchAsync([&] {
+        TransactionRouter::get(operationContext())
+            .implicitlyAbortTransaction(
+                operationContext(),
+                Status(ErrorCodes::NoSuchTransaction,
+                       "Participant changed primaries during the transaction"));
+    });
+    const std::set<HostAndPort> expectedAbortHosts{kTestShardHosts[0], kTestShardHosts[1]};
+    std::set<HostAndPort> seenAbortHosts;
+    for (size_t i = 0; i < expectedAbortHosts.size(); i++) {
+        onCommandForPoolExecutor([&](const auto& request) {
+            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), "abortTransaction");
+            seenAbortHosts.insert(request.target);
+            return BSON("ok" << 1 << "readOnly" << false);
+        });
+    }
+    future.default_timed_get();
+    ASSERT_EQ(expectedAbortHosts, seenAbortHosts);
 }
 
 DEATH_TEST_F(AsyncResultsMergerTestDeathTest,

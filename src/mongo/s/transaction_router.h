@@ -558,6 +558,26 @@ public:
         void implicitlyAbortTransaction(OperationContext* opCtx, const Status& status);
 
         /**
+         * Latches a participant-metadata failure (e.g. a participant primary change) discovered
+         * on a cursor-cleanup drain, where the error cannot be thrown back to a client. The latched
+         * status is thrown by raiseDeferredAbortIfNeeded() at the end of the command whose cleanup
+         * observed it; that command's error path runs the implicit abort and consumes the latch.
+         * No-op if the router is uninitialized, the transaction is already terminating (which also
+         * covers a coordinator-owned commit), or the router is a sub-router (which has no command
+         * hook that could raise a latch; its observations surface via later metadata to the
+         * top-level router, or fail-late at prepare). Never throws.
+         */
+        void recordDeferredAbort(const Status& status);
+
+        /**
+         * Throws the latched deferred-abort status if one is pending, without consuming the latch
+         * or aborting: the caller's error path runs the implicit abort, which consumes the latch.
+         * No-op if nothing is latched. A latched abort implies an initialized router (a new
+         * txnNumber clears the latch via _resetRouterState), which is asserted.
+         */
+        void raiseDeferredAbortIfNeeded();
+
+        /**
          * If a coordinator has been selected for this transaction already, constructs a recovery
          * token, which can be used to resume commit or abort of the transaction from a different
          * router.
@@ -947,6 +967,11 @@ private:
 
         // Track whether commit or abort have been initiated.
         bool terminationInitiated{false};
+
+        // A participant-metadata failure discovered on a cursor-cleanup drain, latched to be
+        // raised at the end of the observing command (whose error path runs the implicit abort).
+        // Unset means no deferred abort is pending.
+        boost::optional<Status> deferredAbort;
 
         // Tracks databases that this transaction has attempted to create.
         std::set<DatabaseName> createdDatabases;
