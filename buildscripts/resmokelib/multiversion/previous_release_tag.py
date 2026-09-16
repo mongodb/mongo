@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import structlog
 from git import Commit, Repo
@@ -166,3 +166,57 @@ def find_previous_release_tag(
 
     LOGGER.debug("selection complete", selected=best_tag, distance=min_distance)
     return best_tag
+
+
+class ReleaseTag(NamedTuple):
+    """A release tag, the version it represents, and the commit it points at."""
+
+    tag: str
+    version: str
+    commit: str
+
+
+def list_release_tags(
+    *,
+    repo_root: Optional[str] = None,
+    pattern: str = DEFAULT_TAG_PATTERN,
+) -> list[ReleaseTag]:
+    """List release tags newest first, with the commit each tag points at.
+
+    Additive companion to :func:`find_previous_release_tag` for callers that
+    need to evaluate candidates themselves (e.g. to probe binary availability
+    per tag) instead of receiving a single selection: same enumeration and
+    ordering (:func:`_list_candidate_tags`, git's versionsort), plus the peeled
+    commit and the version without the leading ``r``.
+    """
+    if repo_root is None:
+        # Same GIT_WORK_TREE preference as find_previous_release_tag.
+        repo_root = os.environ.get("GIT_WORK_TREE")
+    repo = Repo(repo_root)
+    return [
+        ReleaseTag(
+            tag=name,
+            version=name[1:] if name.startswith("r") else name,
+            commit=repo.commit(name).hexsha,
+        )
+        for name in _list_candidate_tags(repo, pattern)
+    ]
+
+
+def is_at_or_descending_target(
+    commit: str,
+    target_commit_ref: str = "HEAD",
+    *,
+    repo_root: Optional[str] = None,
+) -> bool:
+    """Whether ``commit`` is ``target_commit_ref`` or a descendant of it.
+
+    The exclusion :func:`find_previous_release_tag` applies (a previous tag is
+    never the target itself, nor anything built after it), exposed for callers
+    that step through candidates themselves.
+    """
+    if repo_root is None:
+        # Same GIT_WORK_TREE preference as find_previous_release_tag.
+        repo_root = os.environ.get("GIT_WORK_TREE")
+    repo = Repo(repo_root)
+    return repo.is_ancestor(repo.commit(target_commit_ref), repo.commit(commit))

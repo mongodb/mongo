@@ -619,6 +619,19 @@ py_library(
     ],
 )
 
+# Thin shim: the implementation lives in
+# //buildscripts/resmokelib/multiversion:dsc_release. The task invokes this
+# script by path (see the "do multiversion selection" function), so only its
+# import needs checking here.
+py_library(
+    name = "resolve_dsc_release",
+    srcs = ["resolve_dsc_release.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib/multiversion:dsc_release",
+    ],
+)
+
 py_binary(
     name = "download_db_contrib_tool",
     srcs = ["download_db_contrib_tool.py"],

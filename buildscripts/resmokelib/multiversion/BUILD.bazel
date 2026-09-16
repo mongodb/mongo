@@ -2,6 +2,28 @@ load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
+    name = "dsc_release",
+    srcs = [
+        "dsc_release.py",
+        "dsc_release_base.py",
+        "dsc_release_sources.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        # dsc_release.py's import chain runs this package's __init__.py, which
+        # imports buildscripts.resmokelib.config -- without this dep the
+        # package resolves as a namespace (no __init__.py in runfiles) and the
+        # import fails.
+        "//buildscripts/resmokelib",
+        ":multiversion",
+        dependency("boto3"),
+        dependency("evergreen-py"),
+        dependency("packaging"),
+        dependency("structlog"),
+    ],
+)
+
+py_library(
     name = "previous_release_tag_cli",
     srcs = ["previous_release_tag_cli.py"],
     visibility = ["//visibility:public"],
