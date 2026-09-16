@@ -2072,6 +2072,26 @@ TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsEmpty) {
     ASSERT_EQ(engine->getStorageTierFromStorageOptions(BSONObj()), boost::none);
 }
 
+TEST_F(WiredTigerKVEngineTest, MaterializationFrontierIgnoresLowerAndEqualNotifications) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto* conn = engine->getConn();
+    const auto first = Timestamp(10, 1).asULL();
+    const auto next = Timestamp(20, 1).asULL();
+
+    engine->setLastMaterializedLsn(first);
+    engine->setLastMaterializedLsn(first);
+    engine->setLastMaterializedLsn(first - 1);
+    ASSERT_EQ(EINVAL,
+              conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, first - 1));
+    ASSERT_EQ(0, conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, first));
+
+    engine->setLastMaterializedLsn(next);
+    engine->setLastMaterializedLsn(first);
+    ASSERT_EQ(EINVAL,
+              conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, next - 1));
+    ASSERT_EQ(0, conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, next));
+}
+
 // Minimal FlushAllFilesObserver that records how many times it was notified.
 class CountingFlushAllFilesObserver : public FlushAllFilesObserver {
 public:

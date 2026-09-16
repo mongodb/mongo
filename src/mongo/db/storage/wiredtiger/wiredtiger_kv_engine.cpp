@@ -103,6 +103,7 @@ MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
 MONGO_FAIL_POINT_DEFINE(WTFailImportSortedDataInterface);
+MONGO_FAIL_POINT_DEFINE(WTSetRecoveryCheckpointMetadataEBUSY);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
@@ -2308,17 +2309,30 @@ FlushAllFilesObserver* WiredTigerKVEngine::getFlushAllFilesObserver() const {
 }
 
 void WiredTigerKVEngine::setLastMaterializedLsn(uint64_t lsn) {
+    // A step-up can install a checkpoint whose LSN is below the frontier this connection
+    // published in a previous primary term. WT keeps that frontier across demotion.
+    auto published = _lastPublishedMaterializedLsn.synchronize();
+    if (*published >= lsn) {
+        LOGV2_DEBUG(13350500,
+                    2,
+                    "Ignoring materialization LSN at or below the published frontier",
+                    "lsn"_attr = lsn,
+                    "frontier"_attr = *published);
+        return;
+    }
     int ret = _conn->set_context_uint(_conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, lsn);
-    // The frontier is set before the install that goes with it succeeds, so a failed install can
-    // leave it ahead of the installed checkpoint. WT rejects a backwards frontier with EINVAL,
-    // and the LSN being refused is the first thing anyone debugging that will want.
+    // A backwards WT update here indicates a writer outside this publication path.
     if (ret == EINVAL) {
         LOGV2_FATAL(13206604, "Materialization frontier moved backwards", "lsn"_attr = lsn);
     }
     invariantWTOK(ret, nullptr);
+    *published = lsn;
 }
 
 Status WiredTigerKVEngine::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+    if (MONGO_unlikely(WTSetRecoveryCheckpointMetadataEBUSY.shouldFail())) {
+        return {ErrorCodes::ObjectIsBusy, "failpoint WTSetRecoveryCheckpointMetadataEBUSY"};
+    }
     auto getCkptMetaConfigString =
         fmt::format("disaggregated=(checkpoint_meta=\"{}\")", checkpointMetadata);
     int ret = _conn->reconfigure(_conn, getCkptMetaConfigString.c_str());

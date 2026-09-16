@@ -115,7 +115,11 @@ public:
     }
 
     void setLastMaterializedLsn(uint64_t lsn) final {
+        if (lsn <= _lastSetMaterializedLsn) {
+            return;
+        }
         _lastSetMaterializedLsn = lsn;
+        _operations.push_back("setLastMaterializedLsn");
     }
 
     Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {

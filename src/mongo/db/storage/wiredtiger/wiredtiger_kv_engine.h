@@ -944,6 +944,9 @@ private:
     Atomic<Timestamp> _stepDownTimestamp;
     std::mutex _stepdownMutex;
 
+    // Last successful publication. Retained across role changes.
+    synchronized_value<std::uint64_t> _lastPublishedMaterializedLsn{0};
+
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.
     Atomic<std::uint64_t> _initialDataTimestamp;
