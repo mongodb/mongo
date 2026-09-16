@@ -65,8 +65,10 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     const CollectionCatalog* catalogAfterSnapshot,
     long long replTermBeforeSnapshot,
     long long replTermAfterSnapshot,
-    boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot,
-    boost::optional<OperationContext*> activeStateTransitionAfterSnapshot) {
+    boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+        activeStateTransitionBeforeSnapshot,
+    boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+        activeStateTransitionAfterSnapshot) {
     // The catalog and replication term are equal before and after opening the snapshot.
     bool catalogEqual = catalogBeforeSnapshot == catalogAfterSnapshot;
     bool replTermEqual = replTermBeforeSnapshot == replTermAfterSnapshot;
@@ -78,15 +80,28 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     // If there is an active transition, if our opCtx is the interruption's opCtx, we permit the
     // read so the transition can complete.
     bool isStateTransitionThread = activeStateTransitionBeforeSnapshot
-        ? (opCtx == activeStateTransitionBeforeSnapshot.get())
+        ? (opCtx == activeStateTransitionBeforeSnapshot->opCtx)
         : false;
 
     // If this operation should not be killed during an interruption (it's allowed to see an
     // inconsistent state), permit the read (ex: FTDC thread).
     bool canKillOperationInStepdown = opCtx->getClient()->canKillOperationInStepdown();
 
+    // The active transition is a step up that takes the global lock in MODE_X, a read holding
+    // MODE_IS blocks the step up, so we must succeed so step up can proceed. This is safe because
+    // step up acquires the global lock in MODE_X, so the snapshot is guaranteed to be consistent
+    // until the read finishes.
+    //
+    // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+    bool isStepUpOrderedByGlobalLock = activeStateTransitionBeforeSnapshot &&
+        activeStateTransitionBeforeSnapshot == activeStateTransitionAfterSnapshot &&
+        activeStateTransitionBeforeSnapshot->type ==
+            rss::consensus::IntentRegistry::InterruptionType::StepUp &&
+        activeStateTransitionBeforeSnapshot->orderedByGlobalLock;
+
     return catalogEqual && replTermEqual &&
-        (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown);
+        (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown ||
+         isStepUpOrderedByGlobalLock);
 }
 
 }  // namespace
@@ -157,11 +172,12 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         const long long replTermBeforeSnapshot =
             repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
-        boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot = boost::none;
+        boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+            activeStateTransitionBeforeSnapshot = boost::none;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             activeStateTransitionBeforeSnapshot =
                 rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .replicationStateTransitionInterruptionCtx();
+                    .activeStateTransitionInfo();
         }
         auto catalog = CollectionCatalog::get(opCtx);
 
@@ -184,11 +200,12 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // Verify that that the replication state stayed the same while we opened the storage
         // snapshot.
         const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-        boost::optional<OperationContext*> activeStateTransitionAfterSnapshot = boost::none;
+        boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+            activeStateTransitionAfterSnapshot = boost::none;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             activeStateTransitionAfterSnapshot =
                 rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .replicationStateTransitionInterruptionCtx();
+                    .activeStateTransitionInfo();
         }
 
         if (haveAcquiredConsistentCatalogAndSnapshot(opCtx,

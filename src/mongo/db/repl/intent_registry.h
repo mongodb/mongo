@@ -162,6 +162,32 @@ public:
         }
     }
 
+    struct ActiveStateTransition {
+        OperationContext* opCtx;
+        InterruptionType type;
+
+        // Whether this transition acquires the global lock in MODE_X before changing storage, so
+        // that the change is ordered after any operation already holding the global lock.
+        //
+        // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+        bool orderedByGlobalLock;
+
+        bool operator==(const ActiveStateTransition&) const = default;
+    };
+
+    /**
+     * Returns the opCtx driving the active replication state transition along with its type, or
+     * boost::none if there is no active transition.
+     */
+    boost::optional<ActiveStateTransition> activeStateTransitionInfo() {
+        std::shared_lock lock(_stateMutex);
+        if (!_interruptionCtx) {
+            return boost::none;
+        }
+        return ActiveStateTransition{
+            _interruptionCtx, _lastInterruption, _interruptionOrderedByGlobalLock};
+    }
+
     /**
      * Returns true when the active state transition is draining an intent held by this opCtx,
      * meaning the operation should call checkForInterrupt() so the drain can complete.
@@ -202,7 +228,8 @@ public:
         InterruptionType interruption,
         OperationContext* opCtx,
         std::function<void()> postInterruptionCallback = nullptr,
-        boost::optional<uint32_t> timeout_sec = boost::none);
+        boost::optional<uint32_t> timeout_sec = boost::none,
+        bool orderedByGlobalLock = false);
 
     /**
      * Updates metrics around user ops when a state transition that kills operations occurs (i.e.
@@ -287,6 +314,8 @@ private:
     RWMutex _stateMutex;
     stdx::condition_variable _activeInterruptionCV;
     InterruptionType _lastInterruption = InterruptionType::None;
+    // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+    bool _interruptionOrderedByGlobalLock = false;
     OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
     Atomic<int> _pendingStateChange = 0;

@@ -337,7 +337,8 @@ std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOper
     IntentRegistry::InterruptionType interrupt,
     OperationContext* opCtx,
     std::function<void()> postInterruptionCallback,
-    boost::optional<uint32_t> timeout_sec) {
+    boost::optional<uint32_t> timeout_sec,
+    bool orderedByGlobalLock) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
     _pendingStateChange.fetchAndAdd(1);
     auto timeOutSec = std::chrono::seconds(
@@ -355,6 +356,7 @@ std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOper
         _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
         _lastInterruption = interrupt;
         _interruptionCtx = opCtx;
+        _interruptionOrderedByGlobalLock = orderedByGlobalLock;
         if (interrupt == InterruptionType::StepUp) {
             _primaryEnforcementActive = true;
         }
@@ -422,6 +424,7 @@ std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOper
                 std::lock_guard lock(_stateMutex);
                 _interruptionCtx = nullptr;
                 _lastInterruption = InterruptionType::None;
+                _interruptionOrderedByGlobalLock = false;
                 _activeInterruptionCV.notify_one();
                 if (_pendingStateChange.subtractAndFetch(1) == 0) {
                     _pendingStateChangeCV.notify_all();
