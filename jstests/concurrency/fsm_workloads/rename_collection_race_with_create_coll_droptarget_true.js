@@ -46,15 +46,21 @@ var $config = (function() {
          */
         mutexLock: function(collName) {
             jsTestLog('Trying to acquire mutexLock');
+            let acquiredDoc;
             assertAlways.soon(() => {
                 let doc =
                     this.mutexSessionDb[collName + this.controlCollectionSuffix].findAndModify({
                         query: {_id: this.controlDocumentId},
                         update: {$set: {mutex: 1}},
                     });
-                return doc.mutex === 0;
+                if (doc.mutex === 0) {
+                    acquiredDoc = doc;
+                    return true;
+                }
+                return false;
             });
             jsTestLog('Acquired mutexLock');
+            return acquiredDoc;
         },
 
         mutexUnlock: function(collName) {
@@ -83,9 +89,8 @@ var $config = (function() {
             const dataCollections = this.getDataCollections(db, collName);
             const controlCollection = this.getControlCollection(db, collName);
 
-            this.mutexLock(collName);
+            const controlDocument = this.mutexLock(collName);
             try {
-                const controlDocument = controlCollection.findOne({_id: this.controlDocumentId});
                 const sourceColl = db[controlDocument.sourceCollName];
                 assertAlways(sourceColl);
 

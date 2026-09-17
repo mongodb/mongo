@@ -22,9 +22,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const dataCollections = this.getDataCollections(db, collName);
         const controlCollection = this.getControlCollection(db, collName);
 
-        this.mutexLock(collName);
+        const controlDocument = this.mutexLock(collName);
         try {
-            const controlDocument = controlCollection.findOne({_id: this.controlDocumentId});
             const sourceColl = dataCollections.find(collection => collection.getName() ===
                                                         controlDocument.sourceCollName);
             assertAlways(sourceColl);
