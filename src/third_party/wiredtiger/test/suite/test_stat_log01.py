@@ -75,7 +75,6 @@ class test_stat_log01(wttest.WiredTigerTestCase):
         self.check_stats_file(".")
 
 # Statistics log, test subsequent readonly open works.
-@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_stat_log01_readonly(wttest.WiredTigerTestCase):
     # Configure statistics logging so it gets written into the base configuration file.
     conn_config = 'log=(enabled),statistics=(all),statistics_log=(on_close=true)'

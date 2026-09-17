@@ -43,8 +43,6 @@
 |Session Api|Reconfigure|[test_reconfig04.py](../test/suite/test_reconfig04.py), [test_reconfig05.py](../test/suite/test_reconfig05.py)
 |Session Api|Verify|[test_bug005.py](../test/suite/test_bug005.py)
 |Statistics||[test_stat_log02.py](../test/suite/test_stat_log02.py)
-|Tiered Storage|Checkpoint|[test_tiered08.py](../test/suite/test_tiered08.py)
-|Tiered Storage|Flush Tier|[test_tiered08.py](../test/suite/test_tiered08.py)
 |Transactions||[test_txn01.py](../test/suite/test_txn01.py)
 |Truncate||[test_truncate01.py](../test/suite/test_truncate01.py), [test_truncate30.py](../test/suite/test_truncate30.py)
 |Truncate|Prepare|[test_prepare13.py](../test/suite/test_prepare13.py)

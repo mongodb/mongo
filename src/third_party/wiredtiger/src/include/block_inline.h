@@ -88,14 +88,3 @@ __wt_block_header(WT_BLOCK *block)
 
     return ((u_int)WT_BLOCK_HEADER_SIZE);
 }
-
-/*
- * __wt_block_eligible_for_sweep --
- *     Return true if the block meets requirements for sweeping. The check that read reference count
- *     is zero is made elsewhere.
- */
-static WT_INLINE bool
-__wt_block_eligible_for_sweep(WT_BM *bm, WT_BLOCK *block)
-{
-    return (!block->remote && block->objectid <= bm->max_flushed_objectid);
-}

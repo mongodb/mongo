@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 # with no user-visible changes. Cover the two instantiation paths: fast-truncated pages and pages
 # with prepared updates on disk.
 @wttest.skip_for_hook("disagg", "checkpoint skip behavior differs on disagg followers")
-@wttest.skip_for_hook("tiered", "flush_tier calls interfere with checkpoint skip accounting")
 class test_instantiate01(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 

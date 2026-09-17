@@ -60,9 +60,6 @@ class test_compact07(compact_util):
 
     # Test the basic functionality of the background compaction server.
     def test_compact07(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create and populate a table.
         uri_small = self.uri_prefix + '_small'
         self.session.create(uri_small, self.create_params)

@@ -120,7 +120,7 @@ node_open(WORKLOAD_STATE *state, const char *disagg_mode)
 
     state->cfg->opts->disagg.mode = disagg_mode;
     testutil_wiredtiger_open(
-      state->cfg->opts, node_home, ENV_CONFIG_DEF, NULL, &state->conn, false, false);
+      state->cfg->opts, node_home, ENV_CONFIG_DEF, NULL, &state->conn, false);
 
     /* The page log outlives every role the node takes; the connection owns it either way. */
     testutil_check(state->conn->get_page_log(state->conn, "palite", &state->page_log));

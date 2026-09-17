@@ -277,36 +277,39 @@ lsm_config = [
     ]),
 ]
 
+# Leftover keys shared by create and wiredtiger_open.
+tiered_storage_configuration_common = [
+    Config('name', 'none', r'''
+        removed option, preserved to allow parsing old metadata'''),
+    Config('auth_token', '', r'''
+        removed option, preserved to allow parsing old metadata'''),
+    Config('bucket', '', r'''
+        removed option, preserved to allow parsing old metadata'''),
+    Config('bucket_prefix', '', r'''
+        removed option, preserved to allow parsing old metadata'''),
+    Config('cache_directory', '', r'''
+        removed option, preserved to allow parsing old metadata'''),
+    Config('local_retention', '300', r'''
+        removed option, preserved to allow parsing old metadata''',
+        min='0', max='10000'),
+    Config('shared', 'false', r'''
+        removed option, preserved to allow parsing old metadata''',
+        type='boolean'),
+]
+
 tiered_config = [
     Config('tiered_storage', '', r'''
-        configure a storage source for this table''',
-        type='category', subconfig=[
-        Config('name', 'none', r'''
-            permitted values are \c "none" or a custom storage source name created with
-            WT_CONNECTION::add_storage_source. See @ref custom_storage_sources for more
-            information'''),
-        Config('auth_token', '', r'''
-            authentication string identifier'''),
-        Config('bucket', '', r'''
-            the bucket indicating the location for this table'''),
-        Config('bucket_prefix', '', r'''
-            the unique bucket prefix for this table'''),
-        Config('cache_directory', '', r'''
-            a directory to store locally cached versions of files in the storage source. By
-            default, it is named with \c "-cache" appended to the bucket name. A relative
-            directory name is relative to the home directory'''),
-        Config('local_retention', '300', r'''
-            time in seconds to retain data on tiered storage on the local tier for faster
-            read access''',
-            min='0', max='10000'),
+        Removed options, preserved to allow parsing old metadata''',
+        type='category', undoc=True, subconfig=
+        tiered_storage_configuration_common + [
         Config('object_target_size', '0', r'''
-            this option is no longer supported, retained for backward compatibility''',
-            min='0', undoc=True),
-        Config('shared', 'false', r'''
-            enable sharing tiered tables across other WiredTiger instances.''',
-            type='boolean'),
+            removed option, preserved to allow parsing old metadata''',
+            min='0'),
         ]),
 ]
+# Undocumented categories skip the header walk that stamps method_name.
+# Without this, create and open share confchk_tiered_storage_subconfigs.
+tiered_config[0].method_name = 'WT_SESSION.create'
 
 tiered_tree_config = [
     Config('bucket', '', r'''
@@ -355,7 +358,7 @@ file_runtime_config = common_runtime_config + log_runtime_config + [
 ]
 
 # Per-file configuration
-file_config = format_meta + file_runtime_config + tiered_config + file_disaggregated_config + [
+file_config = format_meta + file_runtime_config + file_disaggregated_config + [
     Config('block_allocation', 'best', r'''
         configure block allocation. Permitted values are \c "best" or \c "first"; the \c "best"
         configuration uses a best-fit algorithm, the \c "first" configuration uses a
@@ -508,10 +511,6 @@ file_meta = file_config + [
         the file is read-only. All methods that modify a file are disabled. See @ref
         readonly for more information''',
         type='boolean'),
-    Config('tiered_object', 'false', r'''
-        this file is a tiered object. When opened on its own, it is marked as readonly and may
-        be restricted in other ways''',
-        type='boolean', undoc=True),
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]
@@ -785,9 +784,6 @@ connection_runtime_config = [
             operations for tables with logging turned off. This additional logging information
             is intended for debugging and is informational only, that is, it is ignored during
             recovery''',
-            type='boolean'),
-        Config('tiered_flush_error_continue', 'false', r'''
-            on a write to tiered storage, continue when an error occurs.''',
             type='boolean'),
         Config('update_restore_evict', 'false', r'''
             if true, control all dirty page evictions through forcing update restore eviction.''',
@@ -1090,7 +1086,7 @@ connection_runtime_config = [
         'prefetch_2', 'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay',
         'prepare_resolution_1', 'prepare_resolution_2', 'session_alter_slow',
         'sleep_before_read_overflow_onpage', 'split_1', 'split_2', 'split_3', 'split_4',
-        'split_5', 'split_6', 'split_7', 'split_8','tiered_flush_finish']),
+        'split_5', 'split_6', 'split_7', 'split_8']),
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
@@ -1142,7 +1138,6 @@ connection_runtime_config = [
             'sweep',
             'temporary',
             'thread_group',
-            'tiered',
             'timestamp',
             'transaction',
             'verify',
@@ -1282,44 +1277,14 @@ wiredtiger_open_statistics_log_configuration = [
         ])
 ]
 
-tiered_storage_configuration_common = [
-    Config('local_retention', '300', r'''
-        time in seconds to retain data on tiered storage on the local tier for faster read
-        access''',
-        min='0', max='10000'),
-]
-connection_reconfigure_tiered_storage_configuration = [
-    Config('tiered_storage', '', r'''
-        enable tiered storage. Enabling tiered storage may use one session from the configured
-        session_max''',
-        type='category', subconfig=tiered_storage_configuration_common)
-]
 wiredtiger_open_tiered_storage_configuration = [
     Config('tiered_storage', '', r'''
-        enable tiered storage. Enabling tiered storage may use one session from the configured
-        session_max''',
+        Removed options, preserved to allow parsing old metadata''',
         type='category', undoc=True, subconfig=
         tiered_storage_configuration_common + [
-        Config('auth_token', '', r'''
-            authentication string identifier'''),
-        Config('bucket', '', r'''
-            bucket string identifier where the objects should reside'''),
-        Config('bucket_prefix', '', r'''
-            unique string prefix to identify our objects in the bucket. Multiple instances
-            can share the storage bucket and this identifier is used in naming objects'''),
-        Config('cache_directory', '', r'''
-            a directory to store locally cached versions of files in the storage source. By
-            default, it is named with \c "-cache" appended to the bucket name. A relative
-            directory name is relative to the home directory'''),
         Config('interval', '60', r'''
-            interval in seconds at which to check for tiered storage related work to perform''',
+            removed option, preserved to allow parsing old metadata''',
             min=1, max=1000),
-        Config('name', 'none', r'''
-            Permitted values are \c "none" or a custom storage name created with
-            WT_CONNECTION::add_storage_source'''),
-        Config('shared', 'false', r'''
-            enable sharing tiered tables across other WiredTiger instances.''',
-            type='boolean'),
     ]),
 ]
 
@@ -1766,11 +1731,6 @@ methods = {
     Config('remove_files', 'true', r'''
         if the underlying files should be removed''',
         type='boolean'),
-    Config('remove_shared', 'false', r'''
-        to force the removal of any shared objects. This is intended for tiered tables, and can
-        only be set if the drop operation is configured to remove the underlying files. Ignore
-        this configuration if it is set for non-tiered tables''',
-        type='boolean', undoc=True),
 ]),
 
 'WT_SESSION.log_flush' : Method([
@@ -2244,31 +2204,6 @@ methods = {
         dropped if open in a cursor. While a hot backup is in progress, checkpoints created
         prior to the start of the backup cannot be dropped''',
         type='list'),
-    Config('flush_tier', '', r'''
-        configure flushing objects to tiered storage after checkpoint. See @ref tiered_storage''',
-        type='category', subconfig= [
-            Config('enabled', 'false', r'''
-                if true and tiered storage is in use, perform one iteration of object switching
-                and flushing objects to tiered storage''',
-                type='boolean'),
-            Config('force', 'false', r'''
-                if false (the default), flush_tier of any individual object may be skipped if the
-                underlying object has not been modified since the previous flush_tier. If true,
-                this option forces the flush_tier''',
-                type='boolean'),
-            Config('sync', 'true', r'''
-                wait for all objects to be flushed to the shared storage to the level specified.
-                When false, do not wait for any objects to be written to the tiered storage system
-                but return immediately after generating the objects and work units for an internal
-                thread.  When true, the caller waits until all work queued for this call to be
-                completely processed before returning''',
-                type='boolean'),
-            Config('timeout', '0', r'''
-                amount of time, in seconds, to wait for flushing of objects to complete.
-                WiredTiger returns EBUSY if the timeout is reached. A value of zero disables
-                the timeout''',
-                type='int'),
-    ]),
     Config('force', 'false', r'''
         if false (the default), checkpoints may be skipped if the underlying object has not been
         modified. If true, this option forces the checkpoint''',
@@ -2287,7 +2222,6 @@ methods = {
 'WT_CONNECTION.add_data_source' : Method([]),
 'WT_CONNECTION.add_encryptor' : Method([]),
 'WT_CONNECTION.add_page_log' : Method([]),
-'WT_CONNECTION.add_storage_source' : Method([]),
 'WT_CONNECTION.close' : Method([
     Config('debug', '', r'''
         configure debug specific behavior on connection close. Generally only used for internal
@@ -2297,9 +2231,6 @@ methods = {
             Skips the checkpoint during shutdown.''',
             type='boolean'),
         ]),
-    Config('final_flush', 'false', r'''
-        wait for final flush_tier to copy objects''',
-        type='boolean', undoc=True),
     Config('leak_memory', 'false', r'''
         don't free memory during close''',
         type='boolean'),
@@ -2336,7 +2267,6 @@ methods = {
     connection_reconfigure_page_delta_configuration +\
     connection_reconfigure_log_configuration +\
     connection_reconfigure_statistics_log_configuration +\
-    connection_reconfigure_tiered_storage_configuration +\
     connection_runtime_config
 ),
 'WT_CONNECTION.set_file_system' : Method([]),

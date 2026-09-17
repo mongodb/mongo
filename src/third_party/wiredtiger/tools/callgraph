@@ -655,7 +655,6 @@ our (%modules, %moduleDirs, %moduleAliasesFile, %moduleAliasesSrc);
   schema => {},
   session => {},
   support => {},
-  tiered => {},
   txn => {sourceAliases=>["truncate"]},
   utilities => {},
   bitstring => {},

@@ -40,7 +40,6 @@ class test_layered_follower07(DisaggConfigMixin, test_cc_base):
 
     conn_config = 'cache_size=10MB,page_delta=(delta_pct=100),disaggregated=(role="follower"),checkpoint_cleanup=[wait=1,file_wait_ms=0],'
 
-    @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
     def test_layered_follower07(self):
         # Create a table.
         create_params = 'key_format=i,value_format=S'

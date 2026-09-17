@@ -37,8 +37,6 @@ typedef struct {
     bool can_skip;
     bool database_size_fix;
     bool force;
-    bool flush_tier_enabled;
-    bool flush_tier_force;
     bool use_timestamp;
     const char *name;
     size_t name_len;
@@ -48,180 +46,6 @@ typedef struct {
     const char **cfg;
 } WT_CHECKPOINT_DB_CONFIG;
 
-/*
- * __checkpoint_flush_tier_wait --
- *     Wait for all previous work units queued to be processed.
- */
-static int
-__checkpoint_flush_tier_wait(WT_SESSION_IMPL *session, const char **cfg)
-{
-    WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
-    uint64_t now, start, timeout;
-    int yield_count;
-
-    conn = S2C(session);
-    yield_count = 0;
-    now = start = 0;
-
-    /*
-     * The internal thread needs the schema lock to perform its operations and flush tier also
-     * acquires the schema lock. We cannot be waiting in this function while holding that lock or no
-     * work will get done.
-     */
-    WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
-    WT_RET(__wt_config_gets(session, cfg, "flush_tier.timeout", &cval));
-    timeout = (uint64_t)cval.val;
-    if (timeout != 0)
-        __wt_seconds(session, &start);
-
-    /*
-     * It may be worthwhile looking at the add and decrement values and make choices of whether to
-     * yield or wait based on how much of the workload has been performed. Flushing operations could
-     * take a long time so yielding may not be effective.
-     */
-    while (!WT_FLUSH_STATE_DONE(conn->tiered.flush_state)) {
-        if (start != 0) {
-            __wt_seconds(session, &now);
-            if (now - start > timeout)
-                return (EBUSY);
-        }
-        if (++yield_count < WT_THOUSAND)
-            __wt_yield();
-        else {
-            __wt_cond_signal(session, conn->tiered.cond);
-            __wt_cond_wait(session, conn->tiered.flush_cond, 200, NULL);
-        }
-    }
-    return (0);
-}
-
-/*
- * __checkpoint_flush_tier --
- *     Perform one iteration of tiered storage maintenance.
- */
-static int
-__checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
-{
-    WT_BTREE *btree;
-    WT_CKPT ckpt;
-    WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    uint64_t ckpt_time;
-    const char *key, *value;
-    bool release;
-
-    __wt_verbose(session, WT_VERB_TIERED, "CKPT_FLUSH_TIER: Called force %d", force);
-
-    WT_STAT_CONN_INCR(session, flush_tier);
-    conn = S2C(session);
-    cursor = NULL;
-    release = false;
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
-    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
-
-    /*
-     * For supporting splits and merge:
-     * - See if there is any merging work to do to prepare and create an object that is
-     *   suitable for placing onto tiered storage.
-     * - Do the work to create said objects.
-     * - Move the objects.
-     */
-    __wt_atomic_store_uint32_v_relaxed(&conn->tiered.flush_state, 0);
-    __wt_atomic_store_bool_relaxed(&conn->tiered.flush_ckpt_complete, false);
-    /* Flushing is part of a checkpoint, use the session's checkpoint time. */
-    conn->tiered.flush_most_recent = session->ckpt.current_sec;
-    /*
-     * The load is relaxed rather than acquire: this runs on the checkpoint thread, under the
-     * checkpoint lock, which is the same thread that publishes the timestamp. The value is only
-     * copied for future and debugging use.
-     */
-    conn->tiered.flush_ts = __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_timestamp);
-    /*
-     * It would be more efficient to return here if no tiered storage is enabled in the system. If
-     * the user asks for a flush_tier without tiered storage, the loop below is effectively a no-op
-     * and will not be incorrect. But we could also just return.
-     */
-
-    /*
-     * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
-     * flushing tables that haven't changed.
-     */
-    WT_RET(__wt_metadata_cursor(session, &cursor));
-    while (cursor->next(cursor) == 0) {
-        cursor->get_key(cursor, &key);
-        cursor->get_value(cursor, &value);
-        /* For now just switch tiers which just does metadata manipulation. */
-        if (WT_PREFIX_MATCH(key, "tiered:")) {
-            __wt_verbose(
-              session, WT_VERB_TIERED, "CKPT_FLUSH_TIER: %s %s force %d", key, value, force);
-            if (!force) {
-                /*
-                 * Check the table's last checkpoint time and only flush trees that have a
-                 * checkpoint more recent than the last flush time.
-                 */
-                WT_ERR(__wt_meta_checkpoint(session, key, NULL, &ckpt, NULL));
-                ckpt_time = ckpt.sec;
-                __wt_checkpoint_free(session, &ckpt);
-                WT_ERR(__wt_config_getones(session, value, "flush_time", &cval));
-
-                /* If nothing has changed, there's nothing to do. */
-                if (ckpt_time == 0 || (uint64_t)cval.val >= ckpt_time) {
-                    WT_STAT_CONN_INCR(session, flush_tier_skipped);
-                    continue;
-                }
-            }
-            /* Only instantiate the handle if we need to flush. */
-            WT_ERR_ERROR_OK(__wt_session_get_dhandle(session, key, NULL, NULL, 0), EBUSY, true);
-
-            /*
-             * If we get back EBUSY, this handle may be open with bulk or other special flags. We
-             * need to skip this tree. We fake checkpoints for such trees, i.e. we never really
-             * write a checkpoint to the disk and we cannot get the dhandle now.
-             */
-            if (ret == EBUSY) {
-                WT_STAT_CONN_INCR(session, flush_tier_skipped);
-                continue;
-            }
-            release = true;
-            /*
-             * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
-             * the arg is the config string that is currently in the metadata. Also, mark the tree
-             * dirty to ensure it participates in the checkpoint process, even if clean.
-             */
-            btree = S2BT(session);
-            if (__wt_atomic_load_uint8_relaxed(&btree->original)) {
-                WT_STAT_CONN_INCR(session, flush_tier_skipped);
-                WT_ERR(__wt_session_release_dhandle(session));
-                release = false;
-                continue;
-            }
-            WT_ERR(__wt_tiered_switch(session, value));
-            WT_STAT_CONN_INCR(session, flush_tier_switched);
-            __wt_tree_modify_set(session);
-            btree->flush_most_recent_secs = session->ckpt.current_sec;
-            btree->flush_most_recent_ts =
-              __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_timestamp);
-            WT_ERR(__wt_session_release_dhandle(session));
-            release = false;
-        }
-    }
-    WT_ERR(__wt_metadata_cursor_release(session, &cursor));
-
-    /* Clear the flag on success. */
-    F_CLR_ATOMIC_32(conn, WT_CONN_TIERED_FIRST_FLUSH);
-    return (0);
-
-err:
-    if (release)
-        WT_TRET(__wt_session_release_dhandle(session));
-    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-    WT_STAT_CONN_INCR(session, flush_tier_fail);
-    return (ret);
-}
 /*
  * __checkpoint_name_ok --
  *     Complain if the checkpoint name isn't acceptable.
@@ -1365,13 +1189,6 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
     WT_STAT_CONN_SET(session, checkpoint_snapshot_acquired, 1);
 
     /*
-     * If we are doing a flush_tier, do the metadata naming switch now while holding the schema lock
-     * in this function.
-     */
-    if (ckpt_cfg->flush_tier_enabled)
-        WT_ERR(__checkpoint_flush_tier(session, ckpt_cfg->flush_tier_force));
-
-    /*
      * Get a list of handles we want to sync; for named checkpoints this may pull closed objects
      * into the session cache.
      *
@@ -1405,8 +1222,8 @@ __checkpoint_can_skip(WT_SESSION_IMPL *session, WT_CHECKPOINT_DB_CONFIG *ckpt_cf
     conn = S2C(session);
     txn_global = &conn->txn_global;
 
-    /* Never skip if force is configured, checkpoint is named, or if flushing objects. */
-    if (ckpt_cfg->force || ckpt_cfg->named || ckpt_cfg->flush_tier_enabled)
+    /* Never skip if force is configured or the checkpoint is named. */
+    if (ckpt_cfg->force || ckpt_cfg->named)
         return (0);
 
     /*
@@ -1472,12 +1289,6 @@ __checkpoint_parse_config(
         ckpt_cfg->named = true;
     }
 
-    WT_RET(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
-    ckpt_cfg->flush_tier_enabled = cval.val != 0;
-
-    WT_RET(__wt_config_gets(session, cfg, "flush_tier.force", &cval));
-    ckpt_cfg->flush_tier_force = cval.val != 0;
-
     WT_RET(__wt_config_gets(session, cfg, "drop", &cval));
     ckpt_cfg->drop = cval.len != 0;
 
@@ -1505,10 +1316,6 @@ __checkpoint_establish_time(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /*
-     * If tiered storage is in use, move the time up to at least the most recent flush first. NOTE:
-     * reading the most recent flush time is not an acquire read (or repeated on retry) because
-     * currently checkpoint and flush tier are mutually exclusive.
-     *
      * Update the global value that tracks the most recent checkpoint, and use it to make sure the
      * most recent checkpoint time doesn't move backwards. Also make sure that this checkpoint time
      * is not the same as the previous one, by running the clock forwards as needed.
@@ -1522,8 +1329,6 @@ __checkpoint_establish_time(WT_SESSION_IMPL *session)
      * except in restricted ways:
      *    - to manage the interaction between hot backups and checkpointing, where the absolute time
      *      does not matter;
-     *    - to track when tiered storage was last flushed in order to avoid redoing work, where the
-     *      absolute time does not matter;
      *    - to detect and retry races between opening checkpoint cursors and checkpoints in progress
      *      (which only cares about ordering and only since the last database open).
      *
@@ -1542,7 +1347,6 @@ __checkpoint_establish_time(WT_SESSION_IMPL *session)
      */
 
     __wt_seconds(session, &ckpt_sec);
-    ckpt_sec = WT_MAX(ckpt_sec, conn->tiered.flush_most_recent);
 
     for (;;) {
         WT_ACQUIRE_READ_WITH_BARRIER(most_recent, conn->ckpt.most_recent);
@@ -2316,15 +2120,6 @@ __checkpoint_db_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     __wt_atomic_store_bool_v_release(&txn_global->checkpoint_running, false);
 
-    /*
-     * Signal the tiered storage thread because it waits for the checkpoint to complete to process
-     * flush units. Indicate that the checkpoint has completed.
-     */
-    if (conn->tiered.cond != NULL) {
-        __wt_atomic_store_bool_relaxed(&conn->tiered.flush_ckpt_complete, true);
-        __wt_cond_signal(session, conn->tiered.cond);
-    }
-
     return (ret);
 }
 
@@ -2338,7 +2133,7 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
     WT_CONFIG_ITEM cval, tval;
     WT_DECL_RET;
     uint32_t orig_flags;
-    bool checkpoint_cleanup, flush, flush_sync;
+    bool checkpoint_cleanup;
 
     WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ACTIVE);
     /*
@@ -2385,18 +2180,6 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
           "checkpoint_crash_point and checkpoint_crash_trigger_point are mutually exclusive");
 
     /*
-     * If this checkpoint includes a flush_tier then this call also must wait for any earlier
-     * flush_tier to have completed all of its copying of objects. This happens if the user chose to
-     * not wait for sync on the previous call.
-     */
-    WT_ERR(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
-    flush = cval.val;
-    WT_ERR(__wt_config_gets(session, cfg, "flush_tier.sync", &cval));
-    flush_sync = cval.val;
-    if (flush)
-        WT_ERR(__checkpoint_flush_tier_wait(session, cfg));
-
-    /*
      * Only one checkpoint can be active at a time, and checkpoints must run in the same order as
      * they update the metadata. It's probably a bad idea to run checkpoints out of multiple
      * threads, but as compaction calls checkpoint directly, it can be tough to avoid. Serialize
@@ -2406,13 +2189,6 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
         WT_WITH_CHECKPOINT_LOCK(session, ret = __checkpoint_db_wrapper(session, cfg));
     else
         WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret, ret = __checkpoint_db_wrapper(session, cfg));
-    /*
-     * If this checkpoint is flushing objects, a failure can leave a tree's block manager pointing
-     * to incorrect blocks. Currently we can not recover from this situation. Panic!
-     */
-    if (ret != 0 && flush)
-        WT_IGNORE_RET(
-          __wt_panic(session, ret, "checkpoint can not fail when flush_tier is enabled"));
     /*
      * In disaggregated storage, a checkpoint failure once the checkpoint transaction has started is
      * unrecoverable: there is no WAL to replay from, and checkpoint metadata may already have been
@@ -2434,8 +2210,6 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
     if (checkpoint_cleanup)
         __wt_checkpoint_cleanup_trigger(session);
 
-    if (flush && flush_sync)
-        WT_ERR(__checkpoint_flush_tier_wait(session, cfg));
 err:
     F_CLR(session, WTI_CHECKPOINT_SESSION_FLAGS);
     F_SET(session, orig_flags);

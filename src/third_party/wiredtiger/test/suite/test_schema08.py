@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, shutil
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
@@ -37,10 +36,11 @@ from wtscenario import make_scenarios
 # After doing the operation, create a backup copy of the directory,
 # walk the log recording each LSN, truncate the backup copy of the
 # log walking backward from the LSNs and then run recovery.
-class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subprocess):
+@wttest.skip_for_hook("disagg", "Log recovery is not supported with disagg storage")
+class test_schema08(wttest.WiredTigerTestCase, suite_subprocess):
     # We want to copy, truncate and run recovery so keep the log
     # file small and don't pre-allocate any. We expect a small log.
-    conn_config_string = 'log=(enabled,file_max=100k,prealloc=false,remove=false),'
+    conn_config = 'log=(enabled,file_max=100k,prealloc=false,remove=false),'
 
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
@@ -57,15 +57,10 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
         ('no_ckpt', dict(ckpt=False)),
         ('with_ckpt', dict(ckpt=True)),
     ]
-    tiered_storage_sources = gen_tiered_storage_sources()
-    scenarios = make_scenarios(tiered_storage_sources, types, ops, ckpt)
+    scenarios = make_scenarios(types, ops, ckpt)
     count = 0
     lsns = []
     backup_pfx = "BACKUP."
-
-    # Setup connection config.
-    def conn_config(self):
-        return self.conn_config_string + self.tiered_conn_config()
 
     def do_alter(self, uri, suburi):
         alter_param = 'cache_resident=true'
@@ -187,6 +182,5 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
         self.find_logrecs()
         # print "Found " + str(self.count) + " log records"
 
-        if not self.is_tiered_scenario():
-            self.make_backups()
-            self.run_recovery(uri, suburi)
+        self.make_backups()
+        self.run_recovery(uri, suburi)

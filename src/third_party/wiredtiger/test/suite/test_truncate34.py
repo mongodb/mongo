@@ -34,7 +34,6 @@ from wiredtiger import stat
 # information would only duplicate it. The duplicate state is what a later
 # reconciliation that skips the write can discard while the parent still holds a
 # fast-truncate proxy cell that needs it.
-@wttest.skip_for_hook("tiered", "tiered truncate does not take the fast-delete path")
 class test_truncate34(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'
     uri = 'table:test_truncate34'

@@ -18,6 +18,9 @@
  */
 #define WT_BLOCK_INVALID_OFFSET 0
 
+/* Address cookies omit object ID 0; unpack defaults a missing id to 0. */
+#define WT_TIERED_OBJECTID_NONE 0
+
 /*
  * The max corrupt block size that we'll attempt to detect bitflips for. Essentially default
  * leaf_page_max with a buffer.
@@ -235,8 +238,6 @@ struct __wt_bm {
     int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, bool);
     int (*size)(WT_BM *, WT_SESSION_IMPL *, wt_off_t *);
     int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
-    int (*switch_object)(WT_BM *, WT_SESSION_IMPL *, uint32_t);
-    int (*switch_object_end)(WT_BM *, WT_SESSION_IMPL *, uint32_t);
     int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *, bool verify_success);
@@ -245,27 +246,12 @@ struct __wt_bm {
       size_t *, bool, bool);
     int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
-    WT_BLOCK *block; /* Underlying file. For a multi-handle tree this will be the writable file. */
-    WT_BLOCK *next_block; /* If doing a tier switch, this is going to be the new file. */
-    WT_BLOCK *prev_block; /* If a tier switch was done, this was the old file. */
+    WT_BLOCK *block; /* Underlying file. */
 
     void *map; /* Mapped region */
     size_t maplen;
     void *mapped_cookie;
     bool is_remote; /* Whether the storage is located on a remote host. */
-
-    /*
-     * For trees, such as tiered tables, that are allowed to have more than one backing file or
-     * object, we maintain an array of the block handles used by the tree. We use a reader-writer
-     * mutex to protect the array. We lock it for reading when looking for a handle in the array and
-     * lock it for writing when adding or removing handles in the array.
-     */
-    bool is_multi_handle;
-    WT_BLOCK **handle_array;       /* Array of block handles */
-    size_t handle_array_allocated; /* Size of handle array */
-    WT_RWLOCK handle_array_lock;   /* Lock for block handle array */
-    u_int handle_array_next;       /* Next open slot */
-    uint32_t max_flushed_objectid; /* Local objects at or below this id should be closed */
 
     /*
      * There's only a single block manager handle that can be written, all others are checkpoints.

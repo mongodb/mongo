@@ -32,7 +32,6 @@ import wiredtiger, wttest
 #
 # Test opening a checkpoint cursor after bulk operations.
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     ckpt_precision = [
         ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),

@@ -441,26 +441,10 @@ wt_connect(const char *config_open)
         if (g.prepare)
             strcat(config, ",preserve_prepared=true");
     }
-    /*
-     * If we are using tiered add in the extension and tiered storage configuration.
-     */
-    if (g.opts.tiered_storage) {
-        testutil_snprintf(buf, sizeof(buf), "%s/bucket", g.home);
-        testutil_recreate_dir(buf);
-    }
 
     printf("WT open config: %s\n", config);
     fflush(stdout);
-    testutil_wiredtiger_open(&g.opts, g.home, config, &event_handler, &g.conn, false, false);
-
-    if (g.opts.tiered_storage) {
-        /* testutil_tiered_begin needs the connection. */
-        g.opts.conn = g.conn;
-
-        /* Set up a random delay for the first flush. */
-        set_flush_tier_delay(&g.opts.extra_rnd);
-        testutil_tiered_begin(&g.opts);
-    }
+    testutil_wiredtiger_open(&g.opts, g.home, config, &event_handler, &g.conn, false);
 }
 
 /*
@@ -474,9 +458,6 @@ wt_shutdown(void)
 
     if (g.conn == NULL)
         return (0);
-
-    if (g.opts.tiered_storage)
-        testutil_tiered_end(&g.opts);
 
     printf("Closing connection\n");
     fflush(stdout);

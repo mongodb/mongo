@@ -45,7 +45,6 @@ class PalitePage(NamedTuple):
 # Test the `wt page` command against a palite backed disaggregated storage database.
 # A leader connection writes full-image and delta pages via checkpoints, then `wt page`
 # is run as a subprocess in follower mode against the same cell to inspect them.
-@wttest.skip_for_hook("tiered", "wt page does not run under tiered hook")
 class test_disagg_wt_page(wttest.WiredTigerTestCase, suite_subprocess, DisaggConfigMixin):
     uri = "layered:wt_page_test"
     stable_uri = "file:wt_page_test.wt_stable"

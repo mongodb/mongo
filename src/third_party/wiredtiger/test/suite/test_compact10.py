@@ -72,9 +72,6 @@ class test_compact10(backup_base, compact_util):
     # - Waits for background compaction to compact all the files and create a new full backup.
     # - Compares the two backups.
     def test_compact10(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction or backup")
-
         backup_1 = "BACKUP_1"
         backup_2 = "BACKUP_2"
         uris = self.generate_data()

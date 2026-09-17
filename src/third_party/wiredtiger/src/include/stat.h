@@ -998,8 +998,6 @@ struct __wt_connection_stats {
     int64_t cursor_open_time_internal_usecs;
     int64_t dh_conn_handle_layered_count;
     int64_t dh_conn_handle_table_count;
-    int64_t dh_conn_handle_tiered_count;
-    int64_t dh_conn_handle_tiered_tree_count;
     int64_t dh_conn_handle_btree_count;
     int64_t dh_conn_handle_checkpoint_count;
     int64_t dh_conn_handle_size;
@@ -1412,16 +1410,6 @@ struct __wt_connection_stats {
     int64_t child_modify_blocked_page;
     int64_t page_split_restart;
     int64_t page_read_skip_deleted;
-    int64_t local_objects_inuse;
-    int64_t flush_tier_fail;
-    int64_t flush_tier;
-    int64_t flush_tier_skipped;
-    int64_t flush_tier_switched;
-    int64_t local_objects_removed;
-    int64_t tiered_work_units_dequeued;
-    int64_t tiered_work_units_removed;
-    int64_t tiered_work_units_created;
-    int64_t tiered_retention;
     int64_t txn_prepared_updates;
     int64_t txn_prepared_updates_committed;
     int64_t txn_prepared_updates_key_repeated;

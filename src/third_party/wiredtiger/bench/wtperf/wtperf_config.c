@@ -736,7 +736,6 @@ config_sanity(WTPERF *wtperf)
     /* Various intervals should be less than the run-time. */
     if (opts->run_time > 0 &&
       ((opts->checkpoint_threads != 0 && opts->checkpoint_interval > opts->run_time) ||
-        (opts->tiered_flush_interval != 0 && opts->tiered_flush_interval > opts->run_time) ||
         opts->report_interval > opts->run_time || opts->sample_interval > opts->run_time ||
         opts->scan_interval > opts->run_time || opts->backup_interval > opts->run_time)) {
         fprintf(stderr, "interval value longer than the run-time\n");
@@ -974,10 +973,6 @@ config_opt_print(WTPERF *wtperf)
       "\t"
       "Checkpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
       opts->checkpoint_threads, opts->checkpoint_interval);
-    printf(
-      "\t"
-      "Flush interval: %" PRIu32 "\n",
-      opts->tiered_flush_interval);
     printf(
       "\t"
       "Reporting interval: %" PRIu32 "\n",

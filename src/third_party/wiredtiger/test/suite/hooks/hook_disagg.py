@@ -104,9 +104,6 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     if 'compatibility=' in conn_config:
         skip_test("cannot run disagg hook on a test that requires compatibility in the config string")
 
-    if 'tiered_storage=' in conn_config:
-        skip_test("cannot run disagg hook on a test that uses tiered_storage in the config string")
-
     page_log_extension = WiredTigerTestCase.findExtension('page_log', page_log_name)
     if len(page_log_extension) == 0:
         raise RuntimeError(page_log_name + ' storage source extension not found')
@@ -272,8 +269,6 @@ def session_alter_replace(orig_session_alter, session_self, uri, config):
     return orig_session_alter(session_self, uri, config)
 
 # Called to replace Session.checkpoint.
-# We add a call to flush_tier during every checkpoint to make sure we are exercising disagg
-# functionality.
 def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
     # We cannot do named checkpoints with disagg storage objects.
     # We can't really continue the test without the name, as the name will certainly be used.
@@ -415,7 +410,6 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
             ("test_cursor_bound",    "Can't use cursor bounds with a disagg table"),
             ("test_import",          "Can't import a disagg table"),
             ("test_salvage",         "Salvage is not currently supported for disagg"), # FIXME-WT-14740
-            ("tiered",               "Tiered tests do not apply to disagg"),
         ]
 
         for (skip_string, skip_reason) in skip_categories:

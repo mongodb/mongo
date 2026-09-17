@@ -67,7 +67,7 @@ checkpoint(void *arg)
     u_int counter, max_secs, secs;
     char config_buf[64];
     const char *ckpt_config, *ckpt_vrfy_name;
-    bool backup_locked, ebusy_ok, flush_tier, named_checkpoints;
+    bool backup_locked, ebusy_ok, named_checkpoints;
 
     (void)arg;
 
@@ -78,9 +78,6 @@ checkpoint(void *arg)
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     named_checkpoints = true;
-    /* Tiered tables do not support named checkpoints. */
-    if (g.tiered_storage_config)
-        named_checkpoints = false;
     /* Named checkpoints are not allowed with disaggregated storage. */
     if (g.disagg_storage_config)
         named_checkpoints = false;
@@ -103,14 +100,7 @@ checkpoint(void *arg)
         ckpt_vrfy_name = "WiredTigerCheckpoint";
         backup_locked = ebusy_ok = false;
 
-        /*
-         * Use checkpoint with flush_tier as often as configured. Don't mix with named checkpoints,
-         * we're not interested in testing that combination.
-         */
-        flush_tier = (mmrand(&g.extra_rnd, 1, 100) <= GV(TIERED_STORAGE_FLUSH_FREQUENCY));
-        if (flush_tier)
-            ckpt_config = "flush_tier=(enabled)";
-        else if (named_checkpoints)
+        if (named_checkpoints)
             switch (mmrand(&g.extra_rnd, 1, 20)) {
             case 1:
                 /*

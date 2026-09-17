@@ -76,7 +76,6 @@ func_ok()
         -e '/int __wt_block_compact_start$/d' \
         -e '/int __wt_block_disagg_manager_create$/d' \
         -e '/int __wt_block_manager_size$/d' \
-        -e '/int __wt_block_tiered_load$/d' \
         -e '/int __wt_block_write_size$/d' \
         -e '/int __wt_btcur_skip_page$/d' \
         -e '/int __wt_buf_catfmt$/d' \
@@ -153,11 +152,6 @@ func_ok()
         -e '/int demo_file_sync$/d' \
         -e '/int demo_fs_directory_list_free$/d' \
         -e '/int demo_fs_exist$/d' \
-        -e '/int dir_store_directory_list_free$/d' \
-        -e '/int dir_store_err$/d' \
-        -e '/int dir_store_file_lock$/d' \
-        -e '/int dir_store_file_sync$/d' \
-        -e '/int dir_store_fs_terminate$/d' \
         -e '/int enable_disagg$/d' \
         -e '/int error_handler$/d' \
         -e '/int fail_file_lock$/d' \

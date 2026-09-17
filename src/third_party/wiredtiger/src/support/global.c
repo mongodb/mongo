@@ -62,8 +62,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
   {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
   {"split_5", WT_TIMING_STRESS_SPLIT_5}, {"split_6", WT_TIMING_STRESS_SPLIT_6},
-  {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8},
-  {"tiered_flush_finish", WT_TIMING_STRESS_TIERED_FLUSH_FINISH}, {NULL, 0}};
+  {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8}, {NULL, 0}};
 
 /*
  * __endian_check --
@@ -355,11 +354,6 @@ __global_once(void)
     __wt_process.checksum_with_seed = wiredtiger_crc32c_with_seed_func();
 
     __global_setup_clock();
-
-    /* Run-time configuration. */
-#ifdef WT_STANDALONE_BUILD
-    __wt_process.tiered_shared_2023 = true;
-#endif
 }
 
 /*

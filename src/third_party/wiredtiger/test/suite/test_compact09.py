@@ -50,9 +50,6 @@ class test_compact09(compact_util):
 
     # Test the exclude list functionality of the background compaction server.
     def test_compact09(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create and populate tables.
         uris = []
         for i in range(self.n_tables):

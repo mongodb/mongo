@@ -73,14 +73,14 @@ class test_disagg_checkpoint_size07(wttest.WiredTigerTestCase):
         return ret == 0
 
     def insert(self, uri, nrows, start=0):
-        ts = getattr(self, '_insert_ts', 0) + 1
-        self._insert_ts = ts
-        self.session.begin_transaction()
         cursor = self.session.open_cursor(uri)
         for i in range(start, start + nrows):
+            self.insert_ts += 1
+            self.session.begin_transaction()
             cursor[str(i)] = str(i) + 'x' * self.value_size
+            self.session.commit_transaction(
+                'commit_timestamp=' + self.timestamp_str(self.insert_ts))
         cursor.close()
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
 
     def get_checkpoint_size(self, uri):
         """The size of a file's most recent checkpoint, as the database size counts it."""
@@ -116,6 +116,8 @@ class test_disagg_checkpoint_size07(wttest.WiredTigerTestCase):
             f"{accumulated_database_size} : {context_message}")
 
     def test_failed_drop_does_not_shrink_database_size(self):
+        self.insert_ts = 0
+
         # Filler table for headroom.
         self.session.create(self.keep_uri, 'key_format=S,value_format=S')
         self.insert(self.keep_uri, 6000)

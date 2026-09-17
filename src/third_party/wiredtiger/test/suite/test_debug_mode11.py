@@ -54,7 +54,6 @@ class test_debug_mode11(wttest.WiredTigerTestCase):
                 self.assertEqual(value, exp_value,
                                 f"Expected value for key {key} to be {exp_value} but got {value}")
 
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_skip_shutdown_checkpoint_restart_visibility(self):
         # Build a baseline on an explicit checkpoint.
         self.session.create(self.uri, self.create_config)

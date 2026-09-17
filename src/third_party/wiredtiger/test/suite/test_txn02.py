@@ -34,7 +34,6 @@ from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest
 
-@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     logmax = "100K"

@@ -34,7 +34,6 @@ from helper import simulate_crash_restart
 
 #
 # Test precise checkpoint with fast truncate
-@wttest.skip_for_hook("tiered", "fast truncate is not supported for tiered yet")
 class test_checkpoint34(wttest.WiredTigerTestCase):
 
     format_values = [

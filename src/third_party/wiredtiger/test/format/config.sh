@@ -397,10 +397,6 @@ CONFIG configuration_list[] = {
 
 {"stress.split_8", "stress splits (#8)", C_BOOL, 2, 0, 0}
 
-{"tiered_storage.flush_frequency", "calls to checkpoint that are flush_tier, if tiered storage enabled (percentage)", 0x0, 0, 50, 100 }
-
-{"tiered_storage.storage_source", "storage source used (dir_store | none | off)", C_IGNORE | C_STRING, 0, 0, 0}
-
 {"transaction.implicit", "implicit, without timestamps, transactions (percentage)", 0, 0, 100, 100}
 
 {"transaction.operation_timeout_ms", "requested limit on the time taken to complete operations in this transaction", 0, 0, 0, UINT_MAX}

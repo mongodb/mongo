@@ -38,7 +38,6 @@ import math
 # Verify checkpoint progress verbose logging emits intermediate progress messages for
 # short checkpoints when page-write backoff thresholds are crossed.
 @wttest.skip_for_hook("disagg", "Checkpoint progress output is different under disagg")
-@wttest.skip_for_hook("tiered", "Checkpoint progress output is different under tiered storage")
 class test_verbose05(test_verbose_base):
 
     test_name = __qualname__

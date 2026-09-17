@@ -53,14 +53,6 @@ class BaseDataSet(object):
         # If the timestamp generator is not set, get it from the test case.
         self.timestamp = kwargs.get('timestamp', testcase.getTimestamp())
 
-        # Get the tier populate share from the hook.
-        tier_share_percent = testcase.getTierSharePercent()
-        self.tier_share_value = (tier_share_percent * self.rows) // 100
-
-        # Get the tier cache share from the hook.
-        tier_cache_percent = testcase.getTierCachePercent()
-        self.tier_cache_value =  (tier_cache_percent * self.rows) // 100
-
     def create(self):
         self.testcase.session.create(self.uri, 'key_format=' + self.key_format
                                      + ',value_format=' + self.value_format
@@ -86,16 +78,6 @@ class BaseDataSet(object):
     def store_range(self, key, count, variant=1):
         c = self.open_cursor()
         for i in range(key, key + count):
-            # Flush the data to tiered storage.
-            if self.tier_share_value != 0 and self.tier_share_value == i:
-                self.testcase.session.checkpoint('flush_tier=(enabled,force=true)')
-            # Move the data from local cache to local disk by checkpointing and
-            # re-opening a connection.
-            if self.tier_cache_value != 0 and self.tier_cache_value == i:
-                c.close()
-                self.testcase.session.checkpoint('force=true')
-                self.testcase.reopen_conn()
-                c = self.open_cursor()
             self.store_one_cursor(c, i, variant)
         c.close()
 

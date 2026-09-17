@@ -112,7 +112,7 @@ static void WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn)) subtest_run(TEST_OPTS *opts)
      * WT_PANIC and calls _exit(EXIT_SUCCESS) before the diagnostic abort check in
      * __wt_panic_func.
      */
-    testutil_wiredtiger_open(opts, opts->home, "create", &event_handler, &conn, false, false);
+    testutil_wiredtiger_open(opts, opts->home, "create", &event_handler, &conn, false);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 

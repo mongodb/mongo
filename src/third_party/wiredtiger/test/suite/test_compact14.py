@@ -39,9 +39,6 @@ class test_compact14(compact_util):
     table_numkv = 1
 
     def test_compact14(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create an table and populate small amount of data.
         uri = f"table:{self.test_name}"
         self.session.create(uri, self.create_params)

@@ -135,11 +135,7 @@ class test_truncate16(wttest.WiredTigerTestCase):
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
         fastdelete_pages = self.get_stat(stat.conn.rec_page_delete_fast)
-        if self.runningHook('tiered'):
-            # There's no way the test can guess whether fast delete is possible when
-            # flush_tier calls are "randomly" inserted.
-            pass
-        elif self.trunc_with_remove:
+        if self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
@@ -160,11 +156,7 @@ class test_truncate16(wttest.WiredTigerTestCase):
         # It should have instantiated the page under the key we read, and nothing else.
         # (But not if we weren't fast-deleting.)
         read_deleted = self.get_stat(stat.conn.cache_read_deleted)
-        if self.runningHook('tiered'):
-            # There's no way the test can guess whether fast delete is possible when
-            # flush_tier calls are "randomly" inserted.
-            pass
-        elif self.trunc_with_remove:
+        if self.trunc_with_remove:
             self.assertEqual(read_deleted, 0)
         else:
             self.assertEqual(read_deleted, 1)

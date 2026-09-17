@@ -11,11 +11,11 @@
 /*
  * __wt_session_prefetch_check --
  *     Check if pre-fetching should be triggered for a given ref. Pre-fetching is skipped for
- *     internal sessions, internal pages, tiered tables, special btree handles, an overwhelmed
- *     prefetch queue, and sessions that have not yet read enough pages from disk to justify it.
- *     Internal pages are excluded because identifying which leaf pages to preload from an internal
- *     page traversal is non-trivial. A session that has declared a scan skips the two checks that
- *     only exist to guess at what it has already stated.
+ *     internal sessions, internal pages, special btree handles, an overwhelmed prefetch queue, and
+ *     sessions that have not yet read enough pages from disk to justify it. Internal pages are
+ *     excluded because identifying which leaf pages to preload from an internal page traversal is
+ *     non-trivial. A session that has declared a scan skips the two checks that only exist to guess
+ *     at what it has already stated.
  */
 bool
 __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -28,10 +28,6 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
     scan = session->pf.scan_hint;
 
     WT_STAT_CONN_INCR(session, prefetch_attempts);
-
-    if (__wt_atomic_load_enum_relaxed(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED ||
-      __wt_atomic_load_enum_relaxed(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED_TREE)
-        return (false);
 
     if (__wt_tsan_suppress_load_uint64(&S2C(session)->prefetch.queue_count) >
       WT_MAX_PREFETCH_QUEUE) {

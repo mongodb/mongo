@@ -16,11 +16,9 @@
  *     for and instantiate a storage source.
  */
 int
-__wt_block_disagg_manager_create(
-  WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage, const char *filename)
+__wt_block_disagg_manager_create(WT_SESSION_IMPL *session, const char *filename)
 {
     WT_UNUSED(session);
-    WT_UNUSED(bstorage);
     WT_UNUSED(filename);
 
     /*

@@ -94,10 +94,6 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_LAYERED]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_table_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TABLE]));
-    WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_count,
-      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED]));
-    WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_tree_count,
-      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED_TREE]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_checkpoint_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_checkpoint_count));
     WT_STATP_CONN_SET(session, stats, rec_split_stashed_objects,

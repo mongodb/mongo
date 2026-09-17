@@ -64,7 +64,7 @@ struct __wt_table {
     WT_INDEX **indices;
     size_t idx_alloc;
 
-    bool cg_complete, idx_complete, is_simple, is_tiered_shared;
+    bool cg_complete, idx_complete, is_simple;
     u_int ncolgroups, nindices, nkey_columns;
 };
 
@@ -172,10 +172,9 @@ struct __wt_import_list {
 
 /*
  * Tables without explicit column groups have a single default column group containing all of the
- * columns except tiered shared table as it contains two column groups to represent active and
- * shared tables.
+ * columns.
  */
-#define WT_COLGROUPS(t) WT_MAX((t)->ncolgroups, (u_int)((t)->is_tiered_shared ? 2 : 1))
+#define WT_COLGROUPS(t) WT_MAX((t)->ncolgroups, (u_int)1)
 
 /* Helpers for the locked state of the handle list and table locks. */
 #define WT_SESSION_LOCKED_HANDLE_LIST \

@@ -33,7 +33,6 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 
 # Test that rollback to stable does not abort schema operations that are done
 # as they don't have transaction support
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable09(test_rollback_to_stable_base):
 
     colstore_values = [

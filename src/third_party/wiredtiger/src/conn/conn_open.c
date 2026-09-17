@@ -102,7 +102,6 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_checkpoint_server_destroy(session));
     WT_TRET(__wti_disagg_deferred_pickup_server_destroy(session));
     WT_TRET(__wti_statlog_destroy(session, true));
-    WT_TRET(__wti_tiered_storage_destroy(session, false));
     WT_TRET(__wti_sweep_destroy(session));
     WT_TRET(__wti_prefetch_destroy(session));
     WT_TRET(__wt_checkpoint_parallel_thread_destroy(session));
@@ -149,7 +148,6 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_conn_remove_encryptor(session));
     WT_TRET(__wti_conn_remove_key_provider(session));
     WT_TRET(__wti_conn_remove_page_log(session));
-    WT_TRET(__wti_conn_remove_storage_source(session));
 
     /* Disconnect from shared cache - must be before cache destroy. */
     WT_TRET(__wt_cache_pool_destroy(session));
@@ -257,14 +255,10 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      *
      * As it stands, __wt_conn_is_disagg only works after we have metadata access, which depends on
      * having run recovery, so the config hack is the simplest way to break that dependency.
-     *
-     * Note that tiered storage does not work in disagg mode. We need this check to ensure the
-     * tiered serer is not started when disagg is enabled.
      */
     WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
     bool disagg = (cval.len != 0);
 
-    WT_RET(__wti_tiered_storage_create(session, disagg));
     WT_RET(__wt_logmgr_create(session));
 
     /* Initialize the page history tracker. */

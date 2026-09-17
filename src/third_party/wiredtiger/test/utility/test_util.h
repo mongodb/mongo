@@ -68,10 +68,6 @@ extern "C" {
 #include "windows_shim.h"
 #endif
 
-#define DIR_STORE_BUCKET_NAME "bucket"
-
-#define DIR_STORE "dir_store"
-
 #define TESTUTIL_ENV_CONFIG_DISAGG                               \
     ",disaggregated=(role=%s,page_log=%s,drain_threads=%" PRIu64 \
     ")"                                                          \
@@ -84,15 +80,6 @@ extern "C" {
 #define TESTUTIL_ENV_CONFIG_KEY_PROVIDER_EXT                        \
     ",\"%s/ext/test/key_provider/libwiredtiger_key_provider.so\"=(" \
     "early_load=true,config=(version=%d,key_expires=60,verbose=-1))"
-#define TESTUTIL_ENV_CONFIG_TIERED               \
-    ",tiered_storage=(bucket=%s"                 \
-    ",bucket_prefix=%s,local_retention=%" PRIu32 \
-    ",name=%s"                                   \
-    ",auth_token=%s)"
-#define TESTUTIL_ENV_CONFIG_TIERED_EXT                                         \
-    "\"%s/ext/storage_sources/%s/libwiredtiger_%s.so\"=("                      \
-    "config=\"(delay_ms=%" PRIu64 ",error_ms=%" PRIu64 ",force_delay=%" PRIu64 \
-    ",force_error=%" PRIu64 ",verbose=0)\")"
 #define TESTUTIL_ENV_CONFIG_REC \
     ",log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 #define TESTUTIL_ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
@@ -121,9 +108,8 @@ typedef struct {
     const char *argv0; /* Exec name */
     char usage[512];   /* Usage string for this parser */
 
-    const char *progname;        /* Truncated program name */
-    char *build_dir;             /* Build directory path */
-    char *tiered_storage_source; /* Tiered storage source */
+    const char *progname; /* Truncated program name */
+    char *build_dir;      /* Build directory path */
 
     enum {
         TABLE_NOT_SET = 0, /* Not explicitly set */
@@ -139,20 +125,15 @@ typedef struct {
     uint64_t data_seed;      /* Random seed for data ops */
     uint64_t extra_seed;     /* Random seed for extra ops */
 
-    uint64_t delay_ms;        /* Average length of delay when simulated */
-    uint64_t error_ms;        /* Average length of delay when simulated */
-    uint64_t force_delay;     /* Force a simulated network delay every N operations */
-    uint64_t force_error;     /* Force a simulated network error every N operations */
-    uint32_t local_retention; /* Local retention for tiered storage */
+    uint64_t delay_ms;    /* Average length of delay when simulated */
+    uint64_t error_ms;    /* Average length of delay when simulated */
+    uint64_t force_delay; /* Force a simulated network delay every N operations */
+    uint64_t force_error; /* Force a simulated network error every N operations */
 
-    bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
     bool compat;               /* Compatibility */
     bool do_data_ops;          /* Have schema ops use data */
     bool inmem;                /* In-memory */
-    bool make_bucket_dir;      /* Create bucket when it is a directory */
     bool preserve;             /* Don't remove files on exit */
-    bool tiered_begun;         /* Tiered storage ready */
-    bool tiered_storage;       /* Configure tiered storage */
     bool verbose;              /* Run in verbose mode */
     uint64_t nrecords;         /* Number of records */
     uint64_t nops;             /* Number of operations */
@@ -160,9 +141,6 @@ typedef struct {
     uint64_t n_append_threads; /* Number of append threads */
     uint64_t n_read_threads;   /* Number of read threads */
     uint64_t n_write_threads;  /* Number of write threads */
-
-    uint64_t tiered_flush_interval_us; /* Microseconds between flush_tier calls */
-    uint64_t tiered_flush_next_us;     /* Next tiered flush in epoch microseconds */
 
 /* Key provider modes for the disagg.key_provider configuration. */
 #define DISAGG_KEY_PROVIDER_OFF 0
@@ -587,7 +565,6 @@ void op_create_unique(void *);
 void op_cursor(void *);
 void op_drop(void *);
 bool testutil_is_flag_set(const char *);
-bool testutil_is_dir_store(TEST_OPTS *);
 void testutil_backup_create_full(WT_CONNECTION *, const char *, int, bool, uint32_t, int *);
 void testutil_backup_create_incremental(
   WT_CONNECTION *, const char *, int, int, bool, int *, int *, int *);
@@ -646,13 +623,7 @@ void testutil_format_item(WT_ITEM *item, const char *fmt, ...)
 void testutil_system_internal(const char *function, uint32_t line, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 2, 3)));
 void testutil_wiredtiger_open(
-  TEST_OPTS *, const char *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool, bool);
-void testutil_tiered_begin(TEST_OPTS *);
-void testutil_tiered_end(TEST_OPTS *);
-void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
-void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint64_t, bool *);
-void testutil_tiered_storage_configuration(
-  TEST_OPTS *, const char *, char *, size_t, char *, size_t);
+  TEST_OPTS *, const char *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool);
 uint64_t testutil_time_us(WT_SESSION *);
 #ifndef _WIN32
 void testutil_timeout_wait(uint32_t, pid_t);

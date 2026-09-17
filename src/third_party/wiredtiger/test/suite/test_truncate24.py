@@ -46,7 +46,6 @@ class test_truncate24(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(key_format_values, set_ts)
 
-    @wttest.skip_for_hook("tiered", "test depends on regular checkpoints running")
     def test_truncate24(self):
         if self.runningHook('disagg') and self.key_format == 'r':
             self.skipTest("disagg does not support column-store")

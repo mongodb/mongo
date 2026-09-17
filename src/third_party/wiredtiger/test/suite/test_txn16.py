@@ -34,7 +34,6 @@ import fnmatch, os
 from suite_subprocess import suite_subprocess
 import helper, wttest
 
-@wttest.skip_for_hook("tiered", "Fails on tiered storage")
 class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     t1 = f'table:{test_name}_1'

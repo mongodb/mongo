@@ -37,9 +37,6 @@ class test_compact06(compact_util):
     configuration_items = ['exclude=["table:a.wt"]', 'free_space_target=10MB', 'timeout=60']
 
     def test_background_compact_api(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Compaction isn't supported on tiered tables")
-
         # We cannot trigger the background compaction on a specific API. Note that the URI is
         # not relevant here, the corresponding table does not need to exist for this check.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:

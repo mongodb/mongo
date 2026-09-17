@@ -280,10 +280,6 @@ class suite_subprocess:
 
     # Run the wt utility.
 
-    # FIXME-WT-9808:
-    # The tiered hook silently interjects tiered configuration and extensions,
-    # these are not yet dealt with when running the external 'wt' process.
-    @wttest.skip_for_hook("tiered", "runWt cannot add needed extensions")
     def runWt(self, args, infilename=None,
         outfilename=None, errfilename=None, closeconn=True,
         reopensession=True, failure=False):

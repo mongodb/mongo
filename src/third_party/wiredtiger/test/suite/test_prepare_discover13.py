@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # independent issues with prepared update metadata on the ingest btree:
 #   Path 1: Version cursor truncation hides discovered prepared entries.
 #   Path 2: Ingest eviction drops prepared_id from resolved prepared updates.
-@wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover13(wttest.WiredTigerTestCase):
     test_name = __qualname__

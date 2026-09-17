@@ -80,16 +80,18 @@ class test_layered_checkpoint09(wttest.WiredTigerTestCase):
     def test_ckpt_size_verify_large_dataset(self):
         self.session.create(self.uri, self.create_session_config)
 
+        nitems = 100000
+
         # Insert data.
         cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction()
-        for i in range(100000):
+        for i in range(nitems):
+            self.session.begin_transaction()
             cursor[i] = 'a' * 100
-        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(i + 1))
         cursor.close()
 
         # Do a checkpoint.
-        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(nitems))
         self.session.checkpoint()
 
         self.verifyUntilSuccess()

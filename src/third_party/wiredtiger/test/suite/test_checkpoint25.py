@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 # This version uses timestamps.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     format_values = [
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),

@@ -31,7 +31,6 @@ import wttest
 
 
 @wttest.skip_for_hook("disagg", "Layout and eviction targets differ under disaggregated storage.")
-@wttest.skip_for_hook("tiered", "Layout and eviction targets differ under tiered storage.")
 class test_eviction06(wttest.WiredTigerTestCase):
     conn_config = (
         'cache_size=10MB,statistics=(all),eviction=(threads_min=1,threads_max=1),'

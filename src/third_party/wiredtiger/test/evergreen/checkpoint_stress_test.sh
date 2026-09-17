@@ -3,26 +3,21 @@
 set -o errexit
 set -o verbose
 
-if [ $# -ne 5 ]; then
+if [ $# -ne 4 ]; then
     echo "Error: invalid number of arguments."
-    echo "Usage: format_test_predictable.sh ${tiered} ${times} ${no_of_procs} ${wt_config} ${timestamp_config}"
+    echo "Usage: format_test_predictable.sh ${times} ${no_of_procs} ${wt_config} ${timestamp_config}"
     echo "Current args: $@"
     exit 1
 fi
 
-tiered=$1
-times=$2
-no_of_procs=$3
-wt_config=$4
-timestamp_config=$5
+times=$1
+no_of_procs=$2
+wt_config=$3
+timestamp_config=$4
 
 export WIREDTIGER_CONFIG='checkpoint_sync=0,transaction_sync=(method=none)'
 
 CMD='./test_checkpoint -h WT_TEST.$i.$t ${timestamp_config} -t r -r 2 -W 3 -n 1000000 -k 1000000 -C ${wt_config}'
-
-if [ $tiered -eq 1 ]; then
-    CMD="$CMD -PT"
-fi
 
 for i in $(seq $times); do
   for t in $(seq $no_of_procs); do

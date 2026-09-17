@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# This workload is used to measure the impact of running checkpoint with flush_tier calls.
+# This workload is used to measure rollback-to-stable latency.
 # The latency output files generated from this test will be compared against latency files
 # of other workload.
 #

@@ -29,7 +29,6 @@
 import wiredtiger
 import wttest
 
-@wttest.skip_for_hook("tiered", "test depends on metadata recovery")
 @wttest.skip_for_hook("disagg", "log tables is not supported on disagg")
 class test_recovery03(wttest.WiredTigerTestCase):
     def test_recovery03(self):

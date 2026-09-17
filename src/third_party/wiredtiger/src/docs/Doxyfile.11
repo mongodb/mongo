@@ -2266,7 +2266,6 @@ PREDEFINED             = DOXYGEN \
                          __wt_lsn:=WT_LSN \
                          __wt_modify:=WT_MODIFY \
                          __wt_session:=WT_SESSION \
-                         __wt_storage_source:=WT_STORAGE_SOURCE \
                          __wt_txn_notify:=WT_TXN_NOTIFY \
                          __F(x)=(*x)
 

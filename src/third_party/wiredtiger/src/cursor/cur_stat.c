@@ -712,22 +712,6 @@ __curstat_file_init(
 }
 
 /*
- * __curstat_tiered_init --
- *     Initialize the statistics for a tiered table.
- */
-static int
-__curstat_tiered_init(
-  WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
-{
-    /*
-     * This is currently just a wrapper for the file initialization to get block manager level
-     * statistics. If or when we want to collect statistics on objects then this function will need
-     * to use schema operations to work down from the active object to other flushed objects.
-     */
-    return (__curstat_file_init(session, uri, cfg, cst));
-}
-
-/*
  * __wt_curstat_dsrc_final --
  *     Finalize a data-source statistics cursor.
  */
@@ -804,8 +788,6 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
         WT_RET(__curstat_layered_init(session, dsrc_uri, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
         WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
-    else if (WT_PREFIX_MATCH(dsrc_uri, "tiered:"))
-        WT_RET(__curstat_tiered_init(session, dsrc_uri, cfg, cst));
     else
         return (__wt_bad_object_type(session, uri));
 

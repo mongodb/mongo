@@ -135,59 +135,58 @@ __wt_config_empty(const char *cfg[])
 #define WT_CONFIG_ENTRY_WT_CONNECTION_add_data_source 2
 #define WT_CONFIG_ENTRY_WT_CONNECTION_add_encryptor 3
 #define WT_CONFIG_ENTRY_WT_CONNECTION_add_page_log 4
-#define WT_CONFIG_ENTRY_WT_CONNECTION_add_storage_source 5
-#define WT_CONFIG_ENTRY_WT_CONNECTION_close 6
-#define WT_CONFIG_ENTRY_WT_CONNECTION_debug_info 7
-#define WT_CONFIG_ENTRY_WT_CONNECTION_load_extension 8
-#define WT_CONFIG_ENTRY_WT_CONNECTION_open_session 9
-#define WT_CONFIG_ENTRY_WT_CONNECTION_query_timestamp 10
-#define WT_CONFIG_ENTRY_WT_CONNECTION_reconfigure 11
-#define WT_CONFIG_ENTRY_WT_CONNECTION_rollback_to_stable 12
-#define WT_CONFIG_ENTRY_WT_CONNECTION_set_file_system 13
-#define WT_CONFIG_ENTRY_WT_CONNECTION_set_key_provider 14
-#define WT_CONFIG_ENTRY_WT_CONNECTION_set_timestamp 15
-#define WT_CONFIG_ENTRY_WT_CURSOR_bound 16
-#define WT_CONFIG_ENTRY_WT_CURSOR_close 17
-#define WT_CONFIG_ENTRY_WT_CURSOR_reconfigure 18
-#define WT_CONFIG_ENTRY_WT_SESSION_alter 19
-#define WT_CONFIG_ENTRY_WT_SESSION_begin_transaction 20
-#define WT_CONFIG_ENTRY_WT_SESSION_checkpoint 21
-#define WT_CONFIG_ENTRY_WT_SESSION_close 22
-#define WT_CONFIG_ENTRY_WT_SESSION_commit_transaction 23
-#define WT_CONFIG_ENTRY_WT_SESSION_compact 24
-#define WT_CONFIG_ENTRY_WT_SESSION_create 25
-#define WT_CONFIG_ENTRY_WT_SESSION_drop 26
-#define WT_CONFIG_ENTRY_WT_SESSION_log_flush 27
-#define WT_CONFIG_ENTRY_WT_SESSION_log_printf 28
-#define WT_CONFIG_ENTRY_WT_SESSION_open_cursor 29
-#define WT_CONFIG_ENTRY_WT_SESSION_prepare_transaction 30
-#define WT_CONFIG_ENTRY_WT_SESSION_prepared_id_transaction 31
-#define WT_CONFIG_ENTRY_WT_SESSION_prepared_id_transaction_uint 32
-#define WT_CONFIG_ENTRY_WT_SESSION_publish 33
-#define WT_CONFIG_ENTRY_WT_SESSION_query_timestamp 34
-#define WT_CONFIG_ENTRY_WT_SESSION_reconfigure 35
-#define WT_CONFIG_ENTRY_WT_SESSION_reset 36
-#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 37
-#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 38
-#define WT_CONFIG_ENTRY_WT_SESSION_salvage 39
-#define WT_CONFIG_ENTRY_WT_SESSION_strerror 40
-#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 41
-#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction_uint 42
-#define WT_CONFIG_ENTRY_WT_SESSION_truncate 43
-#define WT_CONFIG_ENTRY_WT_SESSION_verify 44
-#define WT_CONFIG_ENTRY_colgroup_meta 45
-#define WT_CONFIG_ENTRY_file_config 46
-#define WT_CONFIG_ENTRY_file_meta 47
-#define WT_CONFIG_ENTRY_index_meta 48
-#define WT_CONFIG_ENTRY_layered_meta 49
-#define WT_CONFIG_ENTRY_object_meta 50
-#define WT_CONFIG_ENTRY_table_meta 51
-#define WT_CONFIG_ENTRY_tier_meta 52
-#define WT_CONFIG_ENTRY_tiered_meta 53
-#define WT_CONFIG_ENTRY_wiredtiger_open 54
-#define WT_CONFIG_ENTRY_wiredtiger_open_all 55
-#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 56
-#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 57
+#define WT_CONFIG_ENTRY_WT_CONNECTION_close 5
+#define WT_CONFIG_ENTRY_WT_CONNECTION_debug_info 6
+#define WT_CONFIG_ENTRY_WT_CONNECTION_load_extension 7
+#define WT_CONFIG_ENTRY_WT_CONNECTION_open_session 8
+#define WT_CONFIG_ENTRY_WT_CONNECTION_query_timestamp 9
+#define WT_CONFIG_ENTRY_WT_CONNECTION_reconfigure 10
+#define WT_CONFIG_ENTRY_WT_CONNECTION_rollback_to_stable 11
+#define WT_CONFIG_ENTRY_WT_CONNECTION_set_file_system 12
+#define WT_CONFIG_ENTRY_WT_CONNECTION_set_key_provider 13
+#define WT_CONFIG_ENTRY_WT_CONNECTION_set_timestamp 14
+#define WT_CONFIG_ENTRY_WT_CURSOR_bound 15
+#define WT_CONFIG_ENTRY_WT_CURSOR_close 16
+#define WT_CONFIG_ENTRY_WT_CURSOR_reconfigure 17
+#define WT_CONFIG_ENTRY_WT_SESSION_alter 18
+#define WT_CONFIG_ENTRY_WT_SESSION_begin_transaction 19
+#define WT_CONFIG_ENTRY_WT_SESSION_checkpoint 20
+#define WT_CONFIG_ENTRY_WT_SESSION_close 21
+#define WT_CONFIG_ENTRY_WT_SESSION_commit_transaction 22
+#define WT_CONFIG_ENTRY_WT_SESSION_compact 23
+#define WT_CONFIG_ENTRY_WT_SESSION_create 24
+#define WT_CONFIG_ENTRY_WT_SESSION_drop 25
+#define WT_CONFIG_ENTRY_WT_SESSION_log_flush 26
+#define WT_CONFIG_ENTRY_WT_SESSION_log_printf 27
+#define WT_CONFIG_ENTRY_WT_SESSION_open_cursor 28
+#define WT_CONFIG_ENTRY_WT_SESSION_prepare_transaction 29
+#define WT_CONFIG_ENTRY_WT_SESSION_prepared_id_transaction 30
+#define WT_CONFIG_ENTRY_WT_SESSION_prepared_id_transaction_uint 31
+#define WT_CONFIG_ENTRY_WT_SESSION_publish 32
+#define WT_CONFIG_ENTRY_WT_SESSION_query_timestamp 33
+#define WT_CONFIG_ENTRY_WT_SESSION_reconfigure 34
+#define WT_CONFIG_ENTRY_WT_SESSION_reset 35
+#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 36
+#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 37
+#define WT_CONFIG_ENTRY_WT_SESSION_salvage 38
+#define WT_CONFIG_ENTRY_WT_SESSION_strerror 39
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 40
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction_uint 41
+#define WT_CONFIG_ENTRY_WT_SESSION_truncate 42
+#define WT_CONFIG_ENTRY_WT_SESSION_verify 43
+#define WT_CONFIG_ENTRY_colgroup_meta 44
+#define WT_CONFIG_ENTRY_file_config 45
+#define WT_CONFIG_ENTRY_file_meta 46
+#define WT_CONFIG_ENTRY_index_meta 47
+#define WT_CONFIG_ENTRY_layered_meta 48
+#define WT_CONFIG_ENTRY_object_meta 49
+#define WT_CONFIG_ENTRY_table_meta 50
+#define WT_CONFIG_ENTRY_tier_meta 51
+#define WT_CONFIG_ENTRY_tiered_meta 52
+#define WT_CONFIG_ENTRY_wiredtiger_open 53
+#define WT_CONFIG_ENTRY_wiredtiger_open_all 54
+#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 55
+#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 56
 
 extern const char __WT_CONFIG_CHOICE_NULL[]; /* not set in configuration */
 extern const char __WT_CONFIG_CHOICE_DRAM[];
@@ -353,8 +352,6 @@ extern const char __WT_CONFIG_CHOICE_stable_timestamp[];
 extern const char __WT_CONFIG_CHOICE_sweep[];
 extern const char __WT_CONFIG_CHOICE_temporary[];
 extern const char __WT_CONFIG_CHOICE_thread_group[];
-extern const char __WT_CONFIG_CHOICE_tiered[];
-extern const char __WT_CONFIG_CHOICE_tiered_flush_finish[];
 extern const char __WT_CONFIG_CHOICE_timestamp[];
 extern const char __WT_CONFIG_CHOICE_transaction[];
 extern const char __WT_CONFIG_CHOICE_tree_walk[];

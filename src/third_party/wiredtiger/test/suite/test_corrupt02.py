@@ -36,7 +36,6 @@ from metadata_helper import checkpoint_extent_list_blocks
 # use-after-free), and it also tripped the checkpoint-validate diagnostics with a spurious
 # "__assert_ckpt_matches" abort. With corruption_abort disabled the corrupt read should now surface
 # as an ordinary WT_PANIC the application can handle, not a crash.
-@wttest.skip_for_hook("tiered", "corrupts local block files not used by tiered storage")
 @wttest.skip_for_hook("disagg", "corrupts blocks which are not relevant for disagg")
 class test_corrupt02(wttest.WiredTigerTestCase):
     conn_config = ('cache_size=50MB,statistics=(fast),debug_mode=(corruption_abort=false),'

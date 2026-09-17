@@ -27,6 +27,25 @@ The steps are as follows:
 -# Finally drop the FLCS table.
 
 </dd>
+
+<dt>Tiered storage is removed</dt>
+<dd>
+Tiered storage is no longer supported. Checkpoint configuration
+<code>flush_tier</code> is an unknown configuration key. Connection
+reconfigure <code>tiered_storage</code> is an unknown configuration key. The
+<code>WT_STORAGE_SOURCE</code> interface,
+<code>WT_CONNECTION.add_storage_source</code>, and
+<code>WT_CONNECTION.get_storage_source</code> have been removed.
+Opening a <code>tiered:</code>, <code>object:</code>, or <code>tier:</code>
+URI is refused. The connection verbose choice \c tiered is no longer
+recognized. The \c dir_store extension is no longer provided.
+
+<code>wiredtiger_open</code> and table or file <code>tiered_storage</code>
+configuration, and the file <code>tiered_object</code> setting, still parse,
+so leftover keys in existing metadata do not cause an error. New table and
+file creates do not persist these keys.
+</dd>
+</dl> <hr>
 @section version_1131 Upgrading to Version 11.3.1
 <dl>
 

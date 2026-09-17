@@ -87,7 +87,6 @@ class test_sweep03(sweep_util, suite_subprocess):
         # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_disable_idle_timeout_drop_force(self):
         # Create a table to drop. A drop should close its associated handle
         drop_uri = '%s.%s' % (self.uri, "force_drop_test")
@@ -129,7 +128,6 @@ class test_sweep03(sweep_util, suite_subprocess):
 
     # FIXME-WT-16757: Enable on disagg once issue has been investigated.
     @wttest.skip_for_hook("disagg", "Fails with disagg")
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_disable_idle_timeout_drop(self):
         # Create a table to drop. A drop should close its associated handles
         drop_uri = '%s.%s' % (self.uri, "drop_test")

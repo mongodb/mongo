@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # Check the behavior of a fast-truncated page where the truncation is not stable but
 # everything else on the page is.
 
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable36(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     session_config = 'isolation=snapshot'

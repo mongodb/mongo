@@ -37,10 +37,6 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = f'{test_name}.a'
     nentries = 1000
 
-    # Returns the .wt file extension, or in the case
-    # of tiered storage, builds the .wtobj object name.
-    # Assumes that no checkpoints are done, so we
-    # are on the first object.
     def file_name(self, name):
         return self.initialFileName('table:' + name)
 

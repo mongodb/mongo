@@ -33,7 +33,6 @@ each of which is ordered by one or more columns.
 
 <h2>Storage options</h2>
 - @subpage file_formats
-- @subpage tiered_storage
 - @subpage compression
 - @subpage encryption
 
@@ -62,7 +61,6 @@ each of which is ordered by one or more columns.
 - @subpage custom_collators
 - @subpage custom_data_sources
 - @subpage custom_file_systems
-- @subpage custom_storage_sources
 
 <h2>Performance monitoring and tuning</h2>
 - @subpage_single tune_statistics

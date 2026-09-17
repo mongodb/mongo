@@ -346,7 +346,7 @@ __drop_table(
      * In a crash, it is possible for the file metadata entry to exist even though the colgroup was
      * not created completely. In such a scenario, drop the file to keep the metadata consistent.
      *
-     * FIXME-WT-16146: Add capability for cleaning up incomplete complex and tiered tables.
+     * FIXME-WT-16146: Add capability for cleaning up incomplete complex tables.
      */
     if (!table->cg_complete && table->is_simple)
         WT_ERR(__wt_schema_drop(session, file_uri_buf->data, cfg, check_visibility));
@@ -400,165 +400,6 @@ err:
 }
 
 /*
- * __drop_tiered --
- *     Drop a tiered store.
- */
-static int
-__drop_tiered(
-  WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[], bool check_visibility)
-{
-    WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
-    WT_DATA_HANDLE *tier;
-    WT_DECL_RET;
-    WT_TIERED *tiered, tiered_tmp;
-    u_int i, localid;
-    const char *filename, *name;
-    bool exist, got_dhandle, remove_files, remove_shared;
-
-    conn = S2C(session);
-    WT_NOT_READ(got_dhandle, false);
-
-    WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
-    remove_files = cval.val != 0;
-    WT_RET(__wt_config_gets(session, cfg, "remove_shared", &cval));
-    remove_shared = cval.val != 0;
-
-    if (!remove_files && remove_shared)
-        WT_RET_MSG(session, EINVAL,
-          "drop for tiered storage object must configure removal of underlying files "
-          "if forced removal of shared objects is enabled");
-
-    name = NULL;
-    /* Get the tiered data handle. */
-    ret = __wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE);
-    if (ret == EBUSY)
-        WT_RET_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
-    WT_RET(ret);
-    got_dhandle = true;
-    tiered = (WT_TIERED *)session->dhandle;
-    /*
-     * Save a copy because we cannot release the tiered resources until after the dhandle is
-     * released and closed. We have to know if the table is busy or if the close is successful
-     * before cleaning up the tiered information.
-     */
-    __wt_tsan_suppress_memcpy(&tiered_tmp, tiered, sizeof(tiered_tmp));
-
-    /*
-     * We are about to close the dhandle. If that is successful we need to remove any tiered work
-     * from the queue relating to that dhandle. But if closing the dhandle has an error we don't
-     * remove the work. So hold the tiered lock for the duration so that the worker thread cannot
-     * race and process work for this handle.
-     */
-    __wt_spin_lock(session, &conn->tiered.tiered_lock);
-    /*
-     * Close all btree handles associated with this table. This must be done after we're done using
-     * the tiered structure because that is from the dhandle.
-     */
-    WT_ERR(__wt_session_release_dhandle(session));
-    got_dhandle = false;
-    WT_WITH_HANDLE_LIST_WRITE_LOCK(
-      session, ret = __wt_conn_dhandle_close_all(session, uri, true, force, check_visibility));
-    if (ret == EBUSY)
-        WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
-    WT_ERR(ret);
-
-    /*
-     * If closing the URI succeeded then we can remove tiered information using the saved tiered
-     * structure from above. We need the copy because the dhandle has been released.
-     */
-
-    /*
-     * We cannot remove the objects on shared storage as other systems may be accessing them too.
-     * Remove the current local file object, the tiered entry and all bucket objects from the
-     * metadata only.
-     */
-    tier = tiered_tmp.tiers[WT_TIERED_INDEX_LOCAL].tier;
-    localid = tiered_tmp.current_id;
-    if (tier != NULL) {
-        __wt_verbose_debug2(
-          session, WT_VERB_TIERED, "DROP_TIERED: drop %u local object %s", localid, tier->name);
-        WT_WITHOUT_DHANDLE(session,
-          WT_WITH_HANDLE_LIST_WRITE_LOCK(
-            session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force, false)));
-        if (ret == EBUSY)
-            WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
-        WT_ERR(ret);
-        WT_ERR(__wt_metadata_remove(session, tier->name));
-        if (remove_files) {
-            filename = tier->name;
-            WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
-            WT_ERR(__wt_meta_track_drop(session, filename));
-        }
-    }
-
-    /* Close any dhandle and remove any tier: entry from metadata. */
-    tier = tiered_tmp.tiers[WT_TIERED_INDEX_SHARED].tier;
-    if (tier != NULL) {
-        __wt_verbose_debug2(
-          session, WT_VERB_TIERED, "DROP_TIERED: drop shared object %s", tier->name);
-        WT_WITHOUT_DHANDLE(session,
-          WT_WITH_HANDLE_LIST_WRITE_LOCK(
-            session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force, false)));
-        if (ret == EBUSY)
-            WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
-        WT_ERR(ret);
-        WT_ERR(__wt_metadata_remove(session, tier->name));
-    } else
-        /* If we don't have a shared tier we better be on the first object. */
-        WT_ASSERT(session, localid == 1);
-
-    /*
-     * We remove all metadata entries for both the file and object versions of an object. The local
-     * retention means we can have both versions in the metadata. Ignore WT_NOTFOUND.
-     */
-    for (i = tiered_tmp.oldest_id; i < tiered_tmp.current_id; ++i) {
-        WT_ERR(__wt_tiered_name(session, &tiered_tmp.iface, i, WT_TIERED_NAME_LOCAL, &name));
-        __wt_verbose_debug2(
-          session, WT_VERB_TIERED, "DROP_TIERED: remove local object %s from metadata", name);
-        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
-        __wt_free(session, name);
-        WT_ERR(__wt_tiered_name(session, &tiered_tmp.iface, i, WT_TIERED_NAME_OBJECT, &name));
-        __wt_verbose_debug2(
-          session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
-        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
-        if (remove_files && tier != NULL) {
-            filename = name;
-            WT_PREFIX_SKIP_REQUIRED(session, filename, "object:");
-            WT_ERR(__wt_fs_exist(session, filename, &exist));
-            if (exist)
-                WT_ERR(__wt_meta_track_drop(session, filename));
-
-            /*
-             * If a drop operation on tiered storage is configured to force removal of shared
-             * objects, we want to remove these files after the drop operation is successful.
-             */
-            if (remove_shared)
-                WT_ERR(__wt_meta_track_drop_object(session, tiered_tmp.bstorage, filename));
-        }
-        __wt_free(session, name);
-    }
-
-    /*
-     * If everything is successful, remove any tiered work associated with this tiered handle. The
-     * dhandle has been released here but queued work may still refer to it. The queued work unit
-     * has its own reference to it and we're holding the lock so it isn't yet stale.
-     */
-    __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove work for %p", (void *)tiered);
-    __wt_tiered_remove_work(session, tiered, true);
-    __wt_spin_unlock(session, &conn->tiered.tiered_lock);
-
-    ret = __wt_metadata_remove(session, uri);
-
-err:
-    if (got_dhandle)
-        WT_TRET(__wt_session_release_dhandle(session));
-    __wt_free(session, name);
-    __wt_spin_unlock_if_owned(session, &conn->tiered.tiered_lock);
-    return (ret);
-}
-
-/*
  * __schema_drop --
  *     Process a WT_SESSION::drop operation for all supported types.
  */
@@ -588,8 +429,6 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool
         ret = __drop_layered(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __drop_table(session, uri, force, cfg, check_visibility);
-    else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __drop_tiered(session, uri, force, cfg, check_visibility);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->drop == NULL ? __wt_object_unsupported(session, uri) :
                                    dsrc->drop(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);

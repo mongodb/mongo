@@ -8,8 +8,8 @@
 
 /*
  * [block_other]: block.h
- * This file unit tests the __wt_block_header_byteswap, __wt_block_header_byteswap_copy and
- * __wt_block_eligible_for_sweep functions.
+ * This file unit tests the __wt_block_header_byteswap and __wt_block_header_byteswap_copy
+ * functions.
  */
 
 #include <catch2/catch.hpp>
@@ -159,34 +159,4 @@ TEST_CASE("Block manager: block header byteswap", "[block_other]")
     REQUIRE(to.disk_size == 12121);
     REQUIRE(to.checksum == 24358);
 #endif
-}
-
-TEST_CASE("Block manager: block eligible for sweep", "[block_other]")
-{
-    WT_BLOCK block;
-    WT_BM bm;
-
-    SECTION("Block is local")
-    {
-        block.remote = false;
-        block.objectid = 0;
-        bm.max_flushed_objectid = 0;
-
-        // Test that blocks that have been flushed are eligible for sweep.
-        REQUIRE(__wt_block_eligible_for_sweep(&bm, &block) == true);
-
-        // Test that blocks that haven't been flushed should not be eligible for sweep.
-        block.objectid = 1;
-        REQUIRE(__wt_block_eligible_for_sweep(&bm, &block) == false);
-    }
-
-    SECTION("Block is remote")
-    {
-        block.remote = true;
-        block.objectid = 0;
-        bm.max_flushed_objectid = 0;
-
-        // Only local blocks need to be swept.
-        REQUIRE(__wt_block_eligible_for_sweep(&bm, &block) == false);
-    }
 }

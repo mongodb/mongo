@@ -1385,7 +1385,6 @@ __meta_live_restore_to_meta(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, W
     if (bm->is_remote)
         return (0);
 
-    WT_ASSERT(session, bm->is_multi_handle == false);
     /* FIXME-WT-13897 Replace this with an API call into the block manager. */
     WT_FILE_HANDLE *fh = bm->block->fh->handle;
     WT_RET_NOTFOUND_OK(__wt_live_restore_fh_to_metadata(session, fh, buf));
@@ -1451,9 +1450,6 @@ __wt_meta_ckptlist_set(
 
     if (ckptlsn_str != NULL)
         WT_ERR(__wt_buf_catfmt(session, buf, ",checkpoint_lsn=(%s)", ckptlsn_str));
-
-    if (__wt_atomic_load_enum_relaxed(&dhandle->type) == WT_DHANDLE_TYPE_TIERED)
-        WT_ERR(__wt_tiered_set_metadata(session, (WT_TIERED *)dhandle, buf));
 
     WT_ERR(__ckpt_set(session, fname, buf->mem, has_lsn));
 

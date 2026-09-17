@@ -63,12 +63,6 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define ZSTD_BLK BLKCMP_PFX "zstd"
 #define ZSTD_EXT EXT_PFX EXTPATH ZSTD_PATH EXT_SFX
 
-/* Tiered Storage Extensions */
-#ifndef DIR_STORE_PATH
-#define DIR_STORE_PATH "storage_sources/dir_store/libwiredtiger_dir_store.so"
-#endif
-#define DIR_EXT EXT_PFX EXTPATH DIR_STORE_PATH EXT_SFX
-
 #define MAX_MODIFY_PCT 10
 #define MAX_MODIFY_NUM 16
 
@@ -153,12 +147,8 @@ struct __wtperf {          /* Per-database structure */
     const char *compress_ext;   /* Compression extension for conn */
     const char *compress_table; /* Compression arg to table create */
 
-    const char *tiered_ext;   /* Tiered extension for conn */
-    const char *tiered_table; /* Tiered arg to table create */
-
     WTPERF_THREAD *backupthreads; /* Backup threads */
     WTPERF_THREAD *ckptthreads;   /* Checkpoint threads */
-    WTPERF_THREAD *flushthreads;  /* Flush_tier threads */
     WTPERF_THREAD *popthreads;    /* Populate threads */
     WTPERF_THREAD *scanthreads;   /* Scan threads */
 
@@ -172,7 +162,6 @@ struct __wtperf {          /* Per-database structure */
     /* State tracking variables. */
     uint64_t backup_ops;   /* backup operations */
     uint64_t ckpt_ops;     /* checkpoint operations */
-    uint64_t flush_ops;    /* flush operations */
     uint64_t scan_ops;     /* scan operations */
     uint64_t insert_ops;   /* insert operations */
     uint64_t modify_ops;   /* modify operations */
@@ -186,7 +175,6 @@ struct __wtperf {          /* Per-database structure */
 
     volatile bool backup;    /* backup in progress */
     volatile bool ckpt;      /* checkpoint in progress */
-    volatile bool flush;     /* flush_tier in progress */
     volatile bool scan;      /* scan in progress */
     volatile bool error;     /* thread error */
     volatile bool ckpt_stop; /* notify checkpoint thread to stop */
@@ -290,7 +278,6 @@ struct __wtperf_thread {    /* Per-thread structure */
 
     TRACK backup;         /* Backup operations */
     TRACK ckpt;           /* Checkpoint operations */
-    TRACK flush;          /* Flush_tier operations */
     TRACK insert;         /* Insert operations */
     TRACK modify;         /* Modify operations */
     TRACK read;           /* Read operations */
@@ -328,7 +315,6 @@ void stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void worker_throttle(WTPERF_THREAD *);
 uint64_t sum_backup_ops(WTPERF *);
 uint64_t sum_ckpt_ops(WTPERF *);
-uint64_t sum_flush_ops(WTPERF *);
 uint64_t sum_scan_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);
 uint64_t sum_modify_ops(WTPERF *);

@@ -166,12 +166,7 @@ class test_truncate15(wttest.WiredTigerTestCase):
         # Make sure we did at least one fast-delete.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.runningHook('tiered'):
-            # There's no way the test can guess whether fast delete is possible when
-            # flush_tier calls are "randomly" inserted.
-            pass
-        else:
-            self.assertGreater(fastdelete_pages, 0)
+        self.assertGreater(fastdelete_pages, 0)
 
         # Advance stable.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))

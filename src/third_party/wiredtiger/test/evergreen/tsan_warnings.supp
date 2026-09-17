@@ -19,9 +19,6 @@ race:__log_newfile
 # calls makes diagnosing this very hard. For now suppress the surrounding function and handle this in a separate ticket.
 race:__conn_open_session
 
-# __tiered_queue_peek_empty is intentionally unsafe to avoid taking the tiered lock when it's not needed.
-race:__tiered_queue_peek_empty
-
 # __disagg_deferred_ckpt_queued is intentionally unsafe to avoid taking the deferred checkpoint queue
 # lock: a stale answer only delays the pickup server's next look at the queue.
 race:__disagg_deferred_ckpt_queued
@@ -84,7 +81,6 @@ race:__wt_leaf_page_can_split
 race:__split_insert
 race:__evict_page_dirty_update
 race:__cache_pool_server
-race:__drop_tiered
 
 # FIXME-WT-13075 Address these warnings separately as they may have perf impacts
 race:hazard.c

@@ -27,22 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
-from wtscenario import make_scenarios
 
 # Check the alter command succeeds even if the file is modified.
-class test_alter05(TieredConfigMixin, wttest.WiredTigerTestCase):
+@wttest.skip_for_hook("disagg", "session.alter is not supported in disaggregated storage")
+class test_alter05(wttest.WiredTigerTestCase):
     name = "alter05"
-    tiered_storage_sources = gen_tiered_storage_sources()
-    scenarios = make_scenarios(tiered_storage_sources)
-
-    # Setup custom connection config.
-    def conn_config(self):
-        conf = self.tiered_conn_config()
-        if conf != '':
-            conf += ','
-        conf += 'statistics=(all)'
-        return conf
+    conn_config = 'statistics=(all)'
 
     def verify_metadata(self, metastr):
         c = self.session.open_cursor('metadata:', None, None)

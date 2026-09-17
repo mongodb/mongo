@@ -146,8 +146,6 @@ __compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
      */
     if (WT_PREFIX_MATCH(uri, "file:"))
         session->compact->file_count++;
-    if (WT_PREFIX_MATCH(uri, "tiered:"))
-        WT_RET(ENOTSUP);
 
     return (0);
 }
@@ -380,11 +378,9 @@ bool
 __wt_compact_check_eligibility(WT_SESSION_IMPL *session, const char *uri)
 {
     WT_UNUSED(session);
+    WT_UNUSED(uri);
 
-    /* Tiered tables cannot be compacted. */
-    if (WT_SUFFIX_MATCH(uri, ".wtobj"))
-        return (false);
-
+    /* FIXME-WT-18481: always returns true; delete this stub and its callers. */
     return (true);
 }
 
@@ -471,8 +467,7 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
     WT_ERR(__wt_str_name_check(session, uri));
 
     if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
-      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:") &&
-      !WT_PREFIX_MATCH(uri, "tiered:")) {
+      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:")) {
         if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
             ret = dsrc->compact == NULL ?
               __wt_object_unsupported(session, uri) :

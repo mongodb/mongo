@@ -36,7 +36,6 @@ from suite_subprocess import suite_subprocess
 # Reading individual pages in follower mode without a checkpoint pickup.
 # The tool must start when the checkpoint is corrupt, and
 # `wt page -t` must read intact data pages directly off the page log.
-@wttest.skip_for_hook("tiered", "wt page does not run under tiered hook")
 class test_disagg_util03(wttest.WiredTigerTestCase, suite_subprocess,
                          DisaggConfigMixin, DisaggCorruptionMixin):
     uri = "layered:util03"

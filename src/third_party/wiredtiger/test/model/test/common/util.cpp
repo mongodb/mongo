@@ -132,7 +132,7 @@ verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing)
     WT_SESSION *session;
 
     testutil_wiredtiger_open(
-      opts, home, "log=(enabled,file_max=10M,remove=false)", nullptr, &conn, false, false);
+      opts, home, "log=(enabled,file_max=10M,remove=false)", nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     std::vector<std::string> tables = model::wt_list_tables(conn);
 
@@ -205,7 +205,7 @@ verify_workload(const model::kv_workload &workload, TEST_OPTS *opts, const std::
 
     /* Open the database that we just created. */
     WT_CONNECTION *conn;
-    testutil_wiredtiger_open(opts, home.c_str(), env_config, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, home.c_str(), env_config, nullptr, &conn, false);
 
     /* Verify. */
     std::vector<std::string> tables = model::wt_list_tables(conn);

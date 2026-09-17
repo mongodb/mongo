@@ -1534,10 +1534,6 @@ __wt_cursor_init(
       cursor->modify == __wti_cursor_modify_value_format_notsup)
         cursor->modify = __cursor_modify;
 
-    /* Tiered cursors are not yet candidates for caching. */
-    if (uri != NULL && WT_PREFIX_MATCH(uri, "tiered:"))
-        F_CLR(cursor, WT_CURSTD_CACHEABLE);
-
     /*
      * Cursors that are internal to some other cursor (such as file cursors inside a table cursor)
      * should be closed after the containing cursor. Arrange for that to happen by putting internal

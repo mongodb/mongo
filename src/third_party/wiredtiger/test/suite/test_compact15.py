@@ -42,9 +42,6 @@ class test_compact15(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(uris)
 
     def test_compact15(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         self.session.create(self.uri)
 
         if self.valid_uri:

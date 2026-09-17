@@ -212,7 +212,6 @@ struct __wt_btree {
     bool intlpage_compadjust;     /* Run-time compression adjustment */
     uint64_t maxintlpage_precomp; /* Internal page pre-compression size */
 
-    WT_BUCKET_STORAGE *bstorage;    /* Bucket storage source */
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
 
     WT_PAGE_LOG *page_log; /* Page and log service for disaggregated storage */
@@ -350,9 +349,7 @@ struct __wt_btree {
      * We flush pages from the tree (in order to make checkpoint faster), without a high-level lock.
      * To avoid multiple threads flushing at the same time, lock the tree.
      */
-    WT_SPINLOCK flush_lock;              /* Lock to flush the tree's pages */
-    uint64_t flush_most_recent_secs;     /* Wall clock time for the most recent flush */
-    wt_timestamp_t flush_most_recent_ts; /* Timestamp of the most recent flush */
+    WT_SPINLOCK flush_lock; /* Lock to flush the tree's pages */
 
 /*
  * All of the following fields live at the end of the structure so it's easier to clear everything

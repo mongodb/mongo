@@ -987,11 +987,9 @@ __recovery_file_scan(WT_RECOVERY *r)
       "scanning metadata to find the largest file ID");
 
     /*
-     * Scan through all files and tiered entries in the metadata and gather information about each
-     * entry for recovery.
+     * Scan through all files in the metadata and gather information about each entry for recovery.
      */
-    WT_RET(__recovery_metadata_scan_prefix(r, "file:", ".wtobj", __recovery_setup_file));
-    WT_RET(__recovery_metadata_scan_prefix(r, "tiered:", NULL, __recovery_setup_file));
+    WT_RET(__recovery_metadata_scan_prefix(r, "file:", NULL, __recovery_setup_file));
 
     /*
      * Set the connection level file id tracker, as such upon creation of a new file we'll begin

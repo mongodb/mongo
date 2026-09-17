@@ -52,11 +52,12 @@ class test_disagg_checkpoint_size17(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
     def insert_rows(self, cursor, start, count, value_char):
         value = value_char * 1024
-        self.ts_count = getattr(self, 'ts_count', 0) + 1
-        self.session.begin_transaction()
         for i in range(start, start + count):
+            self.ts_count += 1
+            self.session.begin_transaction()
             cursor[f'key{i:08d}'] = value
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
+            self.session.commit_transaction(
+                'commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def evict_page(self, key):
         evict = self.session.open_cursor(self.uri, None, 'debug=(release_evict)')
@@ -68,6 +69,7 @@ class test_disagg_checkpoint_size17(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.session.rollback_transaction()
 
     def test_checkpoint_cursor_does_not_clobber_live_size(self):
+        self.ts_count = 0
         nrows = 2000
 
         self.session.create(self.uri, self.table_config)

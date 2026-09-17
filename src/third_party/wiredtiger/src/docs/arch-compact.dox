@@ -72,10 +72,8 @@ with the compaction process.
 # Background compaction #
 
 Background compaction is a WiredTiger service that runs compaction autonomously on all the eligible files
-present in the database while being the least disruptive as possible. Every file is eligible unless:
-
-- it belongs to a tiered table or,
-- it is a part of the exclude list that can be configured when enabling background compaction.
+present in the database while being the least disruptive as possible. Every file is eligible unless
+it is a part of the exclude list that can be configured when enabling background compaction.
 
 Background compaction retrieves the files to compact by walking the metadata file. To limit disruption,
 background compaction reduces the number of checkpoints by skipping the first one described in the

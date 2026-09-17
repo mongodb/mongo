@@ -327,22 +327,6 @@ class WiredTigerHookPlatformAPI(object):
         """The timestamp generator for this test case."""
         raise NotImplementedError('getTimestamp method not implemented')
 
-    def getTierSharePercent(self):
-        """The tier share percentage generator for this test case."""
-        raise NotImplementedError('getTierSharePercent method not implemented')
-
-    def getTierCachePercent(self):
-        """The tier cache percentage generator for this test case."""
-        raise NotImplementedError('getTierCachePercent method not implemented')
-
-    def getTierStorageSource(self):
-        """The tiered storage source for this test case."""
-        raise NotImplementedError('getTierStorageSource method not implemented')
-
-    def getTierStorageSourceConfig(self):
-        """The tiered storage source configuration for this test case."""
-        raise NotImplementedError('getTierStorageSourceConfig method not implemented')
-
 class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     def tableExists(self, name):
         tablename = name + ".wt"
@@ -361,22 +345,6 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
 
     # By default, there is no automatic timestamping by test infrastructure classes.
     def getTimestamp(self):
-        return None
-
-    # By default, all the populated data lies in the local storage.
-    def getTierSharePercent(self):
-        return 0
-
-    # By default, all the populated data lies in the cache.
-    def getTierCachePercent(self):
-        return 0
-
-    # By default, dir_store is the storage source.
-    def getTierStorageSource(self):
-        return ('dir_store')
-
-    # By default, there is no extra configuration for the storage source.
-    def getTierStorageSourceConfig(self):
         return None
 
 class MultiPlatformAPI(WiredTigerHookPlatformAPI):
@@ -428,39 +396,3 @@ class MultiPlatformAPI(WiredTigerHookPlatformAPI):
             except NotImplementedError:
                 pass
         raise Exception('getTimestamp: no implementation')  # should never happen
-
-    def getTierSharePercent(self):
-        """The tier share value for this test case."""
-        for api in self.apis:
-            try:
-                return api.getTierSharePercent()
-            except NotImplementedError:
-                pass
-        raise Exception('getTierSharePercent: no implementation')  # should never happen
-
-    def getTierCachePercent(self):
-        """The tier cache value for this test case."""
-        for api in self.apis:
-            try:
-                return api.getTierCachePercent()
-            except NotImplementedError:
-                pass
-        raise Exception('getTierCachePercent: no implementation')  # should never happen
-
-    def getTierStorageSource(self):
-        """The tier storage source for this test case."""
-        for api in self.apis:
-            try:
-                return api.getTierStorageSource()
-            except NotImplementedError:
-                pass
-        raise Exception('getTierStorageSource: no implementation')  # should never happen
-
-    def getTierStorageSourceConfig(self):
-        """The tier storage source configuration for this test case."""
-        for api in self.apis:
-            try:
-                return api.getTierStorageSourceConfig()
-            except NotImplementedError:
-                pass
-        raise Exception('getTierStorageSourceCOnfig: no implementation')  # should never happen

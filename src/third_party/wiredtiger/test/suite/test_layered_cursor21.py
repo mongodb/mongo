@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 # all-deleted-scattered case (tombstones in both ingest and stable).
 
 @disagg_test_class
-@wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
 class test_layered_cursor21(wttest.WiredTigerTestCase):
 
     test_name = __qualname__

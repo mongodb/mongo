@@ -624,9 +624,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
                   "%s: the disaggregated block manager requires a page log, none is configured for "
                   "this table or connection",
                   btree->dhandle->name);
-
-            /* A page log service and a storage source cannot both be enabled. */
-            WT_ASSERT(session, btree->bstorage == NULL);
         }
     }
 
@@ -699,28 +696,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         F_CLR(btree, WT_BTREE_LOGGED);
     }
 
-    WT_RET(__wt_config_gets(session, cfg, "tiered_object", &cval));
-    if (cval.val)
-        F_SET(btree, WT_BTREE_NO_CHECKPOINT);
-    else
-        F_CLR(btree, WT_BTREE_NO_CHECKPOINT);
-
     /* Page sizes */
     WT_RET(__btree_page_sizes(session));
-
-    /* Get the last flush times for tiered storage, if applicable. */
-    btree->flush_most_recent_secs = 0;
-    ret = __wt_config_gets(session, cfg, "flush_time", &cval);
-    WT_RET_NOTFOUND_OK(ret);
-    if (ret == 0)
-        btree->flush_most_recent_secs = (uint64_t)cval.val;
-
-    btree->flush_most_recent_ts = WT_TS_NONE;
-    ret = __wt_config_gets(session, cfg, "flush_timestamp", &cval);
-    WT_RET_NOTFOUND_OK(ret);
-    if (ret == 0 && cval.len != 0)
-        WT_RET(__wt_txn_parse_timestamp_raw(
-          session, "flush timestamp", &btree->flush_most_recent_ts, &cval));
 
     /* Checksums */
     WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
@@ -1372,28 +1349,4 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
         btree->maxleafvalue = leaf_split_size / 2;
 
     return (0);
-}
-
-/*
- * __wt_btree_switch_object --
- *     Switch to a writeable object for a tiered btree.
- */
-int
-__wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid)
-{
-    WT_BM *bm;
-    WT_BTREE *btree;
-
-    btree = S2BT(session);
-    /* If the btree is readonly, there is nothing to do. */
-    if (F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY))
-        return (0);
-
-    /*
-     * When initially opening a tiered Btree, a tier switch is done internally without the btree
-     * being fully opened. That's okay, the btree will be told later about the current object
-     * number.
-     */
-    bm = btree->bm;
-    return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid));
 }

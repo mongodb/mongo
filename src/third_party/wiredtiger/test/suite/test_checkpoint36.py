@@ -30,7 +30,6 @@ import wttest, wiredtiger
 
 #
 # Test precise checkpoint without checkpoint timestamp
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint36(wttest.WiredTigerTestCase):
     conn_config = "precise_checkpoint=true"
 

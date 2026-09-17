@@ -34,7 +34,6 @@ from wiredtiger import stat
 # after pass. The eviction scan must still rotate to other tables once it has fully traversed that
 # table, rather than walking it over and over while other tables are never visited.
 @wttest.skip_for_hook("disagg", "Layout and eviction behavior differ under disaggregated storage.")
-@wttest.skip_for_hook("tiered", "Layout and eviction behavior differ under tiered storage.")
 class test_eviction08(wttest.WiredTigerTestCase):
     conn_config = ('cache_size=20MB,statistics=(all),'
                    'eviction=(threads_min=1,threads_max=1)')

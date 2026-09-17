@@ -56,11 +56,12 @@ class test_disagg_checkpoint_size14(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
     def insert_rows(self, cursor, start, count, value_char):
         value = value_char * 1024
-        self.ts_count = getattr(self, 'ts_count', 0) + 1
-        self.session.begin_transaction()
         for i in range(start, start + count):
+            self.ts_count += 1
+            self.session.begin_transaction()
             cursor[f'key{i:08d}'] = value
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
+            self.session.commit_transaction(
+                'commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def evict_page(self, key):
         """Force eviction of the page containing key.  May silently fail (EBUSY)."""
@@ -80,6 +81,7 @@ class test_disagg_checkpoint_size14(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
     def test_failed_install_retry_no_leak(self):
         # Aggressive workload; expect ~1 minute.
+        self.ts_count = 0
         nrows = 5000
         band = 200
         cycles = 400

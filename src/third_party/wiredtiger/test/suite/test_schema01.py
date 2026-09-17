@@ -27,8 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
-from wtscenario import make_scenarios
 
 pop_data = [
     ( 'USA', 1980, 226542250 ),
@@ -46,10 +44,9 @@ expected_out = [
 ]
 
 # Test that tables are reconciled correctly when they are empty.
-class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
+@wttest.skip_for_hook("disagg", "Disagg rewrites table: creates; this test assumes ordinary tables")
+class test_schema01(wttest.WiredTigerTestCase):
     test_name = __qualname__
-    tiered_storage_sources = gen_tiered_storage_sources()
-    scenarios = make_scenarios(tiered_storage_sources)
 
     '''Test various tree types becoming empty'''
 

@@ -325,7 +325,7 @@ test_model_basic_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "basic";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
@@ -434,7 +434,7 @@ test_model_basic_column_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "basic-column";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=r,value_format=S,log=(enabled=false)"));
@@ -618,7 +618,7 @@ test_model_basic_logged_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "basic-logged";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(session->create(session, uri, "key_format=S,value_format=S,log=(enabled=true)"));
 
@@ -785,7 +785,7 @@ test_model_truncate_wt(bool logging)
     if (logging)
         test_home += "-logged";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     std::string config = "key_format=S,value_format=S,log=(enabled=";
     config += std::string(logging ? "true" : "false") + ")";
@@ -882,7 +882,7 @@ test_model_truncate_column_wt(bool logging)
     if (logging)
         test_home += "-logged";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     std::string config = "key_format=r,value_format=S,log=(enabled=";
     config += std::string(logging ? "true" : "false") + ")";
@@ -1037,7 +1037,7 @@ test_model_oldest_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "oldest";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
@@ -1086,7 +1086,7 @@ test_model_oldest_wt(void)
     database.restart();
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* The oldest timestamp should reset, because we don't have the stable timestamp. */
@@ -1098,7 +1098,7 @@ test_model_oldest_wt(void)
     database.restart();
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_assert(database.oldest_timestamp() == wt_get_oldest_timestamp(conn));
 
@@ -1132,7 +1132,7 @@ test_model_debug_log_verify_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "debug-log";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=Q,value_format=Q,log=(enabled=false)"));

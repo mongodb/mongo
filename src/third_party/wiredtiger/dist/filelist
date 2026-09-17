@@ -16,7 +16,6 @@ src/block_cache/block_cache.c
 src/block_cache/block_io.c
 src/block_cache/block_map.c
 src/block_cache/block_mgr.c
-src/block_cache/block_tier.c
 src/block_disagg/block_disagg_addr.c
 src/block_disagg/block_disagg_ckpt.c
 src/block_disagg/block_disagg_mgr.c
@@ -106,7 +105,6 @@ src/conn/conn_prefetch.c
 src/conn/conn_reconfig.c
 src/conn/conn_stat.c
 src/conn/conn_sweep.c
-src/conn/conn_tiered.c
 src/cursor/cur_backup.c
 src/cursor/cur_backup_incr.c
 src/cursor/cur_bulk.c
@@ -259,9 +257,6 @@ src/support/stat.c
 src/support/thread_group.c
 src/support/timestamp.c
 src/support/update_vector.c
-src/tiered/tiered_config.c
-src/tiered/tiered_handle.c
-src/tiered/tiered_work.c
 src/txn/txn.c
 src/txn/txn_log.c
 src/txn/txn_recover.c

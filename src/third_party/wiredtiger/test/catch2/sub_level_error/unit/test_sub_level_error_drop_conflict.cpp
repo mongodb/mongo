@@ -12,7 +12,6 @@
 #include "wt_internal.h"
 #include "../../wrappers/connection_wrapper.h"
 #include "../utils_sub_level_error.h"
-#include "../../../utility/test_util.h"
 
 /*
  * [sub_level_error_drop_conflict]: test_sub_level_error_drop_conflict.cpp
@@ -91,35 +90,6 @@ TEST_CASE("Test WT_CONFLICT_BACKUP and WT_CONFLICT_DHANDLE",
         REQUIRE(session->drop(session, URI, NULL) == 0);
         utils::check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
-
-    /*
-     * This section gives us coverage in __drop_tiered. The dir_store extension is only supported
-     * for POSIX systems, so we skip this section on Windows.
-     */
-#ifndef _WIN32
-    SECTION("Test WT_CONFLICT_DHANDLE with tiered storage")
-    {
-        /* Set up the connection and session to use tiered storage. */
-        const char *home = "WT_TEST";
-        testutil_system("rm -rf %s && mkdir %s && mkdir %s/%s", home, home, home, "bucket");
-        connection_wrapper conn_wrapper = connection_wrapper(home,
-          "create,tiered_storage=(bucket=bucket,bucket_prefix=pfx-,name=dir_store),extensions=(./"
-          "ext/storage_sources/dir_store/libwiredtiger_dir_store.so)");
-
-        utils::prepare_session_and_error(&conn_wrapper, &session, &err_info);
-        REQUIRE(session->create(session, URI, config.c_str()) == 0);
-
-        /* Open a cursor on a table that uses tiered storage, then attempt to drop the table. */
-        REQUIRE(session->open_cursor(session, URI, NULL, NULL, &cursor) == 0);
-        REQUIRE(session->drop(session, URI, NULL) == EBUSY);
-        utils::check_error_info(err_info, EBUSY, WT_CONFLICT_DHANDLE, CONFLICT_DHANDLE_MSG);
-
-        /* Drop the table once the test is completed. */
-        cursor->close(cursor);
-        REQUIRE(session->drop(session, URI, NULL) == 0);
-        utils::check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
-    }
-#endif
 }
 
 /*

@@ -85,6 +85,19 @@ struct __wt_dhandle_clear_log {
             WT_DHANDLE_ACQUIRE(dhandle);                                                   \
     } while (0)
 
+#define WT_DHANDLE_PREV(session, dhandle, head, headname, field)                           \
+    do {                                                                                   \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST)); \
+        if ((dhandle) == NULL)                                                             \
+            (dhandle) = TAILQ_LAST(head, headname);                                        \
+        else {                                                                             \
+            WT_DHANDLE_RELEASE(dhandle);                                                   \
+            (dhandle) = TAILQ_PREV(dhandle, headname, field);                              \
+        }                                                                                  \
+        if ((dhandle) != NULL)                                                             \
+            WT_DHANDLE_ACQUIRE(dhandle);                                                   \
+    } while (0)
+
 #define WT_DHANDLE_IS_CHECKPOINT(dhandle) ((dhandle)->checkpoint != NULL)
 
 /*
@@ -104,8 +117,6 @@ enum wt_dhandle_type {
     WT_DHANDLE_TYPE_BTREE = 0,
     WT_DHANDLE_TYPE_LAYERED,
     WT_DHANDLE_TYPE_TABLE,
-    WT_DHANDLE_TYPE_TIERED,
-    WT_DHANDLE_TYPE_TIERED_TREE,
     WT_DHANDLE_TYPE_NUM /* Number of types, must be last. */
 };
 
@@ -130,9 +141,9 @@ struct __wt_data_handle {
     uint64_t orig_meta_hash;    /* Copy of base metadata hash */
     struct timespec orig_upd;   /* Time of original setup of meta base */
     /*
-     * Sessions holding a connection's data handle and queued tiered storage work units will hold
-     * references; sessions using a connection's data handle will have a non-zero in-use count.
-     * Instances of cached cursors referencing the data handle appear in session_cache_ref.
+     * Sessions holding a connection's data handle will hold references; sessions using a
+     * connection's data handle will have a non-zero in-use count. Instances of cached cursors
+     * referencing the data handle appear in session_cache_ref.
      */
     wt_shared uint32_t references;   /* References to this handle */
     wt_shared int32_t session_inuse; /* Sessions using this handle */
@@ -145,9 +156,8 @@ struct __wt_data_handle {
 
     wt_shared enum wt_dhandle_type type;
 
-#define WT_DHANDLE_BTREE(dhandle)                                                \
-    (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE || \
-      __wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_TIERED)
+#define WT_DHANDLE_BTREE(dhandle) \
+    (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE)
 
     bool compact_skip; /* If the handle failed to compact */
 

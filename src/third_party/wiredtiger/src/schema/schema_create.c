@@ -104,7 +104,7 @@ __create_file_block_manager(WT_SESSION_IMPL *session, const char *uri, const cha
          * isn't currently working. It assumes that the existing default block manager is
          * responsible for objects.
          */
-        WT_RET(__wt_block_disagg_manager_create(session, NULL, filename));
+        WT_RET(__wt_block_disagg_manager_create(session, filename));
     } else {
         WT_RET(__wt_block_manager_create(session, filename, allocsize));
 
@@ -264,18 +264,6 @@ __create_file(
      * reconstruct the configuration metadata from the file.
      */
     if (import) {
-        /*
-         * Create the file for tiered storage. It is required because we switched to a new file
-         * during the import process.
-         */
-        if (WT_SUFFIX_MATCH(filename, ".wtobj")) {
-            if (session->import_list != NULL)
-                WT_ERR(__create_file_block_manager(session, uri, filename, allocsize, filecfg));
-            else
-                WT_ERR_MSG(session, ENOTSUP,
-                  "%s: import without metadata_file not supported on tiered files", uri);
-        }
-
         /* First verify that the data to import exists on disk. */
         WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
         if (!exists)
@@ -306,12 +294,6 @@ __create_file(
                     cval.len -= 2;
                 }
                 WT_ERR(__wt_strndup(session, cval.str, cval.len, &filemeta));
-                /*
-                 * FIXME-WT-7735: Importing a tiered table is not yet allowed.
-                 */
-                if (__wt_config_getones(session, filemeta, "tiered_object", &cval) == 0 &&
-                  cval.val != 0)
-                    WT_ERR_MSG(session, ENOTSUP, "%s: import not supported on tiered files", uri);
                 filecfg[2] = filemeta;
                 /*
                  * If there is a file metadata provided, reconstruct the incremental backup
@@ -434,20 +416,10 @@ __schema_colgroup_source(
         prefix = cval.str;
         len = cval.len;
         suffix = "";
-    } else if ((S2C(session)->bstorage == NULL) ||
-      ((ret = __wt_config_getones(session, config, "tiered_storage.name", &cval)) == 0 &&
-        cval.len != 0 && WT_CONFIG_LIT_MATCH("none", cval))) {
-        /*
-         * If we're using tiered storage, the default is not file unless the user explicitly turns
-         * off using tiered storage for this create. Otherwise the default prefix is tiered.
-         */
+    } else {
         prefix = "file";
         len = strlen(prefix);
         suffix = ".wt";
-    } else {
-        prefix = "tiered";
-        len = strlen(prefix);
-        suffix = "";
     }
     WT_RET_NOTFOUND_OK(ret);
 
@@ -499,11 +471,11 @@ __create_import_cmp_id(const void *a, const void *b)
 }
 
 /*
- * __wt_find_import_metadata --
+ * __find_import_metadata --
  *     Find metadata entry by URI in session's import list. The list must already be sorted by uri.
  */
-int
-__wt_find_import_metadata(WT_SESSION_IMPL *session, const char *uri, const char **config)
+static int
+__find_import_metadata(WT_SESSION_IMPL *session, const char *uri, const char **config)
 {
     WT_IMPORT_ENTRY entry, *result;
 
@@ -523,72 +495,6 @@ __wt_find_import_metadata(WT_SESSION_IMPL *session, const char *uri, const char 
 }
 
 /*
- * __schema_is_tiered_storage_shared --
- *     Check whether the table is configured for tiered storage, and if so, whether the tiered table
- *     is shared.
- */
-static bool
-__schema_is_tiered_storage_shared(WT_SESSION_IMPL *session, const char *config)
-{
-    WT_CONFIG_ITEM cval;
-
-    /*
-     * The tiered storage shared table needs to have two column groups that point to the
-     * underlying active and shared files. The following checks are carried out to determine
-     * whether the table can be created as a tiered storage shared table or not based on
-     * the table creation configuration.
-     *
-     * A table is not a shared if any of the following are true:
-     * 1. The table configuration does not specify an underlying source.
-     * 2. The table configuration does not specify an underlying type of the storage.
-     * 3. The connection is not configured for tiered storage or the table is not
-     *    configured for tiered storage.
-     * 4. The connection is not configured for tiered storage shared or the table is
-     *    not configured for tiered storage shared.
-     */
-    if (__wt_config_getones(session, config, "source", &cval) == 0 && cval.len != 0)
-        return (false);
-    else if (__wt_config_getones(session, config, "type", &cval) == 0 &&
-      !WT_CONFIG_LIT_MATCH("file", cval))
-        return (false);
-    else if ((S2C(session)->bstorage == NULL) ||
-      (__wt_config_getones(session, config, "tiered_storage.name", &cval) == 0 && cval.len != 0 &&
-        WT_CONFIG_LIT_MATCH("none", cval)))
-        return (false);
-    else if (!S2C(session)->bstorage->tiered_shared ||
-      ((__wt_config_getones(session, config, "tiered_storage.shared", &cval) == 0) && !cval.val))
-        return (false);
-
-    return (true);
-}
-
-/*
- * __schema_tiered_shared_colgroup_source --
- *     Get the tiered storage shared URI of the data source for a column group. For a shared tiered
- *     table named table:name the active table is always file:name.wt and the shared table is
- *     tiered:name which points to the shared components.
- */
-static int
-__schema_tiered_shared_colgroup_source(
-  WT_SESSION_IMPL *session, WT_TABLE *table, bool active, WT_ITEM *buf)
-{
-    size_t len;
-    const char *prefix, *suffix, *tablename;
-
-    tablename = table->iface.name + strlen("table:");
-    if (active) {
-        prefix = "file";
-        suffix = ".wt";
-    } else {
-        prefix = "tiered";
-        suffix = "";
-    }
-
-    len = strlen(prefix);
-    return (__wt_buf_fmt(session, buf, "%.*s:%s%s", (int)len, prefix, tablename, suffix));
-}
-
-/*
  * __create_colgroup --
  *     Create a column group.
  */
@@ -596,12 +502,10 @@ static int
 __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, const char *config)
 {
     WT_CONFIG_ITEM cval;
-    WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_ITEM confbuf, fmt, namebuf;
     WT_TABLE *table;
     size_t tlen;
-    int i, ncolgroups;
     char *cgconf, *origconf;
     const char **cfgp, *cfg[4] = {WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL};
     const char *cgname, *source, *sourceconf, *tablename;
@@ -616,7 +520,7 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
     exists = tracked = false;
 
     if (session->import_list != NULL)
-        WT_RET(__wt_find_import_metadata(session, name, &cfg[1]));
+        WT_RET(__find_import_metadata(session, name, &cfg[1]));
 
     tablename = name;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "colgroup:");
@@ -646,94 +550,69 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
         WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : ret,
           "Column group '%s' not found in table '%.*s'", cgname, (int)tlen, tablename);
 
-    WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    /*
-     * A simple table have default one column group except the tiered storage shared table that will
-     * have default 2 column groups.
-     */
-    ncolgroups = table->is_tiered_shared ? 2 : 1;
-    for (i = 0; i < ncolgroups; i++) {
-        /* Get the column group name. */
-        if (table->is_tiered_shared) {
-            WT_ERR(__wt_schema_tiered_shared_colgroup_name(
-              session, tablename, i == 0 ? true : false, buf));
-            name = buf->data;
-        }
+    /* Check if the column group already exists. */
+    if ((ret = __wt_metadata_search(session, name, &origconf)) == 0) {
+        if (exclusive)
+            WT_ERR(EEXIST);
+        exists = true;
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
-        /* Check if the column group already exists. */
-        if ((ret = __wt_metadata_search(session, name, &origconf)) == 0) {
-            if (exclusive)
-                WT_ERR(EEXIST);
-            exists = true;
-        }
-        WT_ERR_NOTFOUND_OK(ret, false);
+    /* Find the first NULL entry in the cfg stack. */
+    for (cfgp = &cfg[1]; *cfgp; cfgp++)
+        ;
 
-        /* Find the first NULL entry in the cfg stack. */
-        for (cfgp = &cfg[1]; *cfgp; cfgp++)
-            ;
+    /* Add the source to the colgroup config before collapsing. */
+    if (__wt_config_getones(session, config, "source", &cval) == 0 && cval.len != 0) {
+        WT_ERR(__wt_buf_fmt(session, &namebuf, "%.*s", (int)cval.len, cval.str));
+        source = namebuf.data;
+    } else {
+        WT_ERR(__schema_colgroup_source(session, table, cgname, config, &namebuf));
+        source = namebuf.data;
+        WT_ERR(__wt_buf_fmt(session, &confbuf, "source=\"%s\"", source));
+        *cfgp++ = confbuf.data;
+    }
 
-        /* Add the source to the colgroup config before collapsing. */
-        if (__wt_config_getones(session, config, "source", &cval) == 0 && cval.len != 0) {
-            WT_ERR(__wt_buf_fmt(session, &namebuf, "%.*s", (int)cval.len, cval.str));
-            source = namebuf.data;
-        } else if (table->is_tiered_shared) {
-            WT_ERR(__schema_tiered_shared_colgroup_source(
-              session, table, i == 0 ? true : false, &namebuf));
-            source = namebuf.data;
-            WT_ERR(__wt_buf_fmt(session, &confbuf, "source=\"%s\"", source));
-            *cfgp++ = confbuf.data;
-        } else {
-            WT_ERR(__schema_colgroup_source(session, table, cgname, config, &namebuf));
-            source = namebuf.data;
-            WT_ERR(__wt_buf_fmt(session, &confbuf, "source=\"%s\"", source));
-            *cfgp++ = confbuf.data;
-        }
-
-        if (session->import_list != NULL)
-            /* Use the import configuration, it should have key and value format configurations. */
-            WT_ERR(__wt_find_import_metadata(session, source, &sourcecfg[0]));
+    if (session->import_list != NULL)
+        /* Use the import configuration, it should have key and value format configurations. */
+        WT_ERR(__find_import_metadata(session, source, &sourcecfg[0]));
+    else {
+        /* Calculate the key/value formats: these go into the source config. */
+        WT_ERR(__wt_buf_fmt(session, &fmt, "key_format=%s", table->key_format));
+        if (cgname == NULL)
+            WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format=%s", table->value_format));
         else {
-            /* Calculate the key/value formats: these go into the source config. */
-            WT_ERR(__wt_buf_fmt(session, &fmt, "key_format=%s", table->key_format));
-            if (cgname == NULL)
-                WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format=%s", table->value_format));
-            else {
-                if (__wt_config_getones(session, config, "columns", &cval) != 0)
-                    WT_ERR_MSG(session, EINVAL, "No 'columns' configuration for '%s'", name);
-                WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format="));
-                WT_ERR(__wt_struct_reformat(session, table, cval.str, cval.len, NULL, true, &fmt));
-            }
-
-            /*
-             * FIXME-WT-16164: __wt_config_merge expects that the config array passed to it is not
-             * sparsely populated. If the first element is NULL the config merge will not return
-             * anything useful. This ternary achieves that semantic. However there is likely a
-             * better, holistic fix here.
-             */
-            sourcecfg[config == NULL ? 0 : 1] = fmt.data;
+            if (__wt_config_getones(session, config, "columns", &cval) != 0)
+                WT_ERR_MSG(session, EINVAL, "No 'columns' configuration for '%s'", name);
+            WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format="));
+            WT_ERR(__wt_struct_reformat(session, table, cval.str, cval.len, NULL, true, &fmt));
         }
 
-        __wt_free(session, sourceconf);
-        WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
-        WT_ERR(__wt_schema_create(session, source, sourceconf));
+        /*
+         * FIXME-WT-16164: __wt_config_merge expects that the config array passed to it is not
+         * sparsely populated. If the first element is NULL the config merge will not return
+         * anything useful. This ternary achieves that semantic. However there is likely a better,
+         * holistic fix here.
+         */
+        sourcecfg[config == NULL ? 0 : 1] = fmt.data;
+    }
 
-        __wt_free(session, cgconf);
-        WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
+    __wt_free(session, sourceconf);
+    WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
+    WT_ERR(__wt_schema_create(session, source, sourceconf));
 
-        __wti_debug_crash_if_flag_set(session, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP,
-          "before inserting a colgroup", name);
+    __wt_free(session, cgconf);
+    WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 
-        if (!exists) {
-            WT_ERR(__wt_metadata_insert(session, name, cgconf));
-            WT_ERR(__wti_schema_open_colgroups(session, table));
-        }
+    __wti_debug_crash_if_flag_set(session, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP,
+      "before inserting a colgroup", name);
 
-        /* Reset the last filled configuration for the next column group. */
-        *--cfgp = NULL;
+    if (!exists) {
+        WT_ERR(__wt_metadata_insert(session, name, cgconf));
+        WT_ERR(__wti_schema_open_colgroups(session, table));
     }
 
 err:
-    __wt_scr_free(session, &buf);
     __wt_free(session, cgconf);
     __wt_free(session, sourceconf);
     __wt_free(session, origconf);
@@ -1027,7 +906,7 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
          * in the config.
          */
         if (session->import_list != NULL)
-            WT_ERR(__wt_find_import_metadata(session, uri, &cfg[1]));
+            WT_ERR(__find_import_metadata(session, uri, &cfg[1]));
         else if (!import_repair) {
             __wt_config_init(session, &conf, config);
             for (nkeys = 0; (ret = __wt_config_next(&conf, &ckey, &cval)) == 0; nkeys++)
@@ -1056,15 +935,7 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
 
     WT_ERR(__wt_config_collapse(session, cfg, &tablecfg));
 
-    if (__schema_is_tiered_storage_shared(session, config)) {
-        WT_ASSERT(session, import == false);
-        WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-
-        /* Concatenate the metadata base string with the tiered storage shared string. */
-        WT_ERR(__wt_buf_fmt(session, tmp, "%s,%s", tablecfg, "shared=true"));
-        WT_ERR(__wt_metadata_insert(session, uri, tmp->mem));
-    } else
-        WT_ERR(__wt_metadata_insert(session, uri, tablecfg));
+    WT_ERR(__wt_metadata_insert(session, uri, tablecfg));
 
     __wti_debug_crash_if_flag_set(session, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE,
       "before inserting a file entry for table", uri);
@@ -1277,149 +1148,6 @@ err:
 }
 
 /*
- * __tiered_metadata_insert --
- *     Wrapper function to insert the tiered object metadata entry.
- */
-static int
-__tiered_metadata_insert(WT_SESSION_IMPL *session, const char *uri, const char **config)
-{
-    WT_DECL_RET;
-    const char *metadata;
-
-    WT_RET(__wt_config_tiered_strip(session, config, &metadata));
-    ret = __wt_metadata_insert(session, uri, metadata);
-    __wt_free(session, metadata);
-
-    return (ret);
-}
-
-/*
- * __create_object --
- *     Create a tiered object for the given name.
- */
-static int
-__create_object(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
-{
-    const char *cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL};
-
-    WT_UNUSED(exclusive);
-    cfg[1] = config;
-
-    if (__wt_conn_is_disagg(session))
-        WT_RET_MSG(session, ENOTSUP, "Tiered storage does not work with disaggregated storage.");
-
-    return (__tiered_metadata_insert(session, uri, cfg));
-}
-
-/*
- * __create_tiered_tree --
- *     Create a tiered tree structure for the given name.
- */
-static int
-__create_tiered_tree(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
-{
-    const char *cfg[] = {WT_CONFIG_BASE(session, tier_meta), NULL, NULL};
-
-    WT_UNUSED(exclusive);
-    cfg[1] = config;
-
-    if (__wt_conn_is_disagg(session))
-        WT_RET_MSG(session, ENOTSUP, "Tiered storage does not work with disaggregated storage.");
-
-    return (__tiered_metadata_insert(session, uri, cfg));
-}
-
-/*
- * __create_tiered --
- *     Create a tiered tree structure for the given name.
- */
-static int
-__create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    WT_TIERED *tiered;
-    char *meta_value;
-    const char *cfg[5] = {WT_CONFIG_BASE(session, tiered_meta), NULL, NULL, NULL, NULL};
-    const char *metadata;
-    bool free_metadata, shared;
-    uint32_t incr_file_id;
-
-    conn = S2C(session);
-    metadata = NULL;
-    tiered = NULL;
-    shared = false;
-    meta_value = NULL;
-    free_metadata = true;
-
-    /* FIXME-WT-16351: Fix the mix of WT_RET and WT_ERR */
-    if (__wt_conn_is_disagg(session))
-        WT_RET_MSG(session, ENOTSUP, "Tiered storage does not work with disaggregated storage.");
-
-    /* Check if the tiered table already exists. */
-    if ((ret = __wt_metadata_search(session, uri, &meta_value)) != WT_NOTFOUND) {
-        if (exclusive)
-            WT_TRET(EEXIST);
-        goto err;
-    }
-    WT_RET_NOTFOUND_OK(ret);
-
-    /*
-     * Make sure we're not trying to share a tiered table.
-     */
-    WT_RET(__wt_btree_shared(session, uri, cfg, &shared));
-    if (shared)
-        WT_RET_MSG(session, EINVAL, "sharing tiered tables is unsupported");
-
-    /*
-     * We're creating a tiered table. Set the initial tiers list to empty. Opening the table will
-     * cause us to create our first file or tiered object.
-     */
-    if (!F_ISSET(conn, WT_CONN_READONLY)) {
-        if (session->import_list != NULL) {
-            WT_RET(__wt_find_import_metadata(session, uri, &metadata));
-            free_metadata = false;
-        } else {
-            WT_RET(__wt_scr_alloc(session, 0, &tmp));
-            /*
-             * By default use the connection level bucket and prefix. Then we add in any user
-             * configuration that may override the system one.
-             */
-            WT_WITH_SCHEMA_LOCK(session, incr_file_id = ++conn->next_file_id);
-
-            WT_ERR(__wt_buf_fmt(session, tmp,
-              ",tiered_storage=(bucket=%s,bucket_prefix=%s)"
-              ",id=%" PRIu32 ",version=(major=%" PRIu16 ",minor=%" PRIu16 "),checkpoint_lsn=",
-              conn->bstorage->bucket, conn->bstorage->bucket_prefix,
-              WT_BTREE_ID_NAMESPACED(incr_file_id, WT_BTREE_ID_NAMESPACE_LOCAL),
-              WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor));
-            cfg[1] = tmp->data;
-            cfg[2] = config;
-            cfg[3] = "tiers=()";
-            WT_ERR(__wt_config_tiered_strip(session, cfg, &metadata));
-        }
-
-        WT_ERR(__wt_metadata_insert(session, uri, metadata));
-    }
-    WT_ERR(__wti_schema_get_tiered_uri(session, uri, WT_DHANDLE_EXCLUSIVE, &tiered));
-    if (WT_META_TRACKING(session)) {
-        WT_WITH_DHANDLE(session, &tiered->iface, ret = __wt_meta_track_handle_lock(session, true));
-        WT_ERR(ret);
-        tiered = NULL;
-    }
-
-err:
-    WT_TRET(__wti_schema_release_tiered(session, &tiered));
-    __wt_scr_free(session, &tmp);
-    __wt_free(session, meta_value);
-    if (free_metadata)
-        __wt_free(session, metadata);
-
-    return (ret);
-}
-
-/*
  * __create_data_source --
  *     Create a custom data source.
  */
@@ -1614,39 +1342,12 @@ __schema_create_config_check(
   WT_SESSION_IMPL *session, const char *uri, const char *config, bool import)
 {
     WT_CONFIG_ITEM cval;
-    bool file_metadata, is_tiered, tiered_name_set, storage_tier_set;
-
-    file_metadata =
-      __wt_config_getones(session, config, "import.file_metadata", &cval) == 0 && cval.val != 0;
+    bool storage_tier_set;
 
     if (import && session->import_list == NULL && !WT_PREFIX_MATCH(uri, "file:") &&
       !WT_PREFIX_MATCH(uri, "table:"))
         WT_RET_MSG(session, ENOTSUP,
           "%s: import is only supported for 'file' and 'table' data sources", uri);
-
-    /*
-     * If tiered storage is configured at the connection level and the user has not configured
-     * tiered_storage.name to be none, then the object being created is a tiered object.
-     */
-    tiered_name_set =
-      __wt_config_getones(session, config, "tiered_storage.name", &cval) == 0 && cval.len != 0;
-    is_tiered =
-      S2C(session)->bstorage != NULL && (!tiered_name_set || !WT_CONFIG_LIT_MATCH("none", cval));
-
-    /* The import.file_metadata configuration is incompatible with tiered storage. */
-    if (is_tiered && file_metadata)
-        WT_RET_MSG(session, EINVAL,
-          "import for tiered storage is incompatible with the 'file_metadata' setting");
-
-    /*
-     * If the type configuration is set to anything but "file" while using tiered storage we must
-     * fail the operation.
-     */
-    if (is_tiered && __wt_config_getones(session, config, "type", &cval) == 0 &&
-      !WT_CONFIG_LIT_MATCH("file", cval))
-        WT_RET_MSG(session, ENOTSUP,
-          "unsupported type configuration: %.*s: type must be file for tiered storage",
-          (int)cval.len, cval.str);
 
     /* In disaggregated storage we should write everything with a timestamp. */
     bool write_ts_never =
@@ -1664,6 +1365,10 @@ __schema_create_config_check(
         if (strncmp("none", cval.str, cval.len) != 0)
             WT_RET_SUB(session, EINVAL, WT_CONFLICT_DISAGG,
               "Cold collections only supported when disaggregated storage is enabled");
+
+    if (__wt_config_getones_none(session, config, "tiered_storage.name", &cval) == 0 &&
+      cval.len != 0)
+        WT_RET_MSG(session, ENOTSUP, "tiered storage is not supported");
 
     return (0);
 }
@@ -1732,14 +1437,8 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config, b
         ret = __create_index(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "layered:"))
         ret = __create_layered(session, uri, exclusive, config);
-    else if (WT_PREFIX_MATCH(uri, "object:"))
-        ret = __create_object(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __create_table(session, uri, exclusive, config);
-    else if (WT_PREFIX_MATCH(uri, "tier:"))
-        ret = __create_tiered_tree(session, uri, exclusive, config);
-    else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __create_tiered(session, uri, exclusive, config);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->create == NULL ? __wt_object_unsupported(session, uri) :
                                      __create_data_source(session, uri, config, dsrc);

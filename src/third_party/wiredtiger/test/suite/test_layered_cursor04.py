@@ -26,10 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, time, wiredtiger, wttest
+import wttest
 from helper_disagg import disagg_test_class
-
-StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # Basic layered tree cursor insert and read
 @disagg_test_class

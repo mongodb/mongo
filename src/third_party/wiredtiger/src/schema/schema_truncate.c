@@ -37,27 +37,6 @@ err:
 }
 
 /*
- * __truncate_tiered --
- *     Truncate for a tiered data source.
- */
-static int
-__truncate_tiered(WT_SESSION_IMPL *session, const char *uri)
-{
-    WT_DECL_RET;
-
-    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
-
-    WT_STAT_DSRC_INCR(session, cursor_truncate);
-
-    WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, uri, NULL, NULL));
-    WT_ERR(ret);
-
-err:
-    WT_TRET(__wt_session_release_dhandle(session));
-    return (ret);
-}
-
-/*
  * __truncate_layered --
  *     Truncate for a layered data source. Opens both start and stop cursors so the downstream
  *     truncate list entry can be stored with concrete keys on both ends.
@@ -144,8 +123,6 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
         ret = __truncate_layered(session, uri);
     else if (WT_PREFIX_SKIP(tablename, "table:"))
         ret = __truncate_table(session, tablename, cfg);
-    else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __truncate_tiered(session, uri);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->truncate == NULL ?
           __truncate_dsrc(session, uri) :

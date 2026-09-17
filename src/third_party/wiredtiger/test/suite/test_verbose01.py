@@ -159,7 +159,6 @@ class test_verbose01(test_verbose_base):
     collection_cfg = 'key_format=S,value_format=S'
 
     # Test use cases passing single verbose categories, ensuring we only produce verbose output for the single category.
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_verbose_single(self):
         # Close the initial connection. We will be opening new connections with different verbosity settings throughout
         # this test.

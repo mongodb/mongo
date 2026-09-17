@@ -55,7 +55,6 @@ class test_truncate19(wttest.WiredTigerTestCase):
         self.session.truncate(None, None, hicursor, None)
         self.session.commit_transaction()
 
-    @wttest.skip_for_hook("tiered", "test depends of sizes of associated file objects")
     @wttest.skip_for_hook("disagg", "test depends of sizes of associated file objects")
     def test_truncate19(self):
         uri = 'table:oplog'

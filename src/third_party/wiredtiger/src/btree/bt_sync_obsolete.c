@@ -595,10 +595,6 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
     newest_txn = WT_TXN_NONE;
     addr_size = write_gen = 0;
 
-    /* Checkpoint cleanup cannot remove obsolete pages from tiered tables. */
-    if (WT_SUFFIX_MATCH(uri, ".wtobj"))
-        return (false);
-
     /*
      * History store table. This table contains the historical versions that are needed to be
      * removed regularly.
