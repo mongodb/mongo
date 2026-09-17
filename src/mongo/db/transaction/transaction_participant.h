@@ -302,8 +302,9 @@ public:
         OperationContext* _opCtx;
     };  // class SideTransactionBlock
 
+    // Map from statement ID -> opTime and wall clock time when that statement was executed.
     using CommittedStatementTimestampMap [[MONGO_MOD_PRIVATE]] =
-        absl::flat_hash_map<StmtId, repl::OpTime>;
+        absl::flat_hash_map<StmtId, std::pair<repl::OpTime, Date_t>>;
 
     static const BSONObj kDeadEndSentinel;
 
@@ -837,6 +838,14 @@ public:
                                                                          StmtId stmtId) const;
 
         /**
+         * Same as checkStatementExecuted(), but returns the wall-clock time at which the statement
+         * was applied (stored in the statement cache at write time) instead of just the opTime.
+         * Returns boost::none if the statement has not executed.
+         */
+        boost::optional<Date_t> checkStatementExecutedAndGetWallClockTime(OperationContext* opCtx,
+                                                                          StmtId stmtId) const;
+
+        /**
          * Marks the session as requiring refresh. Used when the session state has been modified
          * externally, such as through a direct write to the transactions table.
          */
@@ -966,7 +975,8 @@ public:
          */
         void addCommittedStmtIds(OperationContext* opCtx,
                                  const std::vector<StmtId>& stmtIdsCommitted,
-                                 const repl::OpTime& writeOpTime);
+                                 const repl::OpTime& writeOpTime,
+                                 Date_t writeWallClockTime);
 
         /**
          * Handles a WouldChangeOwningShard error based on whether the operation that triggered it
@@ -998,6 +1008,7 @@ public:
     private:
         struct StatementInfo {
             repl::OpTime oplogEntryOpTime;
+            Date_t wallClockTime;
             boost::optional<Timestamp> commitTimestamp;
         };
 
@@ -1022,7 +1033,8 @@ public:
 
         void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                           std::vector<StmtId> stmtIdsWritten,
-                                          const repl::OpTime& lastStmtIdWriteTs);
+                                          const repl::OpTime& lastStmtIdWriteTs,
+                                          Date_t wallClockTime);
 
         // Chooses a snapshot from which a new transaction will read by beginning a storage
         // transaction. This is chosen based on the read concern arguments. If an atClusterTime is

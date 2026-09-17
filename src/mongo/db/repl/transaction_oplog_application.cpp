@@ -701,7 +701,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             // committed txn statements.
             const auto& committedStmtIds = stmtIds ? stmtIds : _getCommittedStmtIds(lsid, txnOps);
             if (committedStmtIds) {
-                txnParticipant.addCommittedStmtIds(opCtx, *committedStmtIds, prepareOp.getOpTime());
+                txnParticipant.addCommittedStmtIds(
+                    opCtx, *committedStmtIds, prepareOp.getOpTime(), prepareOp.getWallClockTime());
             }
 
             if (MONGO_unlikely(applyPrepareTxnOpsFailsWithWriteConflict.shouldFail())) {

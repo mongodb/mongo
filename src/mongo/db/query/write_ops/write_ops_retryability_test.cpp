@@ -114,7 +114,7 @@ void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtI
     txnPart.refreshFromStorageIfNeeded(opCtx);
     txnPart.beginOrContinue(
         opCtx, {txnNumber}, boost::none, TransactionParticipant::TransactionActions::kNone);
-    txnPart.addCommittedStmtIds(opCtx, std::move(executedStmtIds), repl::OpTime());
+    txnPart.addCommittedStmtIds(opCtx, std::move(executedStmtIds), repl::OpTime(), Date_t{});
 }
 
 write_ops::FindAndModifyCommandRequest makeFindAndModifyRequest(

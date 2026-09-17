@@ -72,7 +72,7 @@ void TimeseriesWriteOpsInternalTest::_setUpRetryableWrites(
 void TimeseriesWriteOpsInternalTest::_addExecutedStatementsToTransactionParticipant(
     const std::vector<StmtId>& stmtIds) {
     auto txnParticipant = TransactionParticipant::get(_opCtx);
-    txnParticipant.addCommittedStmtIds(_opCtx, stmtIds, repl::OpTime());
+    txnParticipant.addCommittedStmtIds(_opCtx, stmtIds, repl::OpTime(), Date_t{});
 };
 
 mongo::write_ops::InsertCommandRequest TimeseriesWriteOpsInternalTest::_createInsertCommandRequest(
