@@ -31,9 +31,12 @@
 
 #include "mongo/base/string_data.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 void validateRseqKernelCompat();
 bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release);
+boost::optional<StringData> ubuntuKernelVersionFromVersionSignature(StringData versionSignature);
 
 }  // namespace mongo
