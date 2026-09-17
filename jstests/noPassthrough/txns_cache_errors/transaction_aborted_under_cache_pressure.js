@@ -17,11 +17,13 @@ replSet.startSet();
 replSet.initiate();
 const db = replSet.getPrimary().getDB("test");
 
-// Ensure the thread is turned on.
+// Ensure the thread is turned on. Run it far more often than the default period: the drain loop
+// below only lasts a few hundred milliseconds, so at the default period the thread would not even
+// complete one cycle while a client abort is in flight.
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
-        cachePressureQueryPeriodMilliseconds: 1000,
+        cachePressureQueryPeriodMilliseconds: 20,
     }),
 );
 
@@ -30,6 +32,35 @@ assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         cachePressureEvictionStallDetectionWindowSeconds: 1,
+    }),
+);
+
+// A single-threaded workload cannot keep one application thread blocked on eviction for 95% of
+// every sampling interval, which is what the default proportion demands, so the eviction stall
+// signal never fires. Lower the bar to something this workload can actually reach.
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        cachePressureEvictionStallThresholdProportion: 0.3,
+    }),
+);
+
+// Abort one transaction per pass rather than a whole batch. This keeps the background thread
+// working through the sessions for longer, which improves the odds of it aborting a transaction
+// while the client's own abort is in flight.
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        CachePressureAbortSessionKillLimitPerBatch: 1,
+    }),
+);
+
+// Prevent the idle-timeout from doing anything, so that every abort observed below can only have
+// come from cache pressure.
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        transactionLifetimeLimitSeconds: 24 * 60 * 60,
     }),
 );
 
@@ -54,6 +85,11 @@ assert.commandWorked(db.createCollection("c"));
 
 let sessions = [];
 let firstPreparedTxn = true;
+
+// The drain loop below has to catch the background thread aborting a transaction while a client
+// abort is in flight, which is a per-session chance. Keep filling past the first kill so that
+// there are enough sessions left to give it several chances rather than one or two.
+const minSessions = 20;
 
 jsTestLog("Starting large inserts to create cache pressure...");
 
@@ -88,7 +124,7 @@ while (true) {
     successfulKills = db.serverStatus().metrics.rollbackUnderCachePressure.successfulKills;
 
     // Once we have a successful kill, we know we have aborted the oldest transaction.
-    if (successfulKills > 0) {
+    if (successfulKills > 0 && sessions.length >= minSessions) {
         jsTestLog("Oldest transaction successfully aborted under cache pressure.");
         logCacheStatus();
         break;
@@ -112,6 +148,11 @@ for (let i = 0; i < sessions.length; i++) {
     if (res.ok == 0 && res.code == ErrorCodes.TemporarilyUnavailable) {
         numTemporarilyUnavailable++;
     }
+    // End the session now, while the server is still up, instead of leaving it for the shell's
+    // GC finalizer to clean up after stopSet() has already killed the server. Otherwise, every
+    // leaked session logs a failed endSessions attempt once per second until the resmoke hang
+    // analyzer aborts the shell.
+    sessions[i].endSession();
 }
 
 // At least one of the transactions should return with the temporarily unavailable error code.
