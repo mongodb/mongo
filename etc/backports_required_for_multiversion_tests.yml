@@ -158,8 +158,6 @@ last-continuous:
       ticket: SERVER-108215
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
-    - test_file: jstests/replsets/atlas_initialsync_workflows.js
-      ticket: SERVER-128307
     - test_file: jstests/replsets/force_reconfig_sets_newly_added_field_correctly.js
       ticket: SERVER-128221
     - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
@@ -661,8 +659,6 @@ last-lts:
       ticket: SERVER-111486
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
-    - test_file: jstests/replsets/atlas_initialsync_workflows.js
-      ticket: SERVER-128307
     - test_file: jstests/replsets/auth_coordinateCommitTransaction.js
       ticket: SERVER-103618
     - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
