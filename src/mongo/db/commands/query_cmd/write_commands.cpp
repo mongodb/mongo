@@ -528,11 +528,15 @@ public:
             if (isTimeseriesRetryableUpdate && !wrappedByShardingRouter) {
                 auto executor = getLocalExecutor(opCtx);
                 ON_BLOCK_EXIT([&] {
-                    // Increments the counter if the command contains retries. This is normally done
-                    // within write_ops_exec::performUpdates. But for retryable timeseries updates,
-                    // we should handle the metrics only once at the caller since each statement
-                    // will be run as a separate update command through the internal transaction
-                    // API. See write_ops_exec::performUpdates for more details.
+                    // Increments the counters of retryable writes and if the command contains
+                    // retries, retried writes. This is normally done within
+                    // write_ops_exec::performUpdates. But for retryable timeseries updates, we
+                    // should handle the metrics only once at the caller since each statement will
+                    // be run as a separate update command through the internal transaction API. See
+                    // write_ops_exec::performUpdates for more details.
+                    if (opCtx->isRetryableWrite()) {
+                        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+                    }
                     if (!reply.retriedStmtIds.empty()) {
                         RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
                     }

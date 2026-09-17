@@ -1852,7 +1852,19 @@ WriteResult performUpdates(
 
     LastOpFixer lastOpFixer(opCtx);
 
+    // Count retryable commands for all types of operations except for user-facing
+    // time-series updates on a non-sharded cluster. For non-sharded user time-series
+    // updates, handles the metrics of the command at the caller since each statement
+    // will run as a command through the internal transaction API.
+    bool couldCountAsRetryableCommand = source != OperationSource::kTimeseriesUpdate ||
+        !preConditions.getIsTimeseriesLogicalRequest() || wholeOp.getShardVersion();
+
     bool containsRetry = false;
+    // Update total retryable commands counter if applicable. The retried commands counter is
+    // updated by the below hook.
+    if (opCtx->isRetryableWrite() && couldCountAsRetryableCommand) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
 
     size_t nextOpIndex = 0;
@@ -1887,13 +1899,10 @@ WriteResult performUpdates(
         if (opCtx->isRetryableWrite()) {
             if (auto entry =
                     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
-                // Set containsRetry to true for all types of operations except for user-facing
-                // time-series updates on a non-sharded cluster. For non-sharded user time-series
-                // updates, handles the metrics of the command at the caller since each statement
-                // will run as a command through the internal transaction API.
-                containsRetry = source != OperationSource::kTimeseriesUpdate ||
-                    !preConditions.getIsTimeseriesLogicalRequest() || wholeOp.getShardVersion();
+                containsRetry = couldCountAsRetryableCommand;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - entry->getWallClockTime());
                 // Returns the '_id' of the user measurement for time-series upserts.
                 boost::optional<BSONElement> upsertedId;
                 if (entry->getOpType() == repl::OpTypeEnum::kInsert &&
