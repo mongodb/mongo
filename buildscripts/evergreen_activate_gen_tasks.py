@@ -147,7 +147,7 @@ def activate_task(expansions: "EvgExpansions", evg_api: "SimpleEvergreenApi") ->
         )
 
 
-TASKS_PER_PAGE = 1000
+TASKS_PER_PAGE = 100
 
 REQUEST_TIMEOUT_SECONDS = 60
 
