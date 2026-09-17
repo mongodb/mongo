@@ -251,7 +251,8 @@ private:
     void _abort();
     void _commit(boost::optional<Timestamp> commitTime);
     void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, bool needsAllDurablePin);
-    void _validateTableTimestamps(WiredTigerKVEngineBase* kvEngine);
+    void _setAndValidateTableTimestamps(boost::optional<Timestamp> commitTimestamp);
+    void _publishTables(boost::optional<uint64_t> schemaEpoch);
 
     void _ensureSession();
     void _resetPerTransactionState();

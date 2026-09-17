@@ -1640,7 +1640,7 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
 
     invariant(ru.inUnitOfWork());
     auto* kvEngine = ru.getConnection()->getKVEngine();
-    auto& session = *ru.getSession();
+    auto& session = *ru.getSessionNoTxn();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
 
     const bool publishCreate =

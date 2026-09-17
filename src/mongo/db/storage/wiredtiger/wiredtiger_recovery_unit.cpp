@@ -116,22 +116,27 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     }
 }
 
-void WiredTigerRecoveryUnit::_validateTableTimestamps(WiredTigerKVEngineBase* kvEngineBase) {
-    if (_createdTables.empty())
-        return;
-    auto kvEngine = dynamic_cast<const WiredTigerKVEngine*>(kvEngineBase);
-    if (!kvEngine || !kvEngine->usesSchemaEpochs() || !gFeatureFlagEnableSchemaEpochs.isEnabled())
-        return;
+void WiredTigerRecoveryUnit::_setAndValidateTableTimestamps(
+    boost::optional<Timestamp> commitTimestamp) {
+    auto* kvEngine = checked_cast<const WiredTigerKVEngine*>(_connection->getKVEngine());
     auto stepdownEpoch = kvEngine->getStepDownEpoch();
-    if (!stepdownEpoch)
-        return;
-
     auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
-    for (const auto& [_, ts, state] : _createdTables) {
-        // If no timestamp is present then we're using a schema epoch set via setSchemaEpoch() in
-        // the startup path and the caller is responsible for ensuring it's valid.
-        if (ts.isNull())
+    for (auto& [_, ts, state] : _createdTables) {
+        // Writes that never had a timestamp are assigned the transaction's last timestamp at commit
+        // (see RecoveryUnit::setTimestamp()); stamp such tables the same way so each publish epoch
+        // matches the table's catalog writes.
+        if (ts.isNull()) {
+            if (commitTimestamp && !commitTimestamp->isNull()) {
+                ts = *commitTimestamp;
+            } else {
+                // If this invariant fails a table was created in a transaction with no timestamp or
+                // schema epoch set
+                invariant(_schemaEpoch);
+            }
+        }
+        if (!gFeatureFlagEnableSchemaEpochs.isEnabled() || !stepdownEpoch)
             continue;
+
         auto epoch = provider.getSchemaEpochForTimestamp(ts);
         switch (state) {
             case StepdownState::before:
@@ -146,6 +151,31 @@ void WiredTigerRecoveryUnit::_validateTableTimestamps(WiredTigerKVEngineBase* kv
                         "table created after the stepdown epoch was set cannot "
                         "publish at or below it");
                 break;
+        }
+    }
+}
+
+void WiredTigerRecoveryUnit::_publishTables(boost::optional<uint64_t> schemaEpoch) {
+    if (_createdTables.empty())
+        return;
+
+    auto* kvEngine = _connection->getKVEngine();
+    if (schemaEpoch) {
+        // setSchemaEpoch() is only used for the two tables that must exist before timestamping
+        // is available (the catalog and the oplog itself), each created alone in its own
+        // transaction.
+        invariant(_createdTables.size() == 1);
+        kvEngine->publishIdent(*this, _createdTables[0].uri, *schemaEpoch);
+    } else {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
+        // Publish each table at the epoch of the write that introduced it, so any checkpoint
+        // whose epoch covers a table's catalog entry also covers the table.
+        for (const auto& table : _createdTables) {
+            // If this invariant fails, a table was created without a timestamp in a transaction
+            // that never called setSchemaEpoch().
+            invariant(!table.timestamp.isNull());
+            uint64_t epoch = provider.getSchemaEpochForTimestamp(table.timestamp);
+            kvEngine->publishIdent(*this, table.uri, epoch);
         }
     }
 }
@@ -168,29 +198,8 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
                 kvEngine->unpinAllDurableTimestamp(pinnedTs);
         });
 
-        _validateTableTimestamps(kvEngine);
-
         _txnClose(true);
-
-        if (schemaEpoch) {
-            // setSchemaEpoch() is only used for the two tables that must exist before timestamping
-            // is available (the catalog and the oplog itself), each created alone in its own
-            // transaction.
-            invariant(_createdTables.size() == 1);
-            kvEngine->publishIdent(*this, _createdTables[0].uri, *schemaEpoch);
-        } else {
-            auto& provider = rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider();
-            // Publish each table at the epoch of the write that introduced it, so any checkpoint
-            // whose epoch covers a table's catalog entry also covers the table.
-            for (const auto& table : _createdTables) {
-                // If this invariant fails, a table was created without a timestamp in a transaction
-                // that never called setSchemaEpoch().
-                invariant(!table.timestamp.isNull());
-                invariant(_opCtx);
-                uint64_t epoch = provider.getSchemaEpochForTimestamp(table.timestamp);
-                kvEngine->publishIdent(*this, table.uri, epoch);
-            }
-        }
+        _publishTables(schemaEpoch);
     }
 
     // Re-trigger the oplog visibility update now that the all_durable pin has been released. The
@@ -203,11 +212,16 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
 }
 
 void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
+    auto* kvEngine = _connection->getKVEngine();
+    bool willPublishTables = !_createdTables.empty() && kvEngine && kvEngine->usesSchemaEpochs();
+    if (willPublishTables) {
+        _setAndValidateTableTimestamps(commitTime);
+    }
+
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
         try {
-            auto* kvEngine = _connection->getKVEngine();
-            if (!_createdTables.empty() && kvEngine && kvEngine->usesSchemaEpochs()) {
+            if (willPublishTables) {
                 // In disaggregated storage mode, if this transaction created tables and has a
                 // timestamp, pin all_durable before committing to prevent stable from advancing
                 // past our commit timestamp before we can publish the tables. This is only needed
@@ -217,17 +231,6 @@ void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
                 // being set (by TimestampBlock before the WUOW on secondaries).
                 bool needsAllDurablePin =
                     _commitTimestamp.isNull() && commitTime && !commitTime->isNull();
-                if (commitTime && !commitTime->isNull()) {
-                    invariant(!_schemaEpoch);
-                    // Writes that never had a timestamp are assigned the transaction's last
-                    // timestamp at commit (see RecoveryUnit::setTimestamp()); stamp such tables the
-                    // same way so each publish epoch matches the table's catalog writes.
-                    for (auto& table : _createdTables) {
-                        if (table.timestamp.isNull()) {
-                            table.timestamp = *commitTime;
-                        }
-                    }
-                }
                 _commitAndPublishTables(kvEngine, needsAllDurablePin);
             } else {
                 _txnClose(true);
@@ -248,7 +251,14 @@ void WiredTigerRecoveryUnit::_commit(boost::optional<Timestamp> commitTime) {
             throw;
         }
     } else {
-        invariant(_createdTables.empty());
+        if (willPublishTables) {
+            // Creating a published table without a data write can only happen in follower mode or
+            // when replaying the oplog as part of magic restore, as a leader creating published
+            // tables must replicate that creation
+            invariant(!kvEngine->isInLeaderMode() || storageGlobalParams.magicRestore);
+            _publishTables(_schemaEpoch);
+        }
+        _resetPerTransactionState();
     }
     _setState(State::kCommitting);
 
@@ -265,6 +275,8 @@ void WiredTigerRecoveryUnit::_abort() {
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
         _txnClose(false);
+    } else {
+        _resetPerTransactionState();
     }
     _setState(State::kAborting);
 
@@ -983,6 +995,10 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
               str::stream() << "future commit timestamp " << timestamp.toString()
                             << " cannot be older than read timestamp "
                             << _readAtTimestamp.toString());
+    invariant(!_schemaEpoch,
+              str::stream() << "Schema epoch is set to " << *_schemaEpoch
+                            << " and trying to set the transaction timestamp to "
+                            << timestamp.toString());
 
     _updateMultiTimestampConstraint(timestamp);
     _lastTimestampSet = timestamp;
@@ -1027,6 +1043,10 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
               str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
                             << " and trying to set commit timestamp to " << timestamp.toString());
     invariant(!_isTimestamped);
+    invariant(!_schemaEpoch,
+              str::stream() << "Schema epoch is set to " << *_schemaEpoch
+                            << " and trying to set the commit timestamp to "
+                            << timestamp.toString());
 
     _commitTimestamp = timestamp;
 }
