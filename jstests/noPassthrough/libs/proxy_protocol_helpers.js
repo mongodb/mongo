@@ -14,6 +14,27 @@ export const caFile = "jstests/libs/ca.pem";
 export const clientCertFile = "jstests/libs/client.pem";
 export const x509_user = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 
+// Roles advertised to the server in the proxy protocol SSL TLVs. The X.509 user below is
+// created with no roles of its own, so any role the connection ends up with must have come
+// from these TLVs.
+export const x509_tlv_roles = [
+    {role: "readWriteAnyDatabase", db: "admin"},
+    {role: "clusterMonitor", db: "admin"},
+];
+
+// TLVs emitted by the proxy on every connection. The server only parses these when the
+// connection arrives over the proxy unix domain socket; on the proxy/load balancer port they
+// are ignored, so neither the DN nor the roles take effect there.
+export const proxyProtocolTLVs = [
+    {"type": 0x02, "value": "authority.example.com"},
+    {
+        "ssl": [
+            {"type": 0xe0, "value": x509_user},
+            {"type": 0xe1, "value": x509_tlv_roles},
+        ],
+    },
+];
+
 export const tlsClientOptions = {
     tls: {
         certificateKeyFile: clientCertFile,
@@ -55,10 +76,23 @@ export const connectAndHello = (port, isRouter) => {
     assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 };
 
+const getAuthenticatedUserRoles = (conn) => {
+    const res = assert.commandWorked(conn.adminCommand({connectionStatus: 1}));
+    return res.authInfo.authenticatedUserRoles.map(({role, db}) => `${role}@${db}`).sort();
+};
+
 export const succeedX509Auth = (ingressPort, unixSockPrefix, node, isRouter) => {
     const conn = newTLSMongo(`127.0.0.1:${ingressPort}`, isRouter ? ["loadBalanced=true"] : []);
     const externalDB = conn.getDB("$external");
     assert(externalDB.auth({user: x509_user, mechanism: "MONGODB-X509"}));
+
+    // The roles advertised in the SSL TLVs are parsed over the proxy unix domain socket and
+    // granted to the authenticated user.
+    assert.eq(
+        x509_tlv_roles.map(({role, db}) => `${role}@${db}`).sort(),
+        getAuthenticatedUserRoles(conn),
+        "Roles from the proxy protocol SSL TLVs were not granted",
+    );
     conn.close();
 };
 
@@ -66,6 +100,14 @@ export const failX509Auth = (ingressPort, egressPort, node, isRouter) => {
     const conn = newTLSMongo(`127.0.0.1:${ingressPort}`, isRouter ? ["loadBalanced=true"] : []);
     const externalDB = conn.getDB("$external");
     assert(!externalDB.auth({user: x509_user, mechanism: "MONGODB-X509"}));
+
+    // The SSL TLVs are ignored on the proxy/load balancer port, so neither the DN nor the roles
+    // they advertise are applied to the connection.
+    assert.eq(
+        [],
+        getAuthenticatedUserRoles(conn),
+        "Roles from the proxy protocol SSL TLVs were granted on a non-unix-socket connection",
+    );
     conn.close();
 };
 
@@ -140,12 +182,7 @@ export const testProxyProtocolReplicaSet = (ingressPort, egressPort, version, te
         ingressTLSCert: serverCertFile,
         ingressTLSCA: caFile,
     });
-    proxy_server.setTLVs([
-        {"type": 0x02, "value": "authority.example.com"},
-        {
-            "ssl": [{"type": 0xe0, "value": x509_user}],
-        },
-    ]);
+    proxy_server.setTLVs(proxyProtocolTLVs);
     proxy_server.start();
 
     const rs = new ReplSetTest({
@@ -202,12 +239,7 @@ export const testProxyProtocolReplicaSetWithProxyUnixSocket = (ingressPort, test
             egressUnixSocket: unixSockPath,
         },
     );
-    proxy_server.setTLVs([
-        {"type": 0x02, "value": "authority.example.com"},
-        {
-            "ssl": [{"type": 0xe0, "value": x509_user}],
-        },
-    ]);
+    proxy_server.setTLVs(proxyProtocolTLVs);
     proxy_server.start();
 
     const primary = rs.getPrimary();
@@ -223,12 +255,7 @@ export const testProxyProtocolShardedCluster = (ingressPort, egressPort, version
         ingressTLSCert: serverCertFile,
         ingressTLSCA: caFile,
     });
-    proxy_server.setTLVs([
-        {"type": 0x02, "value": "authority.example.com"},
-        {
-            "ssl": [{"type": 0xe0, "value": x509_user}],
-        },
-    ]);
+    proxy_server.setTLVs(proxyProtocolTLVs);
     proxy_server.start();
 
     const st = new ShardingTest({
@@ -281,12 +308,7 @@ export const testProxyProtocolShardedClusterWithProxyUnixSocket = (ingressPort, 
             egressUnixSocket: unixSockPath,
         },
     );
-    proxy_server.setTLVs([
-        {"type": 0x02, "value": "authority.example.com"},
-        {
-            "ssl": [{"type": 0xe0, "value": x509_user}],
-        },
-    ]);
+    proxy_server.setTLVs(proxyProtocolTLVs);
     proxy_server.start();
 
     testFn(ingressPort, prefix, st.s, true);

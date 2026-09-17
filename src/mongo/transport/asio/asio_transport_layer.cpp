@@ -1674,8 +1674,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                         "rejected"_attr = _discardedDueToMaximumPendingOnProxyHeader.get());
                     return;
                 }
-                if (session->isConnectedToProxyUnixSocket() &&
-                    gProxyUnixSocketCheckPermissions.loadRelaxed()) {
+                if (session->isConnectedToProxyUnixSocket()) {
                     Status status = session->validateProxyUnixSocketPeerPermissions();
                     if (status.code() == ErrorCodes::Unauthorized) {
                         static logv2::SeveritySuppressor suppressor{Seconds(10),

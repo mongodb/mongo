@@ -1,7 +1,8 @@
 /**
  * Verifies that connections over the proxy Unix socket are rejected without a PROXY protocol v2
  * header, and accepted when routed through the proxy protocol server that injects the header.
- * Also exercises peer credential validation paths.
+ * Also exercises peer credential validation, both against the server's own GID and against
+ * net.proxyUnixDomainSocket.fileGroupId when that is set.
  *
  * @tags: [
  *   grpc_incompatible,
@@ -19,10 +20,34 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {isMacOS} from "jstests/libs/server_security/os_helpers.js";
 
 const kInternalErrorCode = 1;
-const kExpectedGid = getCurrentGid();
+const kUnauthorizedLogId = 11793400;
+const kValidationFailedLogId = 11793401;
+
+function readGids(flag, outName) {
+    const outFile = `${MongoRunner.dataDir}/${outName}`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", `id ${flag} > '${outFile}'`));
+    return cat(outFile).trim().split(/\s+/).map(Number);
+}
+
+// The server and the proxy both run as this test's user, so the peer GID the server observes is
+// this process's GID unless the failpoint below overrides it.
+const kServerGid = readGids("-g", "server_gid.txt")[0];
+
+// A supplementary group can be configured as fileGroupId without the server failing to chown the
+// socket, which lets us exercise a GID the server does not run as.
+const kOtherGid = readGids("-G", "all_gids.txt").find((gid) => gid !== kServerGid);
 
 function makeProxySocketPath(prefix, port) {
     return `${prefix}/proxy-mongodb-${port}.sock`;
+}
+
+function getFileGid(path) {
+    const outFile = `${MongoRunner.dataDir}/socket_gid.txt`;
+    const statCmd = isMacOS()
+        ? `stat -f %g '${path}' > '${outFile}'`
+        : `stat -c %g '${path}' > '${outFile}'`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", statCmd), `stat failed for ${path}`);
+    return Number(cat(outFile).trim());
 }
 
 function assertConnectionFails(conn, path) {
@@ -43,181 +68,156 @@ function assertConnectionFails(conn, path) {
     );
 }
 
-function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version, shouldSucceed) {
-    const proxyServer = new ProxyProtocolServer(ingressPort, egressPort, version, {
+// Fronts the node's proxy unix socket with a proxy server and hands its ingress URI to fn.
+function withProxy(conn, proxySocketPath, version, fn) {
+    const proxyServer = new ProxyProtocolServer(allocatePort(), conn.port, version, {
         egressUnixSocket: proxySocketPath,
     });
-    proxyServer.setTLVs([{"type": 0xe0, "value": "unix-proxy"}]);
-    proxyServer.start();
-    try {
-        const uri = `mongodb://127.0.0.1:${ingressPort}`;
-        if (shouldSucceed) {
-            const proxiedConn = new Mongo(uri);
-            assert.commandWorked(proxiedConn.getDB("admin").runCommand({ping: 1}));
-        } else {
-            assertConnectionFails(conn, uri);
-        }
-    } finally {
-        proxyServer.stop();
-    }
-}
-
-function getFileGid(path) {
-    const outFile = `${MongoRunner.dataDir}/socket_gid.txt`;
-    const statCmd = isMacOS()
-        ? `stat -f %g '${path}' > '${outFile}'`
-        : `stat -c %g '${path}' > '${outFile}'`;
-    assert.eq(0, runNonMongoProgram("bash", "-c", statCmd), `stat failed for ${path}`);
-    return Number(cat(outFile).trim());
-}
-
-function getCurrentGid() {
-    const outFile = `${MongoRunner.dataDir}/current_gid.txt`;
-    assert.eq(0, runNonMongoProgram("bash", "-c", `id -g > '${outFile}'`));
-    return Number(cat(outFile).trim());
-}
-
-function runPeerCredentialValidationTest(conn, prefix) {
-    const proxySocketPath = makeProxySocketPath(prefix, conn.port);
-    assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
-    assert.eq(getFileGid(proxySocketPath), kExpectedGid);
-
-    const proxyServer = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
-        egressUnixSocket: proxySocketPath,
-    });
+    // Headers arriving on the proxy unix socket must carry at least one TLV.
     proxyServer.setTLVs([{type: 0xe0, value: "unix-proxy"}]);
     proxyServer.start();
-
     try {
-        {
-            // Matching remoteGid should succeed.
-            const fp = configureFailPoint(
-                conn,
-                "proxyUnixDomainSocketPeerCredentialValidationOverride",
-                {
-                    mode: "alwaysOn",
-                    data: {remoteGid: NumberInt(kExpectedGid)},
-                },
-            );
-            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
-            new Mongo(uri);
-            fp.off();
-        }
-
-        {
-            // Differing remoteGid should fail.
-            const fp = configureFailPoint(
-                conn,
-                "proxyUnixDomainSocketPeerCredentialValidationOverride",
-                {
-                    mode: "alwaysOn",
-                    data: {remoteGid: NumberInt(kExpectedGid - 1)},
-                },
-            );
-            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
-            assert.throws(() => new Mongo(uri));
-            checkLog.containsRelaxedJson(conn, 11793400, {}, 1, 30 * 1000);
-
-            // If proxyUnixSocketCheckPermissions is disabled, connection succeedes.
-            assert.commandWorked(
-                conn.adminCommand({
-                    setParameter: 1,
-                    proxyUnixSocketCheckPermissions: false,
-                }),
-            );
-            new Mongo(uri);
-
-            // Set parameter back to on for next tests.
-            assert.commandWorked(
-                conn.adminCommand({
-                    setParameter: 1,
-                    proxyUnixSocketCheckPermissions: true,
-                }),
-            );
-            fp.off();
-        }
-
-        {
-            // Test failure log if server is unable to validate.
-            const fp = configureFailPoint(
-                conn,
-                "proxyUnixDomainSocketPeerCredentialValidationOverride",
-                {
-                    mode: "alwaysOn",
-                    data: {code: kInternalErrorCode},
-                },
-            );
-            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
-            assert.throws(() => new Mongo(uri));
-            checkLog.containsRelaxedJson(conn, 11793401, {}, 1, 30 * 1000);
-            fp.off();
-        }
+        fn(`mongodb://127.0.0.1:${proxyServer.getIngressPort()}`);
     } finally {
         proxyServer.stop();
     }
 }
 
-function runTest(conn, prefix) {
+// Presents gid as the connecting proxy's GID for the duration of fn.
+function withPeerGid(conn, gid, fn) {
+    const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+        data: {remoteGid: NumberInt(gid)},
+    });
+    try {
+        fn();
+    } finally {
+        fp.off();
+    }
+}
+
+function assertProxyConnectSucceeds(conn, proxySocketPath) {
+    withProxy(conn, proxySocketPath, 2, (uri) => {
+        const proxiedConn = new Mongo(uri);
+        assert.commandWorked(proxiedConn.getDB("admin").runCommand({ping: 1}));
+        proxiedConn.close();
+    });
+}
+
+function assertProxyConnectRejected(conn, proxySocketPath, logId) {
+    withProxy(conn, proxySocketPath, 2, (uri) => {
+        assert.throws(() => new Mongo(uri), [], "Expected the proxy connection to be rejected");
+        checkLog.containsRelaxedJson(conn, logId, {}, 1, 30 * 1000);
+    });
+}
+
+// Only a v2 header is accepted, and a direct connection carrying no header at all is refused.
+function testHeaderRequired(conn, prefix) {
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
 
-    // A direct connection to the proxy unix socket should fail since there is no proxy protocol header.
     assertConnectionFails(conn, proxySocketPath);
 
-    // Test with v1 and v2 proxy protocol header. Only V2 should be accepted.
-    // Proxy connects to mongod via the Unix socket (egress).
-    testWithVersion(conn, allocatePort(), conn.port, proxySocketPath, 1, false /* shouldSucceed */);
-    testWithVersion(conn, allocatePort(), conn.port, proxySocketPath, 2, true /* shouldSucceed */);
-
-    // Validate proxyUnixSocketCheckPermissions parameter functionality.
-    runPeerCredentialValidationTest(conn, prefix);
+    withProxy(conn, proxySocketPath, 1, (uri) => assertConnectionFails(conn, uri));
+    assertProxyConnectSucceeds(conn, proxySocketPath);
 }
 
-function runMongodTest() {
-    const prefix = `${MongoRunner.dataPath}_mongod`;
-    mkdir(prefix);
+// Without fileGroupId, the peer must share the server's GID.
+function testServerGidEnforced(conn, prefix) {
+    const proxySocketPath = makeProxySocketPath(prefix, conn.port);
+    assert.eq(getFileGid(proxySocketPath), kServerGid);
 
-    const mongod = MongoRunner.runMongod({
+    assertProxyConnectSucceeds(conn, proxySocketPath);
+    withPeerGid(conn, kServerGid + 1, () =>
+        assertProxyConnectRejected(conn, proxySocketPath, kUnauthorizedLogId),
+    );
+}
+
+// A peer whose credentials the server cannot read at all is rejected too.
+function testUnreadablePeerCredentialsRejected(conn, prefix) {
+    const proxySocketPath = makeProxySocketPath(prefix, conn.port);
+    const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+        data: {code: kInternalErrorCode},
+    });
+    try {
+        assertProxyConnectRejected(conn, proxySocketPath, kValidationFailedLogId);
+    } finally {
+        fp.off();
+    }
+}
+
+// With fileGroupId set, the peer must belong to that GID instead of the server's.
+function testFileGroupIdEnforced(conn, prefix) {
+    const proxySocketPath = makeProxySocketPath(prefix, conn.port);
+    assert.eq(getFileGid(proxySocketPath), kOtherGid);
+
+    assertProxyConnectRejected(conn, proxySocketPath, kUnauthorizedLogId);
+    withPeerGid(conn, kOtherGid, () => assertProxyConnectSucceeds(conn, proxySocketPath));
+}
+
+// Returns freshly built options; ShardingTest merges its own setParameters into what it gets.
+function proxySocketOptions(prefix, fileGroupId) {
+    const options = {
         proxyUnixSocketPrefix: prefix,
-        proxyUnixSocketFileGroupId: kExpectedGid,
         setParameter: {
             proxyProtocolTimeoutSecs: 1,
             logComponentVerbosity: {network: {verbosity: 4}},
         },
-    });
+    };
+    if (fileGroupId !== undefined) {
+        options.proxyUnixSocketFileGroupId = fileGroupId;
+    }
+    return options;
+}
 
+// The prefix is kept short because a unix socket path cannot exceed 108 characters on Linux.
+function makePrefix(label) {
+    const prefix = `${MongoRunner.dataPath}${label}`;
+    mkdir(prefix);
+    return prefix;
+}
+
+function runMongod(label, fileGroupId, testFns) {
+    const prefix = makePrefix(`mongod_${label}`);
+    const mongod = MongoRunner.runMongod(proxySocketOptions(prefix, fileGroupId));
     try {
-        runTest(mongod, prefix);
+        testFns.forEach((testFn) => testFn(mongod, prefix));
     } finally {
         MongoRunner.stopMongod(mongod);
     }
 }
 
-function runMongosTest() {
-    const prefix = `${MongoRunner.dataPath}_mongos`;
-    mkdir(prefix);
-
+function runMongos(label, fileGroupId, testFns) {
+    const prefix = makePrefix(`mongos_${label}`);
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
-        other: {
-            mongosOptions: {
-                proxyUnixSocketPrefix: prefix,
-                proxyUnixSocketFileGroupId: kExpectedGid,
-                setParameter: {
-                    proxyProtocolTimeoutSecs: 1,
-                    logComponentVerbosity: {network: {verbosity: 4}},
-                },
-            },
-        },
+        other: {mongosOptions: proxySocketOptions(prefix, fileGroupId)},
     });
-
     try {
-        runTest(st.s0, prefix);
+        testFns.forEach((testFn) => testFn(st.s0, prefix));
     } finally {
         st.stop();
     }
 }
 
-runMongodTest();
-runMongosTest();
+for (const [topology, runTopology] of [
+    ["mongod", runMongod],
+    ["mongos", runMongos],
+]) {
+    jsTest.log.info(`Testing the proxy protocol header and the server's own GID on ${topology}`);
+    runTopology("default_gid", undefined, [
+        testHeaderRequired,
+        testServerGidEnforced,
+        testUnreadablePeerCredentialsRejected,
+    ]);
+
+    if (kOtherGid === undefined) {
+        jsTest.log.info(
+            `Skipping fileGroupId coverage on ${topology}: no supplementary group available`,
+        );
+        continue;
+    }
+
+    jsTest.log.info(`Testing fileGroupId ${kOtherGid} is enforced on ${topology}`);
+    runTopology("file_group_id", kOtherGid, [testFileGroupIdEnforced]);
+}

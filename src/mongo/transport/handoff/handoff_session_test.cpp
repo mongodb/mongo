@@ -2235,11 +2235,14 @@ protected:
     }
 
     /**
-     * Builds a PROXY v2 binary header. sniName and subjectDN are optional — pass nullptr to omit
-     * each. Always includes at least a NOOP TLV since the parser requires a non-empty TLV block on
-     * the proxy unix socket (enforced by the parser).
+     * Builds a PROXY v2 binary header. sniName, subjectDN, and rolesBytes/rolesLen are optional
+     * — pass nullptr/0 to omit each. Always includes at least a NOOP TLV since the parser requires
+     * a non-empty TLV block on the proxy unix socket (enforced by the parser).
      */
-    static std::vector<uint8_t> buildProxyHeader(const char* sniName, const char* subjectDN) {
+    static std::vector<uint8_t> buildProxyHeader(const char* sniName,
+                                                 const char* subjectDN,
+                                                 const uint8_t* rolesBytes,
+                                                 size_t rolesLen) {
         static constexpr uint8_t kSignature[12] = {
             0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
 
@@ -2260,12 +2263,17 @@ protected:
                       reinterpret_cast<const uint8_t*>(sniName),
                       static_cast<uint16_t>(strlen(sniName)));
         }
-        if (subjectDN && *subjectDN) {
+        if ((subjectDN && *subjectDN) || (rolesBytes && rolesLen > 0)) {
             std::vector<uint8_t> subTlvs;
-            appendTLV(subTlvs,
-                      0xE0,
-                      reinterpret_cast<const uint8_t*>(subjectDN),
-                      static_cast<uint16_t>(strlen(subjectDN)));
+            if (subjectDN && *subjectDN) {
+                appendTLV(subTlvs,
+                          0xE0,
+                          reinterpret_cast<const uint8_t*>(subjectDN),
+                          static_cast<uint16_t>(strlen(subjectDN)));
+            }
+            if (rolesBytes && rolesLen > 0) {
+                appendTLV(subTlvs, 0xE1, rolesBytes, static_cast<uint16_t>(rolesLen));
+            }
             // SSL TLV value: client_flags(1) + verify(4 big-endian, 0=success) + sub-TLVs.
             std::vector<uint8_t> sslVal = {0x07, 0x00, 0x00, 0x00, 0x00};
             sslVal.insert(sslVal.end(), subTlvs.begin(), subTlvs.end());
@@ -2352,7 +2360,8 @@ TEST_F(HandoffSessionProxyHeaderTest, RejectsUnparseableProxyHeader) {
 
 /** No SNI or client-cert TLVs. SSLPeerInfo is null both before and after handoff. */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderNoSNIOrCert) {
-    auto header = buildProxyHeader(/*sniName=*/nullptr, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
 
     ASSERT_NO_THROW(session->prelude());
@@ -2367,7 +2376,10 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderNoSNIOrCert) {
  * before and after handoff.
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNINoCert) {
-    auto header = buildProxyHeader(/*sniName=*/kTestSniName, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
 
     auto validatePeerInfo = [&] {
@@ -2387,12 +2399,18 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNINoCert) {
 }
 
 /**
- * SNI TLV and SSL TLV block (DN sub-TLV). SSLPeerInfo has sniName and subjectName, both before and
- * after handoff.
+ * SNI TLV and SSL TLV block (DN + roles sub-TLVs). SSLPeerInfo has sniName, subjectName, and
+ * roles, both before and after handoff.
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNIAndCert) {
+    // DER-encoded role data for a single role: role="role_name", db="Third field".
+    static constexpr uint8_t roleDer[] = {
+        0x31, 0x1a, 0x30, 0x18, 0x0c, 0x09, 0x72, 0x6f, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d,
+        0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69, 0x72, 0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
     auto header = buildProxyHeader(/*sniName=*/kTestSniName,
-                                   /*subjectDN=*/"CN=customClient,O=customOrg");
+                                   /*subjectDN=*/"CN=customClient,O=customOrg",
+                                   /*rolesBytes=*/roleDer,
+                                   /*rolesLen=*/sizeof(roleDer));
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
 
     auto validatePeerInfo = [&] {
@@ -2405,7 +2423,9 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNIAndCert) {
         auto swO = peerInfo->subjectName().getOID("2.5.4.10");
         ASSERT_OK(swO.getStatus());
         ASSERT_EQ(swO.getValue(), "customOrg");
-        ASSERT_TRUE(peerInfo->roles().empty());
+        ASSERT_EQ(peerInfo->roles().size(), 1u);
+        ASSERT_EQ(peerInfo->roles().begin()->getRole(), "role_name");
+        ASSERT_EQ(peerInfo->roles().begin()->getDB(), "Third field");
     };
 
     ASSERT_NO_THROW(session->prelude());
@@ -2421,8 +2441,10 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNIAndCert) {
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
     auto preludeFuture = std::async(std::launch::async, [&] { session->prelude(); });
-
-    auto header = buildProxyHeader(/*sniName=*/kTestSniName, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
     ASSERT_FALSE(header.empty());
 
     // Send the first quarter, pause, then send the rest.
@@ -2454,7 +2476,10 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
  * with no header bytes leaking into the message stream.
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderBoundaryIsRespected) {
-    auto header = buildProxyHeader(/*sniName=*/kTestSniName, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
     Message msg = makeMessage(dbMsg, BSON("ping" << 1));
 
     // Write both in one shot so they arrive together in the socket buffer.
@@ -2551,7 +2576,7 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutDuringAddressBlockRead
 TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutSucceedsIfHeaderAlreadyBuffered) {
     unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
 
-    auto header = buildProxyHeader(nullptr, nullptr);
+    auto header = buildProxyHeader(nullptr, nullptr, nullptr, 0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
 
     ASSERT_NO_THROW(session->prelude());
@@ -2633,7 +2658,8 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutNotLeftOnSocketAfterPr
         return ::setsockopt(socket, level, option_name, option_value, option_len);
     };
 
-    auto header = buildProxyHeader(/*sniName=*/nullptr, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
@@ -2655,7 +2681,8 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutNotLeftOnSocketAfterPr
 TEST_F(HandoffSessionProxyHeaderTest, GetSourceRemoteEndpointReturnsProxiedAddress) {
     ASSERT_EQ(session->getSourceRemoteEndpoint(), HostAndPort("anonymous unix socket"));
 
-    auto header = buildProxyHeader(/*sniName=*/nullptr, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
@@ -2704,7 +2731,8 @@ TEST_F(HandoffSessionProxyHeaderTest, GetSourceRemoteEndpointFallsBackToRemoteWh
 TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInOriginMode) {
     ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
 
-    auto header = buildProxyHeader(/*sniName=*/nullptr, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
@@ -2725,7 +2753,8 @@ TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInOriginMode) {
 TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInPeerMode) {
     ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
 
-    auto header = buildProxyHeader(/*sniName=*/nullptr, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
@@ -2745,7 +2774,10 @@ TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInPeerMode) {
 TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
     // Pre-buffer the PROXY header and a cleartext ping so prelude() and the first
     // sourceMessage() complete synchronously on the main thread.
-    auto header = buildProxyHeader(/*sniName=*/kTestSniName, /*subjectDN=*/nullptr);
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
 
     BSONObj body1 = BSON("ping" << 1);
