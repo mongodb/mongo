@@ -6,11 +6,14 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/convert_utils.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstring>
+#include <numeric>
 #include <string_view>
 
 #include <boost/optional.hpp>
@@ -25,6 +28,146 @@ ValueFlatUnorderedSet arrayToUnorderedSet(const Value& val,
     ValueFlatUnorderedSet valueSet = valueComparator.makeFlatUnorderedValueSet();
     valueSet.insert(array.begin(), array.end());
     return valueSet;
+}
+
+namespace {
+/**
+ * Represents a reference into an array of Values by index.
+ *
+ * Provides convenience methods to inspect either the index, or the
+ * referred-to Value.
+ *
+ */
+class IndexedValueRef {
+public:
+    using Index = int;
+    IndexedValueRef(int index) : _index(index) {}
+
+    Index index() const {
+        return _index;
+    }
+
+    const Value& resolve(const std::vector<Value>& values) const {
+        return values[_index];
+    }
+
+    int _index;
+};
+
+/**
+ * Compare IndexedValueRef instances by *index*.
+ */
+class LessThanByIndex {
+public:
+    using Index = IndexedValueRef::Index;
+
+    bool operator()(const auto& a, const auto& b) const {
+        return _index(a) < _index(b);
+    }
+
+private:
+    static Index _index(const IndexedValueRef& ref) {
+        return ref.index();
+    }
+    static Index _index(const Index& value) {
+        return value;
+    }
+};
+
+
+/**
+ * Compare IndexedValueRef instances by *referred-to value*.
+ *
+ * Requires references to both the underlying array, and a ValueComparator
+ * to give correct collation semantics.
+ */
+class LessThanByValue {
+public:
+    LessThanByValue(const std::vector<Value>& array, const ValueComparator& comp)
+        : _array(array), _lessThan(comp.getLessThan()) {}
+    bool operator()(const auto& a, const auto& b) const {
+        return _lessThan(_resolve(a), _resolve(b));
+    }
+
+private:
+    const Value& _resolve(const IndexedValueRef& ref) const {
+        return ref.resolve(_array);
+    }
+    static const Value& _resolve(const Value& value) {
+        return value;
+    }
+    const std::vector<Value>& _array;
+    ValueComparator::LessThan _lessThan;
+};
+
+/**
+ * Implementation of a helper for looking up search values in a constant array.
+ *
+ * Used in $indexOfArray.
+ */
+class ArrayLookupHelperImpl final : public ArrayLookupHelper {
+public:
+    ArrayLookupHelperImpl(const std::vector<Value>& array, const ValueComparator& comp)
+        : _lessThanByValue(array, comp), _indexes(array.size(), 0) {
+        // Initialise a vector of indexes, 0 - N.
+        std::iota(_indexes.begin(), _indexes.end(), 0);
+        // Sort the indexes in the array by (Value, Index), lexicographically.
+        // The array starts sorted by Index, so stable_sort could be used here (a little cheaper to
+        // compare) but it may internally allocate buffers, and our goal is minimal memory usage.
+        LessThanByIndex lessThanByIndex{};
+        std::sort(_indexes.begin(), _indexes.end(), [&](const auto& refA, const auto& refB) {
+            auto cmpValue = comp.compare(refA.resolve(array), refB.resolve(array));
+            if (cmpValue) {
+                return cmpValue < 0;
+            }
+            return lessThanByIndex(refA, refB);
+        });
+    }
+
+    /**
+     * Search for the first occurrence of `searchKey` in the underlying array appearing in the
+     * subspan [startIndex, endIndex)
+     */
+    [[nodiscard]] Index lookup(const Value& searchKey, int startIndex, int endIndex) override {
+        // _indexes is sorted by (Value, Index).
+        // Search for the range of entries for which the *value* equals `searchKey`.
+        auto [begin, end] =
+            std::equal_range(_indexes.begin(), _indexes.end(), searchKey, _lessThanByValue);
+
+        // Now we have a range of entries with _equivalent_ values, and with _increasing_ indexes.
+        // Skip forward to the first entry with index >= `startIndex` by binary search rather than
+        // linearly searching them all.
+        begin = std::lower_bound(begin, end, startIndex, LessThanByIndex{});
+
+        // Begin now points to the _first_ entry with matching value (determined by equal_range)
+        // *and* index >= startIndex (from the lower_bound), or == end. The entry now only needs to
+        // be checked against the endIndex.
+        if (begin != end && begin->index() < endIndex) {
+            return begin->index();
+        }
+
+        // No entries matched by value AND fell in the range [startIndex, endIndex)
+        return -1;
+    }
+    LessThanByValue _lessThanByValue;
+    std::vector<IndexedValueRef> _indexes;
+};
+}  // namespace
+
+std::unique_ptr<ArrayLookupHelper> makeLookupHelper(const std::vector<Value>& array,
+                                                    const ValueComparator& comp,
+                                                    SimpleMemoryUsageTracker& tracker,
+                                                    OperationContext* opCtx) {
+    // The lookup helper costs additional memory usage, but if it would exceed the limits
+    // we can fall back to linear search of the array (same as if the array were not const).
+    const int64_t helperBytes = static_cast<int64_t>(array.size() * sizeof(IndexedValueRef));
+    tracker.add(helperBytes);
+    if (!tracker.withinMemoryLimit(opCtx)) {
+        tracker.add(-helperBytes);
+        // No helper constructed, query will linear search the array.
+        return nullptr;
+    }
+    return std::make_unique<ArrayLookupHelperImpl>(array, comp);
 }
 
 ValueUnorderedMap<std::vector<int>> arrayToIndexMap(const Value& val,
@@ -374,19 +517,8 @@ Value evaluate(const ExpressionIndexOfArray& expr,
     const std::vector<Value>& array = arrayArg.getArray();
     auto args = evaluateAndValidateArguments(expr, root, children, array.size(), variables, ctx);
 
-    if (expr.getParsedIndexMap()) {
-        auto indexVec = expr.getParsedIndexMap()->find(args.targetOfSearch);
-
-        if (indexVec == expr.getParsedIndexMap()->end()) {
-            return Value(-1);
-        }
-
-        // Search through the vector of indexes for first index in our range.
-        for (auto index : indexVec->second) {
-            if (index >= args.startIndex && index < args.endIndex) {
-                return Value(index);
-            }
-        }
+    if (auto helper = expr.getLookupHelper()) {
+        return Value(helper->lookup(args.targetOfSearch, args.startIndex, args.endIndex));
     } else {
         for (int i = args.startIndex; i < args.endIndex; i++) {
             if (expr.getExpressionContext()->getValueComparator().evaluate(array[i] ==

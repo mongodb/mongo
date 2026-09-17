@@ -1,25 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <string_view>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/db/pipeline/expression.h"
 
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonmisc.h"
@@ -46,7 +28,29 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -56,6 +60,8 @@ using boost::intrusive_ptr;
 using std::pair;
 using std::string;
 using std::vector;
+
+MONGO_FAIL_POINT_DEFINE(failIfArrayLookupHelperNotConstructed);
 
 Expression::ExpressionVector Expression::cloneChildren(ExpressionContext& expCtx) const {
     if (_children.empty()) {
@@ -558,8 +564,6 @@ const char* ExpressionAnyElementTrue::getOpName() const {
     return "$anyElementTrue";
 }
 
-/* ---------------------- ExpressionArray --------------------------- */
-
 Value Expression::foldConstant(bool retainResult) const {
     // Fold against a standalone tracker seeded with the per-expression fallback cap rather than the
     // operation-wide tracker. Constant folding can run before query settings are resolved (e.g.
@@ -590,6 +594,8 @@ Value Expression::foldConstant(bool retainResult) const {
     }
     return folded;
 }
+
+/* ---------------------- ExpressionArray --------------------------- */
 
 Value ExpressionArray::evaluate(const Document& root,
                                 Variables* variables,
@@ -2302,20 +2308,37 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     if (optimized.get() != this) {
         return optimized;
     }
-    // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of
-    // an array.
+    // If the input array is an ExpressionConstant we can avoid linear search of the
+    // array for every execution by building a lookup helper with a sorted view over the array.
     if (auto constantArray = dynamic_cast<ExpressionConstant*>(_children[0].get())) {
         const Value valueArray = constantArray->getValue();
         if (valueArray.nullish()) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        if (_lookupHelper) {
+            // We have already constructed a helper for this constant array.
+            return this;
         }
         uassert(50809,
                 str::stream() << "First operand of $indexOfArray must be an array. First "
                               << "argument is of type: " << typeName(valueArray.getType()),
                 valueArray.isArray());
 
-        _parsedIndexMap = exec::expression::arrayToIndexMap(
-            valueArray, getExpressionContext()->getValueComparator());
+        auto helper = exec::expression::makeLookupHelper(
+            valueArray.getArray(),
+            getExpressionContext()->getValueComparator(),
+            getExpressionContext()->getExpressionFallbackTracker(),
+            getExpressionContext()->getOperationContext());
+        // If the helper would exceed the memory budget, makeLookupHelper returns nullptr and
+        // we fall back to a slower linear search at evaluation time. When the
+        // failIfArrayLookupHelperNotConstructed failpoint is active, throw instead of silently
+        // falling back, so tests can confirm memory limits are enforced.
+        if (helper) {
+            _lookupHelper = std::move(helper);
+        } else if (MONGO_unlikely(failIfArrayLookupHelperNotConstructed.shouldFail())) {
+            uasserted(ErrorCodes::FailPointEnabled,
+                      "ArrayLookupHelper was not constructed (memory budget exceeded)");
+        }
     }
     return this;
 }

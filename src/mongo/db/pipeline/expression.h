@@ -2419,6 +2419,12 @@ public:
     }
 };
 
+class ArrayLookupHelper {
+public:
+    using Index = int;
+    [[nodiscard]] virtual Index lookup(const Value& searchKey, int startIndex, int endIndex) = 0;
+    virtual ~ArrayLookupHelper() = default;
+};
 
 class ExpressionIndexOfArray : public ExpressionRangedArity<ExpressionIndexOfArray, 2, 4> {
 public:
@@ -2446,8 +2452,8 @@ public:
         return visitor->visit(this);
     }
 
-    const boost::optional<ValueUnorderedMap<std::vector<int>>>& getParsedIndexMap() const {
-        return _parsedIndexMap;
+    ArrayLookupHelper* getLookupHelper() const {
+        return _lookupHelper.get();
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
@@ -2455,9 +2461,9 @@ public:
     }
 
 private:
-    // Maps the values in the array to the positions at which they occur. We need to remember
-    // the positions so that we can verify they are in the appropriate range.
-    boost::optional<ValueUnorderedMap<std::vector<int>>> _parsedIndexMap;
+    // If the array is const, this helper can map the values in the array to the positions
+    // at which they occur without scanning all elements at runtime.
+    std::unique_ptr<ArrayLookupHelper> _lookupHelper;
 };
 
 class ExpressionIndexOfBytes final : public ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4> {

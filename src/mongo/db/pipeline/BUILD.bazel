@@ -1820,6 +1820,23 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "expression_index_of_array_bm",
+    srcs = [
+        "expression_index_of_array_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":expression_context_for_test",
+        "//src/mongo/db/exec:expression_bm_fixture",
+    ] + select({
+        "//bazel/config:tcmalloc_google_enabled": [
+            "//src/third_party/tcmalloc:tcmalloc_malloc_extension",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_benchmark(
     name = "field_path_bm",
     srcs = ["field_path_bm.cpp"],
     tags = ["query_bm"],

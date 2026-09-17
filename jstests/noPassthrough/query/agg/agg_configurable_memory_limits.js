@@ -1,6 +1,8 @@
 // Tests that certain aggregation operators have configurable memory limits.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -587,4 +589,50 @@ assert.commandWorked(bulk.execute());
     setParam("internalQueryMaxMemoryIntensiveExpressions", originalVal);
 })();
 
+(function testIndexOfArrayLookupHelperMemoryLimit() {
+    // $indexOfArray with a constant first argument but a non-const search value builds an
+    // ArrayLookupHelper at optimize() time. The helper's memory is pre-flight checked against the
+    // expression fallback tracker: if it would exceed the budget, the helper is not built and the
+    // query falls back to a slower linear search. The failIfArrayLookupHelperNotConstructed
+    // failpoint instead _fails_ the query, so tests can verify that if the helper _would_ exceed
+    // the memory limits it is not constructed, and the query _would_ fall back to linear search
+    // (which is otherwise not easily observed)
+    runWithParamsAllNonConfigNodes(
+        db,
+        {
+            internalQueryMaxMemoryUsageBytesPerOperation: 1024,
+            internalQueryMaxSingleExpressionMemoryUsageBytes: 1024,
+            internalQueryMaxRangeBytes: 100 * 1024 * 1024,
+        },
+        () => {
+            const rangeSize = 10000;
+            // Pipeline with an array which is too large for us to construct a lookup helper
+            // without exceeding the memory usage limits.
+            const pipeline = [
+                {
+                    $project: {
+                        idx: {$indexOfArray: [{$range: [0, rangeSize]}, "$_id"]},
+                    },
+                },
+            ];
+
+            // By default, this query should succeed but won't use the lookup helper,
+            // so will be slower.
+            assert.doesNotThrow(
+                () => coll.aggregate(pipeline).toArray(),
+                [],
+                "query with helper declined due to budget should succeed via linear search",
+            );
+
+            const fp = configureFailPoint(conn, "failIfArrayLookupHelperNotConstructed");
+            // Verify that the lookup helper wasn't constructed, because of the memory limits.
+            assert.throwsWithCode(
+                () => coll.aggregate(pipeline).toArray(),
+                ErrorCodes.FailPointEnabled,
+            );
+
+            fp.off();
+        },
+    );
+})();
 MongoRunner.stopMongod(conn);

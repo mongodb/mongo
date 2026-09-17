@@ -197,6 +197,10 @@ unsigned long long convertDateTruncBinSizeValue(const Value& value);
  */
 ValueFlatUnorderedSet arrayToUnorderedSet(const Value& val, const ValueComparator& valueComparator);
 
+std::unique_ptr<ArrayLookupHelper> makeLookupHelper(const std::vector<Value>& array,
+                                                    const ValueComparator& comp,
+                                                    SimpleMemoryUsageTracker& tracker,
+                                                    OperationContext* opCtx);
 /**
  * Converts a 'val' value holding an array into a unordered map, associating each unique value with
  * the list of array positions where the value can be found in the original array.
