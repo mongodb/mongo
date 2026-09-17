@@ -160,8 +160,9 @@ server_parameters:
 
     proxyUnixSocketCheckPermissions:
         description: >-
-            Check whether the connecting process is running under the GID specified in 
-            proxyUnixSocketFileGroupId. Closes connection if check fails.
+            Formerly controlled whether the connecting process's GID was checked against
+            proxyUnixSocketFileGroupId. GID validation is now mandatory, so this is a no-op
+            retained only so that existing configurations continue to start.
         set_at: [startup, runtime]
         cpp_varname: gProxyUnixSocketCheckPermissions
         cpp_vartype: Atomic<bool>

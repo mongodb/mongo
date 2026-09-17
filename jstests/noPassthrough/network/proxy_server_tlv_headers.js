@@ -42,7 +42,41 @@ proxyServer.start();
 // The subject DN from client_roles.pem in RFC 4514 format (which parseDN expects).
 const kDN = "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US";
 
+// Roles from client_roles.pem: backup@admin, readAnyDatabase@admin.
+const kRoles = [
+    {role: "backup", db: "admin"},
+    {role: "readAnyDatabase", db: "admin"},
+];
+
 const kSNI = "my.mongodb.com";
+const kRolesTLVType = 0xe1;
+
+// Mirrors the DER encoding the proxy applies to a roles TLV -- SET OF SEQUENCE{role, db} of
+// UTF8Strings -- which the server logs verbatim as the TLV's value.
+function derEncodeRoles(roles) {
+    const kUTF8String = 0x0c;
+    const kSequence = 0x30;
+    const kSet = 0x31;
+
+    const encodeLength = (length) => {
+        if (length < 0x80) {
+            return String.fromCharCode(length);
+        }
+        let payload = "";
+        for (let remaining = length; remaining > 0; remaining = remaining >>> 8) {
+            payload = String.fromCharCode(remaining & 0xff) + payload;
+        }
+        return String.fromCharCode(0x80 | payload.length) + payload;
+    };
+
+    const encodeTLV = (tag, value) => String.fromCharCode(tag) + encodeLength(value.length) + value;
+
+    let encoded = "";
+    for (const {role, db} of roles) {
+        encoded += encodeTLV(kSequence, encodeTLV(kUTF8String, role) + encodeTLV(kUTF8String, db));
+    }
+    return encodeTLV(kSet, encoded);
+}
 
 function isEmpty(obj) {
     return obj === null || typeof obj === "undefined" || Object.keys(obj).length === 0;
@@ -58,7 +92,8 @@ function buildTLVString(tlvs) {
         tlvString += "0x";
         tlvString += obj["type"].toString(16).padStart(2, "0");
         tlvString += ":";
-        tlvString += obj["value"];
+        const value = obj["value"];
+        tlvString += obj["type"] === kRolesTLVType ? derEncodeRoles(value) : value;
         tlvString += ",";
     }
 
@@ -100,11 +135,17 @@ function runTest(tlvs, sslTlv, expectedSuccess) {
     );
 }
 
-jsTest.log.info("Test 1: Authority TLV with DN in SSL sub-TLVs");
+jsTest.log.info("Test 1: Authority TLV with DN and roles in SSL sub-TLVs");
 runTest(
     [{"type": 0x02, "value": "authority.example.com"}],
     {
-        "ssl": [{"type": 0xe0, "value": kDN}],
+        "ssl": [
+            {"type": 0xe0, "value": kDN},
+            {
+                "type": 0xe1,
+                "value": kRoles,
+            },
+        ],
     },
     true,
 );
@@ -143,7 +184,7 @@ runTest(
     true,
 );
 
-jsTest.log.info("Test 6: SNI + other top-level TLVs + DN + version in SSL sub-TLVs");
+jsTest.log.info("Test 6: SNI + other top-level TLVs + DN + roles + version in SSL sub-TLVs");
 runTest(
     [
         {"type": 0x01, "value": "h2"},
@@ -154,18 +195,40 @@ runTest(
         "ssl": [
             {"type": 0x21, "value": "TLSv1.3"},
             {"type": 0xe0, "value": kDN},
+            {"type": 0xe1, "value": kRoles},
         ],
     },
     true,
 );
 
-jsTest.log.info("Test 7: SSL sub-TLVs with version and cipher but no DN");
+jsTest.log.info("Test 7: SSL sub-TLVs with version and cipher but no DN or roles");
 runTest(
     [{"type": 0x02, "value": kSNI}],
     {
         "ssl": [
             {"type": 0x21, "value": "TLSv1.3"},
             {"type": 0x23, "value": "ECDHE-RSA-AES128-GCM-SHA256"},
+        ],
+    },
+    true,
+);
+
+jsTest.log.info("Test 8: Roles only, no DN, no SNI -- should fail");
+runTest(
+    [{"type": 0x01, "value": "h2"}],
+    {
+        "ssl": [{"type": 0xe1, "value": kRoles}],
+    },
+    false,
+);
+
+jsTest.log.info("Test 9: DN and roles without SNI");
+runTest(
+    [{"type": 0x01, "value": "h2"}],
+    {
+        "ssl": [
+            {"type": 0xe0, "value": kDN},
+            {"type": 0xe1, "value": kRoles},
         ],
     },
     true,

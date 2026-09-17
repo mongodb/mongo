@@ -35,13 +35,71 @@ _unix_egress_path = None  # type: Optional[str]
 # SNI store: maps id(ssl_object) -> server_name captured via sni_callback.
 _sni_store = {}  # type: Dict[int, str]
 
+# OID for the MongoDB roles X509v3 extension.
+_MONGO_ROLES_OID_DOTTED = "1.3.6.1.4.1.34601.2.1.1"
 
-def _extract_cert_dn(der_cert_bytes: bytes) -> Optional[str]:
-    """Extract subject DN (RFC 4514 string) from a DER certificate."""
+# PP2 SSL sub-TLV carrying the peer's MongoDB roles (kProxyProtocolSSLTlvPeerRoles).
+_MONGO_ROLES_TLV_TYPE = 0xE1
+
+
+def _extract_cert_info(der_cert_bytes: bytes) -> tuple[Optional[str], Optional[bytes]]:
+    """Extract subject DN (RFC 4514 string) and roles (raw DER) from a DER certificate.
+
+    Returns (dn_string, roles_der). Either may be None if not present.
+    """
     from cryptography import x509
+    from cryptography.x509.oid import ObjectIdentifier
 
     cert = x509.load_der_x509_certificate(der_cert_bytes)
-    return cert.subject.rfc4514_string()
+
+    # Subject DN as RFC 4514 string (e.g. "CN=foo,OU=bar,O=baz")
+    dn_str = cert.subject.rfc4514_string()
+
+    # Roles extension (OID 1.3.6.1.4.1.34601.2.1.1) — raw DER value
+    roles_der = None
+    try:
+        ext = cert.extensions.get_extension_for_oid(ObjectIdentifier(_MONGO_ROLES_OID_DOTTED))
+        roles_der = ext.value.value  # raw DER bytes of the extension value
+    except x509.ExtensionNotFound:
+        pass
+
+    return dn_str, roles_der
+
+
+def _der_encode_roles(roles: list) -> bytes:
+    """DER-encode a list of {"role": ..., "db": ...} objects.
+
+    Produces the same encoding as the MongoDB roles X509v3 extension, which the server
+    parses with parsePeerRoles():
+
+        MongoDBAuthorizationGrants ::= SET OF MongoDBRole
+        MongoDBRole ::= SEQUENCE { role UTF8String, database UTF8String }
+    """
+
+    def encode_length(length: int) -> bytes:
+        if length < 0x80:
+            return bytes([length])
+        payload = length.to_bytes((length.bit_length() + 7) // 8, "big")
+        return bytes([0x80 | len(payload)]) + payload
+
+    def encode_tlv(tag: int, value: bytes) -> bytes:
+        return bytes([tag]) + encode_length(len(value)) + value
+
+    kUTF8String = 0x0C
+    kSequence = 0x30
+    kSet = 0x31
+
+    encoded_roles = b""
+    for entry in roles:
+        if not isinstance(entry, dict) or "role" not in entry or "db" not in entry:
+            raise ValueError(f"Role entry must have 'role' and 'db' fields: {entry!r}")
+        encoded_roles += encode_tlv(
+            kSequence,
+            encode_tlv(kUTF8String, str(entry["role"]).encode("utf-8"))
+            + encode_tlv(kUTF8String, str(entry["db"]).encode("utf-8")),
+        )
+
+    return encode_tlv(kSet, encoded_roles)
 
 
 # See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
@@ -66,7 +124,17 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> dict[int, bytes]:
             raise ValueError("TLV type is invalid")
         if "value" not in obj:
             raise ValueError("TLV object missing required field 'value'")
-        return type_num, str(obj["value"]).encode("utf-8")
+        val = obj["value"]
+        # The peer roles TLV carries MongoDB roles, DER-encoded the same way the roles X509v3
+        # extension is; every other TLV carries UTF-8 text.
+        if type_num == _MONGO_ROLES_TLV_TYPE:
+            if not isinstance(val, list):
+                raise ValueError(
+                    f"TLV {_MONGO_ROLES_TLV_TYPE:#04x} value expected to be a list of roles, "
+                    f"got {type(val).__name__}"
+                )
+            return type_num, _der_encode_roles(val)
+        return type_num, str(val).encode("utf-8")
 
     def parse_ssl_tlv(obj: dict) -> dict[int, bytes]:
         ret: dict[int, bytes] = {}
@@ -244,16 +312,18 @@ async def _patched_run(args):
                     if sni and 0x02 not in cur_tlv:
                         cur_tlv[0x02] = sni.encode("utf-8")
 
-                    # Peer certificate → subject DN (0xE0)
+                    # Peer certificate → subject DN (0xE0) and roles (0xE1)
                     der_cert = ssl_obj.getpeercert(binary_form=True)
                     if der_cert:
                         try:
-                            dn_str = _extract_cert_dn(der_cert)
+                            dn_str, roles_der = _extract_cert_info(der_cert)
                             if dn_str and 0xE0 not in cur_ssl_tlv:
                                 cur_ssl_tlv[0xE0] = dn_str.encode("utf-8")
+                            if roles_der and 0xE1 not in cur_ssl_tlv:
+                                cur_ssl_tlv[0xE1] = roles_der
                         except Exception as e:
                             print(
-                                f"[proxy] Failed to extract cert DN: {e!r}",
+                                f"[proxy] Failed to extract cert info: {e!r}",
                                 file=sys.stderr,
                                 flush=True,
                             )

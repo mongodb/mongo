@@ -168,12 +168,14 @@ export class ProxyProtocolServer {
      *
      * A TLV object has the following format:
      * - type: Number indicating the TLV type
-     * - value: UTF-8 string
+     * - value: UTF-8 string, or an array of {role: string, db: string} objects. Any value
+     *   corresponding to type 0xE1 (MongoDB roles) is converted into a DER-encoded sequence of roles.
+     *   All other types are carried as UTF-8 text.
      *
      * An SSL TLV object has the following format:
      * - ssl: array of TLV objects
      *
-     * Ex. { [{"type":0xE1,"value":"hello"}, {...}, {ssl: [{"type":0xE2,"value":"hello2"}, {...}]] }
+     * Ex. { [{"type":0x02,"value":"hello"}, {...}, {ssl: [{"type":0xE2,"value":"hello2"}, {...}]] }
      */
     setTLVs(tlvs) {
         const jsonString = JSON.stringify(tlvs) + "\n";
