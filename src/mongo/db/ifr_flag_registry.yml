@@ -41,7 +41,6 @@ rollout:
 
 release:
   featureFlagChangeStreamOptimizedUpdateLookup: {}
-  featureFlagChangeStreamReaderV2: {}
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}

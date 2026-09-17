@@ -19,9 +19,9 @@ feature_flags:
             at runtime retires open v2 cursors with a resumable RetryChangeStream error so they
             resume on the v1 path."
         cpp_varname: gFeatureFlagChangeStreamReaderV2
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: release
+        incremental_rollout_phase: in_development
 
     featureFlagSbeAccumulators:
         description: "Feature flag to enable single-purpose SBE $group accumulators."
