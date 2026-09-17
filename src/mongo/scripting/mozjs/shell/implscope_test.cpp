@@ -3,6 +3,7 @@
 
 #include "mongo/scripting/mozjs/shell/implscope.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/oid.h"
@@ -11,6 +12,7 @@
 #include <memory>
 
 #include <boost/smart_ptr/shared_ptr.hpp>
+#include <js/GCAPI.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
 
@@ -153,6 +155,75 @@ TEST_F(MozJSImplScopeTest, DeleteGlobal_NonExistentIsNoOp) {
         std::unique_ptr<mongo::Scope> scope(
             mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
         ASSERT_NO_THROW(scope->deleteGlobal("doesNotExist"));
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+// This test mimics an operation like a mapReduce over a collection scan. It invokes a JS function
+// once per document, which causes it to be wrapped in a BSONHolder proxy that pins the memory until
+// the proxy is finalized. SpiderMonkey does not account for that memory, so GC won't be triggered
+// if not for the _notePinnedHostBytes mechanism.
+TEST_F(MozJSImplScopeTest, AccumulatedPinnedHostBytesForcesGC) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        auto noopEmitHook = [](const BSONObj& args, void* data) -> BSONObj {
+            return BSONObj();
+        };
+        scope->injectNative("emit", noopEmitHook);
+
+        // The map function just reads a single field, but the whole document is wrapped and pinned
+        // in memory by BSONHolder.
+        ScriptingFunction mapFn = scope->createFunction(
+            "function() { var arithmetic = this.value * 1.000001 + 3.14159;"
+            " emit('all', arithmetic);}");
+
+        // 1000 documents of ~64 KB pins ~64 MB of host BSON, which should be enough to trigger GC
+        constexpr int kNumDocs = 1000;
+        constexpr size_t kPaddingBytes = 64 * 1024;
+        const std::string padding(kPaddingBytes, 'x');
+
+        auto* cx = implscope->getJSContextForTest();
+        const auto gcs0 = JS_GetGCParameter(cx, JSGC_NUMBER);
+
+        const BSONObj emptyArgs;
+        for (int i = 0; i < kNumDocs; ++i) {
+            BSONObjBuilder builder;
+            builder.append("value", static_cast<double>(i));
+            builder.append("padding", padding);
+            const BSONObj doc = builder.obj();
+
+            ASSERT_EQ(
+                0,
+                scope->invoke(mapFn, &emptyArgs, &doc, 0 /* timeoutMs */, true /* ignoreReturn */));
+        }
+
+        const auto gcs1 = JS_GetGCParameter(cx, JSGC_NUMBER);
+        ASSERT_GT(gcs1, gcs0);
+
+        // Verify that reset() can also trigger GC.
+        // Keep the pinned BSON above the 1 MB reset threshold but below the 32 MB per-invocation
+        // threshold so reset() is responsible for forcing the GC.
+        constexpr int kNumResetDocs = 20;
+        for (int i = 0; i < kNumResetDocs; ++i) {
+            BSONObjBuilder builder;
+            builder.append("value", static_cast<double>(i));
+            builder.append("padding", padding);
+            const BSONObj doc = builder.obj();
+
+            ASSERT_EQ(
+                0,
+                scope->invoke(mapFn, &emptyArgs, &doc, 0 /* timeoutMs */, true /* ignoreReturn */));
+        }
+
+        scope->reset();
+
+        const auto gcs2 = JS_GetGCParameter(cx, JSGC_NUMBER);
+        ASSERT_GT(gcs2, gcs1);
     }
     setGlobalScriptEngine(nullptr);
 }

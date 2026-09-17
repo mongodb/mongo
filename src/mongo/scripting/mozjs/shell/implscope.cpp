@@ -1011,6 +1011,16 @@ int MozJSImplScope::invoke(ScriptingFunction func,
                            bool readOnlyArgs,
                            bool readOnlyRecv) {
     return _runSafely([&] {
+        // Keep track of the pinned bytes of these BSON objects so that we can trigger GC
+        // if it grows too big. This can be important to prevent memory growth when the
+        // total size of these objects is large (BF-46311).
+        if (recv) {
+            _notePinnedHostBytes(recv->objsize());
+        }
+        if (argsObject) {
+            _notePinnedHostBytes(argsObject->objsize());
+        }
+
         auto funcValue = _funcs[func - 1];
         JS::RootedValue result(_context);
 
@@ -1223,6 +1233,20 @@ void MozJSImplScope::gc() {
     JS_RequestInterruptCallback(_context);
 }
 
+void MozJSImplScope::_checkPinnedHostBytesAndGc(int64_t threshold) {
+    if (_pinnedHostBytesSinceGc >= threshold && _context) {
+        // A synchronous full GC, not gc() -- that only requests an interrupt, which is not
+        // guaranteed to be serviced before the next invocation pins more bytes.
+        JS_GC(_context);
+        _pinnedHostBytesSinceGc = 0;
+    }
+}
+
+void MozJSImplScope::_notePinnedHostBytes(int64_t nbytes) {
+    _pinnedHostBytesSinceGc += nbytes;
+    _checkPinnedHostBytesAndGc(kPinnedBytesGcThreshold);
+}
+
 void MozJSImplScope::sleep(Milliseconds ms) {
     std::unique_lock<std::mutex> lk(_mutex);
 
@@ -1255,6 +1279,7 @@ void MozJSImplScope::reset() {
     _killStatus = Status::OK();
     _pendingGC.store(false);
     _requireOwnedObjects = false;
+    _checkPinnedHostBytesAndGc(kPinnedBytesResetGcThreshold);
     advanceGeneration();
 }
 

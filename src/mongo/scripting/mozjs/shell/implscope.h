@@ -634,6 +634,30 @@ private:
     Deferred<std::string (*)(const MozJSImplScope&)> _baseURL;
     bool _hasOutOfMemoryException;
 
+    // Host-supplied BSON bytes pinned by live BSONHolder proxies since the last GC.
+    // ValueReader wraps the argument/global BSON in lazy proxies whose holders keep the
+    // owned buffer alive until the proxy is finalized -- which only happens at GC.
+    // SpiderMonkey never sees those malloc bytes (no JS::AddAssociatedMemory accounting)
+    // so without help the GC feels no pressure and dead proxies pin their buffers
+    // indefinitely. So we count the bytes ourselves and force a GC at the threshold below.
+    // See _notePinnedHostBytes().
+    int64_t _pinnedHostBytesSinceGc = 0;
+
+    // Force a GC once this many bytes have been pinned.
+    // 32 MB keeps the worst-case backlog under 3% of the 1100 MB jsHeapLimitMB cap while amortising
+    // the cost of a full GC over many invocations (depending on document size).
+    static constexpr int64_t kPinnedBytesGcThreshold = 32 * 1024 * 1024;
+
+    // Force a GC in reset() if this much pinned garbage exists, so reused pooled scopes
+    // return to a clean floor between requests.
+    static constexpr int64_t kPinnedBytesResetGcThreshold = 1024 * 1024;
+
+    // Adds nbytes to the pinned counter and runs a full GC at kPinnedBytesGcThreshold.
+    void _notePinnedHostBytes(int64_t nbytes);
+
+    // Checks whether _pinnedHostBytesSinceGc exceeds the threshold and performs a GC if so.
+    void _checkPinnedHostBytesAndGc(int64_t threshold);
+
     const std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
     // _promiseResult must be a persistentRootedValue (instead of a simple RootedValue). Using a
