@@ -244,6 +244,8 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
         *aggExState.getDeferredCmd(),
         aggExState.getPrivileges());
     cursorParams.setTailableMode(expCtx->getTailableMode());
+    cursorParams.holdsMongotTaskExecutorCursor =
+        CurOp::get(opCtx)->debug().mongotCursorId.has_value();
 
     // The global cursor manager does not deliver invalidations or kill notifications; the
     // underlying PlanExecutor(s) used by the pipeline will be receiving invalidations and kill

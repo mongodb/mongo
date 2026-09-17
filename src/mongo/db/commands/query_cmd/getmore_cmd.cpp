@@ -705,6 +705,9 @@ public:
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
                                                         &numResults);
+            if (CurOp::get(opCtx)->debug().mongotCursorId.has_value()) {
+                cursorPin->setHoldsMongotTaskExecutorCursor();
+            }
 
             const bool isChangeStream = cursorPin->isChangeStreamQuery();
 

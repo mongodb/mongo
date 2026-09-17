@@ -105,6 +105,11 @@ struct ClientCursorParams {
     TailableModeEnum tailableMode;
     BSONObj originatingCommandObj;
     PrivilegeVector originatingPrivileges;
+
+    // True if this cursor owns execution state that has established a TaskExecutorCursor backed by
+    // the mongot task executor. Such idle cursors must be disposed before shutting down the mongot
+    // task executor, otherwise their shared_ptr references can keep the executor alive.
+    bool holdsMongotTaskExecutorCursor = false;
 };
 
 /**
@@ -170,6 +175,14 @@ public:
 
     bool isChangeStreamQuery() const {
         return _isChangeStreamQuery;
+    }
+
+    bool holdsMongotTaskExecutorCursor() const {
+        return _holdsMongotTaskExecutorCursor;
+    }
+
+    void setHoldsMongotTaskExecutorCursor() {
+        _holdsMongotTaskExecutorCursor = true;
     }
 
     bool usesOptimizedUpdateLookup() const {
@@ -565,6 +578,10 @@ private:
 
     // Flag indicating that a client has requested to kill the cursor.
     bool _killPending = false;
+
+    // True if this cursor owns execution state that has established a TaskExecutorCursor backed by
+    // the mongot task executor.
+    bool _holdsMongotTaskExecutorCursor = false;
 
     // The execution time collected from the initial operation prior to any getMore requests.
     boost::optional<Microseconds> _firstResponseExecutionTime;

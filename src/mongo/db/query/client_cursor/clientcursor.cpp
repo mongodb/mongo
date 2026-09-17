@@ -154,6 +154,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()),
+      _holdsMongotTaskExecutorCursor(params.holdsMongotTaskExecutorCursor),
       // Take a co-owning reference to the operation's memory tracker.
       _memoryUsageTracker(OperationMemoryUsageTracker::getOwningIfExists(operationUsingCursor)) {
     invariant(_exec);

@@ -11,7 +11,6 @@
 namespace mongo {
 
 class ServiceContext;
-
 namespace executor {
 
 /**

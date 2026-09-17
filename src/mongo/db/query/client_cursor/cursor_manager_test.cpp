@@ -323,6 +323,49 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
     ASSERT_EQ(0UL, _cursorManager.numCursors());
 }
 
+TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownDisposesOnlyMarkedIdleCursors) {
+    auto unmarkedIdleCursor = makeCursor(_opCtx.get());
+    const auto unmarkedIdleCursorId = unmarkedIdleCursor->cursorid();
+    unmarkedIdleCursor.release();
+
+    auto markedIdleCursor = makeCursor(_opCtx.get());
+    markedIdleCursor->setHoldsMongotTaskExecutorCursor();
+    markedIdleCursor.release();
+
+    auto markedPinnedCursor = makeCursor(_opCtx.get());
+    const auto markedPinnedCursorId = markedPinnedCursor->cursorid();
+    markedPinnedCursor->setHoldsMongotTaskExecutorCursor();
+
+    ASSERT_EQ(3UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(2UL, _cursorManager.numCursors());
+
+    // The unmarked idle cursor and marked pinned cursor are not disposed by the targeted shutdown
+    // cleanup.
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), unmarkedIdleCursorId));
+    markedPinnedCursor.release();
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), markedPinnedCursorId));
+    ASSERT_EQ(0UL, _cursorManager.numCursors());
+}
+
+TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownIsIdempotent) {
+    // An empty CursorManager has nothing to dispose.
+    ASSERT_EQ(0UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager.numCursors());
+
+    // Disposing a marked idle cursor removes it, so a second call disposes nothing. This guards
+    // against the shutdown cleanup being invoked more than once (or an accounting bug in the
+    // count).
+    auto markedIdleCursor = makeCursor(_opCtx.get());
+    markedIdleCursor->setHoldsMongotTaskExecutorCursor();
+    markedIdleCursor.release();
+
+    ASSERT_EQ(1UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(0UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager.numCursors());
+}
+
 /**
  * Test that pinned cursors do not get timed out.
  */
