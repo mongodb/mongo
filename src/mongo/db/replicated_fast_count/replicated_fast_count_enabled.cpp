@@ -11,9 +11,17 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(disableReplicatedFastCount);
+
 bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
+    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
+        return false;
+    }
+
     // TODO(SERVER-117326): Remove feature flag check.
     return (rss::ReplicatedStorageService::get(opCtx)
                 .getPersistenceProvider()
@@ -36,6 +44,10 @@ bool isReplicatedFastCountEligible(const NamespaceString& nss) {
 }
 
 bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceString& nss) {
+    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
+        return false;
+    }
+
     if (!isReplicatedFastCountEligible(nss)) {
         return false;
     }
@@ -61,6 +73,9 @@ bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
     if (!getTestCommandsEnabled()) {
         return false;
     }
+    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
+        return false;
+    }
     // We don't consult the shouldUseReplicatedFastCount persistence provider field since this is
     // test only functionality.
     return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
@@ -70,6 +85,9 @@ bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
 
 bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx) {
     if (!getTestCommandsEnabled()) {
+        return false;
+    }
+    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
         return false;
     }
     const auto vCtx = VersionContext::getDecoration(opCtx);
