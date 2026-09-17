@@ -1079,6 +1079,21 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "change_streams_sharded_collections_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharded_collections_passthrough.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "replica_sets_jscore_pqs_index_filters",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_pqs_index_filters.yml",
     tags = [
