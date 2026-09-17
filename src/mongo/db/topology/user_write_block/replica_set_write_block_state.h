@@ -110,6 +110,13 @@ public:
     void incrementReplicaSetWritesBlockCounter(ReplicaSetWritesBlockReasonEnum reason);
 
     /**
+     * Decrements the per-reason enable counter without changing whether write blocking is active.
+     * Used when recovering from a rolled-back in-place allowDeletions update that had incremented
+     * the counter. Saturates at zero.
+     */
+    void decrementReplicaSetWritesBlockCounter(ReplicaSetWritesBlockReasonEnum reason);
+
+    /**
      * Reports replica set write blocking counters, specifying one counter per blocking reason.
      */
     void appendReplicaSetWritesBlockCounters(BSONObjBuilder& bob) const;

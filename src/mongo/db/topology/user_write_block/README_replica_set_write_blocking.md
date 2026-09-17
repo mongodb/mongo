@@ -78,9 +78,15 @@ The blocking state is persisted on disk as a `ReplicaSetWriteBlockingCriticalSec
 `acquireRecoverableCriticalSectionBlockingReplicaSetWrites` and
 `releaseRecoverableCriticalSectionBlockingReplicaSetWrites`; active-block policy changes use
 `updateAllowDeletionsForActiveReplicaSetWriteBlock`. Because this is a _recoverable_ critical
-section, the in-memory state is rebuilt from disk whenever consistent data becomes available
-(`recoverRecoverableCriticalSections`, invoked from `onConsistentDataAvailable`), so the block
-survives restarts.
+section, in-memory state is rebuilt from disk on startup and when non-rollback consistent data
+becomes available (`recoverRecoverableCriticalSections`). Rollback of
+`config.replica_set_writes_critical_section` is a separate path: after oplog recovery,
+`ReplicaSetWriteBlockOpObserver::onReplicationRollback` calls
+`recoverReplicaSetWritesCriticalSection`. That recovery restores in-memory write-block and
+`allowDeletions` state from the durable document, but does **not** reconcile auto-compaction:
+pause/resume remains a node-local side effect of acquire (`allowDeletions: false`) and release, so
+rolling back those operations — or an in-place `allowDeletions` change — can leave background
+auto-compaction out of sync with the recovered deletion policy.
 
 ## In-memory state
 

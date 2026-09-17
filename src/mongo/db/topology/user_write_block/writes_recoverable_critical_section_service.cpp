@@ -480,7 +480,7 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351911, 2, "Released user writes recoverable critical section", logAttrs(nss));
 }
 
-void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSections(
+void UserWritesRecoverableCriticalSectionService::recoverUserWritesCriticalSection(
     OperationContext* opCtx) {
     if (MONGO_unlikely(skipRecoverUserWriteCriticalSections.shouldFail())) {
         return;
@@ -509,15 +509,26 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
 
         return true;
     });
+}
 
+void UserWritesRecoverableCriticalSectionService::recoverReplicaSetWritesCriticalSection(
+    OperationContext* opCtx) {
     // Recover the persisted replica set writes critical section documents and restore the
     // state into memory.
     PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> replicaSetWritesStore(
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
     auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
+    bool foundReplicaSetWritesCriticalSection = false;
     replicaSetWritesStore.forEach(
         opCtx, BSONObj{}, [&](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             invariant(doc.getNss().isEmpty());
+            foundReplicaSetWritesCriticalSection = true;
+
+            const bool wasWriteBlocking =
+                replicaSetWriteBlockState->isReplicaSetWriteBlockingEnabled();
+            const bool memoryAllowsDeletions =
+                !replicaSetWriteBlockState->isReplicaSetDeletionsBlockingEnabled();
+            const bool durableAllowsDeletions = doc.getAllowDeletions();
 
             if (doc.getEnabled()) {
                 replicaSetWriteBlockState->enableReplicaSetWriteBlocking(
@@ -531,8 +542,29 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
             } else {
                 replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
             }
+
+            // An in-place allowDeletions rollback needs to undo the counter bump.
+            if (wasWriteBlocking && doc.getEnabled() &&
+                memoryAllowsDeletions != durableAllowsDeletions) {
+                replicaSetWriteBlockState->decrementReplicaSetWritesBlockCounter(
+                    doc.getReplicaSetWritesBlockReason());
+            }
             return true;
         });
+    if (!foundReplicaSetWritesCriticalSection) {
+        replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
+        replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
+    }
+}
+
+void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSections(
+    OperationContext* opCtx) {
+    if (MONGO_unlikely(skipRecoverUserWriteCriticalSections.shouldFail())) {
+        return;
+    }
+
+    recoverUserWritesCriticalSection(opCtx);
+    recoverReplicaSetWritesCriticalSection(opCtx);
 
     LOGV2_DEBUG(6351913,
                 2,

@@ -124,10 +124,23 @@ public:
         boost::optional<UserWritesBlockReasonEnum> reason = boost::none);
 
     /**
-     * This method is called when we have to mirror the state on disk of the recoverable critical
-     * section to memory (on startUp or on rollback).
+     * Mirrors on-disk recoverable critical sections into memory. Recovers both user write blocking
+     * and replica set write blocking.
      */
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
+
+    /**
+     * Mirrors the on-disk user writes critical section into memory. Used on rollback of
+     * config.user_writes_critical_sections.
+     */
+    void recoverUserWritesCriticalSection(OperationContext* opCtx);
+
+    /**
+     * Mirrors the on-disk replica set writes critical section into memory. Used on rollback of
+     * config.replica_set_writes_critical_section. When the durable document is missing (for
+     * example, a rolled-back acquire), clears in-memory replica set write blocking.
+     */
+    void recoverReplicaSetWritesCriticalSection(OperationContext* opCtx);
 
     /**
      * Acquires the user writes critical section preventing replica set writes.

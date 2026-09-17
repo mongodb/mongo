@@ -359,6 +359,26 @@ TEST_F(ReplicaSetWriteBlockStateTest,
     ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 1);
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, DecrementReplicaSetWritesBlockCounterSaturatesAtZero) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->incrementReplicaSetWritesBlockCounter(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->decrementReplicaSetWritesBlockCounter(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->decrementReplicaSetWritesBlockCounter(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    BSONObjBuilder bob;
+    state->appendReplicaSetWritesBlockCounters(bob);
+    ASSERT_EQ(bob.obj()
+                  .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+                  .safeNumberLong(),
+              0);
+}
+
 TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenDeletionsBlockingDisabled) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);

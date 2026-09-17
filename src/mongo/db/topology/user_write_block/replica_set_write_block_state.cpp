@@ -46,6 +46,18 @@ void ReplicaSetWriteBlockState::incrementReplicaSetWritesBlockCounter(
     _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
 }
 
+void ReplicaSetWriteBlockState::decrementReplicaSetWritesBlockCounter(
+    ReplicaSetWritesBlockReasonEnum reason) {
+    auto& counter = _replicaSetWritesBlockCounters[static_cast<size_t>(reason)];
+    auto previous = counter.load();
+    while (previous > 0) {
+        if (counter.compareAndSwap(&previous, previous - 1)) {
+            return;
+        }
+        // On failure, compareAndSwap reloads 'previous' with the current value.
+    }
+}
+
 void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
     auto previousInfo = _writeBlockInfo.swap(WriteBlockInfo{});
     if (previousInfo.blocked) {

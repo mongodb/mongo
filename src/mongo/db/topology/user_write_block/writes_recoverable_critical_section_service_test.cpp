@@ -153,7 +153,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     ASSERT_TRUE(document["allowDeletions"].trueValue());
     ASSERT_EQ(document["replicaSetWritesBlockReason"].str(), "InsufficientDiskSpace");
 
-    // Reapplying the same policy is an active-block no-op.
+    // Reapplying the same policy is a document no-op.
     ASSERT_TRUE(service->updateAllowDeletionsForActiveReplicaSetWriteBlock(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
@@ -197,6 +197,122 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
                 UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
                 true /* allowDeletions */,
                 ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
+}
+
+TEST_F(WritesRecoverableCriticalSectionServiceTest,
+       RecoverUserWritesCriticalSectionDoesNotReestablishReplicaSetWriteBlock) {
+    auto opCtx = cc().makeOperationContext();
+    resetPersistedCriticalSectionAndMemory(opCtx.get());
+
+    auto* service = UserWritesRecoverableCriticalSectionService::get(opCtx.get());
+    service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+        opCtx.get(),
+        UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
+        false /* allowDeletions */,
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        state->disableReplicaSetWriteBlocking();
+        state->disableReplicaSetDeletionsBlocking();
+        ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    // User-write recovery must not re-establish replica set write blocking.
+    service->recoverUserWritesCriticalSection(opCtx.get());
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    service->recoverReplicaSetWritesCriticalSection(opCtx.get());
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+}
+
+TEST_F(WritesRecoverableCriticalSectionServiceTest,
+       RecoverReplicaSetWritesCriticalSectionClearsMemoryWhenDocumentMissing) {
+    auto opCtx = cc().makeOperationContext();
+    resetPersistedCriticalSectionAndMemory(opCtx.get());
+
+    auto* service = UserWritesRecoverableCriticalSectionService::get(opCtx.get());
+    service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+        opCtx.get(),
+        UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
+        false /* allowDeletions */,
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    // Drop the durable document. The OpObserver clears in-memory state on commit.
+    service->releaseRecoverableCriticalSectionBlockingReplicaSetWrites(
+        opCtx.get(),
+        UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ASSERT_TRUE(getPersistedReplicaSetWriteBlockDocument(opCtx.get()).isEmpty());
+
+    // Re-introduce stale in-memory blocking as if an acquire committed locally and the durable
+    // document was then rolled back.
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        state->enableReplicaSetWriteBlocking(
+            ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+        state->enableReplicaSetDeletionsBlocking();
+        ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    service->recoverReplicaSetWritesCriticalSection(opCtx.get());
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+}
+
+TEST_F(WritesRecoverableCriticalSectionServiceTest,
+       RecoverReplicaSetWritesCriticalSectionReenablesWhenReleaseIsRolledBack) {
+    auto opCtx = cc().makeOperationContext();
+    resetPersistedCriticalSectionAndMemory(opCtx.get());
+
+    auto* service = UserWritesRecoverableCriticalSectionService::get(opCtx.get());
+    service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
+        opCtx.get(),
+        UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
+        false /* allowDeletions */,
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ASSERT_FALSE(getPersistedReplicaSetWriteBlockDocument(opCtx.get()).isEmpty());
+
+    // Simulate a local release that cleared in-memory state, then a rollback that restored the
+    // durable document: memory is disabled while the CS doc is present again.
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        state->disableReplicaSetWriteBlocking();
+        state->disableReplicaSetDeletionsBlocking();
+        ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
+
+    service->recoverReplicaSetWritesCriticalSection(opCtx.get());
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+        ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
+    }
 }
 
 }  // namespace
