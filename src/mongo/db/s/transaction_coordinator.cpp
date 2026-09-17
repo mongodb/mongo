@@ -638,7 +638,9 @@ void TransactionCoordinator::_done(Status status) {
     }
 
     if (!status.isOK()) {
-        if (!status.isA<ErrorCategory::NotPrimaryError>() &&
+        const bool canceledBeforeCommitStarted =
+            status == ErrorCodes::TransactionCoordinatorCanceled && stepSnapshot == Step::kInactive;
+        if (!canceledBeforeCommitStarted && !status.isA<ErrorCategory::NotPrimaryError>() &&
             !status.isA<ErrorCategory::ShutdownError>()) {
             LOGV2_WARNING(12111100,
                           "TransactionCoordinator terminating with unexpected error",
