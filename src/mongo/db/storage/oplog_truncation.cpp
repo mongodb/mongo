@@ -115,7 +115,17 @@ RecordId truncateByMarkerQueue(OperationContext* opCtx,
     };
 
     for (auto getNextMarker = true; getNextMarker;) {
+        // Throw if we are interrupted, e.g. when stepdown shuts down the cap maintainer thread.
+        opCtx->checkForInterrupt();
+
+        // Stop truncating if we don't find any markers. The truncate markers can be missing on
+        // shutdown since they are cleared when the cap maintainer thread is shut down.
         auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+        if (!truncateMarkers) {
+            reportElapsed();
+            break;
+        }
+
         auto truncateMarker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx);
         if (!truncateMarker) {
             reportElapsed();

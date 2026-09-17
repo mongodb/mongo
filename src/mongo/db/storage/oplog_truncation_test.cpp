@@ -109,6 +109,38 @@ protected:
         service->getStorageEngine()->checkpoint();
     }
 
+    struct FourMarkerOplog {
+        RecordStore* rs;
+        std::shared_ptr<OplogTruncateMarkers> truncateMarkers;
+        RecordId mayTruncateUpTo;
+    };
+
+    /**
+     * Sets up an oplog holding three full truncate markers, plus a fourth so that the oldest three
+     * may all be truncated, and advances the stable timestamp past all of them.
+     */
+    FourMarkerOplog setUpFourMarkers() {
+        auto opCtx = getOperationContext();
+        auto* rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+        auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+        EXPECT_TRUE(truncateMarkers != nullptr);
+
+        EXPECT_TRUE(rs->oplog()->updateSize(230).isOK());
+        truncateMarkers->setMinBytesPerMarker(100);
+
+        insertOplog(1, 100);
+        insertOplog(2, 110);
+        insertOplog(3, 120);
+        insertOplog(4, 130);
+        EXPECT_EQ(4U, truncateMarkers->numMarkers());
+
+        advanceStableTimestamp(Timestamp(1, 4));
+        auto mayTruncateUpTo =
+            RecordId(getServiceContext()->getStorageEngine()->getPinnedOplog().asULL());
+
+        return {rs, std::move(truncateMarkers), mayTruncateUpTo};
+    }
+
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -614,24 +646,7 @@ TEST_F(OplogTruncationTest, TruncationStatsUpdatedOncePerMarkerTruncated) {
                                                                        false);
 
     auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-    auto engine = getServiceContext()->getStorageEngine();
-
-    auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
-    ASSERT(oplogTruncateMarkers);
-
-    ASSERT_OK(rs->oplog()->updateSize(230));
-    oplogTruncateMarkers->setMinBytesPerMarker(100);
-
-    // Three full markers, plus a fourth so that the oldest three may all be truncated.
-    insertOplog(1, 100);
-    insertOplog(2, 110);
-    insertOplog(3, 120);
-    insertOplog(4, 130);
-    ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
-
-    advanceStableTimestamp(Timestamp(1, 4));
-    auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
 
     const auto startingTruncateCount = oplog_truncation::getTruncateCount();
     const auto startingTimeTruncating = oplog_truncation::getTotalTimeTruncatingMicros();
@@ -670,6 +685,68 @@ TEST_F(OplogTruncationTest, TruncationStatsUpdatedOncePerMarkerTruncated) {
     ASSERT_GTE(timeTruncatingPerMarker[2], startingTimeTruncating + 2 * kMicrosPerMarker);
     ASSERT_GTE(oplog_truncation::getTotalTimeTruncatingMicros(),
                startingTimeTruncating + 3 * kMicrosPerMarker);
+}
+
+// Shutting down the oplog cap maintainer thread clears the truncate markers while a truncation pass
+// may still be running. A pass must notice they are gone and stop.
+TEST_F(OplogTruncationTest, TruncationPassStopsWhenTruncateMarkersCleared) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
+
+    // Kill markers between two iterations of truncation. shutdown() clears the truncate markers
+    // before it kills the opCtx. The opCtx is deliberately left uninterrupted so that the cleared
+    // markers is what stops the truncation pass.
+    int64_t truncateCalls = 0;
+    oplog_truncation::truncateByMarkerQueue(
+        opCtx,
+        *rs,
+        mayTruncateUpTo,
+        [&](OperationContext* opCtx, const CollectionTruncateMarkers::Marker&) {
+            if (++truncateCalls == 1) {
+                oplogTruncateMarkers->kill();
+                LocalOplogInfo::get(opCtx)->setTruncateMarkers(nullptr);
+            }
+            return true;
+        });
+
+    // The pass observed the cleared markers on its next iteration and stopped.
+    ASSERT_EQ(1, truncateCalls);
+    ASSERT_FALSE(LocalOplogInfo::get(opCtx)->getTruncateMarkers());
+}
+
+// A truncation pass leaves the marker queue at a marker boundary once its opCtx is killed, rather
+// than starting another truncation it cannot finish. The cap maintainer thread's opCtx is killed on
+// every shutdown of the thread (e.g. stepdown).
+TEST_F(OplogTruncationTest, TruncationPassStopsWhenInterrupted) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
+
+    // Simulate shutdown() while the first marker is being truncated by killing the markers and
+    // opCtx.
+    int64_t truncateCalls = 0;
+    ASSERT_THROWS_CODE(oplog_truncation::truncateByMarkerQueue(
+                           opCtx,
+                           *rs,
+                           mayTruncateUpTo,
+                           [&](OperationContext* opCtx, const CollectionTruncateMarkers::Marker&) {
+                               ++truncateCalls;
+                               oplogTruncateMarkers->kill();
+                               opCtx->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+                               return true;
+                           }),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+
+    // The in-flight marker was truncated and popped, and the pass then stopped instead of starting
+    // a second truncation.
+    ASSERT_EQ(1, truncateCalls);
+    ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
 }
 
 /**
