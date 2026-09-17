@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
@@ -21,14 +22,47 @@
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 #include <cstddef>
 #include <memory>
+#include <string_view>
 
 namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(forceAggregationSingleDocumentLookupExecutor);
+MONGO_FAIL_POINT_DEFINE(forceChangeStreamUpdateLookupEngine);
+
+// Different engine types used for updateLookup. Can be enforced via failpoint
+// 'forceChangeStreamUpdateLookupEngine'.
+enum class ForcedUpdateLookupEngine { kNone, kAggregation, kSbe, kExpress };
+
+/**
+ * If the 'forceChangeStreamUpdateLookupEngine' failpoint is active, reads its "engine" data field
+ * and returns the requested engine. Tests use this to pin updateLookup to a specific
+ * single-document-lookup implementation. Returns kNone when the failpoint is inactive.
+ */
+ForcedUpdateLookupEngine getForcedUpdateLookupEngine() {
+    using namespace std::literals::string_view_literals;
+    if (auto scoped = forceChangeStreamUpdateLookupEngine.scoped(); scoped.isActive()) {
+        const auto& data = scoped.getData();
+        if (auto elem = data.getField("engine"sv); elem.ok() && elem.type() == BSONType::string) {
+            std::string_view engine = elem.valueStringData();
+            if (engine == "aggregation"sv) {
+                return ForcedUpdateLookupEngine::kAggregation;
+            } else if (engine == "sbe"sv) {
+                return ForcedUpdateLookupEngine::kSbe;
+            } else if (engine == "express"sv) {
+                return ForcedUpdateLookupEngine::kExpress;
+            }
+            uasserted(ErrorCodes::BadValue,
+                      str::stream() << "Unsupported updateLookup engine '" << engine
+                                    << "' in forceChangeStreamUpdateLookupEngine failpoint");
+        }
+    }
+    return ForcedUpdateLookupEngine::kNone;
+}
 
 /**
  * Computes the batch limits for the updateLookup stage. Batching only pays off behind a caching
@@ -63,13 +97,17 @@ exec::agg::BatchedEnrichmentStage::Limits buildUpdateLookupLimits(
  * Both primaries fall back to the routed Aggregation executor when they decline.
  */
 std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecutor(
-    OperationContext* opCtx, bool isOptimized, bool isCollectionStream) {
+    OperationContext* opCtx,
+    bool isOptimized,
+    ForcedUpdateLookupEngine forcedEngine,
+    bool isCollectionStream) {
     using namespace exec::agg;
 
     auto aggExecutor = std::make_unique<AggregationSingleDocumentLookupExecutor>(
         exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder());
 
-    if (!isOptimized) {
+    // Forced aggregation disables the optimized path and runs the universal fallback directly.
+    if (forcedEngine == ForcedUpdateLookupEngine::kAggregation || !isOptimized) {
         return aggExecutor;
     }
 
@@ -78,17 +116,33 @@ std::unique_ptr<exec::agg::SingleDocumentLookupExecutor> buildUpdateLookupExecut
     CurOp::get(opCtx)->debug().usesOptimizedUpdateLookup = true;
 
     LocalLookupEligibilityFactoryImpl eligibilityFactory;
-    std::unique_ptr<SingleDocumentLookupExecutor> primary;
-    if (isCollectionStream) {
-        primary = std::make_unique<SbeSingleDocumentLookupExecutor>(
+    auto makeSbeExecutor = [&] {
+        return std::make_unique<SbeSingleDocumentLookupExecutor>(
             std::make_unique<OnDemandCollectionAcquirer>(),
             eligibilityFactory.makeLocalLookupEligibility(opCtx),
             exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupSbeRecorder());
-    } else {
-        primary = std::make_unique<ExpressSingleDocumentLookupExecutor>(
+    };
+    auto makeExpressExecutor = [&] {
+        return std::make_unique<ExpressSingleDocumentLookupExecutor>(
             std::make_unique<OnDemandCollectionAcquirer>(),
             eligibilityFactory.makeLocalLookupEligibility(opCtx),
             exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupExpressRecorder());
+    };
+
+    // When the failpoint forces a specific engine, install it as the sole executor so tests can
+    // observe the selected engine via serverStatus metrics without fallback interference.
+    if (forcedEngine == ForcedUpdateLookupEngine::kSbe) {
+        return makeSbeExecutor();
+    }
+    if (forcedEngine == ForcedUpdateLookupEngine::kExpress) {
+        return makeExpressExecutor();
+    }
+
+    std::unique_ptr<SingleDocumentLookupExecutor> primary;
+    if (isCollectionStream) {
+        primary = makeSbeExecutor();
+    } else {
+        primary = makeExpressExecutor();
     }
 
     return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
@@ -114,10 +168,11 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
     if (changeStreamAddPostImageDS->isUpdateLookup()) {
         const auto& expCtx = changeStreamAddPostImageDS->getExpCtx();
         auto ifrCtx = expCtx->getIfrContext();
+        const auto forcedEngine = getForcedUpdateLookupEngine();
         const bool isOptimized = ifrCtx &&
             ifrCtx->getSavedFlagValue(
                 feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup) &&
-            !forceAggregationSingleDocumentLookupExecutor.shouldFail();
+            forcedEngine != ForcedUpdateLookupEngine::kAggregation;
         const bool isCollectionStream =
             ChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
             ChangeStreamType::kCollection;
@@ -126,7 +181,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
             changeStreamAddPostImageDS->kStageName,
             expCtx,
             buildUpdateLookupExecutor(
-                expCtx->getOperationContext(), isOptimized, isCollectionStream),
+                expCtx->getOperationContext(), isOptimized, forcedEngine, isCollectionStream),
             buildUpdateLookupLimits(
                 expCtx->getQueryKnobConfiguration(), isOptimized, isCollectionStream),
             exec::agg::BatchedEnrichmentStatsRecorder::makeChangeStreamUpdateLookupRecorder());

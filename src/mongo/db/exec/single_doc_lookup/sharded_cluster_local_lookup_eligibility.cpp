@@ -3,14 +3,13 @@
 
 #include "mongo/db/exec/single_doc_lookup/sharded_cluster_local_lookup_eligibility.h"
 
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/shard_role/initialize_auto_get_helper.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
-#include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -23,15 +22,34 @@ LocalLookupEligibility::Decision ShardedClusterLocalLookupEligibility::decideFro
     const Document& documentKey,
     const ShardId& localShardId,
     const boost::optional<LogicalTime>& placementConflictTime) {
-    try {
-        // Targeting collation MUST be kSimpleSpec. Mirrors
-        // ShardServerProcessInterface::lookupSingleDocument's behaviour.
-        auto targeted = getTargetedShardsForQuery(
-            expCtx, cri, documentKey.toBson(), CollationSpec::kSimpleSpec);
 
-        // Local only when exactly one shard is targeted and it is us.
-        // A documentKey that does not cover the current shard key -> Unknown.
-        if (targeted.size() != 1 || *targeted.begin() != localShardId) {
+    try {
+        // Extract the shard key from the documentKey directly. This avoids interpreting the
+        // documentKey as a query, which would be vulnerable to MQL injection when a shard-key value
+        // contains dollar-prefixed field names (e.g. {$type: ...}).
+        const bool isLocal = [&] {
+            if (!cri.hasRoutingTable()) {
+                // Untracked collection: the document lives on the database's primary shard.
+                return localShardId == cri.getDbPrimaryShardId();
+            }
+
+            const auto& cm = cri.getChunkManager();
+            const auto& pattern = cm.getShardKeyPattern();
+            const auto keyBson = documentKey.toBson();
+
+            // The documentKey must contain every shard-key field. If it is partial we cannot prove
+            // locality from routing alone and must let the fallback target all shards.
+            for (auto&& shardKeyField : pattern.toBSON()) {
+                if (!keyBson.hasField(shardKeyField.fieldNameStringData())) {
+                    return false;
+                }
+            }
+
+            const auto shardKey = pattern.extractShardKeyFromDocumentKey(keyBson);
+            return cm.keyBelongsToShard(shardKey, localShardId);
+        }();
+
+        if (!isLocal) {
             return Unknown{};
         }
 
@@ -57,12 +75,24 @@ LocalLookupEligibility::Decision ShardedClusterLocalLookupEligibility::decideFro
 
 LocalLookupEligibility::Decision ShardedClusterLocalLookupEligibility::decideFromShardingFilter(
     const ScopedCollectionFilter& filter, const Document& documentKey) {
+
     try {
+        const auto keyBson = documentKey.toBson();
+
         // The documentKey carries the shard-key fields; extract them with the held filter's pattern
         // (handles hashed keys), then ask the authoritative ownership filter. keyBelongsToMe() runs
         // against this shard's pinned filtering metadata, so it inherently answers "is it mine".
-        const auto shardKey =
-            filter.getShardKeyPattern().extractShardKeyFromDocumentKey(documentKey.toBson());
+        const auto& pattern = filter.getShardKeyPattern();
+        const auto keyPatternBson = pattern.toBSON();
+
+        // A partial documentKey can't prove ownership against the held filter.
+        for (auto&& shardKeyField : keyPatternBson) {
+            if (!keyBson.hasField(shardKeyField.fieldNameStringData())) {
+                return Unknown{};
+            }
+        }
+
+        const auto shardKey = pattern.extractShardKeyFromDocumentKey(keyBson);
         if (shardKey.isEmpty() || !filter.keyBelongsToMe(shardKey)) {
             return Unknown{};
         }
