@@ -147,7 +147,7 @@ protected:
 
         Lock::GlobalLock globalLk(newOpCtx.get(), MODE_X);
         auto catalogState = catalog::closeCatalog(newOpCtx.get());
-        catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
+        catalog::openCatalogAfterRollbackToStable(newOpCtx.get(), catalogState, stableTimestamp);
     }
 
     void testRestoreFailsWhenMetadataInvalidated(bool terminateSecondaryReadsUponRangeDeletion,

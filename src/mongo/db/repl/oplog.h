@@ -158,8 +158,8 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
 /**
  * Use 'oplog' as the new cached pointer to the local oplog.
  *
- * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding onto
- * the global lock in exclusive mode.
+ * Called by catalog::openCatalogAfterRollbackToStable() to re-establish the oplog collection
+ * pointer while holding onto the global lock in exclusive mode.
  */
 void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* oplog);
 

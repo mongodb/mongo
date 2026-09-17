@@ -50,16 +50,20 @@ namespace catalog {
 // catalog_control.cpp
 class CatalogControlUtils;
 
+enum class [[MONGO_MOD_PUBLIC]] InitMode { kStartup = 0, kRollback, kStorageChange };
+[[MONGO_MOD_PUBLIC]] std::string toStringForLogging(InitMode mode);
+
 /**
  * Must be called after MDBCatalog is loaded.
  */
 [[MONGO_MOD_PUBLIC]]
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
+                                 InitMode mode,
                                  boost::optional<Timestamp> stableTs);
 
 [[MONGO_MOD_PUBLIC]]
-void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine);
+void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine, InitMode mode);
 
 /**
  * Creates a Collection object and registers it in the CollectionCatalog.
@@ -627,6 +631,15 @@ public:
      */
     const HistoricalCatalogIdTracker& catalogIdTracker() const;
     HistoricalCatalogIdTracker& catalogIdTracker();
+
+    /**
+     * Resets the HistoricalCatalogIdTracker to an empty state and seeds the oldest timestamp
+     * maintained. Resetting the state is necessary for FCBIS, as leaking tracker state across
+     * storage changes can lead to incorrect behavior. Setting the oldest timestamp maintained is
+     * necessary for both FCBIS and startup, as the tracker needs to know at which timestamp the
+     * storage engine is initialized.
+     */
+    void resetCatalogIdTracker(Timestamp oldest);
 
     class BatchedCollectionWrite;
 

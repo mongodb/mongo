@@ -461,7 +461,7 @@ void startUpCollectionCatalogDeferred(OperationContext* opCtx) {
     LOGV2(11379201, "Load MDB catalog and collection catalog");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->loadMDBCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(opCtx, storageEngine);
+    catalog::initializeCollectionCatalog(opCtx, storageEngine, catalog::InitMode::kStartup);
 }
 
 StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
@@ -478,7 +478,8 @@ StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
 
     Lock::GlobalWrite globalLk(initializeStorageEngineOpCtx.get());
     catalog::initializeCollectionCatalog(initializeStorageEngineOpCtx.get(),
-                                         service->getStorageEngine());
+                                         service->getStorageEngine(),
+                                         catalog::InitMode::kStartup);
 
     return lastShutdownState;
 }

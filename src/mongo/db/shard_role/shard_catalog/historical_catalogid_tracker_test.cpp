@@ -11,6 +11,46 @@
 namespace mongo {
 namespace {
 
+TEST(HistoricalCatalogIdTrackerTest, DefaultConstructedTrackerReportsUnknownForAnyTimestamp) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+
+    // A default-constructed tracker maintains no timestamp range: every timestamped lookup of a
+    // namespace with no mapping is unknown and requires a durable catalog scan.
+    HistoricalCatalogIdTracker tracker;
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 1)).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown);
+    ASSERT_EQ(tracker.lookup(nss, Timestamp::max() - 1).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown);
+    // Untimestamped lookups are unaffected.
+    ASSERT_EQ(tracker.lookup(nss, boost::none).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists);
+}
+
+TEST(HistoricalCatalogIdTrackerTest,
+     SeededOldestTimestampMaintainedAvoidsUnknownWithinMaintainedRange) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    UUID uuid = UUID::gen();
+    RecordId rid{1};
+
+    // A tracker seeded with an oldest timestamp maintained, as done on startup and storage changes,
+    // knows that namespaces with no mapping did not exist at or after that timestamp.
+    HistoricalCatalogIdTracker tracker(Timestamp(1, 10));
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 9)).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown);
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 10)).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists);
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 20)).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists);
+
+    // Existing collections registered at the oldest timestamp are found without scanning, and
+    // lookups before the oldest timestamp are still reported as unknown.
+    tracker.create(nss, uuid, rid, Timestamp(1, 10));
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 9)).result,
+              HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown);
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 10)).id, rid);
+    ASSERT_EQ(tracker.lookup(nss, Timestamp(1, 20)).id, rid);
+}
+
 TEST(HistoricalCatalogIdTrackerTest, Create) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     UUID uuid = UUID::gen();

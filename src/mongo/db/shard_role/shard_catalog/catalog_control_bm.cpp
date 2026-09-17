@@ -51,14 +51,14 @@ void BM_CatalogControlReopen(benchmark::State& state) {
         benchmark::ClobberMemory();
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         auto catalogState = catalog::closeCatalog(opCtx.get());
-        catalog::openCatalog(opCtx.get(), catalogState, *stableTimestamp);
+        catalog::openCatalogAfterRollbackToStable(opCtx.get(), catalogState, *stableTimestamp);
     }
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         auto catalogState = catalog::closeCatalog(opCtx.get());
-        catalog::openCatalog(opCtx.get(), catalogState, *stableTimestamp);
+        catalog::openCatalogAfterRollbackToStable(opCtx.get(), catalogState, *stableTimestamp);
     }
 }
 

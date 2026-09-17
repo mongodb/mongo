@@ -456,7 +456,8 @@ TEST_F(FeatureCompatibilityVersionTestFixture, CanInitFCVWithIncompleteForegroun
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     storageEngine->loadMDBCatalog(operationContext(), StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(operationContext(), storageEngine);
+    catalog::initializeCollectionCatalog(
+        operationContext(), storageEngine, catalog::InitMode::kStartup);
     FeatureCompatibilityVersion::initializeForStartup(operationContext());
 }
 
