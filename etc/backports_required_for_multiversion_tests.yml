@@ -166,23 +166,15 @@ last-continuous:
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
       ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_drop_collection.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_during_stepdown.js
-      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_rename_collection.js
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
     - test_file: jstests/replsets/initial_sync_reset_oldest_timestamp_after_failed_attempt.js
       ticket: SERVER-128221
     - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_waits_for_stable_timestamp.js
       ticket: SERVER-113184
     - test_file: jstests/replsets/reconfig_commitment_succeeds_with_arbiter.js
       ticket: SERVER-128221
@@ -691,10 +683,6 @@ last-lts:
       ticket: SERVER-94259
     - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
       ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_drop_collection.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_during_stepdown.js
-      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_during_stepdown.js
       ticket: SERVER-89664
     - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
@@ -703,8 +691,6 @@ last-lts:
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js
       ticket: SERVER-93141
-    - test_file: jstests/replsets/initial_sync_rename_collection.js
-      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
     - test_file: jstests/replsets/initial_sync_reset_oldest_timestamp_after_failed_attempt.js
@@ -712,8 +698,6 @@ last-lts:
     - test_file: jstests/replsets/initial_sync_survives_restart.js
       ticket: SERVER-88447
     - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_waits_for_stable_timestamp.js
       ticket: SERVER-113184
     - test_file: jstests/replsets/large_dockey_succeeds_on_secondary.js
       ticket: SERVER-104405

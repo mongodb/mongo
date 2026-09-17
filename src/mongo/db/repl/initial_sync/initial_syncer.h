@@ -414,23 +414,9 @@ private:
      *         |
      *         |
      *         V
-     *   _initiatingSetStableTimestampCallback()
-     *         |                    |
-     *  (skip) |    (wait needed)   |
-     *         |                    V
-     *         |    _checkStableTimestampAdvancementLocked() <---+
-     *         |                    |                            |
-     *         |               (not advanced)                    |
-     *         |                    V                            |
-     *         |    _runFsyncOnSyncSource() (after backoff)      |
-     *         |                    |                            |
-     *         |                    V                            |
-     *         |    _runReplSetGetStatusOnSyncSource()           |
-     *         |                    |                            |
-     *         |                    V                            |
-     *         |    _handleLastStableRecoveryTsResponse() -------+
-     *         |     (advanced or proceed)
-     *         +-------------------+
+     *   _checkIfInitiatingSet()
+     *         |
+     *         |
      *         V
      *    _initializeOplogFetcherAndDbCloners()
      *         |
@@ -641,7 +627,7 @@ private:
      *
      * Non-initiating case — when the conditions above are not met, records the retry
      * deadline in
-     * `_initialSyncState->waitForSyncSourceStableTimestampAdvanceStartTime` and
+     * `_initialSyncState->waitForSyncSourceStableTimestampAdvanceMaxRetryDeadline` and
      * proceeds with the original `beginFetchingOpTime`.
      * (Full retry loop is tracked in SERVER-125965.)
      *
@@ -649,43 +635,6 @@ private:
      */
     void _initiatingSetStableTimestampCallback(
         const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackArgs,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        const OpTime& beginFetchingOpTime);
-
-    /**
-     * Issues {fsync: 1} on the sync source to force a checkpoint, then schedules
-     * _runReplSetGetStatusOnSyncSource. Called on every wait attempt.
-     */
-    void _runFsyncOnSyncSource(const executor::TaskExecutor::CallbackArgs& callbackArgs,
-                               std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                               const OpTime& beginFetchingOpTime);
-
-    /**
-     * Issues {replSetGetStatus: 1} on the sync source and routes the response to
-     * _handleLastStableRecoveryTsResponse.
-     */
-    void _runReplSetGetStatusOnSyncSource(const executor::TaskExecutor::CallbackArgs& callbackArgs,
-                                          std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                                          const OpTime& beginFetchingOpTime);
-
-    /**
-     * Validates the replSetGetStatus response and delegates to
-     * _checkStableTimestampAdvancementLocked for the wait-loop decision.
-     */
-    void _handleLastStableRecoveryTsResponse(
-        const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackArgs,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        const OpTime& beginFetchingOpTime);
-
-    /**
-     * Checks whether lastStableRecoveryTs >= beginApplyingTimestamp. If so, proceeds to
-     * _initializeOplogFetcherAndDbCloners. If the deadline has passed, fails the attempt with
-     * ExceededTimeLimit. Otherwise schedules the next exponential-backoff fsync retry.
-     * Must be called with _mutex held.
-     */
-    void _checkStableTimestampAdvancementLocked(
-        WithLock lock,
-        Timestamp lastStableRecoveryTs,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard,
         const OpTime& beginFetchingOpTime);
 
