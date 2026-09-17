@@ -68,8 +68,14 @@ LiteParsedPipeline liteParseAndValidateWithIfrRetry(const OperationContext* opCt
         },
         kDefaultMaxRetries,
         [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
-            auto* flag = IncrementalRolloutFeatureFlag::findByName(
-                ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName());
+            auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+            tassert(13322500, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+            std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+            auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+            tassert(13322501,
+                    str::stream() << "IFR retry referenced an unknown feature flag: "
+                                  << disabledFlagName,
+                    flag);
             ifrContext->disableFlag(*flag);
         });
 }
