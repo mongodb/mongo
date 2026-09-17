@@ -57,14 +57,16 @@ public:
                      JoinCostEstimate rightCost);
 
     // Overload for INLJ nodes that also records which branch of the Mackert-Lohman formula was
-    // taken when estimating random I/Os.
+    // taken when estimating random I/Os, and the cardinality of the RHS before the join predicate
+    // is applied (i.e. after the RHS's own single-table predicates).
     JoinCostEstimate(CardinalityEstimate numDocsProcessed,
                      CardinalityEstimate numDocsOutput,
                      CardinalityEstimate numSeqIOs,
                      CardinalityEstimate numRandIOs,
                      JoinCostEstimate leftCost,
                      JoinCostEstimate rightCost,
-                     MackertLohmanCase mackertLohmanCase);
+                     MackertLohmanCase mackertLohmanCase,
+                     CardinalityEstimate cardinalityRHSBeforeJoinPred);
 
     JoinCostEstimate(CostEstimate totalCost);
 
@@ -98,6 +100,10 @@ public:
 
     boost::optional<MackertLohmanCase> getMackertLohmanCase() const {
         return _mackertLohmanCase;
+    }
+
+    boost::optional<CardinalityEstimate> getCardinalityRHSBeforeJoinPred() const {
+        return _cardinalityRHSBeforeJoinPred;
     }
 
     std::string toString() const;
@@ -136,6 +142,8 @@ private:
     // The branch of the Mackert-Lohman Y_wap formula used to estimate random I/Os. Only set for
     // INDEXED_NESTED_LOOP_JOIN nodes; boost::none for all other join types.
     boost::optional<MackertLohmanCase> _mackertLohmanCase;
+
+    boost::optional<CardinalityEstimate> _cardinalityRHSBeforeJoinPred;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const JoinCostEstimate& cost) {
@@ -155,11 +163,14 @@ public:
 
     double docsProcessed{0};
     double docsOutput{0};
+    double numDocsTransmitted{0};
     double sequentialIOPages{0};
     double randomIOPages{0};
     double localOpCost{0};
+    double totalCost{0};
     // Only set for INDEXED_NESTED_LOOP_JOIN nodes; absent for HJ and NLJ.
     boost::optional<MackertLohmanCase> mackertLohmanCase;
+    boost::optional<CardinalityEstimate> cardinalityRHSBeforeJoinPred;
 
     void serialize(BSONObjBuilder& bob) const override;
 };

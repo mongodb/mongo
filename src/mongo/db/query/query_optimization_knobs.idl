@@ -735,7 +735,10 @@ server_parameters:
         description: >-
             When true, explain output for join embedding nodes includes a 'joinCostComponents'
             sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
-            sequentialIOPages, randomIOPages, localOpCost).
+            numDocsTransmitted, sequentialIOPages, randomIOPages, localOpCost, totalCost). For
+            indexed nested loop join nodes it also includes a 'cardinalityRHSBeforeJoinPred' field
+            reporting the RHS cardinality before the join predicate is applied (i.e. after the
+            RHS's own single-table predicates).
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExplainJoinCostComponents"
         cpp_vartype: Atomic<bool>

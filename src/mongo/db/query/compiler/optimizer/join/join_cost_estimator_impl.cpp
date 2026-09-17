@@ -233,6 +233,9 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     numSeqIOs =
         CardinalityEstimate{CardinalityType{sortedSparse.numSeqIOs}, EstimationSource::Sampling};
 
+    const auto& rhsCardBeforeJoinPred =
+        _jCtx.singleTableAccess.nodeCardinalitiesOriginalFilter[right];
+
     return JoinCostEstimate(
         numDocsProcessed,
         numDocsOutput,
@@ -240,7 +243,8 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         CardinalityEstimate{CardinalityType{numRandIOsCollection}, EstimationSource::Sampling},
         getNodeCost(left),
         JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE),
-        mlCase);
+        mlCase,
+        rhsCardBeforeJoinPred);
 }
 
 JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left,

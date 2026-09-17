@@ -23,12 +23,21 @@ std::string_view toStringData(MackertLohmanCase c) {
 
 void JoinExtraEstimateInfo::serialize(BSONObjBuilder& bob) const {
     QSNEstimate::serialize(bob);
+    if (cardinalityRHSBeforeJoinPred) {
+        // Emit a numeric value to match the shape of the 'cardinalityEstimate' field serialized by
+        // QSNEstimate::serialize() (see estimates.h). CardinalityEstimate::toBSON() would instead
+        // produce a nested {Cardinality, Source} object that is incompatible with that shape.
+        bob.append("cardinalityRHSBeforeJoinPred", cardinalityRHSBeforeJoinPred->toDouble());
+    }
+
     BSONObjBuilder subBob(bob.subobjStart("joinCostComponents"));
     subBob.append("docsProcessed", docsProcessed);
     subBob.append("docsOutput", docsOutput);
+    subBob.append("numDocsTransmitted", numDocsTransmitted);
     subBob.append("sequentialIOPages", sequentialIOPages);
     subBob.append("randomIOPages", randomIOPages);
     subBob.append("localOpCost", localOpCost);
+    subBob.append("totalCost", totalCost);
     if (mackertLohmanCase) {
         subBob.append("mackertLohmanCase", toStringData(*mackertLohmanCase));
     }
@@ -80,10 +89,12 @@ JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
                                    CardinalityEstimate numRandIOs,
                                    JoinCostEstimate leftCost,
                                    JoinCostEstimate rightCost,
-                                   MackertLohmanCase mackertLohmanCase)
+                                   MackertLohmanCase mackertLohmanCase,
+                                   CardinalityEstimate cardinalityRHSBeforeJoinPred)
     : JoinCostEstimate(
           numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs, leftCost, rightCost) {
     _mackertLohmanCase = mackertLohmanCase;
+    _cardinalityRHSBeforeJoinPred = cardinalityRHSBeforeJoinPred;
 }
 
 JoinCostEstimate::JoinCostEstimate(CostEstimate totalCost)
@@ -105,6 +116,9 @@ BSONObj JoinCostEstimate::toBSON() const {
         << "ioRandNumPages" << _ioRandNumPages.toBSON();
     if (_mackertLohmanCase) {
         bob << "mackertLohmanCase" << toStringData(*_mackertLohmanCase);
+    }
+    if (_cardinalityRHSBeforeJoinPred) {
+        bob << "cardinalityRHSBeforeJoinPred" << _cardinalityRHSBeforeJoinPred->toBSON();
     }
     return bob.obj();
 }

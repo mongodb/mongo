@@ -181,6 +181,19 @@ runTest(pipeline, true /* expectRejected */);
                 "joinCostComponents should be absent when knob is off: " + tojson(stage),
             );
         }
+
+        // We expect only non-join cost estimates to be present.
+        const estimatedStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+            (stage) => stage.hasOwnProperty("costEstimate"),
+        );
+        assert.gt(estimatedStages.length, 0, "Expected estimated stages", {explain});
+        for (const stage of estimatedStages) {
+            assert(
+                !stage.hasOwnProperty("joinCostComponents"),
+                "joinCostComponents should be absent when knob is off",
+                {stage},
+            );
+        }
     }
 
     // Verify that when the knob is ON, joinCostComponents is present on every join opt stage.
@@ -194,9 +207,8 @@ runTest(pipeline, true /* expectRejected */);
     );
     {
         const explain = coll1.explain().aggregate(pipeline);
-        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
-            plannerStageIsJoinOptNode,
-        );
+        const winningStages = getAllPlanStages(getWinningPlanFromExplain(explain));
+        const joinStages = winningStages.filter(plannerStageIsJoinOptNode);
         assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
 
         for (const stage of joinStages) {
@@ -210,9 +222,11 @@ runTest(pipeline, true /* expectRejected */);
             for (const field of [
                 "docsProcessed",
                 "docsOutput",
+                "numDocsTransmitted",
                 "sequentialIOPages",
                 "randomIOPages",
                 "localOpCost",
+                "totalCost",
             ]) {
                 assert(
                     c.hasOwnProperty(field),
@@ -220,6 +234,11 @@ runTest(pipeline, true /* expectRejected */);
                 );
                 assert.gte(c[field], 0, field + " must be non-negative: " + tojson(c));
             }
+
+            // The breakdown's totalCost duplicates the costEstimate.
+            assert.eq(c.totalCost, stage.costEstimate, "totalCost does not match costEstimate", {
+                stage,
+            });
 
             // All stages are INLJ, so mackertLohmanCase must always be present.
             assert(
@@ -229,6 +248,45 @@ runTest(pipeline, true /* expectRejected */);
             assert(
                 validMackertLohmanCases.has(c.mackertLohmanCase),
                 "Unexpected mackertLohmanCase value '" + c.mackertLohmanCase + "': " + tojson(c),
+            );
+
+            // Every RHS filter in 'pipeline' matches all 100 documents, so each INLJ stage must
+            // report exactly the RHS collection size.
+            assert.eq(
+                100,
+                stage.cardinalityRHSBeforeJoinPred,
+                "cardinalityRHSBeforeJoinPred must be the RHS cardinality after its own " +
+                    "predicates",
+                {stage},
+            );
+        }
+
+        // Verify the semantics of 'cardinalityRHSBeforeJoinPred' with a selective RHS predicate:
+        // it must report the number of RHS docs matching the RHS's own predicates (50 of 100) and
+        // not the whole RHS collection size.
+        {
+            const selectivePipeline = [
+                {
+                    $lookup: {
+                        from: coll2.getName(),
+                        localField: "a",
+                        foreignField: "b",
+                        as: "coll2",
+                        pipeline: [{$match: {d: {$gte: 50}}}],
+                    },
+                },
+                {$unwind: "$coll2"},
+            ];
+            const explain = coll1.explain().aggregate(selectivePipeline);
+            const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
+                plannerStageIsJoinOptNode,
+            );
+            assert.eq(1, joinStages.length, "Expected a single INLJ stage", {explain});
+            assert.eq(
+                50,
+                joinStages[0].cardinalityRHSBeforeJoinPred,
+                "cardinalityRHSBeforeJoinPred must be the RHS cardinality after its own predicates",
+                {stage: joinStages[0]},
             );
         }
     }

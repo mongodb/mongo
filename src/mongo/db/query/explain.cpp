@@ -14,6 +14,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -28,6 +29,7 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"
@@ -124,6 +126,12 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
     if (const auto joinPlanCacheKeyHash = explainer.getJoinPlanCacheKeyHash();
         joinPlanCacheKeyHash.has_value()) {
         plannerBob.append("joinPlanCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
+    }
+
+    if (const auto& joinMetrics = CurOp::get(exec->getOpCtx())->debug().joinOptimizationMetrics;
+        joinMetrics && joinMetrics->fallbackReason) {
+        plannerBob.append("joinFallbackReason",
+                          join_ordering::toReasonName(*joinMetrics->fallbackReason));
     }
 
     if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {
