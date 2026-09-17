@@ -51,13 +51,15 @@ describe("QuerySettings stage-memory knob overrides take effect", function () {
         this.rst.startSet();
         this.rst.initiate();
         this.db = this.rst.getPrimary().getDB("test");
-        // Debug builds default the SBE HashAgg spilling mode to "inDebug", which force-spills
-        // regardless of the memory limit. Disable it so the $group (SBE) case spills only when its
-        // knob override is exceeded.
+        // Debug/sanitizer variants force extra spilling regardless of the memory limit, which
+        // breaks the baseline: the SBE HashAgg spilling mode defaults to "inDebug", and sanitizer
+        // variants start mongod with internalQueryEnableAggressiveSpillsInGroup: true. Disable both
+        // so each $group case spills only when its knob override is exceeded.
         assert.commandWorked(
             this.db.adminCommand({
                 setParameter: 1,
                 internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
+                internalQueryEnableAggressiveSpillsInGroup: false,
             }),
         );
         this.coll = this.db[jsTestName()];

@@ -72,6 +72,10 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # The following test assumes the plan cache to be empty, which may not be guaranteed by this suite.
     - jstests/core/query/query_settings/query_settings_plan_cache.js
+    # This test lowers stage memory-limit query knobs, which the background analyzeShardKey command
+    # inherits: its internal $group (which does not allow disk use) then fails with
+    # QueryExceededMemoryLimitNoDiskUseAllowed.
+    - jstests/core/query/query_settings/query_settings_knob_validation_pbt.js
     # The following test doesn't support $lookup where one collection is sharded and the other is unsharded
     - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
     # These tests run analyzeShardKey and make assertions about configuration state, which may not
