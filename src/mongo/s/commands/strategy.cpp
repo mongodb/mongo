@@ -160,9 +160,6 @@ void invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
 
     try {
         runCommandInvocation(rec, invocation);
-        // Surface any abort latched by this command's own cursor-cleanup drains (killCursors, or a
-        // getMore's cursor check-in);
-        txnRouter.raiseDeferredAbortIfNeeded();
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
 

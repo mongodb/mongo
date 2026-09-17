@@ -212,10 +212,6 @@ void BlockingResultsMerger::kill(OperationContext* opCtx) {
                         "error"_attr = ex.what());
         }
     });
-
-    // Unless the wait above threw (global shutdown), kill() is complete and _remoteResponses is
-    // final: drain whatever callbacks queued after AsyncResultsMerger::kill()'s one-shot drain.
-    _arm->drainAdditionalTransactionParticipantsAfterKill(opCtx);
 }
 
 }  // namespace mongo
