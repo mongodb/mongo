@@ -27,6 +27,9 @@ filters:
   - "*join_optimization*":
     approvers:
       - 10gen/query-optimization
+  - "*join_plan_cache*":
+    approvers:
+      - 10gen/query-optimization
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic

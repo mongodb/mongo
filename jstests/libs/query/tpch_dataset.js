@@ -13,10 +13,16 @@ import {checkPauseAfterPopulate} from "jstests/libs/query_optimization/pause_aft
  *
  * In evergreen, tasks such as `query_golden_join_optimization_plan_stability`
  * make sure the prerequisites are already in place.
+ *
+ * @param {string} scale - The scale of the TPCH dataset to populate.
+ * @param {string} [dbName=jsTestName()] - Destination database name. The archive's `tpch.*`
+ *     namespaces are remapped to `${dbName}.*`.
+ * @param {{compact?: boolean}} [options] - `compact` (default true) runs compact on each
+ *     collection after restore to reduce on-disk non-determinism.
+ * @returns {DB} The populated TPC-H database.
  */
-function populateTPCHDataset(scale) {
+export function populateTPCHDataset(scale, dbName = jsTestName(), {compact = true} = {}) {
     const mr = new Mongorestore();
-    const dbName = jsTestName();
 
     mr.execute({
         archive: `../tpc-h/tpch-${scale}-normalized.archive.gz`,
@@ -33,10 +39,12 @@ function populateTPCHDataset(scale) {
 
     const tpchDb = db.getMongo().getDB(dbName);
 
-    // Compact each collection to further reduce the potential for non-determinism
-    tpchDb.getCollectionNames().forEach(function (collName) {
-        assert.commandWorked(tpchDb.runCommand({compact: collName}));
-    });
+    if (compact) {
+        // Compact each collection to further reduce the potential for non-determinism
+        tpchDb.getCollectionNames().forEach(function (collName) {
+            assert.commandWorked(tpchDb.runCommand({compact: collName}));
+        });
+    }
 
     checkPauseAfterPopulate();
 

@@ -35,6 +35,21 @@ export function joinPlanCacheStatsDelta(db, fn) {
 }
 
 /**
+ * Returns {numEntries, estimatedSizeBytes} from serverStatus.metrics.query.planCache.join.
+ */
+export function joinPlanCacheOccupancy(db) {
+    const entries = db
+        .getSiblingDB("admin")
+        .aggregate([{$joinPlanCacheStats: {}}])
+        .toArray();
+    let estimatedSizeBytes = 0;
+    for (const entry of entries) {
+        estimatedSizeBytes += Number(entry.estimatedSizeBytes);
+    }
+    return {numEntries: entries.length, estimatedSizeBytes};
+}
+
+/**
  * Asserts that the join plan cache stats change by the expected amounts during the execution of 'fn'.
  */
 export function assertJoinPlanCacheStats({
