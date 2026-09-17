@@ -656,6 +656,9 @@ void MoveRangeCoordinator::_finalizeMigration(OperationContext* opCtx) {
 
 void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* opCtx,
                                                               const Status& outcome) {
+    const bool isCompletingMigration =
+        _migrationAttempt || _getMigrationCoordinatorDocumentIfExists(opCtx).has_value();
+
     // Release the donor critical section (no-op if never acquired / already released).
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
@@ -686,6 +689,17 @@ void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* 
             store.count(
                 opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) ==
                 0);
+
+    if (isCompletingMigration) {
+        BSONObjBuilder infoBuilder;
+        infoBuilder.append("status", outcome.isOK() ? "success" : "failed");
+        if (!outcome.isOK()) {
+            infoBuilder.append("errorCode", ErrorCodes::errorString(outcome.code()));
+        }
+        LOGV2(12960100,
+              "MoveRange coordinator terminated",
+              logv2::DynamicAttributes{getCoordinatorLogAttrs(), "info"_attr = infoBuilder.obj()});
+    }
 
     _scopedDonateChunk->signalComplete(outcome);
 }
