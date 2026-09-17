@@ -19,6 +19,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
@@ -676,7 +677,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _progress.finished();
     }
 
-    const char* curopMessage = "Validate: scanning documents";
+    const std::string curopMessage = fmt::format(
+        "Validate: scanning documents in {}",
+        NamespaceStringUtil::serialize(coll->ns(), SerializationContext::stateDefault()));
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
