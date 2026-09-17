@@ -8,7 +8,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/str.h"
 
+#include <array>
+#include <fstream>
 #include <string_view>
 
 #include <boost/optional.hpp>
@@ -20,8 +23,6 @@
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <tcmalloc/malloc_extension.h>
 #endif
-
-#include <array>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -44,21 +45,74 @@ bool isKernelVersionSafeForTCMallocPerCPUCache(std::string_view release) {
     return version < std::array{6, 19, 0} || std::array{7, 0, 13} < version;
 }
 
+boost::optional<std::string_view> ubuntuKernelVersionFromVersionSignature(
+    std::string_view versionSignature) {
+    // The format of version_signature looks like this:
+    // Ubuntu 6.5.0-1022.22~22.04.1-aws 6.5.13
+    // It is specified to be "Ubuntu {KERNEL} {UPSTREAM-VERSION}"
+    auto prefix = std::string_view{"Ubuntu "};
+
+    if (!versionSignature.starts_with(prefix)) {
+        return {};
+    }
+
+    auto prefixRemoved = versionSignature.substr(prefix.size());
+    auto spaceBeforeVersion = prefixRemoved.find(' ');
+    if (spaceBeforeVersion == std::string_view::npos) {
+        return {};
+    }
+
+    return prefixRemoved.substr(spaceBeforeVersion + 1);
+}
+
 namespace {
+
+#ifdef __linux__
+boost::optional<std::string> ubuntuKernelVersion() {
+    auto versionSignatureFile = std::ifstream{"/proc/version_signature"};
+    std::string versionSignature;
+
+    // The version information is only on the first line.
+    if (!std::getline(versionSignatureFile, versionSignature)) {
+        return {};
+    }
+
+    if (auto ubuntuKernelVersion = ubuntuKernelVersionFromVersionSignature(versionSignature)) {
+        return std::string{*ubuntuKernelVersion};
+    }
+
+    return {};
+}
+
+boost::optional<std::string> kernelVersion() {
+    struct utsname unameResult;
+    if (uname(&unameResult) != 0) {
+        return {};
+    }
+
+    // If the kernel version does not start with 7.0, the patch version is unimportant.
+    // The Ubuntu specific way to get the patch version is therefore unneeded.
+    if (!std::string_view{unameResult.release}.starts_with("7.0")) {
+        return std::string{unameResult.release};
+    }
+
+    if (str::contains(unameResult.version, "Ubuntu")) {
+        return ubuntuKernelVersion().value_or(unameResult.release);
+    }
+
+    return std::string{unameResult.release};
+}
+#endif
 
 bool isKernelSafeForTCMallocPerCPUCache() {
 #ifdef __linux__
-    struct utsname u;
-    if (uname(&u) != 0) {
-        LOGV2_WARNING(12257602,
-                      "Unable to determine kernel version via uname, cannot check for kernel "
-                      "version compatibility");
-        return true;
+    if (auto version = kernelVersion()) {
+        return isKernelVersionSafeForTCMallocPerCPUCache(*version);
     }
-    std::string_view release{u.release};
-    if (!isKernelVersionSafeForTCMallocPerCPUCache(release)) {
-        return false;
-    }
+
+    LOGV2_WARNING(12257602,
+                  "Unable to determine kernel version via uname, cannot check for kernel "
+                  "version compatibility");
 #endif
     return true;
 }

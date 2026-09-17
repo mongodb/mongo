@@ -1,7 +1,7 @@
 test_kind: js_test
 description: |
   Tests for rseq/tcmalloc kernel compatibility on Linux >= 7.0.14.
-  Only runs on the amazon2023-kernel714-rseq-check variants.
+  Runs on the amazon2023-kernel714-rseq-check and ubuntu2404-arm64-kernel7014-rseq-check variants.
 
 selector:
   roots:
