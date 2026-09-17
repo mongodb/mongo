@@ -641,7 +641,6 @@ DepsTracker Pipeline::getDependenciesForContainer(
         DepsTracker::State status = source->getDependencies(&localDeps);
 
         deps.needRandomGenerator |= localDeps.needRandomGenerator;
-        deps.hasPresenceSensitivePredicate |= localDeps.hasPresenceSensitivePredicate;
 
         if (status == DepsTracker::State::NOT_SUPPORTED) {
             // We don't know anything about this stage, so we have to assume it depends on

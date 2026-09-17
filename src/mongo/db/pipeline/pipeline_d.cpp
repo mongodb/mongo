@@ -860,14 +860,9 @@ SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
  *    1. If there is an inclusion projection at the front of the pipeline, it will be pushed down
  *       as is.
  *    2. If there is no inclusion projection at the front of the pipeline, but there is a finite
- *       dependency set, a projection representing this dependency set will be pushed down if
- *       possible. Presence-sensitive predicates cannot be covered and hence cannot
- *       be pushed down.
+ *       dependency set, a projection representing this dependency set will be pushed down.
  *    3. If there is an exclusion projection at the front of the pipeline, it will be pushed down.
  *    4. Otherwise, an empty projection is returned and no projection push down will happen.
- *
- * If 'deps.hasPresenceSensitivePredicate' is set, avoids pushing down the synthesized
- * projection from case 2.
  *
  * If 'allowExpressions' is true, the returned projection may include expressions (which can only
  * happen in case 1). If 'allowExpressions' is false and the projection we find has expressions,
@@ -909,13 +904,9 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
         }
     }
 
-    // If there is a finite dependency set and there are no presence-sensitive predicates, return a
-    // projection representing this dependency set.
-    // Note that user-supplied (explicit) projections are passed-through in cases 1 and 3.
-    // TODO(SERVER-12869): Remove this workaround once indexes can distinguish a missing field from
-    // a field explicitly set to null.
+    // If there is a finite dependency set, return a projection representing this dependency set.
     // This is case 2.
-    if (!deps.getNeedsAnyMetadata() && !deps.hasPresenceSensitivePredicate) {
+    if (!deps.getNeedsAnyMetadata()) {
         BSONObj depsProjObj = deps.toProjectionWithoutMetadata();
         if (!depsProjObj.isEmpty()) {
             return depsProjObj;

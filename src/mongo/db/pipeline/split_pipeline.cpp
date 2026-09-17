@@ -491,14 +491,6 @@ private:
         if (mergeDeps.needWholeDocument)
             return;  // the merge needs all fields, so nothing we can do.
 
-        // If the merge has a presence-sensitive predicate (e.g. {$exists}, {$type:'null'}),
-        // avoid pushing down a projection to make sure the shards do not cover the query
-        // from an index.
-        // TODO(SERVER-12869): Remove this once indexes can differentiate between null and missing.
-        if (mergeDeps.hasPresenceSensitivePredicate) {
-            return;
-        }
-
         // Empty project is "special" so if no fields are needed, we just ask for _id instead.
         if (mergeDeps.fields.empty())
             mergeDeps.fields.insert("_id");

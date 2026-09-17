@@ -328,8 +328,6 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
-        deps->hasPresenceSensitivePredicate =
-            deps->hasPresenceSensitivePredicate || subDepsTracker.hasPresenceSensitivePredicate;
         deps->setNeedsMetadata(subDepsTracker.metadataDeps());
 
         if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore)) {

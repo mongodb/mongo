@@ -45,16 +45,6 @@
 
 namespace mongo::dependency_analysis {
 
-bool isPresenceSensitiveLeaf(const MatchExpression& node) {
-    if (node.matchType() == MatchExpression::EXISTS) {
-        return true;
-    }
-    if (node.matchType() == MatchExpression::TYPE_OPERATOR) {
-        return static_cast<const TypeMatchExpression&>(node).typeSet().hasType(BSONType::null);
-    }
-    return false;
-}
-
 namespace {
 
 class PostVisitor : public SelectiveMatchExpressionVisitorBase<true> {
@@ -326,10 +316,6 @@ private:
     void visitPathExpression(const PathMatchExpression* expr) {
         if (_ignoreDepsDepth > 0) {
             return;
-        }
-
-        if (isPresenceSensitiveLeaf(*expr)) {
-            _deps->hasPresenceSensitivePredicate = true;
         }
 
         if (auto path = expr->optPath()) {
