@@ -531,7 +531,7 @@ TEST_F(GRPCTransportLayerTest, ConcurrentAsyncConnectsSucceed) {
                     tl.asyncConnect(tl.getListeningAddresses().at(0),
                                     ConnectSSLMode::kGlobalSSLMode,
                                     tl.getReactor(TransportLayer::WhichReactor::kEgress),
-                                    CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                    CommandServiceTestFixtures::kConcurrentConnectTimeout,
                                     nullptr /** connectionMetrics */,
                                     nullptr /** transientSSLContext */));
             }

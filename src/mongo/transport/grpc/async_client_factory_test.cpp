@@ -120,12 +120,9 @@ public:
     }
 
     std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getClient(
-        const HostAndPort& target) {
-        return getFactory()
-            .get(target,
-                 ConnectSSLMode::kGlobalSSLMode,
-                 CommandServiceTestFixtures::kDefaultConnectTimeout)
-            .get();
+        const HostAndPort& target,
+        Milliseconds timeout = CommandServiceTestFixtures::kDefaultConnectTimeout) {
+        return getFactory().get(target, ConnectSSLMode::kGlobalSSLMode, timeout).get();
     }
 
     std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getLeasedClient() {
@@ -239,7 +236,8 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
 
         for (int i = 0; i < concurrentThreads; i++) {
             auto th = monitor.spawn([&] {
-                auto handle = getClient();
+                auto handle =
+                    getClient(getTarget(), CommandServiceTestFixtures::kConcurrentConnectTimeout);
                 for (int req = 0; req < 5; req++) {
                     auto msg = makeUniqueMessage();
                     auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
