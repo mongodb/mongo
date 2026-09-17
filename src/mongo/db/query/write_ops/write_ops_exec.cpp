@@ -112,6 +112,7 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #include <algorithm>
@@ -2201,6 +2202,9 @@ WriteResult performDeletes(
     LastOpFixer lastOpFixer(opCtx);
 
     bool containsRetry = false;
+    if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
 
     size_t nextOpIndex = 0;
@@ -2223,9 +2227,14 @@ WriteResult performDeletes(
 
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
-        if (opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+        const auto alreadyExecutedTime = opCtx->isRetryableWrite()
+            ? txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)
+            : boost::none;
+        if (alreadyExecutedTime) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *alreadyExecutedTime);
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
             out.retriedStmtIds.push_back(stmtId);
             continue;
