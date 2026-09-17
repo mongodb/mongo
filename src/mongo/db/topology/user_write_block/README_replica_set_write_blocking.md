@@ -41,6 +41,12 @@ A static mutex ensures that only one attempt to change the blocking state makes 
 Once the blocking state has been changed, the command waits for the write of the critical section
 document to be majority committed.
 
+When a block is already active, a request with `enabled: true`, the same `reason`, and a different
+`allowDeletions` value updates that value in place. The block remains enabled and keeps its existing
+reason; the request does not re-allow writes or repeat the initial index-build abort/drain path.
+Each allowDeletions change increments `replicaSetWritesBlockCounters` for the reason. Repeating the
+active block's current `allowDeletions` value is a no-op.
+
 ## Interaction with setFeatureCompatibilityVersion
 
 This command is not compatible with `setFeatureCompatibilityVersion`: the two are mutually
@@ -70,10 +76,11 @@ The blocking state is persisted on disk as a `ReplicaSetWriteBlockingCriticalSec
 `replicaSetWritesBlockReason`. This document is managed by the
 `UserWritesRecoverableCriticalSectionService` (shared with user write blocking) through
 `acquireRecoverableCriticalSectionBlockingReplicaSetWrites` and
-`releaseRecoverableCriticalSectionBlockingReplicaSetWrites`. Because this is a _recoverable_
-critical section, the in-memory state is rebuilt from disk whenever consistent data becomes
-available (`recoverRecoverableCriticalSections`, invoked from `onConsistentDataAvailable`), so the
-block survives restarts.
+`releaseRecoverableCriticalSectionBlockingReplicaSetWrites`; active-block policy changes use
+`updateAllowDeletionsForActiveReplicaSetWriteBlock`. Because this is a _recoverable_ critical
+section, the in-memory state is rebuilt from disk whenever consistent data becomes available
+(`recoverRecoverableCriticalSections`, invoked from `onConsistentDataAvailable`), so the block
+survives restarts.
 
 ## In-memory state
 

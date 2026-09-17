@@ -341,6 +341,24 @@ TEST_F(ReplicaSetWriteBlockStateTest, BlockReplicaSetWritesCommandCountersIncrem
     ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 2);
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest,
+       BlockReplicaSetWritesCommandCountersDoNotIncrementWhenAlreadyEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    BSONObjBuilder bob;
+    state->appendReplicaSetWritesBlockCounters(bob);
+    BSONObj doc = bob.obj();
+    const auto sub = doc.getObjectField("replicaSetWritesBlockCounters");
+    ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 1);
+}
+
 TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenDeletionsBlockingDisabled) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);

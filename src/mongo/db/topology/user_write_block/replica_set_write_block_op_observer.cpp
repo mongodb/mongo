@@ -11,7 +11,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
-#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -106,9 +105,16 @@ void ReplicaSetWriteBlockOpObserver::onUpdate(OperationContext* opCtx,
                 OperationContext* opCtx, boost::optional<Timestamp>) {
                 auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
                 if (blockWrites) {
-                    replicaSetWriteBlockState->enableReplicaSetWriteBlocking(blockUserWritesReason);
-                } else {
-                    replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
+                    // An allowDeletions-only update leaves write blocking active. Count the policy
+                    // change without re-entering enableReplicaSetWriteBlocking (which only bumps
+                    // on disabled->enabled).
+                    if (!replicaSetWriteBlockState->isReplicaSetWriteBlockingEnabled()) {
+                        replicaSetWriteBlockState->enableReplicaSetWriteBlocking(
+                            blockUserWritesReason);
+                    } else {
+                        replicaSetWriteBlockState->incrementReplicaSetWritesBlockCounter(
+                            blockUserWritesReason);
+                    }
                 }
                 if (blockDeletions) {
                     replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
@@ -142,7 +148,6 @@ void ReplicaSetWriteBlockOpObserver::onDelete(OperationContext* opCtx,
             });
     }
 }
-
 
 void ReplicaSetWriteBlockOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                                        const NamespaceString& nss,
