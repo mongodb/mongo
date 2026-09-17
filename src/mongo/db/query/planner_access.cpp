@@ -23,10 +23,10 @@
 #include "mongo/db/matcher/expression_reordering.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
@@ -2259,15 +2259,7 @@ TagForPruningResult tagUnindexedOrIndexUnsafeNodesForPruning(MatchExpression* no
 
     // TODO SERVER-12869. Remove this exception once indexes can be trusted to distinguish between
     // not existing and null values.
-    bool unsafe = false;
-    if (node->matchType() == MatchExpression::EXISTS) {
-        unsafe = true;
-    } else if (node->matchType() == MatchExpression::TYPE_OPERATOR) {
-        auto typeExpr = static_cast<const TypeMatchExpression*>(node);
-        if (typeExpr->typeSet().hasType(BSONType::null)) {
-            unsafe = true;
-        }
-    }
+    const bool unsafe = dependency_analysis::isPresenceSensitiveLeaf(*node);
 
     node->setTag(new PruneTag(unsafe));
     return unsafe ? TagForPruningResult::kWhollyTagged : TagForPruningResult::kNothingTagged;

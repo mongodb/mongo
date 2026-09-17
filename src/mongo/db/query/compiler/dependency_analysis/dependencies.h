@@ -241,6 +241,9 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] DepsTracker {
     // to decide whether it is safe to cache, reevaluate, or reorder an operator.
     bool needRandomGenerator = false;
 
+    // Set for presence-sensitive match expressions.
+    bool hasPresenceSensitivePredicate = false;
+
 private:
     // Struct to track metadata dependency validation: either NoMetadataValidation, or a bitset of
     // metadata fields that have been marked available to the pipeline. Used for validating that

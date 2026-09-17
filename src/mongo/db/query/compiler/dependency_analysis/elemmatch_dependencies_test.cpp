@@ -136,4 +136,56 @@ TEST(ElemMatchDependenciesTest, TwoPredicatesUnderElemMatchDeepEvenNesting) {
     }
 }
 
+TEST(ElemMatchDependenciesTest, PresenceSensitivePredicate) {
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: {$exists: true}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_TRUE(deps.hasPresenceSensitivePredicate);
+    }
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: {$type: 'null'}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_TRUE(deps.hasPresenceSensitivePredicate);
+    }
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: 1, b: {$gt: 2}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_FALSE(deps.hasPresenceSensitivePredicate);
+    }
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{$nor: [{a: {$exists: false}}]}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_TRUE(deps.hasPresenceSensitivePredicate);
+    }
+}
+
+TEST(ElemMatchDependenciesTest, PresenceSensitivePredicateUnderElemMatch) {
+    // Presence-sensitive predicates under $elemMatch operate on array elements; array fields are
+    // multikey and hence never covered, so they must not set the flag.
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: {$elemMatch: {b: {$exists: true}}}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_FALSE(deps.hasPresenceSensitivePredicate);
+        ASSERT_EQ(deps.fields, OrderedPathSet({"a"}));
+    }
+    {
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: {$elemMatch: {$type: 'null'}}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_FALSE(deps.hasPresenceSensitivePredicate);
+    }
+    {
+        // A root-level presence-sensitive predicate alongside an $elemMatch is still detected.
+        DepsTracker deps;
+        auto me = parseMatchExpr("{a: {$elemMatch: {b: 1}}, c: {$exists: false}}");
+        dependency_analysis::addDependencies(me.get(), &deps);
+        ASSERT_TRUE(deps.hasPresenceSensitivePredicate);
+    }
+}
+
 }  // namespace mongo
