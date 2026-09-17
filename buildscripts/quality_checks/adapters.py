@@ -405,10 +405,6 @@ def run_streams_coverage(context: CheckContext, files: tuple[str, ...]) -> RunOu
     return _run_lint_stage(context, files, "streams-coverage")
 
 
-def run_streams_test_timeout(context: CheckContext, files: tuple[str, ...]) -> RunOutcome:
-    return _run_lint_stage(context, files, "streams-test-timeout")
-
-
 def run_markdown_links(context: CheckContext, files: tuple[str, ...]) -> RunOutcome:
     return _run_lint_stage(context, files, "markdown-links")
 

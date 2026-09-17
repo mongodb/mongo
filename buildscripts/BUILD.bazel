@@ -652,20 +652,6 @@ py_binary(
     ],
 )
 
-py_library(
-    name = "streams_test_timeout_linter_lib",
-    srcs = ["streams_test_timeout_linter.py"],
-    visibility = ["//visibility:public"],
-)
-
-py_binary(
-    name = "streams_test_timeout_linter",
-    srcs = ["streams_test_timeout_linter.py"],
-    main = "streams_test_timeout_linter.py",
-    visibility = ["//visibility:public"],
-    deps = [],
-)
-
 py_binary(
     name = "yamllinters",
     srcs = [

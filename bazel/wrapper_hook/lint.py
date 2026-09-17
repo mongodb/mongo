@@ -210,7 +210,6 @@ LINT_COPYBARA_FORBIDDEN_TEXT = "copybara-forbidden-text"
 LINT_YAML = "yaml"
 LINT_RESMOKE_TAGS = "resmoke-tags"
 LINT_STREAMS_COVERAGE = "streams-coverage"
-LINT_STREAMS_TEST_TIMEOUT = "streams-test-timeout"
 LINT_MARKDOWN_LINKS = "markdown-links"
 LINT_FILE_SIZE = "file-size"
 LINT_MODULE_MAPPING = "module-mapping"
@@ -231,7 +230,6 @@ ALL_LINT_CHECKS = frozenset(
         LINT_YAML,
         LINT_RESMOKE_TAGS,
         LINT_STREAMS_COVERAGE,
-        LINT_STREAMS_TEST_TIMEOUT,
         LINT_MARKDOWN_LINKS,
         LINT_FILE_SIZE,
         LINT_MODULE_MAPPING,
@@ -1197,30 +1195,6 @@ def run_rules_lint(
         ),
     ):
         lr.run_bazel("//buildscripts:streams_suite_coverage_linter")
-
-    if should_run(
-        LINT_STREAMS_TEST_TIMEOUT,
-        lint_all
-        or any(
-            "streams/exec/tests/" in file and file.endswith((".cpp", ".h", ".hpp", ".inl"))
-            for file in files_to_lint
-        ),
-    ):
-        timeout_files = [
-            file
-            for file in files_to_lint
-            if "streams/exec/tests/" in file and file.endswith((".cpp", ".h", ".hpp", ".inl"))
-        ]
-        # Patch mode: only check the diff against --base-branch
-        # Full mode (--all): full audit
-        timeout_args: list[str] = []
-        if lint_all:
-            timeout_args.append("--all")
-        elif timeout_files:
-            timeout_args.extend(["--base-branch", parsed_args.origin_branch])
-            timeout_args.extend(arg for file in timeout_files for arg in ("--file", file))
-        if timeout_args:
-            lr.run_bazel("//buildscripts:streams_test_timeout_linter", timeout_args)
 
     if should_run(
         LINT_MARKDOWN_LINKS,
