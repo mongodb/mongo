@@ -198,6 +198,15 @@ py_test(
 )
 
 py_test(
+    name = "test_streams_test_timeout_linter",
+    srcs = ["test_streams_test_timeout_linter.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:streams_test_timeout_linter_lib",
+    ],
+)
+
+py_test(
     name = "test_mongolint",
     srcs = ["test_mongolint.py"],
     visibility = ["//visibility:public"],

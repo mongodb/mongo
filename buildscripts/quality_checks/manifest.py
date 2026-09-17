@@ -77,6 +77,14 @@ def _streams_file(candidate: CandidateFile) -> bool:
     )
 
 
+def _streams_exec_test_file(candidate: CandidateFile) -> bool:
+    return any(
+        path.startswith("src/mongo/db/modules/enterprise/src/streams/exec/tests/")
+        and path.endswith((".cpp", ".h", ".hpp", ".inl"))
+        for path in candidate.selection_paths
+    )
+
+
 def _codeowners_file(candidate: CandidateFile) -> bool:
     if candidate.status in {
         ChangeStatus.ADDED,
@@ -299,6 +307,17 @@ CHECKS: tuple[RegisteredCheck, ...] = (
         ),
         _streams_file,
         adapters.run_streams_coverage,
+    ),
+    RegisteredCheck(
+        CheckSpec(
+            "lint.streams-test-timeout",
+            "Streams exec test timeout namespace",
+            "lint",
+            CheckPhase.SHARED_STATE_SERIAL,
+            dependencies=_BAZEL_SERVER_DEPENDENCY,
+        ),
+        _streams_exec_test_file,
+        adapters.run_streams_test_timeout,
     ),
     RegisteredCheck(
         CheckSpec(
