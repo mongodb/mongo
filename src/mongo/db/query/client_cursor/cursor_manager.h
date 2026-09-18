@@ -93,12 +93,6 @@ public:
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
-     * Disposes idle cursors that hold references to the mongot task executor. Intended for mongot
-     * task executor shutdown so those cursor-owned references do not block executor teardown.
-     */
-    std::size_t disposeIdleMongotCursorsForShutdown(OperationContext* opCtx);
-
-    /**
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
      * registered with the manager and returned in pinned state.
      */

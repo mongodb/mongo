@@ -148,38 +148,6 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
     return toDisposeWithoutMutex.size();
 }
 
-std::size_t CursorManager::disposeIdleMongotCursorsForShutdown(OperationContext* opCtx) {
-    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
-
-    for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
-        auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
-        for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
-            auto* cursor = it->second;
-            if (cursor->_operationUsingCursor || !cursor->holdsMongotTaskExecutorCursor()) {
-                ++it;
-                continue;
-            }
-
-            toDisposeWithoutMutex.emplace_back(cursor);
-            ++it;
-            removeCursorFromMap(lockedPartition, cursor);
-        }
-    }
-
-    // Be careful not to dispose of cursors while holding the partition lock.
-    for (auto&& cursor : toDisposeWithoutMutex) {
-        cursor->dispose(opCtx, boost::none);
-    }
-
-    if (!toDisposeWithoutMutex.empty()) {
-        LOGV2(12984900,
-              "Disposed idle cursors holding mongot task executor references during shutdown",
-              "numDisposed"_attr = toDisposeWithoutMutex.size());
-    }
-
-    return toDisposeWithoutMutex.size();
-}
-
 std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceString& nss) {
     std::vector<CursorId> cursorIds;
 

@@ -31,7 +31,6 @@ struct [[MONGO_MOD_PUBLIC]] MongotParams {
 
     Atomic<int> minConnections;
     Atomic<int> maxConnections;
-    Atomic<int> shutdownTimeoutMS;
     transport::ConnectSSLMode sslMode;
 };
 

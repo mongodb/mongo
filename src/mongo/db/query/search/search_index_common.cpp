@@ -124,7 +124,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
         // Pull out the command response. Throw if the command did not reach the remote server.
         uassertStatusOK(response.getStatus());
         uassertStatusOK(response.getValue().response.status);
-    } catch (const ExceptionFor<ErrorCategory::NetworkError>&) {
+    } catch (const ExceptionFor<ErrorCodes::HostUnreachable>&) {
         // Don't expose the remote server host-and-port information to clients. A remote search
         // index management server instance is expected to be running on the same machine as the
         // mongod, so connection failures are not expected to resolve without user intervention
