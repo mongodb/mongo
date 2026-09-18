@@ -398,6 +398,14 @@ public:
     SharedSemiFuture<void> kill(OperationContext* opCtx);
 
     /**
+     * Final drain of additional-participant metadata after kill() has completed: processes
+     * responses buffered by callbacks that finished after kill()'s one-shot drain, which would
+     * otherwise never be processed. Like kill()'s own drain, it no-ops unless the caller's opCtx
+     * is in the cursor's transaction — the only context that can reach that transaction's router.
+     */
+    void drainAdditionalTransactionParticipantsAfterKill(OperationContext* opCtx) noexcept;
+
+    /**
      * Returns remote metrics aggregated in this ARM without reseting the local counts.
      */
     const query_stats::DataBearingNodeMetrics& peekMetrics_forTest() const {
@@ -791,9 +799,26 @@ private:
     void _determineInitialHighWaterMark();
 
     /**
-     * Processes additional participants received in the responses if necessary.
+     * Processes additional participants received in the responses if necessary. Drains every
+     * queued response (enrolling siblings even after one raises) and returns the first failure;
+     * never throws. The caller decides whether to re-throw (active path) or latch a deferred
+     * abort (cleanup path).
      */
-    void _processAdditionalTransactionParticipants(OperationContext* opCtx);
+    Status _processAdditionalTransactionParticipants(OperationContext* opCtx, WithLock lk);
+
+    /**
+     * The cleanup drain: drains buffered additional-participant metadata for the owning
+     * transaction and latches any failure as a deferred abort on the router (raised at the end of
+     * the observing command, whose error path runs the implicit abort).
+     */
+    void _drainAndLatchAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                         WithLock lk) noexcept;
+
+    /**
+     * Returns true if 'opCtx' belongs to the same transaction as this ARM, so processing its
+     * buffered additional-participant metadata is safe and correct.
+     */
+    bool _shouldProcessAdditionalParticipantsFor(OperationContext* opCtx, WithLock lk) const;
 
     /**
      * Removes a remote from the _promisedMinSortKeys set, if already present in there.

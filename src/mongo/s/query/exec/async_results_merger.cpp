@@ -19,6 +19,8 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
@@ -364,7 +366,7 @@ void AsyncResultsMerger::detachFromOperationContext() {
     // Before we're done detaching we do a last attempt to process any additional responses
     // received. This ensures that the only possible state for ARM to have unprocessed responses is
     // when it's been stashed between cursor checkouts or after it's been marked as killed.
-    _processAdditionalTransactionParticipants(_opCtx);
+    _drainAndLatchAdditionalTransactionParticipants(_opCtx, lk);
 
     _subBaton.shutdown();
 
@@ -808,7 +810,9 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
 
     // We process additional transaction participants that have been put in the queue for
     // processing. This can happen at any time since receiving a response is asynchronous in nature.
-    _processAdditionalTransactionParticipants(_opCtx);
+    // The active-fetch path re-raises the first metadata failure so the command boundary implicitly
+    // aborts the transaction and the client learns it is dead.
+    uassertStatusOK(_processAdditionalTransactionParticipants(_opCtx, lk));
 
     if (!_status.isOK()) {
         return _status;
@@ -838,13 +842,66 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
     return std::get<ClusterQueryResult>(std::move(result));
 }
 
-void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx) {
+Status AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                                     WithLock) {
+    auto firstError = Status::OK();
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     while (!_remoteResponses.empty()) {
-        const auto& response = _remoteResponses.front();
-        processAdditionalTransactionParticipantFromResponse(opCtx, response, fcvSnapshot);
+        // Dequeue before processing so a response that raises during validation cannot be
+        // reprocessed by a later drain (a re-raise from a cleanup drain during exception unwind
+        // would terminate mongos). Continue after a failure so sibling responses still enroll
+        // their participants; the first error wins.
+        RemoteResponse response = std::move(_remoteResponses.front());
         _remoteResponses.pop();
+        try {
+            processAdditionalTransactionParticipantFromResponse(opCtx, response, fcvSnapshot);
+        } catch (const DBException& ex) {
+            if (firstError.isOK()) {
+                firstError = ex.toStatus();
+                LOGV2_DEBUG(13412900,
+                            2,
+                            "Failed to process additional transaction participant metadata",
+                            "error"_attr = redact(firstError));
+            }
+        }
     }
+    return firstError;
+}
+
+bool AsyncResultsMerger::_shouldProcessAdditionalParticipantsFor(OperationContext* opCtx,
+                                                                 WithLock) const {
+    return opCtx->inMultiDocumentTransaction() &&
+        opCtx->getLogicalSessionId() == _params.getSessionId().map([&](const auto& lsid) {
+            return makeLogicalSessionId(lsid, opCtx);
+        }) &&
+        opCtx->getTxnNumber() == _params.getTxnNumber();
+}
+
+void AsyncResultsMerger::_drainAndLatchAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                                         WithLock lk) noexcept {
+    // Reachable from the implicitly-noexcept ~PinnedCursor: nothing may escape. The gate's
+    // makeLogicalSessionId can uassert; the drain itself reports failures as Status.
+    try {
+        if (!_shouldProcessAdditionalParticipantsFor(opCtx, lk)) {
+            return;
+        }
+        if (auto status = _processAdditionalTransactionParticipants(opCtx, lk); !status.isOK()) {
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.recordDeferredAbort(status);
+            }
+        }
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(13412901,
+                    2,
+                    "Failed to drain transaction participant metadata during cursor cleanup",
+                    "error"_attr = redact(ex.toStatus()));
+    }
+}
+
+void AsyncResultsMerger::drainAdditionalTransactionParticipantsAfterKill(
+    OperationContext* opCtx) noexcept {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _drainAndLatchAdditionalTransactionParticipants(opCtx, lk);
 }
 
 AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock lk) {
@@ -1427,6 +1484,17 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                  .parsedMetadata = TransactionRouter::Router::parseParticipantResponseMetadata(
                      cbData.response.data)});
             // To avoid data race issues we delay processing until the actual owner thread of the
+            // ARM drains the queue.
+            // Only log when additional participants were actually added.
+            if (const auto& additionalParticipants =
+                    _remoteResponses.back()
+                        .parsedMetadata.txnResponseMetadata.getAdditionalParticipants();
+                additionalParticipants && !additionalParticipants->empty()) {
+                LOGV2_DEBUG(13412904,
+                            2,
+                            "Buffered response for additional transaction participant processing",
+                            "shardId"_attr = remote->shardId);
+            }
         }
     }
 
@@ -1771,13 +1839,7 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     // under the same transaction. Processing additional participants on a different transaction
     // would result in modifying the list of participants of a transaction that has nothing to do
     // with the original one.
-    if (opCtx->inMultiDocumentTransaction() &&
-        opCtx->getLogicalSessionId() == _params.getSessionId().map([&](const auto& lsid) {
-            return makeLogicalSessionId(lsid, opCtx);
-        }) &&
-        opCtx->getTxnNumber() == _params.getTxnNumber()) {
-        _processAdditionalTransactionParticipants(opCtx);
-    }
+    _drainAndLatchAdditionalTransactionParticipants(opCtx, lk);
 
     if (!_haveOutstandingBatchRequests(lk)) {
         _lifecycleState = kKillComplete;
