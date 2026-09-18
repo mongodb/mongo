@@ -18,18 +18,25 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(disableReplicatedFastCount);
 
 bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
+    if (auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        !replCoord || !replCoord->getSettings().isReplSet()) {
+        return false;
+    }
+
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount()) {
+        return true;
+    }
+
     if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
         return false;
     }
 
     // TODO(SERVER-117326): Remove feature flag check.
-    return (rss::ReplicatedStorageService::get(opCtx)
-                .getPersistenceProvider()
-                .shouldUseReplicatedFastCount() ||
-            gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) &&
-        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
+    return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 bool isReplicatedFastCountEligible(const NamespaceString& nss) {
@@ -44,10 +51,6 @@ bool isReplicatedFastCountEligible(const NamespaceString& nss) {
 }
 
 bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceString& nss) {
-    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
-        return false;
-    }
-
     if (!isReplicatedFastCountEligible(nss)) {
         return false;
     }
@@ -56,6 +59,10 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount()) {
         return true;
+    }
+
+    if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
+        return false;
     }
 
     if (!gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
