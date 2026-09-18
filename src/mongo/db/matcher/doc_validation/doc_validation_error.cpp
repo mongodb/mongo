@@ -4,6 +4,7 @@
 #include "mongo/db/matcher/doc_validation/doc_validation_error.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -1830,8 +1831,11 @@ private:
                 "Must have at least one mismatched array element when generating an error for an "
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
-            _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"sv, std::stoll(std::string{failingElement.fieldNameStringData()}));
+
+            int itemIndex;
+            uassertStatusOK(
+                NumberParser().base(10)(failingElement.fieldNameStringData(), &itemIndex));
+            _context->getCurrentObjBuilder().appendNumber("itemIndex"sv, itemIndex);
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {
