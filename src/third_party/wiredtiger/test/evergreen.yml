@@ -258,26 +258,32 @@ functions:
         set -o verbose
         git clone https://github.com/wiredtiger/mongo-tests
   "fetch mongo repo" :
-    command: shell.exec
-    type: setup
-    params:
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        pushd wiredtiger
-        # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
-        # the case of patch builds, it is possible that the developer has a branch name that doesn't
-        # adhere to naming rules, therefore derive the base branch name from git.
-        branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
-        mongo_repo=https://github.com/mongodb/mongo
-        if [[ $branch =~ "mongodb-" ]]; then
-          mongo_branch=v$(echo $branch | cut -d'-' -f 2)
-        else
-          mongo_branch=master
-        fi
-        popd
-        git clone $mongo_repo -b $mongo_branch
+    - command: github.generate_token
+      params:
+        owner: 10gen
+        repo: mongo
+        expansion_name: generated_mongo_token
+        permissions:
+          contents: read
+    - command: shell.exec
+      type: setup
+      params:
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          pushd wiredtiger
+          # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
+          # the case of patch builds, it is possible that the developer has a branch name that doesn't
+          # adhere to naming rules, therefore derive the base branch name from git.
+          branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
+          if [[ $branch =~ "mongodb-" ]]; then
+            mongo_branch=v$(echo $branch | cut -d'-' -f 2)
+          else
+            mongo_branch=master
+          fi
+          popd
+          git clone https://x-access-token:${generated_mongo_token}@github.com/10gen/mongo.git -b $mongo_branch
   "import wiredtiger into mongo" :
     command: shell.exec
     type: setup

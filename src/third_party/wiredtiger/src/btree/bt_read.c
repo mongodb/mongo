@@ -377,9 +377,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         addr_tmp.type = addr.type;
         WT_TIME_AGGREGATE_COPY(&addr_tmp.ta, &full_image_ta);
 
-        int verify_ret =
-          __wt_verify_dsk_image(session, "[verify the newly built full disk image from deltas]",
-            new_image.data, new_image.size, &addr_tmp, WT_VRFY_DISK_EMPTY_PAGE_OK);
+        int verify_ret = __wt_verify_dsk_image(session,
+          "[verify the newly built full disk image from deltas]", new_image.data, new_image.size,
+          &addr_tmp, WT_VRFY_DISK_EMPTY_PAGE_OK | WT_VRFY_DISK_FROM_DELTA);
         WT_ASSERT_ALWAYS(session, verify_ret == 0,
           "verification failed for the newly built full disk image from deltas!");
 #endif

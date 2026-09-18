@@ -57,17 +57,23 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // It is possible to get WT_OLDEST_FOR_EVICTION as the sub-level rollback error from this
         // function. This should not be overwritten by WT_CACHE_OVERFLOW.
 
-        // Set the eviction cache as stuck.
-        conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
-        F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
+        // The eviction server rebuilds the aggressive score and the cache flags on every pass, so
+        // hold the pass lock while the stuck state is hand-set.
+        WT_WITH_LOCK_WAIT(
+          session_impl, &conn_impl->evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, {
+              // Set the eviction cache as stuck.
+              conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
+              F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
 
-        // Set transaction's update amount to 1 and ID to be equal to the oldest transaction ID.
-        session_impl->txn->mod_count = 1;
-        WT_SESSION_TXN_SHARED(session_impl)->id = S2C(session)->txn_global.oldest_id;
-        CHECK(
-          __wti_evict_app_assist_worker(session_impl, false, false, true, false) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Set transaction's update amount to 1 and ID to be equal to the oldest transaction
+              // ID.
+              session_impl->txn->mod_count = 1;
+              WT_SESSION_TXN_SHARED(session_impl)->id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true, false) ==
+                WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
+          });
 
         // Reset updates to the initial value.
         session_impl->txn->mod_count = 0;
@@ -167,29 +173,34 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // Set the transaction to have 1 modification.
         session_impl->txn->mod_count = 1;
 
-        // The oldest-for-eviction check only applies once eviction reports itself stuck.
-        conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
-        F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
+        // The oldest-for-eviction check only applies once eviction reports itself stuck, and the
+        // eviction server rebuilds that state on every pass, so hold the pass lock throughout.
+        WT_WITH_LOCK_WAIT(
+          session_impl, &conn_impl->evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, {
+              conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
+              F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
 
-        // Check if the transaction's ID or its pinned ID is equal to the oldest transaction ID.
-        CHECK(__wt_txn_is_blocking(session_impl) == 0);
-        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+              // Check if the transaction's ID or its pinned ID is equal to the oldest transaction
+              // ID.
+              CHECK(__wt_txn_is_blocking(session_impl) == 0);
+              check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
 
-        // Set transaction's pinned ID to be equal to the oldest transaction ID.
-        WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session_impl);
-        txn_shared->pinned_id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Set transaction's pinned ID to be equal to the oldest transaction ID.
+              WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session_impl);
+              txn_shared->pinned_id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
 
-        // Reset error.
-        __wt_session_reset_last_error(session_impl);
+              // Reset error.
+              __wt_session_reset_last_error(session_impl);
 
-        // Set transaction's ID to be equal to the oldest transaction ID.
-        txn_shared->id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Set transaction's ID to be equal to the oldest transaction ID.
+              txn_shared->id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
+          });
 
         // Reset updates to the initial value.
         session_impl->txn->mod_count = 0;

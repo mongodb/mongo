@@ -40,10 +40,11 @@ from helper_disagg import DisaggSizeTestMixin, disagg_test_class
 # file's running byte total. The next successful checkpoint then saw an invalid page_id
 # and skipped the delta chain discard, permanently leaking the chain's cumulative size.
 #
-# This test enables timing_stress_for_test=[failpoint_rec_before_wrapup], which fires
-# 1% of the time during eviction reconciliation (WT_REC_EVICT), and loops until the
-# free page ID due to failed page replacement reconciliation scenario increments its
-# statistic -- the signal that the error path ran.
+# This test enables timing_stress_for_test=[failpoint_rec_before_wrapup] together with
+# debug_mode=(timing_stress_force=true), which makes the failpoint fire unconditionally
+# on the next eviction reconciliation (WT_REC_EVICT) instead of its usual 1% chance, and
+# checks that the free page ID due to failed page replacement reconciliation scenario
+# increments its statistic -- the signal that the error path ran.
 
 @disagg_test_class
 class test_disagg_checkpoint_size21(DisaggSizeTestMixin, wttest.WiredTigerTestCase):
@@ -118,38 +119,33 @@ class test_disagg_checkpoint_size21(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         # access. The disk-load path sets the persistent flag.
         self.evict_page('key000000')
 
-        # Step 4: Enable the failpoint and switch to full-image mode.
-        # timing_stress_for_test=[failpoint_rec_before_wrapup] fires 1% of the time
-        # during eviction reconciliation (WT_REC_EVICT) after the block write but before
-        # the reconciliation commit path, setting ret = EBUSY and invoking the
-        # reconciliation error path.
+        # Step 4: Enable the failpoint and switch to full-image mode. debug_mode.timing_stress_force
+        # makes the enabled timing_stress_for_test failpoint fire unconditionally on the next
+        # matching reconciliation instead of its usual 1% chance, so the error path below is
+        # reached deterministically.
+        # timing_stress_for_test=[failpoint_rec_before_wrapup] fires during eviction reconciliation
+        # (WT_REC_EVICT) after the block write but before the reconciliation commit path, setting
+        # ret = EBUSY and invoking the reconciliation error path.
         self.conn.reconfigure(
             'page_delta=(delta_pct=1),'
-            'timing_stress_for_test=[failpoint_rec_before_wrapup]'
+            'timing_stress_for_test=[failpoint_rec_before_wrapup],'
+            'debug_mode=(timing_stress_force=true)'
         )
 
-        # Step 5: Dirty the page and force eviction until the failpoint fires.
-        # The first several evictions succeed and re-establish a single-page replacement
-        # result in cache. Once that is set, a subsequent eviction that hits the 1%
-        # failpoint enters the reconciliation error path with all three conditions true
-        # and exercises the free page ID due to failed page replacement reconciliation scenario.
+        # Step 5: Dirty the page and force eviction. The failpoint fires on this reconciliation,
+        # entering the reconciliation error path with all three conditions true and exercising the
+        # free page ID due to failed page replacement reconciliation scenario.
+        # debug_mode.timing_stress_force affects every reconciliation on the connection,
+        # not just this page, so disable it in a finally as soon as its job is done.
         stat_key = stat.dsrc.rec_free_page_id_due_to_failed_replacement_reconciliation
-        max_iters = 500
-        for i in range(max_iters):
+        try:
             c = self.session.open_cursor(self.uri)
-            self.insert_rows(c, 0, nrows, chr(ord('C') + (i % 20)))
+            self.insert_rows(c, 0, nrows, 'C')
             c.close()
             self.evict_page('key000000')
-            if self.get_stat(stat_key) > 0:
-                break
-        else:
-            self.fail(
-                f'failpoint_rec_before_wrapup never triggered the reconciliation '
-                f'error path after {max_iters} evictions'
-            )
-
-        # Disable failpoint before the successful checkpoint to prevent another error.
-        self.conn.reconfigure('timing_stress_for_test=[]')
+        finally:
+            self.conn.reconfigure(
+                'timing_stress_for_test=[],debug_mode=(timing_stress_force=false)')
 
         # Step 6: Final checkpoint after the error path has run.
         self.session.checkpoint()

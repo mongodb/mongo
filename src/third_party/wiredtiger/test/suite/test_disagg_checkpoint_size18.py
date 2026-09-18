@@ -109,36 +109,35 @@ class test_disagg_checkpoint_size18(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         # with the persistent flag set to true.
         self.evict_page('key000000')
 
-        # Enable the failpoint. It fires at 1% of writes (probability=100 in
-        # the [0,10000] failpoint range), so the loop below iterates until the
-        # stat increments.
+        # Enable the failpoint. debug_mode.timing_stress_force makes it fire
+        # unconditionally on the next write instead of its usual 1% chance
+        # (probability=100 in the [0,10000] failpoint range), so a single
+        # dirty + evict below reaches the error path deterministically.
         self.conn.reconfigure(
-            'timing_stress_for_test=[failpoint_page_log_handle_put]')
+            'timing_stress_for_test=[failpoint_page_log_handle_put],'
+            'debug_mode=(timing_stress_force=true)')
 
-        # Dirty + evict until the failpoint fires. Each failing write enters
-        # the reconciliation error path with the persistent flag false;
-        # the disagg block is skipped and the page's block metadata is left
-        # unmodified.
+        # Dirty + evict once. The failing write enters the reconciliation
+        # error path with the persistent flag false; the disagg block is
+        # skipped and the page's block metadata is left unmodified.
+        # debug_mode.timing_stress_force affects every reconciliation on the
+        # connection, not just this page, so disable it in a finally as soon
+        # as its job is done.
         stat_key = stat.dsrc.disagg_block_plh_put_failed
-        max_iters = 500
-        for i in range(max_iters):
+        try:
             c = self.session.open_cursor(self.uri)
-            self.insert_rows(c, 0, nrows, chr(ord('C') + (i % 20)))
+            self.insert_rows(c, 0, nrows, 'C')
             c.close()
             self.evict_page('key000000')
-            if self.get_stat(stat_key) > 0:
-                break
-        else:
-            self.fail(
-                f'failpoint_page_log_handle_put never triggered after {max_iters} evictions')
-
-        # Switch to full-image writes BEFORE disabling the failpoint so the
-        # recovery checkpoint forces a fresh full image and exercises the
-        # running-total decrement / running-total increment path.
-        # Doing it in this order avoids a race where background eviction
-        # between reconfigures could write a delta at the old delta_pct=90.
-        self.conn.reconfigure('page_delta=(delta_pct=1)')
-        self.conn.reconfigure('timing_stress_for_test=[]')
+        finally:
+            # Switch to full-image writes BEFORE disabling the failpoint so the
+            # recovery checkpoint forces a fresh full image and exercises the
+            # running-total decrement / running-total increment path.
+            # Doing it in this order avoids a race where background eviction
+            # between reconfigures could write a delta at the old delta_pct=90.
+            self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.conn.reconfigure(
+                'timing_stress_for_test=[],debug_mode=(timing_stress_force=false)')
 
         # Recovery checkpoint: the page's persistent flag being true passes the
         # old block metadata, so the running-total decrement runs before the

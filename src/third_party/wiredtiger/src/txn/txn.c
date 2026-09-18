@@ -837,7 +837,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, WT_CONF *conf)
           WT_CONF_STRING_MATCH(read_committed, cval)          ? WT_ISO_READ_COMMITTED :
                                                                 WT_ISO_READ_UNCOMMITTED;
 
-    WT_ERR(__txn_conf_operation_timeout(session, conf, false));
+    WT_ERR(__txn_conf_operation_timeout(session, conf, true));
 
     /*
      * The default sync setting is inherited from the connection, but can be overridden by an

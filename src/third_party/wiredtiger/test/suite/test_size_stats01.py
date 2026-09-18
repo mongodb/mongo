@@ -35,8 +35,8 @@ from wiredtiger import stat
 # (the debug=(size_stats) cursor flag), then read back with a statistics cursor. The traversal
 # pattern matches the ordered forward scan MongoDB's collHash performs, so the accounting is a free
 # side-effect of a scan the caller already does. The summary is raw constituents only (per-page-type
-# counts and bytes, leaf key/value bytes and counts, and a leaf page-size histogram); derived figures
-# such as overhead are computed by this test, not the engine.
+# counts and bytes, leaf key/value bytes and counts including tombstoned cells, and a leaf page-size
+# histogram); derived figures such as overhead are computed by this test, not the engine.
 #
 # The summary also works on layered (disaggregated) tables, where it measures the stable
 # constituent's on-disk row-store btree; running under the disagg hook exercises that path.
@@ -61,12 +61,14 @@ class test_size_stats01(wttest.WiredTigerTestCase):
     # Reopen first so every page image is loaded from the last checkpoint. Size_stats counts cells in
     # page->dsk; an in-cache page can keep a pre-delete image while the cursor skips tombstones, so
     # without a reopen the summary and the scan disagree.
-    def size_summary(self, uri=None, enable=True):
+    def size_summary(self, uri=None, enable=True, cleanup=True):
         if uri is None:
             uri = self.uri
         self.reopen_conn(config='statistics=(fast)')
-        # Make sure obsolete keys are physically removed.
-        self.checkpoint_cleanup()
+        # Make sure obsolete keys are physically removed, unless the caller needs tombstones still
+        # occupying the page image.
+        if cleanup:
+            self.checkpoint_cleanup()
         session = self.session
 
         config = 'debug=(size_stats)' if enable else None
@@ -97,6 +99,10 @@ class test_size_stats01(wttest.WiredTigerTestCase):
             value=g(stat.dsrc.btree_size_value_bytes),
             key_count=g(stat.dsrc.btree_size_key_count),
             value_count=g(stat.dsrc.btree_size_value_count),
+            deleted_key=g(stat.dsrc.btree_size_deleted_key_bytes),
+            deleted_value=g(stat.dsrc.btree_size_deleted_value_bytes),
+            deleted_key_count=g(stat.dsrc.btree_size_deleted_key_count),
+            deleted_value_count=g(stat.dsrc.btree_size_deleted_value_count),
             maxleaf=g(stat.dsrc.btree_maxleafpage),
             hist_buckets=g(stat.dsrc.btree_size_leaf_hist_buckets),
             hist_ceiling=g(stat.dsrc.btree_size_leaf_hist_ceiling),
@@ -108,7 +114,7 @@ class test_size_stats01(wttest.WiredTigerTestCase):
 
         s['scanned'] = scanned
         s['total'] = s['leaf_bytes'] + s['internal_bytes'] + s['overflow_bytes']
-        s['overhead'] = s['total'] - (s['key'] + s['value'])
+        s['overhead'] = s['total'] - (s['key'] + s['value'] + s['deleted_key'] + s['deleted_value'])
         return s
 
     def checkpoint_cleanup(self):
@@ -207,7 +213,122 @@ class test_size_stats01(wttest.WiredTigerTestCase):
         self.assertEqual(s0['leaf'], 0)
         self.assertEqual(s0['internal'], 0)
         self.assertEqual(s0['key_count'], 0)
+        self.assertEqual(s0['deleted_key_count'], 0)
         self.assertEqual(sum(s0['hist']), 0)
+
+    # Tombstones that still occupy a leaf image after checkpoint (oldest held back so the stop is
+    # not globally visible) must be counted as deleted, not live. Fast-truncate and history-store
+    # versions are out of scope.
+    def test_size_tombstones(self):
+        nrecords = 100
+        keep_mod = 10
+        value = 'v' * 100
+
+        self.session.create(self.uri, self.params)
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+          ',stable_timestamp=' + self.timestamp_str(1))
+
+        cursor = self.session.open_cursor(self.uri)
+        for i in range(nrecords):
+            self.session.begin_transaction()
+            cursor['key%08d' % i] = value
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
+        cursor.close()
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        self.session.checkpoint()
+
+        cursor = self.session.open_cursor(self.uri)
+        n_deleted = 0
+        for i in range(nrecords):
+            if i % keep_mod != 0:
+                self.session.begin_transaction()
+                cursor.set_key('key%08d' % i)
+                self.assertEqual(cursor.remove(), 0)
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
+                n_deleted += 1
+        cursor.close()
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.session.checkpoint()
+
+        n_live = nrecords - n_deleted
+        s = self.size_summary(cleanup=False)
+        self.assertEqual(s['scanned'], n_live)
+        self.assertEqual(s['key_count'], n_live)
+        self.assertEqual(s['value_count'], n_live)
+        self.assertEqual(s['deleted_key_count'], n_deleted)
+        self.assertEqual(s['deleted_value_count'], n_deleted)
+        self.assertGreater(s['deleted_key'], 0)
+        self.assertGreater(s['deleted_value'], 0)
+
+        # Oldest past the delete timestamp makes the tombstones globally visible. Cleanup while the
+        # leaves are still in cache from the previous walk so it can dirty them; the next reopen
+        # loads images with the tombstones stripped. Disaggregated storage does not rewrite leaves
+        # to drop obsolete time windows, so the stripped-image check is local-page only.
+        if not self.runningHook('disagg'):
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20))
+            self.checkpoint_cleanup()
+            s = self.size_summary(cleanup=False)
+            self.assertEqual(s['scanned'], n_live)
+            self.assertEqual(s['key_count'], n_live)
+            self.assertEqual(s['value_count'], n_live)
+            self.assertEqual(s['deleted_key_count'], 0)
+            self.assertEqual(s['deleted_value_count'], 0)
+            self.assertEqual(s['deleted_key'], 0)
+            self.assertEqual(s['deleted_value'], 0)
+
+    # Overflow values with a visible stop belong with deleted, not live, same as on-page values.
+    @wttest.skip_for_hook("disagg", "cannot force overflow pages on the layered stable constituent")
+    def test_size_tombstones_overflow(self):
+        nrecords, valuesize, keep_mod = 50, 2000, 10
+        value = 'v' * valuesize
+
+        self.session.create(self.uri,
+          'key_format=S,value_format=S,leaf_page_max=4KB,internal_page_max=4KB')
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+          ',stable_timestamp=' + self.timestamp_str(1))
+
+        cursor = self.session.open_cursor(self.uri)
+        for i in range(nrecords):
+            self.session.begin_transaction()
+            cursor['key%08d' % i] = value
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
+        cursor.close()
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        self.session.checkpoint()
+
+        cursor = self.session.open_cursor(self.uri)
+        n_deleted = 0
+        for i in range(nrecords):
+            if i % keep_mod != 0:
+                self.session.begin_transaction()
+                cursor.set_key('key%08d' % i)
+                self.assertEqual(cursor.remove(), 0)
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
+                n_deleted += 1
+        cursor.close()
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.session.checkpoint()
+
+        n_live = nrecords - n_deleted
+        s = self.size_summary(cleanup=False)
+        self.assertGreater(s['overflow'], 0)
+        self.assertEqual(s['scanned'], n_live)
+        self.assertEqual(s['key_count'], n_live)
+        self.assertEqual(s['value_count'], n_live)
+        self.assertEqual(s['deleted_key_count'], n_deleted)
+        self.assertEqual(s['deleted_value_count'], n_deleted)
+        self.assertGreaterEqual(s['deleted_value'], n_deleted * valuesize)
+        self.assertGreaterEqual(s['value'], n_live * valuesize)
+
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20))
+        self.checkpoint_cleanup()
+        s = self.size_summary(cleanup=False)
+        self.assertEqual(s['scanned'], n_live)
+        self.assertEqual(s['key_count'], n_live)
+        self.assertEqual(s['value_count'], n_live)
+        self.assertEqual(s['deleted_key_count'], 0)
+        self.assertEqual(s['deleted_value_count'], 0)
+        self.assertGreaterEqual(s['value'], n_live * valuesize)
 
     # Delete 99% of the keys, leaving a large population of near-empty leaf pages that WiredTiger
     # never merges back together. This is the pathology the page-size histogram exists to surface:

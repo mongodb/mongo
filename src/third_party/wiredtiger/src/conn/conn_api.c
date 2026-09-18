@@ -2423,6 +2423,12 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING);
 
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.timing_stress_force", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_TIMING_STRESS_FORCE);
+    else
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TIMING_STRESS_FORCE);
+
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.update_restore_evict", &cval));
     if (cval.val)
         FLD_SET(conn->debug.flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);

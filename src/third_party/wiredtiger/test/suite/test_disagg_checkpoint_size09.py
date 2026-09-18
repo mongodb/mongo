@@ -110,7 +110,7 @@ class test_disagg_checkpoint_size09(DisaggSizeTestMixin, wttest.WiredTigerTestCa
     #   1. Write initial rows and checkpoint (full-image baseline).
     #   2. Partially update rows and checkpoint (builds delta chain,
     #      chain's cumulative size > 0).
-    #   3. In a loop until both signal stats fire:
+    #   3. In a single pass:
     #      a. Open session_a and write uncommitted updates to the page.
     #         Evict the page. Because uncommitted updates from session_a cannot
     #         go to the history store, eviction falls back to the save-update-restore
@@ -123,12 +123,13 @@ class test_disagg_checkpoint_size09(DisaggSizeTestMixin, wttest.WiredTigerTestCa
     #         The skip-write branch of the reconciliation commit path sets a
     #         single-page replacement result and restores the persistent flag =
     #         (cumulative size > 0).
-    #      d. Enable failpoint_rec_before_wrapup + delta_pct=1. Write new
-    #         committed data to dirty the page and force a full-image eviction.
-    #         The failpoint fires ~1% of the time, invoking the reconciliation
-    #         error path with delta count=0, a single-page replacement result,
-    #         and cumulative size > 0. With the persistent flag set, the error
-    #         path completes; rec_free_page_id increments.
+    #      d. Enable failpoint_rec_before_wrapup + delta_pct=1, with
+    #         debug_mode.timing_stress_force so the failpoint fires unconditionally.
+    #         Write new committed data to dirty the page and force a full-image
+    #         eviction. The failpoint fires, invoking the reconciliation error path
+    #         with delta count=0, a single-page replacement result, and cumulative
+    #         size > 0. With the persistent flag set, the error path completes;
+    #         rec_free_page_id increments.
     #   4. Run a final checkpoint and verify size is not inflated.
     def test_split_multi_inmem_aggregated_flag(self):
         nrows = 20
@@ -159,57 +160,54 @@ class test_disagg_checkpoint_size09(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         self.assertGreater(size_with_delta, size_baseline,
             'Expected checkpoint size to grow after a delta write')
 
-        # Step 3: loop until the page re-instantiation path has been called at least
-        # once AND the reconciliation error path has been reached at least once.
-        max_iters = 500
-        for i in range(max_iters):
-            # (a) Uncommitted write forces the save-update-restore path on eviction.
-            #     Uncommitted updates from session_a cannot be written to the history
-            #     store (they may still be rolled back), so eviction keeps the page
-            #     in memory via the page re-instantiation path, exercising the
-            #     reconciled pages scrubbed and added back to the cache clean scenario.
-            session_a = self.conn.open_session()
-            session_a.begin_transaction()
-            ca = session_a.open_cursor(self.uri)
-            for j in range(nrows // 2):
-                ca[f'key{j:06d}'] = chr(ord('C') + (i % 20)) * 200
-            ca.close()
-            self.evict_page('key000000')
+        # Step 3: drive both signal stats in a single pass. debug_mode.timing_stress_force
+        # makes the failpoint enabled in (d) below fire unconditionally on the next
+        # matching reconciliation instead of its usual 1% chance.
+        #
+        # (a) Uncommitted write forces the save-update-restore path on eviction.
+        #     Uncommitted updates from session_a cannot be written to the history
+        #     store (they may still be rolled back), so eviction keeps the page
+        #     in memory via the page re-instantiation path, exercising the
+        #     reconciled pages scrubbed and added back to the cache clean scenario.
+        session_a = self.conn.open_session()
+        session_a.begin_transaction()
+        ca = session_a.open_cursor(self.uri)
+        for j in range(nrows // 2):
+            ca[f'key{j:06d}'] = 'C' * 200
+        ca.close()
+        self.evict_page('key000000')
 
-            # (b) Rollback: uncommitted updates become aborted. The page now has
-            #     only the committed 'B' value (a durable update) plus aborted updates.
-            session_a.rollback_transaction()
-            session_a.close()
+        # (b) Rollback: uncommitted updates become aborted. The page now has
+        #     only the committed 'B' value (a durable update) plus aborted updates.
+        session_a.rollback_transaction()
+        session_a.close()
 
-            # (c) Checkpoint: skip-write fires because newer_updates_than_last_rec_used
-            #     stays false (the only visible update is already a durable update).
-            #     The reconciliation commit path sets a single-page replacement result
-            #     and restores the persistent flag.
-            self.session.checkpoint()
+        # (c) Checkpoint: skip-write fires because newer_updates_than_last_rec_used
+        #     stays false (the only visible update is already a durable update).
+        #     The reconciliation commit path sets a single-page replacement result
+        #     and restores the persistent flag.
+        self.session.checkpoint()
 
-            # (d) Enable the failpoint and force a full-image eviction.
-            #     The committed write makes the page dirty; delta_pct=1 forces a
-            #     full-image write; the failpoint fires ~1% of the time.
-            self.conn.reconfigure(
-                'page_delta=(delta_pct=1),'
-                'timing_stress_for_test=[failpoint_rec_before_wrapup]'
-            )
+        # (d) Enable the failpoint and force a full-image eviction.
+        #     The committed write makes the page dirty; delta_pct=1 forces a
+        #     full-image write; the failpoint fires deterministically.
+        # debug_mode.timing_stress_force affects every reconciliation on the connection,
+        # not just this page, so disable it in a finally as soon as its job is done.
+        self.conn.reconfigure(
+            'page_delta=(delta_pct=1),'
+            'timing_stress_for_test=[failpoint_rec_before_wrapup],'
+            'debug_mode=(timing_stress_force=true)'
+        )
+        try:
             self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
-            self.insert_rows(c, 0, nrows, chr(ord('D') + (i % 20)))
+            self.insert_rows(c, 0, nrows, 'D')
             c.close()
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + i))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
             self.evict_page('key000000')
-            self.conn.reconfigure('timing_stress_for_test=[]')
-
-            if self.get_stat(scrub_stat) > 0 and self.get_stat(err_stat) > 0:
-                break
-        else:
-            self.fail(
-                f'Failed to trigger both the save-update-restore path (page '
-                f're-instantiation) and the reconciliation error path after '
-                f'{max_iters} iterations'
-            )
+        finally:
+            self.conn.reconfigure(
+                'timing_stress_for_test=[],debug_mode=(timing_stress_force=false)')
 
         # Step 4: final checkpoint after the error path has run.
         self.session.checkpoint()

@@ -2539,8 +2539,10 @@ static WT_INLINE int
 __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd,
   wt_timestamp_t *prev_tsp, u_int modify_type)
 {
+    WT_TIME_WINDOW tw;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
+    bool tw_found;
 
     txn = session->txn;
 
@@ -2562,6 +2564,28 @@ __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
 
         if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE)
             return (WT_NOTFOUND);
+
+        /*
+         * Getting here means the update chain has nothing left: either the key was never modified
+         * at all, or the loop above walked the chain to its end and every update on it was aborted.
+         * Either way, the on-page cell is the only remaining evidence of whether there's anything
+         * to remove. No time window at all means no on-page value either: a row-store key with an
+         * insert list of its own has no on-page row (that's what distinguishes it from an overlaid
+         * on-page row, which updates through the row's own update slot instead), and a
+         * variable-length column-store record can be a deleted placeholder because that record
+         * number never held a value. A time window with an already-visible stop means the key was
+         * already removed. Either way, reject the tombstone instead of stacking it onto nothing.
+         */
+        if (upd == NULL) {
+            tw_found = (S2BT(session)->type != BTREE_ROW || cbt->ins == NULL) &&
+              __wt_read_cell_time_window(cbt, &tw);
+
+            if (!tw_found)
+                return (WT_NOTFOUND);
+
+            if (WT_TIME_WINDOW_HAS_STOP(&tw) && __wt_txn_tw_stop_visible(session, &tw))
+                return (WT_NOTFOUND);
+        }
     }
 
     /* Everything is OK, optionally rollback for testing (skipping metadata operations). */

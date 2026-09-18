@@ -77,13 +77,11 @@ class test_disagg_checkpoint_size13(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
     def test_rec_write_err_path(self):
         nrows = 2000
-        cycles = 30
         band = 200
-        # Big fresh batches per cycle: with memory_page_max=200MB the tail
-        # page absorbs ~2 MB at 1 KB/row, then reconciles into ~500 chunks at
-        # leaf_page_max=4KB. If failpoint_rec_before_wrapup fires during one
-        # of these wide reconciliations, the reconciliation error path cleans
-        # up all chunks.
+        # Big fresh batch: with memory_page_max=200MB the tail page absorbs
+        # ~2 MB at 1 KB/row, then reconciles into ~500 chunks at leaf_page_max=4KB.
+        # The failpoint fires during that wide reconciliation, so the error path
+        # cleans up all chunks.
         big_batch = 2000
 
         self.session.create(self.uri, self.table_config)
@@ -105,27 +103,31 @@ class test_disagg_checkpoint_size13(DisaggSizeTestMixin, wttest.WiredTigerTestCa
         rec_free_pageid_warmup = self.get_conn_stat(
             stat.conn.rec_free_page_id_due_to_failed_replacement_reconciliation)
 
+        # debug_mode.timing_stress_force makes the failpoint fire unconditionally
+        # on the next matching reconciliation instead of its usual 1% chance.
         self.conn.reconfigure(
-            'timing_stress_for_test=[failpoint_rec_before_wrapup]')
+            'timing_stress_for_test=[failpoint_rec_before_wrapup],'
+            'debug_mode=(timing_stress_force=true)'
+        )
 
-        for i in range(cycles):
-            char = chr(ord('a') + (i % 20))
-            new_start = nrows + i * big_batch
+        try:
+            char = 'a'
+            new_start = nrows
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, new_start, big_batch, char)
-            band_start = ((i + cycles) * band) % nrows
+            # Overlap the warm-up region so these rows are updates, not appends.
+            band_start = 0
             self.insert_rows(c, band_start, band, char)
             c.close()
             self.evict_page(f'key{new_start:08d}')
             self.evict_page(f'key{band_start:08d}')
-
-        self.conn.reconfigure('timing_stress_for_test=[]')
+        finally:
+            self.conn.reconfigure(
+                'timing_stress_for_test=[],debug_mode=(timing_stress_force=false)')
         self.session.checkpoint()
 
         rec_free_pageid_final = self.get_conn_stat(
             stat.conn.rec_free_page_id_due_to_failed_replacement_reconciliation)
 
-        # failpoint_rec_before_wrapup fires probabilistically (1%). If the
-        # workload happens not to roll the failpoint, skip rather than fail.
-        if rec_free_pageid_final == rec_free_pageid_warmup:
-            self.skipTest('failpoint_rec_before_wrapup did not fire in this run')
+        self.assertGreater(rec_free_pageid_final, rec_free_pageid_warmup,
+            'rec_free_page_id_due_to_failed_replacement_reconciliation did not advance')

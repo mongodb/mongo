@@ -341,6 +341,78 @@ __wti_conn_dhandle_outdated(WT_SESSION_IMPL *session, const char *uri)
 }
 
 /*
+ * __conn_dhandle_close_action --
+ *     Decide what a handle close should do with the tree's pages.
+ */
+static WT_DHANDLE_CLOSE_ACTION
+__conn_dhandle_close_action(
+  bool dhandle_dead, bool is_mapped, bool final, bool mark_dead, bool skips_checkpoint)
+{
+    /*
+     * A mapped tree cannot be left for sweep: the close releases the mapping its pages point into,
+     * so the discard should happen before we destroy the mapping.
+     */
+    if (is_mapped) {
+        /* Only checkpoint handles are mapped, and nothing that skips checkpoints can be one. */
+        if (skips_checkpoint)
+            return (WT_DHANDLE_CLOSE_INVALID);
+        /* A dead handle's contents are abandoned, so its pages are dropped, not flushed. */
+        return (dhandle_dead ? WT_DHANDLE_CLOSE_DISCARD_EARLY : WT_DHANDLE_CLOSE_CHECKPOINT);
+    }
+
+    /* A handle that is already dead is only here to have its pages discarded. */
+    if (dhandle_dead)
+        return (WT_DHANDLE_CLOSE_DISCARD_LATE);
+
+    /* Leave the pages for sweep when asked; the final close has no later sweep to hand them to. */
+    if (mark_dead)
+        return (final ? WT_DHANDLE_CLOSE_DISCARD_LATE : WT_DHANDLE_CLOSE_MARK_DEAD);
+
+    /* A tree with nothing to flush has no checkpoint to write before the pages go.
+     *
+     * For non-mapped trees, clearing the cache expects the handle marked dead, which cannot happen
+     * until the btree handle is closed.
+     */
+    return (skips_checkpoint ? WT_DHANDLE_CLOSE_DISCARD_LATE : WT_DHANDLE_CLOSE_CHECKPOINT);
+}
+
+#ifdef HAVE_UNITTEST
+WT_DHANDLE_CLOSE_ACTION
+__ut_conn_dhandle_close_action(
+  bool dhandle_dead, bool is_mapped, bool final, bool mark_dead, bool skips_checkpoint)
+{
+    return (
+      __conn_dhandle_close_action(dhandle_dead, is_mapped, final, mark_dead, skips_checkpoint));
+}
+#endif
+
+/*
+ * __conn_dhandle_close_action_checked --
+ *     Decide what a handle close should do with the tree's pages, returning an action the close can
+ *     act on.
+ */
+static WT_DHANDLE_CLOSE_ACTION
+__conn_dhandle_close_action_checked(WT_SESSION_IMPL *session, bool dhandle_dead, bool is_mapped,
+  bool final, bool mark_dead, bool skips_checkpoint)
+{
+    WT_DHANDLE_CLOSE_ACTION action;
+
+    action =
+      __conn_dhandle_close_action(dhandle_dead, is_mapped, final, mark_dead, skips_checkpoint);
+
+    /*
+     * Before reworking the action mechanism we were returning DISCARD_EARLY for this case. Given
+     * that this case was proven to be theoretically impossible it's better to leave the production
+     * logic unchanged to avoid introducing a regression.
+     */
+    WT_ASSERT(session, action != WT_DHANDLE_CLOSE_INVALID);
+    if (action == WT_DHANDLE_CLOSE_INVALID)
+        action = WT_DHANDLE_CLOSE_DISCARD_EARLY;
+
+    return (action);
+}
+
+/*
  * __wt_conn_dhandle_close --
  *     Sync and close the underlying btree handle.
  */
@@ -352,8 +424,9 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
+    WT_DHANDLE_CLOSE_ACTION action;
     int tret;
-    bool discard, is_btree, is_mapped, marked_dead, no_schema_lock;
+    bool is_btree, no_schema_lock;
 
     conn = S2C(session);
     dhandle = session->dhandle;
@@ -424,51 +497,32 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
      */
     __wt_spin_lock(session, &dhandle->close_lock);
 
-    discard = is_mapped = marked_dead = false;
+    action = WT_DHANDLE_CLOSE_NONE;
     if (is_btree && !F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
-        /*
-         * If the handle is already marked dead, we're just here to discard it.
-         */
-        if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
-            discard = true;
-
-        /*
-         * Mark the handle dead (letting the tree be discarded later) if it's not already marked
-         * dead, and it's not a memory-mapped tree. (We can't mark memory-mapped tree handles dead
-         * because we close the underlying file handle to allow the file to be removed and
-         * memory-mapped trees contain pointers into memory that become invalid if the mapping is
-         * closed.)
-         */
         bm = btree->bm;
-        if (bm != NULL)
-            is_mapped = bm->is_mapped(bm, session);
-        if (!discard && mark_dead && (bm == NULL || !is_mapped)) {
-            /* On the final close, discard pages now because no later sweep will run. */
-            if (final)
-                discard = true;
-            else
-                marked_dead = true;
-        }
-
+        bool dhandle_dead = F_ISSET(dhandle, WT_DHANDLE_DEAD);
+        bool is_mapped = (bm != NULL) ? bm->is_mapped(bm, session) : false;
         /*
-         * Flush dirty data from any durable trees we couldn't mark dead. That involves writing a
-         * checkpoint, which can fail if an update cannot be written, causing the close to fail: if
-         * not the final close, return the EBUSY error to our caller for eventual retry.
-         *
-         * We can't discard non-durable trees yet: first we have to close the underlying btree
-         * handle, then we can mark the data handle dead.
-         *
+         * FIXME-WT-18685: Nothing has set WT_BTREE_NO_CHECKPOINT since tiered storage was removed,
+         * so the flag and this test of it can go.
          */
-        if (!discard && !marked_dead) {
-            if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) || __wt_btree_stays_in_memory(btree))
-                discard = true;
-            else {
-                tret = __wt_checkpoint_close(session, final);
-                if (!final && tret == EBUSY)
-                    WT_ERR(tret);
-                WT_TRET(tret);
-            }
-        }
+        bool skips_checkpoint =
+          F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) || __wt_btree_stays_in_memory(btree);
+
+        action = __conn_dhandle_close_action_checked(
+          session, dhandle_dead, is_mapped, final, mark_dead, skips_checkpoint);
+    }
+
+    /*
+     * Flush dirty data from any durable trees we couldn't mark dead. That involves writing a
+     * checkpoint, which can fail if an update cannot be written, causing the close to fail: if not
+     * the final close, return the EBUSY error to our caller for eventual retry.
+     */
+    if (action == WT_DHANDLE_CLOSE_CHECKPOINT) {
+        tret = __wt_checkpoint_close(session, final);
+        if (!final && tret == EBUSY)
+            WT_ERR(tret);
+        WT_TRET(tret);
     }
 
     /*
@@ -477,7 +531,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
      * memory-mapped pages contain pointers into memory that becomes invalid if the mapping is
      * closed, so discard mapped files before closing, otherwise, close first.
      */
-    if (discard && is_mapped) {
+    if (action == WT_DHANDLE_CLOSE_DISCARD_EARLY) {
         tret = __wt_evict_file(session, WT_SYNC_DISCARD);
         if (!final && tret == EBUSY)
             WT_ERR(tret);
@@ -506,10 +560,10 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
      * that, the block manager asserts there are never two references to a block manager object, and
      * re-opening the handle can succeed once we mark this handle dead.)
      *
-     * Check discard too, code we call to clear the cache expects the data handle dead flag to be
-     * set when discarding modified pages.
+     * Check the discarding actions too, code we call to clear the cache expects the data handle
+     * dead flag to be set when discarding modified pages.
      */
-    if (marked_dead || discard)
+    if (action != WT_DHANDLE_CLOSE_NONE && action != WT_DHANDLE_CLOSE_CHECKPOINT)
         F_SET(dhandle, WT_DHANDLE_DEAD);
 
     /*
@@ -518,7 +572,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
      * we don't need to hold an exclusive handle to do it, second, code we call to clear the cache
      * expects the data handle dead flag to be set when discarding modified pages.
      */
-    if (discard && !is_mapped) {
+    if (action == WT_DHANDLE_CLOSE_DISCARD_LATE) {
         tret = __wt_evict_file(session, WT_SYNC_DISCARD);
         if (!final && tret == EBUSY)
             WT_ERR(tret);
@@ -529,7 +583,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
      * If we marked a handle dead it will be closed by sweep, via another call to this function.
      * Otherwise, we're done with this handle.
      */
-    if (!marked_dead) {
+    if (action != WT_DHANDLE_CLOSE_MARK_DEAD) {
         F_CLR(dhandle, WT_DHANDLE_OPEN);
         if (dhandle->checkpoint == NULL)
             __wt_atomic_sub_uint32(&conn->open_btree_count, 1);

@@ -13,7 +13,10 @@ static int __stat_page(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_row_int(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
+static int __size_stat_flush_key(WT_SESSION_IMPL *, uint32_t, const uint8_t *, size_t, bool);
 static void __size_stat_hist_incr(WT_SESSION_IMPL *, size_t);
+static void __size_stat_incr_key(WT_SESSION_IMPL *, uint32_t, bool);
+static void __size_stat_incr_value(WT_SESSION_IMPL *, uint32_t, bool);
 static int __size_stat_overflow(WT_SESSION_IMPL *, const uint8_t *, size_t, int);
 
 /*
@@ -31,6 +34,8 @@ static int __size_stat_overflow(WT_SESSION_IMPL *, const uint8_t *, size_t, int)
 #define WT_SIZE_STAT_OVFL_OVERHEAD 0
 #define WT_SIZE_STAT_OVFL_KEY 1
 #define WT_SIZE_STAT_OVFL_VALUE 2
+#define WT_SIZE_STAT_OVFL_DELETED_KEY 3
+#define WT_SIZE_STAT_OVFL_DELETED_VALUE 4
 
 /*
  * __wt_btree_stat_init --
@@ -429,6 +434,38 @@ __size_stat_hist_incr(WT_SESSION_IMPL *session, size_t bucket)
 }
 
 /*
+ * __size_stat_incr_key --
+ *     Account one on-page key against live or deleted size-summary counters.
+ */
+static void
+__size_stat_incr_key(WT_SESSION_IMPL *session, uint32_t size, bool deleted)
+{
+    if (deleted) {
+        WT_STAT_DSRC_INCRV(session, btree_size_deleted_key_bytes, size);
+        WT_STAT_DSRC_INCR(session, btree_size_deleted_key_count);
+    } else {
+        WT_STAT_DSRC_INCRV(session, btree_size_key_bytes, size);
+        WT_STAT_DSRC_INCR(session, btree_size_key_count);
+    }
+}
+
+/*
+ * __size_stat_incr_value --
+ *     Account one on-page value against live or deleted size-summary counters.
+ */
+static void
+__size_stat_incr_value(WT_SESSION_IMPL *session, uint32_t size, bool deleted)
+{
+    if (deleted) {
+        WT_STAT_DSRC_INCRV(session, btree_size_deleted_value_bytes, size);
+        WT_STAT_DSRC_INCR(session, btree_size_deleted_value_count);
+    } else {
+        WT_STAT_DSRC_INCRV(session, btree_size_value_bytes, size);
+        WT_STAT_DSRC_INCR(session, btree_size_value_count);
+    }
+}
+
+/*
  * __size_stat_overflow --
  *     Read an overflow page and account it against the size summary. The payload (datalen) counts
  *     as key or value data; the overflow page image counts as overhead.
@@ -450,17 +487,40 @@ __size_stat_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
 
     WT_STAT_DSRC_INCR(session, btree_size_overflow_pages);
     WT_STAT_DSRC_INCRV(session, btree_size_overflow_bytes, dsk->mem_size);
-    if (kind == WT_SIZE_STAT_OVFL_KEY) {
-        WT_STAT_DSRC_INCRV(session, btree_size_key_bytes, dsk->u.datalen);
-        WT_STAT_DSRC_INCR(session, btree_size_key_count);
-    } else if (kind == WT_SIZE_STAT_OVFL_VALUE) {
-        WT_STAT_DSRC_INCRV(session, btree_size_value_bytes, dsk->u.datalen);
-        WT_STAT_DSRC_INCR(session, btree_size_value_count);
+    switch (kind) {
+    case WT_SIZE_STAT_OVFL_KEY:
+        __size_stat_incr_key(session, dsk->u.datalen, false);
+        break;
+    case WT_SIZE_STAT_OVFL_VALUE:
+        __size_stat_incr_value(session, dsk->u.datalen, false);
+        break;
+    case WT_SIZE_STAT_OVFL_DELETED_KEY:
+        __size_stat_incr_key(session, dsk->u.datalen, true);
+        break;
+    case WT_SIZE_STAT_OVFL_DELETED_VALUE:
+        __size_stat_incr_value(session, dsk->u.datalen, true);
+        break;
     }
 
 err:
     __wt_scr_free(session, &tmp);
     return (ret);
+}
+
+/*
+ * __size_stat_flush_key --
+ *     Account a deferred row-store key once its following value's stop (or lack of a value cell)
+ *     decides live vs deleted.
+ */
+static int
+__size_stat_flush_key(
+  WT_SESSION_IMPL *session, uint32_t key_size, const uint8_t *ovfl, size_t ovfl_size, bool deleted)
+{
+    if (ovfl != NULL)
+        return (__size_stat_overflow(session, ovfl, ovfl_size,
+          deleted ? WT_SIZE_STAT_OVFL_DELETED_KEY : WT_SIZE_STAT_OVFL_KEY));
+    __size_stat_incr_key(session, key_size, deleted);
+    return (0);
 }
 
 /*
@@ -489,6 +549,10 @@ __wt_size_stat_reset(WT_SESSION_IMPL *session)
     WT_STATP_DSRC_SET(session, stats, btree_size_value_bytes, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_key_count, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_value_count, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_size_deleted_key_bytes, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_size_deleted_value_bytes, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_size_deleted_key_count, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_size_deleted_value_count, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_0, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_1, 0);
     WT_STATP_DSRC_SET(session, stats, btree_size_leaf_hist_2, 0);
@@ -512,7 +576,8 @@ __wt_size_stat_reset(WT_SESSION_IMPL *session)
  * __wti_size_stat_page --
  *     Accumulate one page into the size-summary statistics. Measured from the on-disk page image,
  *     so pages without one (dirty, in-memory only) are skipped. Key and value byte totals are
- *     row-store only.
+ *     row-store only. Cells whose value time window has a stop visible to the walk are counted
+ *     separately from live keys and values.
  */
 int
 __wti_size_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -583,35 +648,65 @@ __wti_size_stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
      * prefix compression is deliberately not resolved, matching what occupies the page image.
      * Overflow key/value payloads are pulled in from their referenced pages.
      *
+     * Keys have no time window. A visible stop on the following value cell means both occupy the
+     * leaf as a tombstone; empty values (a key with no following value cell) have no stop and count
+     * as live. Overflow values with a visible stop are deleted too.
+     *
      * A removed overflow cell (WT_CELL_{KEY,VALUE}_OVFL_RM) normalizes to WT_CELL_{KEY,VALUE}_OVFL
      * but its backing blocks are already freed; skip it via the raw type so we never read them. The
      * removed payload no longer occupies the tree, so there is nothing to attribute.
      */
     if (page->type == WT_PAGE_ROW_LEAF) {
         WT_CELL_UNPACK_KV unpack_kv;
+        const uint8_t *pending_ovfl = NULL;
+        size_t pending_ovfl_size = 0;
+        uint32_t pending_key_size = 0;
+        bool have_key = false;
+
         WT_CELL_FOREACH_KV (session, dsk, unpack_kv) {
             switch (unpack_kv.type) {
             case WT_CELL_KEY:
-                WT_STAT_DSRC_INCRV(session, btree_size_key_bytes, unpack_kv.size);
-                WT_STAT_DSRC_INCR(session, btree_size_key_count);
+            case WT_CELL_KEY_OVFL:
+                /* A key with no value cell is an empty on-page value: count it live. */
+                if (have_key)
+                    WT_RET(__size_stat_flush_key(
+                      session, pending_key_size, pending_ovfl, pending_ovfl_size, false));
+                have_key = false;
+                pending_ovfl = NULL;
+                pending_ovfl_size = 0;
+                pending_key_size = 0;
+                if (unpack_kv.type == WT_CELL_KEY) {
+                    pending_key_size = unpack_kv.size;
+                    have_key = true;
+                } else if (unpack_kv.raw == WT_CELL_KEY_OVFL) {
+                    pending_ovfl = unpack_kv.data;
+                    pending_ovfl_size = unpack_kv.size;
+                    have_key = true;
+                }
                 break;
             case WT_CELL_VALUE:
-                WT_STAT_DSRC_INCRV(session, btree_size_value_bytes, unpack_kv.size);
-                WT_STAT_DSRC_INCR(session, btree_size_value_count);
+            case WT_CELL_VALUE_OVFL: {
+                bool deleted = __wt_txn_tw_stop_visible(session, &unpack_kv.tw);
+
+                if (have_key)
+                    WT_RET(__size_stat_flush_key(
+                      session, pending_key_size, pending_ovfl, pending_ovfl_size, deleted));
+                have_key = false;
+                pending_ovfl = NULL;
+
+                if (unpack_kv.type == WT_CELL_VALUE)
+                    __size_stat_incr_value(session, unpack_kv.size, deleted);
+                else if (unpack_kv.raw == WT_CELL_VALUE_OVFL)
+                    WT_RET(__size_stat_overflow(session, unpack_kv.data, unpack_kv.size,
+                      deleted ? WT_SIZE_STAT_OVFL_DELETED_VALUE : WT_SIZE_STAT_OVFL_VALUE));
                 break;
-            case WT_CELL_KEY_OVFL:
-                if (unpack_kv.raw == WT_CELL_KEY_OVFL)
-                    WT_RET(__size_stat_overflow(
-                      session, unpack_kv.data, unpack_kv.size, WT_SIZE_STAT_OVFL_KEY));
-                break;
-            case WT_CELL_VALUE_OVFL:
-                if (unpack_kv.raw == WT_CELL_VALUE_OVFL)
-                    WT_RET(__size_stat_overflow(
-                      session, unpack_kv.data, unpack_kv.size, WT_SIZE_STAT_OVFL_VALUE));
-                break;
+            }
             }
         }
         WT_CELL_FOREACH_END;
+        if (have_key)
+            WT_RET(__size_stat_flush_key(
+              session, pending_key_size, pending_ovfl, pending_ovfl_size, false));
     }
 
     return (0);

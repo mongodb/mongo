@@ -1521,6 +1521,10 @@ struct __wt_dsrc_stats {
     int64_t block_major;
     int64_t block_size;
     int64_t block_minor;
+    int64_t btree_size_deleted_key_bytes;
+    int64_t btree_size_deleted_key_count;
+    int64_t btree_size_deleted_value_bytes;
+    int64_t btree_size_deleted_value_count;
     int64_t btree_size_internal_bytes;
     int64_t btree_size_internal_pages;
     int64_t btree_size_key_bytes;

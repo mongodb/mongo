@@ -290,6 +290,10 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
     /* Assert that the given probability is sane. */
     WT_ASSERT(session, probability <= 10 * WT_THOUSAND);
 
+    /* Testing only: skip the dice roll and always fire an enabled failpoint. */
+    if (FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_TIMING_STRESS_FORCE))
+        return (true);
+
     return (__wt_random(&session->rnd_random) % (10 * WT_THOUSAND) <= probability);
 }
 

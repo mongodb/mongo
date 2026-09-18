@@ -17,7 +17,7 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool e
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
-    if ((ret = __wt_time_value_validate(session, tw, NULL, false)) != 0)
+    if ((ret = __wt_time_value_validate(session, tw, NULL, false, false)) != 0)
         return (expected_error ?
             WT_ERROR :
             __wt_panic(session, ret, "value timestamp window failed validation"));

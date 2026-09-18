@@ -1910,6 +1910,8 @@ err:
     WT_TRET(__wt_call_log_begin_transaction(session, config, ret));
 #endif
     API_CONF_END(session, conf);
+    WT_ASSERT_ALWAYS(
+      session, ret != WT_ROLLBACK, "Transaction begin cannot return a rollback error");
     API_END_RET(session, ret);
 }
 

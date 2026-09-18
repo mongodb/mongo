@@ -120,6 +120,16 @@ enum wt_dhandle_type {
     WT_DHANDLE_TYPE_NUM /* Number of types, must be last. */
 };
 
+/* What a handle close does with the tree's pages. */
+typedef enum __wt_dhandle_close_action {
+    WT_DHANDLE_CLOSE_NONE,          /* Nothing to do, close the handle */
+    WT_DHANDLE_CLOSE_MARK_DEAD,     /* Keep the pages, let sweep discard them */
+    WT_DHANDLE_CLOSE_DISCARD_EARLY, /* Discard before closing the handle */
+    WT_DHANDLE_CLOSE_DISCARD_LATE,  /* Discard after closing the handle */
+    WT_DHANDLE_CLOSE_CHECKPOINT,    /* Flush and discard the tree, then close the handle */
+    WT_DHANDLE_CLOSE_INVALID        /* Combination of inputs that cannot occur */
+} WT_DHANDLE_CLOSE_ACTION;
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.

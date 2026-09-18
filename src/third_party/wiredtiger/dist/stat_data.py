@@ -1108,6 +1108,10 @@ dsrc_stats = [
     ##########################################
     # Btree size summary statistics (opt-in, accumulated by a debug=(size_stats) cursor scan)
     ##########################################
+    BtreeSizeStat('btree_size_deleted_key_bytes', 'deleted key bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_deleted_key_count', 'deleted key count', 'no_scale'),
+    BtreeSizeStat('btree_size_deleted_value_bytes', 'deleted value bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_deleted_value_count', 'deleted value count', 'no_scale'),
     BtreeSizeStat('btree_size_internal_bytes', 'internal page bytes', 'no_scale,size'),
     BtreeSizeStat('btree_size_internal_pages', 'internal pages', 'no_scale'),
     BtreeSizeStat('btree_size_key_bytes', 'key bytes', 'no_scale,size'),

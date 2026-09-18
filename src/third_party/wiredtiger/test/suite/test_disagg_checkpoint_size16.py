@@ -38,7 +38,7 @@ from helper_disagg import DisaggSizeTestMixin, disagg_test_class
 #   error path's single-block branch invalidates the address cookie via the
 #   post-reconciliation chain discard, subtracting the chain's cumulative size
 #   from the running total. A second phase runs the same failpoint against a
-#   wide multi-block table so the multi-block err-cleanup loop also exercises
+#   wide multi-block table so the multi-block error-cleanup loop also exercises
 #   the post-reconciliation chain discard. If accounting in any prior write
 #   didn't increment the running total by the correct amount, the
 #   running-total decrement assertion aborts the process.
@@ -108,14 +108,34 @@ class test_disagg_checkpoint_size16(DisaggSizeTestMixin, wttest.WiredTigerTestCa
 
         # Phase A: rewrite the same nrows repeatedly. Each cycle re-reconciles
         # the single page as a delta (delta_pct=90), with a full image every
-        # max_consecutive_delta=32 cycles. Some reconciliations fail at the
-        # failpoint, exercising the error-path post-reconciliation chain discard.
+        # max_consecutive_delta=32 cycles, growing the chain naturally. The 1%
+        # failpoint may fire on any of these cycles, exercising the error-path
+        # post-reconciliation chain discard on an evolving chain.
         for i in range(cycles):
             char = chr(ord('a') + (i % 20))
             c = self.session.open_cursor(self.uri)
             self.insert_rows(c, 0, nrows, char)
             c.close()
             self.evict_page(self.uri, 'key00000000')
+
+        # Guarantee the single-block branch is hit at least once instead of
+        # depending on the 1% chance having fired somewhere in the stress above.
+        # debug_mode.timing_stress_force affects every reconciliation on the
+        # connection, so disable it in a finally as soon as its job is done.
+        self.conn.reconfigure('debug_mode=(timing_stress_force=true)')
+        try:
+            c = self.session.open_cursor(self.uri)
+            self.insert_rows(c, 0, nrows, 'z')
+            c.close()
+            self.evict_page(self.uri, 'key00000000')
+        finally:
+            self.conn.reconfigure('debug_mode=(timing_stress_force=false)')
+
+        rec_free_pageid_mid = self.get_conn_stat(
+            stat.conn.rec_free_page_id_due_to_failed_replacement_reconciliation)
+        self.assertGreater(rec_free_pageid_mid, rec_free_pageid_warmup,
+            'rec_free_page_id_due_to_failed_replacement_reconciliation did not advance '
+            'in phase A (single-block branch)')
 
         # Phase B: wide multi-block reconciliations on the small-page table.
         for i in range(wide_cycles):
@@ -128,13 +148,22 @@ class test_disagg_checkpoint_size16(DisaggSizeTestMixin, wttest.WiredTigerTestCa
             self.evict_page(wide_uri, f'key{new_start:08d}')
             self.evict_page(wide_uri, f'key{(i * wide_band) % 2000:08d}')
 
+        # Guarantee the multi-block error-cleanup loop is hit at least once.
+        self.conn.reconfigure('debug_mode=(timing_stress_force=true)')
+        try:
+            wc = self.session.open_cursor(wide_uri)
+            new_start = 2000 + wide_cycles * wide_band
+            self.insert_rows(wc, new_start, wide_band, 'Z')
+            wc.close()
+            self.evict_page(wide_uri, f'key{new_start:08d}')
+        finally:
+            self.conn.reconfigure('debug_mode=(timing_stress_force=false)')
+
         self.conn.reconfigure('timing_stress_for_test=[]')
         self.session.checkpoint()
 
         rec_free_pageid_final = self.get_conn_stat(
             stat.conn.rec_free_page_id_due_to_failed_replacement_reconciliation)
-
-        # failpoint_rec_before_wrapup fires probabilistically (1%). If the
-        # workload happens not to roll the failpoint, skip rather than fail.
-        if rec_free_pageid_final == rec_free_pageid_warmup:
-            self.skipTest('failpoint_rec_before_wrapup did not fire in this run')
+        self.assertGreater(rec_free_pageid_final, rec_free_pageid_mid,
+            'rec_free_page_id_due_to_failed_replacement_reconciliation did not advance '
+            'in phase B (multi-block error-cleanup loop)')

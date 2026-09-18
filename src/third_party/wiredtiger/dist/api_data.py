@@ -311,17 +311,6 @@ tiered_config = [
 # Without this, create and open share confchk_tiered_storage_subconfigs.
 tiered_config[0].method_name = 'WT_SESSION.create'
 
-tiered_tree_config = [
-    Config('bucket', '', r'''
-        the bucket indicating the location for this table'''),
-    Config('bucket_prefix', '', r'''
-        the unique bucket prefix for this table'''),
-    Config('cache_directory', '', r'''
-        a directory to store locally cached versions of files in the storage source. By default,
-        it is named with \c "-cache" appended to the bucket name. A relative directory name
-        is relative to the home directory'''),
-]
-
 log_runtime_config = [
     Config('log', '', r'''
         the transaction log configuration for this object. Only valid if \c log is enabled in
@@ -513,31 +502,6 @@ file_meta = file_config + [
         type='boolean'),
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
-]
-
-tiered_meta = file_meta + tiered_config + [
-    Config('flush_time', '0', r'''
-        indicates the time this tree was flushed to shared storage or 0 if unflushed'''),
-    Config('flush_timestamp', '0', r'''
-        timestamp at which this tree was flushed to shared storage or 0 if unflushed'''),
-    Config('last', '0', r'''
-        the last allocated object ID'''),
-    Config('oldest', '1', r'''
-        the oldest allocated object ID'''),
-    Config('tiers', '', r'''
-        list of data sources to combine into a tiered storage structure''',
-        type='list'),
-]
-
-tier_meta = file_meta + tiered_tree_config
-
-# Objects need to have the readonly setting set and bucket_prefix.
-# The file_meta already contains those pieces.
-object_meta = file_meta + [
-    Config('flush_time', '0', r'''
-        indicates the time this object was flushed to shared storage or 0 if unflushed'''),
-    Config('flush_timestamp', '0', r'''
-        timestamp at which this object was flushed to shared storage or 0 if unflushed'''),
 ]
 
 table_only_config = [
@@ -785,6 +749,11 @@ connection_runtime_config = [
             is intended for debugging and is informational only, that is, it is ignored during
             recovery''',
             type='boolean'),
+        Config('timing_stress_force', 'false', r'''
+            !!! FOR INTERNAL TESTING ONLY. If true, any timing-stress failpoint enabled via
+            timing_stress_for_test always fires instead of firing probabilistically. Intended
+            for deterministically exercising failure paths that are normally hit by chance.''',
+            type='boolean', undoc=True),
         Config('update_restore_evict', 'false', r'''
             if true, control all dirty page evictions through forcing update restore eviction.''',
             type='boolean'),
@@ -1626,15 +1595,9 @@ methods = {
 
 'index.meta' : Method(index_meta),
 
-'object.meta' : Method(object_meta),
-
 'layered.meta' : Method(layered_meta),
 
 'table.meta' : Method(table_meta),
-
-'tier.meta' : Method(tier_meta),
-
-'tiered.meta' : Method(tiered_meta),
 
 'WT_CURSOR.close' : Method([]),
 

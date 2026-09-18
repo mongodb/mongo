@@ -28,6 +28,10 @@ static const char *const __stats_dsrc_desc[] = {
   "block-manager: file major version number",
   "block-manager: file size in bytes",
   "block-manager: minor version number",
+  "btree-size: deleted key bytes",
+  "btree-size: deleted key count",
+  "btree-size: deleted value bytes",
+  "btree-size: deleted value count",
   "btree-size: internal page bytes",
   "btree-size: internal pages",
   "btree-size: key bytes",
@@ -547,6 +551,10 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->block_major = 0;
     stats->block_size = 0;
     stats->block_minor = 0;
+    stats->btree_size_deleted_key_bytes = 0;
+    stats->btree_size_deleted_key_count = 0;
+    stats->btree_size_deleted_value_bytes = 0;
+    stats->btree_size_deleted_value_count = 0;
     stats->btree_size_internal_bytes = 0;
     stats->btree_size_internal_pages = 0;
     stats->btree_size_key_bytes = 0;
@@ -1012,6 +1020,10 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->block_size += from->block_size;
     if (from->block_minor > to->block_minor)
         to->block_minor = from->block_minor;
+    to->btree_size_deleted_key_bytes += from->btree_size_deleted_key_bytes;
+    to->btree_size_deleted_key_count += from->btree_size_deleted_key_count;
+    to->btree_size_deleted_value_bytes += from->btree_size_deleted_value_bytes;
+    to->btree_size_deleted_value_count += from->btree_size_deleted_value_count;
     to->btree_size_internal_bytes += from->btree_size_internal_bytes;
     to->btree_size_internal_pages += from->btree_size_internal_pages;
     to->btree_size_key_bytes += from->btree_size_key_bytes;
@@ -1515,6 +1527,10 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->block_size += WT_STAT_DSRC_READ(from, block_size);
     if ((v = WT_STAT_DSRC_READ(from, block_minor)) > to->block_minor)
         to->block_minor = v;
+    to->btree_size_deleted_key_bytes += WT_STAT_DSRC_READ(from, btree_size_deleted_key_bytes);
+    to->btree_size_deleted_key_count += WT_STAT_DSRC_READ(from, btree_size_deleted_key_count);
+    to->btree_size_deleted_value_bytes += WT_STAT_DSRC_READ(from, btree_size_deleted_value_bytes);
+    to->btree_size_deleted_value_count += WT_STAT_DSRC_READ(from, btree_size_deleted_value_count);
     to->btree_size_internal_bytes += WT_STAT_DSRC_READ(from, btree_size_internal_bytes);
     to->btree_size_internal_pages += WT_STAT_DSRC_READ(from, btree_size_internal_pages);
     to->btree_size_key_bytes += WT_STAT_DSRC_READ(from, btree_size_key_bytes);
