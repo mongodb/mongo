@@ -111,14 +111,19 @@ std::string JoinCostEstimate::toString() const {
 
 BSONObj JoinCostEstimate::toBSON() const {
     BSONObjBuilder bob;
-    bob << "totalCost" << _totalCost.toBSON() << "numDocsProcessed" << _numDocsProcessed.toBSON()
-        << "numDocsOutput" << _numDocsOutput.toBSON() << "ioSeqNumPages" << _ioSeqNumPages.toBSON()
-        << "ioRandNumPages" << _ioRandNumPages.toBSON();
-    if (_mackertLohmanCase) {
-        bob << "mackertLohmanCase" << toStringData(*_mackertLohmanCase);
-    }
-    if (_cardinalityRHSBeforeJoinPred) {
-        bob << "cardinalityRHSBeforeJoinPred" << _cardinalityRHSBeforeJoinPred->toBSON();
+    bob << "totalCost" << _totalCost.toDouble();
+    {
+        BSONObjBuilder localBob(bob.subobjStart("localOpCost"));
+        localBob << "Cost" << _localOpCost.toDouble() << "Source" << _localOpCost.source()
+                 << "numDocsProcessed" << _numDocsProcessed.toBSON() << "numDocsOutput"
+                 << _numDocsOutput.toBSON() << "ioSeqNumPages" << _ioSeqNumPages.toBSON()
+                 << "ioRandNumPages" << _ioRandNumPages.toBSON();
+        if (_mackertLohmanCase) {
+            localBob << "mackertLohmanCase" << toStringData(*_mackertLohmanCase);
+        }
+        if (_cardinalityRHSBeforeJoinPred) {
+            localBob << "cardinalityRHSBeforeJoinPred" << _cardinalityRHSBeforeJoinPred->toBSON();
+        }
     }
     return bob.obj();
 }

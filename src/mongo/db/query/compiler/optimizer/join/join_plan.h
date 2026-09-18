@@ -214,7 +214,11 @@ public:
 
     BSONObj joinPlanNodeToBSON(JoinPlanNodeId node,
                                const JoinGraph& graph,
-                               size_t numNodesToPrint = kHardMaxNodesInJoin) const;
+                               bool brief = false) const;
+    void joinPlanNodeToBSON(BSONObjBuilder& bob,
+                            JoinPlanNodeId node,
+                            const JoinGraph& graph,
+                            bool brief = false) const;
 
     // Number of join nodes of each method enumerated across all plans.
     int getNumHashJoins() const {

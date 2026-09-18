@@ -99,6 +99,8 @@ public:
      * Used for testing & debugging.
      */
     std::string toString() const;
+    BSONObj subsetToBSON(const JoinSubset& subset) const;
+
     const EnumerationStrategy& getStrategy() const {
         return _strategy;
     }

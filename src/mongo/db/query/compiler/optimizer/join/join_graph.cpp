@@ -214,10 +214,13 @@ std::vector<EdgeId> JoinGraph::getEdgesForSubgraph(NodeSet nodes) const {
         // There are no self-edges.
         return edges;
     }
-    for (const auto& [edgeBitset, edgeId] : _edgeMap) {
-        // Subset check: all of this edge's bits are included in 'nodes'.
-        if ((edgeBitset & nodes) == edgeBitset) {
-            edges.push_back(edgeId);
+    // Iterate _edges in EdgeId order (rather than the unordered _edgeMap) so the result is
+    // deterministic.
+    for (size_t edgeIndex = 0; edgeIndex < _edges.size(); ++edgeIndex) {
+        const auto& edge = _edges[edgeIndex];
+        // Subset check: both endpoints of the edge are included in 'nodes'.
+        if (nodes[edge.left] && nodes[edge.right]) {
+            edges.push_back(static_cast<EdgeId>(edgeIndex));
         }
     }
     return edges;

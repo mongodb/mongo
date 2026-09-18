@@ -323,8 +323,8 @@ ReorderedJoinSolution makeReorderedJoinSoln(
     LOGV2_DEBUG(11179802,
                 5,
                 "Winning join plan",
-                "plan"_attr = registry.joinPlanNodeToBSON(
-                    bestPlanNodeId, ctx.joinGraph, ctx.joinGraph.numNodes()));
+                "plan"_attr =
+                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph, false /* brief */));
 
     // Populate enumeration-wide metrics.
     metrics.numPlansEnumerated = peCtx.getNumFinalSubsetPlans();

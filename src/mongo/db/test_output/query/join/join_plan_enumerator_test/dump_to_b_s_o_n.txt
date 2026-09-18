@@ -1,0 +1,2210 @@
+{
+    "nodeSet": "001",
+    "collectionNames": [
+        "test.nss0"
+    ],
+    "collCardinality": {
+        "Cardinality": 10,
+        "Source": "Code"
+    },
+    "filterCardinality": {
+        "Cardinality": 10,
+        "Source": "Code"
+    },
+    "plans": [
+        {
+            "planNodeId": 0,
+            "cost": {
+                "totalCost": 0.011113537500000001,
+                "localOpCost": {
+                    "Cost": 0.011113537500000001,
+                    "Source": 4,
+                    "numDocsProcessed": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 10,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0.03125,
+                        "Source": "Metadata"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "accessPath": "COLLSCAN"
+        }
+    ],
+    "bestPlanIndex": 0,
+    "bestPlanCost": {
+        "Cost": 0.011113537500000001,
+        "Source": "Metadata"
+    }
+}
+{
+    "nodeSet": "010",
+    "collectionNames": [
+        "test.nss1"
+    ],
+    "collCardinality": {
+        "Cardinality": 1010,
+        "Source": "Code"
+    },
+    "filterCardinality": {
+        "Cardinality": 1010,
+        "Source": "Code"
+    },
+    "plans": [
+        {
+            "planNodeId": 1,
+            "cost": {
+                "totalCost": 1.1555981162476794,
+                "localOpCost": {
+                    "Cost": 1.1555981162476794,
+                    "Source": 4,
+                    "numDocsProcessed": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Metadata"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "accessPath": "COLLSCAN"
+        }
+    ],
+    "bestPlanIndex": 0,
+    "bestPlanCost": {
+        "Cost": 1.1555981162476794,
+        "Source": "Metadata"
+    }
+}
+{
+    "nodeSet": "100",
+    "collectionNames": [
+        "test.nss2"
+    ],
+    "collCardinality": {
+        "Cardinality": 2010,
+        "Source": "Code"
+    },
+    "filterCardinality": {
+        "Cardinality": 2010,
+        "Source": "Code"
+    },
+    "plans": [
+        {
+            "planNodeId": 2,
+            "cost": {
+                "totalCost": 2.305076232495359,
+                "localOpCost": {
+                    "Cost": 2.305076232495359,
+                    "Source": 4,
+                    "numDocsProcessed": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Metadata"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "accessPath": "COLLSCAN"
+        }
+    ],
+    "bestPlanIndex": 0,
+    "bestPlanCost": {
+        "Cost": 2.305076232495359,
+        "Source": "Metadata"
+    }
+}
+{
+    "nodeSet": "011",
+    "collectionNames": [
+        "test.nss0",
+        "test.nss1"
+    ],
+    "cardinality": {
+        "Cardinality": 1010,
+        "Source": "Code"
+    },
+    "joinPredicates": [
+        "0.a0 = 1.a1"
+    ],
+    "plans": [
+        {
+            "planNodeId": 4,
+            "cost": {
+                "totalCost": 4.164980796297299,
+                "localOpCost": {
+                    "Cost": 4.153867258797299,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 1030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 3,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 5,
+            "cost": {
+                "totalCost": 2.4090716537476795,
+                "localOpCost": {
+                    "Cost": 1.2423600000000001,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 1020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 6,
+            "cost": {
+                "totalCost": 18.366414699976794,
+                "localOpCost": {
+                    "Cost": 6.79932,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 10100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 8,
+            "cost": {
+                "totalCost": 4.4918549162476795,
+                "localOpCost": {
+                    "Cost": 3.3362568,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 1,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 10,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "001",
+            "rightNode": {
+                "planNodeId": 7,
+                "accessPath": "INDEX_PROBE { a0: -1 }"
+            }
+        },
+        {
+            "planNodeId": 9,
+            "cost": {
+                "totalCost": 2.4090716537476795,
+                "localOpCost": {
+                    "Cost": 1.2423600000000001,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 1020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "001",
+            "rightNodeId": 0
+        },
+        {
+            "planNodeId": 10,
+            "cost": {
+                "totalCost": 19.17959099124768,
+                "localOpCost": {
+                    "Cost": 6.79932,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 10100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "001",
+            "rightNodeId": 0
+        }
+    ],
+    "bestPlanIndex": 1,
+    "bestPlanCost": {
+        "Cost": 2.4090716537476795,
+        "Source": "Sampling"
+    }
+}
+{
+    "nodeSet": "101",
+    "collectionNames": [
+        "test.nss0",
+        "test.nss2"
+    ],
+    "cardinality": {
+        "Cardinality": 2010,
+        "Source": "Code"
+    },
+    "joinPredicates": [
+        "0.a0 = 2.a2"
+    ],
+    "plans": [
+        {
+            "planNodeId": 12,
+            "cost": {
+                "totalCost": 8.2943680550946,
+                "localOpCost": {
+                    "Cost": 8.2832545175946,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 11,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 13,
+            "cost": {
+                "totalCost": 4.782549769995359,
+                "localOpCost": {
+                    "Cost": 2.46636,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 2020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 14,
+            "cost": {
+                "totalCost": 36.59319586245359,
+                "localOpCost": {
+                    "Cost": 13.531320000000001,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 20100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "001",
+            "leftNodeId": 0,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 16,
+            "cost": {
+                "totalCost": 8.08933303249536,
+                "localOpCost": {
+                    "Cost": 5.7842568000000005,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 6030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 1,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 10,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "001",
+            "rightNode": {
+                "planNodeId": 15,
+                "accessPath": "INDEX_PROBE { a0: -1 }"
+            }
+        },
+        {
+            "planNodeId": 17,
+            "cost": {
+                "totalCost": 4.782549769995359,
+                "localOpCost": {
+                    "Cost": 2.46636,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 2020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "001",
+            "rightNodeId": 0
+        },
+        {
+            "planNodeId": 18,
+            "cost": {
+                "totalCost": 38.17460660749536,
+                "localOpCost": {
+                    "Cost": 13.531320000000001,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 20100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "001",
+            "rightNodeId": 0
+        }
+    ],
+    "bestPlanIndex": 1,
+    "bestPlanCost": {
+        "Cost": 4.782549769995359,
+        "Source": "Sampling"
+    }
+}
+{
+    "nodeSet": "110",
+    "collectionNames": [
+        "test.nss1",
+        "test.nss2"
+    ],
+    "cardinality": {
+        "Cardinality": 2030100,
+        "Source": "Code"
+    },
+    "joinPredicates": [],
+    "plans": []
+}
+{
+    "nodeSet": "111",
+    "collectionNames": [
+        "test.nss0",
+        "test.nss1",
+        "test.nss2"
+    ],
+    "cardinality": {
+        "Cardinality": 203010,
+        "Source": "Code"
+    },
+    "joinPredicates": [
+        "0.a0 = 1.a1",
+        "0.a0 = 2.a2"
+    ],
+    "plans": [
+        {
+            "planNodeId": 20,
+            "cost": {
+                "totalCost": 259.6962353138919,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 4,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 19,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 22,
+            "cost": {
+                "totalCost": 257.9403261713423,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 5,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 21,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 24,
+            "cost": {
+                "totalCost": 273.89766921757143,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 6,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 23,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 26,
+            "cost": {
+                "totalCost": 260.0231094338423,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 8,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 25,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 28,
+            "cost": {
+                "totalCost": 257.9403261713423,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 9,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 27,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 30,
+            "cost": {
+                "totalCost": 274.7108455088423,
+                "localOpCost": {
+                    "Cost": 255.53125451759462,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 205030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 6.727171322029716,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 2010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "011",
+            "leftNodeId": 10,
+            "rightSubset": "100",
+            "rightNode": {
+                "planNodeId": 29,
+                "accessPath": "INDEX_PROBE { a2: -1 }"
+            }
+        },
+        {
+            "planNodeId": 31,
+            "cost": {
+                "totalCost": 132.56041702879267,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 4,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 32,
+            "cost": {
+                "totalCost": 130.80450788624304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 5,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 33,
+            "cost": {
+                "totalCost": 146.76185093247216,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 6,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 34,
+            "cost": {
+                "totalCost": 132.88729114874306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 8,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 35,
+            "cost": {
+                "totalCost": 130.80450788624304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 9,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 36,
+            "cost": {
+                "totalCost": 147.57502722374306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "011",
+            "leftNodeId": 10,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 37,
+            "cost": {
+                "totalCost": 3698.95529561661,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 4,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 38,
+            "cost": {
+                "totalCost": 3697.1993864740607,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 5,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 39,
+            "cost": {
+                "totalCost": 3713.1567295202894,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 6,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 40,
+            "cost": {
+                "totalCost": 3699.2821697365603,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 8,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 41,
+            "cost": {
+                "totalCost": 3697.1993864740607,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 9,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 42,
+            "cost": {
+                "totalCost": 3713.9699058115602,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "011",
+            "leftNodeId": 10,
+            "rightSubset": "100",
+            "rightNodeId": 2
+        },
+        {
+            "planNodeId": 43,
+            "cost": {
+                "totalCost": 132.56041702879267,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 4
+        },
+        {
+            "planNodeId": 44,
+            "cost": {
+                "totalCost": 130.80450788624304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 5
+        },
+        {
+            "planNodeId": 45,
+            "cost": {
+                "totalCost": 146.76185093247216,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 6
+        },
+        {
+            "planNodeId": 46,
+            "cost": {
+                "totalCost": 132.88729114874306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 8
+        },
+        {
+            "planNodeId": 47,
+            "cost": {
+                "totalCost": 130.80450788624304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 9
+        },
+        {
+            "planNodeId": 48,
+            "cost": {
+                "totalCost": 147.57502722374306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "100",
+            "leftNodeId": 2,
+            "rightSubset": "011",
+            "rightNodeId": 10
+        },
+        {
+            "planNodeId": 50,
+            "cost": {
+                "totalCost": 262.1442353138919,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 12,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 49,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 52,
+            "cost": {
+                "totalCost": 258.63241702879264,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 13,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 51,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 54,
+            "cost": {
+                "totalCost": 290.4430631212509,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 14,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 53,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 56,
+            "cost": {
+                "totalCost": 261.93920029129265,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 16,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 55,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 58,
+            "cost": {
+                "totalCost": 258.63241702879264,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 17,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 57,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 60,
+            "cost": {
+                "totalCost": 292.0244738662927,
+                "localOpCost": {
+                    "Cost": 253.8498672587973,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 207030,
+                        "Source": "Sampling"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 3.363585661014858,
+                        "Source": "Sampling"
+                    },
+                    "mackertLohmanCase": "collection-fits-cache",
+                    "cardinalityRHSBeforeJoinPred": {
+                        "Cardinality": 1010,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "INLJ",
+            "leftSubset": "101",
+            "leftNodeId": 18,
+            "rightSubset": "010",
+            "rightNode": {
+                "planNodeId": 59,
+                "accessPath": "INDEX_PROBE { a1: 1 }"
+            }
+        },
+        {
+            "planNodeId": 61,
+            "cost": {
+                "totalCost": 135.5403261713423,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 12,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 62,
+            "cost": {
+                "totalCost": 132.02850788624306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 13,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 63,
+            "cost": {
+                "totalCost": 163.8391539787013,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 14,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 64,
+            "cost": {
+                "totalCost": 135.33529114874304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 16,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 65,
+            "cost": {
+                "totalCost": 132.02850788624306,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 17,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 66,
+            "cost": {
+                "totalCost": 165.42056472374304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "101",
+            "leftNodeId": 18,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 67,
+            "cost": {
+                "totalCost": 3697.7099017129303,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 12,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 68,
+            "cost": {
+                "totalCost": 3694.198083427831,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 13,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 69,
+            "cost": {
+                "totalCost": 3726.0087295202893,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 14,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 70,
+            "cost": {
+                "totalCost": 3697.5048666903313,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 16,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 71,
+            "cost": {
+                "totalCost": 3694.198083427831,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 17,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 72,
+            "cost": {
+                "totalCost": 3727.590140265331,
+                "localOpCost": {
+                    "Cost": 1366.66332,
+                    "Source": 5,
+                    "numDocsProcessed": {
+                        "Cardinality": 2030100,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "NLJ",
+            "leftSubset": "101",
+            "leftNodeId": 18,
+            "rightSubset": "010",
+            "rightNodeId": 1
+        },
+        {
+            "planNodeId": 73,
+            "cost": {
+                "totalCost": 135.5403261713423,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 12
+        },
+        {
+            "planNodeId": 74,
+            "cost": {
+                "totalCost": 132.02850788624303,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 13
+        },
+        {
+            "planNodeId": 75,
+            "cost": {
+                "totalCost": 163.83915397870126,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 14
+        },
+        {
+            "planNodeId": 76,
+            "cost": {
+                "totalCost": 135.33529114874304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 16
+        },
+        {
+            "planNodeId": 77,
+            "cost": {
+                "totalCost": 132.02850788624303,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 17
+        },
+        {
+            "planNodeId": 78,
+            "cost": {
+                "totalCost": 165.42056472374304,
+                "localOpCost": {
+                    "Cost": 126.09036,
+                    "Source": 1,
+                    "numDocsProcessed": {
+                        "Cardinality": 3020,
+                        "Source": "Code"
+                    },
+                    "numDocsOutput": {
+                        "Cardinality": 203010,
+                        "Source": "Code"
+                    },
+                    "ioSeqNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Sampling"
+                    },
+                    "ioRandNumPages": {
+                        "Cardinality": 0,
+                        "Source": "Code"
+                    }
+                }
+            },
+            "method": "HJ",
+            "leftSubset": "010",
+            "leftNodeId": 1,
+            "rightSubset": "101",
+            "rightNodeId": 18
+        }
+    ],
+    "bestPlanIndex": 7,
+    "bestPlanCost": {
+        "Cost": 130.80450788624304,
+        "Source": "Sampling"
+    }
+}

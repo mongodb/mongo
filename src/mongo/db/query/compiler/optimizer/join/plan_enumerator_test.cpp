@@ -471,4 +471,29 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
     testLargeSubset(nullptr /* No golden test here. */, PlanTreeShape::LEFT_DEEP, 10);
 }
+
+TEST_F(JoinPlanEnumeratorTest, DumpToBSON) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    initGraph(3, /* withIndexes */ true);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
+
+    auto jCtx = makeContext();
+    // Enumerate via ALL to test the serialization for multiple plans per level.
+    auto ctx = makeEnumeratorContext(jCtx,
+                                     EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
+                                                         .mode = PlanEnumerationMode::ALL,
+                                                         .enableHJOrderPruning = false});
+    ctx.enumerateJoinSubsets();
+
+    // Emit one record per subset to mirror how the plan enumerator logs subsets.
+    for (size_t level = 0; level < jCtx.joinGraph.numNodes(); level++) {
+        for (const auto& subset : ctx.getSubsets(level)) {
+            goldenCtx.outStream() << ctx.subsetToBSON(subset).jsonString(ExtendedRelaxedV2_0_0,
+                                                                         /* pretty */ true)
+                                  << std::endl;
+        }
+    }
+}
 }  // namespace mongo::join_ordering
