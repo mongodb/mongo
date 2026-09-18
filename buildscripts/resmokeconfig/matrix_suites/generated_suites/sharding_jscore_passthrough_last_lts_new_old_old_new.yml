@@ -33,6 +33,9 @@ executor:
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
+    new_binary_set_parameters:
+      failpoint.disableReplicatedFastCount:
+        mode: alwaysOn
     num_mongos: 2
     num_rs_nodes_per_shard: 2
     num_shards: 2

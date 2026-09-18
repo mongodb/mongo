@@ -511,3 +511,15 @@
       - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
       # TODO SERVER-132935: re-enable once the 9.0 binary can parse latestFCV 9.1.
       - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
+
+# The new-binary half of a mixed-bin-versions node can take the replicated fast count
+# initial-sync path even when its sync source is an old binary that never used it, because the
+# FCV-uninitialized-during-initial-sync gate can't see the sync source's real FCV. Setting this
+# failpoint disables replicated fast count entirely on the new-binary nodes only.
+- name: disable_replicated_fast_count_on_new_binary
+  value:
+    executor:
+      fixture:
+        new_binary_set_parameters:
+          failpoint.disableReplicatedFastCount:
+            mode: alwaysOn

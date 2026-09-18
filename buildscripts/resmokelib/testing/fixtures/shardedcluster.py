@@ -64,6 +64,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         configsvr_replset_name="config-rs",
         use_priority_ports=False,
         uds_path_prefix=None,
+        new_binary_set_parameters=None,
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -83,6 +84,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # mongod options
         self.mongod_options = self.fixturelib.make_historic(
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
+        )
+        # Forwarded to each shard/configsvr ReplicaSetFixture; only ever merged into the
+        # new-binary half of a mixed-bin-versions node (see replicaset.py, _builder.py).
+        self.new_binary_set_parameters = self.fixturelib.make_historic(
+            self.fixturelib.default_if_none(new_binary_set_parameters, {})
         )
 
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
@@ -776,6 +782,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "replset_config_options": replset_config_options,
             "shard_logging_prefix": self.configsvr_shard_logging_prefix,
             "uds_path_prefix": self.uds_path_prefix,
+            "new_binary_set_parameters": self.new_binary_set_parameters,
             **configsvr_options,
         }
 
@@ -855,6 +862,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "shard_logging_prefix": shard_logging_prefix,
             "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
             "uds_path_prefix": self.uds_path_prefix,
+            "new_binary_set_parameters": self.new_binary_set_parameters,
             **shard_options,
         }
 

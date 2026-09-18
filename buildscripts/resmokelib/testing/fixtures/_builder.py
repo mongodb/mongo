@@ -415,6 +415,11 @@ class ReplSetBuilder(FixtureBuilder):
             new_fixture_port = old_fixture.port
 
         new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
+        if is_multiversion and replset.new_binary_set_parameters:
+            new_fixture_mongod_options["set_parameters"] = new_fixture_mongod_options.get(
+                "set_parameters", {}
+            ).copy()
+            new_fixture_mongod_options["set_parameters"].update(replset.new_binary_set_parameters)
 
         new_fixture = make_fixture(
             _class,

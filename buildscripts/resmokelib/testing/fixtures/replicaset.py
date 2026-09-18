@@ -88,6 +88,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         router_endpoint_for_mongot: Optional[int] = None,
         use_priority_ports=False,
         uds_path_prefix: Optional[str | bool] = None,
+        new_binary_set_parameters=None,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -98,6 +99,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.mongod_executable = mongod_executable
         self.mongod_options = self.fixturelib.make_historic(
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
+        )
+        # Only merged into the new-binary half of a mixed-bin-versions node (see
+        # _builder.py:_new_mongod); the old-binary half never receives these, since a
+        # failpoint/setParameter that doesn't exist on the old binary would fail it to start.
+        self.new_binary_set_parameters = self.fixturelib.make_historic(
+            self.fixturelib.default_if_none(new_binary_set_parameters, {})
         )
 
         # Process load_extensions: ["*"] means all, otherwise load named extensions.

@@ -15,6 +15,7 @@
 
 namespace mongo {
 
+// TODO(SERVER-135231): Remove the failpoint.
 MONGO_FAIL_POINT_DEFINE(disableReplicatedFastCount);
 
 bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
