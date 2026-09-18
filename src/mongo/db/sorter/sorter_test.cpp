@@ -162,6 +162,140 @@ TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     EXPECT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
 }
 
+using SorterBatchGuardTest = unittest::Test;
+
+// A budget this small is entirely consumed by the memory the sorter reserves for its spill
+// iterators, which leaves an effective budget of zero. So, every insertion outside of a batch
+// spills.
+constexpr size_t kSpillEveryInsertionBudgetBytes = 20;
+
+// Roomy enough that the iterator reserve still leaves several KB, so a small batch stays in memory.
+constexpr size_t kRoomyBudgetBytes = 64 * 1024;
+
+std::unique_ptr<IWSorter> makeSorterWithBudget(const SortOptions& opts,
+                                               const boost::filesystem::path& spillDir) {
+    return IWSorter::make(opts, IWComparator(ASC), FileTraits<>::makeSpiller(opts, spillDir), {});
+}
+
+TEST_F(SorterBatchGuardTest, SpillsPerInsertionOutsideOfBatch) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+
+    // Without a batch the sorter spills as soon as an insertion crosses the budget, so against this
+    // budget the insertions spill repeatedly. The exact range count is left unasserted because the
+    // sorter also merges spilled ranges as its iterators accumulate.
+    EXPECT_GT(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, BatchDefersSpillUntilFinish) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+
+    // The batch took the sorter well past its budget, but spilling stays suppressed so that the
+    // batch is not split across a spill boundary. Exceeding the budget for the length of one batch
+    // is the deliberate cost of keeping batches whole.
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+    EXPECT_GT(sorter->stats().memUsage(), kSpillEveryInsertionBudgetBytes);
+
+    // Closing the batch spills everything accumulated during it, as a single range.
+    batchGuard.finish();
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, BatchDefersSpillUntilFinishWithLimitedSorter) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.Limit(100).MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+
+    batchGuard.finish();
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, DestructorWithoutFinishDoesNotSpill) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    {
+        SorterBatchGuard batchGuard{*sorter};
+        for (int i = 0; i < 12; ++i) {
+            sorter->add(i, -i);
+        }
+    }
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+
+    // The sorter is left over budget; the next insertion outside a batch spills it.
+    sorter->add(100, -100);
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, FinishDoesNotSpillBatchThatStayedWithinBudget) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kRoomyBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    sorter->add(1, -1);
+    batchGuard.finish();
+
+    // Closing a batch only spills if the sorter is actually over its budget; a small batch stays in
+    // memory exactly as it would without a guard.
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+}
+
+TEST_F(SorterBatchGuardTest, DeferredSpillPreservesSortedOutput) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    // Insert descending so that the output ordering comes from the sorter rather than the insertion
+    // order, with the batch boundary falling in the middle of the data.
+    {
+        SorterBatchGuard batchGuard{*sorter};
+        for (int i = 11; i >= 0; --i) {
+            sorter->add(i, -i);
+        }
+        batchGuard.finish();
+    }
+    for (int i = 15; i >= 12; --i) {
+        sorter->add(i, -i);
+    }
+
+    // Deferring a spill to the end of a batch must not lose or reorder anything: the merge of the
+    // batch's range with the keys added afterwards still yields every pair in sorted order.
+    auto expected = std::make_unique<IntIterator>(0, 16);
+    auto actual = sorter->done();
+    ASSERT_ITERATORS_EQUIVALENT(expected, actual);
+}
+
+using SorterBatchGuardDeathTest = SorterBatchGuardTest;
+
+DEATH_TEST_F(SorterBatchGuardDeathTest, OnlyOneBatchAtATime, "!_spillingSuppressed") {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    SorterBatchGuard nestedBatchGuard{*sorter};
+}
+
 /**
  * This suite includes test cases for resumable index builds where the Sorter is reconstructed from
  * state persisted to disk during a previous clean shutdown.

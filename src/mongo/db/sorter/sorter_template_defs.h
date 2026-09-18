@@ -622,9 +622,7 @@ public:
             this->_stats.incrementMemUsage(memUsage);
         }
 
-        if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes) {
-            spill();
-        }
+        this->_spillIfOverBudget();
     }
 
     void add(const Key& key, const Value& val) override {
@@ -887,8 +885,7 @@ public:
             if (_data.size() == this->_opts.limit)
                 std::make_heap(_data.begin(), _data.end(), less);
 
-            if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes)
-                spill();
+            this->_spillIfOverBudget();
 
             return;
         }
@@ -914,8 +911,7 @@ public:
 
         std::push_heap(_data.begin(), _data.end(), less);
 
-        if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes)
-            spill();
+        this->_spillIfOverBudget();
     }
 
     void add(const Key& key, const Value& val) override {

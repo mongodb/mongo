@@ -2338,6 +2338,87 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+// A single document generating more key data than the sorter's memory budget must still be spilled
+// as one unit.
+TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeys) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // 40 keys of ~64 KB each is ~2.5 MB of key data, well past the 1 MB budget below, so the
+    // sorter wants to spill part-way through this one document's keys.
+    constexpr int keysPerDocument = 40;
+    constexpr size_t elementSizeBytes = 64 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        BSONArrayBuilder arr;
+        for (int i = 0; i < keysPerDocument; ++i) {
+            // Distinct per element, so the document generates exactly kKeysPerDocument keys.
+            arr.append(std::to_string(i) + std::string(elementSizeBytes, 'a'));
+        }
+        ASSERT_OK(
+            Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << arr.arr())));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    auto& indexState = resumeInfo->getIndexes()[0];
+
+    // One spill, holding every key of the document -- not one spill part-way through them.
+    ASSERT_TRUE(indexState.getRanges());
+    EXPECT_EQ(indexState.getRanges()->size(), 1);
+    ASSERT_TRUE(indexState.getNumKeys());
+    EXPECT_EQ(*indexState.getNumKeys(), keysPerDocument);
+
+    // The spilled position covers the whole document.
+    ASSERT_TRUE(indexState.getLastSpilledRecordId());
+    EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
@@ -2401,6 +2482,99 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     // by the collection's RecordId range.
     EXPECT_GT(lastSpilledRecordId->getLong(), 0);
     EXPECT_LE(lastSpilledRecordId->getLong(), numDocs);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// Every index in a build sorts into its own sorter and so spills at its own pace. Each one must
+// still keep a document's keys together, so a build where all three indexes overflow on the same
+// document persists one whole-document range per index.
+TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeysForMultipleIndexes) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // The 1 MB budget below is split across the three indexes, so each sorter gets ~349 KB. Each
+    // field contributes 20 keys of ~32 KB (~640 KB), overflowing every one of them.
+    constexpr int kKeysPerDocument = 20;
+    constexpr size_t kElementSizeBytes = 32 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        auto makeArray = [&](std::string_view field) {
+            BSONArrayBuilder arr;
+            for (int i = 0; i < kKeysPerDocument; ++i) {
+                arr.append(std::string(field) + std::to_string(i) +
+                           std::string(kElementSizeBytes, 'a'));
+            }
+            return arr.arr();
+        };
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << 0 << "a" << makeArray("a") << "b" << makeArray("b")
+                                             << "c" << makeArray("c"))));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
+        return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine);
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           infos,
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), infos.size());
+
+    for (auto&& indexState : resumeInfo->getIndexes()) {
+        const auto indexName = indexState.getSpec()["name"].String();
+
+        // One spill per index, holding all of that index's keys for the document.
+        ASSERT_TRUE(indexState.getRanges()) << indexName;
+        EXPECT_EQ(indexState.getRanges()->size(), 1) << indexName;
+        ASSERT_TRUE(indexState.getNumKeys()) << indexName;
+        EXPECT_EQ(*indexState.getNumKeys(), kKeysPerDocument) << indexName;
+
+        // And each index's spilled position covers the whole document.
+        ASSERT_TRUE(indexState.getLastSpilledRecordId()) << indexName;
+        EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1) << indexName;
+    }
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }

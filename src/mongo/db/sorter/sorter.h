@@ -564,6 +564,9 @@ private:
 
 }  // namespace sorter
 
+template <typename Key, typename Value>
+class SorterBatchGuard;
+
 /**
  * Each instance of this class accepts (Key, Value) pairs and, depending on its SortOptions and the
  * configured Spiller/Storage, may keep them in memory or spill sorted ranges to an external
@@ -669,9 +672,68 @@ public:
     virtual void spill() = 0;
 
 protected:
+    /**
+     * Spills if the in-memory data has grown past 'maxMemoryUsageBytes' and spilling is not
+     * currently suppressed.
+     */
+    void _spillIfOverBudget() {
+        if (!_spillingSuppressed && _stats.memUsage() > _opts.maxMemoryUsageBytes) {
+            spill();
+        }
+    }
+
     SortOptions _opts;
 
     boost::optional<SharedBufferFragmentBuilder> _memPool;
+
+private:
+    friend class SorterBatchGuard<Key, Value>;
+
+    void _suppressSpilling() {
+        invariant(!_spillingSuppressed);
+        _spillingSuppressed = true;
+    }
+
+    void _allowSpilling() {
+        invariant(_spillingSuppressed);
+        _spillingSuppressed = false;
+    }
+
+    bool _spillingSuppressed = false;
+};
+
+/**
+ * Scoped guard that keeps the given sorter from spilling partway through a batch. As a result, the
+ * sorter may temporarily exceed its configured memory limit while this guard is active.
+ */
+template <typename Key, typename Value>
+class SorterBatchGuard {
+    SorterBatchGuard(const SorterBatchGuard&) = delete;
+    SorterBatchGuard& operator=(const SorterBatchGuard&) = delete;
+
+public:
+    explicit SorterBatchGuard(Sorter<Key, Value>& sorter) : _sorter(&sorter) {
+        _sorter->_suppressSpilling();
+    }
+
+    ~SorterBatchGuard() {
+        if (_sorter) {
+            _sorter->_allowSpilling();
+        }
+    }
+
+    /**
+     * Closes the batch, spilling if the sorter is now over its memory budget. Call exactly once.
+     */
+    void finish() {
+        invariant(_sorter);
+        auto* sorter = std::exchange(_sorter, nullptr);
+        sorter->_allowSpilling();
+        sorter->_spillIfOverBudget();
+    }
+
+private:
+    Sorter<Key, Value>* _sorter;
 };
 
 

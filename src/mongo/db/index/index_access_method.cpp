@@ -1267,6 +1267,9 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         }
     }
 
+    // Ensure that a document's keys are not partially spilled, so that if this builder is later
+    // resumed it doesn't lose the keys beyond the spill boundary.
+    SorterBatchGuard batchGuard{*_sorter};
     for (const auto& keyString : *keys) {
         ++_keysInserted;
         ++_keysInsertedCounted;
@@ -1279,6 +1282,7 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
+    batchGuard.finish();
     auto phase = idl::serialize(IndexBuildPhaseEnum::kCollectionScan);
     updateProcessedMetrics(
         phase, _timer, &_keysInsertedCounted, &_bytesInsertedCounted, &_durationLastUpdated);

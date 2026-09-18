@@ -197,6 +197,58 @@ export function mixedSpillingDocTemplate(i) {
     };
 }
 
+// Number of array elements in `c`, and the padding on each, for `multiKeySpillingDocTemplate`. One
+// document therefore contributes MULTIKEY_SPILLING_KEYS_PER_DOC keys of ~1 KB each (~100 KB) to the
+// {c:1} sorter — small relative to that sorter's budget (see MULTIKEY_SPILLING_OPTIONS), so a spill
+// lands at an arbitrary key of an arbitrary document rather than at a document boundary.
+const MULTIKEY_SPILLING_KEYS_PER_DOC = 100;
+const MULTIKEY_SPILLING_ELEMENT_PAD_BYTES = 1_000;
+
+// Options that `multiKeySpillingDocTemplate` needs so that a sorter spill lands in the middle of one
+// document's keys. Spread these into the `run()` options.
+export const MULTIKEY_SPILLING_OPTIONS = Object.freeze({
+    docTemplate: multiKeySpillingDocTemplate,
+    // Split across the three indexes this is 5 MB per sorter. It must stay well above the sorter's
+    // memory-pool block cap (`operationMemoryPoolBlockMaxSizeKB`, 2 MB by default): a document's
+    // keys are allocated from that pool before they are added to the sorter, and the sorter charges
+    // itself the pool's usage, so with a budget near or below the block size the spill would trip on
+    // the first key of a document instead of part-way through it.
+    maxIndexBuildMemoryUsageMegabytes: 15,
+    // ~100 KB of {c:1} keys per document against a 5 MB sorter budget means a spill roughly every 50
+    // documents — several before the scan is paused at either the middle or the last document.
+    docCount: 300,
+});
+
+/**
+ * A document template for building the same three index types as `DEFAULT_INDEX_SPECS` (index[0]
+ * {a:1} unique, index[1] {"$**":1} on `b`, index[2] {c:1}) where each document generates many keys
+ * for index[2] — enough that a sorter spill almost always lands between two keys of the same
+ * document rather than on a document boundary. At that moment some of the document's keys are
+ * already in the sorter (or spilled) while the rest have not been added yet.
+ *
+ * Must be paired with the rest of `MULTIKEY_SPILLING_OPTIONS`; the field shapes the default index
+ * specs rely on (unique scalar `a`, multi-element array `b`, array-valued `c`) are preserved.
+ */
+export function multiKeySpillingDocTemplate(i) {
+    const prefix = String(i).padStart(8, "0");
+    const c = new Array(MULTIKEY_SPILLING_KEYS_PER_DOC);
+    for (let j = 0; j < c.length; j++) {
+        // Distinct per (document, element) so every key is its own entry in the index.
+        c[j] =
+            prefix +
+            "_" +
+            String(j).padStart(4, "0") +
+            "_" +
+            "x".repeat(MULTIKEY_SPILLING_ELEMENT_PAD_BYTES);
+    }
+    return {
+        _id: i,
+        a: prefix,
+        b: [prefix + "y", prefix + "z"],
+        c,
+    };
+}
+
 function bulkInsert(coll, count, template, batchSize = 1000) {
     let i = 0;
     while (i < count) {
