@@ -254,7 +254,7 @@ filters:
   - "bind_input_params*":
     approvers:
       - 10gen/query-optimization
-  - "partitioned_cache.h":
+  - "partitioned_cache*":
     approvers:
       - 10gen/query-optimization
   - "canonical_query*":
