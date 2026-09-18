@@ -38,6 +38,19 @@ class DistroSelectionTest(unittest.TestCase):
                 "ubuntu22",
             )
 
+    def test_detects_ubuntu_26(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            os_release = pathlib.Path(temp_dir) / "os-release"
+            os_release.write_text(
+                'NAME="Ubuntu"\nVERSION_ID="26.04"\n',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                hermetic_container_integration.detect_host_distro(os_release),
+                "ubuntu26",
+            )
+
     def test_detects_fixed_amazon_linux_2023_3_release(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)

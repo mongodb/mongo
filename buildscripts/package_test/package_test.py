@@ -544,6 +544,23 @@ OS_DOCKER_LOOKUP = {
         ),
         "python3",
     ),
+    "ubuntu2604": (
+        "ubuntu:26.04",
+        "apt",
+        frozenset(
+            [
+                "python3",
+                "python-is-python3",
+                "wget",
+                "pkg-config",
+                "systemd",
+                "systemd-dev",
+                "procps",
+                "file",
+            ]
+        ),
+        "python3",
+    ),
     "windows": None,
     "windows_i686": None,
     "windows_x86_64": None,

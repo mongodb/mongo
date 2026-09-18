@@ -9,6 +9,24 @@ from buildscripts import local_rbe_container_url
 
 
 class LocalRbeContainerUrlTest(unittest.TestCase):
+    def test_detects_ubuntu_26(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            os_release = root / "os-release"
+            os_release.write_text(
+                'NAME="Ubuntu"\nVERSION_ID="26.04"\n',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                local_rbe_container_url.get_host_distro_major_version(
+                    os_release,
+                    root / "system-release",
+                    platform="linux",
+                ),
+                "ubuntu26",
+            )
+
     def test_detects_fixed_amazon_linux_2023_3_release(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)

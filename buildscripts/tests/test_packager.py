@@ -108,6 +108,18 @@ class TestPackager(TestCase):
         """Test SUSE build OS choices include SUSE 16."""
         self.assertIn("suse16", Distro("suse").build_os("x86_64"))
 
+    def test_ubuntu2604_repo_os_version(self) -> None:
+        """Test Ubuntu 26.04 repository codename."""
+        self.assertEqual("resolute", Distro("ubuntu").repo_os_version("ubuntu2604"))
+
+    def test_ubuntu_build_os_includes_ubuntu2604(self) -> None:
+        """Test Ubuntu build OS choices include Ubuntu 26.04."""
+        self.assertIn("ubuntu2604", Distro("ubuntu").build_os("x86_64"))
+
+    def test_enterprise_ubuntu_arm64_build_os_includes_ubuntu2604(self) -> None:
+        """Test enterprise Ubuntu arm64 build OS choices include Ubuntu 26.04."""
+        self.assertIn("ubuntu2604", EnterpriseDistro("ubuntu").build_os("arm64"))
+
     def test_redhat_release_dist(self) -> None:
         """Test the rpm release dist for RHEL, including multi-digit major versions."""
         distro = Distro("redhat")

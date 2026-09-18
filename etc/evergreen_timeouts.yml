@@ -291,6 +291,22 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
+  ubuntu2604:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  ubuntu2604-arm64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2604:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2604-arm64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
   enterprise-windows-all-feature-flags-required:
     - task: buildscripts_test
       exec_timeout: 15

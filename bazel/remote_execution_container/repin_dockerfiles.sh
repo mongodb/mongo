@@ -113,6 +113,11 @@ systemtap-sdt-dev
 libncurses-dev
 "
 
+ADDITIONAL_PACKAGES["ubuntu:26.04"]="
+systemtap-sdt-dev
+libncurses-dev
+"
+
 declare -A PREPARE_COMMANDS
 PREPARE_COMMANDS["redhat/ubi10:10.0"]="export OPENSSL_ppccap=0"
 
@@ -142,6 +147,7 @@ IMAGE_DIRS["ubuntu:18.04"]="ubuntu18"
 IMAGE_DIRS["ubuntu:20.04"]="ubuntu20"
 IMAGE_DIRS["ubuntu:22.04"]="ubuntu22"
 IMAGE_DIRS["ubuntu:24.04"]="ubuntu24"
+IMAGE_DIRS["ubuntu:26.04"]="ubuntu26"
 
 # Fetch the latest sha256:xxx hash for an image.
 get_latest_sha() {

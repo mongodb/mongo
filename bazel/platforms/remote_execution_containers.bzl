@@ -65,4 +65,9 @@ REMOTE_EXECUTION_CONTAINERS = {
         "dockerfile": "bazel/remote_execution_container/ubuntu24/Dockerfile",
         "web-url": "https://gallery.ecr.aws/w3i8j1a8/devprod-build/sha256:c149ffd5df007a909a7bbb87719a96a4445c62bc2c0a9f1f609ae9ae6ae7e6b7",
     },
+    "ubuntu26": {
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:523007cd10bbdf3bd3ee0e8ed4fd8df4cf1eb9f86d9d33acef324e35ecede485",
+        "dockerfile": "bazel/remote_execution_container/ubuntu26/Dockerfile",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:523007cd10bbdf3bd3ee0e8ed4fd8df4cf1eb9f86d9d33acef324e35ecede485",
+    },
 }
