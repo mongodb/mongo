@@ -264,6 +264,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             external_include_paths_feature,
             feature(name = "archive_param_file", enabled = True),
             feature(name = "supports_dynamic_linker", enabled = False),
+            feature(name = "supports_start_end_lib", enabled = True),
             # Override Bazel's built-in coverage feature with a no-op.
             # The WASI SDK does not ship libclang_rt.profile.a, so coverage
             # instrumentation cannot work on wasm32 targets.  Without this

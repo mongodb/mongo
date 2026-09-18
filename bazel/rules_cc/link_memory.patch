@@ -5,11 +5,11 @@
          outputs = outputs,
          progress_message = progress_message,
 -        resource_set = _resource_set,
-+        resource_set = _resource_set_lto if feature_configuration.is_enabled("thin_lto") else _resource_set,
++        resource_set = _resource_set_for(feature_configuration, link_type),
          env = env,
          use_default_shell_env = True,
          execution_requirements = execution_info,
-@@ -459,10 +459,48 @@
+@@ -459,10 +459,72 @@
          return s
      return s.replace("\\", "\\\\").replace("$", "\\$")
  
@@ -31,6 +31,30 @@
 +# there, so cost decouples from input count entirely - mongod under LTO has the
 +# fewest inputs of anything here and the highest peak, which any input-derived
 +# estimate underestimates by two orders of magnitude.
++# Dynamic-library links are a different beast: under --start-lib/--end-lib the
++# linker loads members lazily, and our .so's export a narrow surface and drop
++# almost everything.  The largest .so in the tree (extension test examples,
++# ~15.5k linker inputs) peaks at 220 MB (cgroup memory.peak, 2026-09) while the
++# executable formula above would claim ~13 GB for it - which serialized all
++# local links behind it (profiles showed 79% of the link phase running exactly
++# one link).  0.05 MB/input gives that measurement 3.5x headroom.
++_MONGO_DYLIB_LINK_MEMORY_PER_INPUT_MB = 0.05
++
++def _resource_set_for(feature_configuration, link_type):
++    if feature_configuration.is_enabled("thin_lto"):
++        return _resource_set_lto
++    if is_dynamic_library(link_type):
++        return _resource_set_dylib
++    return _resource_set
++
++def _resource_set_dylib(os, inputs):
++    if os == "windows":
++        return {"memory": _MONGO_WINDOWS_LINK_MEMORY_MB, "cpu": 1}
++    elif os == "osx" or os == "linux":
++        return {"memory": max(_MONGO_LINK_MEMORY_FLOOR_MB, _MONGO_DYLIB_LINK_MEMORY_PER_INPUT_MB * inputs), "cpu": 1}
++    else:
++        return {"memory": 1500 + inputs, "cpu": 1}
++
 +_MONGO_LINK_MEMORY_FLOOR_MB = 150
 +_MONGO_LINK_MEMORY_PER_INPUT_MB = 0.85
 +
