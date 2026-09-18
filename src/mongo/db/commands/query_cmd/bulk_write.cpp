@@ -108,6 +108,7 @@
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -1663,6 +1664,8 @@ bool handleUpdateOp(OperationContext* opCtx,
             if (auto entry =
                     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - entry->getWallClockTime());
 
                 auto [numMatched, numDocsModified, upserted] =
                     getRetryResultForUpdate(opCtx, nsString, op, entry);
