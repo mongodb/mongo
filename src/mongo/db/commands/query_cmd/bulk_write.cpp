@@ -789,8 +789,10 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
         auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, idx)
                                                 : kUninitializedStmtId;
-        const bool wasAlreadyExecuted =
-            opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId);
+        const auto timestampIfAlreadyExecuted = opCtx->isRetryableWrite()
+            ? txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)
+            : boost::none;
+        const bool wasAlreadyExecuted = bool(timestampIfAlreadyExecuted);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -848,6 +850,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
             }
         } else if (wasAlreadyExecuted) {
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *timestampIfAlreadyExecuted);
 
             SingleWriteResult res;
             res.setN(1);
