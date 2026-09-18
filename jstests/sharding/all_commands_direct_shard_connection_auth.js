@@ -1160,7 +1160,6 @@ const allCommands = {
         },
     },
     repairReplicatedMetadata: {
-        // TODO SERVER-134907: flip to shouldFail: false once the action is granted to clusterAdmin.
         command: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {}},
         isAdminCommand: true,
         shouldFail: true,
