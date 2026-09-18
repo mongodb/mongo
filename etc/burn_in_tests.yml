@@ -18,6 +18,7 @@ selector:
       - streams_aspio_iceberg_4
       - streams_aspio_iceberg_large
       - streams_aspio_iceberg_5
+      - streams_aspio_iceberg_azure
       - streams_aspio_utilities
       - streams_aspio_pubsub
       # The with_mongot_extension_* suites are temporary, experimental suites that load the real
