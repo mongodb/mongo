@@ -59,7 +59,7 @@ void WindowFunctionPercentileCommon::reset() {
 }
 
 Value WindowFunctionPercentileCommon::computePercentile(double p) const {
-    const double n = _values.size();
+    const int n = representAsChecked<int>(_values.size());
 
     // boost::container::flat_multiset stores the values in ascending order, so we don't need to
     // sort them before finding the value at index 'rank'.
