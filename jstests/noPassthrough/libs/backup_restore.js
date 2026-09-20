@@ -206,7 +206,7 @@ export const BackupRestoreTest = function (options) {
                 dbpath: dbpathFormat,
                 setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})},
             },
-            oplogSize: 1024,
+            oplogSize: 2048,
         });
 
         // Avoid stepdowns due to heavy workloads on slow machines.
@@ -216,7 +216,7 @@ export const BackupRestoreTest = function (options) {
         rst.initiate(config);
 
         // Initialize replica set using default timeout. This should give us sufficient time to
-        // allocate 1GB oplogs on slow test hosts.
+        // allocate 2GB oplogs on slow test hosts.
         rst.awaitNodesAgreeOnPrimary();
         let primary = rst.getPrimary();
         let secondary = rst.getSecondary();
