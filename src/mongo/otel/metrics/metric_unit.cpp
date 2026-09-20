@@ -42,6 +42,8 @@ std::string_view toString(MetricUnit unit) {
         // Throughput
         case MetricUnit::kBytesPerSecond:
             return "bytes_per_second";
+        case MetricUnit::kMegabytesPerSecond:
+            return "megabytes_per_second";
 
         // Database
         case MetricUnit::kOperations:

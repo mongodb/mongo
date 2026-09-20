@@ -31,6 +31,7 @@ enum class MetricUnit {
 
     // Throughput
     kBytesPerSecond,
+    kMegabytesPerSecond,
 
     // Database
     kOperations,
