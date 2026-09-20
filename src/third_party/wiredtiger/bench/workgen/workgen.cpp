@@ -42,6 +42,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include "wiredtiger.h"
 #include "workgen.h"
