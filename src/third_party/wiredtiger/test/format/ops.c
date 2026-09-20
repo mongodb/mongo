@@ -661,7 +661,7 @@ begin_transaction(TINFO *tinfo, const char *iso_config)
  * next_timestamp --
  *     Allocate the next global timestamp under the step-down read lock. The write lock is held
  *     exclusively during step-down notification; threads blocked here unblock with values strictly
- *     above step_down_ts, routing their writes to ingest.
+ *     above step_down_ts, sending their writes to ingest (mirrored to both when configured).
  */
 uint64_t
 next_timestamp(WT_SESSION *session)

@@ -2056,12 +2056,12 @@ __wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, uint64_t prepared_id)
  *     Setting the step-down timestamp announces a planned step-down: the stable constituent will be
  *     checkpointed at that timestamp, and everything committed after it must go to the ingest
  *     constituent to survive the role change. Transactions that begin once the timestamp is set
- *     route their writes accordingly. A write transaction that began before then routed its writes
- *     to stable, so if it is still running it "straddles" the boundary: its commit can land above
- *     the step-down timestamp, yet its content sits in stable, where nothing above the checkpoint
- *     survives. Rather than risk losing the writes, return WT_ROLLBACK and have the application
- *     retry it as a new transaction, which writes ingest. For read operations only the assertion
- *     applies.
+ *     route their writes to ingest (mirroring to both when write mirroring is enabled). A write
+ *     transaction that began before then routed its writes to stable, so if it is still running it
+ *     "straddles" the boundary: its commit can land above the step-down timestamp, yet its content
+ *     sits in stable, where nothing above the checkpoint survives. Rather than risk losing the
+ *     writes, return WT_ROLLBACK and have the application retry it as a new transaction, which
+ *     routes to ingest. For read operations only the assertion applies.
  */
 static WT_INLINE int
 __wt_txn_stepdown_straddler_check(WT_SESSION_IMPL *session, bool is_writer)

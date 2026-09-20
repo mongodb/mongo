@@ -48,7 +48,6 @@ class test_layered_async_stepdown10(
     table_config = 'key_format=S,value_format=S'
 
     base = 'statistics=(all),precise_checkpoint=true,cache_size=500MB,'
-    conn_config = base + 'disaggregated=(role="leader",lose_all_my_data=true)'
     conn_config_follower = base + 'disaggregated=(role="follower",lose_all_my_data=true)'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -57,7 +56,16 @@ class test_layered_async_stepdown10(
       ('epoch', dict(use_epochs=True)),
       ('legacy', dict(use_epochs=False)),
     ]
-    scenarios = make_scenarios(disagg_storages, worlds)
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    scenarios = make_scenarios(disagg_storages, worlds, write_modes)
+
+    def conn_config(self):
+        return self.base + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},' \
+            'role="leader",lose_all_my_data=true)'
 
     # How long the workload runs against each phase of the transition.
     phase_sleep = 10.0 if wttest.islongtest() else 1.0

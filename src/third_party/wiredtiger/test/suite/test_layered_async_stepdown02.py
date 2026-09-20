@@ -40,10 +40,16 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
     test_name = __qualname__
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     # A scan interrupted by the step-down timestamp re-seats and still yields its own snapshot
     # exactly once, in order, whatever the concurrent writer does to the keys underneath it.
@@ -120,7 +126,9 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.write_at(uri, {'b': 's', 'd': 's', 'f': 's'}, 10)
         self.set_step_down_ts(20)
         self.write_at(uri, {'a': 'i', 'c': 'i', 'e': 'i'}, 30)
-        self.assertEqual(self.read_keys_at(self.stable_uri(uri), 40), {'b', 'd', 'f'})
+        expected_stable = {'a', 'b', 'c', 'd', 'e', 'f'} if self.stable_has_step_down_writes() \
+            else {'b', 'd', 'f'}
+        self.assertEqual(self.read_keys_at(self.stable_uri(uri), 40), expected_stable)
 
         cursor = self.session.open_cursor(uri, None, None)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(40))
@@ -172,8 +180,9 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         self.assertEqual(self.read_kvs_at(uri, 40), {'old': 'ingest', 'fresh': 'ingest'})
 
-        # Ground truth: both writes landed in ingest; the stable version is untouched.
-        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 40), {'old': 'stable'})
+        expected_stable = {'old': 'ingest', 'fresh': 'ingest'} if self.stable_has_step_down_writes() \
+            else {'old': 'stable'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 40), expected_stable)
         self.complete_step_down(20)
 
     # Reverse iteration and largest_key on either side of the step-down timestamp; largest_key is
@@ -332,10 +341,9 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         check_oracle('leader')
 
-        # Ground truth: nothing in the ingest phase touched stable; the remove of 'gone' is a
-        # marker record in ingest that hides the stable value at merge time.
-        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 50),
-            {'gone': 's', 'upd': 's', 'keep': 's'})
+        expected_stable = {'reborn': 'i', 'upd': 'i2', 'keep': 's', 'new': 'i'} \
+            if self.stable_has_step_down_writes() else {'gone': 's', 'upd': 's', 'keep': 's'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 50), expected_stable)
         self.assertEqual(self.read_keys_at(self.ingest_uri(uri), 50),
             {'gone', 'reborn', 'upd', 'new'})
 
@@ -433,9 +441,8 @@ class test_layered_async_stepdown02(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_kvs_at(uri, snapshot_ts), snapshot,
             'reading at the old frontier must be unaffected by the later writes')
 
-        # Ground truth: the churn afterwards never touched the stable table.
-        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), self.ts), snapshot,
-            'later writes must not leak into the stable table')
+        expected_stable = dict(expected) if self.stable_has_step_down_writes() else snapshot
+        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), self.ts), expected_stable)
 
         cursor.close()
 

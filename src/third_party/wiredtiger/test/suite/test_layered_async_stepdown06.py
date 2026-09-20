@@ -38,10 +38,16 @@ from wtscenario import make_scenarios
 class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     test_name = __qualname__
 
@@ -71,9 +77,7 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_kvs_at(t_post, 40), {'b': 'ingest'})
         self.assertEqual(self.read_kvs_at(t_both, 40), {'a': 'stable', 'b': 'ingest'})
 
-        # Ground truth: each half is still in its own constituent. A follower cannot open
-        # the live stable table, so read the checkpoint view; a constituent that was never
-        # checkpointed has nothing in stable.
+        # A follower cannot open the live stable table, so read the checkpoint view.
         self.assertEqual(self.read_keys_at(self.ingest_uri(t_pre), 40), set())
         if self.stable_is_checkpointed(self.conn, t_post):
             self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(t_post), 40), set())
@@ -88,7 +92,7 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
             {'a': 'stable', 'b': 'ingest', 'c': 'follower'})
 
     # A restart without local files serves exactly the step-down checkpoint: the stable content
-    # survives and the ingest content, being local-only, is gone.
+    # committed at or below the cutoff survives, and the post-cutoff writes are gone.
     def test_step_down_checkpoint_survives_restart(self):
         self.set_global_ts(1, 1)
         self.session.create(self.uri, 'key_format=S,value_format=S')
@@ -421,6 +425,65 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 50), {'k1', 'k2'})
         self.assertEqual(self.read_kvs_at(self.uri, 50), {'k1': 'v', 'k2': 'follower'})
 
+        # Neither write reached the step-down checkpoint.
+        self.assertEqual(self.read_kvs_at(self.stable_checkpoint_uri(self.uri), 50), {})
+
+    # Test step-down -> pickup -> step-up. Writes in the stepdown window survive through ingest.
+    # The step-up must drain the writes from ingest to stable.
+    def test_step_up_after_pickup_recovers_window_writes(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.write_at(self.uri, {'a': 'stable'}, 10)
+        self.set_step_down_ts(20)
+        self.write_at(self.uri, {'b': 'window'}, 30)
+        self.complete_step_down(20)
+
+        # A second node picks the stepdown checkpoint up, to take over as leader below.
+        conn_b = self.wiredtiger_open('follower', self.extensionsConfig() + ',create,' +
+            self.conn_base_config + 'disaggregated=(role="follower")')
+        self.disagg_advance_checkpoint(conn_b, self.conn)
+
+        # The step-down checkpoint holds the pre-cutoff content only.
+        self.assertEqual(self.read_kvs_at(self.stable_checkpoint_uri(self.uri), 30),
+            {'a': 'stable'})
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 30),
+            {'b': 'window'})
+        self.assertEqual(self.read_kvs_at(self.uri, 30),
+            {'a': 'stable', 'b': 'window'})
+
+        # Node B takes over, writes and publishes its own checkpoint, which carries only what B has.
+        conn_b.reconfigure('disaggregated=(role="leader")')
+        session_b = conn_b.open_session('')
+        c_b = session_b.open_cursor(self.uri, None, None)
+        session_b.begin_transaction()
+        c_b['c'] = 'from-b'
+        session_b.commit_transaction('commit_timestamp=' + self.timestamp_str(21))
+        c_b.close()
+        conn_b.set_timestamp('stable_timestamp=' + self.timestamp_str(21))
+        session_b.checkpoint()
+        session_b.close()
+
+        # This node picks B's checkpoint up, replacing its stable tree with B's content.
+        self.disagg_advance_checkpoint_and_wait(self.conn, conn_b)
+        self.assertEqual(self.read_kvs_at(self.stable_checkpoint_uri(self.uri), 30),
+            {'a': 'stable', 'c': 'from-b'})
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 30),
+            {'b': 'window'})
+
+        conn_b.reconfigure('disaggregated=(role="follower")')
+        conn_b.close()
+        self.conn.reconfigure('disaggregated=(role="leader")')
+
+        # After stepping up, the content in ingest is drained to stable.
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 30),
+            {'a': 'stable', 'b': 'window', 'c': 'from-b'},
+            'the step-up must recover the window write from ingest after a pickup')
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 30), {})
+        self.assertEqual(self.read_kvs_at(self.uri, 30),
+            {'a': 'stable', 'b': 'window', 'c': 'from-b'})
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
+        self.session.checkpoint()
 
     # Once the step-down completes the node is a follower; setting the cutoff again is rejected.
     def test_step_down_ts_after_step_down_rejected(self):
@@ -454,7 +517,8 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         # Step up. The promotion drains the ingest content into the stable table.
         self.conn.reconfigure('disaggregated=(role="leader")')
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 50), {'a', 'b', 'c'},
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 50),
+            {'a': 'cycle1-stable', 'b': 'cycle1-ingest', 'c': 'follower-ingest'},
             'the step-up must drain the ingest content into the stable table')
         expected = {'a': 'cycle1-stable', 'b': 'cycle1-ingest', 'c': 'follower-ingest'}
         self.assertEqual(self.read_kvs_at(self.uri, 50), expected)
@@ -463,11 +527,12 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         self.session.checkpoint()
 
-        # Cycle 2: setting the cutoff again must succeed and route new writes to ingest.
+        # Cycle 2: setting the cutoff again must succeed and route new writes to ingest (mirrored
+        # to both when enabled).
         self.set_step_down_ts(60)
         self.write_at(self.uri, {'d': 'cycle2-ingest'}, 70)
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 80), {'d'},
-            'a later write in the second cycle must route to ingest')
+            'a later write in the second cycle must reach ingest')
         self.complete_step_down(60)
 
         expected['d'] = 'cycle2-ingest'
@@ -476,6 +541,10 @@ class test_layered_async_stepdown06(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         # A second step-up drains the second cycle's ingest content as well.
         self.conn.reconfigure('disaggregated=(role="leader")')
+        # With a precise checkpoint, a commit above the stable timestamp stays dirty and cannot be
+        # verified: advance stable over this cycle's write and checkpoint, as cycle 1 does.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(70))
+        self.session.checkpoint()
         self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 80), {'a', 'b', 'c', 'd'})
         self.assertEqual(self.read_kvs_at(self.uri, 80), expected)
 

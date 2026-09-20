@@ -656,10 +656,11 @@ set:
 
     /*
      * Once the step-down timestamp is set, committed writes are directed to the ingest constituent
-     * and everything from before belongs to stable. The application is expected to step down after
-     * setting it, which clears it, so it is only valid on a leader and cannot be changed while set.
-     * The step-down epoch is stored in the same locked section so readers observe the boundary in
-     * both spaces or in neither.
+     * (or mirrored to both stable and ingest when write mirroring is enabled) and everything from
+     * before belongs to stable. The application is expected to step down after setting it, which
+     * clears it, so it is only valid on a leader and cannot be changed while set. The step-down
+     * epoch is stored in the same locked section so readers observe the boundary in both spaces or
+     * in neither.
      */
     if (has_step_down) {
         __wt_writelock(session, &txn_global->step_down_lock);

@@ -1108,11 +1108,11 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     WT_ERR(__wt_config_merge(session, stable_cfg, NULL, &constituent_cfg));
 
     /*
-     * Once the step-down timestamp is set, all writes go to the ingest constituent, so a stable
-     * constituent would stay empty. Create the table in the follower shape instead, and the next
-     * step-up creates the missing constituent. A leader checkpoint therefore covers only the tables
-     * created below the boundary. The schema lock held here serializes the timestamp, making the
-     * relaxed load safe.
+     * A table created inside the step-down window is marked step_down_created, which sends every
+     * write to the ingest constituent and never mirrors, so its stable constituent would stay
+     * empty. Create the table in the follower shape instead, and the next step-up creates the
+     * missing constituent. A leader checkpoint therefore covers only the tables created below the
+     * boundary. The schema lock held here serializes the timestamp, making the relaxed load safe.
      */
     step_down_ts = __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp);
     if (__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {

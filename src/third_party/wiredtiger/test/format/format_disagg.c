@@ -334,7 +334,7 @@ disagg_stepdown_drain_dump_stragglers(wt_timestamp_t step_down_ts)
  *        values > step_down_ts.
  *     3. Drain: wait until every worker has committed or rolled back at or below step_down_ts.
  *     4. Let the workers keep writing above the boundary for a window, exercising post-step-down
- *        leader writes routed to ingest.
+ *        leader writes.
  *     5. Pause worker writes and wait for every worker to acknowledge, guaranteeing no writer is
  *        still active.
  *     6. Pin stable at step_down_ts and take the step-down checkpoint; with writes paused it sees
@@ -417,7 +417,8 @@ disagg_async_stepdown(wt_thread_t *checkpoint_tid, wt_thread_t *timestamp_tid)
 
     /*
      * Let the workers keep writing above the boundary for a window: post-step-down leader writes
-     * are routed to ingest and this exercises that path before the checkpoint.
+     * are routed either to ingest or to both and this exercises either one of the configurations
+     * before the checkpoint.
      */
     track_msg("[stepdown] post-drain ingest write window");
     __wt_sleep(DISAGG_STEPDOWN_INGEST_WINDOW_SEC, 0);

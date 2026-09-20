@@ -37,10 +37,16 @@ from wtscenario import make_scenarios
 class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     test_name = __qualname__
 
@@ -102,7 +108,9 @@ class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestC
         # Routing took effect from the same call.
         self.write_at(self.uri, {'k1': 'v'}, 30)
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), {'k1'})
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), set())
+        expected_stable = {'k1'} if self.stable_has_step_down_writes() else set()
+        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
 
     # A cutoff below the current stable must be rejected: stable may never sit past it.
     def test_step_down_ts_below_stable_rejected(self):
@@ -129,6 +137,7 @@ class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestC
             {'post0': 'v30', 'post1': 'v40', 'post2': 'v50'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 60),
             {'post0', 'post1', 'post2'})
+        self.complete_step_down(20)
 
     # Later commits at or below the cutoff are rejected.
     def test_commit_at_or_below_cutoff_rejected(self):

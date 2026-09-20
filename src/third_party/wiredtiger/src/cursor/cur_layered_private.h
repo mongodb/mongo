@@ -15,6 +15,17 @@
 typedef enum { WTI_CLAYERED_ROLE_FOLLOWER, WTI_CLAYERED_ROLE_LEADER } WTI_CLAYERED_ROLE;
 
 /*
+ * WTI_CLAYERED_WRITE_TARGET --
+ *	The constituent or constituents receiving a layered-table write.
+ */
+typedef enum {
+    WTI_CLAYERED_WRITE_NONE,
+    WTI_CLAYERED_WRITE_STABLE,
+    WTI_CLAYERED_WRITE_INGEST,
+    WTI_CLAYERED_WRITE_BOTH
+} WTI_CLAYERED_WRITE_TARGET;
+
+/*
  * WTI_CURSOR_LAYERED --
  *	A layered table cursor.
  */
@@ -68,4 +79,5 @@ struct __wti_clayered_op {
     WT_CURSOR *stable;               /* resolved slot == clayered->stable_cursor (may be NULL) */
     WT_TRUNCATE_LIST *truncate_list; /* the layered table's truncate list */
     WT_COLLATOR *collator;
+    WTI_CLAYERED_WRITE_TARGET write_target;
 };

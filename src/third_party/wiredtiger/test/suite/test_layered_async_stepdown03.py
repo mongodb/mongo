@@ -38,10 +38,16 @@ from wtscenario import make_scenarios
 class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     test_name = __qualname__
 
@@ -66,7 +72,8 @@ class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.session.rollback_transaction()
         cursor.close()
 
-        # A retry after the timestamp is set routes cleanly to ingest.
+        # A retry after the timestamp is set routes to ingest (mirrored to stable when write
+        # mirroring is enabled).
         cursor = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction()
         cursor['straddle'] = 'after'
@@ -76,7 +83,9 @@ class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), {'straddle'})
         self.assertEqual(self.read_keys_at(self.uri, 40), {'straddle'})
 
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), set())
+        expected_stable = {'straddle': 'after'} if self.stable_has_step_down_writes() else {}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
 
     # Straddler rollback applies to any write; remove rolls back like insert.
     def test_straddler_rollback_remove(self):
@@ -124,6 +133,9 @@ class test_layered_async_stepdown03(LayeredStepdownMixin, wttest.WiredTigerTestC
         cursor.close()
         self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'v'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 40), {'k1'})
+        expected_stable = {'k1'} if self.stable_has_step_down_writes() else set()
+        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
 
     # A straddler rolls back even when committing at or below the cutoff.
     def test_straddler_commit_below_cutoff_also_rolls_back(self):

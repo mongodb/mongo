@@ -353,6 +353,8 @@ configure_disagg_storage(const char *home, char **p, size_t max, char *ext_cfg, 
     testutil_disagg_storage_configuration(
       &opts, home, disagg_cfg, sizeof(disagg_cfg), ext_cfg, ext_cfg_size);
     CONFIG_APPEND(*p, ",%s", disagg_cfg);
+    CONFIG_APPEND(*p, ",disaggregated=(stepdown_write_mirroring=%s)",
+      GV(DISAGG_STEPDOWN_WRITE_MIRRORING) ? "true" : "false");
 }
 
 /*

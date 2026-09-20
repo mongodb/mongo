@@ -34,6 +34,10 @@ from wiredtiger import stat
 
 # Shared helpers for the layered async step-down test suite.
 class LayeredStepdownMixin:
+    # Whether leader writes in the step-down window are mirrored to stable.
+    def stable_has_step_down_writes(self):
+        return self.write_mirroring
+
     # Set the global oldest and stable timestamps.
     def set_global_ts(self, oldest, stable):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(oldest) +

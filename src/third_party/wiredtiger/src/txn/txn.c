@@ -1684,6 +1684,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     wt_timestamp_t step_down_ts;
     uint32_t prepare_count;
     bool wrote_ingest, wrote_stable;
+    bool mirroring;
 #endif
     u_int i;
     bool cannot_fail, locked, prepare, readonly, update_durable_ts;
@@ -1698,6 +1699,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     prepare_count = 0;
     step_down_ts = __wt_atomic_load_uint64_relaxed(&txn_global->step_down_timestamp);
     wrote_ingest = wrote_stable = false;
+    mirroring = F_ISSET(&conn->disaggregated_storage, WT_DISAGG_STEPDOWN_WRITE_MIRRORING);
 #endif
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
     recno = WT_RECNO_OOB;
@@ -1847,19 +1849,28 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 #ifdef HAVE_DIAGNOSTIC
         /*
-         * While the step-down timestamp is set, a committing transaction's layered content must sit
-         * on one side of the boundary: ingest content strictly above the timestamp, stable content
-         * at or below it, and never both constituents from one transaction.
+         * While the step-down timestamp is set, different invariants apply depending on whether
+         * mirroring is enabled.
+         *
+         * If mirroring is disabled, a committing transaction's layered content must sit on one side
+         * of the boundary: ingest content strictly above the timestamp, stable content at or below
+         * it, and never both constituents from one transaction.
+         *
+         * Otherwise, after the loop we verify that stable writes were mirrored to ingest.
          */
         if (step_down_ts != WT_TS_NONE && op->type != WT_TXN_OP_NONE && op->btree != NULL) {
             if (WT_URI_IS_INGEST(op->btree->dhandle->name)) {
                 wrote_ingest = true;
                 WT_ASSERT(session, txn->first_commit_timestamp > step_down_ts);
             } else if (WT_URI_IS_STABLE(op->btree->dhandle->name)) {
-                wrote_stable = true;
-                WT_ASSERT(session, txn->time_point.durable_timestamp <= step_down_ts);
+                if (!mirroring) {
+                    wrote_stable = true;
+                    WT_ASSERT(session, txn->time_point.durable_timestamp <= step_down_ts);
+                } else if (txn->time_point.durable_timestamp > step_down_ts)
+                    wrote_stable = true;
             }
-            WT_ASSERT(session, !(wrote_ingest && wrote_stable));
+            if (!mirroring)
+                WT_ASSERT(session, !(wrote_ingest && wrote_stable));
         }
 #endif
 
@@ -1876,6 +1887,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_DIAGNOSTIC
     WT_ASSERT(session, txn->prepare_count == prepare_count);
     txn->prepare_count = 0;
+
+    /*
+     * While the step-down timestamp is set, a transaction that wrote a stable constituent above the
+     * boundary must also have written an ingest constituent if mirroring writes.
+     */
+    if (mirroring)
+        WT_ASSERT(session, step_down_ts == WT_TS_NONE || !wrote_stable || wrote_ingest);
 #endif
 
     /* Add a 2 second wait to simulate commit transaction slowness. */

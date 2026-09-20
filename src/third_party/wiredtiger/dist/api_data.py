@@ -176,6 +176,10 @@ disaggregated_config_common = [
 ]
 # Disaggregated options accepted only at wiredtiger_open, never at reconfigure.
 connection_disaggregated_config_open = [
+    Config('stepdown_write_mirroring', 'false', r'''
+        mirror writes to both the stable and ingest constituents during the step-down
+        window to enable early cross-constituents write conflicts detection''',
+        type='boolean', undoc=True),
     Config('legacy_tombstone_encoding_break_glass', '', r'''
         break-glass override for whether values written to the stable table that begin with
         the reserved ingest tombstone marker are escaped on disk. Do not set this in normal

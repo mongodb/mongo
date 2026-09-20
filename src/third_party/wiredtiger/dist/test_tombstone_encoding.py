@@ -158,6 +158,19 @@ __clayered_encoder2(WT_CURSOR *cursor)
 }
 """, 1, contains="is not a")
 
+# A write-target comparison is a valid constituent decision.
+expect("encode with a write target decision", """
+static int
+__clayered_encoder_target(WT_CURSOR *cursor)
+{
+    WT_ITEM value, *buf;
+
+    WT_ERR(__clayered_deleted_encode(
+      session, &cursor->value, op->write_target == WTI_CLAYERED_WRITE_STABLE, &value, &buf));
+    return (0);
+}
+""", 0)
+
 # A well-formed encode with the table decision as its third argument is correct.
 expect("encode with a good decision argument", """
 static int
@@ -431,13 +444,17 @@ if cg_anchors != {"__clayered_deleted_encode"} or cg_chains != [
 
 def canned_callgraph(drop_anchor=None, drop_lines=(), extra=()):
     # A synthetic D1/D2 walk output: one standalone line per anchor, the golden caller edges, and
-    # the one required path that is longer than a single call.
+    # the required paths that are longer than a single call.
     _, anchors = ste.callgraph_args()
     lines = [f"{a}      (src/x.c)" for a in anchors if a != drop_anchor]
     for target, callers in sorted(ste.CALLGRAPH_GOLDEN_CALLERS.items()):
         lines += [f"{target} <- {c}" for c in sorted(callers)]
-    lines.append("__clayered_deleted_encode <- __clayered_modify_ingest <- __clayered_modify_int"
-                 " <- __clayered_modify")
+    lines.append("__clayered_deleted_encode <- __clayered_modify_ingest"
+                 " <- __clayered_modify_int <- __clayered_modify")
+    lines.append("__clayered_deleted_encode <- __clayered_modify_ingest"
+                 " <- __clayered_modify_both <- __clayered_modify_int <- __clayered_modify")
+    lines.append("__clayered_deleted_encode <- __clayered_put <- __clayered_insert")
+    lines.append("__clayered_deleted_encode <- __clayered_put <- __clayered_update")
     return "\n".join([l for l in lines if l not in drop_lines] + list(extra)) + "\n"
 
 
@@ -446,7 +463,8 @@ def canned_callgraph(drop_anchor=None, drop_lines=(), extra=()):
 PROMOTERS = sorted(
     ste.CALLGRAPH_GOLDEN_CALLERS[ste.DECODE_CURRENT_FN] | {"__clayered_insert"})
 STORERS = sorted(
-    {"__clayered_modify_ingest", "__clayered_modify_stable"} | set(ste.CALLGRAPH_ENCODE_EXEMPT))
+    {"__clayered_modify_both", "__clayered_modify_stable", "__clayered_modify_ingest"}
+    | set(ste.CALLGRAPH_ENCODE_EXEMPT))
 
 
 def canned_tagline(names, line):
@@ -482,15 +500,18 @@ expect_callgraph("callgraph clean graph", 0, main_out=canned_callgraph())
 
 # A missing anchor fails loudly, naming the function, and suppresses the follow-on noise.
 expect_callgraph("callgraph missing anchor", 1,
-    contains="__clayered_put() was not found",
-    main_out=canned_callgraph(drop_anchor="__clayered_put"))
+    contains="__clayered_put_constituent() was not found",
+    main_out=canned_callgraph(drop_anchor="__clayered_put_constituent"))
 
-# Severing the only path from the modify entry point to the encode helper is caught.
-expect_callgraph("callgraph severed reachability", 1,
+# Severing both paths from the modify entry point to the encode helper is caught. The body storer
+# finding is expected as well because the severed function no longer reaches the encoder.
+expect_callgraph("callgraph severed reachability", 2,
     contains="__clayered_modify() no longer reaches __clayered_deleted_encode()",
     main_out=canned_callgraph(drop_lines=(
-        "__clayered_deleted_encode <- __clayered_modify_ingest <- __clayered_modify_int"
-        " <- __clayered_modify",)))
+        "__clayered_deleted_encode <- __clayered_modify_ingest"
+        " <- __clayered_modify_int <- __clayered_modify",
+        "__clayered_deleted_encode <- __clayered_modify_ingest"
+        " <- __clayered_modify_both <- __clayered_modify_int <- __clayered_modify")))
 
 # A caller absent from the golden inventory is reported for review.
 expect_callgraph("callgraph new caller", 1,
@@ -499,8 +520,9 @@ expect_callgraph("callgraph new caller", 1,
 
 # A vanished caller is reported, alongside the reachability break it causes.
 expect_callgraph("callgraph vanished caller", 2,
-    contains="__clayered_update() no longer calls __clayered_deleted_encode() directly",
-    main_out=canned_callgraph(drop_lines=("__clayered_deleted_encode <- __clayered_update",)))
+    contains="__clayered_modify_stable() no longer calls __clayered_deleted_encode() directly",
+    main_out=canned_callgraph(drop_lines=(
+        "__clayered_deleted_encode <- __clayered_modify_stable",)))
 
 # The tagline contract: matching body lines are joined onto the function's standalone line ahead
 # of an empty parenthesized annotation.

@@ -52,10 +52,18 @@ class test_layered_async_stepdown08(
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     worlds = [
-      ('epoch', dict(use_epochs=True, conn_config=base + leader)),
-      ('legacy', dict(use_epochs=False, conn_config=base + leader)),
+      ('epoch', dict(use_epochs=True)),
+      ('legacy', dict(use_epochs=False)),
     ]
-    scenarios = make_scenarios(disagg_storages, worlds)
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    scenarios = make_scenarios(disagg_storages, worlds, write_modes)
+
+    def conn_config(self):
+        return self.base + self.leader + \
+            f',disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()})'
 
     def uri(self, name):
         return f'layered:{self.test_name}_{name}'
@@ -165,6 +173,25 @@ class test_layered_async_stepdown08(
         assert_both_sides()
         self.complete_step_down(self.cutoff_ts)
         assert_both_sides()
+
+    def test_existing_table_window_writes(self):
+        """Test writing to an existing table in the window in both epoch modes."""
+        self.setup_world()
+        uri, rows = self.create_with_rows('existing', 2)
+        self.publish_and_make_stable(uri, 20)
+
+        self.set_step_down_ts(self.cutoff_ts)
+        self.write_at(uri, {'window': 'window'}, 6)
+
+        expected = {**rows, 'window': 'window'}
+        self.assertEqual(self.read_kvs_at(uri, 7), expected)
+        expected_stable = expected if self.stable_has_step_down_writes() else rows
+        self.assertEqual(self.read_kvs_at(self.stable_uri(uri), 7), expected_stable)
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(uri), 7), {'window': 'window'})
+
+        self.complete_step_down(self.cutoff_ts)
+        self.assertEqual(self.read_kvs_at(uri, 7), expected)
+        self.assertEqual(self.read_kvs_at(self.stable_checkpoint_uri(uri), 7), rows)
 
     def create_tables_with_mixed_states(self):
         """

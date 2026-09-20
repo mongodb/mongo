@@ -39,10 +39,16 @@ from wtscenario import make_scenarios
 class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     test_name = __qualname__
 
@@ -152,8 +158,7 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(self.read_kvs_at(self.uri, 20), {'below': 'v', 'at': 'v'})
         self.assertEqual(self.read_kvs_at(self.uri, 21), {'below': 'v', 'at': 'v', 'above': 'v'})
 
-        # Ground truth: the content split exactly at the cutoff. A follower cannot open the
-        # live stable table, so read its checkpoint view.
+        # A follower cannot open the live stable table, so read its checkpoint view.
         self.assertEqual(self.read_keys_at(self.stable_checkpoint_uri(self.uri), 30), {'below', 'at'})
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 30), {'above'})
 
@@ -263,9 +268,9 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
 
         self.set_step_down_ts(20)
 
-        # Every key lives in ingest; the stable table was never written.
         self.write_at(self.uri, {'b': 'i', 'd': 'i'}, 30)
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40), set())
+        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 40),
+            {'b', 'd'} if self.stable_has_step_down_writes() else set())
 
         cursor = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(40))
@@ -287,6 +292,7 @@ class test_layered_async_stepdown07(LayeredStepdownMixin, wttest.WiredTigerTestC
         self.assertEqual(cursor.search_near(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
         cursor.close()
+        self.complete_step_down(20)
 
     # largest_key ignores visibility, so it reports a key from a transaction that has not committed.
     def test_largest_key_with_uncommitted_write(self):
@@ -432,10 +438,16 @@ _straddler_ops = [
 class test_layered_async_stepdown07_straddler_ops(LayeredStepdownMixin, wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages, _straddler_ops)
+    scenarios = make_scenarios(disagg_storages, _straddler_ops, write_modes)
 
     test_name = __qualname__
 
@@ -469,10 +481,16 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
                                                    wttest.WiredTigerTestCase):
     conn_base_config = \
         'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),precise_checkpoint=true,'
-    conn_config = conn_base_config + 'disaggregated=(role="leader")'
+    write_modes = [
+        ('mirrored', dict(write_mirroring=True)),
+        ('ingest_only', dict(write_mirroring=False)),
+    ]
+    def conn_config(self):
+        return self.conn_base_config + \
+            f'disaggregated=(stepdown_write_mirroring={str(self.write_mirroring).lower()},role="leader")'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, write_modes)
 
     test_name = __qualname__
 
@@ -565,7 +583,7 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
         self.complete_step_down(20)
 
     # A checkpoint taken while the cutoff is set, before stable reaches it, changes nothing for
-    # readers or for routing.
+    # readers or for ingest writes.
     def test_extra_checkpoint_while_cutoff_set(self):
         self.set_global_ts(1, 1)
         self.session.create(self.uri, 'key_format=S,value_format=S')
@@ -583,7 +601,8 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
         ckpt_session.checkpoint()
         ckpt_session.close()
 
-        # The checkpoint holds the stable half and nothing else.
+        # The checkpoint holds only the content committed at or below the stable timestamp, and
+        # nothing committed above it.
         ckpt_cursor = self.session.open_cursor(self.stable_uri(self.uri), None,
             'checkpoint=WiredTigerCheckpoint')
         checkpointed = {}
@@ -593,7 +612,9 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
         self.assertEqual(checkpointed, {'b': 's', 'd': 's'})
 
         self.assertEqual(self.read_kvs_at(self.uri, 50), before)
-        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 50), {'b', 'd'})
+        expected_stable = {'a', 'b', 'd', 'z'} if self.stable_has_step_down_writes() \
+            else {'b', 'd'}
+        self.assertEqual(self.read_keys_at(self.stable_uri(self.uri), 50), expected_stable)
         self.assertEqual(self.read_keys_at(self.ingest_uri(self.uri), 50), {'a', 'z'})
 
         # A write after that checkpoint still routes to ingest, and the step-down still completes.
@@ -602,3 +623,151 @@ class test_layered_async_stepdown07_write_conflicts(LayeredStepdownMixin,
         self.complete_step_down(30)
         self.assertEqual(self.read_kvs_at(self.uri, 50),
             {'b': 's', 'd': 's', 'a': 'i', 'z': 'i', 'y': 'i'})
+
+    # Two writers that both began after the cutoff collide trying to modify the same key.
+    def test_modify_conflict_leaves_ingest_alone(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.write_at(self.uri, {'k1': 'base'}, 10)
+
+        self.set_step_down_ts(20)
+
+        # Writer A holds an uncommitted modify of k1.
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
+        cursor.set_key('k1')
+        self.assertEqual(cursor.modify([wiredtiger.Modify('X', 0, 1)]), 0)
+
+        # Writer B's modify of the same key conflicts and is discarded. B wrote nothing else, so the
+        # transaction still commits (empty).
+        wsession = self.conn.open_session()
+        wcur = wsession.open_cursor(self.uri, None, None)
+        wsession.begin_transaction()
+        wcur.set_key('k1')
+        self.expect_conflict_rollback(lambda: wcur.modify([wiredtiger.Modify('Z', 0, 1)]))
+        wsession.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        wcur.close()
+        wsession.close()
+
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        cursor.close()
+
+        # A's modified value survives.
+        self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'Xase'})
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 40), {'k1': 'Xase'})
+        expected_stable = {'k1': 'Xase'} if self.stable_has_step_down_writes() else {'k1': 'base'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
+
+    # A step-down writer that writes a key cleanly, then conflicts on another, cannot commit: the
+    # conflict drops that write and the transaction must roll back, losing the clean write too.
+    def test_conflict_then_cannot_commit(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.write_at(self.uri, {'k1': 'base'}, 10)
+
+        self.set_step_down_ts(20)
+
+        # Writer A holds an uncommitted write of k1.
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
+        cursor['k1'] = 'a'
+
+        # Writer B writes k2 cleanly, then conflicts with A on k1.
+        wsession = self.conn.open_session()
+        wcur = wsession.open_cursor(self.uri, None, None)
+        wsession.begin_transaction()
+        wcur['k2'] = 'b'
+        wcur.set_key('k1')
+        wcur.set_value('b')
+        self.expect_conflict_rollback(wcur.update)
+
+        # B wrote k2 before the conflict, so the transaction has work to commit; the engine still
+        # refuses, so B must roll back and k2 is lost with the rest of the transaction.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wsession.commit_transaction('commit_timestamp=' + self.timestamp_str(30)),
+            '/transaction requires rollback/')
+        wsession.close()
+
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        cursor.close()
+
+        # B's k2 was discarded with the rolled-back transaction; A's k1 alone persists.
+        self.assertEqual(self.read_kvs_at(self.uri, 40), {'k1': 'a'})
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 40), {'k1': 'a'})
+        expected_stable = {'k1': 'a'} if self.stable_has_step_down_writes() else {'k1': 'base'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
+
+    # Two writers that both began after the cutoff collide on a remove of the same key.
+    def test_remove_conflict_both_after_cutoff(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.write_at(self.uri, {'k1': 'base'}, 10)
+
+        self.set_step_down_ts(20)
+
+        # Writer A holds an uncommitted remove of k1.
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
+        cursor.set_key('k1')
+        self.assertEqual(cursor.remove(), 0)
+
+        # Writer B's remove of the same key conflicts; it wrote nothing else, so its transaction
+        # still commits (empty).
+        wsession = self.conn.open_session()
+        wcur = wsession.open_cursor(self.uri, None, None)
+        wsession.begin_transaction()
+        wcur.set_key('k1')
+        self.expect_conflict_rollback(wcur.remove)
+        wsession.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        wcur.close()
+        wsession.close()
+
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        cursor.close()
+
+        # A's remove alone took effect, on both constituents.
+        self.assertEqual(self.read_kvs_at(self.uri, 40), {})
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 40), {'k1': '\x14'})
+        expected_stable = {} if self.stable_has_step_down_writes() else {'k1': 'base'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
+
+    # A remove leaves ingest holding the bare tombstone marker, and in mirrored mode the stable
+    # row is gone as well, so re-inserting the key has to succeed on both legs: a plain insert,
+    # and one with overwrite=false that must not report a duplicate.
+    def test_reinsert_after_remove(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.write_at(self.uri, {'k1': 'base', 'k2': 'base'}, 10)
+
+        self.set_step_down_ts(20)
+        self.remove_at(self.uri, ['k1', 'k2'], 30)
+
+        # A plain insert over one removed key.
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
+        cursor.set_key('k1')
+        cursor.set_value('again')
+        self.assertEqual(cursor.insert(), 0)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(31))
+        cursor.close()
+
+        # An overwrite=false insert over the other: ingest holds only the tombstone marker, which
+        # must not be reported as an existing value.
+        cursor = self.session.open_cursor(self.uri, None, 'overwrite=false')
+        self.session.begin_transaction()
+        cursor.set_key('k2')
+        cursor.set_value('again')
+        self.assertEqual(cursor.insert(), 0)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(32))
+        cursor.close()
+
+        expected = {'k1': 'again', 'k2': 'again'}
+        self.assertEqual(self.read_kvs_at(self.uri, 40), expected)
+        self.assertEqual(self.read_kvs_at(self.ingest_uri(self.uri), 40), expected)
+        expected_stable = expected if self.stable_has_step_down_writes() \
+            else {'k1': 'base', 'k2': 'base'}
+        self.assertEqual(self.read_kvs_at(self.stable_uri(self.uri), 40), expected_stable)
+        self.complete_step_down(20)
