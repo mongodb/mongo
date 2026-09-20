@@ -179,6 +179,9 @@ teams:
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<!subteam^S0AK685U9TK>" # @rss-repl-triage - Leads + triagers
+    thresholds: # this accounts for the combination of RSSD and Replication
+      hot: 6
+      cold: 6
   - name: "Storage Engines"
     slack_tags:
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
