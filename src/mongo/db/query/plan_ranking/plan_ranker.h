@@ -5,6 +5,7 @@
 
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -16,7 +17,7 @@ namespace plan_ranking {
 
 struct RankingContext {
     QuerySolutionVector solutions;
-    StringSet topLevelSampleFieldNames = {};
+    ce::TopLevelSampleFields topLevelSampleFieldNames = ce::TopLevelSampleFields::allFields();
     bool hasRelevantMultikeyIndex = false;
 };
 

@@ -158,7 +158,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     //  CanonicalQuery.
     //  2. Extract the fields of the relevant indexes for each branch of the rooted $or by passing
     //  in the pointer to 'topLevelSampleFieldNames' to planSubqueries().
-    StringSet topLevelSampleFieldNames;
+    auto topLevelSampleFieldNames = ce::TopLevelSampleFields::allFields();
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
     if (cbrEnabled) {
@@ -181,22 +181,15 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
     // Run the plan enumerator for each of the $or branches thus enumerating all plans for each
     // $or branch.
-    auto subplanningStatus = samplingEstimator
-        ? QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
-                                       getSolutionCachedData,
-                                       collection(),
-                                       *_query,
-                                       plannerParams,
-                                       samplingEstimator.get(),
-                                       exactCardinality.get(),
-                                       topLevelSampleFieldNames)
-        : QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
-                                       getSolutionCachedData,
-                                       collection(),
-                                       *_query,
-                                       plannerParams,
-                                       samplingEstimator.get(),
-                                       exactCardinality.get());
+    auto subplanningStatus =
+        QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
+                                     getSolutionCachedData,
+                                     collection(),
+                                     *_query,
+                                     plannerParams,
+                                     samplingEstimator.get(),
+                                     exactCardinality.get(),
+                                     topLevelSampleFieldNames.relevantIndexOutput());
 
 
     // If the plan ranker is cost-based, plan each branch of the $or using the respective
@@ -212,9 +205,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             // TODO: SERVER-119839 This generates a sample even for trivial queries.
             // The subplanner should use the CBRPlanRankingStrategy instead.
             samplingEstimator->generateSample(
-                topLevelSampleFieldNames.empty()
-                    ? ce::ProjectionParams{ce::NoProjection{}}
-                    : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+                std::move(topLevelSampleFieldNames).toProjectionParams());
         }
 
         for (const auto& branchResult : subplanningStatus.getValue().branches) {

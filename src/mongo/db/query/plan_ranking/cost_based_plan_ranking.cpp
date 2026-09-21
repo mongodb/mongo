@@ -107,7 +107,7 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                              QueryPlannerParams& plannerParams,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              const MultipleCollectionAccessor& collections,
-                                             StringSet topLevelSampleFieldNames,
+                                             ce::TopLevelSampleFields topLevelSampleFieldNames,
                                              bool hasRelevantMultikeyIndex,
                                              PlanRankerReason reasonIfChoseWinner) {
     // Multiplanning has already consumed the solutions; re-enumerate them.

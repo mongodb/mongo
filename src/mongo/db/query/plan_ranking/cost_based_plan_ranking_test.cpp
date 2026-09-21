@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
+#include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
@@ -43,7 +45,7 @@ StatusWith<PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& str
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query,
                            *plannerData.plannerParams,
-                           topLevelSampleFieldNames,
+                           topLevelSampleFieldNames.relevantIndexOutput(),
                            boost::optional<bool&>(hasRelevantMultikeyIndex));
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus();
@@ -102,6 +104,27 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneEarlyExitsWhenBatchFilled) {
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     // The multi-planner picked the winner, so the strategy must be recorded on the result.
     ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
+}
+
+// Exercises a bug where the sampling estimator would only sample fields referenced directly by the
+// MatchExpression even though it contains a predicate that needs the whole document (see
+// SERVER-134526).
+TEST_F(CostBasedPlanRankingTest, WholeDocumentFilterIsEstimatedOnWholeDocuments) {
+    insertNDocuments(200);  // {_id:i, a:i, b:i, c:i}
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] = createCQAndPlannerData(
+        colls, fromjson("{a: {$gte: 0}, $expr: {$eq: [{$size: {$objectToArray: '$$ROOT'}}, 4]}}"));
+    plannerData.plannerParams = makePlannerParams(indices, 200);
+
+    plan_ranking::CBRPlanRankingStrategy strategy;
+    auto status = planAndRank(strategy, plannerData);
+    ASSERT_OK(status.getStatus());
+    const auto& result = status.getValue();
+    ASSERT_EQ(result.solutions.size(), 1);
+
+    const auto& estimates = result.maybeExplainData->estimates;
+    ASSERT_EQ(200.0, estimates.at(result.solutions.front()->root())->outCE.toDouble());
 }
 
 }  // namespace

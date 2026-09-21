@@ -73,7 +73,7 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query,
                            plannerParams,
-                           rctx.topLevelSampleFieldNames,
+                           rctx.topLevelSampleFieldNames.relevantIndexOutput(),
                            boost::optional<bool&>(rctx.hasRelevantMultikeyIndex));
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(

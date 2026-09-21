@@ -134,13 +134,10 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     auto topLevelSampleFieldNames =
         ce::extractTopLevelFieldsFromMatchExpression(cq->getPrimaryMatchExpression());
     auto statusWithMultiPlanSolns =
-        QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames);
+        QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames.relevantIndexOutput());
 
     Timer generateSampleTimer;
-    samplingEstimator->generateSample(
-        topLevelSampleFieldNames.empty()
-            ? ce::ProjectionParams{ce::NoProjection{}}
-            : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+    samplingEstimator->generateSample(std::move(topLevelSampleFieldNames).toProjectionParams());
     double generateSampleTimeMS = generateSampleTimer.elapsed().count() / 1000.0;
 
     Timer planningTimer;

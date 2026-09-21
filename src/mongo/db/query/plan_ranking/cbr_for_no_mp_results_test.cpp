@@ -56,7 +56,7 @@ StatusWith<PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& str
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query,
                            plannerParams,
-                           topLevelSampleFieldNames,
+                           topLevelSampleFieldNames.relevantIndexOutput(),
                            boost::optional<bool&>(hasRelevantMultikeyIndex));
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(

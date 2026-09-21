@@ -23,9 +23,57 @@
 
 namespace mongo::ce {
 /**
+ * Represents the top-level fields that must be present in a sample.
+ */
+class TopLevelSampleFields {
+public:
+    /**
+     * Creates a set that represents all fields.
+     */
+    static TopLevelSampleFields allFields() {
+        return {};
+    }
+
+    explicit TopLevelSampleFields(StringSet fieldNames) : _fieldNames(std::move(fieldNames)) {}
+
+    bool needsAllFields() const {
+        return _fieldNames == kAllFields;
+    }
+
+    /**
+     * Only valid when not all fields are needed.
+     */
+    const StringSet& fieldNames() const;
+
+    /**
+     * Adds the fields of 'other' to 'this'. If either side needs all fields, marks 'this' as
+     * needing all fields.
+     */
+    void merge(TopLevelSampleFields other);
+
+    /**
+     * Helper to construct relevant indexes for the query planner.
+     */
+    boost::optional<StringSet&> relevantIndexOutput();
+
+    /**
+     * Helper to construct projection params from these top level fields.
+     */
+    ProjectionParams toProjectionParams() &&;
+
+private:
+    // boost::none denotes that all fields are needed.
+    static inline const boost::optional<StringSet> kAllFields = boost::none;
+
+    TopLevelSampleFields() = default;
+
+    boost::optional<StringSet> _fieldNames = kAllFields;
+};
+
+/**
  * Helper function to extract the top level fields from a given MatchExpression.
  */
-StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
+TopLevelSampleFields extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
 
 /**
  * The canonically (lexicographically) sorted field paths a persisted NDV statistic describes.

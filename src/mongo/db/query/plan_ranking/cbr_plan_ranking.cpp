@@ -94,7 +94,7 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const MultipleCollectionAccessor& collections,
     QuerySolutionVector solutions,
-    StringSet topLevelSampleFieldNames,
+    ce::TopLevelSampleFields topLevelSampleFieldNames,
     bool hasRelevantMultikeyIndex) const {
     using namespace cost_based_ranker;
 
@@ -117,9 +117,8 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     }
 
     if (ceMode == QueryCBRCEModeEnum::kSamplingCE) {
-        auto meTopLevelFields =
-            ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
-        topLevelSampleFieldNames.merge(meTopLevelFields);
+        topLevelSampleFieldNames.merge(
+            ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression()));
     }
 
     // Start timer for server status metrics
@@ -150,10 +149,7 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         // If we do not have any fields that we want to sample then we just include all the
         // fields in the sample. This can occur for primary match expressions which are
         // not trivially estimable yet have no top-level fields (eg. $geoNear or $expr).
-        samplingEstimator->generateSample(
-            topLevelSampleFieldNames.empty()
-                ? ce::ProjectionParams{ce::NoProjection{}}
-                : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+        samplingEstimator->generateSample(std::move(topLevelSampleFieldNames).toProjectionParams());
 
         auto samplingDurationMicros =
             tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startSamplingTicks);

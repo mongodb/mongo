@@ -92,7 +92,11 @@ void validateTopLevelSampleFieldNames(const StringSet& topLevelSampleFieldNames)
 void checkSampleContainsMatchExpressionFields(const StringSet& topLevelSampleFieldNames,
                                               const MatchExpression* expr) {
     const auto matchExpressionFields = extractTopLevelFieldsFromMatchExpression(expr);
-    for (const auto& matchField : matchExpressionFields) {
+    tassert(13452601,
+            "MatchExpression needs the whole document but the sample doesn't contain all fields",
+            !matchExpressionFields.needsAllFields());
+
+    for (const auto& matchField : matchExpressionFields.fieldNames()) {
         tassert(10670301,
                 "MatchExpression contains fields not present in topLevelSampleFieldNames. "
                 "MatchExpression: " +
@@ -282,15 +286,43 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
 }
 }  // namespace
 
-StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr) {
+TopLevelSampleFields extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr) {
     DepsTracker deps;
     dependency_analysis::addDependencies(expr, &deps);
+    if (deps.needWholeDocument) {
+        return TopLevelSampleFields::allFields();
+    }
+
     StringSet topLevelFieldsSet;
     for (auto&& path : deps.fields) {
         const auto field = stage_builder::getTopLevelField(path);
         topLevelFieldsSet.emplace(std::string(field));
     }
-    return topLevelFieldsSet;
+    return TopLevelSampleFields{std::move(topLevelFieldsSet)};
+}
+
+const StringSet& TopLevelSampleFields::fieldNames() const {
+    tassert(13452602, "All fields are needed", !needsAllFields());
+    return _fieldNames.value();
+}
+
+void TopLevelSampleFields::merge(TopLevelSampleFields other) {
+    if (needsAllFields() || other.needsAllFields()) {
+        _fieldNames = kAllFields;
+    } else {
+        _fieldNames->merge(other._fieldNames.value());
+    }
+}
+
+boost::optional<StringSet&> TopLevelSampleFields::relevantIndexOutput() {
+    return !needsAllFields() ? boost::optional<StringSet&>(_fieldNames.value()) : boost::none;
+}
+
+ProjectionParams TopLevelSampleFields::toProjectionParams() && {
+    if (needsAllFields() || _fieldNames->empty()) {
+        return NoProjection{};
+    }
+    return TopLevelFieldsProjection{std::move(_fieldNames.value())};
 }
 
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(

@@ -28,7 +28,7 @@ public:
                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
                                             const MultipleCollectionAccessor& collections,
                                             QuerySolutionVector solutions,
-                                            StringSet topLevelSampleFieldNames,
+                                            ce::TopLevelSampleFields topLevelSampleFieldNames,
                                             bool hasRelevantMultikeyIndex) const;
 };
 
@@ -37,7 +37,7 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                              QueryPlannerParams& plannerParams,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              const MultipleCollectionAccessor& collections,
-                                             StringSet topLevelSampleFieldNames,
+                                             ce::TopLevelSampleFields topLevelSampleFieldNames,
                                              bool hasRelevantMultikeyIndex,
                                              PlanRankerReason reasonIfChoseWinner);
 

@@ -1237,8 +1237,8 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionDottedPath
     // Expect only top level fields, a and b to be included.
     std::set<std::string> expectedFields{"a", "b"};
 
-    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
-    for (const auto& topLevelField : topLevelFields) {
+    ASSERT_EQUALS(topLevelFields.fieldNames().size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields.fieldNames()) {
         ASSERT_TRUE(expectedFields.contains(topLevelField));
     }
 }
@@ -1250,8 +1250,8 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionRootedOr) 
 
     std::set<std::string> expectedFields{"a", "b", "c"};
 
-    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
-    for (const auto& topLevelField : topLevelFields) {
+    ASSERT_EQUALS(topLevelFields.fieldNames().size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields.fieldNames()) {
         ASSERT_TRUE(expectedFields.contains(topLevelField));
     }
 }
@@ -1262,8 +1262,8 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionDuplicateF
     auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
 
     // Duplicate field names should not be included.
-    ASSERT_EQUALS(topLevelFields.size(), 1);
-    ASSERT_EQUALS(*topLevelFields.begin(), "a"sv);
+    ASSERT_EQUALS(topLevelFields.fieldNames().size(), 1);
+    ASSERT_EQUALS(*topLevelFields.fieldNames().begin(), "a"sv);
 }
 
 TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionNestedAndOr) {
@@ -1272,10 +1272,60 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionNestedAndO
     auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
     std::set<std::string> expectedFields{"a", "b", "c", "d"};
 
-    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
-    for (const auto& topLevelField : topLevelFields) {
+    ASSERT_EQUALS(topLevelFields.fieldNames().size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields.fieldNames()) {
         ASSERT_TRUE(expectedFields.contains(topLevelField));
     }
+}
+
+TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionWholeDocument) {
+    auto filter = fromjson("{a: 1, $expr: {$eq: [{$type: '$$ROOT'}, 'object']}}");
+    auto expr = parse(filter);
+    ASSERT_TRUE(ce::extractTopLevelFieldsFromMatchExpression(expr.get()).needsAllFields());
+}
+
+TEST(TopLevelSampleFieldsTest, FieldNamesAreKeptUnlessAllFieldsAreNeeded) {
+    ce::TopLevelSampleFields fields{StringSet{"a", "b"}};
+    ASSERT_FALSE(fields.needsAllFields());
+    ASSERT_EQ(fields.fieldNames(), (StringSet{"a", "b"}));
+
+    ASSERT_TRUE(ce::TopLevelSampleFields::allFields().needsAllFields());
+}
+
+TEST(TopLevelSampleFieldsTest, MergeUnionsFieldNames) {
+    ce::TopLevelSampleFields fields{StringSet{"a", "b"}};
+    fields.merge(ce::TopLevelSampleFields{StringSet{"b", "c"}});
+    ASSERT_EQ(fields.fieldNames(), (StringSet{"a", "b", "c"}));
+}
+
+TEST(TopLevelSampleFieldsTest, MergeNeedsAllFieldsIfEitherSideDoes) {
+    ce::TopLevelSampleFields fields{StringSet{"a"}};
+    fields.merge(ce::TopLevelSampleFields::allFields());
+    ASSERT_TRUE(fields.needsAllFields());
+    fields.merge(ce::TopLevelSampleFields{StringSet{"b"}});
+    ASSERT_TRUE(fields.needsAllFields());
+}
+
+TEST(TopLevelSampleFieldsTest, RelevantIndexOutputWritesThroughToFieldNames) {
+    ce::TopLevelSampleFields fields{StringSet{"a"}};
+    auto out = fields.relevantIndexOutput();
+    ASSERT_TRUE(out.has_value());
+    out->insert("b");
+    ASSERT_EQ(fields.fieldNames(), (StringSet{"a", "b"}));
+    ASSERT_FALSE(ce::TopLevelSampleFields::allFields().relevantIndexOutput().has_value());
+}
+
+TEST(TopLevelSampleFieldsTest, ToProjectionParamsProjectsOnlyNonEmptyFieldNames) {
+    auto projection = ce::TopLevelSampleFields{StringSet{"a", "b"}}.toProjectionParams();
+    ASSERT_EQ(std::get<ce::TopLevelFieldsProjection>(projection), (StringSet{"a", "b"}));
+    ASSERT_TRUE(std::holds_alternative<ce::NoProjection>(
+        ce::TopLevelSampleFields{StringSet{}}.toProjectionParams()));
+    ASSERT_TRUE(std::holds_alternative<ce::NoProjection>(
+        ce::TopLevelSampleFields::allFields().toProjectionParams()));
+}
+
+DEATH_TEST(TopLevelSampleFieldsDeathTest, FieldNamesOfAllFieldsIsInvalid, "13452602") {
+    ce::TopLevelSampleFields::allFields().fieldNames();
 }
 
 using SamplingEstimatorTestDeathTest = SamplingEstimatorTest;
