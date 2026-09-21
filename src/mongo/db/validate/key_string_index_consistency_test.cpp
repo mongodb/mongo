@@ -474,6 +474,102 @@ TEST_F(KeyStringIndexConsistencyTest, GeoKeygenFailuresCollapseAcrossDocuments) 
     EXPECT_THAT(*errors.begin(), HasSubstr("at path loc"));
 }
 
+TEST_F(KeyStringIndexConsistencyTest, MultikeyDocErrorsCollapseAcrossDocuments) {
+    // The "not multikey but document has multikey data" error omits per-document content
+    // (RecordId, _id) so that documents failing this check on the same index collapse to a single
+    // error, keeping res.errors bounded by the number of indexes rather than the number of bad
+    // documents (see SERVER-134574).
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto indexName{"a_1"sv};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx,
+            collWriter,
+            BSON("name" << indexName << "v" << int(IndexConfig::kLatestIndexVersion) << "key"
+                        << BSON("a" << 1))));
+        wuow.commit();
+    }
+
+    const auto* index = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT_FALSE(index->isMultikey(opCtx, *coll));
+
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    ASSERT_OK(state.initializeCollection(opCtx));
+    state.initializeCursors(opCtx);
+    ValidateResults results;
+    KeyStringIndexConsistency ksic(opCtx, &state);
+
+    // Two distinct documents whose "a" field is an array, so both individually should mark the
+    // index as multikey even though it is not currently marked as such.
+    ksic.traverseRecord(
+        opCtx, *coll, index, RecordId(1), BSON("a" << BSON_ARRAY(1 << 2)), &results);
+    ksic.traverseRecord(
+        opCtx, *coll, index, RecordId(2), BSON("a" << BSON_ARRAY(3 << 4)), &results);
+
+    using testing::HasSubstr;
+
+    const auto& errors = results.getIndexValidateResult(std::string{indexName}).getErrors();
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_THAT(*errors.begin(), HasSubstr("is not multikey"));
+    EXPECT_THAT(*errors.begin(), HasSubstr("7556100"));
+}
+
+TEST_F(KeyStringIndexConsistencyTest, MultikeyPathCoverageErrorsCollapseAcrossDocuments) {
+    // The "multikey paths do not cover" error likewise omits per-document content, so documents
+    // whose multikey paths the index's recorded multikey paths do not cover collapse to a single
+    // error per index rather than one per document (see SERVER-134574).
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto indexName{"ab_1"sv};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx,
+            collWriter,
+            BSON("name" << indexName << "v" << int(IndexConfig::kLatestIndexVersion) << "key"
+                        << BSON("a" << 1 << "b" << 1))));
+        // Marks the index multikey with recorded paths covering only "a".
+        ASSERT_OK(Helpers::insert(
+            opCtx, writer.get(), BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1)));
+        wuow.commit();
+    }
+
+    const auto* index = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT_TRUE(index->isMultikey(opCtx, *coll));
+
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    ASSERT_OK(state.initializeCollection(opCtx));
+    state.initializeCursors(opCtx);
+    ValidateResults results;
+    KeyStringIndexConsistency ksic(opCtx, &state);
+
+    // Two distinct documents whose multikey path is "b" rather than "a", which the index's
+    // recorded multikey paths do not cover.
+    ksic.traverseRecord(
+        opCtx, *coll, index, RecordId(1), BSON("a" << 1 << "b" << BSON_ARRAY(3 << 4)), &results);
+    ksic.traverseRecord(
+        opCtx, *coll, index, RecordId(2), BSON("a" << 1 << "b" << BSON_ARRAY(5 << 6)), &results);
+
+    using testing::HasSubstr;
+
+    const auto& errors = results.getIndexValidateResult(std::string{indexName}).getErrors();
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_THAT(*errors.begin(), HasSubstr("multikey paths do not cover"));
+    EXPECT_THAT(*errors.begin(), HasSubstr("7556100"));
+}
+
 // Splitting the record-store scan into disjoint slices and merging the per-slice
 // KeyStringIndexConsistency objects must reproduce a single serial scan, regardless of merge order.
 // This is the property that lets the scan be parallelized: the first-phase bucket counts are an

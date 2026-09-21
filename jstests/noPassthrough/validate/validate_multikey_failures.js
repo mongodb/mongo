@@ -44,7 +44,7 @@ assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
 assert(res.indexDetails["a.b_1"].errors[0].startsWith("Index a.b_1 is not multikey"));
-assert(res.indexDetails["a.b_1"].errors[0].includes("2 key(s)"));
+assert(res.indexDetails["a.b_1"].errors[0].includes("log id 7556100"));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556100, {"indexName": "a.b_1"}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"a.b": 1}}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"a.b": 2}}, 1));
@@ -59,7 +59,7 @@ assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
 assert(res.indexDetails["a.b_1"].errors[0].startsWith("Index a.b_1 is not multikey"));
-assert(res.indexDetails["a.b_1"].errors[0].includes("1 key(s)"));
+assert(res.indexDetails["a.b_1"].errors[0].includes("log id 7556100"));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556100, {"indexName": "a.b_1"}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"a.b": 3}}, 1));
 
@@ -73,11 +73,8 @@ res = coll.validate({fixMultikey: true});
 assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
-assert(
-    res.indexDetails["a.b_1"].errors[0].startsWith(
-        "Index a.b_1 multikey paths do not cover a document",
-    ),
-);
+assert(res.indexDetails["a.b_1"].errors[0].startsWith("Index a.b_1 multikey paths do not cover"));
+assert(res.indexDetails["a.b_1"].errors[0].includes("log id 7556100"));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556100, {"indexName": "a.b_1"}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"a.b": 6}}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 5367500, {"index": "a.b_1"}, 1));

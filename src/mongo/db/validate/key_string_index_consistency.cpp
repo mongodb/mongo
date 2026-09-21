@@ -1001,9 +1001,13 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                                        {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
                                        *documentMultikeyPaths);
 
+    // Logs the offending document and each of its index keys. The errors added to 'results' below
+    // deliberately omit per-document content (RecordId and _id) so that inconsistencies on the same
+    // index collapse to a single entry, keeping res.errors bounded by the number of indexes rather
+    // than the number of bad documents. The per-document detail lives here in the logs instead.
     auto printMultikeyMetadata = [&]() {
         LOGV2(7556100,
-              "Index is not multikey but document has multikey data",
+              "Index has a multikey inconsistency with a document",
               "indexName"_attr = descriptor->indexName(),
               "recordId"_attr = recordId,
               "record"_attr = redact(recordBson));
@@ -1038,13 +1042,9 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
             auto& curRecordResults = results->getIndexValidateResult(descriptor->indexName());
             const std::string msg = fmt::format(
-                "Index {} is not multikey but document with RecordId({}) and {} has multikey "
-                "data, "
-                "{} key(s)",
-                descriptor->indexName(),
-                recordId.toString(),
-                recordBson.getField("_id").toString(),
-                documentKeySet->size());
+                "Index {} is not multikey but has one or more documents with multikey data; see "
+                "log id 7556100 for the affected documents",
+                descriptor->indexName());
             curRecordResults.addError(msg, false);
             if (crashOnMultikeyValidateFailure.shouldFail()) {
                 invariant(false, msg);
@@ -1072,11 +1072,10 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                 printMultikeyMetadata();
 
                 const std::string msg = fmt::format(
-                    "Index {} multikey paths do not cover a document with RecordId({}) and {}. "
-                    "Rerun with {{fixMultikey: true}} if not already set. ",
-                    descriptor->indexName(),
-                    recordId.toString(),
-                    recordBson.getField("_id").toString());
+                    "Index {} multikey paths do not cover one or more documents with multikey "
+                    "data; see log id 7556100 for the affected documents. Rerun with "
+                    "{{fixMultikey: true}} if not already set.",
+                    descriptor->indexName());
                 auto& curRecordResults = results->getIndexValidateResult(descriptor->indexName());
                 curRecordResults.addError(msg, false);
             }
