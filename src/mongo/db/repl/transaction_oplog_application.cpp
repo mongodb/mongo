@@ -82,6 +82,8 @@ MONGO_FAIL_POINT_DEFINE(applyPrepareTxnOpsFailsWithWriteConflict);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOutForApplyPrepare);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint);
+
 class ScopedSetTxnInfoOnOperationContext {
 public:
     ScopedSetTxnInfoOnOperationContext(OperationContext* opCtx,
@@ -984,6 +986,14 @@ std::vector<Timestamp> getUnmatchedTxnPrepareTimestampsForLog(
 void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) try {
     LOGV2(11535500, "Recovering prepared transactions from precise checkpoint");
 
+    if (MONGO_unlikely(
+            hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint.shouldFail())) {
+        LOGV2(11535503,
+              "Hanging due to hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint fail "
+              "point");
+        hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint.pauseWhileSet(opCtx);
+    }
+
     // Find all transactions left in prepare according to the transaction table.
     ExpectedTxnMap expectedTransactions;
     _forEachTransactionTablePreparedTransaction(
@@ -1054,6 +1064,12 @@ void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) t
                     "processedPreparedIdTimestamps"_attr = processedPrepareTimestamps);
     }
 } catch (DBException& ex) {
+    if (ErrorCodes::isShutdownError(ex.code())) {
+        LOGV2(11615300,
+              "Interrupted at shutdown while recovering prepared transactions from checkpoint.",
+              "reason"_attr = ex.toStatus());
+        throw;
+    }
     LOGV2_FATAL(11372902,
                 "Exception while recovering prepared transactions from checkpoint.",
                 "reason"_attr = ex.toStatus());

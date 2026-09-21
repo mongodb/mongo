@@ -35,6 +35,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -8429,6 +8430,19 @@ TEST_F(TxnParticipantStartupRecoveryTest, CanRecoverPreparedInternalTxnFromSessi
 
     // We should have stashed in the "secondary" style and released the locks taken above.
     ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
+}
+
+TEST_F(TxnParticipantStartupRecoveryTest,
+       RecoverPreparedTransactionsFromPreciseCheckpointThrowsOnShutdown) {
+    setUpPreparedTransaction(_sessionId, _txnNumber);
+
+    // Simulate a shutdown racing with recovery: the opCtx is killed before recovery gets a
+    // chance to run. This must throw the interruption rather than crash.
+    opCtx()->markKilled(ErrorCodes::InterruptedAtShutdown);
+
+    ASSERT_THROWS_CODE(recoverPreparedTransactionsFromPreciseCheckpoint(opCtx()),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
 }
 
 using TxnParticipantStartupRecoveryDeathTest = TxnParticipantStartupRecoveryTest;
