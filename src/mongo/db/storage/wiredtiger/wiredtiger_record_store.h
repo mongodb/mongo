@@ -478,7 +478,13 @@ private:
 
     void _handleTruncateAfter(WiredTigerRecoveryUnit&, const RecordId& lastKeptId) override;
 
-    StatusWith<Timestamp> _readEarliestTimestamp(RecoveryUnit&);
+    // A non-null 'after' bounds the search, so the cursor descends to the leaf holding 'after'
+    // instead of stepping over every page an earlier truncate deleted but has not yet reclaimed.
+    StatusWith<Timestamp> _readEarliestTimestamp(RecoveryUnit&, const RecordId& after);
+
+    // The earliest record only ever moves forward within a process lifetime, so a value read
+    // through an older snapshot must not replace a newer cached one.
+    void _advanceCachedEarliestTimestamp(Timestamp ts);
 
     Atomic<int64_t> _maxSize;
     Atomic<uint64_t> _cachedEarliestTimestamp{0};

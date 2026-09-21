@@ -749,8 +749,9 @@ public:
     virtual StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) = 0;
 
     /**
-     * Returns the last value successfully returned by getEarliestTimestamp(), or an empty
-     * Timestamp if getEarliestTimestamp() has not yet succeeded. Never performs storage I/O.
+     * Returns the newest value observed for this record store's earliest timestamp, from
+     * getEarliestTimestamp() or a truncation's commit-time refresh, or an empty Timestamp if
+     * none has been observed. The value never moves backward. Never performs storage I/O.
      */
     virtual Timestamp getCachedEarliestTimestamp() const = 0;
 };

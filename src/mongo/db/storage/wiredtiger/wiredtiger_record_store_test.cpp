@@ -810,11 +810,13 @@ TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestamp) {
         txn.commit();
         return ts;
     }();
-    {
+    Timestamp ts3 = [&] {
         StorageWriteTransaction txn(ru);
-        oplogOrderInsertOplog(op.get(), engine, rs, 3);
+        auto rid3 = oplogOrderInsertOplog(op.get(), engine, rs, 3);
+        Timestamp ts(static_cast<unsigned long long>(rid3.getLong()));
         txn.commit();
-    }
+        return ts;
+    }();
 
     // Cache starts null; getEarliestTimestamp() populates it.
     ASSERT_TRUE(wtRS->getCachedEarliestTimestamp().isNull());
@@ -838,6 +840,121 @@ TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestamp) {
         txn.abort();
     }
     ASSERT_EQ(ts2, wtRS->getCachedEarliestTimestamp());
+
+    // Truncation applied while replaying another node's writes (e.g. on standby) must update the
+    // cache.
+    {
+        repl::UnreplicatedWritesBlock writesNotReplicated(op.get());
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(wtRS->rangeTruncate(op.get(), ru, RecordId(), rid2, 0, -1));
+        txn.commit();
+    }
+    ASSERT_EQ(ts3, wtRS->getCachedEarliestTimestamp());
+}
+
+TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestampNeverMovesBackward) {
+    // A caller reading through a snapshot that predates a truncation sees the oplog as it was, and
+    // its read returns a timestamp that is no longer the front. The cache must refuse that value.
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    auto rs = &harnessHelper->oplogRecordStore();
+    auto engine = harnessHelper->getEngine();
+
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs);
+
+    ServiceContext::UniqueOperationContext opA(harnessHelper->newOperationContext());
+    auto& ruA = *shard_role_details::getRecoveryUnit(opA.get());
+
+    RecordId rid1;
+    Timestamp ts1 = [&] {
+        StorageWriteTransaction txn(ruA);
+        rid1 = oplogOrderInsertOplog(opA.get(), engine, rs, 1);
+        Timestamp ts(static_cast<unsigned long long>(rid1.getLong()));
+        txn.commit();
+        return ts;
+    }();
+    Timestamp ts2 = [&] {
+        StorageWriteTransaction txn(ruA);
+        auto rid2 = oplogOrderInsertOplog(opA.get(), engine, rs, 2);
+        Timestamp ts(static_cast<unsigned long long>(rid2.getLong()));
+        txn.commit();
+        return ts;
+    }();
+
+    // Hold a read snapshot on this operation context that predates the truncate below.
+    {
+        auto rawCursor = wtRS->getRawCursor(opA.get(), ruA, true);
+        ASSERT_TRUE(rawCursor->next().has_value());
+    }
+
+    // A second client truncates records the held snapshot can still see.
+    auto clientB = harnessHelper->serviceContext()->getService()->makeClient("truncate-client");
+    auto opB = harnessHelper->newOperationContext(clientB.get());
+    auto& ruB = *shard_role_details::getRecoveryUnit(opB.get());
+    {
+        StorageWriteTransaction txn(ruB);
+        ASSERT_OK(wtRS->rangeTruncate(opB.get(), ruB, RecordId(), rid1, 0, -1));
+        txn.commit();
+    }
+    ASSERT_EQ(ts2, wtRS->getCachedEarliestTimestamp());
+
+    // The stale reader still sees the old front through its snapshot, but the cache must keep the
+    // newer value.
+    auto swStale = wtRS->getEarliestTimestamp(ruA);
+    ASSERT_OK(swStale);
+    ASSERT_EQ(swStale.getValue(), ts1);
+    ASSERT_EQ(wtRS->getCachedEarliestTimestamp(), ts2);
+}
+
+TEST(WiredTigerRecordStoreTest, CachedEarliestOplogTimestampRefreshUsesABoundedCursor) {
+    // The cache refresh must read starting just past the removed range instead of from the very
+    // beginning of the table, so that its cost does not grow with the number of pages earlier
+    // truncates deleted but have not yet reclaimed.
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    auto rs = &harnessHelper->oplogRecordStore();
+    auto engine = harnessHelper->getEngine();
+
+    auto wtRS = checked_cast<WiredTigerRecordStore::Oplog*>(rs);
+
+    ServiceContext::UniqueOperationContext op(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(op.get());
+    auto wtRu = WiredTigerRecoveryUnit::get(&ru);
+
+    const int kNumRecords = 200;
+    RecordId lastTruncated;
+    for (int i = 1; i <= kNumRecords; i++) {
+        StorageWriteTransaction txn(ru);
+        lastTruncated = oplogOrderInsertOplog(op.get(), engine, rs, i);
+        txn.commit();
+    }
+    {
+        // The truncate range must leave at least one record behind.
+        StorageWriteTransaction txn(ru);
+        oplogOrderInsertOplog(op.get(), engine, rs, kNumRecords + 1);
+        txn.commit();
+    }
+
+    const std::string statsUri = "statistics:" + wtRS->getURI();
+    auto readStat = [&](int key) {
+        auto sw = WiredTigerUtil::getStatisticsValue(
+            *wtRu->getSessionNoTxn(), statsUri, "statistics=(fast)", key);
+        ASSERT_OK(sw);
+        return sw.getValue();
+    };
+
+    auto boundedNextsBefore = readStat(WT_STAT_DSRC_CURSOR_BOUNDS_NEXT_UNPOSITIONED);
+    auto skipsBefore = readStat(WT_STAT_DSRC_CURSOR_NEXT_SKIP_TOTAL);
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(wtRS->rangeTruncate(op.get(), ru, RecordId(), lastTruncated, 0, -kNumRecords));
+        txn.commit();
+    }
+    auto boundedNexts = readStat(WT_STAT_DSRC_CURSOR_BOUNDS_NEXT_UNPOSITIONED) - boundedNextsBefore;
+    auto skips = readStat(WT_STAT_DSRC_CURSOR_NEXT_SKIP_TOTAL) - skipsBefore;
+
+    // The refresh must not have stepped over any of the records the truncate just removed.
+    ASSERT_EQ(skips, 0);
+    // Exactly one read that started from the removed range's end.
+    ASSERT_EQ(boundedNexts, 1);
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
