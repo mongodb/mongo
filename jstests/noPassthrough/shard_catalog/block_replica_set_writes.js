@@ -37,13 +37,9 @@ function runAutoCompactRetryingBusy(adminDB, cmdObj, timeoutMsg, workedMsg) {
     }, timeoutMsg);
 }
 
-// Confirms background auto-compact is running with the expected options.
-// Re-requesting the same options is a silent no-op. We therefore probe with a deliberately different
-// freeSpaceTargetMB: while auto-compact is running, the probe is rejected and the active
-// options are reported in the error message. A transient ObjectIsBusy
-// (the previous command's signal not yet consumed) is retried.
-function assertAutoCompactRunningWith(adminDB, expectedMB) {
-    const probeMB = expectedMB + 1;
+// Confirms background auto-compact is running by probing with a different configuration. A
+// transient ObjectIsBusy (the previous command's signal not yet consumed) is retried.
+function assertAutoCompactRunning(adminDB, probeMB) {
     assert.soon(() => {
         const res = adminDB.runCommand({autoCompact: true, freeSpaceTargetMB: probeMB});
         if (res.code === ErrorCodes.ObjectIsBusy) return false;
@@ -53,13 +49,8 @@ function assertAutoCompactRunningWith(adminDB, expectedMB) {
             "auto-compact reconfigure should be rejected because it is already running",
             {res},
         );
-        assert(
-            res.errmsg.includes(`freeSpaceTargetMB: ${expectedMB}`),
-            "autoCompact error should report the active options",
-            {res},
-        );
         return true;
-    }, `Timed out confirming auto-compact is running with expected options`);
+    }, `Timed out confirming auto-compact is running`);
 }
 
 describe("Test blockReplicaSetWrites command on shard replica sets in a sharded cluster", function () {
@@ -568,7 +559,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
     });
 
-    it("Test that auto-compact running before write block is enabled is stopped when the write block is enabled and restored when the write block is released", function () {
+    it("Test that changing allowDeletions from true to false pauses auto-compact", function () {
         if (
             PersistenceProviderUtil.allNodesHavePropertyWithValue(
                 this.shard0Primary,
@@ -576,15 +567,62 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
                 false,
             )
         ) {
-            jsTest.log.info("Skipping auto-compact restore test: local collections not supported");
+            jsTest.log.info(
+                "Skipping auto-compact allowDeletions transition test: local collections not supported",
+            );
+            return;
+        }
+
+        const adminDB = this.shard0PrimaryAdminDB;
+        const freeSpaceTargetMB = 650;
+
+        // Start auto-compaction while the active write block allows deletions.
+        enableReplicaSetWriteBlock(adminDB, true /* allowDeletions */, "InsufficientDiskSpace");
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: true, freeSpaceTargetMB},
+            "Timed out enabling autoCompact while deletions are allowed",
+        );
+        assertAutoCompactRunning(adminDB, freeSpaceTargetMB + 1);
+
+        // Tighten the active block so existing auto-compaction must be paused.
+        enableReplicaSetWriteBlock(adminDB, false /* allowDeletions */, "InsufficientDiskSpace");
+
+        // Release the block so a different configuration can prove the transition stopped
+        // auto-compaction. The release path does not pause or resume it.
+        disableReplicaSetWriteBlock(adminDB, "InsufficientDiskSpace");
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: true, freeSpaceTargetMB: freeSpaceTargetMB + 1},
+            "Timed out enabling autoCompact after releasing the write block",
+        );
+
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: false},
+            "Timed out disabling autoCompact after the allowDeletions transition",
+        );
+    });
+
+    it("Test that auto-compact running before write block is enabled is stopped and not restored", function () {
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                this.shard0Primary,
+                "supportsLocalCollections",
+                false,
+            )
+        ) {
+            jsTest.log.info(
+                "Skipping auto-compact write block pause test: local collections not supported",
+            );
             return;
         }
 
         const adminDB = this.shard0PrimaryAdminDB;
         const freeSpaceTargetMB = 750;
 
-        // Enable auto-compact with a custom freeSpaceTargetMB so we can verify the exact
-        // options are preserved after restore.
+        // Enable auto-compact with a custom freeSpaceTargetMB so we can verify it is stopped by the
+        // write block.
         runAutoCompactRetryingBusy(
             adminDB,
             {autoCompact: true, freeSpaceTargetMB},
@@ -593,7 +631,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
 
         // Confirm auto-compact is running with the expected options before engaging the write
         // block.
-        assertAutoCompactRunningWith(adminDB, freeSpaceTargetMB);
+        assertAutoCompactRunning(adminDB, freeSpaceTargetMB + 1);
 
         // Engage write block with allowDeletions:false, auto-compact should be stopped.
         enableReplicaSetWriteBlock(adminDB, false /* allowDeletions */, "InsufficientDiskSpace");
@@ -605,11 +643,16 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "autoCompact enable must be blocked while write block is active",
         );
 
-        // Release the write block, auto-compact should be restored with the original options.
+        // Release the write block. Auto-compact must remain stopped and require explicit re-enable.
         disableReplicaSetWriteBlock(adminDB, "InsufficientDiskSpace");
 
-        // After releasing the write block, auto-compact must be restored with the original options.
-        assertAutoCompactRunningWith(adminDB, freeSpaceTargetMB);
+        // Explicitly re-enabling with a different target succeeds, which proves the previous
+        // configuration was not automatically restored.
+        runAutoCompactRetryingBusy(
+            adminDB,
+            {autoCompact: true, freeSpaceTargetMB: freeSpaceTargetMB + 1},
+            "Timed out explicitly enabling autoCompact after write block release",
+        );
 
         // Disable auto-compact.
         runAutoCompactRetryingBusy(
@@ -619,7 +662,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
     });
 
-    it("Test that explicitly disabling auto-compact during a write block prevents restore on write block release", function () {
+    it("Test that explicitly disabling auto-compact during a write block leaves it disabled", function () {
         if (
             PersistenceProviderUtil.allNodesHavePropertyWithValue(
                 this.shard0Primary,
@@ -643,12 +686,12 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Timed out enabling autoCompact",
         );
 
-        // Engage write block with allowDeletions:false — auto-compact is stopped, options saved.
+        // Engage write block with allowDeletions:false — auto-compact is stopped.
         enableReplicaSetWriteBlock(adminDB, false /* allowDeletions */, "InsufficientDiskSpace");
 
         // Explicitly disable auto-compact while the write block is active.
         // Disabling is always permitted and signals user intent to stop permanently,
-        // which must override the automatic restore on write block release.
+        // so it remains stopped after write block release.
         runAutoCompactRetryingBusy(
             adminDB,
             {autoCompact: false},
@@ -656,8 +699,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Disabling autoCompact must always be permitted",
         );
 
-        // Release the write block. Because we explicitly disabled auto-compact, the saved options
-        // must be discarded — auto-compact must NOT be automatically restored.
+        // Release the write block. Auto-compact must NOT be automatically restored.
         disableReplicaSetWriteBlock(adminDB, "InsufficientDiskSpace");
 
         // Confirm auto-compact was not restored. Probe by enabling with a *different*

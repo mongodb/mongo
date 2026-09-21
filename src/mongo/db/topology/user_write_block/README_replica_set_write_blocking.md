@@ -44,8 +44,8 @@ document to be majority committed.
 When a block is already active, a request with `enabled: true`, the same `reason`, and a different
 `allowDeletions` value updates that value in place. The block remains enabled and keeps its existing
 reason; the request does not re-allow writes or repeat the initial index-build abort/drain path.
-Each allowDeletions change increments `replicaSetWritesBlockCounters` for the reason. Repeating the
-active block's current `allowDeletions` value is a no-op.
+Each `allowDeletions` change increments `replicaSetWritesBlockCounters` for the reason. Repeating
+the active block's current `allowDeletions` value is a no-op.
 
 ## Interaction with setFeatureCompatibilityVersion
 
@@ -63,10 +63,14 @@ The `allowDeletions` flag exists because deletions are not purely space-freeing:
 temporarily consume additional disk space (for example, through the writes they generate). The flag
 therefore lets an operator choose. When deletions are allowed, an operator can block inserts and
 updates while still permitting users to delete data and recover. When deletions are blocked, they
-are treated like any other write and rejected. Blocking deletions also blocks compaction, which can
-itself require disk space: both the on-demand `compact` command (`checkIfCompactAllowedToStart`) and
-background auto-compaction (paused via `pauseOrResumeAutoCompactForWriteBlock`) are disallowed while
-deletions are blocked.
+are treated like any other write and rejected. Blocking deletions also prevents starting on-demand
+`compact` (`checkIfCompactAllowedToStart`) or enabling background auto-compaction, because either
+can itself require disk space. A newly acquired block with `allowDeletions: false`, or an active
+block changed from `allowDeletions: true` to `false`, also pauses existing background
+auto-compaction via `pauseAutoCompactForReplicaSetWritesBlock`. The paused configuration is not
+retained or automatically restored; changing `allowDeletions` back to `true` or releasing the block
+still requires an operator to explicitly re-enable auto-compaction. Recovery only updates
+write-block state and does not reconcile an already-running background auto-compaction.
 
 ## On-disk state and recovery
 
@@ -83,10 +87,9 @@ becomes available (`recoverRecoverableCriticalSections`). Rollback of
 `config.replica_set_writes_critical_section` is a separate path: after oplog recovery,
 `ReplicaSetWriteBlockOpObserver::onReplicationRollback` calls
 `recoverReplicaSetWritesCriticalSection`. That recovery restores in-memory write-block and
-`allowDeletions` state from the durable document, but does **not** reconcile auto-compaction:
-pause/resume remains a node-local side effect of acquire (`allowDeletions: false`) and release, so
-rolling back those operations — or an in-place `allowDeletions` change — can leave background
-auto-compaction out of sync with the recovered deletion policy.
+`allowDeletions` state from the durable document, but does **not** reconcile auto-compaction.
+Consequently, rollback or recovery can leave node-local background auto-compaction out of sync with
+the recovered deletion policy.
 
 ## In-memory state
 
@@ -96,8 +99,8 @@ deletions-blocked flag, a transient index-build-block flag, and counters used fo
 (`replicaSetWritesBlockCounters`, one per reason) and for rejection metrics
 (`replicaSetWritesBlockRejected`, split into inserts/updates/deletes). The `serverStatus().repl`
 field `replicaSetWritesBlockAllowDeletions` is always present and reports whether deletions are
-allowed. It is `true` while replica set write blocking is disabled. It exposes the predicates that
-decide whether an operation may proceed: `checkReplicaSetWritesAllowed`,
+allowed; it is `true` while replica set write blocking is disabled. The state exposes the predicates
+that decide whether an operation may proceed: `checkReplicaSetWritesAllowed`,
 `checkReplicaSetDeletionsAllowed`, and the operation-specific gates `checkIfCompactAllowedToStart`,
 `checkIfConvertToCappedAllowedToStart`, `checkIfIncomingMigrationAllowedToStart`,
 `checkIfIncomingReshardingAllowedToStart`, and `checkIfIndexBuildAllowedToStart`. When a check fails
@@ -141,7 +144,9 @@ internal-database, and `system.profile` exemptions described above):
     first data-cloning insert is rejected.
 - **Blocked only when deletions are blocked** (i.e. `allowDeletions` was false): deletes — including
   range deletions (orphan cleanup) and TTL deletions — the on-demand `compact` command
-  (`checkIfCompactAllowedToStart`), and background auto-compaction.
+  (`checkIfCompactAllowedToStart`), and attempts to enable background auto-compaction. Existing
+  background auto-compaction is paused when a new block is acquired with deletions blocked or an
+  active block changes from allowing to blocking deletions, as described above.
 - **Held (paused and resumed):**
   - `reshardCollection` already in progress on the recipient — the resharding recipient treats
     `ErrorCodes::ReplicaSetWritesBlocked` as a transient error and hold, resuming once the block is

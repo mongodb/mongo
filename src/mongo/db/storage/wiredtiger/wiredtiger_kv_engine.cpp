@@ -3381,22 +3381,7 @@ Status WiredTigerKVEngine::_reconfigureAutoCompact(RecoveryUnit& ru,
     // We may get WT_BACKGROUND_COMPACT_ALREADY_RUNNING when we try to reconfigure background
     // compaction while it is already running.
     if (err.sub_level_err == WT_BACKGROUND_COMPACT_ALREADY_RUNNING) {
-        BSONObjBuilder current;
-        {
-            std::lock_guard lk(_autoCompactMutex);
-            if (_activeAutoCompactOptions) {
-                current.append("enabled", _activeAutoCompactOptions->enable);
-                if (_activeAutoCompactOptions->freeSpaceTargetMB) {
-                    current.appendNumber(
-                        "freeSpaceTargetMB",
-                        static_cast<long long>(*_activeAutoCompactOptions->freeSpaceTargetMB));
-                }
-                current.append("runOnce", _activeAutoCompactOptions->runOnce);
-            }
-        }
-        uasserted(ErrorCodes::AlreadyInitialized,
-                  str::stream() << err.err_msg
-                                << "; current auto-compact options: " << current.obj());
+        uasserted(ErrorCodes::AlreadyInitialized, err.err_msg);
     }
 
     status = wtRCToStatus(ret, *s, "Failed to configure auto compact");
@@ -3414,23 +3399,6 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
         return status;
     }
 
-    std::lock_guard lk(_autoCompactMutex);
-    // Cache the active configuration so it can be reported and saved/restored across a write block.
-    // excludedIdents are intentionally dropped: they are non-owning views that would dangle if
-    // retained, and each enable caller (including the write-block restore path) recomputes the
-    // oplog exclusion itself.
-    _activeAutoCompactOptions = (options.enable && !options.runOnce)
-        ? boost::make_optional(AutoCompactOptions{true /* enable */,
-                                                  false /* runOnce */,
-                                                  options.freeSpaceTargetMB,
-                                                  {} /* excludedIdents */})
-        : boost::none;
-    if (!options.enable) {
-        // An explicit user disable signals intent to stop auto-compaction permanently, so forget
-        // any configuration saved for a write-block restore. This overrides the automatic restore
-        // performed when the write block is released.
-        _autoCompactOptionsForRestore = boost::none;
-    }
     return Status::OK();
 }
 
@@ -3450,56 +3418,16 @@ Status WiredTigerKVEngine::fixDatabaseSize() {
                         "wiredTigerRepair fixDatabaseSize checkpoint");
 }
 
-Status WiredTigerKVEngine::pauseOrResumeAutoCompactForWriteBlock(
-    RecoveryUnit& ru, bool pause, const std::vector<std::string_view>& excludedIdents) {
-    if (pause) {
-        {
-            std::lock_guard lk(_autoCompactMutex);
-            // Save the currently-active configuration so it can be restored on resume. An
-            // idempotent pause (nothing active) must not clobber a previously-saved value with
-            // boost::none.
-            if (_activeAutoCompactOptions) {
-                _autoCompactOptionsForRestore = _activeAutoCompactOptions;
-            }
-        }
-
-        auto status =
-            _reconfigureAutoCompact(ru,
-                                    AutoCompactOptions{false /* enable */,
-                                                       false /* runOnce */,
-                                                       boost::none /* freeSpaceTargetMB */,
-                                                       {} /* excludedIdents */});
-        if (status.isOK()) {
-            std::lock_guard lk(_autoCompactMutex);
-            _activeAutoCompactOptions = boost::none;
-        }
-        return status;
-    }
-
-    boost::optional<AutoCompactOptions> saved;
-    {
-        std::lock_guard lk(_autoCompactMutex);
-        saved = _autoCompactOptionsForRestore;
-    }
-    if (!saved) {
-        // Nothing was paused, so there is nothing to restore.
-        return Status::OK();
-    }
-
-    auto status = _reconfigureAutoCompact(
-        ru,
-        AutoCompactOptions{
-            true /* enable */, false /* runOnce */, saved->freeSpaceTargetMB, excludedIdents});
+Status WiredTigerKVEngine::pauseAutoCompactForReplicaSetWritesBlock(RecoveryUnit& ru) {
+    auto status = _reconfigureAutoCompact(ru,
+                                          AutoCompactOptions{false /* enable */,
+                                                             false /* runOnce */,
+                                                             boost::none /* freeSpaceTargetMB */,
+                                                             {} /* excludedIdents */});
     if (!status.isOK()) {
-        // Keep the saved configuration so a subsequent resume can retry.
         return status;
     }
 
-    std::lock_guard lk(_autoCompactMutex);
-    _activeAutoCompactOptions = AutoCompactOptions{
-        true /* enable */, false /* runOnce */, saved->freeSpaceTargetMB, {} /* excludedIdents */};
-    // The saved configuration has been consumed.
-    _autoCompactOptionsForRestore = boost::none;
     return Status::OK();
 }
 

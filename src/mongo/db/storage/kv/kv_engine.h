@@ -712,8 +712,7 @@ public:
     }
 
     /**
-     * See StorageEngine::autoCompact for details. An explicit disable (options.enable == false)
-     * additionally discards any configuration saved by pauseOrResumeAutoCompactForWriteBlock().
+     * See StorageEngine::autoCompact for details.
      */
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
@@ -745,15 +744,10 @@ public:
     }
 
     /**
-     * Pauses (pause=true) or resumes (pause=false) background auto-compaction for a replica set
-     * write block transition. Pausing saves the active configuration and stops compaction; resuming
-     * restarts it with the saved configuration, excluding 'excludedIdents' (ignored when pausing).
-     * Kept separate from autoCompact() so that a write-block stop (which saves for restore) is not
-     * confused with a user disable (which is permanent and discards the saved configuration).
+     * Pauses background auto-compaction for a replica set write block transition. Auto-compaction
+     * must be explicitly re-enabled after the write block is released.
      */
-    virtual Status pauseOrResumeAutoCompactForWriteBlock(RecoveryUnit&,
-                                                         bool pause,
-                                                         const std::vector<std::string_view>&) {
+    virtual Status pauseAutoCompactForReplicaSetWritesBlock(RecoveryUnit&) {
         return Status::OK();
     }
 

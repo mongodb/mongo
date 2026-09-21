@@ -1196,15 +1196,13 @@ const Milliseconds kAutoCompactReconfigureRetryInterval{50};
 constexpr int kMaxAutoCompactReconfigureAttempts = 600;  // ~30s of retrying before giving up.
 
 /**
- * Runs an auto-compaction reconfigure for a write block transition under the global lock, retrying
+ * Pauses auto-compaction for a write block transition under the global lock, retrying
  * the transient ObjectIsBusy (a previous reconfigure not yet applied by the background server) up
  * to kMaxAutoCompactReconfigureAttempts so the change isn't dropped. A non-OK status is logged, not
  * thrown, to avoid failing the replica set write block.
  */
-void retryPauseOrResumeAutoCompactForWriteBlock(
-    OperationContext* opCtx,
-    std::string_view operation,
-    const std::function<Status(RecoveryUnit&)>& reconfigure) {
+void retryPauseAutoCompactForReplicaSetWritesBlock(
+    OperationContext* opCtx, const std::function<Status(RecoveryUnit&)>& reconfigure) {
     Status status = Status::OK();
     for (int attempt = 0; attempt < kMaxAutoCompactReconfigureAttempts; ++attempt) {
         status = [&] {
@@ -1226,42 +1224,22 @@ void retryPauseOrResumeAutoCompactForWriteBlock(
     }
 
     // IllegalOperation means auto-compaction is simply not applicable, so there is nothing to
-    // stop or restore. Warn only on unexpected errors.
+    // stop. Warn only on unexpected errors.
     if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
         LOGV2_WARNING(12966500,
-                      "Failed to reconfigure auto-compaction for replica set write block",
-                      "operation"_attr = operation,
+                      "Failed to pause auto-compaction for replica set write block",
                       "error"_attr = status);
     }
 }
 }  // namespace
 
-void StorageEngineImpl::pauseOrResumeAutoCompactForWriteBlock(OperationContext* opCtx,
-                                                              bool pause,
-                                                              std::string_view oplogIdent) {
+void StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
     if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
         return;
     }
 
-    if (pause) {
-        // The engine saves the currently-active configuration before stopping compaction so it can
-        // be restored on resume; stopping when nothing is running is a no-op.
-        retryPauseOrResumeAutoCompactForWriteBlock(opCtx, "pause", [&](RecoveryUnit& ru) {
-            return _engine->pauseOrResumeAutoCompactForWriteBlock(
-                ru, pause, {} /* excludedIdents */);
-        });
-        return;
-    }
-
-    // On resume the engine restores the saved configuration, excluding the current oplog ident
-    // supplied by the caller (the saved options intentionally omit the non-owning excludedIdents,
-    // so the exclusion is recomputed by the caller on each resume rather than restored).
-    std::vector<std::string_view> excludedIdents;
-    if (!oplogIdent.empty()) {
-        excludedIdents.push_back(oplogIdent);
-    }
-    retryPauseOrResumeAutoCompactForWriteBlock(opCtx, "resume", [&](RecoveryUnit& ru) {
-        return _engine->pauseOrResumeAutoCompactForWriteBlock(ru, pause, excludedIdents);
+    retryPauseAutoCompactForReplicaSetWritesBlock(opCtx, [&](RecoveryUnit& ru) {
+        return _engine->pauseAutoCompactForReplicaSetWritesBlock(ru);
     });
 }
 
