@@ -495,7 +495,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, MultiFieldDocumentKeyHandledViaIxsca
 }
 
 // On a regular (non-clustered) collection an _id-equality lookup must produce a plan with an index
-// scan stage, never a bare record-store scan (the parallel-poc COLLSCAN regression).
+// scan stage, never a bare record-store scan.
 TEST_F(SbeSingleDocumentLookupExecutorTest, RegularCollectionUsesIndexScan) {
     createCollection();
     insertDocuments(
@@ -598,7 +598,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ClusteredCollectionWithHashedIdIndex
 // index and a secondary "_id_hashed" index. QueryPlanner::plan() may offer an indexed solution for
 // either one; PreparedExecutor::make() takes solutions[0] unconditionally. SBE must resolve the
 // lookup via the real "_id_" index, not decline just because the hashed index happened to be
-// offered first -- the document is still perfectly reachable through the ordinary ixscan path.
+// offered first; the document is still reachable through the ordinary ixscan path.
 TEST_F(SbeSingleDocumentLookupExecutorTest,
        NonClusteredCollectionWithHashedIdIndexUsesRealIdIndex) {
     createCollection();
@@ -900,8 +900,8 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, UuidMismatchMidBatchReportsNotFound)
 // Dropping the collection right after releaseResources() used to trip the
 // ConsistentCollection::checkNoCollectionsInUse debug invariant, because releaseResources() only
 // saved the plan and dropped the executor's own _collectionAcquisition bookkeeping, while
-// sbe::ScanStageBase::_coll -- the actual CollectionAcquisition the scan stage holds, set once in
-// prepare() -- is a second, independent reference that saveState() never clears. Since
+// sbe::ScanStageBase::_coll (the CollectionAcquisition the scan stage holds, set once in
+// prepare()) is a second, independent reference that saveState() never clears. Since
 // releaseResources() now fully tears the plan down along with the acquisition, that stale
 // reference can no longer outlive the acquisition it was built against.
 TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesThenDropCollectionIsSafe) {
@@ -920,8 +920,8 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, ReleaseResourcesThenDropCollectionIs
 }
 
 // Same root cause as above: any catalog-mutating operation on the same OperationContext after only
-// releaseResources() -- not just a drop, even an index-metadata rebuild taking a normal MODE_X
-// collection lock -- used to hit the still-live sbe::ScanStageBase::_coll reference in the cached
+// releaseResources(), not just a drop but even an index-metadata rebuild taking a normal MODE_X
+// collection lock, used to hit the still-live sbe::ScanStageBase::_coll reference in the cached
 // plan. Now that releaseResources() always tears the plan down, isExecutorInvalidated()'s
 // version-check branch is reachable: the next lookup detects the bumped
 // PlanCacheInvalidatorVersion and rebuilds.
@@ -944,6 +944,144 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, PlanCacheInvalidationMidBatchTrigger
     ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), rebuildCountBefore + 1);
 }
 
+// A documentKey without _id declines before any acquisition or plan is built, and is recorded
+// as notHandled with no latency.
+TEST_F(SbeSingleDocumentLookupExecutorTest, LookupWithoutIdFieldIsNotHandled) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    createCollection();
+    insertDocuments({fromjson("{_id: 1}")});
+    auto strategy = makeStrategyWithRealRecorder(std::make_unique<AlwaysLocalEligibility>());
+
+    const auto before = snapshotSbeCell(capturer);
+    auto result = lookup(&strategy, fromjson("{sk: 1}"));
+    const auto after = snapshotSbeCell(capturer);
+
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+    // Declined before building anything: no plan, no cached acquisition.
+    ASSERT_FALSE(strategy.getCachedPlanRoot_forTest());
+    ASSERT_FALSE(strategy.holdsAttachedCatalogState_forTest());
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled + 1);
+    // A declined lookup carries no meaningful latency.
+    ASSERT_EQ(after.latencyCount, before.latencyCount);
+}
+
+// --- kNotHandled declines: unsupported _id value types -----------------------------------------
+//
+// These are the shapes behind tassert 13006201 ($_internalSearchIdLookup's never-kNotHandled
+// invariant, which is exactly why the decline must be safe): an _id value the SlotBinder cannot
+// encode as a single bound pair must decline cleanly (kNotHandled) so the fallback wrapper can take
+// over, never crash. isDirectlyEncodableEqualityType() is the gate (regex, array, undefined, and
+// object all refuse); the decline can fire either at PreparedExecutor::make (plan shape) or at
+// SlotBinder::bind (per-value encoding), so these tests assert the outcome, not the sub-path.
+
+// A regex _id cannot be stored (validIdField rejects it) but mongot's index is not so constrained;
+// the lookup must decline rather than crash or seek wrong bounds.
+TEST_F(SbeSingleDocumentLookupExecutorTest, RegexIdIsNotHandled) {
+    createCollection();
+    insertDocuments({fromjson("{_id: 1, x: 'a'}")});
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, BSON("_id" << BSONRegEx("needle", "")));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+
+    // The strategy recovers on the next (supported) lookup in the same window.
+    auto recovery = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(recovery.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(recovery.document->toBson(), fromjson("{_id: 1, x: 'a'}"));
+}
+
+// An array _id is likewise unstorable but mongot-reachable, and likewise must decline.
+TEST_F(SbeSingleDocumentLookupExecutorTest, ArrayIdIsNotHandled) {
+    createCollection();
+    insertDocuments({fromjson("{_id: 1, x: 'a'}")});
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, BSON("_id" << BSON_ARRAY(1 << 2 << 3)));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+
+    auto recovery = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(recovery.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(recovery.document->toBson(), fromjson("{_id: 1, x: 'a'}"));
+}
+
+// A compound (object) _id is a real, storable shape: the document exists, so this decline is
+// distinguishable from kDocumentNotFound; the caller must fall back to find it. Non-clustered
+// compound _id is the known SBE support gap tracked as SERVER-134080; this pins that the gap is a
+// safe decline, not a wrong result. (The clustered counterpart is supported and covered above by
+// ClusteredCompoundIdLookupsReturnFullDocument.)
+TEST_F(SbeSingleDocumentLookupExecutorTest, NonClusteredCompoundIdIsNotHandled) {
+    createCollection();
+    const BSONObj compoundId = BSON("a" << 1 << "b" << 2);
+    insertDocuments({BSON("_id" << compoundId << "x" << "compound")});
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, BSON("_id" << compoundId));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
+}
+
+// The mid-batch mixed sequence: a decline caused by the _id *value* (not the plan) must not tear
+// down the cached plan; resetOnException is dismissed on the bind-failure return so the next
+// supported _id in the same window rebinds the very same plan. This is the interleaving a real
+// mixed batch produces (mongot returning a supported and an unsupported _id in one batch).
+TEST_F(SbeSingleDocumentLookupExecutorTest, DeclinedIdMidSequenceKeepsCachedPlanUsable) {
+    createCollection();
+    insertDocuments({fromjson("{_id: 1, x: 'a'}"), fromjson("{_id: 2, x: 'b'}")});
+
+    auto strategy = makeStrategy();
+    auto r1 = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(r1.status, LookupResult::HandledStatus::kDocumentFound);
+    const auto* originalPlanRoot = strategy.getCachedPlanRoot_forTest();
+    ASSERT_TRUE(originalPlanRoot);
+    ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), 1U);
+
+    // Both unsupported value types decline mid-sequence...
+    auto regexDecline = lookup(&strategy, BSON("_id" << BSONRegEx("needle", "")));
+    ASSERT_EQ(regexDecline.status, LookupResult::HandledStatus::kNotHandled);
+    auto compoundDecline = lookup(&strategy, fromjson("{_id: {a: 9, b: 9}}"));
+    ASSERT_EQ(compoundDecline.status, LookupResult::HandledStatus::kNotHandled);
+
+    // ...without discarding the cached plan: same root, no rebuild, and the next supported _id is
+    // found through it.
+    ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot);
+    ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), 1U);
+
+    auto r2 = lookup(&strategy, fromjson("{_id: 2}"));
+    ASSERT_EQ(r2.status, LookupResult::HandledStatus::kDocumentFound);
+    ASSERT_BSONOBJ_EQ(r2.document->toBson(), fromjson("{_id: 2, x: 'b'}"));
+    ASSERT_EQ(strategy.getCachedPlanRoot_forTest(), originalPlanRoot);
+    ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), 1U);
+}
+
+// The allow-list's exotic-but-encodable types (binData, null, minKey, maxKey) must NOT decline:
+// mongot can yield any of them as an _id, and each encodes as a single bound pair. Pins the
+// accept-side of isDirectlyEncodableEqualityType so the decline set can't silently widen.
+TEST_F(SbeSingleDocumentLookupExecutorTest, ExoticButEncodableIdTypesAreHandled) {
+    createCollection();
+    const std::vector<BSONObj> docs{
+        BSON("_id" << BSONBinData("\x01\x02", 2, BinDataGeneral) << "x" << "bin"),
+        BSON("_id" << BSONNULL << "x" << "null"),
+        BSON("_id" << MINKEY << "x" << "minkey"),
+        BSON("_id" << MAXKEY << "x" << "maxkey")};
+    insertDocuments(docs);
+
+    auto strategy = makeStrategy();
+    for (const auto& doc : docs) {
+        auto result = lookup(&strategy, BSON("_id" << doc["_id"]));
+        ASSERT_EQ(result.status, LookupResult::HandledStatus::kDocumentFound);
+        ASSERT_BSONOBJ_EQ(result.document->toBson(), doc);
+    }
+    // Every encodable type rebinds the one cached plan: it was built exactly once for all four
+    // (the rebuild count is the reliable reuse signal; a plan-root pointer can be fooled by heap
+    // address reuse).
+    ASSERT_EQ(strategy.getPlanRebuildCount_forTest(), 1U);
+}
+
 // --- Plan summary stats sink -------------------------------------------------------------------
 
 TEST_F(SbeSingleDocumentLookupExecutorTest,
@@ -956,7 +1094,7 @@ TEST_F(SbeSingleDocumentLookupExecutorTest,
     strategy.setPlanSummaryStatsSink(&sink);
 
     // The sink only folds in at teardown (releaseResources()/resetPlan()), not after every
-    // lookup, so it stays untouched mid-window.
+    // lookup, so it stays untouched mid-batch.
     lookup(&strategy, fromjson("{_id: 1}"));
     lookup(&strategy, fromjson("{_id: 2}"));
     ASSERT_EQ(sink.totalKeysExamined, 0U);

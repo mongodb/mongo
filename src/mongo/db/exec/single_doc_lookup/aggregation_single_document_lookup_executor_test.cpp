@@ -41,10 +41,16 @@ public:
         lastCollectionUUID = collectionUUID;
         lastDocumentKey = documentKey;
         lastReadConcern = std::move(readConcern);
+        if (_throwTooManyMatching) {
+            uasserted(ErrorCodes::TooManyMatchingDocuments, "simulated duplicate match");
+        }
         return _result;
     }
 
     boost::optional<Document> _result;
+
+    // When set, lookupSingleDocument() throws TooManyMatchingDocuments instead of returning.
+    bool _throwTooManyMatching = false;
 
     int callCount = 0;
     NamespaceString lastNss;
@@ -158,6 +164,33 @@ TEST_F(AggregationSingleDocumentLookupExecutorTest, RecordsFoundAndNotFoundIntoA
     // asserted (the recorder unit test covers exact sums with synthetic durations).
     ASSERT_EQ(after.latencyCount, before.latencyCount + 2);
     ASSERT_GTE(after.latencySum, before.latencySum);
+}
+
+// A lookup that throws must propagate AND record nothing into any cell: the outcome is neither
+// found nor not-found.
+TEST_F(AggregationSingleDocumentLookupExecutorTest, ThrownLookupPropagatesAndRecordsNothing) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const auto before = snapshotAggregationCell(capturer);
+
+    auto mock = installMock(boost::none);
+    mock->_throwTooManyMatching = true;
+    auto executor = makeExecutor();
+
+    ASSERT_THROWS_CODE(
+        executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1)),
+        DBException,
+        ErrorCodes::TooManyMatchingDocuments);
+
+    const auto after = snapshotAggregationCell(capturer);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount);
+    ASSERT_EQ(after.latencySum, before.latencySum);
 }
 
 }  // namespace

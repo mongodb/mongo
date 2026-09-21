@@ -13,6 +13,9 @@ filters:
   - "collection_uuid_coll_stats_index_stats.js":
     approvers:
       - 10gen/query-optimization
+  - "internal_search_id_lookup*.js":
+    approvers:
+      - 10gen/query-integration-search
   - "multiple_unpack_bucket_error.js":
     approvers:
       - 10gen/query-integration-timeseries

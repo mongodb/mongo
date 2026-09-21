@@ -15,9 +15,11 @@ namespace mongo::exec::agg {
 BatchedEnrichmentStage::BatchedEnrichmentStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    Limits limits)
+    Limits limits,
+    BatchedEnrichmentStatsRecorder batchStatsRecorder)
     : Stage(stageName, pExpCtx),
       _limits(limits),
+      _batchStatsRecorder(std::move(batchStatsRecorder)),
       _memTracker(
           OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     tassert(12916800, "maxInputEvents must be at least 1", _limits.maxInputEvents >= 1);
@@ -154,6 +156,9 @@ void BatchedEnrichmentStage::enrichBatch() {
             closeBatch();
         }
     }};
+    // Counted before beginBatch(): a batch whose opening throws is still counted, so
+    // 'enrichBatchesStarted' can include failed batch openings.
+    _batchStatsRecorder.recordBatchStarted();
     beginBatch();
     batchOpened = true;
 

@@ -30,7 +30,10 @@ using Limits = BatchedEnrichmentStage::Limits;
 class EnrichmentStageMock : public BatchedEnrichmentStage {
 public:
     EnrichmentStageMock(const boost::intrusive_ptr<ExpressionContext>& expCtx, Limits limits)
-        : BatchedEnrichmentStage("$mockEnrich", expCtx, limits) {}
+        : BatchedEnrichmentStage("$mockEnrich",
+                                 expCtx,
+                                 limits,
+                                 BatchedEnrichmentStatsRecorder::makeNoopRecorder_forTest()) {}
 
     // The transform applied to each data event in enrich(). Defaults to tagging it 'enriched:
     // true'. Returning boost::none drops the event.

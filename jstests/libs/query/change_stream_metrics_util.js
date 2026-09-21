@@ -1,4 +1,8 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
+} from "jstests/libs/query/change_stream_util.js";
 
 // The single-document-lookup engine that enriched an updateLookup change event with its post-image.
 // The serverStatus key under 'changeStreams.updateLookup' is the value of each constant.
@@ -7,6 +11,34 @@ export const UpdateLookupExecutor = Object.freeze({
     kExpress: "express",
     kSBE: "sbe",
 });
+
+// The engine expected to handle an updateLookup given the stream's watch level (defaults to the
+// suite's passthrough level). Collection-level streams have a fixed lookup namespace and use the
+// caching SBE executor; db/cluster-level streams look up a different namespace per event and use
+// Express. featureFlagChangeStreamOptimizedUpdateLookup is default-on and not FCV-gated, so the
+// flag is assumed enabled everywhere these tests run.
+export function expectedUpdateLookupEngine(watchMode = changeStreamPassthroughType()) {
+    return watchMode === ChangeStreamWatchMode.kCollection
+        ? UpdateLookupExecutor.kSBE
+        : UpdateLookupExecutor.kExpress;
+}
+
+// Reads the updateLookup single-document-lookup deltas out of a serverStatus metrics diff, keyed by
+// engine (UpdateLookupExecutor.kSBE/kExpress/kAggregation), treating any missing leaf as 0.
+export function readUpdateLookupDelta(delta) {
+    const ul = (delta.changeStreams && delta.changeStreams.updateLookup) || {};
+    const leaf = (engine, field) => (ul[engine] && ul[engine][field]) || 0;
+    const result = {};
+    for (const engine of Object.values(UpdateLookupExecutor)) {
+        result[engine] = {
+            found: leaf(engine, "found"),
+            notFound: leaf(engine, "notFound"),
+            notHandled: leaf(engine, "notHandled"),
+            latencyCount: ((ul[engine] && ul[engine].latencyMicros) || {}).totalCount || 0,
+        };
+    }
+    return result;
+}
 
 /**
  * combine() numeric value of server status metrics between 'a' and 'b'.
@@ -99,6 +131,17 @@ export class ServerStatusMetrics {
         const before = this.getSsMetricsAcrossCluster(db);
         fn();
         const after = this.getSsMetricsAcrossCluster(db);
+        return _combineMetrics(before, after, (beforeVal, afterVal) => afterVal - beforeVal);
+    }
+
+    /**
+     * Single-connection counterpart of withServerStatusMetricsAcrossCluster(), for tests that
+     * only ever execute on the node they're connected to.
+     */
+    static withServerStatusMetrics(db, fn) {
+        const before = this.getSsMetrics(db);
+        fn();
+        const after = this.getSsMetrics(db);
         return _combineMetrics(before, after, (beforeVal, afterVal) => afterVal - beforeVal);
     }
 

@@ -9,7 +9,17 @@
  * ]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
+import {
+    expectedUpdateLookupEngine,
+    readUpdateLookupDelta,
+    ServerStatusMetrics,
+    UpdateLookupExecutor,
+} from "jstests/libs/query/change_stream_metrics_util.js";
+import {
+    withClusteredColl,
+    withCollation,
+    withShardedColl,
+} from "jstests/libs/query/collection_config_decorators.js";
 import {
     assertCollDataDistribution,
     ChangeStreamTest,
@@ -18,15 +28,15 @@ import {
     withChangeStreamTest,
 } from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 describe("sharded change stream updateLookup primary->fallback metrics", function () {
     let st;
     let mongosDB;
 
-    // Higher-frequency periodic noops keep the change stream's cluster time advancing so update
-    // events become available promptly. The 'featureFlagChangeStreamOptimizedUpdateLookup' tag
-    // ensures the optimized primary (and thus the primary->fallback handoff under test) is wired;
-    // it must not be set as a fixture --setParameter, which older binaries reject at startup.
+    // Periodic noops keep cluster time advancing so update events surface promptly. The feature
+    // flag tag wires the optimized primary; it cannot be a fixture setParameter because older
+    // binaries reject it at startup.
     before(function () {
         st = new ShardingTest({
             shards: 2,
@@ -36,8 +46,7 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         mongosDB = st.s.getDB(jsTestName());
     });
 
-    // Start each test from a pristine database whose primary is shard0. Relocations performed by a
-    // test are reset before the next test, so no case needs its own isolated database.
+    // Start each test from a pristine database whose primary is shard0.
     beforeEach(function () {
         assert.commandWorked(mongosDB.dropDatabase());
         assert.commandWorked(
@@ -52,85 +61,48 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         st.stop();
     });
 
-    // Reads the updateLookup single-document-lookup deltas out of a serverStatus metrics diff,
-    // treating any missing leaf as 0. The primary is whichever optimized engine is wired today
-    // (Express, with SBE reserved for a follow-up), so we sum express + sbe notHandled to be
-    // agnostic to which primary declined.
-    function readUpdateLookupDelta(delta) {
-        const ul = (delta.changeStreams && delta.changeStreams.updateLookup) || {};
-        const leaf = (engine, field) => (ul[engine] && ul[engine][field]) || 0;
-        return {
-            primaryFound: leaf("express", "found") + leaf("sbe", "found"),
-            primaryNotHandled: leaf("express", "notHandled") + leaf("sbe", "notHandled"),
-            aggFound: leaf("aggregation", "found"),
-            aggNotFound: leaf("aggregation", "notFound"),
-            // 'latencyMicros' is a histogram; 'totalCount' is its number of recorded observations.
-            aggLatencyCount:
-                (ul.aggregation &&
-                    ul.aggregation.latencyMicros &&
-                    ul.aggregation.latencyMicros.totalCount) ||
-                0,
-        };
-    }
-
-    // Opens a 'fullDocument: updateLookup' change stream at 'watchMode' over 'coll', runs
-    // 'body(cst, cursor)' (which updates the doc, relocates it, and drains) while snapshotting the
-    // cluster-wide serverStatus metrics, then asserts the primary declined once and the aggregation
-    // fallback handled it. The fallback's two outcomes are mutually exclusive, so a single
-    // 'expectFound' flag suffices: true means it should have found the post-image, false means it
-    // should have found it absent.
+    // Runs 'body' under a updateLookup stream at 'watchMode' inside a serverStatus snapshot, then
+    // asserts the primary declined once and the aggregation fallback handled it; 'expectFound'
+    // picks which fallback outcome.
     function assertUpdateLookupViaAggregate({watchMode, coll, expectFound}, body) {
         const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(mongosDB, () => {
             withUpdateLookupStream(watchMode, coll, body);
         });
-        const observed = readUpdateLookupDelta(delta);
-        assert.eq(observed.primaryNotHandled, 1, {observed, delta});
-        assert.eq(observed.aggFound, expectFound ? 1 : 0, {observed, delta});
-        assert.eq(observed.aggNotFound, expectFound ? 0 : 1, {observed, delta});
-        // The aggregation fallback handled the lookup (found or notFound), so it recorded latency.
-        assert.gt(observed.aggLatencyCount, 0, {observed, delta});
+        const byEngine = readUpdateLookupDelta(delta);
+        const primary = byEngine[expectedUpdateLookupEngine(watchMode)];
+        const fallback = byEngine[UpdateLookupExecutor.kAggregation];
+        assert.eq(primary.notHandled, 1, {byEngine, delta});
+        assert.eq(fallback.found, expectFound ? 1 : 0, {byEngine, delta});
+        assert.eq(fallback.notFound, expectFound ? 0 : 1, {byEngine, delta});
+        // The fallback handled the lookup (found or notFound), so it recorded latency.
+        assert.gt(fallback.latencyCount, 0, {byEngine, delta});
     }
 
-    // Shard-key strategies exercised by the sharded relocation cases, to confirm the
-    // primary->fallback handoff is independent of how the collection is sharded. Every doc has a
-    // unique _id, so updates/removes can always match on {_id: 0}; 'shardKeyFilter' covers the shard
-    // key for moveChunk targeting, and 'doc' carries exactly the shard-key fields.
+    // Shard-key strategies for the relocation cases; every doc has a unique _id so writes match on
+    // {_id: 0}, and 'shardKeyFilter' covers the shard key for moveChunk targeting.
+    // shardCollection only accepts the simple collation, so collation is not a dimension for
+    // these configs.
     const shardKeyConfigs = [
-        {name: "hashed _id", key: {_id: "hashed"}, doc: {_id: 0}, shardKeyFilter: {_id: 0}},
-        {name: "range _id", key: {_id: 1}, doc: {_id: 0}, shardKeyFilter: {_id: 0}},
-        {name: "range sk", key: {sk: 1}, doc: {_id: 0, sk: 0}, shardKeyFilter: {sk: 0}},
-        {
-            name: "range _id, clustered",
-            key: {_id: 1},
-            doc: {_id: 0},
-            shardKeyFilter: {_id: 0},
-            clustered: true,
-        },
-        {
-            name: "hashed _id, clustered",
-            key: {_id: "hashed"},
-            doc: {_id: 0},
-            shardKeyFilter: {_id: 0},
-            clustered: true,
-        },
-    ];
+        {name: "_id", key: {_id: 1}, doc: {_id: 0}, shardKeyFilter: {_id: 0}},
+        {name: "sk", key: {sk: 1}, doc: {_id: 0, sk: 0}, shardKeyFilter: {sk: 0}},
+    ]
+        .flatMap((config) => [config, withClusteredColl(config)])
+        .flatMap(withShardedColl);
 
-    // Shards 'collName' on 'key' and returns the collection. Range keys start as a single chunk on
-    // shard0; hashed keys are initially distributed, so callers normalize the document's chunk with
-    // ensureStartsOnShard0(). When 'clustered' is true, create the collection with a clustered _id
-    // index first to exercise the clustered updateLookup path under the same relocation scenarios.
-    function shardedCollectionOnShard0(collName, key, clustered = false) {
+    // moveCollection/movePrimary target unsplittable/untracked collections, which do accept a
+    // non-simple collation.
+    const unshardedConfigs = [{name: "default", doc: {_id: 0}, collOpts: {}}]
+        .flatMap((config) => [config, withClusteredColl(config)])
+        .flatMap((config) => [config, withCollation(config)]);
+
+    // Shards 'collName' on 'key'. Range keys start as one chunk on shard0; hashed keys are
+    // presplit, so callers pin the doc's chunk with ensureStartsOnShard0().
+    function shardedCollectionOnShard0(collName, key, collOpts) {
         const coll = mongosDB.getCollection(collName);
-        if (clustered) {
-            assert.commandWorked(
-                mongosDB.createCollection(collName, {
-                    clusteredIndex: {key: {_id: 1}, unique: true},
-                }),
-            );
-        }
+        assert.commandWorked(mongosDB.createCollection(collName, collOpts));
         const cmd = {shardCollection: coll.getFullName(), key};
-        // Hashed sharding otherwise pre-splits into several chunks spread across all shards; pin it
-        // to a single chunk so the doc starts on shard0 (range keys already start as one chunk).
+
+        // Pin hashed sharding to a single chunk so the doc starts on shard0.
         if (Object.values(key).includes("hashed")) {
             cmd.numInitialChunks = 1;
         }
@@ -138,9 +110,8 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         return coll;
     }
 
-    // Hashed shard keys presplit into one chunk per shard, with shard assignment shuffled at
-    // collection-creation time ignoring numInitialChunks entirely. Ensure shard0 is responsible for
-    // data falling under 'shardKeyFilter'.
+    // Hashed assignment is shuffled at creation and ignores numInitialChunks, so move the chunk
+    // holding 'shardKeyFilter' to shard0 explicitly.
     function ensureStartsOnShard0(coll, shardKeyFilter) {
         assert.commandWorked(
             mongosDB.adminCommand({
@@ -151,19 +122,9 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         );
     }
 
-    // Asserts (retrying, so the donor's asynchronous range deletion / cleanup can finish) that the
-    // collection's single document has fully relocated to shard1, with nothing left on shard0.
-    function assertDocRelocatedToShard1(coll) {
-        assertCollDataDistribution(mongosDB, coll, [
-            [st.shard0, 0],
-            [st.shard1, 1],
-        ]);
-    }
-
-    // Opens a 'fullDocument: updateLookup' change stream at the given watch level over 'coll', runs
-    // 'fn(cst, cursor)', then cleans up. getChangeStream() handles the watchMode-specific stage
-    // options and collection selection; whole-db / whole-cluster streams still surface events with
-    // the collection's own namespace, so callers assert the same ns/documentKey at every level.
+    // Opens a updateLookup stream at 'watchMode' over 'coll' and runs 'fn(cst, cursor)'. Whole-db
+    // and whole-cluster streams still surface events with the collection's own namespace, so
+    // callers assert the same ns/documentKey at every level.
     function withUpdateLookupStream(watchMode, coll, fn) {
         // Cluster-level streams run against the admin database; the others against the test database.
         const csDb = ChangeStreamTest.getDBForChangeStream(watchMode, mongosDB);
@@ -177,22 +138,21 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
         });
     }
 
-    // Every scenario runs at each watch level; the sharded relocations additionally run across every
-    // shard-key strategy so the handoff is verified across all sharding shapes. The optimized
-    // primary differs by change-stream level (SBE for collection-level streams, Express for
-    // whole-db / whole-cluster), so covering all levels exercises whichever primary is selected.
+    // Run every scenario at each watch level: the optimized primary differs by level (SBE for
+    // collection-level, Express for whole-db / whole-cluster), and the sharded relocations also
+    // run across every shard-key strategy.
     for (const watchMode of Object.values(ChangeStreamWatchMode)) {
         for (const config of shardKeyConfigs) {
             it(`moveChunk relocates the post-image [${watchModeToString(watchMode)}][${config.name}]: primary declines, aggregation finds it`, function () {
-                const coll = shardedCollectionOnShard0("moveChunk", config.key, config.clustered);
+                const coll = shardedCollectionOnShard0("moveChunk", config.key, config.collOpts);
                 assert.commandWorked(coll.insert(config.doc));
                 ensureStartsOnShard0(coll, config.shardKeyFilter);
 
                 assertUpdateLookupViaAggregate(
                     {watchMode, coll, expectFound: true},
                     (cst, cursor) => {
-                        // Record the update on shard0's oplog, then move the doc's chunk to shard1 so
-                        // the post-image is no longer local to the shard observing the update.
+                        // Update while local, then move the chunk so the post-image is no longer on
+                        // the shard observing the update.
                         assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
                         assert.commandWorked(
                             mongosDB.adminCommand({
@@ -201,7 +161,10 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                                 to: st.shard1.shardName,
                             }),
                         );
-                        assertDocRelocatedToShard1(coll);
+                        assertCollDataDistribution(mongosDB, coll, [
+                            [st.shard0, 0],
+                            [st.shard1, 1],
+                        ]);
 
                         cst.assertNextChangesEqual({
                             cursor,
@@ -222,7 +185,7 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                 const coll = shardedCollectionOnShard0(
                     "reshardCollection",
                     config.key,
-                    config.clustered,
+                    config.collOpts,
                 );
                 assert.commandWorked(coll.insert({...config.doc, rk: 0}));
                 ensureStartsOnShard0(coll, config.shardKeyFilter);
@@ -231,8 +194,7 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                     {watchMode, coll, expectFound: true},
                     (cst, cursor) => {
                         assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
-                        // Reshard onto a new key with all data placed on shard1, changing the
-                        // collection's UUID and relocating the post-image off shard0.
+                        // Reshard onto a new key with all data on shard1.
                         assert.commandWorked(
                             mongosDB.adminCommand({
                                 reshardCollection: coll.getFullName(),
@@ -246,7 +208,10 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                                 ],
                             }),
                         );
-                        assertDocRelocatedToShard1(coll);
+                        assertCollDataDistribution(mongosDB, coll, [
+                            [st.shard0, 0],
+                            [st.shard1, 1],
+                        ]);
 
                         cst.assertNextChangesEqual({
                             cursor,
@@ -267,7 +232,7 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                 const coll = shardedCollectionOnShard0(
                     "deletedPostImage",
                     config.key,
-                    config.clustered,
+                    config.collOpts,
                 );
                 assert.commandWorked(coll.insert(config.doc));
                 ensureStartsOnShard0(coll, config.shardKeyFilter);
@@ -275,8 +240,6 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                 assertUpdateLookupViaAggregate(
                     {watchMode, coll, expectFound: false},
                     (cst, cursor) => {
-                        // Record the update on shard0, relocate the doc off shard0 so the primary
-                        // declines, then delete it so the aggregation fallback finds nothing.
                         assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
                         assert.commandWorked(
                             mongosDB.adminCommand({
@@ -286,14 +249,12 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                             }),
                         );
                         assert.commandWorked(coll.remove({_id: 0}));
-                        // The relocated doc is now deleted, so neither shard holds it.
                         assertCollDataDistribution(mongosDB, coll, [
                             [st.shard0, 0],
                             [st.shard1, 0],
                         ]);
 
-                        // Drain the update (whose post-image lookup now finds nothing, so fullDocument
-                        // resolves to null) and the following delete.
+                        // The update's post-image lookup finds nothing; drain it and the delete.
                         const ns = {db: mongosDB.getName(), coll: coll.getName()};
                         cst.assertNextChangesEqual({
                             cursor,
@@ -311,12 +272,12 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                 );
             });
 
-            // Test the successful case of finding the post-image as expected in various configurations.
+            // No relocation: the primary resolves the lookup locally.
             it(`updateLookup resolves the post-image locally without relocation [${watchModeToString(watchMode)}][${config.name}]`, function () {
                 const coll = shardedCollectionOnShard0(
-                    "noRelocation",
+                    `noRelocation-${watchMode}-${config.name}`,
                     config.key,
-                    config.clustered,
+                    config.collOpts,
                 );
                 assert.commandWorked(coll.insert(config.doc));
 
@@ -341,76 +302,89 @@ describe("sharded change stream updateLookup primary->fallback metrics", functio
                     },
                 );
 
-                const observed = readUpdateLookupDelta(delta);
-                assert.eq(observed.primaryFound, 1, {observed, delta});
-                assert.eq(observed.primaryNotHandled, 0, {observed, delta});
-                assert.eq(observed.aggFound, 0, {observed, delta});
-                assert.eq(observed.aggNotFound, 0, {observed, delta});
+                const byEngine = readUpdateLookupDelta(delta);
+                const primary = byEngine[expectedUpdateLookupEngine(watchMode)];
+                assert.eq(primary.found, 1, {byEngine, delta});
+                assert.eq(primary.notHandled, 0, {byEngine, delta});
+                assert.eq(byEngine[UpdateLookupExecutor.kAggregation].found, 0, {byEngine, delta});
+                assert.eq(byEngine[UpdateLookupExecutor.kAggregation].notFound, 0, {
+                    byEngine,
+                    delta,
+                });
             });
         }
 
-        it(`moveCollection relocates the post-image [${watchModeToString(watchMode)}]: primary declines, aggregation finds it`, function () {
-            // moveCollection operates on an unsharded collection, which lives entirely on its owning
-            // shard (shard0 here). Create it by inserting.
-            const coll = mongosDB.getCollection("moveCollection");
-            assert.commandWorked(coll.insert({_id: 0}));
+        // moveCollection/movePrimary operate on unsplittable/untracked collections, which (unlike
+        // classic shardCollection) do accept a non-simple default collation, so they're the only
+        // place in this suite that can exercise collation as a dimension.
+        for (const config of unshardedConfigs) {
+            it(`moveCollection relocates the post-image [${watchModeToString(watchMode)}][${config.name}]: primary declines, aggregation finds it`, function () {
+                const coll = assertCreateCollection(mongosDB, "moveCollection", config.collOpts);
+                assert.commandWorked(coll.insert(config.doc));
 
-            assertUpdateLookupViaAggregate({watchMode, coll, expectFound: true}, (cst, cursor) => {
-                assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
-                assert.commandWorked(
-                    mongosDB.adminCommand({
-                        moveCollection: coll.getFullName(),
-                        toShard: st.shard1.shardName,
-                    }),
+                assertUpdateLookupViaAggregate(
+                    {watchMode, coll, expectFound: true},
+                    (cst, cursor) => {
+                        assert.commandWorked(coll.update(config.doc, {$set: {v: 1}}));
+                        assert.commandWorked(
+                            mongosDB.adminCommand({
+                                moveCollection: coll.getFullName(),
+                                toShard: st.shard1.shardName,
+                            }),
+                        );
+                        assertCollDataDistribution(mongosDB, coll, [
+                            [st.shard0, 0],
+                            [st.shard1, 1],
+                        ]);
+
+                        cst.assertNextChangesEqual({
+                            cursor,
+                            expectedChanges: [
+                                {
+                                    operationType: "update",
+                                    ns: {db: mongosDB.getName(), coll: coll.getName()},
+                                    documentKey: config.doc,
+                                    fullDocument: {...config.doc, v: 1},
+                                },
+                            ],
+                        });
+                    },
                 );
-                assertDocRelocatedToShard1(coll);
-
-                cst.assertNextChangesEqual({
-                    cursor,
-                    expectedChanges: [
-                        {
-                            operationType: "update",
-                            ns: {db: mongosDB.getName(), coll: coll.getName()},
-                            documentKey: {_id: 0},
-                            fullDocument: {_id: 0, v: 1},
-                        },
-                    ],
-                });
             });
-        });
 
-        it(`movePrimary relocates an untracked collection's post-image [${watchModeToString(watchMode)}]: primary declines, aggregation finds it`, function () {
-            // Unlike moveCollection (a resharding-based single-collection move), movePrimary
-            // relocates every untracked collection of a database along with its primary shard,
-            // exercising a distinct code path. beforeEach restores this database's primary to shard0.
-            const coll = mongosDB.getCollection("movePrimary");
-            assert.commandWorked(coll.insert({_id: 0}));
+            it(`movePrimary relocates an untracked collection's post-image [${watchModeToString(watchMode)}][${config.name}]: primary declines, aggregation finds it`, function () {
+                const coll = assertCreateCollection(mongosDB, "movePrimary", config.collOpts);
+                assert.commandWorked(coll.insert(config.doc));
 
-            assertUpdateLookupViaAggregate({watchMode, coll, expectFound: true}, (cst, cursor) => {
-                assert.commandWorked(coll.update({_id: 0}, {$set: {v: 1}}));
-                assert.commandWorked(
-                    mongosDB.adminCommand({
-                        movePrimary: mongosDB.getName(),
-                        to: st.shard1.shardName,
-                    }),
+                assertUpdateLookupViaAggregate(
+                    {watchMode, coll, expectFound: true},
+                    (cst, cursor) => {
+                        assert.commandWorked(coll.update(config.doc, {$set: {v: 1}}));
+                        assert.commandWorked(
+                            mongosDB.adminCommand({
+                                movePrimary: mongosDB.getName(),
+                                to: st.shard1.shardName,
+                            }),
+                        );
+                        assertCollDataDistribution(mongosDB, coll, [
+                            [st.shard0, 0],
+                            [st.shard1, 1],
+                        ]);
+
+                        cst.assertNextChangesEqual({
+                            cursor,
+                            expectedChanges: [
+                                {
+                                    operationType: "update",
+                                    ns: {db: mongosDB.getName(), coll: coll.getName()},
+                                    documentKey: config.doc,
+                                    fullDocument: {...config.doc, v: 1},
+                                },
+                            ],
+                        });
+                    },
                 );
-                assertDocRelocatedToShard1(coll);
-
-                // Assert only the update event; on an untracked collection movePrimary also emits a
-                // trailing drop (+ invalidate for collection-level streams), but the update whose
-                // post-image lookup we care about precedes them.
-                cst.assertNextChangesEqual({
-                    cursor,
-                    expectedChanges: [
-                        {
-                            operationType: "update",
-                            ns: {db: mongosDB.getName(), coll: coll.getName()},
-                            documentKey: {_id: 0},
-                            fullDocument: {_id: 0, v: 1},
-                        },
-                    ],
-                });
             });
-        });
+        }
     }
 });

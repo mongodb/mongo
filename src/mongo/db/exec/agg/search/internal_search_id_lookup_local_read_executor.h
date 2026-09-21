@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/query/plan_summary_stats.h"
 
@@ -25,9 +26,11 @@ class InternalSearchIdLookUpLocalReadExecutor final : public SingleDocumentLooku
 public:
     InternalSearchIdLookUpLocalReadExecutor(
         boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle> catalogResourceHandle,
-        boost::optional<std::vector<BSONObj>> viewPipeline)
+        boost::optional<std::vector<BSONObj>> viewPipeline,
+        exec::SingleDocumentLookupStatsRecorder recorder)
         : _catalogResourceHandle(std::move(catalogResourceHandle)),
-          _viewPipeline(std::move(viewPipeline)) {}
+          _viewPipeline(std::move(viewPipeline)),
+          _recorder(std::move(recorder)) {}
 
     LookupResult performLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const NamespaceString& nss,
@@ -42,6 +45,7 @@ public:
 private:
     boost::intrusive_ptr<DSInternalSearchIdLookUpCatalogResourceHandle> _catalogResourceHandle;
     boost::optional<std::vector<BSONObj>> _viewPipeline;
+    exec::SingleDocumentLookupStatsRecorder _recorder;
 
     // Non-owning; owned by the stage. Stats are accumulated here when set.
     PlanSummaryStats* _planSummaryStatsSink = nullptr;

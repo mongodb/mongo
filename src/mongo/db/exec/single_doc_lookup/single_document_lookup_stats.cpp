@@ -80,6 +80,41 @@ const SingleDocumentLookupStats kUpdateLookupSbeStats{
                                   "changeStreams.updateLookup.sbe.latencyMicros"),
 };
 
+const SingleDocumentLookupStats kSearchIdLookupAggregationStats{
+    .found = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kSearchIdLookupAggregationFound,
+        "search.idLookup.aggregation.found",
+        "Number of search id lookups via aggregation engine that found the document."),
+    .notFound = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kSearchIdLookupAggregationNotFound,
+        "search.idLookup.aggregation.notFound",
+        "Number of search id lookups via aggregation where the document was absent."),
+    .notHandled = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kSearchIdLookupAggregationNotHandled,
+        "search.idLookup.aggregation.notHandled",
+        "Number of search id lookups via aggregation the engine declined."),
+    .latencyMicros =
+        createUpdateLookupLatency(otel::metrics::MetricNames::kSearchIdLookupAggregationLatency,
+                                  "search.idLookup.aggregation.latencyMicros"),
+};
+
+const SingleDocumentLookupStats kSearchIdLookupSbeStats{
+    .found = createUpdateLookupCounter(otel::metrics::MetricNames::kSearchIdLookupSbeFound,
+                                       "search.idLookup.sbe.found",
+                                       "Number of search id lookups via SBE that found the "
+                                       "document."),
+    .notFound = createUpdateLookupCounter(
+        otel::metrics::MetricNames::kSearchIdLookupSbeNotFound,
+        "search.idLookup.sbe.notFound",
+        "Number of search id lookups via SBE where the document was absent."),
+    .notHandled =
+        createUpdateLookupCounter(otel::metrics::MetricNames::kSearchIdLookupSbeNotHandled,
+                                  "search.idLookup.sbe.notHandled",
+                                  "Number of search id lookups via SBE that the engine declined."),
+    .latencyMicros = createUpdateLookupLatency(
+        otel::metrics::MetricNames::kSearchIdLookupSbeLatency, "search.idLookup.sbe.latencyMicros"),
+};
+
 }  // namespace
 
 SingleDocumentLookupStatsRecorder
@@ -103,6 +138,22 @@ SingleDocumentLookupStatsRecorder SingleDocumentLookupStatsRecorder::makeUpdateL
                                              kUpdateLookupSbeStats.notFound,
                                              kUpdateLookupSbeStats.notHandled,
                                              kUpdateLookupSbeStats.latencyMicros);
+}
+
+SingleDocumentLookupStatsRecorder
+SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder() {
+    return SingleDocumentLookupStatsRecorder(kSearchIdLookupAggregationStats.found,
+                                             kSearchIdLookupAggregationStats.notFound,
+                                             kSearchIdLookupAggregationStats.notHandled,
+                                             kSearchIdLookupAggregationStats.latencyMicros);
+}
+
+SingleDocumentLookupStatsRecorder
+SingleDocumentLookupStatsRecorder::makeSearchIdLookupSbeRecorder() {
+    return SingleDocumentLookupStatsRecorder(kSearchIdLookupSbeStats.found,
+                                             kSearchIdLookupSbeStats.notFound,
+                                             kSearchIdLookupSbeStats.notHandled,
+                                             kSearchIdLookupSbeStats.latencyMicros);
 }
 
 }  // namespace mongo::exec
