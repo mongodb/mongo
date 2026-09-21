@@ -311,7 +311,10 @@ public:
 
     Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const final;
 
-    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) final;
+    Status stepUpIfEligible(
+        OperationContext* opCtx,
+        bool skipDryRun,
+        boost::optional<Date_t> priorPrimaryStopAcceptingWritesTime = boost::none) final;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) final;
 

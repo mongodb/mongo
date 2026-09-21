@@ -419,7 +419,10 @@ public:
 
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
-    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) override;
+    Status stepUpIfEligible(
+        OperationContext* opCtx,
+        bool skipDryRun,
+        boost::optional<Date_t> priorPrimaryStopAcceptingWritesTime = boost::none) override;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 

@@ -508,7 +508,9 @@ void ReplicationCoordinatorNoOp::clearCommittedSnapshot() {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) {
+Status ReplicationCoordinatorNoOp::stepUpIfEligible(OperationContext* opCtx,
+                                                    bool skipDryRun,
+                                                    boost::optional<Date_t>) {
     MONGO_UNREACHABLE;
 }
 

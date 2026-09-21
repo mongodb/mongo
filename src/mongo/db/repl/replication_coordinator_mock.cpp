@@ -741,7 +741,9 @@ WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptions
     return wc;
 }
 
-Status ReplicationCoordinatorMock::stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) {
+Status ReplicationCoordinatorMock::stepUpIfEligible(OperationContext* opCtx,
+                                                    bool skipDryRun,
+                                                    boost::optional<Date_t>) {
     return Status::OK();
 }
 

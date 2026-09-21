@@ -329,8 +329,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
               (endTimeYieldLocksInvalidateSessions - startTimeYieldLocksInvalidateSessions));
 }
 
-Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) {
-
+Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx,
+                                                    bool skipDryRun,
+                                                    boost::optional<Date_t>) {
     auto reason = skipDryRun ? StartElectionReasonEnum::kStepUpRequestSkipDryRun
                              : StartElectionReasonEnum::kStepUpRequest;
     _startElectSelfIfEligibleV1(reason);

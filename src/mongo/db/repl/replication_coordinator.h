@@ -1057,7 +1057,10 @@ public:
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) = 0;
 
-    virtual Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) = 0;
+    virtual Status stepUpIfEligible(
+        OperationContext* opCtx,
+        bool skipDryRun,
+        boost::optional<Date_t> priorPrimaryStopAcceptingWritesTime = boost::none) = 0;
 
     virtual ServiceContext* getServiceContext() = 0;
 
