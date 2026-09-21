@@ -15,9 +15,9 @@ import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 const collName = jsTestName();
 const dbName = jsTestName();
 
-// Use an isolated server instance to obtain predictible serverStatus planning metrics. Disable CBR, because it changes multi planner metrics.
-// TODO SERVER-122264 Enable CBR for this test.
-const conn = MongoRunner.runMongod({setParameter: {featureFlagCostBasedRanker: false}});
+// Use an isolated server instance to obtain predictible serverStatus planning
+// metrics. Force MultiPlanner, as CBR would not guarantee MP server status would be emitted.
+const conn = MongoRunner.runMongod({setParameter: {internalQueryPlanRanker: "multiPlanning"}});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
