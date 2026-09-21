@@ -570,11 +570,20 @@ export const $config = (function () {
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 // If a concurrent rename came in, then either the full operation succeded (meaning
                 // there will be 0 documents left) or the insert came in first.
-                assert.contains(currentDocs, [0, numDocs], {
+                //
+                // TODO (SERVER-134055): re-enable this check once bulk inserts error to prevent collection reincarnation.
+                jsTest.log.info("CRUD - Insert document count", {
                     tid,
                     currentTid: this.tid,
                     collection: targetThreadColl,
+                    currentDocs,
+                    numDocs,
                 });
+                // assert.contains(currentDocs, [0, numDocs], {
+                //     tid,
+                //     currentTid: this.tid,
+                //     collection: targetThreadColl,
+                // });
 
                 jsTest.log.info("CRUD - Update", {
                     tid,
