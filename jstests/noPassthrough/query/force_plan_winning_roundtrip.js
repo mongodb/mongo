@@ -3,6 +3,7 @@
  * even after the winning solution has been extended.
  */
 import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({
     setParameter: {
@@ -12,6 +13,19 @@ const conn = MongoRunner.runMongod({
 });
 assert.neq(conn, null);
 const db = conn.getDB("test");
+
+// The pre-extension winning solution hash is only captured on the deferred engine selection path.
+// Without it, explain reports the post-extension hash, which cannot be used to force the winning
+// plan (the forced hash is matched against unextended candidate solutions), so the agg case below
+// would fail with 'Forced plan solution hash not present in candidate plan set'.
+if (!isDeferredGetExecutorEnabled(db)) {
+    jsTest.log.info(
+        `Skipping ${jsTestName()}: requires featureFlagGetExecutorDeferredEngineChoice`,
+    );
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
