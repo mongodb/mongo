@@ -1,56 +1,26 @@
 /**
  * End to end test that DDL operations invalidate cached join plans, and only when they need to.
- * Verifies via server logs that after a join query shape has been cached (and is being served from
- * the cache), a DDL operation on a referenced collection forces the next identical query to miss
- * the cache and re-optimize -- but only if it changed an index relevant to that plan. A DDL which
- * bumps the collection's version tag while leaving every node's relevant-index fingerprint intact
- * must leave the entry usable, as should a DDL that drops or hides a relevant index that the cached plan does not use.
- *
- * TODO(SERVER-129272): Implement this test without relying on server logs once we have commands
- * to inspect the join plan cache.
+ * Verifies via the serverStatus counters that after a join query shape has been cached (and is being
+ * served from the cache), a DDL operation on a referenced collection forces the next identical query
+ * to miss the cache and re-optimize -- but only if it changed an index relevant to that plan. A DDL
+ * which bumps the collection's version tag while leaving every node's relevant-index fingerprint
+ * intact must leave the entry usable, as should a DDL that drops or hides a relevant index that the
+ * cached plan does not use.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  * ]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
-
-const JOIN_PLAN_CACHE_HIT_LOG_ID = 11083906;
-const JOIN_PLAN_CACHE_MISS_LOG_ID = 11083907;
-
-// Counts occurrences of each given structured log ID in a single pass over the log file. Returns an
-// object mapping each id to its count.
-function countLogIds(logFile, ids) {
-    const counts = {};
-    for (const id of ids) {
-        counts[id] = 0;
-    }
-    for (const line of cat(logFile).split("\n")) {
-        if (line.length === 0) {
-            continue;
-        }
-        let entry;
-        try {
-            entry = JSON.parse(line);
-        } catch (e) {
-            continue;
-        }
-        if (entry && counts.hasOwnProperty(entry.id)) {
-            counts[entry.id]++;
-        }
-    }
-    return counts;
-}
+import {assertAllJoinsUseMethod, joinPlanCacheStatsDelta} from "jstests/libs/query/join_utils.js";
 
 describe("join plan cache DDL invalidation", function () {
     // Test-wide, created once in before(): the mongod stays up for the whole test.
     let conn;
     let db;
-    let logFile;
     // Reset each test by resetCollections() (see beforeEach).
     let baseColl;
     let foreignColl;
@@ -59,17 +29,12 @@ describe("join plan cache DDL invalidation", function () {
 
     before(function () {
         conn = MongoRunner.runMongod({
-            useLogFiles: true,
             setParameter: {
                 internalEnableJoinOptimization: true,
                 internalEnableJoinPlanCache: true,
             },
         });
-        logFile = conn.fullOptions.logFile;
         db = conn.getDB(jsTestName());
-
-        // Raise query log verbosity so the join plan cache hit/miss log lines are emitted.
-        assert.commandWorked(conn.getDB("admin").setLogLevel(5, "query"));
     });
 
     after(function () {
@@ -96,11 +61,8 @@ describe("join plan cache DDL invalidation", function () {
 
     // (Re)creates the shared base + foreign collections in a known clean state and rebuilds the
     // shared runSpec. Called from beforeEach so every test starts from pristine collections (no
-    // leftover indexes from a prior test). Because the recreated collections get fresh UUIDs, any
-    // join plan cache entry a previous test left for this query shape is stale, so the first run of
-    // each test deterministically misses.
+    // leftover indexes from a prior test).
     function resetCollections() {
-        // TODO (SERVER-129272): Clear the join plan cache here instead of relying on fresh UUIDs.
         baseColl = db[jsTestName()];
         baseColl.drop();
         assert.commandWorked(
@@ -129,29 +91,26 @@ describe("join plan cache DDL invalidation", function () {
         ];
 
         // The shared runSpec passed to runOnce() by the tests that use the base+foreign pair.
-        runSpec = {logFile, coll: baseColl, pipeline, expectedResultCount: 8};
+        runSpec = {coll: baseColl, pipeline, expectedResultCount: 8};
     }
 
     beforeEach(function () {
+        // Clear the plan cache and reset the collections to a known clean state as test may create indexes that shouldn't affect other tests.
+        assert.commandWorked(db.adminCommand({clearJoinPlanCache: 1}));
         resetCollections();
         // Reset the forced join method so a test that forces INLJ (and fails before resetting) can't
         // leak that setting into later tests.
         setForcedJoinMethod("any");
     });
 
-    // Runs 'pipeline' on 'coll' once, asserts the result size, and returns whether
-    // that run hit or missed the join plan cache: {hit, miss} as booleans, derived from the change
-    // in the hit/miss log counts. A run that is ineligible for join optimization (e.g. a referenced
+    // Runs 'pipeline' on 'coll' once, asserts the result size, and returns whether that run hit or
+    // missed the join plan cache: {hit, miss} as booleans, derived from the change in the cumulative
+    // serverStatus counters. A run that is ineligible for join optimization (e.g. a referenced
     // collection no longer exists) touches the cache for neither, so both are false.
-    function runOnce({logFile, coll, pipeline, expectedResultCount}) {
-        const ids = [JOIN_PLAN_CACHE_HIT_LOG_ID, JOIN_PLAN_CACHE_MISS_LOG_ID];
-        const before = countLogIds(logFile, ids);
-
-        assert.eq(coll.aggregate(pipeline).toArray().length, expectedResultCount);
-
-        const after = countLogIds(logFile, ids);
-        const hitDelta = after[JOIN_PLAN_CACHE_HIT_LOG_ID] - before[JOIN_PLAN_CACHE_HIT_LOG_ID];
-        const missDelta = after[JOIN_PLAN_CACHE_MISS_LOG_ID] - before[JOIN_PLAN_CACHE_MISS_LOG_ID];
+    function runOnce({coll, pipeline, expectedResultCount}) {
+        const {hitDelta, missDelta} = joinPlanCacheStatsDelta(db, () => {
+            assert.eq(coll.aggregate(pipeline).toArray().length, expectedResultCount);
+        });
         assert.lte(hitDelta + missDelta, 1, "a single run cannot both hit and miss the cache", {
             hitDelta,
             missDelta,
@@ -294,7 +253,6 @@ describe("join plan cache DDL invalidation", function () {
         // an index on it shifts this shape's key.
         const filteredPipeline = [{$match: {b: {$gt: 0}}}, ...pipeline];
         const filteredSpec = {
-            logFile,
             coll: baseColl,
             pipeline: filteredPipeline,
             expectedResultCount: 8,

@@ -1,48 +1,29 @@
 /**
- * End to end test for the join plan cache. Verifies via server logs that an identical join query
- * shape misses the cache on first execution and hits it on the second.
- *
- * TODO(SERVER-129272): Implement this test without relying on server logs once we have commands
- * to inspect the join plan cache.
+ * End to end test for the join plan cache. Verifies that an identical join query shape misses the
+ * cache on first execution and hits it on the second, using the serverStatus counters.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  * ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-
-const JOIN_PLAN_CACHE_HIT_LOG_ID = 11083906;
-const JOIN_PLAN_CACHE_MISS_LOG_ID = 11083907;
-
-// Counts occurrences of a structured log line with the given numeric log ID.
-function countLogId(logFile, id) {
-    return cat(logFile)
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .map((line) => {
-            try {
-                return JSON.parse(line);
-            } catch (e) {
-                return null;
-            }
-        })
-        .filter((entry) => entry && entry.id === id).length;
-}
+import {assertJoinPlanCacheStats} from "jstests/libs/query/join_utils.js";
 
 describe("join plan cache", function () {
     before(function () {
         this.conn = MongoRunner.runMongod({
-            useLogFiles: true,
             setParameter: {
                 internalEnableJoinOptimization: true,
                 internalEnableJoinPlanCache: true,
             },
         });
-        this.logFile = this.conn.fullOptions.logFile;
 
         const db = this.conn.getDB(jsTestName());
+        this.db = db;
+        this.adminDB = this.conn.getDB("admin");
+        assert.commandWorked(this.adminDB.adminCommand({clearJoinPlanCache: 1}));
         this.baseColl = db[jsTestName()];
         this.foreignColl = db[jsTestName() + "_a"];
 
@@ -82,9 +63,6 @@ describe("join plan cache", function () {
             },
             {$unwind: "$foreignColl"},
         ];
-
-        // Raise query log verbosity so the join plan cache hit/miss log lines are emitted.
-        assert.commandWorked(this.conn.getDB("admin").setLogLevel(5, "query"));
     });
 
     after(function () {
@@ -92,23 +70,39 @@ describe("join plan cache", function () {
     });
 
     it("misses the cache on the first run and hits it on the second run", function () {
-        assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+        const emptyStats = this.adminDB.aggregate([{$joinPlanCacheStats: {}}]).toArray();
+        assert.eq(0, emptyStats.length, "expected an empty join plan cache before the first run", {
+            emptyStats,
+        });
+
+        // First run must miss and cache the plan.
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 0,
+            expectedMisses: 1,
+        });
+
+        const stats = this.adminDB.aggregate([{$joinPlanCacheStats: {}}]).toArray();
         assert.eq(
-            countLogId(this.logFile, JOIN_PLAN_CACHE_MISS_LOG_ID),
             1,
-            "expected exactly one join plan cache miss on the first run",
-        );
-        assert.eq(
-            countLogId(this.logFile, JOIN_PLAN_CACHE_HIT_LOG_ID),
-            0,
-            "did not expect a join plan cache hit on the first run",
+            stats.length,
+            "expected exactly one join plan cache entry after the first run",
+            {
+                stats,
+            },
         );
 
-        assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
-        assert.gte(
-            countLogId(this.logFile, JOIN_PLAN_CACHE_HIT_LOG_ID),
-            1,
-            "expected a join plan cache hit on the second run",
-        );
+        // Second run is served from the cache.
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 1,
+            expectedMisses: 0,
+        });
     });
 });

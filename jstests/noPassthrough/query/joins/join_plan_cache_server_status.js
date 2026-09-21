@@ -2,69 +2,15 @@
  * End to end test for the join plan cache serverStatus metrics.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   requires_sbe,
  * ]
  */
 
-import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
+import {assertAllJoinsUseMethod, assertJoinPlanCacheStats} from "jstests/libs/query/join_utils.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 describe("join plan cache serverStatus metrics", function () {
-    // Returns {hits, misses, invalidations} from serverStatus.metrics.query.planCache.join.
-    function joinPlanCacheStats(db) {
-        const planCache = db.serverStatus().metrics.query.planCache;
-        assert(planCache.hasOwnProperty("join"), "missing metrics.query.planCache.join", {
-            planCache,
-        });
-        const join = planCache.join;
-        return {hits: join.hits, misses: join.misses, invalidations: join.invalidations};
-    }
-
-    // Helper function to assert that the join plan cache stats have changed by
-    // the expected amounts during the execution of the given function.
-    function assertJoinPlanCacheStats({
-        db,
-        fn,
-        expectedHits,
-        expectedMisses,
-        expectedInvalidations = 0,
-    }) {
-        const beforeStats = joinPlanCacheStats(db);
-        fn();
-        const afterStats = joinPlanCacheStats(db);
-        assert.eq(
-            afterStats.hits - beforeStats.hits,
-            expectedHits,
-            "unexpected join plan cache hits",
-            {
-                expectedHits: expectedHits,
-                before: beforeStats,
-                after: afterStats,
-            },
-        );
-        assert.eq(
-            afterStats.misses - beforeStats.misses,
-            expectedMisses,
-            "unexpected join plan cache misses",
-            {
-                expectedMisses: expectedMisses,
-                before: beforeStats,
-                after: afterStats,
-            },
-        );
-        assert.eq(
-            afterStats.invalidations - beforeStats.invalidations,
-            expectedInvalidations,
-            "unexpected join plan cache invalidations",
-            {
-                expectedInvalidations: expectedInvalidations,
-                before: beforeStats,
-                after: afterStats,
-            },
-        );
-    }
-
     beforeEach(function () {
         this.conn = MongoRunner.runMongod({
             setParameter: {
