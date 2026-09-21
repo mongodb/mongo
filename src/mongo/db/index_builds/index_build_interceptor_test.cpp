@@ -9,6 +9,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -69,6 +70,17 @@ key_string::Value makeKeyString(int64_t value, RecordId rid) {
     ksBuilder.appendNumberLong(value);
     ksBuilder.appendRecordId(rid);
     return key_string::Value(ksBuilder.release());
+}
+
+// Asserts that 'record' carries multikey state and that the paths it carries are 'expected'. The
+// flag alone is not enough: an index can already be multikey while the paths a write implies are
+// new, and the planner relies on that path-level detail.
+void assertRecordCarriesMultikeyPaths(const BSONObj& record, const MultikeyPaths& expected) {
+    ASSERT_TRUE(record[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) << record;
+    auto pathsElem = record[IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
+    ASSERT_EQ(pathsElem.type(), BSONType::object) << record;
+    auto parsed = unittest::assertGet(multikey_paths::parse(pathsElem.Obj()));
+    ASSERT_EQ(multikey_paths::toString(parsed), multikey_paths::toString(expected));
 }
 
 class IndexBuilderInterceptorTest : public CatalogTestFixture {
@@ -386,6 +398,397 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
     EXPECT_EQ(duplicates[0], ksWithoutRid);
 }
 
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    const auto entry = getIndexEntry("a_1");
+
+    // Two keys from one document, with the path-level information a multikey index carries.
+    key_string::HeapBuilder firstBuilder(key_string::Version::kLatestVersion);
+    firstBuilder.appendNumberLong(10);
+    key_string::Value firstKey(firstBuilder.release());
+    key_string::HeapBuilder secondBuilder(key_string::Version::kLatestVersion);
+    secondBuilder.appendNumberLong(20);
+    key_string::Value secondKey(secondBuilder.release());
+    const MultikeyPaths multikeyPaths{MultikeyComponents{0}};
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         _coll->getCollectionPtr(),
+                                         entry,
+                                         {firstKey, secondKey},
+                                         {},
+                                         multikeyPaths,
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        EXPECT_EQ(numKeys, 2);
+        wuow.commit();
+    }
+
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(sideWrites.size(), 2);
+
+    // Only the first of the document's records carries the state; every record is applied, so one
+    // is enough.
+    ASSERT_TRUE(sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
+    ASSERT_FALSE(sideWrites[1][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
+
+    auto pathsElem = sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
+    ASSERT_EQ(pathsElem.type(), BSONType::object);
+    auto parsedPaths = unittest::assertGet(multikey_paths::parse(pathsElem.Obj()));
+    EXPECT_EQ(multikey_paths::toString(parsedPaths), multikey_paths::toString(multikeyPaths));
+}
+
+// A document can be multikey while generating no keys at all (SERVER-39705) -- a sparse
+// {"a.b": 1} index over {a: [{c: 1}]}, for instance.
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysWritesNoRecord) {
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    auto entry = getIndexEntry("a_1");
+
+    const MultikeyPaths multikeyPaths{MultikeyComponents{0}};
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         _coll->getCollectionPtr(),
+                                         entry,
+                                         {},
+                                         {},
+                                         multikeyPaths,
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        EXPECT_EQ(numKeys, 0);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+    // The state is still tracked in memory for the node that received the write.
+    EXPECT_TRUE(interceptor->getMultikeyPaths());
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetadataKeyRecord) {
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'wc_1', key: {'$**': 1}}"));
+    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    auto entry = getIndexEntry("wc_1");
+
+    key_string::HeapBuilder metadataBuilder(key_string::Version::kLatestVersion);
+    metadataBuilder.appendNumberLong(10);
+    key_string::Value metadataKey(metadataBuilder.release());
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         _coll->getCollectionPtr(),
+                                         entry,
+                                         {},
+                                         {metadataKey},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        EXPECT_EQ(numKeys, 1);
+        wuow.commit();
+    }
+
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(sideWrites.size(), 1);
+    EXPECT_TRUE(sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
+}
+
+// An update can make a document multikey without changing its key set at all: {a: 5} becoming
+// {a: [5]} still indexes the single key 5.
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecordsMultikeyPaths) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+
+    // The update path only takes the side table while a build is in progress on this index, which
+    // IndexBuildBlock signals by registering the interceptor on the entry.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "a_1",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    auto* entry = getIndexEntry("a_1");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(
+            entry->accessMethod()->update(operationContext(),
+                                          *shard_role_details::getRecoveryUnit(operationContext()),
+                                          pooledBuilder,
+                                          BSON("_id" << 0 << "a" << 5),
+                                          BSON("_id" << 0 << "a" << BSON_ARRAY(5)),
+                                          RecordId{1},
+                                          _coll->getCollectionPtr(),
+                                          entry,
+                                          InsertDeleteOptions{},
+                                          &numInserted,
+                                          &numDeleted));
+        wuow.commit();
+    }
+
+    // The key itself is unchanged, so without writing the whole key sets there would be no record
+    // here at all.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(sideWrites.size(), 2);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "d");
+    EXPECT_EQ(sideWrites[1].getStringField("op"), "i");
+    assertRecordCarriesMultikeyPaths(sideWrites[1], MultikeyPaths{MultikeyComponents{0}});
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingKeysPairsASingleCarrierKey) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "a_1",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    auto* entry = getIndexEntry("a_1");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        // Drop two of five elements: the difference removes two keys and adds none.
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(entry->accessMethod()->update(
+            operationContext(),
+            *shard_role_details::getRecoveryUnit(operationContext()),
+            pooledBuilder,
+            BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2 << 3 << 4 << 5)),
+            BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2 << 3)),
+            RecordId{1},
+            _coll->getCollectionPtr(),
+            entry,
+            InsertDeleteOptions{},
+            &numInserted,
+            &numDeleted));
+        wuow.commit();
+    }
+
+    // The two removed keys, plus one surviving key written as a delete and an insert. Writing whole
+    // key sets would instead have produced five deletes and three inserts.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(4, sideWrites.size());
+    std::size_t inserts = 0;
+    for (const auto& record : sideWrites) {
+        if (record.getStringField("op") == "i") {
+            ++inserts;
+            assertRecordCarriesMultikeyPaths(record, MultikeyPaths{MultikeyComponents{0}});
+        }
+    }
+    EXPECT_EQ(inserts, 1);
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateMovingTheArrayPathRecordsTheNewPaths) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'ab_1', key: {'a.b': 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "ab_1",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    auto* entry = getIndexEntry("ab_1");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        // {a: {b: [1, 2]}} indexes keys 1 and 2 with the array at "a.b"; {a: [{b: 1}]} indexes key
+        // 1 alone with the array at "a". The difference removes key 2 and adds nothing.
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(entry->accessMethod()->update(
+            operationContext(),
+            *shard_role_details::getRecoveryUnit(operationContext()),
+            pooledBuilder,
+            BSON("_id" << 0 << "a" << BSON("b" << BSON_ARRAY(1 << 2))),
+            BSON("_id" << 0 << "a" << BSON_ARRAY(BSON("b" << 1))),
+            RecordId{1},
+            _coll->getCollectionPtr(),
+            entry,
+            InsertDeleteOptions{},
+            &numInserted,
+            &numDeleted));
+        wuow.commit();
+    }
+
+    // The sole insert record must carry the new document's paths: the array is now at the first
+    // path component, not the second.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    boost::optional<BSONObj> insertRecord;
+    for (const auto& record : sideWrites) {
+        if (record.getStringField("op") == "i") {
+            ASSERT_FALSE(insertRecord) << "expected exactly one insert record";
+            insertRecord = record;
+        }
+    }
+    ASSERT_TRUE(insertRecord);
+    assertRecordCarriesMultikeyPaths(*insertRecord, MultikeyPaths{MultikeyComponents{0}});
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateChangingKeySetWritesOnlyTheDifference) {
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "a_1",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    auto* entry = getIndexEntry("a_1");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        // Appending an element to the array adds one key and removes none.
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(
+            entry->accessMethod()->update(operationContext(),
+                                          *shard_role_details::getRecoveryUnit(operationContext()),
+                                          pooledBuilder,
+                                          BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)),
+                                          BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2 << 3)),
+                                          RecordId{1},
+                                          _coll->getCollectionPtr(),
+                                          entry,
+                                          InsertDeleteOptions{},
+                                          &numInserted,
+                                          &numDeleted));
+        wuow.commit();
+    }
+
+    // Just the one added key, carrying the multikey state -- not all three.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(sideWrites.size(), 1);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "i");
+    assertRecordCarriesMultikeyPaths(sideWrites[0], MultikeyPaths{MultikeyComponents{0}});
+}
+
+TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecord) {
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+
+    // Register it on the entry the way IndexBuildBlock does during a build, since that is where the
+    // drain looks the interceptor up.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "a_1",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
+    ksBuilder.appendNumberLong(10);
+    ksBuilder.appendRecordId(RecordId{1});
+    key_string::Value keyString(ksBuilder.release());
+    const MultikeyPaths multikeyPaths{MultikeyComponents{0}};
+
+    {
+        BufBuilder bufBuilder;
+        keyString.serialize(bufBuilder);
+        BSONObjBuilder recordBuilder;
+        recordBuilder.append("op", "i");
+        recordBuilder.appendBinData("key", bufBuilder.len(), BinDataGeneral, bufBuilder.buf());
+        recordBuilder.append(IndexBuildInterceptor::kSideWriteMultikeyFieldName, true);
+        {
+            BSONObjBuilder pathsBuilder(
+                recordBuilder.subobjStart(IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName));
+            multikey_paths::serialize(BSON("a" << 1), multikeyPaths, pathsBuilder);
+        }
+        auto record = recordBuilder.obj();
+
+        WriteUnitOfWork wuow(operationContext());
+        auto table = getTable(*indexBuildInfo.sideWritesIdent);
+        ASSERT_OK(table->insertRecord(operationContext(),
+                                      *shard_role_details::getRecoveryUnit(operationContext()),
+                                      record.objdata(),
+                                      record.objsize(),
+                                      Timestamp()));
+        wuow.commit();
+    }
+
+    // Nothing is known in memory: this interceptor never handled the client write.
+    ASSERT_FALSE(interceptor->getMultikeyPaths());
+
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                _coll->getCollectionPtr(),
+                                                getIndexEntry("a_1"),
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
+                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // The drain must have consumed the record, otherwise the assertion below would be vacuous.
+    ASSERT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+
+    auto recovered = interceptor->getMultikeyPaths();
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ(multikey_paths::toString(*recovered), multikey_paths::toString(multikeyPaths));
+}
+
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven) {
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
@@ -446,6 +849,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -567,6 +971,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -670,6 +1075,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                               _coll->getCollectionPtr(),
                                               entry,
                                               InsertDeleteOptions{.dupsAllowed = true},
+                                              /*onMultikeyPathsRecovered=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
         // Exactly one WCE fired during the drain.
@@ -774,6 +1180,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                               _coll->getCollectionPtr(),
                                               entry,
                                               InsertDeleteOptions{.dupsAllowed = true},
+                                              /*onMultikeyPathsRecovered=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
         EXPECT_EQ(initialTimesEntered + 1,
@@ -869,6 +1276,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
                                           _coll->getCollectionPtr(),
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
+                                          /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield),
         DBException,
@@ -1161,6 +1569,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1215,6 +1624,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1286,6 +1696,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1321,6 +1732,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContaine
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1367,6 +1779,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1463,6 +1876,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1522,6 +1936,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1604,6 +2019,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1667,6 +2083,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1739,6 +2156,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1811,6 +2229,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -1890,6 +2309,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                           _coll->getCollectionPtr(),
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
+                                          /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
     EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
@@ -1965,6 +2385,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 _coll->getCollectionPtr(),
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
@@ -2044,6 +2465,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                           _coll->getCollectionPtr(),
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
+                                          /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
     EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);

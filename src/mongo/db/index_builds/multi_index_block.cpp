@@ -1477,10 +1477,33 @@ Status MultiIndexBlock::drainBackgroundWrites(
         // _ignoreUnique is set explicitly.
         auto trackDups = !_ignoreUnique ? IndexBuildInterceptor::TrackDuplicates::kTrack
                                         : IndexBuildInterceptor::TrackDuplicates::kNoTrack;
+
+        // Multikey state a drained record carried lives only in the interceptor's memory, and the
+        // record is deleted by the same transaction that applies it. Fold it into this build's
+        // state and persist it in that transaction.
+        auto onMultikeyPathsRecovered = [this, i](OperationContext* opCtx,
+                                                  const MultikeyPaths& paths) -> Status {
+            _indexes[i].drainedMultikey = true;
+            if (!paths.empty()) {
+                if (_indexes[i].drainedMultikeyPaths.empty()) {
+                    _indexes[i].drainedMultikeyPaths = paths;
+                } else {
+                    MultikeyPathTracker::mergeMultikeyPaths(&_indexes[i].drainedMultikeyPaths,
+                                                            paths);
+                }
+            }
+            if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+                return Status::OK();
+            }
+            _upsertIndexStateInfo(opCtx, i);
+            return Status::OK();
+        };
+
         auto status = interceptor->drainWritesIntoIndex(opCtx,
                                                         coll,
                                                         _indexes[i].block->getEntry(opCtx, coll),
                                                         _indexes[i].options,
+                                                        onMultikeyPathsRecovered,
                                                         trackDups,
                                                         drainYieldPolicy);
         if (!status.isOK()) {
@@ -1831,15 +1854,19 @@ void MultiIndexBlock::_writeIndexStateInfoToContainer(OperationContext* opCtx, s
     if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
         return;
     }
+    writeConflictRetry(opCtx, "writeIndexStateInfoToContainer", NamespaceString::kEmpty, [&] {
+        WriteUnitOfWork wuow(opCtx);
+        _upsertIndexStateInfo(opCtx, index);
+        wuow.commit();
+    });
+}
+
+void MultiIndexBlock::_upsertIndexStateInfo(OperationContext* opCtx, size_t index) const {
     invariant(index < _indexes.size());
 
     auto obj = _buildIndexStateInfo(_indexes[index]).toBSON();
     auto key = indexBuildMetadataKey + static_cast<int64_t>(index) + 1;
-    writeConflictRetry(opCtx, "writeIndexStateInfoToContainer", NamespaceString::kEmpty, [&] {
-        WriteUnitOfWork wuow(opCtx);
-        _upsertIntoContainer(opCtx, key, obj);
-        wuow.commit();
-    });
+    _upsertIntoContainer(opCtx, key, obj);
 
     LOGV2_DEBUG(12558701,
                 1,
@@ -1929,10 +1956,23 @@ IndexStateInfo MultiIndexBlock::_buildIndexStateInfo(const IndexToBuild& index) 
     }
 
     indexStateInfo.setSpec(index.block->getSpec());
-    indexStateInfo.setIsMultikey(index.bulk->isMultikey());
+    indexStateInfo.setIsMultikey(index.bulk->isMultikey() || index.drainedMultikey);
+
+    // The bulk builder only knows the multikey state the collection scan found; fold in anything
+    // recovered from drained side writes.
+    MultikeyPaths paths = index.bulk->getMultikeyPaths();
+    if (!index.drainedMultikeyPaths.empty()) {
+        if (paths.empty()) {
+            // `mergeMultikeyPaths` requires both inputs to have the same shape, and an empty
+            // vector means the index does not track paths at all.
+            paths = index.drainedMultikeyPaths;
+        } else {
+            MultikeyPathTracker::mergeMultikeyPaths(&paths, index.drainedMultikeyPaths);
+        }
+    }
 
     std::vector<MultikeyPath> multikeyPaths;
-    for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
+    for (const auto& multikeyPath : paths) {
         MultikeyPath multikeyPathObj;
         std::vector<int32_t> multikeyComponents;
         for (const auto& multikeyComponent : multikeyPath) {

@@ -17,6 +17,7 @@
 #include "mongo/db/index/geo/s2_bucket_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_bulk_builder_metrics.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
@@ -341,12 +342,44 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     if (entry->indexBuildInterceptor() || !entry->isReady()) {
+        // A primary-driven index build carries the multikey state a write implies on the side write
+        // records that write produces, so it needs at least one record to carry it. An update whose
+        // new keys are all present already -- a scalar becoming a single-element array, say, where
+        // the key does not change at all -- has an empty difference and produces none, losing that
+        // state. Such an update therefore writes one of its surviving keys as a delete and an
+        // insert on top of the real difference: that leaves the index exactly as it was while
+        // giving the insert record something to carry the state
+        // TODO (SERVER-135300): Remove once a side write can carry multikey state on its own.
+        bool needsCarrierForMultikeyState =
+            entry->indexBuildInterceptor() && updateTicket.added.empty() &&
+            !updateTicket.newKeys.empty() &&
+            // Wildcard indexes write their multikey metadata keys in full rather than as a
+            // difference, so for those the metadata records are already a carrier.
+            updateTicket.newMultikeyMetadataKeys.empty() &&
+            shouldMarkIndexAsMultikey(updateTicket.newKeys.size(),
+                                      updateTicket.newMultikeyMetadataKeys,
+                                      updateTicket.newMultikeyPaths) &&
+            index_builds::primary_driven::enabled(
+                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        KeyStringSet carrierRemoved;
+        KeyStringSet carrierAdded;
+        if (needsCarrierForMultikeyState) {
+            // Any surviving key will do; `added` being empty means every new key is an old one too,
+            // so re-inserting it is a no-op for the index.
+            const auto& carrier = *updateTicket.newKeys.begin();
+            carrierRemoved = updateTicket.removed;
+            carrierRemoved.insert(carrier);
+            carrierAdded.insert(carrier);
+        }
+        auto& keysRemoved = needsCarrierForMultikeyState ? carrierRemoved : updateTicket.removed;
+        auto& keysAdded = needsCarrierForMultikeyState ? carrierAdded : updateTicket.added;
+
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll,
                                        entry,
                                        loc,
-                                       updateTicket.removed,
+                                       keysRemoved,
                                        oldDoc,
                                        logIfError,
                                        numDeleted,
@@ -356,7 +389,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                             coll,
                                             entry,
                                             loc,
-                                            updateTicket.added,
+                                            keysAdded,
                                             updateTicket.newMultikeyMetadataKeys,
                                             updateTicket.newMultikeyPaths,
                                             newDoc,
@@ -865,6 +898,22 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                                              int64_t* const keysDeleted,
                                                              int64_t* const bytesInserted,
                                                              int64_t* const bytesDeleted) {
+    // Recover any multikey state the writer recorded alongside this key.
+    if (operation[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) {
+        if (auto interceptor = entry->indexBuildInterceptor()) {
+            MultikeyPaths multikeyPaths;
+            if (auto pathsElem = operation[IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
+                pathsElem.type() == BSONType::object) {
+                auto swPaths = multikey_paths::parse(pathsElem.Obj());
+                if (!swPaths.isOK()) {
+                    return swPaths.getStatus();
+                }
+                multikeyPaths = std::move(swPaths.getValue());
+            }
+            interceptor->recordDrainedMultikeyPaths(multikeyPaths);
+        }
+    }
+
     auto opType = [&operation] {
         switch (operation.getStringField("op")[0]) {
             case 'i':

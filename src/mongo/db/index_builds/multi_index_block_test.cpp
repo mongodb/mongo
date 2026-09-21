@@ -1208,6 +1208,106 @@ TEST_F(MultiIndexBlockTest, ResumablePrimaryDrivenIndexBuildTableIsCreatedAfterO
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileDraining) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo{BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine};
+
+    ASSERT_OK(indexer
+                  ->init(operationContext(),
+                         coll,
+                         {indexBuildInfo},
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    // Nothing the collection scan saw was multikey.
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    {
+        auto beforeInfo = index_builds::readAndParseResumeIndexInfo(
+            storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+        ASSERT_TRUE(beforeInfo);
+        ASSERT_EQ(beforeInfo->getIndexes().size(), 1);
+        EXPECT_FALSE(beforeInfo->getIndexes()[0].getIsMultikey());
+    }
+
+    // A concurrent write that makes the index multikey, recorded as a side write.
+    auto* entry = coll->getIndexCatalog()->findIndexByName(
+        operationContext(), "a_1", IndexCatalog::InclusionPolicy::kAll);
+    ASSERT(entry);
+    auto interceptor = entry->indexBuildInterceptor();
+    ASSERT(interceptor);
+
+    key_string::HeapBuilder ksBuilder{key_string::Version::kLatestVersion};
+    ksBuilder.appendNumberLong(10);
+    ksBuilder.appendRecordId(RecordId{2});
+    key_string::Value keyString{ksBuilder.release()};
+    MultikeyPaths multikeyPaths{MultikeyComponents{0}};
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         coll.get(),
+                                         entry,
+                                         {keyString},
+                                         {},
+                                         multikeyPaths,
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // The drained state is now in the resume record, not only in this node's memory.
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    EXPECT_TRUE(resumeInfo->getIndexes()[0].getIsMultikey());
+    EXPECT_FALSE(resumeInfo->getIndexes()[0].getMultikeyPaths().empty());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 // With resumable PDIB enabled, the first call to drainBackgroundWrites must
 // transition into kDrainWrites and persist a ResumeIndexInfo with that phase to the replicated
 // internal-indexBuild-<UUID> table.

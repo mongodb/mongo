@@ -33,6 +33,10 @@ public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
     using DrainYieldPolicy = SideWritesTracker::DrainYieldPolicy;
 
+    // Field names of the multikey state a side write record carries.
+    static constexpr std::string_view kSideWriteMultikeyFieldName = "multikey";
+    static constexpr std::string_view kSideWriteMultikeyPathsFieldName = "multikeyPaths";
+
     enum class Op { kInsert, kDelete };
 
     /**
@@ -87,6 +91,15 @@ public:
                                         const IndexCatalogEntry* indexCatalogEntry) const;
 
     /**
+     * Invoked, inside the transaction draining a batch, when that batch recovered multikey state
+     * from its records. It is handed everything this interceptor knows so far. The records that
+     * carried that state are deleted by the same transaction, so a caller that needs it to outlive
+     * this node has to persist it here; pass an empty function to drop it instead.
+     */
+    using OnMultikeyPathsRecoveredFn =
+        std::function<Status(OperationContext*, const MultikeyPaths&)>;
+
+    /**
      * Drain the writes from the side writes table/tracker into the
      * index identified by `indexCatalogEntry`.
      */
@@ -94,6 +107,7 @@ public:
                                 const CollectionPtr& coll,
                                 const IndexCatalogEntry* indexCatalogEntry,
                                 const InsertDeleteOptions& options,
+                                const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
 
@@ -145,6 +159,11 @@ public:
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
     /**
+     * Records multikey paths recovered from a side write that this node's drain applied.
+     */
+    void recordDrainedMultikeyPaths(const MultikeyPaths& multikeyPaths);
+
+    /**
      * Creates a ContainerSpiller from the _sorterTable.
      */
     IntegerKeyedContainer& getSorterContainer() {
@@ -179,6 +198,15 @@ private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     bool _checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
+
+    /**
+     * Merges 'multikeyPaths' into '_multikeyPaths'
+     */
+    void _mergeMultikeyPaths(const MultikeyPaths& multikeyPaths);
+
+    // Set when a drained record hands multikey state back, cleared once that state has been
+    // reported to the drain's OnMultikeyPathsRecoveredFn.
+    bool _multikeyPathsRecovered = false;
 
     // This temporary record store records all the index keys that we encounter upon collection
     // scan. We will use the _sorterTable for primary-driven index builds to replicate sorting and

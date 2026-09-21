@@ -14,6 +14,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/enabled.h"
@@ -113,12 +114,14 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(
     return Status::OK();
 }
 
-Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
-                                                   const CollectionPtr& coll,
-                                                   const IndexCatalogEntry* indexCatalogEntry,
-                                                   const InsertDeleteOptions& options,
-                                                   TrackDuplicates trackDuplicates,
-                                                   DrainYieldPolicy drainYieldPolicy) {
+Status IndexBuildInterceptor::drainWritesIntoIndex(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* indexCatalogEntry,
+    const InsertDeleteOptions& options,
+    const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+    TrackDuplicates trackDuplicates,
+    DrainYieldPolicy drainYieldPolicy) {
     // Sorted index types may choose to disallow duplicates (enforcing an unique index).
     // Only sorted indexes will use this lambda passed through the IndexAccessMethod interface.
     auto onDuplicateKeyFn = [=, this](const CollectionPtr& coll,
@@ -128,8 +131,36 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             : Status::OK();
     };
 
-    return _sideWritesTracker.drainWritesIntoIndex(
-        opCtx, coll, indexCatalogEntry, options, onDuplicateKeyFn, drainYieldPolicy);
+    // Report any multikey state the batch recovered from its records while its transaction is
+    // still open, so the caller can persist it alongside the keys it applied.
+    SideWritesTracker::OnBatchAppliedFn onBatchApplied;
+    if (onMultikeyPathsRecovered) {
+        onBatchApplied = [&](OperationContext* opCtx) -> Status {
+            boost::optional<MultikeyPaths> recovered;
+            {
+                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+                if (!std::exchange(_multikeyPathsRecovered, false)) {
+                    return Status::OK();
+                }
+                recovered = _multikeyPaths;
+            }
+            auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
+            if (!status.isOK()) {
+                // Leave the state flagged so a later batch reports it again.
+                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+                _multikeyPathsRecovered = true;
+            }
+            return status;
+        };
+    }
+
+    return _sideWritesTracker.drainWritesIntoIndex(opCtx,
+                                                   coll,
+                                                   indexCatalogEntry,
+                                                   options,
+                                                   onDuplicateKeyFn,
+                                                   onBatchApplied,
+                                                   drainYieldPolicy);
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
@@ -171,6 +202,23 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
     return _multikeyPaths;
 }
 
+void IndexBuildInterceptor::_mergeMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+    if (_multikeyPaths) {
+        MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), multikeyPaths);
+    } else {
+        // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey "shape".
+        // Initialize `_multikeyPaths` with the right shape from the first result.
+        _multikeyPaths = multikeyPaths;
+    }
+}
+
+void IndexBuildInterceptor::recordDrainedMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    _mergeMultikeyPaths(multikeyPaths);
+    std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+    _multikeyPathsRecovered = true;
+}
+
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const CollectionPtr& coll,
                                         const IndexCatalogEntry* indexCatalogEntry,
@@ -191,18 +239,12 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         keys.size(), multikeyMetadataKeys, multikeyPaths);
 
     // No need to take the multikeyPaths mutex if this would not change any multikey state.
-    if (op == Op::kInsert && isMultikey) {
+    bool isMultikeyInsert = op == Op::kInsert && isMultikey;
+    if (isMultikeyInsert) {
         // SERVER-39705: It's worth noting that a document may not generate any keys, but be
         // described as being multikey. This step must be done to maintain parity with `validate`s
         // expectations.
-        std::unique_lock<std::mutex> lk(_multikeyPathMutex);
-        if (_multikeyPaths) {
-            MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), multikeyPaths);
-        } else {
-            // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey
-            // "shape". Initialize `_multikeyPaths` with the right shape from the first result.
-            _multikeyPaths = multikeyPaths;
-        }
+        _mergeMultikeyPaths(multikeyPaths);
     }
 
     if (*numKeysOut == 0) {
@@ -217,6 +259,26 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                 sideWritesDeletedCounter.add(written);
             }
         });
+
+    // The multikey state this document implies, to be recorded on the first of its key records.
+    // Each record holds a single key, so the drain cannot re-derive from them that a document
+    // generated several.
+    BSONObj multikeyFields;
+    if (isMultikeyInsert) {
+        BSONObjBuilder multikeyBuilder;
+        multikeyBuilder.append(kSideWriteMultikeyFieldName, true);
+        if (!multikeyPaths.empty()) {
+            // Empty paths mean the index does not support path-level multikey tracking; the flag
+            // above is then the whole of the state. Only serialize when there is more to say, since
+            // `multikey_paths::serialize` expects one entry per key pattern field.
+            BSONObjBuilder pathsBuilder(
+                multikeyBuilder.subobjStart(kSideWriteMultikeyPathsFieldName));
+            multikey_paths::serialize(
+                indexCatalogEntry->descriptor()->keyPattern(), multikeyPaths, pathsBuilder);
+            pathsBuilder.doneFast();
+        }
+        multikeyFields = multikeyBuilder.obj();
+    }
 
     // Reuse the same builder to avoid an allocation per key.
     BufBuilder builder;
@@ -234,7 +296,16 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         builder.reset();
         keyString.serialize(builder);
         BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
-        toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << binData));
+
+        BSONObjBuilder recordBuilder;
+        recordBuilder.append("op", op == Op::kInsert ? "i" : "d");
+        recordBuilder.append("key", binData);
+        if (toInsert.empty() && !multikeyFields.isEmpty()) {
+            // Only the first record carries the multikey state. Every record is applied, and
+            // applying it more than once is idempotent, so one is enough.
+            recordBuilder.appendElements(multikeyFields);
+        }
+        toInsert.emplace_back(recordBuilder.obj());
     }
 
     if (op == Op::kInsert) {
@@ -245,8 +316,17 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
             builder.reset();
             keyString.serialize(builder);
             BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
-            toInsert.emplace_back(BSON("op" << "i"
-                                            << "key" << binData));
+
+            BSONObjBuilder recordBuilder;
+            recordBuilder.append("op", "i");
+            recordBuilder.append("key", binData);
+            if (toInsert.empty() && !multikeyFields.isEmpty()) {
+                // A wildcard index reports multikey through its metadata keys alone, so a document
+                // can produce these records and no key records at all. The state then rides on the
+                // first metadata record instead.
+                recordBuilder.appendElements(multikeyFields);
+            }
+            toInsert.emplace_back(recordBuilder.obj());
         }
     }
 

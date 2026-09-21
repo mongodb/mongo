@@ -205,6 +205,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
     const IndexCatalogEntry* indexCatalogEntry,
     const InsertDeleteOptions& options,
     const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
+    const OnBatchAppliedFn& onBatchApplied,
     DrainYieldPolicy drainYieldPolicy) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -368,6 +369,12 @@ Status SideWritesTracker::drainWritesIntoIndex(
         if (batchSize == 0) {
             invariant(!record);
             return true;
+        }
+
+        if (onBatchApplied) {
+            if (auto status = onBatchApplied(opCtx); !status.isOK()) {
+                return status;
+            }
         }
 
         wuow.commit();

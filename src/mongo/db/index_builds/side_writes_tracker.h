@@ -37,6 +37,12 @@ public:
      */
     enum class DrainYieldPolicy { kNoYield, kYield };
 
+    /**
+     * Invoked once per drained batch, inside the transaction that applies that batch's keys and
+     * deletes its records.
+     */
+    using OnBatchAppliedFn = std::function<Status(OperationContext*)>;
+
     SideWritesTracker(OperationContext* opCtx,
                       std::string_view ident,
                       LazyRecordStore::CreateMode createMode)
@@ -74,6 +80,7 @@ public:
                                 const IndexCatalogEntry* indexCatalogEntry,
                                 const InsertDeleteOptions& options,
                                 const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
+                                const OnBatchAppliedFn& onBatchApplied,
                                 DrainYieldPolicy drainYieldPolicy);
 
     /**
