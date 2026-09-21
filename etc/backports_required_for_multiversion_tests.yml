@@ -148,8 +148,6 @@ last-continuous:
       ticket: SERVER-132650
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
-    - test_file: jstests/noPassthrough/read_write_concern/read_pref.js
-      ticket: SERVER-128221
     - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
       ticket: SERVER-116460
     - test_file: jstests/noPassthrough/sharded_cluster_topology/shard_registry_rsm_removal_race.js
@@ -158,8 +156,6 @@ last-continuous:
       ticket: SERVER-108215
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
-    - test_file: jstests/replsets/force_reconfig_sets_newly_added_field_correctly.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
@@ -170,18 +166,10 @@ last-continuous:
       ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
-    - test_file: jstests/replsets/initial_sync_reset_oldest_timestamp_after_failed_attempt.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/initial_sync_test_fixture_test.js
       ticket: SERVER-113184
-    - test_file: jstests/replsets/reconfig_commitment_succeeds_with_arbiter.js
-      ticket: SERVER-128221
-    - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync_on_oplog_seed.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-120318
-    - test_file: jstests/replsets/step_down_during_draining2.js
-      ticket: SERVER-128221
     - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_sample.js
       ticket: SERVER-127620
     - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
@@ -651,8 +639,6 @@ last-lts:
       ticket: SERVER-93149
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
-    - test_file: jstests/noPassthrough/read_write_concern/read_pref.js
-      ticket: SERVER-128221
     - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
       ticket: SERVER-116460
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
@@ -679,8 +665,6 @@ last-lts:
       ticket: SERVER-106165
     - test_file: jstests/replsets/election_term_over_int_max.js
       ticket: SERVER-119413
-    - test_file: jstests/replsets/force_reconfig_sets_newly_added_field_correctly.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
       ticket: SERVER-103955
     - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
@@ -699,8 +683,6 @@ last-lts:
       ticket: SERVER-93141
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
-    - test_file: jstests/replsets/initial_sync_reset_oldest_timestamp_after_failed_attempt.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/initial_sync_survives_restart.js
       ticket: SERVER-88447
     - test_file: jstests/replsets/initial_sync_test_fixture_test.js
@@ -721,22 +703,16 @@ last-lts:
       ticket: SERVER-89664
     - test_file: jstests/replsets/read_operations_during_step_up.js
       ticket: SERVER-89664
-    - test_file: jstests/replsets/reconfig_commitment_succeeds_with_arbiter.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/reconfig_waits_for_config_majority.js
       ticket: SERVER-117353
     - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
       ticket: SERVER-89618
-    - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync_on_oplog_seed.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-120318
-    - test_file: jstests/replsets/step_down_during_draining2.js
-      ticket: SERVER-128221
     - test_file: jstests/replsets/sync_source_clears_post_failure.js
       ticket: SERVER-91960
     - test_file: jstests/replsets/timeseries_mixed_schema_bucket_initial_sync.js
