@@ -23,7 +23,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceOutToStageFn(
     tassert(10561501, "expected 'DocumentSourceOut' type", ds);
 
     return make_intrusive<exec::agg::OutStage>(
-        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries, ds->getMergeShardId());
+        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries);
 }
 
 namespace exec {
@@ -219,18 +219,6 @@ void OutStage::createTemporaryCollection() {
         return builder.obj();
     }();
 
-    auto targetShard = [&]() -> boost::optional<ShardId> {
-        if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
-            // Used for consistently picking a shard in testing.
-            MONGO_unlikely(fpTarget.isActive())) {
-            return ShardId(fpTarget.getData()["shardId"].String());
-        } else {
-            // If the output collection exists, we should create the temp collection on the shard
-            // that owns the output collection.
-            return _mergeShardId;
-        }
-    }();
-
     _outIsLegacyTimeseries = [&] {
         if (!_timeseries) {
             return false;
@@ -244,6 +232,19 @@ void OutStage::createTemporaryCollection() {
         // or viewless according to the feature flag.
         return !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
             VersionContext(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    }();
+
+    auto targetShard = [&]() -> boost::optional<ShardId> {
+        if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
+            // Used for consistently picking a shard in testing.
+            MONGO_unlikely(fpTarget.isActive())) {
+            return ShardId(fpTarget.getData()["shardId"].String());
+        } else {
+            // If the output collection exists, we should create the temp collection on the shard
+            // that owns the output collection. Otherwise, it's created on the DB primary shard.
+            return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
+                pExpCtx->getOperationContext(), makeBucketNsIfLegacyTimeseries(_outputNs));
+        }
     }();
 
     //  Note that this temporary collection name is used by MongoMirror and thus should not be
