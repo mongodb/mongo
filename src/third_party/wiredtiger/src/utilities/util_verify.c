@@ -132,10 +132,10 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
             WT_USE_ERR();
         }
 
-    if (dump_all_data && dump_key_data)
-        WT_ERR_MSG(session_impl, ENOTSUP, "%s",
-          "-u (unredact all data), should not be set to true simultaneously with -k (unredact only "
-          "keys)");
+    if (dump_all_data && dump_key_data) {
+        fprintf(stderr, "%s: -u and -k are mutually exclusive\n", progname);
+        WT_USE_ERR();
+    }
 
     argc -= __wt_optind;
     argv += __wt_optind;

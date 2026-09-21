@@ -62,11 +62,8 @@
 /* URI / file name patterns; tables and record files are namespaced by owning node. */
 #define DATA_KEY_MIN 0
 #define DATA_KEY_MAX 9
-/*
- * node, thread, slot, generation. The generation stays zero unless -q asks for unique table names,
- * so the name is the slot's whatever the mode, and the verifier parses one format either way.
- */
-#define SCHEMA_TABLE_FMT "table:schema_%" PRIu32 "_%" PRIu32 "_%" PRIu32 "_%" PRIu32
+/* node, thread, slot: the slot's name, which every create in that slot reuses. */
+#define SCHEMA_TABLE_FMT "table:schema_%" PRIu32 "_%" PRIu32 "_%" PRIu32
 
 /*
  * Per-node, per-thread record files: "<records dir>/node<node>-<role>-<thread>", named for the role
@@ -171,8 +168,6 @@ typedef struct {
     char page_log_home[PATH_MAX];
     uint32_t thread_count;
     uint32_t pool_size;
-    /* FIXME-WT-18403: Remove -q once all the known create/drop/create issues are gone. */
-    bool unique_tables;               /* -q: never reuse a table name */
     bool epoch_less;                  /* -e: legacy schema operations without epochs or publish */
     uint32_t total_time;              /* -t: graceful stop after this many seconds */
     uint32_t switch_interval;         /* -s: switch roles every N seconds; 0: never */
@@ -259,8 +254,6 @@ typedef struct {
         struct {
             /* Table state is carried across leader-follower transitions. */
             TABLE_STATE state;
-            /* Advanced by every create under -q, so a slot's table name is never reused. */
-            uint32_t gen;
             /* Published create's epoch once its publish applies, else 0; atomic access. */
             uint64_t create_epoch;
             /* Published drop's epoch once its publish applies, else 0; atomic access. */

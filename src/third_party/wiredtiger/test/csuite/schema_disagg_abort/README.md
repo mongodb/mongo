@@ -96,7 +96,7 @@ checkpont cannot be verified reliably.
 
 ```text
 test_schema_disagg_abort [-b build-dir] [-e] [-h dir] [-k [l|f]N] [-p] [-r l|f|lf]
-                         [-s N] [-T threads] [-t time] [-q] [-u pool] [-v]
+                         [-s N] [-T threads] [-t time] [-u pool] [-v]
 ```
 
 `-r` selects a lone leader, lone follower or leader/follower pair. `-s` schedules role switches,

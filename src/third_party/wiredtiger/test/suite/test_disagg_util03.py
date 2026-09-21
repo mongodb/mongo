@@ -107,15 +107,36 @@ class test_disagg_util03(wttest.WiredTigerTestCase, suite_subprocess,
         self._populate()
         table_id, page_id, lsn = self._find_base_image_page()
         self.corrupt_checkpoint_metadata_page()
+
         out, err = self._run_wt(
             'page', '-t', str(table_id), '-p', str(page_id), '-l', str(lsn))
         self.assertIn('proceeding with empty metadata', err)
-        # The page-log metadata is printed to stdout; the page image itself
-        # is dumped as raw bytes to stderr.
+        # The page-log metadata is printed to stdout; by default the page
+        # image itself is redacted rather than dumped as raw bytes.
         self.assertIn(f"table_id: {table_id}", out)
         self.assertIn("results: count=1", out)
         self.assertIn(f"base of 0 delta(s): page_id {page_id}", err)
+        self.assertIn("{REDACTED}", err)
+        self.assertNotIn("(chunk 2 of ", err)
+
+        _, err = self._run_wt(
+            'page', '-u', '-t', str(table_id), '-p', str(page_id), '-l', str(lsn))
+        self.assertIn('proceeding with empty metadata', err)
+        self.assertIn(f"base of 0 delta(s): page_id {page_id}", err)
         self.assertIn("(chunk 2 of ", err)
+        self.assertNotIn("{REDACTED}", err)
+
+    def test_raw_read_keys_only_rejected(self):
+        if self.ds_name != 'palite':
+            self.skipTest('palite-only test')
+        if not wiredtiger.diagnostic_build():
+            self.skipTest('wt page requires a diagnostic build')
+        self._populate()
+        table_id, page_id, lsn = self._find_base_image_page()
+        _, err = self._run_wt(
+            'page', '-k', '-t', str(table_id), '-p', str(page_id), '-l', str(lsn),
+            failure=True)
+        self.assertIn('-k is not supported with -t', err)
 
     def test_raw_read_unknown_page(self):
         if self.ds_name != 'palite':

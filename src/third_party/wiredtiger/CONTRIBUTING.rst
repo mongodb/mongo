@@ -152,6 +152,15 @@ existing example in the source code and copy it.
   not "``(p == 0)``" or "``(!p)``"
 * Use ``for(;;)`` to create an infinite loop, rather than
   ``while(true)``
+* Set, clear and test flags with the ``F_*`` / ``FLD_*`` / ``LF_*`` macros in
+  ``src/include/misc.h``, never with a bitwise assignment such as
+  ``flags |= mask`` or a ternary such as ``flags = cond ? MASK : 0``:
+
+  * ``LF_*`` for a local variable named ``flags``
+  * ``F_*`` for a structure field named ``flags``
+  * ``FLD_*`` for any other named field
+  * ``F_*_ATOMIC_*`` / ``FLD_*_ATOMIC_*`` when the field is accessed concurrently
+  There is no ``LF_SET_IF``; wrap ``LF_SET`` in a condition instead.
 * When returning a value from a function, use parentheses around the
   return value: ``return (0)``;
 * Single statement blocks in conditions and loops do not use braces

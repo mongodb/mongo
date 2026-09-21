@@ -74,11 +74,11 @@ Working code samples live in `examples/c/` and `examples/python/`.
 
 ## C Coding Conventions
 
-Full rules in @CONTRIBUTING.md.
+Always read @CONTRIBUTING.rst before writing or editing C code; it holds the full rules and this section does not repeat them.
 
 ### Comment Prose Style
 
-Mechanics — delimiter style, function-header layout, FIXME tags, wrap width — live in @CONTRIBUTING.md and are enforced by `dist/s_style`, `dist/comment_style.py`, and `dist/s_comment.py`. The guidance here is about what to write in the prose, not how to punctuate it.
+Mechanics — delimiter style, function-header layout, FIXME tags, wrap width — live in @CONTRIBUTING.rst and are enforced by `dist/s_style`, `dist/comment_style.py`, and `dist/s_comment.py`. The guidance here is about what to write in the prose, not how to punctuate it.
 
 - **Be terse.** Aim for one sentence. If you are writing three, you are probably restating the code, explaining things the reader already knows, or narrating the editing session. The codebase prefers no comment to a wordy one — most lines have no comment at all.
 - **Write for a working WiredTiger engineer.** Do not explain concepts a developer in this codebase already understands — hazard pointers, reconciliation, the history store, eviction, dhandles, session and cursor semantics, btree splits, transactions, timestamps.

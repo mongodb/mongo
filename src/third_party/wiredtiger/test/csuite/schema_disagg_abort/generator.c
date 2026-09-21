@@ -83,8 +83,6 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
         /* A legacy create is complete immediately; epoch mode publishes it in a later event. */
         ev.type = EVENT_CREATE;
         *slot_state = state->cfg->epoch_less ? TABLE_PUBLISHED : TABLE_CREATED;
-        if (state->cfg->unique_tables)
-            ++state->workers[t].table[slot].gen;
         break;
     case TABLE_CREATED:
         testutil_assert(!state->cfg->epoch_less);
@@ -142,8 +140,7 @@ generator_op(WORKLOAD_STATE *state, uint32_t t, GENERATOR_PHASE phase)
 
     ev.thread_id = t;
     ev.slot = slot;
-    testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot,
-      state->workers[t].table[slot].gen);
+    testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot);
     if (ev.type == EVENT_INSERT) {
         ev.key_min = DATA_KEY_MIN;
         ev.key_max = DATA_KEY_MAX;
@@ -236,8 +233,8 @@ generator_publish_pending(WORKLOAD_STATE *state)
             ev.type = *slot_state == TABLE_CREATED ? EVENT_PUBLISH_CREATE : EVENT_PUBLISH_DROP;
             ev.thread_id = t;
             ev.slot = slot;
-            testutil_snprintf(ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t,
-              slot, state->workers[t].table[slot].gen);
+            testutil_snprintf(
+              ev.uri, sizeof(ev.uri), SCHEMA_TABLE_FMT, state->cfg->node_id, t, slot);
 
             *slot_state = *slot_state == TABLE_CREATED ? TABLE_PUBLISHED : TABLE_REMOVED;
             generator_emit(state, &ev);
