@@ -728,49 +728,6 @@ server_parameters:
         default: 30000
         redact: false
 
-    initialSyncWaitForSyncSourceLastStableRecoveryTs:
-        description: >-
-            If true, during initial sync, we will wait for the sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp before starting collection cloning.
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<bool>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTs
-        default: false
-        redact: false
-
-    initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs:
-        description: >-
-            The amount of time in seconds that the node will wait for the node's sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false. Default
-            wait period of 10 minutes.
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs
-        default:
-            expr: 60 * 10
-        validator:
-            gte: 0
-        redact: false
-
-    initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs:
-        description: >-
-            If the earliest oplog entry on the sync source is the "initiating set" entry and the
-            sync source's lastStableRecoveryTimestamp is within this many seconds of that entry,
-            initial sync skips waiting for the stable recovery timestamp to advance and resets
-            beginApplyingTimestamp back to the initiating set entry. The default is 0, which requires
-            an exact match: the skip fires only when the stable recovery timestamp is still at the
-            initiating-set entry, the all-at-once replSetInitiate case where the primary cannot
-            self-commit and it stays pinned there for all of initial sync. Retained (settable at
-            runtime) as an escape hatch to widen the window. No effect if
-            'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false.
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs
-        default: 0
-        validator:
-            gte: 0
-        redact: false
-
     minWaitForStreamingHelloMillis:
         description: >-
             Minimum timeout in milliseconds for pre-auth streamable hello commands.
