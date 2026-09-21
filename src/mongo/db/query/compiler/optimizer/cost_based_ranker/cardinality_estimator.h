@@ -224,7 +224,7 @@ protected:
     // this node is under an $elemMatch, if so it will return that path.
     std::string_view getPath(const MatchExpression* node);
 
-    const CardinalityEstimate _collCard;
+    CardinalityEstimate _collCard;
 
     // The input cardinality of the last complete conjunction. This conjunction may consist of a
     // chain of QSN nodes (an implicit conjunction) including all intervals and filter expressions

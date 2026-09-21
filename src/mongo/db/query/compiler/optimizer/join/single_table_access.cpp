@@ -73,9 +73,6 @@ SamplingEstimatorMap makeSamplingEstimators(
                 ++metrics.numPersistentSamplesUsed;
             }
             samplingEstimators.emplace(nss, std::move(estimator));
-
-        } else {
-            continue;
         }
     }
     return samplingEstimators;
@@ -190,8 +187,13 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     // visible.
     Timer cbrPlanningTimer;
     ON_BLOCK_EXIT([&]() { metrics.cbrPlanningTimeMicros = cbrPlanningTimer.micros(); });
-    sleepWhileCbrPlanningForJoinOptimization.execute(
-        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    sleepWhileCbrPlanningForJoinOptimization.execute([](const BSONObj& data) {
+        if (data.isEmpty()) {
+            sleepWhileCbrPlanningForJoinOptimization.pauseWhileSet();
+        } else {
+            sleepmillis(data["ms"].numberInt());
+        }
+    });
 
     if (MONGO_unlikely(failSingleTableAccessPlansForJoinOptimization.shouldFail())) {
         return Status(ErrorCodes::InternalError,

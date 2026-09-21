@@ -1452,7 +1452,7 @@ public:
         return makeCard(bounds ? _ndvMultiKeyBounded : _ndvMultiKey);
     }
     CardinalityEstimate getCollCard() const override {
-        MONGO_UNIMPLEMENTED;
+        return makeCard(1000.0);
     }
     size_t getSampleSize() const override {
         MONGO_UNIMPLEMENTED;

@@ -50,6 +50,9 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
         tassert(9746501,
                 "samplingEstimator cannot be null when CBRCEMode is samplingCE",
                 _samplingEstimator != nullptr);
+        // Sampling CE uses the sampler's cardinality as the collection baseline.
+        _collCard = _samplingEstimator->getCollCard();
+        _inputCard = _collCard;
     }
     for (auto&& indexEntry : _collInfo.indexes) {
         for (auto&& indexedPath : indexEntry.keyPattern) {
