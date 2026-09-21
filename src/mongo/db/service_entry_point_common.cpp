@@ -279,22 +279,36 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         return readConcernParseStatus;
     }
 
-    // Represents whether the client explicitly defines read concern within the cmdObj or not.
-    // It will be set to false also if the client specifies empty read concern {readConcern: {}}.
-    bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
+    // True only when the client set a level. Partial RCs (e.g. {afterClusterTime: T}) get the
+    // level filled in below, so provenance resolves to customDefault / implicitDefault.
+    bool clientSuppliedReadConcern = readConcernArgs.hasLevel();
     bool customDefaultWasApplied = false;
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                               readConcernArgs.isImplicitDefault());
 
-    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+    auto applyDefaultReadConcern = [&](repl::ReadConcernArgs rcDefault) {
         LOGV2_DEBUG(21955,
                     2,
                     "Applying default readConcern on {command} of {readConcernDefault} "
                     "on {command}",
                     "Applying default readConcern on command",
                     "readConcernDefault"_attr = rcDefault,
+                    "providedReadConcern"_attr = readConcernArgs,
+                    "isImplicit"_attr = !readConcernSupport.defaultReadConcernPermit.isOK(),
                     "command"_attr = invocation->definition()->getName());
-        readConcernArgs = std::move(rcDefault);
+        if (readConcernArgs.isEmpty()) {
+            readConcernArgs = std::move(rcDefault);
+        } else if (rcDefault.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern &&
+                   readConcernArgs.getArgsAfterClusterTime()) {
+            // A default level of "available" cannot be combined with afterClusterTime (see
+            // ReadConcernArgs::validate()). Promote to "local": afterClusterTime is honored
+            // and the level resolves as if no default were configured.
+            readConcernArgs.setLevel(repl::ReadConcernLevel::kLocalReadConcern);
+        } else {
+            readConcernArgs.setLevel(rcDefault.getLevel());
+        }
+        // Applying a default must never produce an invalid combination.
+        uassertStatusOK(readConcernArgs.validate());
         // Update the readConcernSupport, since the default RC was applied.
         readConcernSupport =
             invocation->supportsReadConcern(readConcernArgs.getLevel(), !customDefaultWasApplied);
@@ -323,11 +337,9 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                 // "for command", "command"_attr = invocation->definition()->getName());
             }
 
-            // A member in a regular replica set.  Since these servers receive client queries, in
-            // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
-            // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
-            // since this covers both isSpecified() && !isSpecified()
-            if (readConcernArgs.isEmpty()) {
+            // Apply the CWRC default when the client did not set a level. Empty RC: replace
+            // whole; partial RC: merge level only to preserve afterClusterTime / opTime.
+            if (!readConcernArgs.hasLevel()) {
                 const auto rwcDefaults =
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
                 const auto rcDefault = rwcDefaults.getDefaultReadConcern();
@@ -343,14 +355,13 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         }
     }
 
-    // Apply the implicit default read concern even if the command does not support a cluster wide
-    // read concern.
+    // Apply the implicit default RC when the command does not support CWRC and the client did
+    // not set a level.
     if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
         readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
-        !isInternalClient && readConcernArgs.isEmpty()) {
-        auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                             .getImplicitDefaultReadConcern();
-        applyDefaultReadConcern(rcDefault);
+        !isInternalClient && !readConcernArgs.hasLevel()) {
+        applyDefaultReadConcern(ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                    .getImplicitDefaultReadConcern());
     }
 
     // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an

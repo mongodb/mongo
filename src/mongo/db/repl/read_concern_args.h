@@ -114,6 +114,12 @@ public:
      */
     Status parse(const BSONObj& readConcernObj);
 
+    /**
+     * Verifies that this ReadConcernArgs instance represents a valid combination of readConcern
+     * level and associated timing options.
+     */
+    Status validate() const;
+
     static ReadConcernArgs fromBSONThrows(const BSONObj& readConcernObj);
 
     /**
@@ -166,6 +172,13 @@ public:
      * Checks whether _level is explicitly set.
      */
     bool hasLevel() const;
+
+    /**
+     * Sets the read concern level (used to merge a default level into a partial RC).
+     */
+    void setLevel(ReadConcernLevel level) {
+        _level = level;
+    }
 
     /**
      * Returns the opTime. Deprecated: will be replaced with getArgsAfterClusterTime.
