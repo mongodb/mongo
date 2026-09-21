@@ -247,13 +247,18 @@ MongoRunner.getBinVersionFor = function (version) {
 };
 
 /**
- * Returns true if two version strings could represent the same version. This is true
+ * Returns true if two version strings could represent the same *version*. This is true
  * if, after passing the versions through getBinVersionFor, the versions share the same
  * value for every component (major, minor, and patch) up through the length of the
  * shorter version.
  *
  * That is, 3.2 compares equal to 3.2.4 (the patch component of the longer version is
  * not examined), but 3.2.3 does not compare equal to 3.2.4.
+ *
+ * Pre-release tags and git hashes are ignored where they trail the shorter version, so
+ * 9.1.0 and 9.1.0-rc1021 are the same version -- different *builds* of it. Use
+ * getBuildVersion() and isSameBuild() when builds must be told apart (e.g. a
+ * release-candidate last-patch binary vs the mainline build).
  *
  * Two versions whose pre-release or build metadata differ (e.g. 9.0.0-rc1 vs 9.0.0-rc2,
  * or two git hashes) are reported as not the same.
@@ -269,6 +274,31 @@ MongoRunner.areBinVersionsTheSame = function (versionA, versionB) {
         // non-numeric component such as a pre-release tag or git hash.
         return false;
     }
+};
+
+/**
+ * Returns the *build version* for a version string or alias (e.g. "latest",
+ * "last-patch"): the exact version string identifying a binary *build*, with aliases
+ * resolved. Two binaries are the same build if and only if their build versions are
+ * equal.
+ *
+ * Contrast with the *version* (see areBinVersionsTheSame()), which abstracts away
+ * pre-release tags and git hashes: 9.1.0 and 9.1.0-rc1021 are different builds of the
+ * same version.
+ */
+MongoRunner.getBuildVersion = function (version) {
+    return MongoRunner.getBinVersionFor(version);
+};
+
+/**
+ * Returns true if two version strings refer to the same *build*: their build versions
+ * (see getBuildVersion()) are exactly equal, pre-release tags and git hashes included.
+ *
+ * Same build implies same version (areBinVersionsTheSame()); the converse does not
+ * hold.
+ */
+MongoRunner.isSameBuild = function (versionA, versionB) {
+    return MongoRunner.getBuildVersion(versionA) === MongoRunner.getBuildVersion(versionB);
 };
 
 /**

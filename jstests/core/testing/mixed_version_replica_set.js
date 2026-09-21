@@ -31,9 +31,11 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
 
         if (!nodeAtLatestVersion && TestData.multiversionBinVersion === "last-patch") {
             // For last-patch we can't compute the exact version: the master branch isn't updated
-            // when a patch release is cut. So we only assert it differs from latest.
+            // when a patch release is cut. So we only assert the node is not running the latest
+            // *build*: areBinVersionsTheSame() would conflate a last-patch binary built from a
+            // release candidate (e.g. the DSC release 9.1.0-rc1021) with mainline latest (9.1.0).
             assert(
-                !MongoRunner.areBinVersionsTheSame(actualVersion, latestBinVersion),
+                !MongoRunner.isSameBuild(actualVersion, latestBinVersion),
                 "last-patch node unexpectedly at latest version",
                 {actualVersion, latestBinVersion},
             );

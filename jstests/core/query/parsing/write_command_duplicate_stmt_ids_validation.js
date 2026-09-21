@@ -13,6 +13,11 @@
  *   does_not_support_transactions,
  *   # Implicit sharding makes the timeseries a regular collection.
  *   assumes_no_implicit_collection_creation_on_get_collection,
+ *   # The DSC disaggregated-storage multiversion suites run the last-patch binary as the primary
+ *   # in their old_new fixture. That binary can be an Atlas release candidate that predates the
+ *   # stmtIds validation added in SERVER-131326, so it would accept the invalid commands this test
+ *   # expects to be rejected with InvalidOptions.
+ *   disagg_multiversion_incompatible,
  * ]
  */
 const adminDB = db.getSiblingDB("admin");
