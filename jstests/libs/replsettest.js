@@ -1867,9 +1867,9 @@ export class ReplSetTest {
     }
 
     /**
-     *  Blocks until the set is initialized with a primary, then waits for step-up writes
-     *  (primary-only services + query analysis writer) and for cluster time key generation to
-     *  complete.
+     * Blocks until the set is initialized with a primary and all non-arbiter members have reached
+     * SECONDARY, then waits for step-up writes (primary-only services + query analysis writer)
+     * and for cluster time key generation to complete.
      *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
      *  match ASC ReplSetTest.initiate.
      */
@@ -1878,7 +1878,13 @@ export class ReplSetTest {
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
-        const primary = this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+        const primary = this.getPrimary(this.timeoutMS, 25 /* retryIntervalMS */);
+
+        // Blocks until the remaining nodes have finished startup recovery and report SECONDARY.
+        // Without this, callers can observe nodes still in STARTUP2 and see spurious
+        // NotPrimaryOrSecondary failures or stale reads. Mirrors ReplSetTest.initiate, which
+        // awaits secondaries before waiting on step-up writes.
+        this.awaitSecondaryNodes(this.timeoutMS, null /* secondaries */, 25 /* retryIntervalMS */);
 
         // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
         if (this._notX509Auth(primary) || primary.isTLS()) {
