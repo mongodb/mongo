@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -126,6 +127,11 @@ private:
      */
     Atomic<size_t> _maxSize;
 };
+
+/**
+ * Computes the user-visible SHA256 'keyHash' for 'key'.
+ */
+std::string computeKeyHashString(OperationContext* opCtx, const Key& key);
 
 /**
  * Acquire a reference to the global queryStats store.

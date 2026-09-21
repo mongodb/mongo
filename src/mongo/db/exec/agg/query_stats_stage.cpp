@@ -14,7 +14,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/buildinfo.h"
 
+#include <deque>
 #include <string_view>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
@@ -81,8 +83,24 @@ BSONObj QueryStatsStage::computeQueryStatsKey(
     return key->toBson(pExpCtx->getOperationContext(), opts, serializationContext);
 }
 
+void QueryStatsStage::conditionallyLogOutput(const Document& doc) const {
+    if (_algorithm != TransformAlgorithmEnum::kNone) {
+        LOGV2_DEBUG_OPTIONS(7808301,
+                            3,
+                            {logv2::LogTruncation::Disabled},
+                            "Logging all outputs of $queryStats",
+                            "thisOutput"_attr = doc);
+    }
+}
+
+void QueryStatsStage::conditionallyLogFinished() const {
+    if (_algorithm != TransformAlgorithmEnum::kNone) {
+        LOGV2_DEBUG_OPTIONS(
+            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
+    }
+}
+
 GetNextResult QueryStatsStage::doGetNext() {
-    const auto shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
     /**
      * When a CopiedPartition is present (loaded) and contains more elements (QueryStatsEntry), we
      * can process and return the next element in the _currentCopiedPartition.
@@ -104,38 +122,36 @@ GetNextResult QueryStatsStage::doGetNext() {
         // Safe to assume _currentCopiedPartition is now loaded.
 
         // Exhaust all elements in the current copied partition.
-        // Use a while loop here to handle cases where toDocument() may fail for a specific
-        // QueryStatsEntry, in which case we suppress the thrown exception and continue
-        // iterating to the next available entry.
-        while (!_currentCopiedPartition.empty()) {
-            auto& statsEntries = _currentCopiedPartition.statsEntries;
-            const auto& queryStatsEntry = statsEntries.front();
-            ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
-            if (auto doc =
-                    toDocument(_currentCopiedPartition.getReadTimestamp(), queryStatsEntry)) {
-                if (shouldLog) {
-                    LOGV2_DEBUG_OPTIONS(7808301,
-                                        3,
-                                        {logv2::LogTruncation::Disabled},
-                                        "Logging all outputs of $queryStats",
-                                        "thisOutput"_attr = *doc);
-                }
-                return std::move(*doc);
-            }
+        if (auto doc = nextDocument(_currentCopiedPartition.statsEntries,
+                                    _currentCopiedPartition.getReadTimestamp())) {
+            return std::move(*doc);
         }
         // Once we have exhausted entries in this partition, move on to the next partition.
         _currentCopiedPartition.incrementPartitionId();
     }
 
-    if (shouldLog) {
-        LOGV2_DEBUG_OPTIONS(
-            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
+    conditionallyLogFinished();
+    return GetNextResult::makeEOF();
+}
+
+boost::optional<Document> QueryStatsStage::nextDocument(std::deque<QueryStatsEntry>& statsEntries,
+                                                        const Date_t& readTimestamp) const {
+    // Use a while loop here to handle cases where toDocument() may fail for a specific
+    // QueryStatsEntry, in which case we suppress the thrown exception and continue iterating to the
+    // next available entry.
+    while (!statsEntries.empty()) {
+        const auto& queryStatsEntry = statsEntries.front();
+        ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
+        if (auto doc = toDocument(readTimestamp, queryStatsEntry)) {
+            conditionallyLogOutput(*doc);
+            return doc;
+        }
     }
-    return DocumentSource::GetNextResult::makeEOF();
+    return boost::none;
 }
 
 boost::optional<Document> QueryStatsStage::toDocument(
-    const Date_t& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
+    const Date_t& readTimestamp, const QueryStatsEntry& queryStatsEntry) const {
     const auto& key = queryStatsEntry.key;
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
@@ -144,18 +160,7 @@ boost::optional<Document> QueryStatsStage::toDocument(
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
-        auto representativeShapeKey = key->toBson(
-            pExpCtx->getOperationContext(),
-            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-            SerializationContext::stateDefault());
-        // This SHA256 version of the hash is output to aid in data analytics use cases. In these
-        // cases, we often care about comparing hashes from different hosts, potentially on
-        // different versions and platforms. The thinking here is that the SHA256 algorithm is more
-        // stable across these different environments than the quicker 'absl::HashOf'
-        // implementation.
-        auto keyHash = SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
-                                                representativeShapeKey.objsize())
-                           .toString();
+        auto keyHash = computeKeyHashString(pExpCtx->getOperationContext(), *key);
         auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
                                                      SerializationContext::stateDefault())
                                   .toHexString();
@@ -190,7 +195,7 @@ boost::optional<Document> QueryStatsStage::toDocument(
                                                 includeWriteMetrics,
                                                 includeCBRMetrics,
                                                 includeErrorMetrics)},
-                        {"asOf", partitionReadTime}};
+                        {"asOf", readTimestamp}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);
@@ -293,10 +298,6 @@ bool QueryStatsStage::CopiedPartition::isValidPartitionId(
 
 const Date_t& QueryStatsStage::CopiedPartition::getReadTimestamp() const {
     return _readTimestamp;
-}
-
-bool QueryStatsStage::CopiedPartition::empty() const {
-    return statsEntries.empty();
 }
 
 }  // namespace exec::agg

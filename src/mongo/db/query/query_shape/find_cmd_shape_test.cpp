@@ -387,6 +387,22 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
         ASSERT_EQ(templateHashValue, shapeHash.toHexString());
     }
 
+    // The same shape with different literal values must hash identically: only field paths and
+    // predicate/sort structure belong to the shape, never the constants themselves.
+    {
+        auto differentLiterals = makeTemplateFindCommandRequest(kDefaultTestNss);
+        differentLiterals->setFilter(BSON("a" << 987654));
+        differentLiterals->setMin(BSON("d" << 0));
+        differentLiterals->setMax(BSON("d" << 100));
+        differentLiterals->setLet(BSON("e" << -1));
+        auto parsedFind =
+            uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(differentLiterals)}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
+        ASSERT_EQ(templateHashValue, shapeHash.toHexString())
+            << "changing literal values must not change the query shape hash";
+    }
+
     // Functions that modify a single component of the "find" command shape.
     using FindCommandRequestModificationFn = std::function<void(FindCommandRequest&)>;
     FindCommandRequestModificationFn modifyFilterFn = [](FindCommandRequest& findCommandRequest) {

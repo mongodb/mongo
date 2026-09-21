@@ -9,6 +9,7 @@
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/util/modules.h"
 
+#include <deque>
 #include <string_view>
 
 namespace mongo {
@@ -48,8 +49,6 @@ private:
 
         const Date_t& getReadTimestamp() const;
 
-        bool empty() const;
-
         void load(QueryStatsStore& queryStatsStore);
 
         std::deque<QueryStatsEntry> statsEntries;
@@ -62,9 +61,20 @@ private:
 
     GetNextResult doGetNext() final;
 
-    boost::optional<Document> toDocument(const Date_t& partitionReadTime,
+    /**
+     * Returns the document for the front entry of 'statsEntries', popping the entries it consumes.
+     * Skips over entries that fail to serialize, and returns boost::none once 'statsEntries' is
+     * empty.
+     */
+    boost::optional<Document> nextDocument(std::deque<QueryStatsEntry>& statsEntries,
+                                           const Date_t& readTimestamp) const;
+
+    boost::optional<Document> toDocument(const Date_t& readTimestamp,
                                          const QueryStatsEntry& queryStatsEntry) const;
 
+    void conditionallyLogOutput(const Document& doc) const;
+
+    void conditionallyLogFinished() const;
 
     BSONObj computeQueryStatsKey(std::shared_ptr<const Key> key,
                                  const SerializationContext& serializationContext) const;

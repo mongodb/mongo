@@ -5,6 +5,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
@@ -463,6 +464,22 @@ Status validateQueryStatsKeyBson(const BSONObj& keyBson) {
     // for server-added nesting when embedding 'keyBson' in a command reply.
     return validateBSONDepthForUserStorage(keyBson).addContext(
         "Query stats key is too deeply nested");
+}
+
+// This SHA256 version of the hash is output to aid in data analytics use cases. In these
+// cases, we often care about comparing hashes from different hosts, potentially on
+// different versions and platforms. The thinking here is that the SHA256 algorithm is more
+// stable across these different environments than the quicker 'absl::HashOf'
+// implementation. This must match the value used to populate the store's 'KeyHashIndex',
+// which the $match on keyHash optimization relies on.
+std::string computeKeyHashString(OperationContext* opCtx, const Key& key) {
+    auto representativeShapeKey =
+        key.toBson(opCtx,
+                   query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                   SerializationContext::stateDefault());
+    return SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
+                                    representativeShapeKey.objsize())
+        .toString();
 }
 
 void registerRequest(OperationContext* opCtx,
