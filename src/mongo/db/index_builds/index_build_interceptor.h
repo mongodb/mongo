@@ -138,6 +138,7 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const IndexCatalogEntry* indexCatalogEntry,
+        const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     /**

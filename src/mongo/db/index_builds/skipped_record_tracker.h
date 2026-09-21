@@ -15,6 +15,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <functional>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
@@ -58,6 +59,13 @@ public:
     bool areAllRecordsApplied(OperationContext* opCtx) const;
 
     /**
+     * Invoked, inside the transaction that applies a retried record and deletes it, when that
+     * record's keys made the index multikey.
+     */
+    using OnMultikeyPathsRecordedFn =
+        std::function<Status(OperationContext*, const MultikeyPaths&)>;
+
+    /**
      * By default, attempts to generate keys for each skipped record and insert into the index.
      * Returns OK if all records were either indexed or no longer exist.
      *
@@ -67,6 +75,7 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const IndexCatalogEntry* indexCatalogEntry,
+        const OnMultikeyPathsRecordedFn& onMultikeyPathsRecorded,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     boost::optional<MultikeyPaths> getMultikeyPaths() const {

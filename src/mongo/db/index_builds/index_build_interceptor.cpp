@@ -333,11 +333,14 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     return _sideWritesTracker.bufferSideWrite(opCtx, coll, indexCatalogEntry, std::move(toInsert));
 }
 
-Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
-                                                  const IndexCatalogEntry* indexCatalogEntry,
-                                                  RetrySkippedRecordMode mode) {
-    return _skippedRecordTracker.retrySkippedRecords(opCtx, collection, indexCatalogEntry, mode);
+Status IndexBuildInterceptor::retrySkippedRecords(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexCatalogEntry* indexCatalogEntry,
+    const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+    RetrySkippedRecordMode mode) {
+    return _skippedRecordTracker.retrySkippedRecords(
+        opCtx, collection, indexCatalogEntry, onMultikeyPathsRecovered, mode);
 }
 
 }  // namespace mongo

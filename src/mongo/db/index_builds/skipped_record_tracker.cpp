@@ -117,10 +117,12 @@ bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
     return !cursor->next();
 }
 
-Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
-                                                 const CollectionPtr& collection,
-                                                 const IndexCatalogEntry* indexCatalogEntry,
-                                                 RetrySkippedRecordMode mode) {
+Status SkippedRecordTracker::retrySkippedRecords(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexCatalogEntry* indexCatalogEntry,
+    const OnMultikeyPathsRecordedFn& onMultikeyPathsRecorded,
+    RetrySkippedRecordMode mode) {
 
     const bool keyGenerationOnly = mode == RetrySkippedRecordMode::kKeyGeneration;
 
@@ -244,6 +246,13 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                 }
 
                 MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), *multikeyPaths);
+
+                if (onMultikeyPathsRecorded) {
+                    if (auto status = onMultikeyPathsRecorded(opCtx, *_multikeyPaths);
+                        !status.isOK()) {
+                        return status;
+                    }
+                }
             }
         }
 

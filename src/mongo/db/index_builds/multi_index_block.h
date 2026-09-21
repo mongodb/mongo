@@ -388,6 +388,15 @@ private:
      */
     void _writeAllStateToContainer(OperationContext* opCtx) const;
 
+    /**
+     * Folds multikey paths recovered while draining side writes or retrying skipped records into
+     * this build's state and persists them with the rest of the resume state, within the caller's
+     * transaction.
+     */
+    Status _recordRecoveredMultikeyPaths(OperationContext* opCtx,
+                                         size_t index,
+                                         const MultikeyPaths& paths);
+
     BSONObj _constructStateObject() const;
 
     IndexBuildMetadata _buildIndexBuildMetadata() const;

@@ -1483,20 +1483,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
         // state and persist it in that transaction.
         auto onMultikeyPathsRecovered = [this, i](OperationContext* opCtx,
                                                   const MultikeyPaths& paths) -> Status {
-            _indexes[i].drainedMultikey = true;
-            if (!paths.empty()) {
-                if (_indexes[i].drainedMultikeyPaths.empty()) {
-                    _indexes[i].drainedMultikeyPaths = paths;
-                } else {
-                    MultikeyPathTracker::mergeMultikeyPaths(&_indexes[i].drainedMultikeyPaths,
-                                                            paths);
-                }
-            }
-            if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
-                return Status::OK();
-            }
-            _upsertIndexStateInfo(opCtx, i);
-            return Status::OK();
+            return _recordRecoveredMultikeyPaths(opCtx, i, paths);
         };
 
         auto status = interceptor->drainWritesIntoIndex(opCtx,
@@ -1517,13 +1504,22 @@ Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx,
                                             const CollectionPtr& collection,
                                             RetrySkippedRecordMode mode) {
     invariant(!_buildIsCleanedUp);
-    for (auto&& index : _indexes) {
-        auto interceptor = index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
+    for (size_t i = 0; i < _indexes.size(); i++) {
+        auto* entry = _indexes[i].block->getEntry(opCtx, collection);
+        auto interceptor = entry->indexBuildInterceptor();
         if (!interceptor)
             continue;
 
+        // A retried record's keys go into the index while its multikey state goes only into the
+        // tracker's memory, and the record itself is deleted by the same transaction, so that state
+        // has to be persisted here as well.
+        auto onMultikeyPathsRecovered = [this, i](OperationContext* opCtx,
+                                                  const MultikeyPaths& paths) -> Status {
+            return _recordRecoveredMultikeyPaths(opCtx, i, paths);
+        };
+
         auto status = interceptor->retrySkippedRecords(
-            opCtx, collection, index.block->getEntry(opCtx, collection), mode);
+            opCtx, collection, entry, onMultikeyPathsRecovered, mode);
         if (!status.isOK()) {
             return status;
         }
@@ -1904,6 +1900,28 @@ void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) const {
                 "collectionUUID"_attr = _collectionUUID,
                 "numIndexes"_attr = _indexes.size(),
                 "details"_attr = metadataObj);
+}
+
+Status MultiIndexBlock::_recordRecoveredMultikeyPaths(OperationContext* opCtx,
+                                                      size_t index,
+                                                      const MultikeyPaths& paths) {
+    invariant(index < _indexes.size());
+
+    _indexes[index].drainedMultikey = true;
+    if (!paths.empty()) {
+        if (_indexes[index].drainedMultikeyPaths.empty()) {
+            _indexes[index].drainedMultikeyPaths = paths;
+        } else {
+            MultikeyPathTracker::mergeMultikeyPaths(&_indexes[index].drainedMultikeyPaths, paths);
+        }
+    }
+
+    if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return Status::OK();
+    }
+
+    _upsertIndexStateInfo(opCtx, index);
+    return Status::OK();
 }
 
 IndexBuildMetadata MultiIndexBlock::_buildIndexBuildMetadata() const {

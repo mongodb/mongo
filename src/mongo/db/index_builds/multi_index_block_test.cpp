@@ -1308,6 +1308,102 @@ TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileDraining) {
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileRetryingSkippedRecords) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a.b" << 1) << "name"
+                                  << "a.b_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    ASSERT_OK(indexer
+                  ->init(operationContext(),
+                         coll,
+                         {indexBuildInfo},
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+
+    // Scanned: the array sits at "a.b", the second path component.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << 0 << "a" << BSON("b" << BSON_ARRAY(1 << 2)))));
+        wuow.commit();
+    }
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    const auto multikeyComponents = [&]() -> std::vector<int32_t> {
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+            storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+        ASSERT_TRUE(resumeInfo);
+        ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+        auto& paths = resumeInfo->getIndexes()[0].getMultikeyPaths();
+        ASSERT_EQ(paths.size(), 1);
+        return paths[0].getMultikeyComponents();
+    };
+
+    // Only the second component so far, from the document the scan saw.
+    EXPECT_EQ(std::vector<int32_t>{1}, multikeyComponents());
+
+    // A document whose array sits at "a" instead, written after the scan and left undrained, so
+    // that the retry below is the only thing that can report its paths.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(
+            operationContext(), coll.get(), BSON("_id" << 1 << "a" << BSON_ARRAY(BSON("b" << 9)))));
+        wuow.commit();
+    }
+
+    auto* entry = coll->getIndexCatalog()->findIndexByName(
+        operationContext(), "a.b_1", IndexCatalog::InclusionPolicy::kAll);
+    ASSERT(entry);
+    auto interceptor = entry->indexBuildInterceptor();
+    ASSERT(interceptor);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        interceptor->getSkippedRecordTracker().record(operationContext(), coll.get(), RecordId{2});
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer->retrySkippedRecords(operationContext(), coll.get()));
+
+    // The retry found the first component multikey, and that reached the resume record.
+    EXPECT_EQ((std::vector<int32_t>{0, 1}), multikeyComponents());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 // With resumable PDIB enabled, the first call to drainBackgroundWrites must
 // transition into kDrainWrites and persist a ResumeIndexInfo with that phase to the replicated
 // internal-indexBuild-<UUID> table.
