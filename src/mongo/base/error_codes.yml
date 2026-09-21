@@ -1363,5 +1363,10 @@ error_codes:
       categories: [StreamProcessorUserError],
     }
 
+  # A KMIP server rejected a request for a reason that could succeed on a retry.
+  # Uncategorized because RetryableKMIPService does the retrying, and what escapes it
+  # should not be retried again.
+  - {code: 528, name: KMIPRetryableError}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
