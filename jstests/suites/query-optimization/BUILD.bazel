@@ -609,3 +609,24 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "pbt_clustered_experiment_coll",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/pbt_clustered_experiment_coll.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
