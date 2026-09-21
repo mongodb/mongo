@@ -277,7 +277,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 runTestCaseIneligiblePipeline({
@@ -288,7 +288,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Fallback if the prefix of the pipeline contains an exclusion $project on the base collection.
@@ -299,7 +299,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Same, for an exclusion $project on a subpath, and with a preceding $match.
@@ -311,7 +311,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Excluding only "_id" is still an exclusion projection, so it falls back too.
@@ -322,7 +322,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Excluding "_id" while including other fields is fine.
@@ -381,7 +381,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligibleSubPipelineStage",
 });
 
 // Regression test for tassert 11116400 "unexpected $match": a $limit before a $match prevents the
@@ -397,7 +397,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Join opt should be applied to the prefix because it is eligible but
@@ -568,7 +568,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: {path: "$x", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}},
     ],
     expectedCount: 1,
-    expectedFallbackReason: null,
+    expectedFallbackReason: "outerJoinUnwind",
 });
 
 // Aggregation is ineligible when a hint is specified.

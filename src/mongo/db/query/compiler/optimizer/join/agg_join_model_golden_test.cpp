@@ -54,7 +54,7 @@ public:
 TEST_F(AggJoinModelGoldenTest, longPrefix) {
     const auto query = R"([
             {$match: {c: 1, h: 12}},
-            {$project: {k: 0}},
+            {$project: {c: 1, h: 1, a: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
             {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},

@@ -9,8 +9,10 @@ input {
         },
         {
             "$project": {
-                "k": false,
-                "_id": true
+                "_id": true,
+                "c": true,
+                "h": true,
+                "a": true
             }
         },
         {
@@ -62,7 +64,10 @@ output: {
                         ]
                     },
                     "projection": {
-                        "k": false
+                        "_id": true,
+                        "c": true,
+                        "h": true,
+                        "a": true
                     }
                 },
                 "embedPath": ""

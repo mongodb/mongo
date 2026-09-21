@@ -1145,7 +1145,15 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReordering) {
 
     auto pipeline = makePipeline(query, {"A"});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kLookupNotUnwound));
 }
 
 TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReorderingNonAbsorbableUnwind) {
@@ -1156,7 +1164,15 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReorderingNonAbsorbableUnw
 
     auto pipeline = makePipeline(query, {"B"});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kLookupNotUnwound));
 }
 
 TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
@@ -2374,7 +2390,16 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
 }
 
 TEST_F(PipelineAnalyzerTest, ConflictingLocalFields) {
@@ -2583,7 +2608,16 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligibleSubPipelineStage));
 }
 
 TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
@@ -2600,7 +2634,15 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligibleSubPipelineStage));
 }
 
 TEST_F(PipelineAnalyzerTest, LongPrefix) {
@@ -2642,7 +2684,7 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
-TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
+TEST_F(PipelineAnalyzerTest, PipelineIneligibleForSortStage) {
     const auto sortPrefixQuery = R"([
             {$match: {c: 1}},
             {$sort: {e: 1}},
@@ -2655,7 +2697,16 @@ TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
 
     auto pipeline = makePipeline(sortPrefixQuery, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
 }
 
 TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
@@ -3032,7 +3083,15 @@ TEST_F(PipelineAnalyzerTest, PrefixExclusionProjectIsIneligible) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a", "b", "c"}, {{"A", {"b"}}});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
 }
 
 // An exclusion $project on a subpath of the base collection is ineligible as well.
@@ -3047,7 +3106,15 @@ TEST_F(PipelineAnalyzerTest, PrefixExclusionProjectOnSubPathIsIneligible) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a", "b", "c.d"}, {{"A", {"b"}}});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
 }
 
 // Exclusion projections are still supported in a $lookup subpipeline- only the base collection is
@@ -3123,7 +3190,16 @@ TEST_F(PipelineAnalyzerTest, InvalidPipelinePrefixDetected) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
 }
 
 TEST_F(PipelineAnalyzerTest, InvalidSubPipelineDetected) {
@@ -3139,7 +3215,16 @@ TEST_F(PipelineAnalyzerTest, InvalidSubPipelineDetected) {
 
     auto pipeline = makePipeline(query, {"A", "B"});
     markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"b"}}});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // We bail after failing to build a join model.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kIneligibleSubPipelineStage));
 }
 
 TEST_F(PipelineAnalyzerTest, tooManyNodes) {
@@ -3744,10 +3829,10 @@ TEST_F(PipelineAnalyzerTest, LeadingMatchAfterLimitPushdownBailsOut) {
     ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
     ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
     ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
-              toStringData(JoinFallbackReason::kTooFewNodes));
+              toStringData(JoinFallbackReason::kIneligiblePrefixStage));
     ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
-    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
-    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 0);
     ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
     ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
     ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);

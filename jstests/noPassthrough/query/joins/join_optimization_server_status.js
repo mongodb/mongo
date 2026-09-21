@@ -160,6 +160,25 @@ describe("join optimization serverStatus metrics", function () {
                 {before, after},
             );
         };
+
+        // However, in cases where a $lookup is present, we want to collect $queryStats metrics, so we process the query a bit farther!
+        this.assertEarlyFallbackWithLookup = (reason, runQuery) => {
+            const before = this.metrics();
+            runQuery();
+            const after = this.metrics();
+            const delta = fallbackReasonDelta(before, after);
+            // Note: we may have additional fallback reasons from background queries- don't count them.
+            assert.eq(delta[reason], 1, `fallback reason '${reason}' should have been recorded`, {
+                before,
+                after,
+            });
+            assert.eq(
+                counterDelta(before, after, "joinOptimizationConsidered"),
+                1,
+                "an ineligible query should not be counted as considered",
+                {before, after},
+            );
+        };
     });
 
     after(function () {
@@ -605,7 +624,7 @@ describe("join optimization serverStatus metrics", function () {
 
     it("records 'lookupNotUnwound'", function () {
         // A $lookup that is not unwound produces an array rather than a join.
-        this.assertEarlyFallback("lookupNotUnwound", () =>
+        this.assertEarlyFallbackWithLookup("lookupNotUnwound", () =>
             this.orders
                 .aggregate([
                     {
@@ -623,7 +642,7 @@ describe("join optimization serverStatus metrics", function () {
 
     it("records 'outerJoinUnwind'", function () {
         // Preserving null/empty arrays makes the $unwind an outer join.
-        this.assertEarlyFallback("outerJoinUnwind", () =>
+        this.assertEarlyFallbackWithLookup("outerJoinUnwind", () =>
             this.orders
                 .aggregate([
                     {
@@ -641,7 +660,7 @@ describe("join optimization serverStatus metrics", function () {
     });
 
     it("records 'unwindIncludeArrayIndex'", function () {
-        this.assertEarlyFallback("unwindIncludeArrayIndex", () =>
+        this.assertEarlyFallbackWithLookup("unwindIncludeArrayIndex", () =>
             this.orders
                 .aggregate([
                     {
@@ -660,14 +679,14 @@ describe("join optimization serverStatus metrics", function () {
 
     it("records 'ineligiblePrefixStage'", function () {
         // A stage before the first $lookup that the prefix cannot represent.
-        this.assertEarlyFallback("ineligiblePrefixStage", () =>
+        this.assertEarlyFallbackWithLookup("ineligiblePrefixStage", () =>
             this.orders.aggregate([{$sort: {a: 1}}, ...this.pipeline]).itcount(),
         );
     });
 
     it("records 'ineligibleSubPipelineStage'", function () {
         // A $lookup sub-pipeline stage that join optimization does not support.
-        this.assertEarlyFallback("ineligibleSubPipelineStage", () =>
+        this.assertEarlyFallbackWithLookup("ineligibleSubPipelineStage", () =>
             this.orders
                 .aggregate([
                     {

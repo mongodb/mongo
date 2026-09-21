@@ -26,6 +26,7 @@
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/compiler/optimizer/join/server_status_metrics.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -270,12 +271,6 @@ boost::optional<JoinFallbackReason> isUnwindEligible(const DocumentSourceUnwind&
 /**
  * Checks whether every stage in ['start', 'end') is one we can push into a CanonicalQuery, either
  * for a $lookup sub-pipeline or for the pipeline prefix over the base collection.
- *
- * 'allowExclusionProjection' must be false for the base collection prefix, because the stage
- * builders do not yet support exclusion projections there. They remain supported in $lookup
- * sub-pipelines.
- *
- * TODO SERVER-131452: Relax this restriction.
  */
 bool isSubPipelineOrPrefixEligible(DocumentSourceContainer::const_iterator start,
                                    DocumentSourceContainer::const_iterator end,
@@ -291,10 +286,29 @@ bool isSubPipelineOrPrefixEligible(DocumentSourceContainer::const_iterator start
                 transform->getTransformerType() !=
                 TransformerInterface::TransformerType::kExclusionProjection;
         }
-        return dynamic_cast<DocumentSourceMatch*>(docSrc.get()) ||
-            dynamic_cast<DocumentSourceProject*>(docSrc.get()) ||
+        if (auto* match = dynamic_cast<DocumentSourceMatch*>(docSrc.get())) {
+            // Need explicit check for $text here, otherwise CQ construction will uassert.
+            return !match->isTextQuery();
+        }
+        return dynamic_cast<DocumentSourceProject*>(docSrc.get()) ||
             dynamic_cast<DocumentSourceAddFields*>(docSrc.get());
     });
+}
+
+/**
+ * Helper function to validate eligibility of pipeline prefix.
+ */
+bool isPipelinePrefixEligible(const DocumentSourceContainer& suffix) {
+    auto suffixIt = suffix.begin();
+    while (suffixIt != suffix.end() && !dynamic_cast<DocumentSourceLookUp*>(suffixIt->get())) {
+        suffixIt++;
+    }
+    tassert(13518200, "Expected to find a $lookup", suffixIt != suffix.end());
+    // Note: 'allowExclusionProjection' must be false for the base collection prefix, because the
+    // stage builders do not yet support exclusion projections there. They remain supported in
+    // $lookup sub-pipelines. TODO SERVER-131452: Relax this restriction.
+    return isSubPipelineOrPrefixEligible(
+        suffix.begin(), suffixIt, false /* allowExclusionProjection */);
 }
 
 boost::optional<JoinFallbackReason> isLookupEligible(const DocumentSourceLookUp& lookup) {
@@ -362,30 +376,20 @@ bool addJoinPredicates(const std::vector<JoinPredicate>& joinPreds,
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
-    auto startIt = pipeline.getSources().begin();
-
-    // Permit a leading join hint- we'll check it later.
-    if (dynamic_cast<DocumentSourceInternalJoinHint*>(startIt->get())) {
-        startIt++;
+    auto it = pipeline.getSources().begin();
+    if (dynamic_cast<DocumentSourceMergeCursors*>(it->get())) {
+        // If this stage appears in the pipeline (e..g on mongos) we need to bail before we try to
+        // clone it.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kCollectionSharded);
+        return false;
     }
 
     bool foundLookup = false;
-    auto it = startIt;
     while (it != pipeline.getSources().end()) {
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(it->get()); lookup) {
-            // Found first $lookup- if prefix not valid, or if $lookup itself is not eligible,
-            // bail!
-            if (auto reason = isLookupEligible(*lookup)) {
-                joinOptMetrics.fallbackReasons.increment(*reason);
-                return false;
-            }
-            if (!isSubPipelineOrPrefixEligible(startIt, it, false /* allowExclusionProjection */)) {
-                joinOptMetrics.fallbackReasons.increment(
-                    JoinFallbackReason::kIneligiblePrefixStage);
-                return false;
-            }
+            // Found first $lookup. We DON'T check if its actually eligible here, because we want to
+            // initialize metrics & a more granular fallback reason if it is!
             foundLookup = true;
-            // One eligible $lookup is enough to proceed.
             break;
         }
         it++;
@@ -442,6 +446,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     if (dynamic_cast<DocumentSourceInternalJoinHint*>(suffix->peekFront())) {
         // Remove hint stage from pipeline if present.
         hint = suffix->popFront();
+    }
+
+    // Validate the pipeline prefix here (rather than earlier on) so we can collect more detailed
+    // fallback information.
+    if (!isPipelinePrefixEligible(suffix->getSources())) {
+        metrics.fallbackReason = JoinFallbackReason::kIneligiblePrefixStage;
+        return Status(ErrorCodes::BadValue, "Invalid pipeline prefix for join-opt");
     }
 
     // Initialize deps after popping the $hint stage, but BEFORE we try to push a pipeline prefix
