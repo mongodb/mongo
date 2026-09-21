@@ -1067,8 +1067,11 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+            if (auto alreadyExecutedTimestamp =
+                    txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - *alreadyExecutedTimestamp);
                 // Since multi:true is not allowed with retryable writes if the statement was
                 // executed there will always be 1 document deleted.
                 responses.addDeleteReply(
