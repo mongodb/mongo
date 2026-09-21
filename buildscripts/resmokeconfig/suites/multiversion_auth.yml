@@ -22,13 +22,6 @@ selector:
     # TODO SERVER-94362: now that last-LTS is 9.0, this test is obsolete and should be deleted
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/create_and_drop_database_multiversion_coordination.js
 
-    # TODO SERVER-132998: this test pins oldVersion "8.0.16" and relies on it being an
-    # adjacent-major downgrade partner of the latest binary. With latest now 9.1 (last-LTS 9.0), an
-    # 8.0 binary is two majors below latest and can neither share a replica set with the latest node
-    # nor have its dbpath opened by the latest binary. Re-enable once oldVersion is updated to a
-    # version compatible with 9.1 that still allows creating the invalid wildcard index.
-    - jstests/multiVersion/genericBinVersion/query-optimization/invalid_wildcard_index_log_at_startup.js
-
     # TODO SERVER-133009: featureFlagPQSBackfill is FCV-gated at 8.3. The test
     # assumes representative queries are NOT migrated while FCV is last-LTS. Now that last-LTS is 9.0
     # (>= 8.3), backfill is active at last-LTS and the queries are migrated, breaking the empty-
@@ -44,12 +37,6 @@ selector:
 
     # TODO SERVER-109312: now that last-LTS is 9.0, this test is obsolete and should be deleted
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js
-
-    # TODO SERVER-132998: featureFlagConvertObjectToBinData is FCV-gated at 9.0. The test
-    # expects $convert from Object to BinData to fail with ConversionFailure while FCV is last-LTS. Now
-    # that last-LTS is 9.0 (>= 9.0), the feature is enabled at last-LTS and the conversion succeeds,
-    # breaking the ConversionFailure expectations.
-    - jstests/multiVersion/genericBinVersion/query-optimization/object_bindata_convert_upgrade_downgrade.js
 
     # TODO SERVER-133011: the test hardcodes the expected change-event sequence
     # produced by the last-lts binary. Now that last-lts is 9.0, the DDL change-event stream differs
@@ -86,25 +73,6 @@ selector:
     # 9.0. Now that last-LTS is 9.0, the downgrade target remains at the feature's FCV and the
     # fallback expectations are no longer valid.
     - jstests/multiVersion/genericChangeStreams/change_stream_v2_fcv_upgrade_downgrade.js
-
-    # TODO SERVER-132998: featureFlagExposeArrayIndexInMapFilterReduce is FCV-gated at 8.3.
-    # The test's last-stable cases use arrayIndexAs $map/$reduce validators and expect creating a
-    # collection with them to fail once FCV is set to the last version. Now that last-LTS is 9.0
-    # (>= 8.3), those query features are allowed at the last FCV and creation succeeds, breaking the
-    # expected-failure assertions (see TODO SERVER-90514 in the test).
-    - jstests/multiVersion/genericSetFCVUsage/collection_validator_feature_compatibility_version.js
-
-    # TODO SERVER-132998: featureFlagMqlJsEngineGap is FCV-gated at 8.3. The test
-    # expects MQL features covering common server-side JavaScript use cases to fail in all
-    # last-LTS-FCV states. Now that last-LTS is 9.0 (>= 8.3), the feature is enabled at last-LTS,
-    # so the expressions can be created and evaluated, breaking the expected-failure assertions.
-    - jstests/multiVersion/genericBinVersion/query-optimization/mql_js_engine_gap_upgrade_downgrade.js
-
-    # TODO SERVER-132998: featureFlagExposeArrayIndexInMapFilterReduce is FCV-gated at
-    # 8.3. The test expects views using arrayIndexAs/as/valueAs to fail at last-LTS. Now that
-    # last-LTS is 9.0 (>= 8.3), these features are enabled at the target FCV and the expected
-    # commandFailed assertions fail.
-    - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
 
     # TODO SERVER-132957: the test assumes the last-lts binary writes the authSchema document during
     # createUser. That was true of the 8.0 binary, but the 9.0 binary only writes it during FCV

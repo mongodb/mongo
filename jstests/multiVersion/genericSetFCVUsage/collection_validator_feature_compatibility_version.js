@@ -10,7 +10,7 @@ const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
+const featureFlagsToEnable = [];
 
 // These arrays should be populated with
 //
@@ -34,97 +34,7 @@ const testCasesLastContinuous = [
 
 const testCasesLastContinuousWithFeatureFlags = [];
 
-const testCasesLastStable = testCasesLastContinuous.concat([
-    // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $map: {
-                            input: "$a",
-                            arrayIndexAs: "i",
-                            in: "$$i",
-                        },
-                    },
-                    [0, 1, 2],
-                ],
-            },
-        },
-        nonMatchingDocument: {a: [0, 0]},
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $reduce: {
-                            input: "$a",
-                            arrayIndexAs: "i",
-                            initialValue: 0,
-                            in: {$add: ["$$value", "$$i"]},
-                        },
-                    },
-                    0,
-                ],
-            },
-        },
-        nonMatchingDocument: {a: [0, 1]},
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $reduce: {
-                            input: "$a",
-                            initialValue: 0,
-                            in: {$add: ["$$value", "$$IDX"]},
-                        },
-                    },
-                    0,
-                ],
-            },
-        },
-        nonMatchingDocument: {a: [0, 1]},
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $reduce: {
-                            input: "$a",
-                            as: "elem",
-                            valueAs: "acc",
-                            initialValue: 0,
-                            in: {$add: ["$$acc", "$$elem"]},
-                        },
-                    },
-                    0,
-                ],
-            },
-        },
-        nonMatchingDocument: {a: [0, 1]},
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $filter: {
-                            input: "$a",
-                            arrayIndexAs: "i",
-                            cond: {$eq: ["$$i", 1]},
-                        },
-                    },
-                    [1, 2, 3],
-                ],
-            },
-        },
-        nonMatchingDocument: {a: [0, 0]},
-    },
-]);
+const testCasesLastStable = testCasesLastContinuous.concat([]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test

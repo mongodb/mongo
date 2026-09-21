@@ -10,7 +10,7 @@ const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
+const featureFlagsToEnable = [];
 
 // '$_testFeatureFlagLatest' is an expression permanently enabled in the latest FCV, gated by
 // gFeatureFlagBlender. This allows for a permanent test to validate feature flag logic.
@@ -35,102 +35,7 @@ const testCasesLastContinuousWithFeatureFlags = [];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
 // stable release.
-const testCasesLastStable = testCasesLastContinuous.concat([
-    // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
-    [
-        {
-            $match: {
-                $expr: {
-                    $eq: [
-                        {
-                            $map: {
-                                input: "$a",
-                                arrayIndexAs: "i",
-                                in: "$$i",
-                            },
-                        },
-                        [0, 1, 2],
-                    ],
-                },
-            },
-        },
-    ],
-    [
-        {
-            $match: {
-                $expr: {
-                    $eq: [
-                        {
-                            $reduce: {
-                                input: "$a",
-                                arrayIndexAs: "i",
-                                initialValue: 0,
-                                in: {$add: ["$$value", "$$i"]},
-                            },
-                        },
-                        0,
-                    ],
-                },
-            },
-        },
-    ],
-    [
-        {
-            $match: {
-                $expr: {
-                    $eq: [
-                        {
-                            $reduce: {
-                                input: "$a",
-                                initialValue: 0,
-                                in: {$add: ["$$value", "$$IDX"]},
-                            },
-                        },
-                        0,
-                    ],
-                },
-            },
-        },
-    ],
-    [
-        {
-            $match: {
-                $expr: {
-                    $eq: [
-                        {
-                            $reduce: {
-                                input: "$a",
-                                as: "elem",
-                                valueAs: "acc",
-                                initialValue: 0,
-                                in: {$add: ["$$acc", "$$elem"]},
-                            },
-                        },
-                        0,
-                    ],
-                },
-            },
-        },
-    ],
-    [
-        {
-            $match: {
-                $expr: {
-                    $eq: [
-                        {
-                            $filter: {
-                                input: "$a",
-                                arrayIndexAs: "i",
-                                cond: {$eq: ["$$i", 1]},
-                            },
-                        },
-                        [1, 2, 3],
-                    ],
-                },
-            },
-        },
-    ],
-]);
+const testCasesLastStable = testCasesLastContinuous.concat([]);
 
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
