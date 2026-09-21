@@ -1041,14 +1041,6 @@ void checkCollectionMetadataInShardCatalog(
     const boost::optional<CollectionType> collectionInGlobalCatalog,
     int64_t strictChunkChecksThreshold,
     std::vector<MetadataInconsistencyItem>& inconsistencies) {
-
-    if (rsMode == RSNodeMode::kDelayedSecondary) {
-        // Delayed secondaries can't make most of the checks in this function because they check the
-        // in-memory metadata (CSR). Plus, on initial sync suites, it causes failures.
-        // TODO (SERVER-131102): Re-enable this check for initial sync suites.
-        return;
-    }
-
     boost::optional<CollectionMetadata> inMemoryShardCatalogMetadata;
     ChunkVersion collectionPlacementVersion;
     bool csrIsUnowned = false;
