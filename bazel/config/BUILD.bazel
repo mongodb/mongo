@@ -1476,6 +1476,7 @@ selects.config_setting_group(
         "//bazel/platforms:amazon_linux_2023_3",
         "//bazel/platforms:ubuntu22",
         "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:ubuntu26",
     ],
 )
 
@@ -2839,6 +2840,7 @@ selects.config_setting_group(
         "//bazel/platforms:ubuntu20",
         "//bazel/platforms:ubuntu22",
         "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:ubuntu26",
         "//bazel/platforms:amazon_linux_2",
         "//bazel/platforms:debian10",
         "//bazel/platforms:debian12",

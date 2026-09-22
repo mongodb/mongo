@@ -152,4 +152,14 @@ TOOLCHAIN_MAP_V5 = {
         "sha": "44581b6a7e0df623cecc6a9f56c958f4a981293a9df338c5a95a5aa08310fd0a",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2404-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
     },
+    "ubuntu26_aarch64": {
+        "platform_name": "ubuntu2604-arm64",
+        "sha": "4a3eb9555e679bcb2416948e65db54b6363d114343aa51cf0e42058fdcf2f008",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2604-arm64-edf71c48476695b4bb7bb3ee0e098920dc226a99.tar.gz",
+    },
+    "ubuntu26_x86_64": {
+        "platform_name": "ubuntu2604",
+        "sha": "a2b2126664f36f0fdbc8e377d889b4a536550c9f6ed389d7bbaf6777599c9943",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2604-edf71c48476695b4bb7bb3ee0e098920dc226a99.tar.gz",
+    },
 }

@@ -55,6 +55,7 @@ SUPPORTED_DEBIAN_RELEASES = [
     'bullseye',
     'bookworm',
     'trixie',
+    'forky',
 ]
 
 

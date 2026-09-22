@@ -53,6 +53,8 @@ PLATFORM_NAME_MAP = {
     "ubuntu22_x86_64": "ubuntu2204",
     "ubuntu24_aarch64": "ubuntu2404-arm64",
     "ubuntu24_x86_64": "ubuntu2404",
+    "ubuntu26_aarch64": "ubuntu2604-arm64",
+    "ubuntu26_x86_64": "ubuntu2604",
 }
 
 REQUESTS_SESSION = requests.Session()
