@@ -61,6 +61,8 @@ last-patch:
       ticket: SERVER-127745
     - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
       ticket: SERVER-131326
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
+      ticket: SERVER-134952
     - test_file: jstests/sharding/query/graph_lookup/graph_lookup_spill_on_merging_shard.js
       ticket: SERVER-130431
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
@@ -176,6 +178,8 @@ last-continuous:
       ticket: SERVER-131326
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
       ticket: SERVER-131202
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
+      ticket: SERVER-134952
     - test_file: jstests/sharding/query/graph_lookup/graph_lookup_spill_on_merging_shard.js
       ticket: SERVER-130431
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
@@ -827,6 +831,8 @@ last-lts:
       ticket: SERVER-95976
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
       ticket: SERVER-131202
+    - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
+      ticket: SERVER-134952
     - test_file: jstests/sharding/query/explain/explain_find_transformed_query.js
       ticket: SERVER-82471
     - test_file: jstests/sharding/query/graph_lookup/graph_lookup_spill_on_merging_shard.js
