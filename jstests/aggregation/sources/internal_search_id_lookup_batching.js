@@ -8,6 +8,7 @@
  *
  * @tags: [
  *   requires_fcv_90,
+ *   featureFlagSearchOptimizedIdLookup,
  *   # Runs $_internalSearchIdLookup directly over an internal-client connection; only mongod
  *   # accepts that. Every non-mongos-fronted resmoke suite already gives a bare mongod connection
  *   # as 'db', so this tag alone is sufficient.

@@ -49,6 +49,5 @@ release:
   featureFlagSbeAccumulators: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagSearchExtension: {}
-  featureFlagSearchOptimizedIdLookup: {}
   featureFlagUnifiedWriteExecutor: {}
   featureFlagVectorSearchExtension: {}
