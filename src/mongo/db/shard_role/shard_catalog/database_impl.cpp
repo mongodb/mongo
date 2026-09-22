@@ -37,6 +37,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
+#include "mongo/db/shard_role/shard_catalog/collection_impl.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
@@ -1042,7 +1043,18 @@ Status DatabaseImpl::userCreateNS(
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.
         if (!statusWithMatcher.isOK()) {
-            return statusWithMatcher.getStatus();
+            // Do not enforce an OK result during oplog application: as at startup, the
+            // validator may have been well formed on the version that wrote it. Keeping it
+            // rejects writes to the collection (fail closed) rather than allowing them
+            // unvalidated (SERVER-134863).
+            if (opCtx->writesAreReplicated() &&
+                !MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
+                return statusWithMatcher.getStatus();
+            }
+            LOGV2_WARNING(13486302,
+                          "Creating collection with a malformed collection validator",
+                          logAttrs(nss),
+                          "validatorStatus"_attr = statusWithMatcher.getStatus());
         }
 
         hangAfterParsingValidator.pauseWhileSet();

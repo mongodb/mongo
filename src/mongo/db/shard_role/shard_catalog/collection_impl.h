@@ -49,6 +49,12 @@
 
 namespace mongo {
 
+class FailPoint;
+
+// Defined in collection_impl.cpp; lets tests simulate a validator that was well formed on the
+// version that wrote it but not on this one (SERVER-134863).
+extern FailPoint allowSettingMalformedCollectionValidators;
+
 class [[MONGO_MOD_PRIVATE]] CollectionImpl final : public Collection {
 public:
     // Uses the collator factory to convert the BSON representation of a collator to a
