@@ -3488,7 +3488,10 @@ public:
 
             ASSERT_EQ(false, results.isValid());
             ASSERT_EQ(false, results.getRepaired());
-            ASSERT_EQ(static_cast<size_t>(1), totalErrors(results));
+            // Each of the three records fails a different BSON check, and since SERVER-128900 the
+            // specific failing check is named in the error message, so the errors no longer
+            // collapse into one entry in the results' error set.
+            ASSERT_EQ(static_cast<size_t>(3), totalErrors(results));
             ASSERT_EQ(static_cast<size_t>(0), totalNonTransientWarnings(results));
             ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());

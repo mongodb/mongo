@@ -1687,7 +1687,10 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
     // BSONColumn iteration immediately uasserts InvalidBSONColumn because the empty reference
     // object has no fields, making interleaved.states empty.
     // V2_Column wraps all column errors as NonConformantBSON; V1_Original lets InvalidBSONColumn
-    // propagate directly, which is the path under test (includeReason=true in validateRecord).
+    // propagate directly, which is the path under test. The uassert comes from the decompressor
+    // rather than from one of bson_validate.cpp's own checks, so it is described as "BSONColumn
+    // decompression failed"; the decompressor's own message ("Invalid BSONColumn encoding")
+    // is kept out of the results and reported only in the log (12395400).
     const char kInvalidColumnBytes[] = "\xF1\x05\x00\x00\x00\x00";
     const BSONBinData invalidColumn{
         kInvalidColumnBytes, sizeof(kInvalidColumnBytes) - 1, BinDataType::Column};
@@ -1703,7 +1706,8 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
         V1_Original);
 
     ASSERT_EQ(results.size(), 1U);
-    ASSERT_THAT(*results.front().getErrors().begin(), ::testing::HasSubstr("InvalidBSONColumn"));
+    ASSERT_THAT(*results.front().getErrors().begin(),
+                ::testing::HasSubstr("BSONColumn decompression failed"));
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationFixedBucketingInconsistency) {
