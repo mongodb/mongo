@@ -1101,7 +1101,7 @@ export const ResumableIndexBuildTest = class {
         startOptions.setParameter = Object.assign(setParameter, startOptions.setParameter || {});
         upg.start(conn, startOptions);
         reconnect(conn);
-        upg.waitForState(conn, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
+        upg.waitForMyState(conn, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
         if (shouldComplete) {
             // Ensure that the index builds were completed upon the node starting back up.
@@ -1460,7 +1460,7 @@ export const ResumableIndexBuildTest = class {
             setParameter: {ramLogMaxLines: kRamLogMaxLines},
         });
         reconnect(resumeNode);
-        rst.waitForState(resumeNode, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
+        rst.waitForMyState(resumeNode, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
         otherNodeFp.off();
 
         // Ensure that the index build was completed upon the node starting back up.

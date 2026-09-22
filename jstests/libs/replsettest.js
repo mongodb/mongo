@@ -3801,13 +3801,58 @@ export class ReplSetTest {
     }
 
     /**
+     * Waits until 'node' reports one of 'states' as its own member state, via the 'myState' field
+     * of its own replSetGetStatus.
+     *
+     * Unlike waitForState, this asks the node itself rather than reading a peer's view of it, so
+     * it is safe to wait for SECONDARY here. Prefer awaitSecondaryNodes when SECONDARY is the only
+     * acceptable state. Use this when several states are acceptable, for instance
+     * [PRIMARY, SECONDARY] for a node that has just restarted and may come back as either, or
+     * [SECONDARY, RECOVERING] for a node whose initial sync may have finished or failed -- which
+     * 'hello' cannot distinguish.
+     *
+     * @param node is a single node, by id or conn
+     * @param states is a single state or list of states
+     * @param timeout how long to wait for one of the states to be reached
+     * @param retryIntervalMS how long to sleep between attempts
+     */
+    waitForMyState(node, states, timeout, retryIntervalMS) {
+        node = resolveToConnection(this, node);
+        timeout = timeout || this.timeoutMS;
+        retryIntervalMS = retryIntervalMS || 200;
+        const acceptable = Array.isArray(states) ? states : [states];
+        acceptable.forEach((state) =>
+            assert.eq(typeof state, "number", `state must be a ReplSetTest.State value: ${state}`),
+        );
+
+        let lastState;
+        jsTest.log.info("ReplSetTest waitForMyState: waiting on " + node.name, {acceptable});
+        assert.soonNoExcept(
+            () => {
+                // Transient failures are expected: the node may be restarting, or may close
+                // connections as it transitions between states.
+                const status = asCluster(this, node, () =>
+                    assert.commandWorked(node.adminCommand({replSetGetStatus: 1})),
+                );
+                lastState = status.myState;
+                return acceptable.includes(lastState);
+            },
+            () =>
+                `${node.name} did not reach any of ${tojson(acceptable)};` +
+                ` last observed myState was ${lastState}`,
+            timeout,
+            retryIntervalMS,
+        );
+    }
+
+    /**
      * Wait for a state indicator to go to a particular state or states.
      *
      * Note that this waits for the state as indicated by the primary node, if there is one. If not,
      * it will use the first live node.
      *
-     * Cannot be used to wait for a secondary state alone. To wait for a secondary state, use the
-     * function 'awaitSecondaryNodes' instead.
+     * Cannot be used to wait for a secondary state. To wait for a secondary state, use
+     * 'awaitSecondaryNodes', or 'waitForMyState' if other states are also acceptable.
      *
      * @param node is a single node, by id or conn
      * @param state is a single state or list of states
@@ -3815,9 +3860,11 @@ export class ReplSetTest {
      * @param reconnectNode indicates that we should reconnect to a node that stepped down
      */
     waitForState(node, state, timeout, reconnectNode) {
+        const requested = Array.isArray(state) ? state : [state];
         assert(
-            state != ReplSetTest.State.SECONDARY,
-            "To wait for a secondary state, use the function 'awaitSecondaryNodes' instead.",
+            !requested.includes(ReplSetTest.State.SECONDARY),
+            "To wait for a secondary state, use the function 'awaitSecondaryNodes' instead, or" +
+                " 'waitForMyState' if states other than SECONDARY are also acceptable.",
         );
         this._waitForIndicator(node, "state", state, timeout, reconnectNode);
     }

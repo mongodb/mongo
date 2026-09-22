@@ -51,6 +51,7 @@ assert.soon(
     "Node should transition to STARTUP2 after signal is sent",
 );
 
-rst.waitForState(restartNode, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
+// This is a single-node set, so the restarted node can only come back as the primary.
+rst.waitForState(restartNode, ReplSetTest.State.PRIMARY);
 
 rst.stopSet();
