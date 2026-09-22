@@ -517,7 +517,19 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // constructing the ForwardableOperationMetadata.
         forwardableOpMetadata.setOn(opCtx.get());
 
-        while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
+        // Restricts the hang to the builds named in the fail point's "buildUUIDs" array. Absent
+        // or empty, every build matches, which is how callers that set no data behave.
+        const auto matchesThisBuild = [&buildUUID](const BSONObj& data) {
+            auto buildUUIDs = data.getObjectField("buildUUIDs");
+            if (buildUUIDs.isEmpty()) {
+                return true;
+            }
+            return std::any_of(
+                buildUUIDs.begin(), buildUUIDs.end(), [&buildUUID](const auto& elem) {
+                    return UUID::parse(elem.String()) == buildUUID;
+                });
+        };
+        while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail(matchesThisBuild))) {
             sleepmillis(100);
         }
 

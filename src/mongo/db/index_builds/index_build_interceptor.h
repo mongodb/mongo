@@ -19,6 +19,7 @@
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 #include <cstdint>
 #include <memory>
@@ -231,4 +232,39 @@ private:
     mutable std::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
+
+namespace index_builds {
+
+/**
+ * Interceptors created before the index builds that will own them exist, keyed by index ident.
+ *
+ * A step-up creates these for the builds it is about to resume, so writes accepted before those
+ * builds set themselves up are recorded. An entry is only meaningful while this node is primary
+ * and the build it belongs to has yet to adopt it.
+ *
+ * A build adopts its entry while setting up, which erases it. Anything not adopted is cleared
+ * when the step-up task that created it ends, by which point no build will.
+ */
+class PendingInterceptors {
+public:
+    /** Returns the pending interceptor for 'indexIdent', or null. */
+    std::shared_ptr<IndexBuildInterceptor> find(std::string_view indexIdent) const;
+
+    bool contains(std::string_view indexIdent) const;
+
+    void add(std::string_view indexIdent, std::shared_ptr<IndexBuildInterceptor> interceptor);
+
+    void erase(std::string_view indexIdent);
+
+    void clear();
+
+private:
+    mutable std::mutex _mutex;
+    StringMap<std::shared_ptr<IndexBuildInterceptor>> _interceptors;
+};
+
+PendingInterceptors& getPendingInterceptors(ServiceContext* svcCtx);
+
+}  // namespace index_builds
+
 }  // namespace mongo

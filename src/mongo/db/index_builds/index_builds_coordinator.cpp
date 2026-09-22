@@ -120,6 +120,7 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry);
+MONGO_FAIL_POINT_DEFINE(failToCreatePendingInterceptorsOnStepUp);
 
 auto& indexBuildsTotalMetric = MetricsService::instance().createInt64Counter(
     MetricNames::kIndexBuildsTotal, "Total number of index builds.", MetricUnit::kCount);
@@ -2148,6 +2149,65 @@ std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* o
     return indexBuilds.size();
 }
 
+void IndexBuildsCoordinator::_attachInterceptorsForResumableBuildsOnStepUp(
+    OperationContext* opCtx) {
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            vCtx, fcvSnapshot) ||
+        !index_builds::primary_driven::enabled(opCtx, fcvSnapshot)) {
+        return;
+    }
+
+    // Drop anything an earlier term left behind.
+    auto& pending = index_builds::getPendingInterceptors(opCtx->getServiceContext());
+    pending.clear();
+
+    // resumeInfo() below reads the index build table and so leaves a snapshot open. Later step-up
+    // work acquires collections in MODE_X, which requires that none is.
+    ScopeGuard abandonSnapshot(
+        [&] { shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot(); });
+
+    for (auto&& [buildUUID, build] :
+         index_builds::primary_driven::registry(opCtx->getServiceContext()).all()) {
+        if (!build.indexBuildIdent) {
+            continue;
+        }
+
+        try {
+            if (MONGO_unlikely(failToCreatePendingInterceptorsOnStepUp.shouldFail())) {
+                uasserted(ErrorCodes::FailPointEnabled,
+                          "failToCreatePendingInterceptorsOnStepUp fail point is enabled");
+            }
+
+            // Throws if the build is not resumable, which leaves it with no pending interceptor.
+            std::ignore = index_builds::primary_driven::resumeInfo(
+                opCtx, build.collectionUUID, buildUUID, build.indexes, *build.indexBuildIdent);
+
+            for (const auto& indexBuildInfo : build.indexes) {
+                pending.add(indexBuildInfo.indexIdent,
+                            std::make_shared<IndexBuildInterceptor>(
+                                opCtx,
+                                indexBuildInfo,
+                                LazyRecordStore::CreateMode::openExisting,
+                                indexBuildInfo.spec.getBoolField("unique")));
+            }
+
+            LOGV2(13491000,
+                  "Index build: created pending interceptors for a build to be resumed on step-up",
+                  "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = build.collectionUUID);
+        } catch (const DBException& e) {
+            LOGV2(13491001,
+                  "Index build: could not create pending interceptors on step-up, build will not "
+                  "be resumed",
+                  "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = build.collectionUUID,
+                  "error"_attr = e);
+        }
+    }
+}
+
 void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     if (MONGO_unlikely(hangIndexBuildOnStepUp.shouldFail())) {
         LOGV2(4753600, "Hanging due to hangIndexBuildOnStepUp fail point");
@@ -2168,6 +2228,10 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
         LOGV2(11148206, "Waiting for previous step up thread to exit.");
         _stepUpThread.join();
     }
+
+    // The node accepts writes as soon as this returns, and a write landing before the pending
+    // interceptor exists is invisible to the resumed build.
+    _attachInterceptorsForResumableBuildsOnStepUp(opCtx);
 
     _stepUpThread = stdx::thread([this] {
         Client::initThread("IndexBuildsCoordinator-StepUp",
@@ -2280,6 +2344,12 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
         }
     };
 
+    // A resumed build adopts its pending interceptors while setting up, so whatever is left when
+    // this task ends belongs to a build that will not resume. Clear however this returns, since the
+    // waits below can throw and the catch at the end swallows it.
+    ScopeGuard clearPendingInterceptors(
+        [&] { index_builds::getPendingInterceptors(opCtx->getServiceContext()).clear(); });
+
     try {
         // If we step up quickly after stepping down, there may be old builds still tearing down
         // from us having previously been primary.
@@ -2332,11 +2402,21 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
             vCtx, fcvSnapshot);
     const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx, fcvSnapshot);
 
+    auto& pending = index_builds::getPendingInterceptors(opCtx->getServiceContext());
+
     for (auto&& [buildUUID, build] :
          index_builds::primary_driven::registry(opCtx->getServiceContext()).all()) {
 
+        // A step-up creates a pending interceptor for every index of a build it will resume. If
+        // any is missing, writes taken since then were not recorded, so abort rather than commit
+        // an index missing their keys.
+        const bool hasPendingInterceptors = std::all_of(
+            build.indexes.begin(), build.indexes.end(), [&](const auto& indexBuildInfo) {
+                return pending.contains(indexBuildInfo.indexIdent);
+            });
+
         bool resumeSucceeded = false;
-        if (resumablePdibEnabled && build.indexBuildIdent) {
+        if (resumablePdibEnabled && build.indexBuildIdent && hasPendingInterceptors) {
             try {
                 auto resumeInfo = index_builds::primary_driven::resumeInfo(
                     opCtx, build.collectionUUID, buildUUID, build.indexes, *build.indexBuildIdent);

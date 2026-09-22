@@ -343,4 +343,43 @@ Status IndexBuildInterceptor::retrySkippedRecords(
         opCtx, collection, indexCatalogEntry, onMultikeyPathsRecovered, mode);
 }
 
+namespace index_builds {
+namespace {
+const auto _pendingInterceptors = ServiceContext::declareDecoration<PendingInterceptors>();
+}  // namespace
+
+PendingInterceptors& getPendingInterceptors(ServiceContext* svcCtx) {
+    return _pendingInterceptors(svcCtx);
+}
+
+std::shared_ptr<IndexBuildInterceptor> PendingInterceptors::find(
+    std::string_view indexIdent) const {
+    std::lock_guard lk(_mutex);
+    auto it = _interceptors.find(indexIdent);
+    return it == _interceptors.end() ? nullptr : it->second;
+}
+
+bool PendingInterceptors::contains(std::string_view indexIdent) const {
+    std::lock_guard lk(_mutex);
+    return _interceptors.contains(indexIdent);
+}
+
+void PendingInterceptors::add(std::string_view indexIdent,
+                              std::shared_ptr<IndexBuildInterceptor> interceptor) {
+    std::lock_guard lk(_mutex);
+    _interceptors[std::string{indexIdent}] = std::move(interceptor);
+}
+
+void PendingInterceptors::erase(std::string_view indexIdent) {
+    std::lock_guard lk(_mutex);
+    _interceptors.erase(indexIdent);
+}
+
+void PendingInterceptors::clear() {
+    std::lock_guard lk(_mutex);
+    _interceptors.clear();
+}
+
+}  // namespace index_builds
+
 }  // namespace mongo

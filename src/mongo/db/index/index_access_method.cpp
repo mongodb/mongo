@@ -27,6 +27,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -120,6 +121,28 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
 }
 
 namespace {
+
+/**
+ * Returns the interceptor recording writes for 'entry': the one installed on its catalog entry, or
+ * failing that the pending one created for a build that has yet to set itself up.
+ */
+std::shared_ptr<IndexBuildInterceptor> effectiveIndexBuildInterceptor(
+    OperationContext* opCtx, const IndexCatalogEntry* entry) {
+    if (auto installed = entry->indexBuildInterceptor()) {
+        return installed;
+    }
+    // A ready index does not need an interceptor.
+    if (entry->isReady()) {
+        return nullptr;
+    }
+    // Pending interceptors only apply to writes this node accepts as primary.
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+            opCtx, NamespaceString::kContainerNamespace)) {
+        return nullptr;
+    }
+    return index_builds::getPendingInterceptors(opCtx->getServiceContext()).find(entry->getIdent());
+}
+
 otel::metrics::AttributeDefinition<std::string_view> makeIndexBuildPhaseAttribute() {
     return {.name = "phase",
             .values = {idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
@@ -769,7 +792,7 @@ bool SortedDataIndexAccessMethod::_prepareUpdate(OperationContext* opCtx,
     if (fromMatches) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
-        const auto getKeysMode = entry->indexBuildInterceptor()
+        const auto getKeysMode = effectiveIndexBuildInterceptor(opCtx, entry)
             ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered
             : options.getKeysMode;
 
@@ -1814,7 +1837,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
 
-    if (auto interceptor = entry->indexBuildInterceptor()) {
+    if (auto interceptor = effectiveIndexBuildInterceptor(opCtx, entry)) {
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t inserted = 0;
@@ -1861,7 +1884,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
-    if (auto interceptor = entry->indexBuildInterceptor()) {
+    if (auto interceptor = effectiveIndexBuildInterceptor(opCtx, entry)) {
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t removed = 0;

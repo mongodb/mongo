@@ -530,6 +530,13 @@ public:
 
 private:
     /**
+     * Creates a pending interceptor for each primary-driven index build awaiting resume, so writes
+     * accepted before those builds set themselves up are recorded. Must run before the node accepts
+     * writes.
+     */
+    void _attachInterceptorsForResumableBuildsOnStepUp(OperationContext* opCtx);
+
+    /**
      * Resumes primary-driven index builds on step-up to primary. Resumed index builds will be
      * continued in a background thread. Index builds that cannot be resumed will be aborted.
      */

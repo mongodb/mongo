@@ -101,11 +101,29 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             return status;
     }
 
-    _indexBuildInterceptor =
-        std::make_shared<IndexBuildInterceptor>(opCtx,
-                                                indexBuildInfo,
-                                                LazyRecordStore::CreateMode::openExisting,
-                                                writableEntry->descriptor()->unique());
+    // Pending interceptors are keyed by the ident the write path reads off the catalog entry.
+    tassert(13491002,
+            "resumed index build's ident does not match its catalog entry",
+            writableEntry->getIdent() == indexBuildInfo.indexIdent);
+
+    // Adopt the pending interceptor a step-up created for this build rather than starting a second
+    // one over the same tables. It is released on commit, so a rollback leaves it where the write
+    // path can still find it.
+    _indexBuildInterceptor = index_builds::getPendingInterceptors(opCtx->getServiceContext())
+                                 .find(indexBuildInfo.indexIdent);
+    if (_indexBuildInterceptor) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [svcCtx = opCtx->getServiceContext(), indexIdent = indexBuildInfo.indexIdent](
+                OperationContext*, boost::optional<Timestamp>) {
+                index_builds::getPendingInterceptors(svcCtx).erase(indexIdent);
+            });
+    } else {
+        _indexBuildInterceptor =
+            std::make_shared<IndexBuildInterceptor>(opCtx,
+                                                    indexBuildInfo,
+                                                    LazyRecordStore::CreateMode::openExisting,
+                                                    writableEntry->descriptor()->unique());
+    }
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor);
 
     _completeInit(opCtx, collection);

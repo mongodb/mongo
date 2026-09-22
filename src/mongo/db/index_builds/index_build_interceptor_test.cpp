@@ -2477,5 +2477,38 @@ TEST_F(IndexBuilderInterceptorTest,
     EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
 }
 
+class PendingInterceptorsTest : public unittest::Test {
+protected:
+    index_builds::PendingInterceptors pending;
+};
+
+TEST_F(PendingInterceptorsTest, FindReturnsNullWhenNothingHeld) {
+    EXPECT_FALSE(pending.contains("index-a"));
+    EXPECT_EQ(pending.find("index-a"), nullptr);
+}
+
+TEST_F(PendingInterceptorsTest, FindLeavesTheInterceptorHeld) {
+    pending.add("index-a", nullptr);
+    EXPECT_TRUE(pending.contains("index-a"));
+    pending.find("index-a");
+    EXPECT_TRUE(pending.contains("index-a"));
+}
+
+TEST_F(PendingInterceptorsTest, EraseAffectsOnlyTheNamedIndex) {
+    pending.add("index-a", nullptr);
+    pending.add("index-b", nullptr);
+    pending.erase("index-a");
+    EXPECT_FALSE(pending.contains("index-a"));
+    EXPECT_TRUE(pending.contains("index-b"));
+}
+
+TEST_F(PendingInterceptorsTest, ClearDropsEverything) {
+    pending.add("index-a", nullptr);
+    pending.add("index-b", nullptr);
+    pending.clear();
+    EXPECT_FALSE(pending.contains("index-a"));
+    EXPECT_FALSE(pending.contains("index-b"));
+}
+
 }  // namespace
 }  // namespace mongo
