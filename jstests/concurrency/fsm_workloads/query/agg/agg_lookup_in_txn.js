@@ -17,6 +17,8 @@
  *     requires_fcv_80,
  *     assumes_balancer_off,
  *     requires_getmore,
+ *     # TODO SERVER-134129: Remove the tag.
+ *     does_not_support_stepdowns,
  * ]
  * ]
  */
