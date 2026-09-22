@@ -472,17 +472,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             cmd.kCommandName, parsed.collValidator->validatorDoc, parsed.collValidator->isOK());
 
         if (!parsed.collValidator->isOK()) {
-            // Do not enforce an OK result during oplog application: as at startup, the
-            // validator may have been well formed on the version that wrote it. Keeping it
-            // rejects writes to the collection (fail closed) rather than allowing them
-            // unvalidated (SERVER-134863).
-            if (opCtx->writesAreReplicated()) {
-                return parsed.collValidator->getStatus();
-            }
-            LOGV2_WARNING(13486301,
-                          "Applying collMod with a malformed collection validator",
-                          logAttrs(nss),
-                          "validatorStatus"_attr = parsed.collValidator->getStatus());
+            return parsed.collValidator->getStatus();
         }
         oplogEntryBuilder.append(CollMod::kValidatorFieldName, validatorObj);
     }
