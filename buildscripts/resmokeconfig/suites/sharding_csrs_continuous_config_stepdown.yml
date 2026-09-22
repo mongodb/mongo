@@ -303,6 +303,11 @@ selector:
     - jstests/sharding/resharding_oplog_sync_agg_resume_token.js
     - jstests/sharding/timeseries/timeseries_change_stream_no_orphans.js
 
+    # Uses the ChangeStreamTest fixture correctly, but intermittently stalls for many minutes
+    # under this suite and hits the hang analyzer; cause not yet identified.
+    # TODO: SERVER-135482 investigate and re-enable.
+    - jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+
     # TODO (SERVER-115616): Enable after retrying addShard cmd on retriable network errors.
     - jstests/sharding/add_shard_4.js
 

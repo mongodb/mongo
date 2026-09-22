@@ -132,9 +132,10 @@ private:
 
         /**
          * Encodes 'idElem' into the slot value type for this binder and writes it into the runtime
-         * env. Returns false for unsupported _id types so the caller can decline with kNotHandled.
+         * env. The _id value is pre-validated by canLookupId(), so every encodable value is
+         * handled.
          */
-        bool bind(const BSONElement& idElem, sbe::RuntimeEnvironment* env) const;
+        void bind(const BSONElement& idElem, sbe::RuntimeEnvironment* env) const;
 
         Kind kind;
         sbe::value::SlotId slotA;  // lowKey / minRecord

@@ -4,7 +4,6 @@
  *
  * @tags: [requires_fcv_90]
  */
-import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {withFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -28,9 +27,9 @@ import {
 // $_internalSearchIdLookup aggregation tests: 'key' is the shard-key spec, 'collOpts' the
 // collection options, and the shared decorators add the clustered and hashed/range variants.
 
-// _id-keyed sharding ties the shard key's value to _id itself, and its compound cell pins the
-// SERVER-134686 known issue (see reportsOrphanAsFound). sk-keyed sharding uses a separate shard
-// key field, so _id is free to vary independently, crossed with both id shapes.
+// _id-keyed sharding ties the shard key's value to _id itself, and its compound cell verifies
+// SBE filters orphans there too. sk-keyed sharding uses a separate shard key field, so _id is
+// free to vary independently, crossed with both id shapes.
 const shardKeyConfigs = [
     {name: "_id-keyed, scalar _id", key: {_id: 1}, makeId: (seed) => seed, collOpts: {}},
     {name: "sk-keyed, scalar _id", key: {sk: 1}, makeId: (seed) => seed, collOpts: {}},
@@ -69,33 +68,6 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
     let mongosDB;
     let internalDB0;
     let internalDB1;
-
-    // Whether SBE can encode this config's _id shape.
-    //
-    // TODO: SERVER-134080 Support non-scalar _id lookups in SbeSingleDocumentLookupExecutor.
-    // Until then, an object _id is only encodable on a clustered collection, and the local-read
-    // fallback handles it instead.
-    //
-    // 'allCollectionsClusteredByDefault' is set in before(): the sharding_clustered_collections
-    // suite runs with the 'clusterAllCollectionsByDefault' failpoint, which clusters every
-    // collection on _id at creation regardless of collOpts — including the collOpts:{} configs
-    // below — making compound _id encodable there too. The lookups run shard-local, so the
-    // failpoint is read from a shard, not mongos.
-    let allCollectionsClusteredByDefault = false;
-
-    function doesSbeHandleLookup(config) {
-        const compoundId = typeof config.makeId(0) === "object";
-        const clustered =
-            config.collOpts.hasOwnProperty("clusteredIndex") || allCollectionsClusteredByDefault;
-        return !compoundId || clustered;
-    }
-
-    // Whether a post-move donor-side lookup reports the orphaned document as found.
-    // TODO: SERVER-134080: non-clustered compound _ids move to SBE, which filters the orphan
-    // correctly, so this stops being true.
-    function reportsOrphanAsFound(config) {
-        return !doesSbeHandleLookup(config) && Object.keys(config.key)[0] === "_id";
-    }
 
     // Shards an already-populated collection, then guarantees the seed-0 and seed-1
     // documents end up in separate chunks, both on shard0, regardless of sharding
@@ -137,11 +109,6 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
             mongos: 1,
         });
         mongosDB = st.s.getDB(jsTestName());
-        // Whether the ambient clusterAllCollectionsByDefault failpoint is on (see
-        // doesSbeHandleLookup): queried once here because it is fixed for the whole run.
-        allCollectionsClusteredByDefault = ClusteredCollectionUtil.areAllCollectionsClustered(
-            st.rs0.getPrimary(),
-        );
         // $_internalSearchIdLookup always runs shard-local, so each shard's primary gets one
         // long-lived internal-client connection for the direct-to-shard commands below.
         internalDB0 = createInternalDB(st.rs0.getPrimary().host, mongosDB.getName());
@@ -222,13 +189,7 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                             [stayingDoc._id, migratingDoc._id],
                             {shardVersion: shard0Version},
                         );
-                        assert.eq(
-                            donorResults,
-                            reportsOrphanAsFound(config)
-                                ? [stayingDoc, migratingDoc]
-                                : [stayingDoc],
-                            {donorResults},
-                        );
+                        assert.eq(donorResults, [stayingDoc], {donorResults});
 
                         const recipientResults = runAggWithMockMongotResults(
                             internalDB1,
@@ -240,46 +201,25 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                     },
                 );
 
-                // Donor: stayingDoc found, the orphan notFound (found for the known-issue cell,
-                // reportsOrphanAsFound); recipient: migratingDoc found.
+                // Donor: stayingDoc found, the orphan notFound; recipient: migratingDoc found.
+                // SBE handles every legal _id shape directly, compound objects included.
                 const byEngine = readIdLookupDelta(delta);
-                if (doesSbeHandleLookup(config)) {
-                    assert.eq(
-                        byEngine.sbe,
-                        {found: 2, notFound: 1, notHandled: 0},
-                        {
-                            byEngine,
-                            delta,
-                        },
-                    );
-                    assert.eq(
-                        byEngine.aggregation,
-                        {found: 0, notFound: 0, notHandled: 0},
-                        {
-                            byEngine,
-                            delta,
-                        },
-                    );
-                } else {
-                    assert.eq(
-                        byEngine.sbe,
-                        {found: 0, notFound: 0, notHandled: 3},
-                        {
-                            byEngine,
-                            delta,
-                        },
-                    );
-                    assert.eq(
-                        byEngine.aggregation,
-                        reportsOrphanAsFound(config)
-                            ? {found: 3, notFound: 0, notHandled: 0}
-                            : {found: 2, notFound: 1, notHandled: 0},
-                        {
-                            byEngine,
-                            delta,
-                        },
-                    );
-                }
+                assert.eq(
+                    byEngine.sbe,
+                    {found: 2, notFound: 1, notHandled: 0},
+                    {
+                        byEngine,
+                        delta,
+                    },
+                );
+                assert.eq(
+                    byEngine.aggregation,
+                    {found: 0, notFound: 0, notHandled: 0},
+                    {
+                        byEngine,
+                        delta,
+                    },
+                );
             });
         });
 
@@ -361,40 +301,23 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                     },
                 );
                 const getMoreByEngine = readIdLookupDelta(getMoreDelta);
-                if (doesSbeHandleLookup(config)) {
-                    assert.eq(
-                        getMoreByEngine.sbe,
-                        {found: 2, notFound: 0, notHandled: 0},
-                        {
-                            getMoreByEngine,
-                            getMoreDelta,
-                        },
-                    );
-                    assert.eq(
-                        getMoreByEngine.aggregation,
-                        {found: 0, notFound: 0, notHandled: 0},
-                        {getMoreByEngine, getMoreDelta},
-                    );
-                } else {
-                    assert.eq(
-                        getMoreByEngine.sbe,
-                        {found: 0, notFound: 0, notHandled: 2},
-                        {
-                            getMoreByEngine,
-                            getMoreDelta,
-                        },
-                    );
-                    assert.eq(
-                        getMoreByEngine.aggregation,
-                        {found: 2, notFound: 0, notHandled: 0},
-                        {getMoreByEngine, getMoreDelta},
-                    );
-                }
+                assert.eq(
+                    getMoreByEngine.sbe,
+                    {found: 2, notFound: 0, notHandled: 0},
+                    {
+                        getMoreByEngine,
+                        getMoreDelta,
+                    },
+                );
+                assert.eq(
+                    getMoreByEngine.aggregation,
+                    {found: 0, notFound: 0, notHandled: 0},
+                    {getMoreByEngine, getMoreDelta},
+                );
 
                 // Re-issued with a fresh shardVersion, the query sees the post-move state:
                 // migratingDoc is still physically on shard0, so it must be dropped by the
-                // shard filter as an unowned orphan (or reported as found for the known-issue
-                // cell, reportsOrphanAsFound).
+                // shard filter as an unowned orphan.
                 const freshDelta = ServerStatusMetrics.withServerStatusMetrics(internalDB0, () => {
                     const freshResults = runAggWithMockMongotResults(
                         internalDB0,
@@ -408,44 +331,22 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                             ),
                         },
                     );
-                    assert.eq(
-                        freshResults,
-                        reportsOrphanAsFound(config) ? [stayingDoc, migratingDoc] : [stayingDoc],
-                        {freshResults},
-                    );
+                    assert.eq(freshResults, [stayingDoc], {freshResults});
                 });
                 const freshByEngine = readIdLookupDelta(freshDelta);
-                if (doesSbeHandleLookup(config)) {
-                    assert.eq(
-                        freshByEngine.sbe,
-                        {found: 1, notFound: 1, notHandled: 0},
-                        {
-                            freshByEngine,
-                            freshDelta,
-                        },
-                    );
-                    assert.eq(
-                        freshByEngine.aggregation,
-                        {found: 0, notFound: 0, notHandled: 0},
-                        {freshByEngine, freshDelta},
-                    );
-                } else {
-                    assert.eq(
-                        freshByEngine.sbe,
-                        {found: 0, notFound: 0, notHandled: 2},
-                        {
-                            freshByEngine,
-                            freshDelta,
-                        },
-                    );
-                    assert.eq(
-                        freshByEngine.aggregation,
-                        reportsOrphanAsFound(config)
-                            ? {found: 2, notFound: 0, notHandled: 0}
-                            : {found: 1, notFound: 1, notHandled: 0},
-                        {freshByEngine, freshDelta},
-                    );
-                }
+                assert.eq(
+                    freshByEngine.sbe,
+                    {found: 1, notFound: 1, notHandled: 0},
+                    {
+                        freshByEngine,
+                        freshDelta,
+                    },
+                );
+                assert.eq(
+                    freshByEngine.aggregation,
+                    {found: 0, notFound: 0, notHandled: 0},
+                    {freshByEngine, freshDelta},
+                );
             });
         });
 
@@ -567,29 +468,16 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                     },
                 );
                 const engineStats = readIdLookupDelta(serverStatusDelta);
-                if (doesSbeHandleLookup(config)) {
-                    assert.eq(
-                        engineStats.sbe,
-                        {found: 1, notFound: 1, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                    assert.eq(
-                        engineStats.aggregation,
-                        {found: 0, notFound: 0, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                } else {
-                    assert.eq(
-                        engineStats.sbe,
-                        {found: 0, notFound: 0, notHandled: 2},
-                        {engineStats, serverStatusDelta},
-                    );
-                    assert.eq(
-                        engineStats.aggregation,
-                        {found: 1, notFound: 1, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                }
+                assert.eq(
+                    engineStats.sbe,
+                    {found: 1, notFound: 1, notHandled: 0},
+                    {engineStats, serverStatusDelta},
+                );
+                assert.eq(
+                    engineStats.aggregation,
+                    {found: 0, notFound: 0, notHandled: 0},
+                    {engineStats, serverStatusDelta},
+                );
             });
 
             // The completed-before case. Unlike a moveChunk with suspended range deletion, there
@@ -639,31 +527,19 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
 
                 // Donor: stayingDoc found, migratingDoc notFound (absent, not an orphan);
                 // recipient: migratingDoc found. Same observable counts as the moveChunk live
-                // test, but through absence rather than orphan filtering.
+                // test, but through absence rather than orphan filtering. SBE handles every
+                // legal _id shape directly, compound objects included.
                 const engineStats = readIdLookupDelta(serverStatusDelta);
-                if (doesSbeHandleLookup(config)) {
-                    assert.eq(
-                        engineStats.sbe,
-                        {found: 2, notFound: 1, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                    assert.eq(
-                        engineStats.aggregation,
-                        {found: 0, notFound: 0, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                } else {
-                    assert.eq(
-                        engineStats.sbe,
-                        {found: 0, notFound: 0, notHandled: 3},
-                        {engineStats, serverStatusDelta},
-                    );
-                    assert.eq(
-                        engineStats.aggregation,
-                        {found: 2, notFound: 1, notHandled: 0},
-                        {engineStats, serverStatusDelta},
-                    );
-                }
+                assert.eq(
+                    engineStats.sbe,
+                    {found: 2, notFound: 1, notHandled: 0},
+                    {engineStats, serverStatusDelta},
+                );
+                assert.eq(
+                    engineStats.aggregation,
+                    {found: 0, notFound: 0, notHandled: 0},
+                    {engineStats, serverStatusDelta},
+                );
             });
         });
     }

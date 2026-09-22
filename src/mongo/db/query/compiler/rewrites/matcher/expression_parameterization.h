@@ -372,4 +372,11 @@ std::vector<const MatchExpression*> parameterizeMatchExpression(
  */
 std::vector<const MatchExpression*> unparameterizeMatchExpression(MatchExpression* tree);
 
+/**
+ * True when a comparison expression's literal 'data' is eligible for auto-parameterization: the
+ * literal can be assigned a reusable input parameter ID without changing the plan produced for
+ * a different literal of the same type.
+ */
+bool isEligibleForComparisonAutoParameterization(const BSONElement& data);
+
 }  // namespace mongo

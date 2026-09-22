@@ -15,6 +15,9 @@
  *   # Wrapping the mock-mongot pipelines in $facet breaks the failpoint orchestration and the
  *   # result shapes.
  *   do_not_wrap_aggregations_in_facets,
+ *   # The optimizedIdLookup: false config flips featureFlagSearchOptimizedIdLookup on every
+ *   # non-config node via setParameterOnAllNonConfigNodes.
+ *   assumes_stable_shard_list,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
@@ -32,13 +35,24 @@ import {
     runAggWithMockMongotResults,
 } from "jstests/libs/query/internal_search_id_lookup_util.js";
 import {withClusteredColl, withCollation} from "jstests/libs/query/collection_config_decorators.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const internalDB = createInternalDB(testDB.getMongo().uri, testDB.getName());
 
-const configs = [{name: "default", collOpts: {}}]
+// Every config runs with the SBE fast path on except this one: it re-runs the same per-config its
+// with featureFlagSearchOptimizedIdLookup off, so every lookup falls back to the plain aggregation
+// local-read path.
+const optimizedIdLookupOffConfig = {
+    name: "optimizedIdLookup off",
+    collOpts: {},
+    optimizedIdLookup: false,
+};
+
+const configs = [{name: "default", collOpts: {}, optimizedIdLookup: true}]
     .flatMap((config) => [config, withClusteredColl(config)])
-    .flatMap((config) => [config, withCollation(config)]);
+    .flatMap((config) => [config, withCollation(config)])
+    .concat(optimizedIdLookupOffConfig);
 
 const oid = ObjectId();
 const compound = {a: 1, b: 2};
@@ -48,6 +62,9 @@ const docs = [
     {_id: oid, x: "oid"},
     {_id: compound, x: "compound"},
     {_id: null, x: "null"},
+    {_id: MinKey(), x: "minkey"},
+    {_id: MaxKey(), x: "maxkey"},
+    {_id: true, x: "bool"},
 ];
 
 describe("$_internalSearchIdLookup", function () {
@@ -57,12 +74,23 @@ describe("$_internalSearchIdLookup", function () {
             let coll;
 
             before(function () {
+                setParameterOnAllNonConfigNodes(
+                    testDB.getMongo(),
+                    "featureFlagSearchOptimizedIdLookup",
+                    config.optimizedIdLookup,
+                );
                 coll = assertDropAndRecreateCollection(testDB, collName, config.collOpts);
                 assert.writeOK(coll.insert(docs));
             });
 
             after(function () {
                 assertDropCollection(testDB, collName);
+                // Restore the default so later configs and the outer its below aren't affected.
+                setParameterOnAllNonConfigNodes(
+                    testDB.getMongo(),
+                    "featureFlagSearchOptimizedIdLookup",
+                    true,
+                );
             });
 
             it("finds every `_id` shape via mocked mongot results", function () {
@@ -79,49 +107,55 @@ describe("$_internalSearchIdLookup", function () {
             // Mixed shapes and outcomes in one batch: no sibling's result may be corrupted, and
             // search.idLookup.<engine> must attribute each outcome to the right engine. Order is
             // asserted exactly too.
-            //
-            // TODO: SERVER-134080 Support non-scalar _id lookups in SbeSingleDocumentLookupExecutor.
-            // Until then, a non-clustered collection's compound _id always declines to the
-            // aggregation fallback; the expected counts below reflect that as temporary.
             it("drops missing/absent `_id`s, including non-scalar ones, mixed into the same batch, correctly attributed per engine", function () {
-                // Fixed input: 1 (found), "missing-str" (not found), oid (found), {a:9,b:9} (not
-                // found, compound), compound (found, compound), null (found), undefined (dropped
-                // by enrich() before performLookup, so absent from both cells below). Clustered:
-                // SBE handles everything directly. Non-clustered: SBE can't encode compound or
-                // null _id, so those entries decline to the aggregation fallback.
-                const clustered = config.collOpts.hasOwnProperty("clusteredIndex");
-                const expected = clustered
+                // Fixed input: 1 (found), null (declines in SBE), "missing-str" (not found),
+                // oid (found), {a:9,b:9} (not found, compound), compound (found, compound),
+                // undefined (dropped by enrich() before performLookup, so absent from both cells
+                // below), minKey/maxKey/true (each declines in SBE). SBE handles every other encodable
+                // _id shape directly, on clustered and non-clustered collections alike, compound
+                // included.
+                //
+                // With optimizedIdLookup off, SBE never engages: every one of the 9 lookups that
+                // reach the stage resolves through the aggregation fallback instead.
+                const expected = config.optimizedIdLookup
                     ? {
-                          sbe: {found: 4, notFound: 2, notHandled: 0},
-                          aggregation: {found: 0, notFound: 0},
+                          sbe: {found: 3, notFound: 2, notHandled: 4},
+                          aggregation: {found: 4, notFound: 0},
                       }
                     : {
-                          sbe: {found: 2, notFound: 1, notHandled: 3},
-                          aggregation: {found: 2, notFound: 1},
+                          sbe: {found: 0, notFound: 0, notHandled: 0},
+                          aggregation: {found: 7, notFound: 2},
                       };
 
                 const delta = ServerStatusMetrics.withServerStatusMetrics(testDB, () => {
                     assert.eq(
                         runAggWithMockMongotResults(internalDB, collName, [
                             1,
+                            null,
                             "missing-str",
                             oid,
                             {a: 9, b: 9},
                             compound,
-                            null,
                             undefined,
+                            MinKey(),
+                            MaxKey(),
+                            true,
                         ]),
                         [
                             {_id: 1, x: "scalar"},
+                            {_id: null, x: "null"},
                             {_id: oid, x: "oid"},
                             {_id: compound, x: "compound"},
-                            {_id: null, x: "null"},
+                            {_id: MinKey(), x: "minkey"},
+                            {_id: MaxKey(), x: "maxkey"},
+                            {_id: true, x: "bool"},
                         ],
                     );
                 });
 
-                const sbe = delta.search.idLookup.sbe;
-                const aggregation = delta.search.idLookup.aggregation;
+                const idLookup = delta.search.idLookup;
+                const sbe = idLookup.sbe || {found: 0, notFound: 0, notHandled: 0};
+                const aggregation = idLookup.aggregation || {found: 0, notFound: 0};
                 assert.eq(sbe.found, expected.sbe.found, {sbe});
                 assert.eq(sbe.notFound, expected.sbe.notFound, {sbe});
                 assert.eq(sbe.notHandled, expected.sbe.notHandled, {sbe});

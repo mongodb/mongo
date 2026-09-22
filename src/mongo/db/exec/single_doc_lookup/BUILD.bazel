@@ -251,13 +251,13 @@ mongo_cc_library(
         "//src/mongo/db/query:collection_query_info",
         # PlanYieldPolicySBE.
         "//src/mongo/db/query:plan_yield_policy_sbe",
-        # IndexBoundsBuilder::isDirectlyEncodableEqualityType.
-        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
         # QueryPlanner::plan + QueryPlannerParams.
         "//src/mongo/db/query:query_planner",
         # QueryPlannerParams::fillOutMainCollectionPlannerParams / requiresShardFiltering.
         "//src/mongo/db/query:query_planner_params",
-        # parameterizeMatchExpression.
+        # validIdField.
+        "//src/mongo/db/query/util:validate_id",
+        # isEligibleForComparisonAutoParameterization.
         "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
         # buildSlotBasedExecutableTree, prepareSlotBasedExecutableTree, makeKeyStringPair,
         # PlanStageData, ParameterizedIndexScanSlots.
