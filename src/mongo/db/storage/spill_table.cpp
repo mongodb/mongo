@@ -100,7 +100,14 @@ SpillTable::~SpillTable() {
               "error"_attr = exceptionToStatus());
     }
 
-    _storageEngine.dropSpillTable(*_ru, ident());
+    try {
+        _storageEngine.dropSpillTable(*_ru, ident());
+    } catch (...) {
+        LOGV2(13548400,
+              "Failed to drop spill table, spill table will be removed at next startup",
+              "ident"_attr = ident(),
+              "error"_attr = exceptionToStatus());
+    }
 }
 
 std::string_view SpillTable::ident() const {

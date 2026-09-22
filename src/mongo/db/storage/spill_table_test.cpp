@@ -8,7 +8,9 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
@@ -211,6 +213,63 @@ TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
     cursor->detachFromOperationContext();
 
     EXPECT_GT(retries, 0);
+}
+
+/**
+ * Forwards to a real StorageEngine, except that dropSpillTable() throws for a designated ident.
+ */
+class SpillTableDropShim : public StorageEngineMock {
+public:
+    explicit SpillTableDropShim(StorageEngine& engine) : _engine(engine) {}
+
+    void failDropForIdent(std::string failIdent, Status statusToRaise) {
+        _failIdent = std::move(failIdent);
+        _statusToRaise = std::move(statusToRaise);
+    }
+
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) override {
+        if (_failIdent && ident == *_failIdent) {
+            uassertStatusOK(_statusToRaise);
+        }
+        _engine.dropSpillTable(ru, ident);
+    }
+
+private:
+    StorageEngine& _engine;
+    boost::optional<std::string> _failIdent;
+    Status _statusToRaise = Status::OK();
+};
+
+TEST_F(SpillTableTest, DropFailureOnDestruction) {
+    constexpr int64_t kThresholdBytes = 1024;
+    const auto opCtx = makeOperationContext();
+
+    SpillTableDropShim shim{*_storageEngine};
+
+    auto* const spillEngine = _storageEngine->getSpillEngine();
+    auto ru = spillEngine->newRecoveryUnit();
+    auto rs = spillEngine->makeInternalRecordStore(
+        *ru, ident::generateNewInternalIdent(), KeyFormat::Long);
+    const auto ident = std::string(rs->getIdent());
+    auto spillTable =
+        std::make_unique<SpillTable>(std::move(ru),
+                                     std::move(rs),
+                                     shim,
+                                     *DiskSpaceMonitor::get(opCtx->getServiceContext()),
+                                     kThresholdBytes);
+
+    const auto obj = BSON("a" << 1);
+    std::vector<Record> records{{RecordId(), {obj.objdata(), obj.objsize()}}};
+    ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
+
+    shim.failDropForIdent(ident, {ErrorCodes::UnknownError, "simulated spill table drop failure"});
+
+    spillTable.reset();
+
+    // The failed drop leaves the table behind rather than terminating the process.
+    EXPECT_TRUE(spillIdentExists(opCtx.get(), ident));
+    _storageEngine->dropSpillTable(*spillEngine->newRecoveryUnit(), ident);
+    EXPECT_FALSE(spillIdentExists(opCtx.get(), ident));
 }
 
 }  // namespace

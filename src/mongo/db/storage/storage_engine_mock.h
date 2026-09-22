@@ -73,7 +73,7 @@ public:
         return {};
     }
 
-    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) final {
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) override {
         _droppedSpillIdents.emplace_back(ident);
     };
 
