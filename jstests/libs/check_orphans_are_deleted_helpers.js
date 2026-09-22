@@ -1,6 +1,10 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
+// Generous 12 minute bound on the teardown drain: a leaked cursor is reaped within
+// 'cursorTimeoutMillis' (10 min) plus one 'clientCursorMonitorFrequencySecs' tick.
+const kRangeDeletionDrainTimeoutMS = 12 * 60 * 1000;
+
 export var CheckOrphansAreDeletedHelpers = (function () {
     function runCheck(mongosConn, shardConn, shardId) {
         // Under some conditions, migrations that hit errors simply clear the filtering metadata and
@@ -81,6 +85,10 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                         ns,
                 );
 
+                // Wait for range deletions to drain (see kRangeDeletionDrainTimeoutMS) before
+                // checking for orphans on this namespace.
+                // TODO SERVER-131725: Remove this workaround once the long-term cursor-killing fix
+                // is in place.
                 let rangeDeletions = [];
                 assert.soon(
                     () => {
@@ -112,6 +120,8 @@ export var CheckOrphansAreDeletedHelpers = (function () {
                             tojson(rangeDeletions)
                         );
                     },
+                    kRangeDeletionDrainTimeoutMS,
+                    1000,
                 );
 
                 const coll = shardConn.getDB(dbName)[collName];

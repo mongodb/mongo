@@ -38,10 +38,6 @@ const kValidator = {a: {$type: "number"}};
 // that violates the validator.
 const kScanViolationCode = 12370902;
 
-// Generous bound on the teardown drain: a leaked cursor is reaped within 'cursorTimeoutMillis'
-// (10s) plus one 'clientCursorMonitorFrequencySecs' tick.
-const kRangeDeletionDrainTimeoutMS = 2 * 60 * 1000;
-
 // Error codes that are acceptable for any collMod state in a concurrent FSM test.
 // ConflictingOperationInProgress fires when two threads issue collMod with different parameters
 // simultaneously; the FSM's own iteration loop provides the retry.
@@ -58,11 +54,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.passConnectionCache = true;
 
     $config.data.getConcurrentOperations = () => [ConcurrentOperation.ValidationLevelChange];
-
-    // Original cursor-reaping parameter values, captured from setParameter's `was` field in setup
-    // and restored in teardown (see temporary workaround below).
-    let originalCursorTimeoutMillis;
-    let originalClientCursorMonitorFrequencySecs;
 
     // -------------------------------------------------------------------------
     // States
@@ -233,18 +224,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // -------------------------------------------------------------------------
 
     $config.setup = function setup(db, collName, cluster) {
-        // Temporarily lower the cursor timeout so that a dangling idle cursor left behind by the
-        // collMod constraint-upgrade scan is reaped quickly, instead of blocking range deletions.
-        // TODO SERVER-131725: Remove this workaround after a long-term fix is in place.
-        cluster.executeOnMongodNodes(function lowerCursorTimeout(db) {
-            originalCursorTimeoutMillis = assert.commandWorked(
-                db.adminCommand({setParameter: 1, cursorTimeoutMillis: 10000}),
-            ).was;
-            originalClientCursorMonitorFrequencySecs = assert.commandWorked(
-                db.adminCommand({setParameter: 1, clientCursorMonitorFrequencySecs: 1}),
-            ).was;
-        });
-
         // Base creates the sharded collection and inserts partitioned docs as {_id, skey, tid}.
         $super.setup.apply(this, arguments);
 
@@ -278,48 +257,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         this.cleanupInvalidDocs(db, collName);
 
         assert.commandWorked(db.runCommand({validate: collName}));
-
-        try {
-            // Drain range deletions before restoring the parameters: an idle cursor blocks the
-            // range deleter until reaped, which takes ~10s under the lowered timeout but 10min
-            // under the default -- long enough to outlast the CheckOrphansDeleted hook.
-            // TODO SERVER-131725: Remove this workaround after a long-term fix is in place.
-            cluster.executeOnMongodNodes(function drainRangeDeletions(db) {
-                if (!db.hello().isWritablePrimary) {
-                    return;
-                }
-                const rangeDeletions = db.getSiblingDB("config").rangeDeletions;
-                let docs = [];
-                assert.soon(
-                    () => {
-                        docs = rangeDeletions.find().toArray();
-                        return docs.length === 0;
-                    },
-                    () =>
-                        "Timed out waiting for " +
-                        rangeDeletions.getFullName() +
-                        " to drain @ " +
-                        db.getMongo().host +
-                        ", last known contents: " +
-                        tojson(docs),
-                    kRangeDeletionDrainTimeoutMS,
-                    1000,
-                );
-            });
-        } finally {
-            // Restore in a finally so a failed drain does not leak the lowered values into the
-            // next workload run against this fixture.
-            // TODO SERVER-131725: Remove this workaround after a long-term fix is in place.
-            cluster.executeOnMongodNodes(function resetCursorTimeout(db) {
-                assert.commandWorked(
-                    db.adminCommand({
-                        setParameter: 1,
-                        cursorTimeoutMillis: originalCursorTimeoutMillis,
-                        clientCursorMonitorFrequencySecs: originalClientCursorMonitorFrequencySecs,
-                    }),
-                );
-            });
-        }
 
         $super.teardown.apply(this, arguments);
     };
