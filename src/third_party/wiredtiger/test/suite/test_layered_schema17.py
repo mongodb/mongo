@@ -345,9 +345,9 @@ class test_layered_schema17(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def test_strict_step_down_drop_then_pickup(self):
         """
-        Completing the pending drop of the unpublished table resolves the step-down
-        inconsistency: once the table is gone from the local metadata, strict
-        validation passes and the stepped-down node can install checkpoints.
+        Dropping the unpublished table leaves strict validation nothing to explain: the
+        local-only difference is gone rather than excused by the queued CREATE, and the
+        stepped-down node still installs the new leader's checkpoint.
         """
         conn_lead = self.step_down_with_unpublished_table()
 

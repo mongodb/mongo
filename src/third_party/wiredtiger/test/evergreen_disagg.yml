@@ -664,8 +664,7 @@ variables:
             set -o verbose
             ${PREPARE_TEST_ENV}
             # The full mode matrix in short runs: single node, lone follower, role switches,
-            # kills, and both two-node topologies. The two-node switch modes at the end are
-            # EXPECTED to fail until FIXME-WT-17746 land.
+            # kills, and both two-node topologies.
             bash ./smoke.sh
 
   # Configure flags for builtins.

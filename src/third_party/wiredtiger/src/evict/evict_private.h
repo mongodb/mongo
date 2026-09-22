@@ -126,6 +126,8 @@ extern void __wti_evict_queue_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wti_evict_queue_clear_page_locked(
   WT_SESSION_IMPL *session, WT_REF *ref, bool exclude_urgent);
 extern void __wti_evict_set_saved_walk_tree(WT_SESSION_IMPL *session, WT_DATA_HANDLE *new_dhandle);
+static WT_INLINE bool __wti_evict_ckpt_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)

@@ -502,12 +502,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
         bm = btree->bm;
         bool dhandle_dead = F_ISSET(dhandle, WT_DHANDLE_DEAD);
         bool is_mapped = (bm != NULL) ? bm->is_mapped(bm, session) : false;
-        /*
-         * FIXME-WT-18685: Nothing has set WT_BTREE_NO_CHECKPOINT since tiered storage was removed,
-         * so the flag and this test of it can go.
-         */
-        bool skips_checkpoint =
-          F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) || __wt_btree_stays_in_memory(btree);
+        bool skips_checkpoint = __wt_btree_stays_in_memory(btree);
 
         action = __conn_dhandle_close_action_checked(
           session, dhandle_dead, is_mapped, final, mark_dead, skips_checkpoint);

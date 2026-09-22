@@ -398,10 +398,9 @@ struct __wt_btree {
 #define WT_BTREE_IGNORE_CACHE 0x010000u    /* Cache-resident object */
 #define WT_BTREE_IN_MEMORY 0x020000u       /* Cache-resident object */
 #define WT_BTREE_LOGGED 0x040000u          /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_CHECKPOINT 0x080000u   /* Disable checkpoints */
-#define WT_BTREE_NO_EVICT 0x100000u        /* Cache-resident object. Never run eviction on it. */
-#define WT_BTREE_SALVAGE 0x200000u         /* Handle is for salvage */
-#define WT_BTREE_VERIFY 0x400000u          /* Handle is for verify */
+#define WT_BTREE_NO_EVICT 0x080000u        /* Cache-resident object. Never run eviction on it. */
+#define WT_BTREE_SALVAGE 0x100000u         /* Handle is for salvage */
+#define WT_BTREE_VERIFY 0x200000u          /* Handle is for verify */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     /*
      * These flags are only modified while the data handle is held exclusively, that is, at open, at

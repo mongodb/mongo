@@ -1405,8 +1405,7 @@ __rec_is_checkpoint(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
      * checkpoint, before writing the checkpoint. In short, we don't do checkpoint writes here;
      * clear the boundary information as a reminder and create the checkpoint during wrapup.
      */
-    return (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) && !__wt_btree_stays_in_memory(btree) &&
-      __wt_ref_is_root(r->ref));
+    return (!__wt_btree_stays_in_memory(btree) && __wt_ref_is_root(r->ref));
 }
 
 /*

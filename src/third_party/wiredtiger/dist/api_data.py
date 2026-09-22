@@ -162,10 +162,7 @@ connection_disaggregated_config_common = [
         checkpoint. At startup the mode must be off: the startup pickup populates an empty
         node from the checkpoint. Turn it on after startup, provided table creates and drops
         reach this node through replicated operations and publish() rather than through
-        pickup. After a step-down,
-        turn it off until the unpublished tables left behind (step-down discards their
-        pending metadata updates) have been dropped. Preserved across calls to reconfigure
-        that do not name it''',
+        pickup. Preserved across calls to reconfigure that do not name it''',
         choices=['false', 'true'], undoc=True),
 ]
 disaggregated_config_common = [
