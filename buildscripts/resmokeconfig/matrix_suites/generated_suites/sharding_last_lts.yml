@@ -25,6 +25,23 @@ selector:
     - jstests/sharding/max_time_ms_enforced_on_shard.js
     - jstests/sharding/drop_indexes_with_stale_config_error.js
     - jstests/sharding/query/out_merge/merge_write_concern.js
+    - jstests/sharding/query/change_streams/change_stream_all_databases_v2_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
+    - jstests/sharding/query/change_streams/change_stream_cluster_v2_ignore_removed_shards_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_collection_v2_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
+    - jstests/sharding/query/change_streams/change_stream_database_v2_ignore_removed_shards_smoke.js
+    - jstests/sharding/query/change_streams/change_stream_database_v2_strict_whitebox.js
+    - jstests/sharding/query/change_streams/change_stream_resumes_on_v2_disable.js
+    - jstests/sharding/query/change_streams/change_stream_resume_after_rename.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_cluster.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_collection.js
+    - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
+    - jstests/sharding/query/change_streams/test_change_stream_sharding_move_chunk_events.js
     - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
     - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
     - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
