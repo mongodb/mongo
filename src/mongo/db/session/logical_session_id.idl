@@ -197,6 +197,10 @@ structs:
                 description: "Contains context fields of the current transaction"
                 type: TransactionRuntimeContext
                 optional: true
+            isServerInitiatedTransaction:
+                description: "Indicates that the transaction originated from an internal server component rather than a client connection."
+                type: bool
+                optional: true
 
     SessionsCollectionFetchResultIndividualResult:
         description: "Individual result"

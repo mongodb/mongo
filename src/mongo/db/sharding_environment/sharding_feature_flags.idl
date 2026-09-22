@@ -246,6 +246,16 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+    featureFlagServerInitiatedTransactionClassification:
+        description: >-
+            When enabled, the router attaches the 'isServerInitiatedTransaction' generic argument to
+            the first command sent to each participant of a server-initiated (internal) transaction,
+            so that the participant can attribute its transaction lifecycle metrics as internal
+            rather than external. Gated on FCV to ensure all nodes in the cluster understand the field 
+            before it is sent.
+        cpp_varname: feature_flags::gServerInitiatedTransactionClassification
+        default: false
+        fcv_gated: true
     # TODO (SERVER-133881): Remove this flag once 10.0 becomes last LTS.
     featureFlagCreateRenameNewSetAllowChunkOperationsBehavior:
         description: >-

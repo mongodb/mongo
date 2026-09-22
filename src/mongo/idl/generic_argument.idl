@@ -427,6 +427,15 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Set by the router to indicate that the transaction was initiated by the server itself
+            # (an internal transaction) rather than explicitly by a user. This lets the shard
+            # participant attribute its transaction lifecycle counters and metrics as internal vs.
+            # external.
+            isServerInitiatedTransaction:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
             # Contains context fields of the current transaction
             transactionRuntimeContext:
                 type: TransactionRuntimeContext
