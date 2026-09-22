@@ -2534,6 +2534,80 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, SpillPersistsMultikeyStateOfTheDocumentItCheckpoints) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // 40 keys of ~64 KB is ~2.5 MB of key data against the 1 MB budget below.
+    constexpr int kKeysPerDocument = 40;
+    constexpr size_t kElementSizeBytes = 64 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    // The document is multikey and is the first the build sees, so nothing else can have marked the
+    // index multikey by the time it spills.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        BSONArrayBuilder arr;
+        for (int i = 0; i < kKeysPerDocument; ++i) {
+            arr.append(std::to_string(i) + std::string(kElementSizeBytes, 'a'));
+        }
+        ASSERT_OK(
+            Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << arr.arr())));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    auto& indexState = resumeInfo->getIndexes()[0];
+
+    // The document was spilled, and the state that says so also says the index is multikey.
+    ASSERT_TRUE(indexState.getLastSpilledRecordId());
+    EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1);
+    EXPECT_TRUE(indexState.getIsMultikey());
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 // A single document generating more key data than the sorter's memory budget must still be spilled
 // as one unit.
 TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeys) {

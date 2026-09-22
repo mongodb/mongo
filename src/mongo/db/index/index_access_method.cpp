@@ -1339,6 +1339,10 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         }
     }
 
+    // Update the multikey state before adding any key, so that a spill triggered while closing the
+    // batch below persists it together with this document's position.
+    setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
+
     // Ensure that a document's keys are not partially spilled, so that if this builder is later
     // resumed it doesn't lose the keys beyond the spill boundary.
     SorterBatchGuard batchGuard{*_sorter};
@@ -1358,8 +1362,6 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
     auto phase = idl::serialize(IndexBuildPhaseEnum::kCollectionScan);
     updateProcessedMetrics(
         phase, _timer, &_keysInsertedCounted, &_bytesInsertedCounted, &_durationLastUpdated);
-
-    setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
 
     return Status::OK();
 }
