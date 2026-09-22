@@ -2343,6 +2343,14 @@ Status WiredTigerKVEngine::setRecoveryCheckpointMetadata(std::string_view checkp
                 "WiredTiger temporarily could not apply the checkpoint metadata; the checkpoint "
                 "pickup should be retried"};
     }
+    // ECANCELED marks a key-provider callback that declined because the server is shutting down.
+    // The pickup is abandoned, it does not advance the checkpoint metadata LSN, so the node picks
+    // this checkpoint up again on restart.
+    if (ret == ECANCELED) {
+        return {ErrorCodes::ShutdownInProgress,
+                "WiredTiger could not apply the checkpoint metadata because the server is shutting "
+                "down"};
+    }
     invariantWTOK(ret, nullptr);
     return Status::OK();
 }
