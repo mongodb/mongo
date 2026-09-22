@@ -19,8 +19,10 @@ namespace mongo::exec::agg {
 /**
  * idLookup's original lookup strategy, now behind SingleDocumentLookupExecutor: resolves an _id via
  * a `$match`-on-_id sub-pipeline (optionally + the view pipeline) against the stage's stashed
- * acquisition, whose shard filter drops orphans on sharded collections. Installed when the feature
- * flag is off or a view is present; always handles the lookup (never kNotHandled).
+ * acquisition. Always includes a shard filter, so that despite never being routed by a mongos, the
+ * sub-pipeline lookup drops orphans physically present on the shard but no longer owned (e.g. left
+ * behind by a chunk migration). Installed when the feature flag is off or a view is present; always
+ * handles the lookup (never kNotHandled).
  */
 class InternalSearchIdLookUpLocalReadExecutor final : public SingleDocumentLookupExecutor {
 public:
