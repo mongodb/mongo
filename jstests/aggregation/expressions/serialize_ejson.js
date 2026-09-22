@@ -299,4 +299,18 @@ describe("$deserializeEJSON", () => {
             assert.eq(res.a, "failed");
         }
     });
+    it("rejects malformed BinData", () => {
+        const malformedBinDataTests = [
+            // Subtype 4 requires exactly 16 bytes.
+            {input: {$binary: {base64: "MTIz", subType: "4"}}, code: 13016802},
+            // Subtype 16 is unassigned.
+            {input: {$binary: {base64: "MTIz", subType: "10"}}, code: 12978507},
+        ];
+        for (const {input, code} of malformedBinDataTests) {
+            assert.throwsWithCode(
+                () => coll.findOne({}, {a: {$deserializeEJSON: {input: {$literal: input}}}}),
+                code,
+            );
+        }
+    });
 });

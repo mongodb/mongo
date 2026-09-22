@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -128,6 +129,8 @@ void extract2Args(const BSONObj& args, BSONElement* elts) {
 BSONObj emitFromJS(const BSONObj& args, void* data) {
     BSONElement elts[2];
     extract2Args(args, elts);
+    convert_utils::uassertValidUserConstructedBinData(elts[0]);
+    convert_utils::uassertValidUserConstructedBinData(elts[1]);
     EmitState* emitState = EmitStateGuard::get();
     MutableDocument md;
     if (elts[0].type() == BSONType::undefined) {

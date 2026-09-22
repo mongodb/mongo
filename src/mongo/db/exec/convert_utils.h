@@ -66,4 +66,19 @@ boost::optional<BinDataVectorView> parseBinDataVector(const BSONBinData& binData
  */
 std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEndian = true);
 
+/**
+ * Returns true for subtypes in the user-defined range (128-255).
+ */
+bool isValidUserDefinedBinDataType(int typeCode);
+
+/**
+ * Performs validations for any BinData present in the output of $literal, $function, $convert or
+ * $deserializeEJSON that are not covered by 'validateBSON()'. Rejects any unassigned subtype, and
+ * validates the structure of UUID, MD5, ByteArrayDeprecated and Vector. Column is rejected only
+ * when 'allowColumn' is false. The BSONElement overload recurses into objects, arrays and
+ * codeWScope.
+ */
+void uassertValidUserConstructedBinData(const BSONBinData& binData, bool allowColumn = true);
+void uassertValidUserConstructedBinData(const BSONElement& elem, bool allowColumn = true);
+
 }  // namespace mongo::exec::expression::convert_utils

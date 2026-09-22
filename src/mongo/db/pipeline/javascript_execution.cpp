@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/convert_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -66,6 +67,7 @@ Value JsExecution::callFunction(ScriptingFunction func,
     _scope->append(returnValue, "", "__returnValue");
     const BSONObj result = returnValue.done();
     uassertValidBSONFromJavaScript(result, "Invalid BSON returned from JavaScript function");
+    exec::expression::convert_utils::uassertValidUserConstructedBinData(result.firstElement());
     return Value(result.firstElement());
 }
 

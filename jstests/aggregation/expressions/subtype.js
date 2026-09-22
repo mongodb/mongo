@@ -12,15 +12,15 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({}));
 
-function runAndAssert(operand, result, allowedAsLiteral = true) {
+function runAndAssert(operand, result, allowedAsLiteral = true, literalErrorCode = 12978506) {
     // Test with constant-folding optimization, if this operand is allowed as a literal.
     if (allowedAsLiteral) {
         testExpression(coll, {$subtype: operand}, result);
     } else {
-        // The operand is rejected as a literal and should fail to parse.
+        // The operand is rejected as a literal.
         assert.throwsWithCode(
             () => testExpression(coll, {$subtype: operand}, result),
-            ErrorCodes.FailedToParse,
+            literalErrorCode,
         );
     }
     coll.drop();
@@ -63,12 +63,14 @@ runAndAssert(BinData(6, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 6);
 // BinData subtype 7 (BSONColumn) is not allowed as a literal in a query.
 runAndAssert(BinData(7, "CQDoAwAAAAAAAAA="), 7, false /*allowedAsLiteral*/);
 runAndAssert(BinData(8, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 8);
-runAndAssert(BinData(9, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 9);
+// A Vector (9) literal must be a valid vector.
+runAndAssert(BinData(9, "AwAB"), 9);
 runAndAssert(BinData(128, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 128);
 
-// Test with undocumented subtype.
-runAndAssert(BinData(16, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 16);
-runAndAssert(BinData(31, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 31);
+// Undocumented subtypes in the 10-127 range are not allowed as a literal. User-defined subtypes
+// (128-255) are allowed.
+runAndAssert(BinData(16, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 16, false /*allowedAsLiteral*/, 12978507);
+runAndAssert(BinData(31, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 31, false /*allowedAsLiteral*/, 12978507);
 runAndAssert(BinData(200, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 200);
 
 // Test with null and missing.

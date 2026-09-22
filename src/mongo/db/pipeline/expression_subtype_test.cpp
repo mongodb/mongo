@@ -42,6 +42,9 @@ TEST_F(ExpressionSubtypeTest, WithDefinedBinDataSubtype) {
     std::array<char, 16> subtype2Buf{};
     DataView(subtype2Buf.data()).write<LittleEndian<int32_t>>(12);
 
+    // Vector (9) requires a valid header: INT8 dtype, padding 0, one element.
+    std::array<char, 3> vectorBuf{0x03, 0x00, 0x01};
+
     const std::vector<std::pair<BinDataType, BSONBinData>> cases{
         {BinDataGeneral, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, BinDataGeneral}},
         {Function, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, Function}},
@@ -51,7 +54,7 @@ TEST_F(ExpressionSubtypeTest, WithDefinedBinDataSubtype) {
         {MD5Type, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, MD5Type}},
         {Encrypt, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, Encrypt}},
         {Sensitive, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, Sensitive}},
-        {Vector, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, Vector}},
+        {Vector, {vectorBuf.data(), 3, Vector}},
         {bdtCustom, {"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, bdtCustom}},
     };
     for (const auto& [subtype, binData] : cases) {
@@ -66,7 +69,7 @@ TEST_F(ExpressionSubtypeTest, BsonColumnThrowsWhenUsedAsLiteral) {
     BSONObj spec = BSON("$subtype" << Value(columnBinData));
     ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       12978506);
 }
 
 TEST_F(ExpressionSubtypeTest, ByteArrayDeprecatedThrowsWithBadInnerPrefix) {
@@ -79,7 +82,7 @@ TEST_F(ExpressionSubtypeTest, ByteArrayDeprecatedThrowsWithBadInnerPrefix) {
     BSONObj spec = BSON("$subtype" << Value(badSubtype2));
     ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       12978505);
 }
 
 TEST_F(ExpressionSubtypeTest, BdtUUIDThrowsWithWrongSize) {
@@ -88,7 +91,7 @@ TEST_F(ExpressionSubtypeTest, BdtUUIDThrowsWithWrongSize) {
     BSONObj spec = BSON("$subtype" << Value(shortUUID));
     ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       13016802);
 }
 
 TEST_F(ExpressionSubtypeTest, MD5TypeThrowsWithWrongSize) {
@@ -97,7 +100,7 @@ TEST_F(ExpressionSubtypeTest, MD5TypeThrowsWithWrongSize) {
     BSONObj spec = BSON("$subtype" << Value(shortMD5));
     ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       13016802);
 }
 
 TEST_F(ExpressionSubtypeTest, WithUndefinedBinDataSubtype) {

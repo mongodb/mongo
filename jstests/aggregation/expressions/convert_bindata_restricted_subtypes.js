@@ -288,3 +288,28 @@ assert.throwsWithCode(
             .toArray(),
     kConvertToEncryptNotAllowedCode,
 );
+
+// Subtype 9 (Vector): banned for non-array input. Array conversion is covered by
+// convert_bindata_vector.js.
+const kVectorSubtype = 9;
+const kConvertToVectorNotAllowedCode = ErrorCodes.ConversionFailure;
+
+assert.throwsWithCode(
+    () =>
+        coll
+            .aggregate([
+                {
+                    $project: {
+                        output: {
+                            $convert: {
+                                input: "$input",
+                                to: {type: "binData", subtype: kVectorSubtype},
+                                format: "base64",
+                            },
+                        },
+                    },
+                },
+            ])
+            .toArray(),
+    kConvertToVectorNotAllowedCode,
+);

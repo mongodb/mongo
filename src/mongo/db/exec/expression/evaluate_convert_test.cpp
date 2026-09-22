@@ -4560,6 +4560,108 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToBinDataBdtUUIDFailsSizeCheck) {
                        13016802);
 }
 
+TEST_F(EvaluateConvertTest, ConvertLongToBinDataNewUUIDFailsSizeCheck) {
+    auto expCtx = getExpCtx();
+    auto convertExp =
+        Expression::parseExpression(expCtx.get(),
+                                    fromjson("{$convert: {input: '$path1', to: {type: 'binData', "
+                                             "subtype: 4}, byteOrder: 'little'}}"),
+                                    expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(42LL)}}, &expCtx->variables),
+                       AssertionException,
+                       13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertBinDataToBinDataWrongSizeUUIDIdentityRejected) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 4))),
+        expCtx->variablesParseState);
+    auto shortUuid = BSONBinData("AAAAAAAA", 8, BinDataType::newUUID);
+    Document input{{"path1", shortUuid}};
+    ASSERT_THROWS_CODE(
+        convertExp->evaluate(input, &expCtx->variables), AssertionException, 13016802);
+}
+
+TEST_F(EvaluateConvertTest, ConvertToBinDataSensitiveSubtypeAllowed) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 8)
+                                        << "format" << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    Document input{{"path1", "AAAAAAAAAAAAAAAAAAAAAA=="sv}};
+    auto result = convertExp->evaluate(input, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+    ASSERT_EQ(result.getBinData().type, BinDataType::Sensitive);
+}
+
+TEST_F(EvaluateConvertTest, ConvertBinDataToBinDataSensitiveIdentityAllowed) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 8))),
+        expCtx->variablesParseState);
+    auto sensitive = BSONBinData("gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, BinDataType::Sensitive);
+    Document input{{"path1", sensitive}};
+    ASSERT_VALUE_EQ(convertExp->evaluate(input, &expCtx->variables), Value(sensitive));
+}
+
+TEST_F(EvaluateConvertTest, ConvertBinDataToBinDataFunctionIdentityAllowed) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1"
+                                        << "to" << BSON("type" << "binData" << "subtype" << 1))),
+        expCtx->variablesParseState);
+    auto function = BSONBinData("abc", 3, BinDataType::Function);
+    Document input{{"path1", function}};
+    ASSERT_VALUE_EQ(convertExp->evaluate(input, &expCtx->variables), Value(function));
+}
+
+TEST_F(EvaluateConvertTest, ConvertArrayToBinDataBannedSubtypeRejected) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << BSON_ARRAY(1 << 5 << 10) << "to"
+                                        << BSON("type" << "binData" << "subtype" << 7) << "format"
+                                        << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables), AssertionException, 12910300);
+}
+
+TEST_F(EvaluateConvertTest, ConvertArrayToBinDataAllowedNonVectorSubtypeProducesVector) {
+    auto expCtx = getExpCtx();
+    // Array conversion always yields a Vector. An allowed non-vector subtype is accepted and
+    // ignored.
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << BSON_ARRAY(1 << 5 << 10) << "to"
+                                        << BSON("type" << "binData" << "subtype" << 8) << "format"
+                                        << toStringData(BinDataFormat::kBase64))),
+        expCtx->variablesParseState);
+    auto result = convertExp->evaluate({}, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::binData);
+    ASSERT_EQ(result.getBinData().type, BinDataType::Vector);
+}
+
+TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFunctionSubtypeAllowed) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: {type: 'binData', subtype: 1}}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document input{{"path1", Document{{"a", "a"sv}}}};
+    auto expectedBson = BSON("a" << "a");
+    ASSERT_VALUE_EQ(
+        convertExp->evaluate(input, &expCtx->variables),
+        Value(BSONBinData(expectedBson.objdata(), expectedBson.objsize(), BinDataType::Function)));
+}
+
 }  // namespace evaluate_convert_test
 
 namespace evaluate_convert_shortcut_test {

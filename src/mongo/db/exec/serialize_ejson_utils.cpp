@@ -6,6 +6,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/platform/decimal128.h"
@@ -427,7 +428,9 @@ Value parseBinary(const Value& value) {
     static constexpr auto kBase64Msg = "$binary.base64 must be a valid base64 encoded string";
     std::string binData = rethrowWithErrorCode<ErrorCodes::ConversionFailure>(
         [&base64Val] { return base64::decode(base64Val.getStringData()); }, kBase64Msg);
-    return Value(BSONBinData(binData.data(), binData.size(), subType));
+    BSONBinData result(binData.data(), binData.size(), subType);
+    convert_utils::uassertValidUserConstructedBinData(result);
+    return Value(std::move(result));
 }
 
 Value parseUuid(const Value& value) {

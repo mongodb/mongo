@@ -6,6 +6,8 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <stack>
@@ -330,6 +332,81 @@ std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEn
         }
     }
     return results;
+}
+
+bool isValidUserDefinedBinDataType(int typeCode) {
+    static const auto smallestUserDefinedType = BinDataType::bdtCustom;
+    static const auto largestUserDefinedType = static_cast<BinDataType>(255);
+    return (smallestUserDefinedType <= typeCode) && (typeCode <= largestUserDefinedType);
+}
+
+void uassertValidUserConstructedBinData(const BSONBinData& binData, bool allowColumn) {
+    // User-defined subtypes are opaque and always allowed.
+    if (isValidUserDefinedBinDataType(binData.type)) {
+        return;
+    }
+
+    switch (binData.type) {
+        // These subtypes have no structure to validate.
+        case BinDataType::BinDataGeneral:
+        case BinDataType::Function:
+        case BinDataType::Sensitive:
+        // Encrypt payloads are validated by their FLE consumers.
+        case BinDataType::Encrypt:
+            break;
+        case BinDataType::bdtUUID:
+        case BinDataType::newUUID:
+        case BinDataType::MD5Type:
+            uassert(13016802,
+                    str::stream() << "BinData subtype " << static_cast<int>(binData.type)
+                                  << " requires exactly " << UUID::kNumBytes << " bytes",
+                    binData.length == UUID::kNumBytes);
+            break;
+        case BinDataType::ByteArrayDeprecated:
+            uassert(12978505,
+                    "BinData subtype ByteArrayDeprecated (2) requires a valid inner length prefix",
+                    binData.length >= 4 &&
+                        ConstDataView(static_cast<const char*>(binData.data))
+                                .read<LittleEndian<int32_t>>() == binData.length - 4);
+            break;
+        case BinDataType::Vector:
+            // 'parseBinDataVector()' uasserts that the header is well formed.
+            parseBinDataVector(binData);
+            break;
+        case BinDataType::Column:
+            uassert(12978506, "BinData subtype Column (7) is not allowed", allowColumn);
+            break;
+        default:
+            // Any unassigned or future subtype is rejected.
+            uasserted(12978507,
+                      str::stream() << "BinData subtype " << static_cast<int>(binData.type)
+                                    << " is not allowed");
+    }
+}
+
+void uassertValidUserConstructedBinData(const BSONElement& elem, bool allowColumn) {
+    switch (elem.type()) {
+        case BSONType::binData: {
+            int len = 0;
+            const char* data = elem.binData(len);
+            uassertValidUserConstructedBinData(BSONBinData(data, len, elem.binDataType()),
+                                               allowColumn);
+            break;
+        }
+        case BSONType::object:
+        case BSONType::array:
+            for (const auto& child : elem.embeddedObject()) {
+                uassertValidUserConstructedBinData(child, allowColumn);
+            }
+            break;
+        case BSONType::codeWScope:
+            for (const auto& child : elem.codeWScopeObject()) {
+                uassertValidUserConstructedBinData(child, allowColumn);
+            }
+            break;
+        default:
+            break;
+    }
 }
 
 }  // namespace mongo::exec::expression::convert_utils

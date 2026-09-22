@@ -11,10 +11,14 @@ const genericBinData = BinData(0, "abcdefgh");
 
 assert.commandWorked(coll.insert({_id: 0}));
 
-function assertProjectionFails(expr) {
+const fixedSizeErrorCode = 13016802;
+const byteArrayErrorCode = 12978505;
+const notAllowedErrorCode = 12978506;
+
+function assertProjectionFails(expr, code = ErrorCodes.FailedToParse) {
     assert.throwsWithCode(
         () => coll.aggregate([{$project: {output: expr}}]).toArray(),
-        ErrorCodes.FailedToParse,
+        code,
         [],
         expr,
     );
@@ -57,8 +61,8 @@ const testCases = [
 
 for (const testCase of testCases) {
     // BSONColumn should be rejected.
-    assertProjectionFails({$const: testCase(bsonColumn)});
-    assertProjectionFails({$literal: testCase(bsonColumn)});
+    assertProjectionFails({$const: testCase(bsonColumn)}, notAllowedErrorCode);
+    assertProjectionFails({$literal: testCase(bsonColumn)}, notAllowedErrorCode);
     // Generic binData should succeed.
     assertProjectionWorks({$const: testCase(genericBinData)});
     assertProjectionWorks({$literal: testCase(genericBinData)});
@@ -73,8 +77,8 @@ const subtype2BadPrefix = BinData(2, "AAAAAAAAAAAAAAAAAAAAAA==");
 
 assertProjectionWorks({$const: subtype2Valid});
 assertProjectionWorks({$literal: subtype2Valid});
-assertProjectionFails({$const: subtype2BadPrefix});
-assertProjectionFails({$literal: subtype2BadPrefix});
+assertProjectionFails({$const: subtype2BadPrefix}, byteArrayErrorCode);
+assertProjectionFails({$literal: subtype2BadPrefix}, byteArrayErrorCode);
 
 // Subtypes 3 (bdtUUID deprecated) and 5 (MD5Type): must be exactly 16 bytes.
 const k16BytesBase64 = "AAAAAAAAAAAAAAAAAAAAAA==";
@@ -82,13 +86,13 @@ const k4BytesBase64 = "AAAAAA==";
 
 assertProjectionWorks({$const: BinData(3, k16BytesBase64)});
 assertProjectionWorks({$literal: BinData(3, k16BytesBase64)});
-assertProjectionFails({$const: BinData(3, k4BytesBase64)});
-assertProjectionFails({$literal: BinData(3, k4BytesBase64)});
+assertProjectionFails({$const: BinData(3, k4BytesBase64)}, fixedSizeErrorCode);
+assertProjectionFails({$literal: BinData(3, k4BytesBase64)}, fixedSizeErrorCode);
 
 assertProjectionWorks({$const: BinData(5, k16BytesBase64)});
 assertProjectionWorks({$literal: BinData(5, k16BytesBase64)});
-assertProjectionFails({$const: BinData(5, k4BytesBase64)});
-assertProjectionFails({$literal: BinData(5, k4BytesBase64)});
+assertProjectionFails({$const: BinData(5, k4BytesBase64)}, fixedSizeErrorCode);
+assertProjectionFails({$literal: BinData(5, k4BytesBase64)}, fixedSizeErrorCode);
 
 // Subtype 6 (Encrypt): allowed (FLE range queries embed subtype-6 payloads as expression operands).
 assertProjectionWorks({$const: BinData(6, "CAABAA==")});

@@ -87,7 +87,7 @@ const successTests = [
         expectedHash: BinData(0, "Wv5M8jFeEv4="),
     },
     {
-        expressionInput: {input: BinData(4, "aGV5"), algorithm: "xxh64"},
+        expressionInput: {input: BinData(128, "aGV5"), algorithm: "xxh64"},
         expectedHash: BinData(0, "Wv5M8jFeEv4="),
     },
 
@@ -96,7 +96,7 @@ const successTests = [
         expectedHash: BinData(0, "+mkLggYe39KFJimuuoqJd7V+QPy3fRp6KLJsumJZEgQ="),
     },
     {
-        expressionInput: {input: BinData(4, "aGV5"), algorithm: "sha256"},
+        expressionInput: {input: BinData(128, "aGV5"), algorithm: "sha256"},
         expectedHash: BinData(0, "+mkLggYe39KFJimuuoqJd7V+QPy3fRp6KLJsumJZEgQ="),
     },
 
@@ -105,7 +105,7 @@ const successTests = [
         expectedHash: BinData(0, "YFfxPEluz3/Xd86555rihQ=="),
     },
     {
-        expressionInput: {input: BinData(4, "aGV5"), algorithm: "md5"},
+        expressionInput: {input: BinData(128, "aGV5"), algorithm: "md5"},
         expectedHash: BinData(0, "YFfxPEluz3/Xd86555rihQ=="),
     },
 

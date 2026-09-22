@@ -309,6 +309,7 @@ mongo_cc_library(
         "serialize_ejson_utils.cpp",
     ],
     deps = [
+        ":convert_utils",
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
     ],

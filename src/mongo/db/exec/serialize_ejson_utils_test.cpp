@@ -67,9 +67,9 @@ const TestCase testCases[]{
      BSON_ARRAY(1 << 2),
      JsonCompatible::yes},
     // binData
-    {BSONBinData("123", 3, BinDataType::newUUID),
-     BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "4")),
-     BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "4")),
+    {BSONBinData("123", 3, BinDataType::BinDataGeneral),
+     BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "0")),
+     BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "0")),
      JsonCompatible::no},
     {BSONBinData(kUuidBytes, 16, BinDataType::newUUID),
      BSON("$uuid" << "00000000-0000-4000-8000-000000000000"),
@@ -411,6 +411,19 @@ TEST(SerializeExtendedJsonUtilsTest, DeserializeFailsWithConversionFailureOnInva
                 << value << " failed with " << e.what() << " instead";
         }
     }
+}
+
+TEST(SerializeExtendedJsonUtilsTest, DeserializeRejectsMalformedBinData) {
+    // Three bytes for a subtype that requires sixteen.
+    ASSERT_THROWS_CODE(deserializeFromExtendedJson(
+                           Value(BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "4")))),
+                       AssertionException,
+                       13016802);
+    // Unassigned subtype.
+    ASSERT_THROWS_CODE(deserializeFromExtendedJson(
+                           Value(BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "10")))),
+                       AssertionException,
+                       12978507);
 }
 
 TEST(SerializeExtendedJsonUtilsTest, DeserializeEmptyFieldName) {
