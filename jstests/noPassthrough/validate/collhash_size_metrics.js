@@ -157,6 +157,18 @@ for (const m of metrics) {
     assert.gte(m.leafPages, 1, "expected at least one leaf page", m);
     // Clean shutdown before validation means every page has an on-disk image.
     assert.eq(0, m.pagesWithoutImage, "walk skipped pages that had no on-disk image", m);
+    // schemaVersion 2: key/value are live cells; a visible tombstone is in the deleted fields.
+    // This dataset has no deletes, so those fields are present and zero.
+    assert.eq(2, m.schemaVersion, "unexpected size-metrics schema version", m);
+    assert.eq(0, m.deletedKeyCount, "unexpected deleted keys on a dataset with no deletes", m);
+    assert.eq(0, m.deletedValueCount, "unexpected deleted values on a dataset with no deletes", m);
+    assert.eq(0, m.deletedKeyBytes, "unexpected deleted key bytes on a dataset with no deletes", m);
+    assert.eq(
+        0,
+        m.deletedValueBytes,
+        "unexpected deleted value bytes on a dataset with no deletes",
+        m,
+    );
 }
 
 // The collection record store (identified by its file URI): key count equals the document count,

@@ -442,6 +442,14 @@ void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::
     const int64_t valueBytes = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_BYTES);
     const int64_t keyCount = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_COUNT);
     const int64_t valueCount = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_COUNT);
+    // A visible stop on a value cell is a tombstone still occupying the leaf. Those cells are
+    // excluded from key/value and reported here. schemaVersion 1 (the field absent) counted them
+    // as live; 2 is this split. Bump the version if a field is dropped or a count changes meaning.
+    constexpr int64_t kSizeMetricsSchemaVersion = 2;
+    const int64_t deletedKeyBytes = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_KEY_BYTES);
+    const int64_t deletedKeyCount = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_KEY_COUNT);
+    const int64_t deletedValueBytes = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_VALUE_BYTES);
+    const int64_t deletedValueCount = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_VALUE_COUNT);
     const int64_t maxLeafPage = stat(WT_STAT_DSRC_BTREE_MAXLEAFPAGE);
 #if defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_BUCKETS) && \
     defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_CEILING)
@@ -471,6 +479,7 @@ void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::
 
     LOGV2(12951900,
           "WiredTiger size metrics",
+          "schemaVersion"_attr = kSizeMetricsSchemaVersion,
           "uri"_attr = fileUri,
           "leafPages"_attr = leafPages,
           "internalPages"_attr = internalPages,
@@ -483,6 +492,10 @@ void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::
           "valueBytes"_attr = valueBytes,
           "keyCount"_attr = keyCount,
           "valueCount"_attr = valueCount,
+          "deletedKeyBytes"_attr = deletedKeyBytes,
+          "deletedKeyCount"_attr = deletedKeyCount,
+          "deletedValueBytes"_attr = deletedValueBytes,
+          "deletedValueCount"_attr = deletedValueCount,
           "leafPageSizeHistogram"_attr = histogram);
 }
 
