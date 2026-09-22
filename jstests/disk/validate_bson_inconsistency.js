@@ -77,14 +77,6 @@ resetDbpath(dbpath);
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 2);
     assert.eq(res.warnings.length, 1);
-    // The warning must disambiguate which conformance check failed (UUID length) and point at the
-    // per-document log id (6825900).
-    assert(
-        res.warnings.some(
-            (w) => w.includes("BSON UUID length should be 16 bytes") && w.includes("6825900"),
-        ),
-        tojson(res.warnings),
-    );
 
     res = coll.validate({checkBSONConformance: false});
     assert(res.valid, tojson(res));
@@ -118,13 +110,7 @@ resetDbpath(dbpath);
     res = coll.validate({checkBSONConformance: true});
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 5);
-    // Disambiguation splits the previously-collapsed single warning into one per distinct reason:
-    // invalid regex option vs. unsorted regex options.
-    assert.eq(res.warnings.length, 2, tojson(res.warnings));
-    assert(
-        res.warnings.some((w) => w.includes("Bad regex options") && w.includes("6825900")),
-        tojson(res.warnings),
-    );
+    assert.eq(res.warnings.length, 1);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -164,11 +150,6 @@ resetDbpath(dbpath);
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 2);
     assert.eq(res.warnings.length, 1);
-    // The warning must disambiguate the failing check (MD5 length).
-    assert(
-        res.warnings.some((w) => w.includes("MD5 must be 16 bytes") && w.includes("6825900")),
-        tojson(res.warnings),
-    );
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -220,22 +201,7 @@ resetDbpath(dbpath);
     res = assert.commandWorked(testColl.validate({checkBSONConformance: true}));
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 7);
-    // Disambiguation splits the previously-collapsed single warning into one per distinct reason:
-    // deprecated BSON type vs. deprecated BSON binary data subtype.
-    assert.eq(res.warnings.length, 2, tojson(res.warnings));
-    assert(
-        res.warnings.some(
-            (w) => w.includes("Use of deprecated BSON type") && w.includes("6825900"),
-        ),
-        tojson(res.warnings),
-    );
-    assert(
-        res.warnings.some(
-            (w) =>
-                w.includes("Use of deprecated BSON binary data subtype") && w.includes("6825900"),
-        ),
-        tojson(res.warnings),
-    );
+    assert.eq(res.warnings.length, 1);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -360,36 +326,15 @@ resetDbpath(dbpath);
         ]),
     );
 
-    // Disambiguation splits the previously-collapsed single warning into one per distinct failing
-    // check, and each of the four bad documents fails a different one: unsupported subtype
-    // (improperFLE1), unsupported original BSON type for the subtype (improperFLE2), a missing
-    // subtype byte (improperFLE3), and an FLE2 value shorter than the minimum (improperFLE4).
-    const expectedEncryptedWarnings = [
-        "Unsupported Encrypted BSON Value type in the collection",
-        "BSON type is not supported for the Encrypted BSON Value subtype",
-        "Encrypted BSON Value is missing its subtype byte",
-        "Invalid FLE2 Encrypted BSON Value length",
-    ];
-
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 4);
-    assert.eq(res.warnings.length, 4, tojson(res.warnings));
-    assert(
-        res.warnings.every((w) => w.includes("6825900")),
-        tojson(res.warnings),
-    );
-    for (const expected of expectedEncryptedWarnings) {
-        assert(
-            res.warnings.some((w) => w.includes(expected)),
-            tojson({expected, warnings: res.warnings}),
-        );
-    }
+    assert.eq(res.warnings.length, 1);
 
     res = assert.commandWorked(testColl.validate({checkBSONConformance: true}));
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 4);
-    assert.eq(res.warnings.length, 4, tojson(res.warnings));
+    assert.eq(res.warnings.length, 1);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();

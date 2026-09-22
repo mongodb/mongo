@@ -39,7 +39,6 @@
 
 
 namespace mongo {
-
 namespace {
 using namespace std::literals::string_view_literals;
 
@@ -85,57 +84,6 @@ constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 constexpr ErrorCodes::Error InvalidBSONColumn = ErrorCodes::InvalidBSONColumn;
 
-// Internal exception thrown by the uassert* helpers below. It carries the complete failure message
-// in `status` and the failing check's description (a short, fixed string naming the check, with no
-// document data in it) beside it, so that the description travels with the failure to the enclosing
-// catch block without ever being attached to the Status (and so is never serialized to a client)
-// and without costing anything on the success path. Never escapes this file: every throw site is
-// enclosed by a catch in ValidateBuffer::validate() or
-// ColumnValidator::doValidateBSONColumn().
-struct BSONValidationException {
-    Status status;
-    std::string description;
-};
-
-// Result of one internal validation step: the Status to report, plus the description of the failing
-// check when the failure carried one.
-struct ValidationStatus {
-    static ValidationStatus OK() {
-        return {Status::OK(), boost::none};
-    }
-
-    bool isOK() const {
-        return status.isOK();
-    }
-
-    Status status;
-    boost::optional<std::string> description;
-};
-
-// Throws `code` (NonConformantBSON, InvalidBSON, or InvalidBSONColumn) so callers can distinguish
-// the failing check by code, together with `description` so callers can disambiguate further.
-// `description` is the failing check's fixed wording and must not embed any of the document's data;
-// per-document data (e.g. an observed length) goes in `detail`, which is appended to the message
-// only. The message is therefore "<description>" or "<description>: <detail>".
-MONGO_COMPILER_NOINLINE MONGO_COMPILER_NORETURN void uassertedBSONValidation(
-    ErrorCodes::Error code, std::string_view description, std::string_view detail = {}) {
-    throw BSONValidationException{Status(code,
-                                         detail.empty()
-                                             ? std::string{description}
-                                             : fmt::format("{}: {}", description, detail)),
-                                  std::string{description}};
-}
-
-// Conditional variant mirroring uassert(): throws uassertedBSONValidation(...) if !cond. The
-// optional trailing arguments are the message detail, passed straight into the failure branch, so a
-// `fmt::format(...)` written there is evaluated only when the check actually fails.
-#define uassertBSONValidation(code, cond, description, ...)                        \
-    do {                                                                           \
-        if (MONGO_unlikely(!(cond))) {                                             \
-            uassertedBSONValidation(code, description __VA_OPT__(, ) __VA_ARGS__); \
-        }                                                                          \
-    } while (false)
-
 class DefaultValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {}
@@ -162,21 +110,11 @@ public:
                         // Check for exceptions when decompressing. The block-based decoder is used
                         // over BSONColumn's iterator API, and the materialized elements are
                         // discarded, as we only care about whether decoding throws.
-                        //
-                        // The decompressor raises its own uasserts, whose messages carry document
-                        // data. Describe them with a single fixed description here, keeping the
-                        // decompressor's own message on the Status (and so in the logs) rather
-                        // than in the validation results.
-                        try {
-                            bsoncolumn::DiscardingContainer<BSONElement> elements;
-                            bsoncolumn::BSONColumnBlockBased(static_cast<const char*>(binData.data),
-                                                             binData.length)
-                                .decompress<bsoncolumn::BSONElementMaterializer>(
-                                    elements, new BSONElementStorage());
-                        } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
-                            uassertedBSONValidation(
-                                e.code(), "BSONColumn decompression failed", e.reason());
-                        }
+                        bsoncolumn::DiscardingContainer<BSONElement> elements;
+                        bsoncolumn::BSONColumnBlockBased(static_cast<const char*>(binData.data),
+                                                         binData.length)
+                            .decompress<bsoncolumn::BSONElementMaterializer>(
+                                elements, new BSONElementStorage());
                         break;
                     }
                     case BinDataType::Encrypt:
@@ -204,8 +142,9 @@ private:
 
         auto len = binData.length;
         // Make sure we can read the subtype byte of the Encrypted BSON Value.
-        uassertBSONValidation(
-            NonConformantBSON, len, "Encrypted BSON Value is missing its subtype byte");
+        uassert(ErrorCodes::NonConformantBSON,
+                fmt::format("Invalid Encrypted BSON Value length {}", len),
+                len);
 
         // Skip the size bytes and BinData subtype byte to the actual encrypted data.
         auto data = static_cast<const char*>(binData.data);
@@ -215,11 +154,9 @@ private:
         switch (encryptedBinDataType) {
             case EncryptedBinDataType::kDeterministic:
             case EncryptedBinDataType::kRandom: {
-                uassertBSONValidation(
-                    NonConformantBSON,
-                    len > minLength,
-                    "Invalid deterministic or random Encrypted BSON Value length",
-                    fmt::format("length {}, expected more than {}", len, minLength));
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format("Invalid Encrypted BSON Value length {}", len),
+                        len > minLength);
                 break;
             }
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
@@ -229,28 +166,24 @@ private:
             case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2:
             case EncryptedBinDataType::kFLE2TextIndexedValue: {
-                uassertBSONValidation(
-                    NonConformantBSON,
-                    len >= minLength,
-                    "Invalid FLE2 Encrypted BSON Value length",
-                    fmt::format("length {}, expected at least {}", len, minLength));
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format("Invalid Encrypted BSON Value length {}", len),
+                        len >= minLength);
                 int8_t originalBsonTypeByte = ConstDataView(data + sizeof(uint8_t) + UUIDLength)
                                                   .read<LittleEndian<uint8_t>>();
                 auto originalBsonType = static_cast<BSONType>(originalBsonTypeByte);
-                uassertBSONValidation(
-                    NonConformantBSON,
-                    isFLE2SupportedType(encryptedBinDataType, originalBsonType),
-                    "BSON type is not supported for the Encrypted BSON Value subtype",
-                    fmt::format("BSON type '{}', subtype {}",
-                                typeName(originalBsonType),
-                                fmt::underlying(encryptedBinDataType)));
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format(
+                            "BSON type '{}' is not supported for Encrypted BSON Value subtype {}",
+                            typeName(originalBsonType),
+                            fmt::underlying(encryptedBinDataType)),
+                        isFLE2SupportedType(encryptedBinDataType, originalBsonType));
                 break;
             }
             default: {
-                uassertedBSONValidation(
-                    NonConformantBSON,
-                    "Unsupported Encrypted BSON Value type in the collection",
-                    fmt::format("type {}", fmt::underlying(encryptedBinDataType)));
+                uasserted(ErrorCodes::NonConformantBSON,
+                          fmt::format("Unsupported Encrypted BSON Value type {} in the collection",
+                                      fmt::underlying(encryptedBinDataType)));
             }
         }
     }
@@ -281,28 +214,26 @@ public:
                     case BinDataType::newUUID: {
                         constexpr int32_t UUIDLength = 16;
                         auto l = binData.length;
-                        uassertBSONValidation(NonConformantBSON,
-                                              l == UUIDLength,
-                                              "BSON UUID length should be 16 bytes",
-                                              fmt::format("found {} instead", l));
+                        uassert(ErrorCodes::NonConformantBSON,
+                                fmt::format(
+                                    "BSON UUID length should be 16 bytes. Found {} instead.", l),
+                                l == UUIDLength);
                         break;
                     }
                     case BinDataType::MD5Type: {
                         constexpr int32_t md5Length = 16;
                         auto l = binData.length;
-                        uassertBSONValidation(NonConformantBSON,
-                                              l == md5Length,
-                                              "MD5 must be 16 bytes",
-                                              fmt::format("got {} instead", l));
+                        uassert(NonConformantBSON,
+                                fmt::format("MD5 must be 16 bytes, got {} instead.", l),
+                                l == md5Length);
                         break;
                     }
                     case BinDataType::ByteArrayDeprecated:
                     case BinDataType::bdtUUID:
-                        uassertedBSONValidation(NonConformantBSON,
-                                                "Use of deprecated BSON binary data subtype",
-                                                fmt::format("{} ({})",
-                                                            typeName(BinDataType(binData.type)),
-                                                            binData.type));
+                        uasserted(NonConformantBSON,
+                                  fmt::format("Use of deprecated BSON binary data subtype {} ({})",
+                                              typeName(BinDataType(binData.type)),
+                                              binData.type));
                         break;
                     default:
                         break;
@@ -320,9 +251,10 @@ public:
             case stdx::to_underlying(BSONType::dbRef):
             case stdx::to_underlying(BSONType::symbol):
             case stdx::to_underlying(BSONType::codeWScope):
-                uassertedBSONValidation(NonConformantBSON,
-                                        "Use of deprecated BSON type",
-                                        fmt::format("{} ({})", typeName(BSONType(type)), type));
+                uasserted(NonConformantBSON,
+                          fmt::format("Use of deprecated BSON type {} ({})",
+                                      typeName(BSONType(type)),
+                                      type));
                 break;
         }
     }
@@ -338,10 +270,10 @@ public:
                 auto& cur = _objFrames.back();
                 std::sort(cur.fieldNames.begin(), cur.fieldNames.end());
                 const auto dup = std::adjacent_find(cur.fieldNames.begin(), cur.fieldNames.end());
-                uassertBSONValidation(NonConformantBSON,
-                                      dup == cur.fieldNames.end(),
-                                      "Duplicate key found; element names must be unique",
-                                      fmt::format("\"{}\"", *dup));
+                uassert(
+                    NonConformantBSON,
+                    fmt::format("Duplicate key found \"{}\", element names must be unique.", *dup),
+                    dup == cur.fieldNames.end());
             }
             _objFrames.pop_back();
         }
@@ -359,9 +291,9 @@ private:
     };
 
     void _checkUTF8Char(std::string_view str) {
-        uassertBSONValidation(NonConformantBSON,
-                              str::validUTF8(str),
-                              "Found string that doesn't follow UTF-8 encoding");
+        uassert(NonConformantBSON,
+                "Found string that doesn't follow UTF-8 encoding.",
+                str::validUTF8(str));
     }
 
     bool _inArr() const {
@@ -376,12 +308,11 @@ private:
         if (_inArr()) {
             // Checks the actual index field value, starting after the type byte
             const std::string_view actualIndex(ptr + sizeof(char));
-            uassertBSONValidation(NonConformantBSON,
-                                  _objFrames.back().indexCounter == actualIndex,
-                                  "Indices of BSON Array are invalid",
-                                  fmt::format("expected {}, but got {}",
-                                              std::string_view(_objFrames.back().indexCounter),
-                                              actualIndex));
+            uassert(NonConformantBSON,
+                    fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
+                                std::string_view(_objFrames.back().indexCounter),
+                                actualIndex),
+                    _objFrames.back().indexCounter == actualIndex);
             ++_objFrames.back().indexCounter;
         } else if (_inObj()) {
             const std::string_view fieldName(ptr + sizeof(char));
@@ -397,14 +328,12 @@ private:
         // valid.
         static constexpr std::string_view validRegexOptions("ilmsux");
         const std::string_view opt = regex.RegexFlags();
-        uassertBSONValidation(NonConformantBSON,
-                              opt.find_first_not_of(validRegexOptions) == std::string::npos,
-                              "Bad regex options: contains an option that is not allowed",
-                              fmt::format("{:?}, only {:?} allowed", opt, validRegexOptions));
-        uassertBSONValidation(NonConformantBSON,
-                              std::is_sorted(opt.begin(), opt.end()),
-                              "Bad regex options: options must be sorted",
-                              fmt::format("{:?}", opt));
+        uassert(NonConformantBSON,
+                fmt::format("Bad regex options {:?}: Only {:?} allowed", opt, validRegexOptions),
+                opt.find_first_not_of(validRegexOptions) == std::string::npos);
+        uassert(NonConformantBSON,
+                fmt::format("Bad regex options {:?}: Must be sorted", opt),
+                std::is_sorted(opt.begin(), opt.end()));
     }
 
     // Behaves like a stack, used to validate array index count.
@@ -412,10 +341,10 @@ private:
 };
 
 template <bool precise>
-ValidationStatus _doValidateColumn(const char* originalBuffer,
-                                   uint64_t maxLength,
-                                   BSONValidateModeEnum mode,
-                                   ValidationVersion validationVersion);
+Status _doValidateColumn(const char* originalBuffer,
+                         uint64_t maxLength,
+                         BSONValidateModeEnum mode,
+                         ValidationVersion validationVersion);
 
 template <bool precise, typename BSONValidator>
 class ValidateBuffer {
@@ -434,40 +363,27 @@ public:
             _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
     }
 
-    ValidationStatus validate() noexcept {
+    Status validate() noexcept {
         try {
             setupValidation();
-            uassertBSONValidation(
-                InvalidBSON, _maxLength >= 5, "BSON buffer has to be at least 5 bytes");
+            uassert(InvalidBSON, "BSON data has to be at least 5 bytes", _maxLength >= 5);
 
             // Read the length as signed integer, to ensure we limit it to < 2GB.
             // All other lengths are read as unsigned, which makes for easier bounds checking.
             Cursor cursor = {_data, _data + _maxLength};
             int32_t len = cursor.template read<int32_t>();
-            uassertBSONValidation(InvalidBSON,
-                                  len >= 5,
-                                  "BSON data has to be at least 5 bytes",
-                                  fmt::format("decoded length {}", len));
-            uassertBSONValidation(InvalidBSON,
-                                  static_cast<size_t>(len) <= _maxLength,
-                                  "BSON length exceeds buffer size",
-                                  fmt::format("length {} should be less or equal to {}",
-                                              static_cast<size_t>(len),
-                                              _maxLength));
+            uassert(InvalidBSON, "BSON data has to be at least 5 bytes", len >= 5);
+            uassert(InvalidBSON,
+                    str::stream() << "Incorrect BSON length " << static_cast<size_t>(len)
+                                  << " should be less or equal to " << _maxLength,
+                    static_cast<size_t>(len) <= _maxLength);
             const char* end = _currFrame->end = _data + len;
-            uassertBSONValidation(InvalidBSON, end[-1] == 0, "BSON object not terminated with EOO");
+            uassert(InvalidBSON, "BSON object not terminated with EOO", end[-1] == 0);
             _validateIterative(Cursor{cursor.ptr, end});
-        } catch (const BSONValidationException& e) {
-            // The description travels beside the Status rather than on it, so that it is never
-            // serialized to a client.
-            return {
-                Status(e.status.code(), str::stream() << e.status.reason() << " " << _context()),
-                e.description};
         } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
-            // A validation failure raised by code outside this file, which carries no description.
-            return {Status(e.code(), str::stream() << e.what() << " " << _context()), boost::none};
+            return Status(e.code(), str::stream() << e.what() << " " << _context());
         }
-        return ValidationStatus::OK();
+        return Status::OK();
     }
 
     /* Assumes the root level is a single literal element (which may contain nested objects).
@@ -477,13 +393,13 @@ public:
      */
     int validateAndMeasureElem() {
         setupValidation();
-        uassertBSONValidation(InvalidBSON,
-                              _maxLength > 1,  // must at least have a 0-terminator after control
-                              "BSON literal is not followed by fieldname");
+        uassert(InvalidBSON,
+                "BSON literal is not followed by fieldname",
+                _maxLength > 1);  // must at least have a 0-terminator after control
         // Confirm fieldName is just a null terminator
-        uassertBSONValidation(NonConformantBSON,
-                              _maxLength > 1 && _data[1] == 0,
-                              "BSON literal content does not have an empty fieldname");
+        uassert(NonConformantBSON,
+                "BSON literal content does not have an empty fieldname",
+                _maxLength > 1 && _data[1] == 0);
 
         // Handle one element without using iterative loop, and without expecting
         // multiple instances or an EOO.  Only resume with the iterative loop if
@@ -498,9 +414,9 @@ public:
             // Size is fieldname, type, and a stored int
             int64_t size =
                 static_cast<int64_t>(ConstDataView(_data + 2).read<LittleEndian<int32_t>>()) + 2;
-            uassertBSONValidation(InvalidBSON,
-                                  (size_t)size <= _maxLength,
-                                  "BSON literal content exceeds buffer size");
+            uassert(InvalidBSON,
+                    "BSON literal content exceeds buffer size",
+                    (size_t)size <= _maxLength);
             _validateIterative(Cursor{ptr, _data + size});
             return size;
         } else {
@@ -515,8 +431,7 @@ private:
         _currFrame = _frames.begin();
         _currElem = nullptr;
         auto maxFrames = BSONDepth::getMaxAllowableDepth() + 1;  // A flat BSON has one frame.
-        uassertBSONValidation(
-            InvalidBSON, _frames.size() <= maxFrames, "Cannot enforce max nesting depth");
+        uassert(InvalidBSON, "Cannot enforce max nesting depth", _frames.size() <= maxFrames);
     }
 
     /**
@@ -541,9 +456,7 @@ private:
         /* Also requires remaining buf after the skip (both BSONColumn and BSONObj guarantee
            this by having at minimum a trailing EOO) */
         void skip(size_t len) {
-            uassertBSONValidation(InvalidBSON,
-                                  (ptr += len) < end,
-                                  "BSON element value extends past the end of the buffer");
+            uassert(InvalidBSON, "BSON size is larger than buffer size", (ptr += len) < end);
         }
 
         template <typename T>
@@ -556,7 +469,7 @@ private:
         void skipString() {
             auto len = read<uint32_t>();
             skip(len);
-            uassertBSONValidation(InvalidBSON, !ptr[-1] && len > 0, "Not null terminated string");
+            uassert(InvalidBSON, "Not null terminated string", !ptr[-1] && len > 0);
         }
 
         size_t strlen() const {
@@ -573,19 +486,19 @@ private:
     };
 
     const char* _pushFrame(Cursor cursor) {
-        uassertBSONValidation(ErrorCodes::Overflow,
-                              ++_currFrame != _frames.end(),
-                              "BSONObj exceeds maximum nested object depth");
+        uassert(ErrorCodes::Overflow,
+                "BSONObj exceeds maximum nested object depth",
+                ++_currFrame != _frames.end());
         return _updateFrame(cursor);
     }
 
     const char* _updateFrame(Cursor cursor) {
         auto obj = cursor.ptr;
         auto len = cursor.template read<int32_t>();
-        uassertBSONValidation(InvalidBSON,
-                              len >= 5,
-                              "Nested BSON object has to be at least 5 bytes",
-                              fmt::format("decoded length {}", len));
+        uassert(
+            ErrorCodes::InvalidBSON,
+            fmt::format("Nested BSON object has to be at least 5 bytes (decoded length: {})", len),
+            len >= 5);
         _currFrame->end = obj + len;
 
         if constexpr (precise) {
@@ -610,30 +523,21 @@ private:
                 const char* columnStart = cursor.ptr;
                 cursor.skip(count);
                 if (subtype == BinDataType::Column && _validationVersion >= V2_Column) {
-                    uassertBSONValidation(InvalidBSONColumn,
-                                          !_insideColumn,
-                                          "BSONColumn cannot contain nested BSONColumn data");
+                    uassert(InvalidBSONColumn,
+                            "BSONColumn cannot contain nested BSONColumn data",
+                            !_insideColumn);
                     /* do not pass down cursor; we want to reset the nesting depth */
-                    if (auto columnResult = _doValidateColumn<precise>(
-                            columnStart, count, _validator.validateMode(), _validationVersion);
-                        MONGO_unlikely(!columnResult.isOK())) {
-                        // The inner column validation already described the specific check that
-                        // failed; keep that description rather than replacing it with the coarser
-                        // "Invalid BSON column", so the caller can still tell where in the column
-                        // code the failure originated. (The code is still reported as
-                        // NonConformantBSON: column errors are wrapped at this boundary.)
-                        uassertedBSONValidation(
-                            NonConformantBSON,
-                            std::move(columnResult.description).value_or("Invalid BSON column"),
-                            columnResult.status.reason());
-                    }
+                    uassert(NonConformantBSON,
+                            "Invalid BSON column",
+                            _doValidateColumn<precise>(
+                                columnStart, count, _validator.validateMode(), _validationVersion)
+                                .isOK());
                 }
                 break;
             }
             case stdx::to_underlying(BSONType::boolean):
                 if (auto value = cursor.template read<uint8_t>())  // If not 0, must be 1.
-                    uassertBSONValidation(
-                        InvalidBSON, value == 1, "BSON bool is neither false nor true");
+                    uassert(InvalidBSON, "BSON bool is neither false nor true", value == 1);
                 break;
             case stdx::to_underlying(BSONType::regEx):
                 cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
@@ -649,8 +553,7 @@ private:
                 cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
                 break;
             default:
-                uassertedBSONValidation(
-                    InvalidBSON, "Unrecognized BSON type", fmt::format("type {}", type));
+                uasserted(InvalidBSON, str::stream() << "Unrecognized BSON type " << type);
         }
         return cursor.ptr;
     }
@@ -677,9 +580,7 @@ private:
                     static_cast<BSONType>(ConstDataView(nestedElemStart).read<int8_t>()) ==
                         BSONType::codeWScope) {
                     invariant(_popFrame());
-                    uassertBSONValidation(InvalidBSON,
-                                          cursor.ptr == _currFrame->end,
-                                          "Incorrect BSON length in CodeWScope");
+                    uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
                 }
             }
         }
@@ -718,9 +619,7 @@ private:
             // Use the fact that the EOO byte is 0, just like the end of string, so checking for
             // EOO is same as finding len == 0. The cursor cannot point past EOO, so the strlen
             // is safe.
-            uassertBSONValidation(InvalidBSON,
-                                  cursor.ptr < cursor.end,
-                                  "BSON element starts past the end of the buffer");
+            uassert(InvalidBSON, "BSON size is larger than buffer size", cursor.ptr < cursor.end);
             while (size_t len = cursor.strlen()) {
                 const int8_t type = ConstDataView(cursor.ptr).read<int8_t>();
                 _currElem = cursor.ptr;
@@ -742,9 +641,7 @@ private:
             }
 
             // Got the EOO byte: skip it and compare its location with the expected frame end.
-            uassertBSONValidation(InvalidBSON,
-                                  ++cursor.ptr == _currFrame->end,
-                                  "Incorrect BSON length: EOO is not at the end of the object");
+            uassert(InvalidBSON, "incorrect BSON length", ++cursor.ptr == _currFrame->end);
             _maybePopCodeWithScope(cursor);
         } while (_popFrame());  // Finished when there are no frames left.
 
@@ -794,31 +691,31 @@ private:
 };
 
 template <typename BSONValidator>
-ValidationStatus _doValidate(const char* originalBuffer,
-                             uint64_t maxLength,
-                             BSONValidator validator,
-                             ValidationVersion validationVersion) {
+Status _doValidate(const char* originalBuffer,
+                   uint64_t maxLength,
+                   BSONValidator validator,
+                   ValidationVersion validationVersion) {
     // First try validating using the fast but less precise version. That version will return
     // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
     // and actual failures will rerun the precise version that gives a detailed error context.
     if (MONGO_likely((ValidateBuffer<false, BSONValidator>(
-                          originalBuffer, maxLength, validator, validationVersion, false)
+                          originalBuffer, maxLength, validator, validationVersion)
                           .validate()
                           .isOK())))
-        return ValidationStatus::OK();
+        return Status::OK();
 
     return ValidateBuffer<true, BSONValidator>(
-               originalBuffer, maxLength, validator, validationVersion, false)
+               originalBuffer, maxLength, validator, validationVersion)
         .validate();
 }
 
 template <bool precise>
 class ColumnValidator {
 public:
-    static ValidationStatus doValidateBSONColumn(const char* originalBuffer,
-                                                 int maxLength,
-                                                 BSONValidateModeEnum mode,
-                                                 ValidationVersion validationVersion) noexcept {
+    static Status doValidateBSONColumn(const char* originalBuffer,
+                                       int maxLength,
+                                       BSONValidateModeEnum mode,
+                                       ValidationVersion validationVersion) noexcept {
         // run control pointer through to end of buffer
         // run over literal data as directed by lengths from control
         // check formatting of Simple8B blocks
@@ -833,9 +730,9 @@ public:
 
         try {
             // Check this beforehand to ensure we cannot overflow the buffer with any strlen
-            uassertBSONValidation(NonConformantBSON,
-                                  ptr < end && *(end - 1) == stdx::to_underlying(BSONType::eoo),
-                                  "BSON column is missing EOO termination");
+            uassert(NonConformantBSON,
+                    "BSON column is missing EOO termination",
+                    ptr < end && *(end - 1) == stdx::to_underlying(BSONType::eoo));
 
             while (ptr < end) {
                 uint8_t control = *ptr;
@@ -845,10 +742,10 @@ public:
                         interleavedMode = false;
                     } else {
                         // should be the last control of the sequence
-                        uassertBSONValidation(NonConformantBSON,
-                                              ptr == end,
-                                              "BSONColumn EOO does not fully consume buffer");
-                        return ValidationStatus::OK();
+                        uassert(NonConformantBSON,
+                                "BSONColumn EOO does not fully consume buffer",
+                                ptr == end);
+                        return Status::OK();
                     }
                 } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
                     int size;
@@ -872,10 +769,9 @@ public:
                     // interleaved objects begin with a reference object, and then a series
                     // of diff blocks for followup objects, ending with an EOO. Nesting
                     // interleaved mode is not allowed.
-                    uassertBSONValidation(
-                        InvalidBSONColumn, !interleavedMode, "Nested interleaved mode");
+                    uassert(InvalidBSONColumn, "Nested interleaved mode", !interleavedMode);
                     ++ptr;
-                    const auto validateResult = [&] {
+                    const auto validateResult = [&]() -> Status {
                         if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
                             return ValidateBuffer<precise, DefaultValidator>(
                                        ptr, end - ptr, DefaultValidator(), validationVersion, true)
@@ -890,10 +786,10 @@ public:
                                 .validate();
                         MONGO_UNREACHABLE;
                     }();
-                    uassertBSONValidation(InvalidBSONColumn,
-                                          validateResult.isOK(),
-                                          "Invalid reference object for interleaved mode",
-                                          validateResult.status.reason());
+                    uassert(InvalidBSONColumn,
+                            fmt::format("Invalid reference object for interleaved mode, {}",
+                                        validateResult.reason()),
+                            validateResult.isOK());
                     // we now know the reference object is valid and safe to interpret
                     BSONObj reference(ptr);
                     ptr += reference.objsize();
@@ -902,35 +798,26 @@ public:
                     // Simple8b block sequence, just check for memory overflow of block count
                     uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
                     int size = sizeof(uint64_t) * numBlocks;
-                    uassertBSONValidation(InvalidBSONColumn,
-                                          ptr + size + 1 <= end,
-                                          "BSONColumn blocks exceed buffer size");
+                    uassert(InvalidBSONColumn,
+                            "BSONColumn blocks exceed buffer size",
+                            ptr + size + 1 <= end);
                     ptr += 1 + size;
                 }
             }
-        } catch (const BSONValidationException& e) {
-            // The description travels beside the Status rather than on it, so that it is never
-            // serialized to a client.
-            return {e.status, e.description};
         } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
-            // A validation failure raised by code outside this file, which carries no description.
-            return {e.toStatus(), boost::none};
+            return Status(e.code(), str::stream() << e.what());
         }
 
-        // We should not get here for a valid object, the final EOO should have returned OK. This is
-        // a direct return rather than a throw, so report the description the way the uassert*
-        // helpers would.
-        constexpr auto kMissingTerminatingEoo = "Missing terminating EOO"sv;
-        return {Status(NonConformantBSON, kMissingTerminatingEoo),
-                std::string{kMissingTerminatingEoo}};
+        // We should not get here for a valid object, the final EOO should have returned OK
+        return Status(NonConformantBSON, "Missing terminating EOO");
     }
 };
 
 template <bool precise>
-ValidationStatus _doValidateColumn(const char* originalBuffer,
-                                   uint64_t maxLength,
-                                   BSONValidateModeEnum mode,
-                                   ValidationVersion validationVersion) {
+Status _doValidateColumn(const char* originalBuffer,
+                         uint64_t maxLength,
+                         BSONValidateModeEnum mode,
+                         ValidationVersion validationVersion) {
     if constexpr (precise) {
         // First try validating using the fast but less precise version. That version will
         // return a not-OK status for objects with CodeWScope or nesting exceeding 32 levels.
@@ -939,7 +826,7 @@ ValidationStatus _doValidateColumn(const char* originalBuffer,
         if (MONGO_likely(ColumnValidator<false>::doValidateBSONColumn(
                              originalBuffer, maxLength, mode, validationVersion)
                              .isOK()))
-            return ValidationStatus::OK();
+            return Status::OK();
 
         return ColumnValidator<true>::doValidateBSONColumn(
             originalBuffer, maxLength, mode, validationVersion);
@@ -954,41 +841,30 @@ ValidationStatus _doValidateColumn(const char* originalBuffer,
 Status validateBSON(const char* originalBuffer,
                     uint64_t maxLength,
                     BSONValidateModeEnum mode,
-                    ValidationVersion validationVersion,
-                    boost::optional<std::string>* outDescription) noexcept {
-    auto result = [&] {
-        if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
-            return _doValidate(originalBuffer, maxLength, DefaultValidator(), validationVersion);
-        else if (mode == BSONValidateModeEnum::kExtended)
-            return _doValidate(originalBuffer, maxLength, ExtendedValidator(), validationVersion);
-        else if (mode == BSONValidateModeEnum::kFull)
-            return ValidateBuffer<true, FullValidator>(
-                       originalBuffer, maxLength, FullValidator(), validationVersion, false)
-                .validate();
-        else
-            MONGO_UNREACHABLE;
-    }();
-
-    // The failing check reported its description beside the Status rather than on it, so that the
-    // success path pays nothing and the description is never serialized to a client.
-    if (MONGO_unlikely(outDescription && !result.isOK())) {
-        *outDescription = std::move(result.description);
-    }
-    return result.status;
+                    ValidationVersion validationVersion) noexcept {
+    if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
+        return _doValidate(originalBuffer, maxLength, DefaultValidator(), validationVersion);
+    else if (mode == BSONValidateModeEnum::kExtended)
+        return _doValidate(originalBuffer, maxLength, ExtendedValidator(), validationVersion);
+    else if (mode == BSONValidateModeEnum::kFull)
+        return ValidateBuffer<true, FullValidator>(
+                   originalBuffer, maxLength, FullValidator(), validationVersion)
+            .validate();
+    else
+        MONGO_UNREACHABLE;
 }
 
 Status validateBSON(const BSONObj& obj,
                     BSONValidateModeEnum mode,
-                    ValidationVersion validationVersion,
-                    boost::optional<std::string>* outDescription) noexcept {
-    return validateBSON(obj.objdata(), obj.objsize(), mode, validationVersion, outDescription);
+                    ValidationVersion validationVersion) noexcept {
+    return validateBSON(obj.objdata(), obj.objsize(), mode, validationVersion);
 }
 
 Status validateBSONColumn(const char* originalBuffer,
                           int maxLength,
                           BSONValidateModeEnum mode,
                           ValidationVersion validationVersion) noexcept {
-    return _doValidateColumn<true>(originalBuffer, maxLength, mode, validationVersion).status;
+    return _doValidateColumn<true>(originalBuffer, maxLength, mode, validationVersion);
 }
 
 void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context) {

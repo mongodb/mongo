@@ -89,11 +89,9 @@ const char* describeTimeseriesValidationResult(TimeseriesValidationResult result
             return "Time-series time values are not in ascending order. For more info, see logs "
                    "with log id 6698300.";
         case TimeseriesValidationResult::kMissingTime:
-            return "Time-series bucket has missing time fields. For more info, see logs with log "
-                   "id 6698300.";
+            return "Time-series bucket has missing time fields.";
         case TimeseriesValidationResult::kV3WithOrderedTime:
-            return "Time-series bucket is v3 but has its measurements in-order on time. For more "
-                   "info, see logs with log id 12351700.";
+            return "Time-series bucket is v3 but has its measurements in-order on time.";
         case TimeseriesValidationResult::kInvalidBSONInTimeField:
             return "Invalid BSON In Time Field. For more info, see logs with log id 6698300.";
         case TimeseriesValidationResult::kMinMaxInconsistent:

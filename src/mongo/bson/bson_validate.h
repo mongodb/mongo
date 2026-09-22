@@ -10,10 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <string>
 #include <string_view>
-
-#include <boost/optional/optional.hpp>
 
 [[MONGO_MOD_PUBLIC]];
 
@@ -50,29 +47,15 @@ constexpr inline ValidationVersion currentValidationVersion = V2_Column;
  *    - Validity of UTF-8 strings.
  *    - Valid compressed BSON columns.
  * Length is only limited by the buffer's maxLength and the inherent 2GB - 1 format limitation.
- *
- * When 'outDescription' is non-null and validation fails, it may be populated with a short, fixed
- * description of the check that failed, naming the failing check but containing none of the
- * document's data (unlike the returned Status' reason, which is annotated with observed lengths,
- * field paths and the document's _id). Every distinct check has its own wording, so the set of
- * possible descriptions is small and callers can distinguish failures without parsing the
- * data-annotated message. It is left unchanged if validation succeeds, or if the failure came from
- * code outside bson_validate.cpp that carries no description.
- *
- * The description is threaded back purely through parameters; it is never attached to the returned
- * Status and so is never serialized to a client. It is intended for server-side diagnostics such
- * as collection validation.
  */
 Status validateBSON(const char* buf,
                     uint64_t maxLength,
                     BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
-                    ValidationVersion validationVersion = currentValidationVersion,
-                    boost::optional<std::string>* outDescription = nullptr) noexcept;
+                    ValidationVersion validationVersion = currentValidationVersion) noexcept;
 
 Status validateBSON(const BSONObj& obj,
                     BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
-                    ValidationVersion validationVersion = currentValidationVersion,
-                    boost::optional<std::string>* outDescription = nullptr) noexcept;
+                    ValidationVersion validationVersion = currentValidationVersion) noexcept;
 
 Status validateBSONColumn(const char* buf,
                           int maxLength,
