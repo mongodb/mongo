@@ -451,7 +451,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     const auto after = afterBuilder.obj()
                            .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
                            .safeNumberLong();
-    ASSERT_EQ(after, 1);
+    ASSERT_EQ(after, 2);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -493,7 +493,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     const auto after = afterBuilder.obj()
                            .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
                            .safeNumberLong();
-    ASSERT_EQ(after, 1);
+    ASSERT_EQ(after, 2);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,

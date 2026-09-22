@@ -522,12 +522,6 @@ void UserWritesRecoverableCriticalSectionService::recoverReplicaSetWritesCritica
             invariant(doc.getNss().isEmpty());
             foundReplicaSetWritesCriticalSection = true;
 
-            const bool wasWriteBlocking =
-                replicaSetWriteBlockState->isReplicaSetWriteBlockingEnabled();
-            const bool memoryAllowsDeletions =
-                !replicaSetWriteBlockState->isReplicaSetDeletionsBlockingEnabled();
-            const bool durableAllowsDeletions = doc.getAllowDeletions();
-
             if (doc.getEnabled()) {
                 replicaSetWriteBlockState->enableReplicaSetWriteBlocking(
                     doc.getReplicaSetWritesBlockReason());
@@ -541,12 +535,6 @@ void UserWritesRecoverableCriticalSectionService::recoverReplicaSetWritesCritica
                 replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
             }
 
-            // An in-place allowDeletions rollback needs to undo the counter bump.
-            if (wasWriteBlocking && doc.getEnabled() &&
-                memoryAllowsDeletions != durableAllowsDeletions) {
-                replicaSetWriteBlockState->decrementReplicaSetWritesBlockCounter(
-                    doc.getReplicaSetWritesBlockReason());
-            }
             return true;
         });
     if (!foundReplicaSetWritesCriticalSection) {
