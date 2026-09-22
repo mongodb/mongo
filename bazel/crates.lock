@@ -1,5 +1,5 @@
 {
-  "checksum": "ee4354f9da6b0ac753a9936d29d6c240c95efcab607d4f68875f3fbca8630f51",
+  "checksum": "9f58d9521be5db6e457e07ee78c32bdc685775f21fc31a92c6bf67ac15bdb54b",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -2525,12 +2525,18 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
+            "all-native-arch",
+            "arm64",
             "gimli",
             "host-arch",
             "pulley",
+            "riscv64",
+            "s390x",
             "std",
             "timing",
-            "unwind"
+            "unwind",
+            "x86"
           ],
           "selects": {}
         },
@@ -17194,6 +17200,7 @@
         "crate_features": {
           "common": [
             "addr2line",
+            "all-arch",
             "anyhow",
             "async",
             "backtrace",
@@ -17721,6 +17728,7 @@
         "crate_features": {
           "common": [
             "addr2line",
+            "all-arch",
             "cache",
             "compile",
             "completion",
@@ -18654,6 +18662,7 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
             "component-model",
             "gc",
             "gc-drc",
@@ -19356,6 +19365,7 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
             "component-model",
             "gc",
             "gc-drc",
@@ -21198,11 +21208,14 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
+            "arm64",
             "gc",
             "gc-drc",
             "gc-null",
             "stack-switching",
-            "threads"
+            "threads",
+            "x64"
           ],
           "selects": {}
         },

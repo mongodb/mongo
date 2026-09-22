@@ -347,8 +347,12 @@ setup_local_config_platform(name = "internal_platforms_do_not_use")
 # when an IBM target platform has that constraint.
 register_execution_platforms(
     "@internal_platforms_do_not_use//host:host",
+    "//bazel/platforms:rhel8_amd64_cross",
+    "//bazel/platforms:rhel8_arm64_cross",
     "//bazel/platforms:rhel9_amd64_cross",
     "//bazel/platforms:rhel9_arm64_cross",
+    "//bazel/platforms:rhel10_amd64_cross",
+    "//bazel/platforms:rhel10_arm64_cross",
 )
 
 # The hermetic C/C++ toolchain, plus the gdb build that is pinned against it.
@@ -533,14 +537,14 @@ setup_mongo_linux_cross_toolchains_extension = use_extension(
 )
 use_repo(
     setup_mongo_linux_cross_toolchains_extension,
-    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64",
-    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64",
-    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64",
-    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64",
-    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64",
-    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64",
-    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64",
-    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64",
     "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64",
     "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64",
     "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64",
@@ -548,30 +552,30 @@ use_repo(
 )
 
 register_toolchains(
-    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_exec_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
     "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
-    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_exec_toolchain",
 )
 
 setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
@@ -784,6 +788,9 @@ crate.spec(
         "logging",
         "demangle",
         "cranelift",
+        # Cross-RBE AOT actions use the execution-platform CLI. Include every
+        # Cranelift backend so it can compile s390x Wasm from any host.
+        "all-arch",
         "profiling",
         "coredump",
         "addr2line",

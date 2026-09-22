@@ -211,9 +211,6 @@ LINUX_CROSS_RBE_CONFIG_RE = re.compile(
 LINUX_CROSS_RBE_DEFAULT_TARGET_DISTRO = "rhel9"
 
 
-LINUX_CROSS_RBE_DEFAULT_EXEC_DISTRO = "rhel9"
-
-
 LINUX_CROSS_RBE_DEFAULT_EXEC_ARCH = "x86_64"
 
 
@@ -283,14 +280,20 @@ LINUX_CROSS_REMOTE_COMPILE_MNEMONICS = (
     "Rustfmt",
     "TemplateRenderer",
     "UpbAmalgamation",
+    "WasmAotCompile",
     "WheelBuild",
     "WitBindgenC",
     "WheelInstall",
 )
 
 
-# WasmAotCompile uses the target-built s390x Wasmtime CLI and runs natively.
-# Bindgen actions remain remote because their output is architecture-independent.
+# IBM cross builds run WasmAotCompile with the execution-platform Wasmtime CLI
+# remotely (remote-first, with a persistent-container fallback that works when
+# the execution platform matches the host architecture). The CLI is built with
+# all Cranelift architectures enabled, so the s390x target can be compiled from
+# any execution platform. WasmAotCompile therefore stays out of this native
+# local-tool list; bindgen actions remain remote because their output is
+# architecture-independent.
 LINUX_CROSS_LOCAL_TOOL_MNEMONICS = tuple(
     dict.fromkeys(
         (
@@ -308,8 +311,6 @@ LINUX_CROSS_LOCAL_TOOL_MNEMONICS = tuple(
         )
     )
 )
-
-
 LINUX_CROSS_LOCAL_RELEASE_ENV_VARS = (
     LINUX_CROSS_TOOLCHAIN_ENV,
     WASI_SDK_EXEC_ARCH_ENV,
@@ -383,11 +384,15 @@ def _linux_cross_rbe_config(
         exec_arch = match.group("exec_arch") or LINUX_CROSS_RBE_DEFAULT_EXEC_ARCH
         if exec_arch == "arm64":
             exec_arch = "aarch64"
+        target_distro = match.group("target_distro") or LINUX_CROSS_RBE_DEFAULT_TARGET_DISTRO
         selected = LinuxCrossRBEConfig(
             target_arch=match.group("target_arch"),
-            target_distro=match.group("target_distro") or LINUX_CROSS_RBE_DEFAULT_TARGET_DISTRO,
+            target_distro=target_distro,
             exec_arch=exec_arch,
-            exec_distro=LINUX_CROSS_RBE_DEFAULT_EXEC_DISTRO,
+            # Keep the target, host action container, and RBE worker release
+            # aligned. The target distro is always one of the supported RHEL
+            # releases matched above.
+            exec_distro=target_distro,
         )
     return selected
 
@@ -1224,7 +1229,7 @@ def _linux_host_container_action_args(
                 *[
                     f"--strategy={mnemonic}=remote"
                     for mnemonic in LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
-                    if mnemonic not in ("IdlcGenerator", "Genrule")
+                    if mnemonic not in ("IdlcGenerator", "Genrule", "WasmAotCompile")
                 ],
                 # Genrule is remote-first, but genrules can be explicitly tagged
                 # no-remote (the resmoke TSS test list genrule runs on the
@@ -1232,6 +1237,17 @@ def _linux_host_container_action_args(
                 # fall back to the native container like they do in the
                 # non-cross dynamic mode instead of failing strategy selection.
                 "--strategy=Genrule=remote,persistent-container,local",
+                # WasmAotCompile is remote-first too: the execution-platform CLI
+                # is built with all Cranelift architectures enabled, so it can
+                # compile the s390x target from an x86_64 or ARM64 worker. Keep
+                # a persistent-container fallback so an RBE outage degrades to
+                # local execution instead of hard-failing the build. The
+                # fallback only succeeds where the CLI's architecture matches
+                # the host (the arm64 s390x-cross compile distros); on a host
+                # of a different architecture the attempt fails with an exec
+                # format error, the same outcome every other execution-platform
+                # tool hits without RBE.
+                "--strategy=WasmAotCompile=remote,persistent-container,local",
                 # These actions invoke execution-platform tools (notably the
                 # WASI clang used by ConfigHeaderGen) and must not fall back to
                 # the native IBM host when an RBE attempt is unavailable.

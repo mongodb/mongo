@@ -566,46 +566,46 @@
     },
     "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%setup_mongo_linux_cross_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "JSaooGL+qqLvDJe2gX14L7m9UcsJBjWmoyODNwZemJ8=",
+        "bzlTransitiveDigest": "4q+urDOQABxFwFMUpKJKJnd6uVwVfm/PROjIt8jGFF8=",
         "usagesDigest": "CLqWoiirAYDlbHYzkK/ZRzzlKha6+TR03Xh4cCF2u+A=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
-          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64": {
+          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel8",
               "target_arch": "ppc64le",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel8",
               "exec_arch": "x86_64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64": {
+          "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel8",
               "target_arch": "ppc64le",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel8",
               "exec_arch": "aarch64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64": {
+          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel8",
               "target_arch": "s390x",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel8",
               "exec_arch": "x86_64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64": {
+          "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel8",
               "target_arch": "s390x",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel8",
               "exec_arch": "aarch64",
               "version": "v5"
             }
@@ -650,42 +650,42 @@
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64": {
+          "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel10",
               "target_arch": "ppc64le",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel10",
               "exec_arch": "x86_64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64": {
+          "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel10",
               "target_arch": "ppc64le",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel10",
               "exec_arch": "aarch64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64": {
+          "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel10",
               "target_arch": "s390x",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel10",
               "exec_arch": "x86_64",
               "version": "v5"
             }
           },
-          "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64": {
+          "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64": {
             "repoRuleId": "@@//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%linux_cross_toolchain_download",
             "attributes": {
               "target_distro": "rhel10",
               "target_arch": "s390x",
-              "exec_distro": "rhel9",
+              "exec_distro": "rhel10",
               "exec_arch": "aarch64",
               "version": "v5"
             }

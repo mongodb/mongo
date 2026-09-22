@@ -841,10 +841,10 @@ common:linux-cross-rbe-toolchain --extra_toolchains=//bazel/toolchains:mongo_lin
 
 common:linux-s390x-rhel8-cross-rbe --config=linux-cross-rbe-toolchain
 common:linux-s390x-rhel8-cross-rbe --platforms=//bazel/platforms:rhel8_s390x_cross
-common:linux-s390x-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64_cross
-common:linux-s390x-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_exec_toolchain
-common:linux-s390x-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_x86_64//:mongo_exec_toolchain_for_pycross
-common:linux-s390x-rhel8-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_s390x_on_rhel9_x86_64
+common:linux-s390x-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel8_amd64_cross
+common:linux-s390x-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_exec_toolchain
+common:linux-s390x-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_exec_toolchain_for_pycross
+common:linux-s390x-rhel8-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_s390x_on_rhel8_x86_64
 common:linux-s390x-rhel8-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-s390x-rhel9-cross-rbe --config=linux-cross-rbe-toolchain
@@ -857,18 +857,18 @@ common:linux-s390x-rhel9-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-s390x-rhel10-cross-rbe --config=linux-cross-rbe-toolchain
 common:linux-s390x-rhel10-cross-rbe --platforms=//bazel/platforms:rhel10_s390x_cross
-common:linux-s390x-rhel10-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64_cross
-common:linux-s390x-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_exec_toolchain
-common:linux-s390x-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_x86_64//:mongo_exec_toolchain_for_pycross
-common:linux-s390x-rhel10-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel9_x86_64
+common:linux-s390x-rhel10-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel10_amd64_cross
+common:linux-s390x-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_exec_toolchain
+common:linux-s390x-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_exec_toolchain_for_pycross
+common:linux-s390x-rhel10-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel10_x86_64
 common:linux-s390x-rhel10-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-ppc64le-rhel8-cross-rbe --config=linux-cross-rbe-toolchain
 common:linux-ppc64le-rhel8-cross-rbe --platforms=//bazel/platforms:rhel8_ppc64le_cross
-common:linux-ppc64le-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64_cross
-common:linux-ppc64le-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain
-common:linux-ppc64le-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain_for_pycross
-common:linux-ppc64le-rhel8-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_ppc64le_on_rhel9_x86_64
+common:linux-ppc64le-rhel8-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel8_amd64_cross
+common:linux-ppc64le-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_exec_toolchain
+common:linux-ppc64le-rhel8-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_exec_toolchain_for_pycross
+common:linux-ppc64le-rhel8-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_ppc64le_on_rhel8_x86_64
 common:linux-ppc64le-rhel8-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-ppc64le-rhel9-cross-rbe --config=linux-cross-rbe-toolchain
@@ -881,18 +881,18 @@ common:linux-ppc64le-rhel9-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-ppc64le-rhel10-cross-rbe --config=linux-cross-rbe-toolchain
 common:linux-ppc64le-rhel10-cross-rbe --platforms=//bazel/platforms:rhel10_ppc64le_cross
-common:linux-ppc64le-rhel10-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel9_amd64_cross
-common:linux-ppc64le-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain
-common:linux-ppc64le-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain_for_pycross
-common:linux-ppc64le-rhel10-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_ppc64le_on_rhel9_x86_64
+common:linux-ppc64le-rhel10-cross-rbe --extra_execution_platforms=//bazel/platforms:rhel10_amd64_cross
+common:linux-ppc64le-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_exec_toolchain
+common:linux-ppc64le-rhel10-cross-rbe --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_exec_toolchain_for_pycross
+common:linux-ppc64le-rhel10-cross-rbe --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_ppc64le_on_rhel10_x86_64
 common:linux-ppc64le-rhel10-cross-rbe --repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64
 
 common:linux-s390x-rhel8-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
 common:linux-s390x-rhel8-cross-rbe-arm64 --platforms=//bazel/platforms:rhel8_s390x_cross
-common:linux-s390x-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64_cross
-common:linux-s390x-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_exec_toolchain
-common:linux-s390x-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel9_aarch64//:mongo_exec_toolchain_for_pycross
-common:linux-s390x-rhel8-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_s390x_on_rhel9_aarch64
+common:linux-s390x-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel8_arm64_cross
+common:linux-s390x-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_exec_toolchain
+common:linux-s390x-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_exec_toolchain_for_pycross
+common:linux-s390x-rhel8-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_s390x_on_rhel8_aarch64
 common:linux-s390x-rhel8-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64
 
 common:linux-s390x-rhel9-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
@@ -905,18 +905,18 @@ common:linux-s390x-rhel9-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=aar
 
 common:linux-s390x-rhel10-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
 common:linux-s390x-rhel10-cross-rbe-arm64 --platforms=//bazel/platforms:rhel10_s390x_cross
-common:linux-s390x-rhel10-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64_cross
-common:linux-s390x-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_exec_toolchain
-common:linux-s390x-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel9_aarch64//:mongo_exec_toolchain_for_pycross
-common:linux-s390x-rhel10-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel9_aarch64
+common:linux-s390x-rhel10-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel10_arm64_cross
+common:linux-s390x-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_exec_toolchain
+common:linux-s390x-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_exec_toolchain_for_pycross
+common:linux-s390x-rhel10-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel10_aarch64
 common:linux-s390x-rhel10-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64
 
 common:linux-ppc64le-rhel8-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
 common:linux-ppc64le-rhel8-cross-rbe-arm64 --platforms=//bazel/platforms:rhel8_ppc64le_cross
-common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64_cross
-common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain
-common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain_for_pycross
-common:linux-ppc64le-rhel8-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_ppc64le_on_rhel9_aarch64
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel8_arm64_cross
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_exec_toolchain
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_exec_toolchain_for_pycross
+common:linux-ppc64le-rhel8-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_ppc64le_on_rhel8_aarch64
 common:linux-ppc64le-rhel8-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64
 
 common:linux-ppc64le-rhel9-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
@@ -929,10 +929,10 @@ common:linux-ppc64le-rhel9-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=a
 
 common:linux-ppc64le-rhel10-cross-rbe-arm64 --config=linux-cross-rbe-toolchain
 common:linux-ppc64le-rhel10-cross-rbe-arm64 --platforms=//bazel/platforms:rhel10_ppc64le_cross
-common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64_cross
-common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain
-common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain_for_pycross
-common:linux-ppc64le-rhel10-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_ppc64le_on_rhel9_aarch64
+common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_execution_platforms=//bazel/platforms:rhel10_arm64_cross
+common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_exec_toolchain
+common:linux-ppc64le-rhel10-cross-rbe-arm64 --extra_toolchains=@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_exec_toolchain_for_pycross
+common:linux-ppc64le-rhel10-cross-rbe-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_ppc64le_on_rhel10_aarch64
 common:linux-ppc64le-rhel10-cross-rbe-arm64 --repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64
 
 # This should always be at the bottom because any platform specific configs should always be applied if possible

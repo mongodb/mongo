@@ -40,6 +40,20 @@ if [[ "$status" -eq 0 ]]; then
     exit 0
 fi
 
+# A cross-compiled mongod cannot execute on the build host: the shell reports
+# "cannot execute binary file" (Exec format error) with status 126. The
+# cross-compiled binary itself is fine; skip the record here rather than failing
+# the archive task. Cross-compile variants publish the version info from a task
+# that runs on the native target host instead (see record_mongodb_server_version
+# in etc/evergreen_yml_components/tasks/compile_tasks_shared.yml).
+if [[ "$status" -eq 126 ]] && grep -qi "cannot execute binary file\|Exec format error" "$stderr_file"; then
+    echo "Skipping mongod --version: $binary was built for a different architecture." >&2
+    if command -v file >/dev/null 2>&1; then
+        file "$binary" >&2 || true
+    fi
+    exit 0
+fi
+
 echo "ERROR: MongoDB server version command failed with exit code $status: $binary --version" >&2
 echo "Captured stdout:" >&2
 cat "$output_file" >&2

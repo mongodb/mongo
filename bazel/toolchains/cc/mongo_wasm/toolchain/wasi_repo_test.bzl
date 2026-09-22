@@ -25,12 +25,12 @@ def _cross_execution_arch_test_impl(ctx):
     asserts.equals(
         env,
         "amd64",
-        cross_execution_arch("rhel8_s390x_on_rhel9_x86_64"),
+        cross_execution_arch("rhel8_s390x_on_rhel8_x86_64"),
     )
     asserts.equals(
         env,
         "aarch64",
-        cross_execution_arch("rhel10_ppc64le_on_rhel9_aarch64"),
+        cross_execution_arch("rhel10_ppc64le_on_rhel10_aarch64"),
     )
     asserts.equals(env, None, cross_execution_arch("rhel9_s390x"))
 

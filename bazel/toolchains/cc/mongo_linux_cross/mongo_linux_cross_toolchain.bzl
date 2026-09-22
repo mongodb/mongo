@@ -17,9 +17,21 @@ _TARGETS = [
 ]
 
 _EXECS = [
+    ("rhel8", "x86_64"),
+    ("rhel8", "aarch64"),
     ("rhel9", "x86_64"),
     ("rhel9", "aarch64"),
+    ("rhel10", "x86_64"),
+    ("rhel10", "aarch64"),
 ]
+
+def execs_for_target(target_distro):
+    """Return execution platforms with the same RHEL release as the target."""
+    return [
+        (exec_distro, exec_arch)
+        for exec_distro, exec_arch in _EXECS
+        if exec_distro == target_distro
+    ]
 
 def _repo_name(target_distro, target_arch, exec_distro, exec_arch):
     return "mongo_linux_cross_toolchain_v5_{}_{}_on_{}_{}".format(
@@ -49,7 +61,7 @@ _ENV_VARS = [
 ] + [
     "{}_{}".format(_env_prefix(target_distro, target_arch, exec_distro, exec_arch), suffix)
     for target_distro, target_arch in _TARGETS
-    for exec_distro, exec_arch in _EXECS
+    for exec_distro, exec_arch in execs_for_target(target_distro)
     for suffix in _ENV_SUFFIXES
 ]
 
@@ -419,6 +431,15 @@ EFFECTIVE_SYSTEM_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES""",
     return substitutions
 
 def _linux_cross_toolchain_impl(ctx):
+    if ctx.attr.target_distro != ctx.attr.exec_distro:
+        fail(
+            "{} must use the same target and execution RHEL release ({} != {}).".format(
+                ctx.name,
+                ctx.attr.target_distro,
+                ctx.attr.exec_distro,
+            ),
+        )
+
     selected = ctx.os.environ.get(LINUX_CROSS_TOOLCHAIN_ENV_VAR, "")
     if selected != _selector(ctx):
         _generate_noop_cross_toolchain(ctx, _substitutions(ctx, False))
@@ -606,7 +627,7 @@ linux_cross_toolchain_download = repository_rule(
     attrs = {
         "target_distro": attr.string(values = ["rhel8", "rhel9", "rhel10"], mandatory = True),
         "target_arch": attr.string(values = ["ppc64le", "s390x"], mandatory = True),
-        "exec_distro": attr.string(values = ["rhel9"], mandatory = True),
+        "exec_distro": attr.string(values = ["rhel8", "rhel9", "rhel10"], mandatory = True),
         "exec_arch": attr.string(values = ["x86_64", "aarch64"], mandatory = True),
         "version": attr.string(values = ["v5"], mandatory = True),
         "flags_tpl": attr.label(
@@ -628,13 +649,13 @@ def linux_cross_toolchain_repo_names():
     return [
         _repo_name(target_distro, target_arch, exec_distro, exec_arch)
         for target_distro, target_arch in _TARGETS
-        for exec_distro, exec_arch in _EXECS
+        for exec_distro, exec_arch in execs_for_target(target_distro)
     ]
 
 def setup_mongo_linux_cross_toolchains(register_toolchains = True):
     names = []
     for target_distro, target_arch in _TARGETS:
-        for exec_distro, exec_arch in _EXECS:
+        for exec_distro, exec_arch in execs_for_target(target_distro):
             name = _repo_name(target_distro, target_arch, exec_distro, exec_arch)
             names.append(name)
             linux_cross_toolchain_download(

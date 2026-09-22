@@ -132,8 +132,9 @@ the checked-in `src/third_party/*/dist` source distributions are never modified.
 native builds do not create these overlays.
 
 Omitting `-arm64` selects `x86_64` execution. The target distro and execution architecture are
-independent, so all RHEL 8, 9, and 10 target sysroots can be used with either RHEL 9 execution pool.
-For example:
+independent, but the execution OS release always matches the target RHEL release. RHEL 8 targets use
+RHEL 8 execution workers, RHEL 9 targets use RHEL 9 workers, and RHEL 10 targets use RHEL 10
+workers. For example:
 
 ```bash
 bazel build --config=linux-s390x-rhel8-cross-rbe install-dist-test
@@ -145,8 +146,8 @@ bazel build --config=linux-ppc64le-rhel10-cross-rbe-arm64 install-dist-test
 These configs keep the Bazel client and repository setup on the host. In patch builds and waterfall
 tasks marked `compiling_for_test`, C++/Rust compilation, LTO compilation, IDL generation,
 execution-platform genrules/wheel build and installation, and WASI tools use RBE and the selected
-RHEL 9 execution architecture. Final C++ links, archives, debug extraction/stripping, DWP/GDB index
-generation, packaging, and tests run in the native host action container. IBM cross mode is
+same-release execution architecture. Final C++ links, archives, debug extraction/stripping, DWP/GDB
+index generation, packaging, and tests run in the native host action container. IBM cross mode is
 deliberately compile-only; `remote_test` or `remote_link` cannot re-enable remote target links.
 Local cross-output actions are marked no-cache, which avoids sending multi-gigabyte debug files
 through CAS.
@@ -176,21 +177,23 @@ would otherwise resolve to an older IBM host runtime during Evergreen's version 
 Tool-link actions (shown by Bazel as `CppLink [for tool]`), foreign-tool `Genrule`, `WheelBuild`,
 and `WheelInstall` actions, IDL generation, and WASI compile/link actions use the execution-platform
 toolchain and remain remote even when the final target link is local. `WitBindgenC` and
-`RustWasmBindgen` also remain remote because their output is architecture-independent. For s390x,
-`WasmAotCompile` instead runs a target-built Wasmtime CLI in the native IBM container. The CLI uses
-the s390x Cranelift backend; its Rust compilation stays remote, while
-`experimental_use_cc_common_link` separates its native C++ link from that compile action. Native
-s390x builds retain the original execution-platform CLI. PPC64LE remains unsupported by the WASM
-engine, as it was before cross-RBE. The host-side `PyWriteBuildData` tar metadata action is
-explicitly local because rules_pkg marks it `no-remote`. The WASI SDK repository uses the explicit
-`MONGO_WASI_SDK_EXEC_ARCH` execution override during bootstrap and hydration, with the Linux cross
-selector as a compatibility fallback. Thus an IBM host does not send an IBM WASI binary to an
-`x86_64` or ARM RBE worker. Native IBM WASI archives remain available when the build is not
-cross-RBE, and the SDK's `llvm-ar` dispatches on the executing machine so the same hydrated
-repository serves both remote and local archive actions. Evergreen gives each task an isolated
-rootless Podman storage/runtime directory, resets it before use, and removes all task-owned
-containers and files in task teardown. A failed Podman cleanup is reported but never hides the build
-result.
+`RustWasmBindgen` also remain remote because their output is architecture-independent. For IBM cross
+builds, `WasmAotCompile` is remote-first: it uses the execution-platform Wasmtime CLI, which is
+built with all Cranelift architectures enabled and runs with `--target s390x-unknown-linux-gnu`.
+Unlike the WASI links it falls back to the persistent container when RBE is unavailable; the
+fallback succeeds where the execution platform matches the host architecture (the arm64 s390x-cross
+compile distros) and fails with an exec format error elsewhere. The foreign-architecture CLI is
+never executed natively on an IBM host. Non-cross native s390x builds retain the original local
+execution-platform CLI. PPC64LE remains unsupported by the WASM engine, as it was before cross-RBE.
+The host-side `PyWriteBuildData` tar metadata action is explicitly local because rules_pkg marks it
+`no-remote`. The WASI SDK repository uses the explicit `MONGO_WASI_SDK_EXEC_ARCH` execution override
+during bootstrap and hydration, with the Linux cross selector as a compatibility fallback. Thus an
+IBM host does not send an IBM WASI binary to an `x86_64` or ARM RBE worker. Native IBM WASI archives
+remain available when the build is not cross-RBE, and the SDK's `llvm-ar` dispatches on the
+executing machine so the same hydrated repository serves both remote and local archive actions.
+Evergreen gives each task an isolated rootless Podman storage/runtime directory, resets it before
+use, and removes all task-owned containers and files in task teardown. A failed Podman cleanup is
+reported but never hides the build result.
 
 The `//buildscripts:archive_artifacts` packaging binary is constrained to the invoking host's
 execution platform. This matters for `bazel run` after a cross build: the archive launcher runs on
@@ -205,18 +208,18 @@ arguments.
 No cross-toolchain URL or SHA is required for normal use. Each concrete config selects one
 repository that composes three pinned inputs:
 
-- the RHEL 9 `x86_64` or `aarch64` toolchain archive containing Clang, LLD, and the tools that run
-  on the RBE worker;
+- the matching RHEL release's `x86_64` or `aarch64` toolchain archive containing Clang, LLD, and the
+  tools that run on the RBE worker;
 - the matching RHEL 8, 9, or 10 `s390x` or `ppc64le` toolchain archive containing target C/C++
   headers, CRT objects, and runtime libraries; and
 - a target-architecture sysroot exported from the matching pinned, multi-architecture RBE container
   image.
 
 The compiler receives the MongoDB target triple and the extracted target sysroot, while executable
-compiler tools come only from the selected RHEL 9 execution archive. Rust selects the corresponding
-target standard library and uses the same cross linker. The archives, container digests, execution
-platform, and EngFlow pool are selected by checked-in configuration, which keeps remote actions
-independent of the host's installed compiler and system libraries.
+compiler tools come only from the selected same-release execution archive. Rust selects the
+corresponding target standard library and uses the same cross linker. The archives, container
+digests, execution platform, and EngFlow pool are selected by checked-in configuration, which keeps
+remote actions independent of the host's installed compiler and system libraries.
 
 Preparing the sysroot requires Docker or Podman on the Bazel host. The repository rule pulls the
 requested `linux/s390x` or `linux/ppc64le` image variant, exports only its header and library trees,
@@ -228,8 +231,8 @@ For toolchain development or one-off experiments, a complete cross-toolchain arc
 pinned composition. Set both URL and SHA variables for the exact target/execution pair:
 
 ```bash
-export MONGO_LINUX_CROSS_TOOLCHAIN_RHEL10_PPC64LE_ON_RHEL9_AARCH64_URL=https://.../toolchain.tar.gz
-export MONGO_LINUX_CROSS_TOOLCHAIN_RHEL10_PPC64LE_ON_RHEL9_AARCH64_SHA256=<sha256>
+export MONGO_LINUX_CROSS_TOOLCHAIN_RHEL10_PPC64LE_ON_RHEL10_AARCH64_URL=https://.../toolchain.tar.gz
+export MONGO_LINUX_CROSS_TOOLCHAIN_RHEL10_PPC64LE_ON_RHEL10_AARCH64_SHA256=<sha256>
 bazel build --config=linux-ppc64le-rhel10-cross-rbe-arm64 install-dist-test
 ```
 
@@ -240,9 +243,9 @@ Pair-specific variables take precedence over target-only variables.
 
 The override is a complete replacement, not an additional target-runtime layer. It must contain the
 compiler, linker/binutils, target sysroot, headers, CRT objects, runtime libraries, and toolchain
-files. Its executables must run on the selected RHEL 9 RBE worker architecture while producing
-artifacts for the requested `s390x` or `ppc64le` target.
+files. Its executables must run on the selected same-release RHEL worker architecture while
+producing artifacts for the requested `s390x` or `ppc64le` target.
 
 Use `MONGO_LINUX_CROSS_RBE_CONTAINER_IMAGE` or `MONGO_LINUX_CROSS_RBE_POOL` only for debugging or
-one-off RBE experiments; the checked-in configs otherwise use the pinned `rhel9` RBE container and
-the matching EngFlow pool.
+one-off RBE experiments; the checked-in configs otherwise use the pinned RHEL container matching the
+target release and the matching EngFlow pool.

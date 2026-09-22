@@ -96,18 +96,23 @@ constraint_setting(name = "distro")
     ]
 ]
 
-# The normal RHEL execution platforms remain available to native builds.  IBM
-# cross-RBE actions use these equivalent platforms with an additional
+# The normal RHEL execution platforms remain available to native builds. IBM
+# cross-RBE actions use equivalent same-release platforms with an additional
 # constraint, allowing rules whose tools are foreign-architecture executables
 # to opt into the cross execution platform without changing native builds.
 [
     setup_platform(
         arch,
-        "rhel9",
+        distro,
         "",
         extra_constraints = [":use_mongo_linux_cross_execution"],
         name_suffix = "_cross",
     )
+    for distro in [
+        "rhel8",
+        "rhel9",
+        "rhel10",
+    ]
     for arch in [
         "arm64",
         "amd64",

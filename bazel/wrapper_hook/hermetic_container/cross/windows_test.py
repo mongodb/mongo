@@ -308,7 +308,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             *(
                 mnemonic
                 for mnemonic in hermetic_container_integration.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
-                if mnemonic != "Genrule"
+                if mnemonic not in ("Genrule", "WasmAotCompile")
             ),
         ):
             with self.subTest(mnemonic=mnemonic):
@@ -316,13 +316,17 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         # Genrule is remote-first but tolerates no-remote-tagged genrules
         # (e.g. the resmoke TSS test list) via the native container fallback.
         self.assertIn("--strategy=Genrule=remote,persistent-container,local", args)
+        # WasmAotCompile is remote-first with a persistent-container fallback:
+        # the execution-platform CLI runs locally where the execution platform
+        # matches the host architecture (the arm64 s390x-cross compile distros).
+        self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", args)
         self.assertIn(
             r"--strategy_regexp=.*Linking .*\[for tool\].*=remote",
             args,
         )
         self.assertIn(r"--strategy_regexp=.*Linking .*\.wasm.*=remote", args)
 
-    def test_linux_cross_rbe_runs_native_wasm_aot_and_remote_generators(self):
+    def test_linux_cross_rbe_runs_wasm_aot_and_remote_generators(self):
         args = hermetic_container_integration._linux_host_container_action_args(
             hermetic_container_integration._linux_cross_rbe_host_args(
                 [
@@ -337,9 +341,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             remote_compile_only=True,
         )
 
-        # The AOT rule supplies a target-built s390x Wasmtime executable.
-        # Bindgen tools still run on the foreign execution platform.
-        self.assertIn("--strategy=WasmAotCompile=persistent-container,local", args)
+        # The cross compile task uses the execution-platform Wasmtime CLI,
+        # remote-first with a persistent-container fallback. Bindgen tools also
+        # run on the foreign execution platform without a fallback.
+        self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", args)
         self.assertNotIn("--strategy=WasmAotCompile=remote", args)
         for mnemonic in ("WitBindgenC", "RustWasmBindgen"):
             with self.subTest(mnemonic=mnemonic):
@@ -348,6 +353,28 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         # WASI compile and link actions still use the execution-architecture SDK.
         self.assertIn("--strategy=CppCompile=remote", args)
         self.assertIn(r"--strategy_regexp=.*Linking .*\.wasm.*=remote", args)
+
+    def test_linux_cross_rbe_native_host_runs_wasm_aot_remotely(self):
+        with mock.patch.object(
+            hermetic_container_integration._cross_linux, "normalize_arch", return_value="s390x"
+        ):
+            args = hermetic_container_integration._linux_host_container_action_args(
+                hermetic_container_integration._linux_cross_rbe_host_args(
+                    [
+                        "build",
+                        "--config=linux-s390x-cross-rbe",
+                        "install-dist-test",
+                    ],
+                    {},
+                    containers={
+                        "rhel9": {"container-url": "docker://example.invalid/rbe@sha256:123"}
+                    },
+                ),
+                {},
+                remote_compile_only=True,
+            )
+
+        self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", args)
 
     def test_linux_cross_rbe_local_test_strategy_overrides_remote_test_config(self):
         args = hermetic_container_integration._linux_cross_rbe_host_args(
@@ -394,7 +421,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             hermetic_container_integration._linux_cross_rbe_host_args(
                 args,
                 {},
-                containers={"rhel9": {"container-url": "docker://example.invalid/rbe@sha256:123"}},
+                containers={"rhel10": {"container-url": "docker://example.invalid/rbe@sha256:123"}},
             ),
             {},
             remote_compile_only=True,
@@ -407,7 +434,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             *(
                 mnemonic
                 for mnemonic in hermetic_container_integration.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
-                if mnemonic != "Genrule"
+                if mnemonic not in ("Genrule", "WasmAotCompile")
             ),
         ):
             with self.subTest(mnemonic=mnemonic):
@@ -416,6 +443,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         # (the resmoke TSS test list genrule needs host credentials and
         # network) instead of failing strategy selection.
         self.assertIn("--strategy=Genrule=remote,persistent-container,local", host_args)
+        # WasmAotCompile is remote-first with a persistent-container fallback.
+        self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", host_args)
         # Keep the failure-prone execution-platform tools covered explicitly so
         # removing them from the policy tuple cannot silently regress cross builds.
         for mnemonic in (
@@ -469,7 +498,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             (
                 "linux-s390x-rhel8-cross-rbe",
                 "//bazel/platforms:rhel8_s390x",
-                "//bazel/platforms:rhel9_amd64_cross",
+                "//bazel/platforms:rhel8_amd64_cross",
             ),
             (
                 "linux-s390x-rhel9-cross-rbe",
@@ -479,7 +508,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             (
                 "linux-ppc64le-rhel10-cross-rbe",
                 "//bazel/platforms:rhel10_ppc64le",
-                "//bazel/platforms:rhel9_amd64_cross",
+                "//bazel/platforms:rhel10_amd64_cross",
             ),
         ):
             with self.subTest(config=config_name):
@@ -708,10 +737,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 "install-dist-test",
             ],
             {},
-            containers={"rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}},
+            containers={"rhel8": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}},
         )
 
-        self.assertIn("--extra_execution_platforms=//bazel/platforms:rhel9_arm64_cross", args)
+        self.assertIn("--extra_execution_platforms=//bazel/platforms:rhel8_arm64_cross", args)
         self.assertIn("--remote_default_exec_properties=Pool=default", args)
         self.assertIn("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=aarch64", args)
         self.assertIn("--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64", args)
@@ -724,18 +753,31 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 "install-dist-test",
             ],
             {},
-            containers={"rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}},
+            containers={"rhel10": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}},
         )
 
-        self.assertIn("--extra_execution_platforms=//bazel/platforms:rhel9_amd64_cross", args)
-        self.assertIn("--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel9_x86_64", args)
+        self.assertIn("--extra_execution_platforms=//bazel/platforms:rhel10_amd64_cross", args)
+        self.assertIn("--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel10_x86_64", args)
+
+    def test_linux_cross_rbe_uses_matching_target_rhel_release(self):
+        for distro in ("rhel8", "rhel9", "rhel10"):
+            with self.subTest(distro=distro):
+                config = hermetic_container_integration._linux_cross_rbe_config(
+                    ["build", f"--config=linux-s390x-{distro}-cross-rbe"],
+                    env={},
+                    repo_root=hermetic_container_integration.REPO_ROOT,
+                )
+
+                self.assertIsNotNone(config)
+                self.assertEqual(config.target_distro, distro)
+                self.assertEqual(config.exec_distro, distro)
 
     def test_linux_cross_rbe_process_env_uses_execution_platform(self):
         config = hermetic_container_integration.LinuxCrossRBEConfig(
             target_arch="s390x",
             target_distro="rhel10",
             exec_arch="x86_64",
-            exec_distro="rhel9",
+            exec_distro="rhel10",
         )
 
         process_env = hermetic_container_integration._linux_cross_rbe_process_env(
@@ -748,7 +790,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
         self.assertEqual(
             process_env["MONGO_LINUX_CROSS_TOOLCHAIN"],
-            "rhel10_s390x_on_rhel9_x86_64",
+            "rhel10_s390x_on_rhel10_x86_64",
         )
         self.assertEqual(process_env["MONGO_WASI_SDK_EXEC_ARCH"], "x86_64")
 
@@ -907,6 +949,11 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 hermetic_container_integration.platform, "system", return_value="Linux"
             ),
             mock.patch.object(
+                hermetic_container_integration._cross_linux,
+                "normalize_arch",
+                return_value="s390x",
+            ),
+            mock.patch.object(
                 hermetic_container_integration,
                 "load_remote_execution_containers",
                 return_value=containers,
@@ -995,8 +1042,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 self.assertIn(f"--strategy={mnemonic}=persistent-container,local", host_args)
                 self.assertNotIn(f"--strategy={mnemonic}=remote", host_args)
         self.assertIn("--strategy=ConfigHeaderGen=remote", host_args)
-        self.assertIn("--strategy=WasmAotCompile=persistent-container,local", host_args)
-        self.assertNotIn("--strategy=WasmAotCompile=remote", host_args)
+        self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", host_args)
         self.assertIn(
             r"--strategy_regexp=.*Linking .*\[for tool\].*=remote",
             host_args,

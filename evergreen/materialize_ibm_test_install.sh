@@ -22,6 +22,11 @@ install-dbtest)
     private_expected="bazel-bin/install-dbtest/bin/dbtest"
     bazel_args="--config=evg"
     ;;
+install-dist-test)
+    expected="bazel-bin/install/bin/mongod"
+    private_expected="bazel-bin/install-dist-test/bin/mongod"
+    bazel_args="--config=evg"
+    ;;
 install-mongo_integration_test)
     expected="bazel-bin/install/install-mongo_integration_test_test_list.txt"
     private_expected="bazel-bin/install-mongo_integration_test/install-mongo_integration_test_test_list.txt"
