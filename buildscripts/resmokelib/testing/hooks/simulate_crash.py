@@ -9,7 +9,6 @@ unclean shutdown. Once started, validate will be run on all collections. A valid
 indicates a problem.
 """
 
-import logging
 import os
 import random
 import shutil
@@ -20,8 +19,6 @@ import pymongo
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.testing.hooks import bghook
-
-LOGGER = logging.getLogger(__name__)
 
 
 def validate(mdb, logger, acceptable_err_codes):
@@ -124,8 +121,7 @@ class SimulateCrash(bghook.BGHook):
                 absolute_filepath = os.path.join(current_path, filename)
                 self.copy_file(dbpath, absolute_filepath, dest_root)
 
-    @classmethod
-    def copy_file(cls, root, absolute_filepath, new_root):
+    def copy_file(self, root, absolute_filepath, new_root):
         """Copy a file in |root| at |absolute_filepath| into |new_root|, maintaining its relative position.
 
         For example: '/a/b/c' if copied from '/a/b' to '/x' would yield '/x/c'.
@@ -139,7 +135,7 @@ class SimulateCrash(bghook.BGHook):
                 if not chunk:
                     current_bytes = os.fstat(src.fileno()).st_size  # file may have shrunk
                     if current_bytes <= total_bytes_sent:
-                        LOGGER.warning(
+                        self.logger.warning(
                             "%s shrank from %d to %d bytes while copying for a crash simulation "
                             "snapshot; keeping the %d bytes already copied",
                             absolute_filepath,
