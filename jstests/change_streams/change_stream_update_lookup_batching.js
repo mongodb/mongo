@@ -11,6 +11,7 @@
  * @tags: [
  *   requires_fcv_90,
  *   uses_change_streams,
+ *   featureFlagChangeStreamOptimizedUpdateLookup,
  *   # The exact batch-count and metrics-delta assertions no longer hold once the txn
  *   # passthrough bundles the test's writes into transactions.
  *   change_stream_does_not_expect_txns,

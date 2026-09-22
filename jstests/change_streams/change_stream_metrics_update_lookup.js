@@ -4,6 +4,7 @@
  * 'changeStreams.updateLookup.<engine>'.
  *
  * @tags: [
+ *   featureFlagChangeStreamOptimizedUpdateLookup,
  *   # Can not run in balancer suites as it expects no data migrations across shards for correct
  *   # metric capture (test expects shard local lookup).
  *   assumes_balancer_off,
