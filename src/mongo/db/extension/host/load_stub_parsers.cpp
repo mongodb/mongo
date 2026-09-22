@@ -22,7 +22,7 @@ namespace {
 using namespace std::literals::string_view_literals;
 std::filesystem::path getExtensionStubParserDirectory() {
     if (getTestCommandsEnabled()) {
-        return std::filesystem::current_path() /
+        return serverGlobalParams.cwd /
             std::filesystem::path{"src/mongo/db/extension/test_examples"};
     }
     // In production, the stub parsers are expected to be found in the same directory as the
