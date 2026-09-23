@@ -625,7 +625,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutDuringConnectionHands
         "triggerConnectionSetupHandshakeTimeout",
         BSON("instance" << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
     auto cbh = makeCallbackHandle();
-    auto deferred = runCommand(cbh, makeTestCommand(Milliseconds(100), makeEchoCmdObj()));
+    // The request does not need to have a timeout since the triggerConnectionSetupHandshakeTimeout
+    // failpoint already sets the timeout to 0ms.
+    auto deferred = runCommand(cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj()));
 
     auto result = deferred.get(interruptible());
 
