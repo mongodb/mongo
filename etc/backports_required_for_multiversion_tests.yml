@@ -43,6 +43,8 @@ last-continuous:
     ticket: SERVER-129103
   - test_file: jstests/aggregation/expressions/convert_bindata.js
     ticket: SERVER-129103
+  - test_file: jstests/aggregation/sources/bucket/bucket_literal_values.js
+    ticket: SERVER-134618
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
   - test_file: jstests/core/filemd5.js
@@ -1018,6 +1020,8 @@ last-lts:
     ticket: SERVER-129103
   - test_file: jstests/aggregation/expressions/convert_bindata.js
     ticket: SERVER-129103
+  - test_file: jstests/aggregation/sources/bucket/bucket_literal_values.js
+    ticket: SERVER-134618
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
   - test_file: jstests/core/filemd5.js
