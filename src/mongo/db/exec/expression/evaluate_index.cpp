@@ -62,8 +62,11 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
                 collation.isObject());
         auto collationBson = collation.getDocument().toBson();
 
-        auto collatorFactory = CollatorFactoryInterface::get(
-            expr.getExpressionContext()->getOperationContext()->getServiceContext());
+        auto* opCtx = expr.getExpressionContext()->getOperationContext();
+        tassert(10131413,
+                "$_internalKeyStringValue with a collation requires an OperationContext",
+                opCtx);
+        auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
         collator = uassertStatusOKWithContext(collatorFactory->makeFromBSON(collationBson),
                                               "Invalid collation spec");
     }

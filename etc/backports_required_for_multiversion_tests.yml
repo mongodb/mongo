@@ -21,6 +21,10 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/core/query/doc_validation/doc_validation_invalid_validators.js
+      ticket: SERVER-131412
+    - test_file: jstests/noPassthrough/query/profile/profile_filter.js
+      ticket: SERVER-131412
     - test_file: jstests/aggregation/expressions/regex_backslash_c.js
       ticket: SERVER-127985
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
@@ -238,6 +242,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/core/query/doc_validation/doc_validation_invalid_validators.js
+      ticket: SERVER-131412
+    - test_file: jstests/noPassthrough/query/profile/profile_filter.js
+      ticket: SERVER-131412
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
