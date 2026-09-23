@@ -960,10 +960,17 @@ py_library(
 )
 
 py_library(
+    name = "jira_cve_links",
+    srcs = ["jira_cve_links.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "validate_commit_message",
     srcs = ["validate_commit_message.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:jira_cve_links",
         "@bazel_rules_mongo//utils:evergreen_git",
         "@pypi//:pathspec",
         dependency(

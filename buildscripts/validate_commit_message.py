@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: SSPL-1.0
 """Validate that the commit message is ok."""
 
+import logging
 import pathlib
 import re
 import subprocess
+import sys
 
 import pathspec
 import requests
@@ -15,6 +17,7 @@ from git import Commit, Repo
 from typing_extensions import Annotated
 
 from buildscripts.bazel_rules_mongo.utils.evergreen_git import get_changed_files
+from buildscripts.jira_cve_links import unresolved_cves_by_ticket
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -36,6 +39,11 @@ BANNED_STRINGS = ["https://spruce.mongodb.com", "https://evergreen.mongodb.com",
 VALID_SUMMARY = re.compile(
     r'(?:Revert ")?(?:([A-Z]+)-([A-Z0-9]+)|Import wiredtiger|Bump \S+ from \S+ to \S+)'
 )
+
+# A Jira key anywhere in a message, for the linked-CVE check rather than summary validation.
+# Matched case-insensitively and normalized to upper case, so "server-123" counts. The
+# numeric suffix skips placeholders, and the boundaries keep "utf-8" or "SERVER-12x" out.
+JIRA_KEY_RE = re.compile(r"(?<![A-Za-z0-9-])([A-Z]+)-([1-9][0-9]*)(?![0-9A-Za-z-])", re.IGNORECASE)
 
 # The allowed jira projects and their corresponding allowed file paths.
 # allowed file paths are in gitignore format
@@ -121,6 +129,70 @@ The decision to add this check was made in SERVER-101443, please feel free to le
             return False
 
     return True
+
+
+def referenced_jira_keys_for_cve_check(commits: list[Commit]) -> dict[str, list[str]]:
+    """
+    Collect every Jira ticket the change references, not just the one it is filed under.
+
+    Deliberately wider than VALID_SUMMARY, which only looks at the first line because that
+    is what the commit is *for*; a linked CVE is worth catching wherever the ticket is
+    mentioned, since a fix can reference a second ticket in its description.
+
+    Because the repository squashes, a commit message here already carries the pull request
+    title and description: the merge-queue commit is the squashed headline plus body, and the
+    pull request path asks GitHub for the text the merge would produce. So scanning messages
+    covers the title, the description and the commit messages without any extra API call.
+
+    Two filters keep this from asking Jira about things that are not tickets. Only projects
+    in ALLOWED_JIRA_PROJECTS are considered, so a mention of a BF or a CVE key is ignored,
+    and suffixes must be numeric, which skips the SERVER-XXXX placeholder a pull request may
+    still carry.
+
+    :param commits: Commits already validated by is_valid_commit.
+    :return: Jira key -> where it was referenced, in first-seen order.
+    """
+    found: dict[str, list[str]] = {}
+    for commit in commits:
+        summary, _, description = commit.message.partition("\n")
+        for text, part in ((summary, "summary"), (description, "description")):
+            for match in JIRA_KEY_RE.finditer(text):
+                jira_project = match.group(1).upper()
+                if jira_project not in ALLOWED_JIRA_PROJECTS:
+                    continue
+                origins = found.setdefault(f"{jira_project}-{match.group(2)}", [])
+                origin = f'{part} of "{summary}"'
+                if origin not in origins:
+                    origins.append(origin)
+    return found
+
+
+def format_cve_failure(jira_key: str, origins: list[str], unresolved: list[str]) -> str:
+    """
+    Explain one blocking ticket to the author.
+
+    The scan is wider than the ticket the change is filed under, so the key may be an
+    incidental mention. Each remediation covers one case: the change is the fix and must
+    wait, the reference is unrelated and should go, or the CVE is already out.
+
+    Only Jira keys appear in the output, never summaries or descriptions of the CVE itself.
+
+    :param jira_key: The referenced ticket that blocked the merge.
+    :param origins: Where the ticket was referenced.
+    :param unresolved: Unresolved linked CVE keys.
+    :return: Multi-line message.
+    """
+    cves = ", ".join(unresolved)
+    referenced_in = ", ".join(origins)
+    return f"""{jira_key} is linked to unresolved CVE(s): {cves}
+Referenced in: {referenced_in}
+
+This safeguard is meant to prevent premature disclosure of security issues on the public repo.
+
+ - If this fix is related to the CVE(s), do not merge to master before publication.
+ - If this fix is unrelated to the CVE(s), remove {jira_key} from the {referenced_in}.
+ - If the CVE(s) are published, follow the proper process to resolve {cves} before merging.
+{RETRY_INSTRUCTIONS}"""
 
 
 def get_non_merge_queue_squashed_commits(
@@ -219,12 +291,22 @@ def main(
             help="What is requested this task. Defined https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Project-Configuration-Files#expansions.",
         ),
     ] = "",
+    jira_auth_pat: Annotated[
+        str,
+        typer.Option(
+            envvar="JIRA_AUTH_PAT",
+            help="Jira token for the CI account. The linked-CVE check is skipped without it.",
+        ),
+    ] = "",
 ):
     """
     Validate the commit message.
 
     It validates the latest message when no arguments are provided.
     """
+    # jira_cve_links logs through stdlib logging so it stays dependency-free. Without this
+    # its records would be dropped, since stdlib logging defaults to WARNING.
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
     commits: list[Commit] = []
     if requester == "github_merge_queue":
@@ -243,7 +325,26 @@ def main(
             LOGGER.error("Invalid commit, unable to merge")
             raise typer.Exit(code=STATUS_ERROR)
 
-    return
+    # Only reached once every summary is well formed, so the ticket keys below are known
+    # good. A malformed summary is the author's first problem; no point asking Jira about it.
+    if not jira_auth_pat:
+        LOGGER.warning("JIRA_AUTH_PAT is not set; skipping the linked CVE check")
+        return
+
+    jira_keys = referenced_jira_keys_for_cve_check(commits)
+    if not jira_keys:
+        LOGGER.info("No Jira keys to check for linked CVEs")
+        return
+
+    blocking = unresolved_cves_by_ticket(list(jira_keys), jira_auth_pat)
+    if not blocking:
+        LOGGER.info("No unresolved linked CVEs", checked=list(jira_keys))
+        return
+
+    for jira_key, unresolved in blocking.items():
+        LOGGER.error(format_cve_failure(jira_key, jira_keys[jira_key], unresolved))
+    LOGGER.error("Unresolved linked CVE, unable to merge")
+    raise typer.Exit(code=STATUS_ERROR)
 
 
 app = typer.Typer(pretty_exceptions_show_locals=False)

@@ -71,3 +71,6 @@ filters:
   - "lint_resmoke_suite_tests.py":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "jira_cve_links.py":
+    approvers:
+      - 10gen/server-release
