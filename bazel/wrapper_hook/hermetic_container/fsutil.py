@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import getpass
 import hashlib
+import json
 import os
 import pathlib
 import shutil
@@ -17,6 +18,7 @@ from .constants import (
     HERMETIC_CONTAINER_MACOS_CASE_SENSITIVE_OUTPUT_ENV,
     HERMETIC_CONTAINER_MACOS_OUTPUT_IMAGE_SIZE_ENV,
     HERMETIC_CONTAINER_OUTPUT_ROOT_VERSION,
+    MONGO_BAZEL_SHARED_INSTALL_DIR_ENV,
 )
 from .env import _env_is_false, _info
 
@@ -320,16 +322,79 @@ def _linux_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
     return output_base.with_name(f"{output_base.name}-mongo-shared-install")
 
 
+def _effective_linux_shared_install_dir(
+    output_base: pathlib.Path, env: Mapping[str, str]
+) -> pathlib.Path:
+    """Return the caller's explicit shared install root when set, else the derived sibling.
+
+    MongoInstallRule actions honor MONGO_BAZEL_SHARED_INSTALL_DIR the same way, so publication,
+    container configuration, and cleanup must agree on this one effective path.
+    """
+    override = env.get(MONGO_BAZEL_SHARED_INSTALL_DIR_ENV, "")
+    if override:
+        return pathlib.Path(override)
+    return _linux_shared_install_dir(output_base)
+
+
 def _host_temp_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
-    """Return a host-temp shared install root outside Bazel's output-root hierarchy."""
+    """Return the legacy host-temp root used by macOS and previous Linux defaults."""
     if not output_base.name:
         raise ValueError("Bazel output base cannot be the filesystem root")
     return pathlib.Path(tempfile.gettempdir()) / f"{output_base.name}-mongo-shared-install"
 
 
-def _linux_native_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:
-    """Return the host-temp shared install root for native Linux actions."""
-    return _host_temp_shared_install_dir(output_base)
+def _remove_linux_shared_install_trees(output_base: pathlib.Path) -> None:
+    """Remove the output-base sibling and the legacy host-temp shared install trees."""
+    _remove_path(_linux_shared_install_dir(output_base))
+    _remove_path(_host_temp_shared_install_dir(output_base))
+
+
+_SHARED_INSTALL_RECORD_NAME = "shared-install-dirs.json"
+
+
+def _shared_install_record_path(repo_root: pathlib.Path) -> pathlib.Path:
+    return _hermetic_container_state_dir(repo_root) / _SHARED_INSTALL_RECORD_NAME
+
+
+def _record_shared_install_dir(repo_root: pathlib.Path, shared_install_dir: pathlib.Path) -> None:
+    """Persist the most recent published shared install root for clean-time removal.
+
+    Clean-time removal keys the shared trees off the current invocation's output base, which
+    can drift when the environment changes between build and clean (for example TEST_TMPDIR
+    or --output_user_root). `bazel clean` also removes the last recorded root so a drifted
+    clean still removes the tree the build actually published.
+    """
+    record_path = _shared_install_record_path(repo_root)
+    try:
+        record_path.parent.mkdir(parents=True, exist_ok=True)
+        record_path.write_text(
+            json.dumps({"shared_install_dir": str(shared_install_dir)}), encoding="utf-8"
+        )
+    except OSError:
+        # Recording is best-effort; clean still removes the trees derived from the current
+        # invocation's output base.
+        pass
+
+
+def _recorded_shared_install_dir(repo_root: pathlib.Path) -> pathlib.Path | None:
+    record_path = _shared_install_record_path(repo_root)
+    try:
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(record, dict):
+        return None
+    shared_install_dir = record.get("shared_install_dir")
+    if not isinstance(shared_install_dir, str):
+        return None
+    return pathlib.Path(shared_install_dir)
+
+
+def _clear_recorded_shared_install_dir(repo_root: pathlib.Path) -> None:
+    try:
+        _shared_install_record_path(repo_root).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _macos_shared_install_dir(output_base: pathlib.Path) -> pathlib.Path:

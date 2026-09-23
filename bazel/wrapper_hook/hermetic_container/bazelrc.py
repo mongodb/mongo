@@ -157,10 +157,34 @@ def _config_requested(
     return config_name in _effective_config_values(args, env=env, repo_root=repo_root)
 
 
+def _startup_args(args: Sequence[str]) -> list[str]:
+    """Returns the startup option section of args with @argfile arguments expanded.
+
+    Bazel expands `@<path>` arguments (including in the startup option section), so an
+    argfile can legally carry --output_base or --output_user_root. The wrapper's mirror must
+    see those values to key its state on the same output base Bazel will use. Expansion is
+    not recursive, matching Bazel.
+    """
+    command_index = _bazel_command_index(args)
+    startup_args = list(args) if command_index is None else list(args[:command_index])
+    expanded = []
+    for arg in startup_args:
+        if len(arg) < 2 or not arg.startswith("@"):
+            expanded.append(arg)
+            continue
+        try:
+            contents = pathlib.Path(arg[1:]).read_text(encoding="utf-8")
+        except OSError:
+            # Bazel reports unreadable argfiles itself; keep the literal token.
+            expanded.append(arg)
+            continue
+        expanded.extend(shlex.split(contents))
+    return expanded
+
+
 def _startup_option_values(args: Sequence[str], name: str) -> list[str]:
     """Returns a Bazel startup option's command-line values in precedence order."""
-    command_index = _bazel_command_index(args)
-    startup_args = args if command_index is None else args[:command_index]
+    startup_args = _startup_args(args)
     values = []
     index = 0
     while index < len(startup_args):
@@ -182,8 +206,7 @@ def _startup_option_value(args: Sequence[str], name: str) -> str | None:
 
 def _startup_boolean_option(args: Sequence[str], name: str, default: bool) -> bool:
     """Returns the effective value of a --[no]NAME startup option."""
-    command_index = _bazel_command_index(args)
-    startup_args = args if command_index is None else args[:command_index]
+    startup_args = _startup_args(args)
     enabled = f"--{name}"
     disabled = f"--no{name}"
     value = default
@@ -433,10 +456,17 @@ def _bazel_output_base(
         or _default_bazel_user_output_root(env, system="Linux")
     )
     user_root_path = pathlib.Path(os.path.expanduser(user_root))
+    # Bazel uses MD5 for this non-security output-base identifier, keyed on the resolved
+    # (realpath) workspace path. Keep this in sync with Bazel so the wrapper and Bazel resolve
+    # the same output tree, including for symlinked workspaces where a stale directory keyed
+    # by the unresolved path may also exist. Prefer the resolved key when both exist, and fall
+    # back to the unresolved key only so state published by older wrappers stays discoverable.
+    try:
+        resolved_workspace = str(repo_root.resolve())
+    except OSError:
+        resolved_workspace = str(repo_root)
     candidates = []
-    for workspace in [str(repo_root), str(repo_root.resolve())]:
-        # Bazel uses MD5 for this non-security output-base identifier. Keep this in sync with
-        # Bazel so the wrapper and Bazel resolve the same output tree.
+    for workspace in (resolved_workspace, str(repo_root)):
         workspace_digest = hashlib.md5(  # nosemgrep: insecure-hash-algorithm-md5
             workspace.encode(), usedforsecurity=False
         ).hexdigest()

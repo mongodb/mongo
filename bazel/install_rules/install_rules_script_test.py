@@ -142,16 +142,41 @@ class InstallRulesScriptTest(unittest.TestCase):
                     [str(script), "--depfile", str(depfile), "--install-dir", str(install_dir)],
                 ),
                 mock.patch.object(sys, "platform", "linux"),
-                mock.patch.object(tempfile, "gettempdir", return_value=str(root / "system-temp")),
                 mock.patch.dict(os.environ, {"MONGO_BAZEL_SHARED_INSTALL_DIR": ""}),
             ):
                 namespace = runpy.run_path(str(script), run_name="__main__")
 
-            expected = root / "system-temp" / "output-base-mongo-shared-install" / "k8-fastbuild"
+            expected = root / "output-base-mongo-shared-install" / "k8-fastbuild"
             self.assertEqual(str(expected), namespace["install_link"])
             convenience_link = install_dir.parent / "install"
             self.assertTrue(convenience_link.is_symlink())
             self.assertEqual(expected, convenience_link.resolve())
+
+    def test_linux_root_output_base_degrades_to_host_temp(self) -> None:
+        with _temporary_directory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            depfile = root / "install-deps.json"
+            depfile.write_text(
+                json.dumps({"bins": [], "libs": [], "roots": {}, "includes": {}}),
+                encoding="utf-8",
+            )
+            install_dir = root / "install-dist-test"
+            script = pathlib.Path(__file__).with_name("install_rules.py")
+
+            with mock.patch.object(
+                sys,
+                "argv",
+                [str(script), "--depfile", str(depfile), "--install-dir", str(install_dir)],
+            ):
+                namespace = runpy.run_path(str(script), run_name="__main__")
+
+            with mock.patch.object(tempfile, "gettempdir", return_value=str(root / "system-temp")):
+                # An output base that normalizes to the filesystem root is exotic; degrade to
+                # the legacy host-temp layout instead of failing every install action.
+                self.assertEqual(
+                    str(root / "system-temp" / "-mongo-shared-install"),
+                    namespace["_linux_native_shared_install_root"]("/"),
+                )
 
     def test_stable_output_symlink_is_hardlinked(self) -> None:
         if os.name == "nt":
@@ -304,6 +329,39 @@ class InstallRulesScriptTest(unittest.TestCase):
                     install_dir.parent / "install" / "lib" / "source" / "tool",
                 )
             )
+
+    def test_shared_install_copy_escape_hatch_publishes_copies(self) -> None:
+        with _temporary_directory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            source = root / "source" / "test-tool"
+            source.parent.mkdir()
+            source.write_text("test binary\n", encoding="utf-8")
+            source.chmod(0o755)
+
+            depfile = root / "install-deps.json"
+            depfile.write_text(
+                json.dumps({"bins": [str(source)], "libs": [], "roots": {}, "includes": {}}),
+                encoding="utf-8",
+            )
+            install_dir = root / "install-dist-test"
+            script = pathlib.Path(__file__).with_name("install_rules.py")
+
+            with (
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    [str(script), "--depfile", str(depfile), "--install-dir", str(install_dir)],
+                ),
+                mock.patch.dict(os.environ, {"MONGO_BAZEL_SHARED_INSTALL_COPY": "1"}),
+            ):
+                runpy.run_path(str(script), run_name="__main__")
+
+            # The escape hatch publishes copies so installed files share no inode with the
+            # Bazel source artifact.
+            installed_file = install_dir / "bin" / source.name
+            self.assertEqual("test binary\n", installed_file.read_text(encoding="utf-8"))
+            self.assertFalse(os.path.samefile(source, installed_file))
+            self.assertEqual(1, os.stat(source).st_nlink)
 
     def test_directory_install_handles_long_destination_paths(self) -> None:
         with _temporary_directory() as temp_dir:
@@ -930,6 +988,126 @@ class InstallRulesScriptTest(unittest.TestCase):
                 runpy.run_path(str(script), run_name="__main__")
 
             self.assertEqual("test binary\n", shared_destination.read_text(encoding="utf-8"))
+
+    def test_shared_install_recreates_externally_deleted_tree(self) -> None:
+        with _temporary_directory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            source = root / "source" / "test-tool"
+            source.parent.mkdir()
+            source.write_text("test binary\n", encoding="utf-8")
+            source.chmod(0o755)
+
+            depfile = root / "install-deps.json"
+            depfile.write_text(
+                json.dumps({"bins": [str(source)], "libs": [], "roots": {}, "includes": {}}),
+                encoding="utf-8",
+            )
+            install_dir = (
+                root
+                / "sandbox"
+                / "execroot"
+                / "_main"
+                / "bazel-out"
+                / "k8-fastbuild"
+                / "bin"
+                / "install-dist-test"
+            )
+            shared_install_root = root / "shared-install"
+            shared_destination = shared_install_root / "k8-fastbuild" / "bin" / source.name
+            script = pathlib.Path(__file__).with_name("install_rules.py")
+
+            with (
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        str(script),
+                        "--depfile",
+                        str(depfile),
+                        "--install-dir",
+                        str(install_dir),
+                    ],
+                ),
+                mock.patch.dict(
+                    os.environ,
+                    {"MONGO_BAZEL_SHARED_INSTALL_DIR": str(shared_install_root)},
+                ),
+            ):
+                namespace = runpy.run_path(str(script), run_name="__main__")
+
+            # Cache hygiene can remove the shared install tree mid-build; the next
+            # publication must repair the tree instead of failing with ENOENT.
+            shutil.rmtree(shared_install_root)
+            namespace["install"](str(source), "bin")
+
+            self.assertEqual("test binary\n", shared_destination.read_text(encoding="utf-8"))
+
+    def test_shared_install_recreates_tree_with_protected_parent(self) -> None:
+        if os.name == "nt":
+            self.skipTest("POSIX directory permissions are required for this regression test")
+
+        with _temporary_directory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            source = root / "source" / "test-tool"
+            source.parent.mkdir()
+            source.write_text("test binary\n", encoding="utf-8")
+            source.chmod(0o755)
+
+            depfile = root / "install-deps.json"
+            depfile.write_text(
+                json.dumps({"bins": [str(source)], "libs": [], "roots": {}, "includes": {}}),
+                encoding="utf-8",
+            )
+            install_dir = (
+                root
+                / "sandbox"
+                / "execroot"
+                / "_main"
+                / "bazel-out"
+                / "k8-fastbuild"
+                / "bin"
+                / "install-dist-test"
+            )
+            shared_install_root = root / "sandbox-mongo-shared-install"
+            shared_install_root.mkdir(parents=True)
+            shared_install_root.chmod(0o555)
+            script = pathlib.Path(__file__).with_name("install_rules.py")
+
+            try:
+                with (
+                    mock.patch.object(
+                        sys,
+                        "argv",
+                        [
+                            str(script),
+                            "--depfile",
+                            str(depfile),
+                            "--install-dir",
+                            str(install_dir),
+                        ],
+                    ),
+                    mock.patch.dict(
+                        os.environ,
+                        {
+                            "MONGO_BAZEL_SHARED_INSTALL_DIR": str(
+                                root / "sandbox-mongo-shared-install"
+                            )
+                        },
+                    ),
+                ):
+                    runpy.run_path(str(script), run_name="__main__")
+            finally:
+                # Restore permissions so TemporaryDirectory can remove the simulated shared tree.
+                shared_install_root.chmod(0o755)
+
+            # Local action runners can protect the output-root hierarchy; creating the shared
+            # tree recovers the same way the rename stage does.
+            self.assertEqual(
+                "test binary\n",
+                (shared_install_root / "k8-fastbuild" / "bin" / source.name).read_text(
+                    encoding="utf-8"
+                ),
+            )
 
     def test_shared_install_stages_directory_outside_publication_lock(self) -> None:
         with _temporary_directory() as temp_dir:

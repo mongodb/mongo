@@ -42,6 +42,9 @@ CONTAINER_CGROUP_RE = re.compile(r"docker|kubepods|containerd|libpod|lxc", re.IG
 KUBERNETES_SERVICE_HOST_ENV = "KUBERNETES_SERVICE_HOST"
 
 
+MONGO_BAZEL_SHARED_INSTALL_DIR_ENV = "MONGO_BAZEL_SHARED_INSTALL_DIR"
+
+
 DEFAULT_HOST_CA_BUNDLE = pathlib.Path("/etc/ssl/certs/ca-certificates.crt")
 
 

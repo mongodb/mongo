@@ -1604,12 +1604,20 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "gettempdir",
                 return_value=str(pathlib.Path(temp_dir) / "system-temp"),
             ):
-                native_shared_install_dir = (
-                    hermetic_container_integration._linux_native_shared_install_dir(output_base)
+                legacy_shared_install_dir = (
+                    hermetic_container_integration._host_temp_shared_install_dir(output_base)
                 )
-            native_shared_install_dir.mkdir(parents=True)
-            native_stale_file = native_shared_install_dir / "stale-binary"
-            native_stale_file.write_text("stale", encoding="utf-8")
+            legacy_shared_install_dir.mkdir(parents=True)
+            legacy_stale_file = legacy_shared_install_dir / "stale-binary"
+            legacy_stale_file.write_text("stale", encoding="utf-8")
+            # A shared install root recorded by a build whose output-base key drifted (for
+            # example TEST_TMPDIR changed between the build and the clean) is removed too.
+            recorded_shared_install_dir = (
+                pathlib.Path(temp_dir) / "drifted-output-base-mongo-shared-install"
+            )
+            recorded_shared_install_dir.mkdir()
+            recorded_stale_file = recorded_shared_install_dir / "stale-binary"
+            recorded_stale_file.write_text("stale", encoding="utf-8")
 
             with (
                 mock.patch.object(
@@ -1623,7 +1631,15 @@ class LinuxHostContainerTest(unittest.TestCase):
                     "gettempdir",
                     return_value=str(pathlib.Path(temp_dir) / "system-temp"),
                 ),
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_shared_install_record_path",
+                    return_value=pathlib.Path(temp_dir) / "shared-install-record.json",
+                ),
             ):
+                hermetic_container_integration._record_shared_install_dir(
+                    pathlib.Path(temp_dir) / "repo", recorded_shared_install_dir
+                )
                 rc = hermetic_container_integration.run_hermetic_container(
                     "/usr/bin/bazel",
                     [f"--output_base={output_base}", "clean"],
@@ -1635,30 +1651,122 @@ class LinuxHostContainerTest(unittest.TestCase):
                 "/usr/bin/bazel", [f"--output_base={output_base}", "clean"]
             )
             self.assertFalse(shared_install_dir.exists())
-            self.assertFalse(native_shared_install_dir.exists())
+            self.assertFalse(legacy_shared_install_dir.exists())
+            self.assertFalse(recorded_shared_install_dir.exists())
 
-    def test_linux_direct_build_keeps_install_actions_out_of_sandboxes(self):
+    def test_linux_clean_keeps_shared_install_tree_for_combined_build(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_base = pathlib.Path(temp_dir) / "output-base"
+            shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
+                output_base
+            )
+            shared_install_dir.mkdir()
+
+            with (
+                mock.patch.object(
+                    hermetic_container_integration.platform, "system", return_value="Linux"
+                ),
+                mock.patch.object(
+                    hermetic_container_integration, "_run_direct", return_value=0
+                ) as run_direct,
+            ):
+                rc = hermetic_container_integration.run_hermetic_container(
+                    "/usr/bin/bazel",
+                    [f"--output_base={output_base}", "clean", "build", "//..."],
+                    env={},
+                )
+
+            self.assertEqual(rc, 0)
+            run_direct.assert_called_once_with(
+                "/usr/bin/bazel",
+                [f"--output_base={output_base}", "clean", "build", "//..."],
+            )
+            # The build half of the combined invocation repopulates the shared install
+            # trees, so the clean-time removal must leave them in place.
+            self.assertTrue(shared_install_dir.exists())
+
+    def test_linux_direct_publish_honors_shared_install_override(self):
         with (
             mock.patch.object(
                 hermetic_container_integration.platform, "system", return_value="Linux"
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(hermetic_container_integration, "_run_direct", return_value=0),
             mock.patch.object(
                 hermetic_container_integration, "_publish_linux_shared_install_symlink"
             ) as publish_shared_install,
-            mock.patch.object(
-                hermetic_container_integration.tempfile,
-                "gettempdir",
-                return_value="/tmp/host-temp",
-            ),
         ):
             rc = hermetic_container_integration.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["--output_base=/tmp/output", "build", "install-dist-test"],
-                env={"MONGO_LINUX_CONTAINER_ACTIONS": "0"},
+                env={
+                    "MONGO_LINUX_CONTAINER_ACTIONS": "0",
+                    "MONGO_BAZEL_SHARED_INSTALL_DIR": "/custom/shared-install",
+                },
             )
+
+        self.assertEqual(rc, 0)
+        # Publication uses the caller's explicit root, matching the install script.
+        publish_shared_install.assert_called_once_with(
+            {"shared_install_dir": "/custom/shared-install"}
+        )
+
+    def test_recorded_shared_install_dir_skips_caller_overrides(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            record_path = pathlib.Path(temp_dir) / "record.json"
+            derived = pathlib.Path("/tmp/output-mongo-shared-install")
+            with mock.patch.object(
+                hermetic_container_integration,
+                "_shared_install_record_path",
+                return_value=record_path,
+            ):
+                # A caller-owned override is never recorded, so cleanup cannot delete it.
+                hermetic_container_integration._record_published_shared_install_dir(
+                    ["--output_base=/tmp/output", "build"],
+                    {"MONGO_BAZEL_SHARED_INSTALL_DIR": str(derived.parent / "custom")},
+                    derived.parent / "custom",
+                )
+                self.assertIsNone(
+                    hermetic_container_integration._recorded_shared_install_dir(
+                        pathlib.Path(temp_dir)
+                    )
+                )
+
+                # The derived sibling is recorded so a drifted clean can still remove it.
+                hermetic_container_integration._record_published_shared_install_dir(
+                    ["--output_base=/tmp/output", "build"],
+                    {},
+                    derived,
+                )
+                self.assertEqual(
+                    derived,
+                    hermetic_container_integration._recorded_shared_install_dir(
+                        pathlib.Path(temp_dir)
+                    ),
+                )
+
+    def test_linux_direct_build_keeps_install_actions_out_of_sandboxes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.object(
+                    hermetic_container_integration.platform, "system", return_value="Linux"
+                ),
+                mock.patch.object(
+                    hermetic_container_integration, "_run_direct", return_value=0
+                ) as run_direct,
+                mock.patch.object(
+                    hermetic_container_integration, "_publish_linux_shared_install_symlink"
+                ) as publish_shared_install,
+                mock.patch.object(
+                    hermetic_container_integration,
+                    "_shared_install_record_path",
+                    return_value=pathlib.Path(temp_dir) / "shared-install-record.json",
+                ),
+            ):
+                rc = hermetic_container_integration.run_hermetic_container(
+                    "/usr/bin/bazel",
+                    ["--output_base=/tmp/output", "build", "install-dist-test"],
+                    env={"MONGO_LINUX_CONTAINER_ACTIONS": "0"},
+                )
 
         self.assertEqual(rc, 0)
         run_direct.assert_called_once_with(
@@ -1671,7 +1779,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             ],
         )
         publish_shared_install.assert_called_once_with(
-            {"shared_install_dir": "/tmp/host-temp/output-mongo-shared-install"}
+            {"shared_install_dir": "/tmp/output-mongo-shared-install"}
         )
 
     def test_reports_background_container_image_digest(self):
@@ -2060,24 +2168,6 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
         )
         self.assertNotIn(output_base, shared_install_dir.parents)
 
-    def test_linux_native_shared_install_dir_is_outside_output_tree(self):
-        output_base = pathlib.Path("/cache/output-base")
-
-        with mock.patch.object(
-            hermetic_container_integration.tempfile,
-            "gettempdir",
-            return_value="/tmp/host-temp",
-        ):
-            shared_install_dir = hermetic_container_integration._linux_native_shared_install_dir(
-                output_base
-            )
-
-        self.assertEqual(
-            pathlib.Path("/tmp/host-temp/output-base-mongo-shared-install"),
-            shared_install_dir,
-        )
-        self.assertNotIn(output_base, shared_install_dir.parents)
-
     def test_macos_shared_install_symlink_matches_install_script_fallback(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)
@@ -2149,7 +2239,8 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             (repo_root / "bazel-out").symlink_to(bazel_out)
             user_root = temp / "user_root"
             expected = (
-                user_root / hashlib.md5(str(repo_root).encode(), usedforsecurity=False).hexdigest()
+                user_root
+                / hashlib.md5(str(repo_root.resolve()).encode(), usedforsecurity=False).hexdigest()
             )
 
             self.assertEqual(
@@ -2172,7 +2263,10 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root = temp / "repo"
             repo_root.mkdir()
             test_tmpdir = temp / "bazel-test"
-            digest = hashlib.md5(str(repo_root).encode(), usedforsecurity=False).hexdigest()
+            # Bazel keys the output base on the resolved workspace path.
+            digest = hashlib.md5(
+                str(repo_root.resolve()).encode(), usedforsecurity=False
+            ).hexdigest()
 
             self.assertEqual(
                 hermetic_container_integration._bazel_output_base(
@@ -2181,6 +2275,61 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
                     repo_root=repo_root,
                 ),
                 test_tmpdir / f"_bazel_{hermetic_container_integration._current_user()}" / digest,
+            )
+
+    def test_symlinked_workspace_prefers_resolved_output_base(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = pathlib.Path(temp_dir)
+            real_repo_root = temp / "real-repo"
+            real_repo_root.mkdir()
+            symlinked_repo_root = temp / "symlink-repo"
+            symlinked_repo_root.symlink_to(real_repo_root)
+            user_root = temp / "user_root"
+            # Bazel keyed the real output base on the resolved workspace path.
+            resolved_base = (
+                user_root
+                / hashlib.md5(
+                    str(real_repo_root.resolve()).encode(), usedforsecurity=False
+                ).hexdigest()
+            )
+            resolved_base.mkdir(parents=True)
+            # An older wrapper also left state keyed by the unresolved workspace path.
+            stale_base = (
+                user_root
+                / hashlib.md5(str(symlinked_repo_root).encode(), usedforsecurity=False).hexdigest()
+            )
+            stale_base.mkdir(parents=True)
+
+            self.assertEqual(
+                hermetic_container_integration._bazel_output_base(
+                    [
+                        "--nosystem_rc",
+                        "--nohome_rc",
+                        "--noworkspace_rc",
+                        f"--output_user_root={user_root}",
+                        "build",
+                    ],
+                    env={},
+                    repo_root=symlinked_repo_root,
+                ),
+                resolved_base,
+            )
+
+    def test_argfile_startup_options_are_expanded(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            argfile = pathlib.Path(temp_dir) / "startup.opts"
+            argfile.write_text(
+                "--nosystem_rc\n--nohome_rc\n--output_base=/argfile/output/base\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                hermetic_container_integration._bazel_output_base(
+                    [f"@{argfile}", "build", "+t"],
+                    env={},
+                    repo_root=pathlib.Path(temp_dir) / "repo",
+                ),
+                pathlib.Path("/argfile/output/base"),
             )
 
     def test_bazelrc_startup_output_user_root(self):
@@ -2252,7 +2401,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
                         {}, system="Linux"
                     )
                 )
-                / hashlib.md5(str(repo_root).encode(), usedforsecurity=False).hexdigest(),
+                / hashlib.md5(str(repo_root.resolve()).encode(), usedforsecurity=False).hexdigest(),
             )
 
             self.assertEqual(
@@ -2313,7 +2462,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             )
             self.assertEqual(
                 on_disk["shared_install_dir"],
-                str(temp / "system-temp" / "output_base-mongo-shared-install"),
+                str(temp / "output_base-mongo-shared-install"),
             )
             self.assertEqual(on_disk["output_base"], str(output_base))
             self.assertRegex(
@@ -2346,7 +2495,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             self.assertNotEqual(temporary_path, destination)
             self.assertFalse(pathlib.Path(temporary_path).exists())
 
-    def test_new_output_base_generation_clears_stale_shared_install_files(self):
+    def test_new_output_base_generation_migrates_legacy_shared_install_files(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = pathlib.Path(temp_dir)
             repo_root = temp / "repo"
@@ -2357,16 +2506,16 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
                 "gettempdir",
                 return_value=str(temp / "system-temp"),
             ):
-                shared_install_dir = (
-                    hermetic_container_integration._linux_native_shared_install_dir(output_base)
+                shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
+                    output_base
                 )
                 shared_install_dir.mkdir(parents=True)
                 stale_file = shared_install_dir / "stale-binary"
                 stale_file.write_text("stale", encoding="utf-8")
                 legacy_shared_install_dir = (
-                    hermetic_container_integration._linux_shared_install_dir(output_base)
+                    hermetic_container_integration._host_temp_shared_install_dir(output_base)
                 )
-                legacy_shared_install_dir.mkdir()
+                legacy_shared_install_dir.mkdir(parents=True)
                 legacy_stale_file = legacy_shared_install_dir / "legacy-stale-binary"
                 legacy_stale_file.write_text("stale", encoding="utf-8")
 
@@ -2377,9 +2526,67 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
                     machine="x86_64",
                 )
 
+            # The sibling tree is live across generations: native fallbacks and container
+            # actions publish into it concurrently, so generation rollover must not delete it.
             self.assertTrue(shared_install_dir.is_dir())
-            self.assertFalse(stale_file.exists())
+            self.assertTrue(stale_file.exists())
             self.assertFalse(legacy_shared_install_dir.exists())
+
+    def test_workspace_nested_output_base_uses_host_temp_shared_install(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = pathlib.Path(temp_dir)
+            repo_root = temp / "repo"
+            repo_root.mkdir()
+            output_base = repo_root / "output-base"
+            with mock.patch.object(
+                hermetic_container_integration.tempfile,
+                "gettempdir",
+                return_value=str(temp / "system-temp"),
+            ):
+                _, config = hermetic_container_integration._write_linux_container_actions_config(
+                    [f"--output_base={output_base}", "build"],
+                    env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
+                    repo_root=repo_root,
+                    machine="x86_64",
+                )
+
+            # A writable shared-install bind inside the workspace would nest inside the
+            # read-only repository bind, so the config falls back to host temp.
+            expected = pathlib.Path(temp_dir) / "system-temp" / "output-base-mongo-shared-install"
+            self.assertEqual(str(expected), config["shared_install_dir"])
+
+    def test_linux_container_config_honors_shared_install_override(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = pathlib.Path(temp_dir)
+            repo_root = temp / "repo"
+            repo_root.mkdir()
+            output_base = temp / "output_base"
+
+            _, config = hermetic_container_integration._write_linux_container_actions_config(
+                [f"--output_base={output_base}", "build"],
+                env={
+                    "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
+                    "MONGO_BAZEL_SHARED_INSTALL_DIR": str(temp / "custom-shared-install"),
+                },
+                repo_root=repo_root,
+                machine="x86_64",
+            )
+            self.assertEqual(str(temp / "custom-shared-install"), config["shared_install_dir"])
+
+            # A caller-owned override is honored even when it nests inside the workspace; the
+            # layout consequences belong to the caller who chose the path.
+            _, nested_config = hermetic_container_integration._write_linux_container_actions_config(
+                [f"--output_base={repo_root / 'output-base'}", "build"],
+                env={
+                    "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
+                    "MONGO_BAZEL_SHARED_INSTALL_DIR": str(repo_root / "custom-shared-install"),
+                },
+                repo_root=repo_root,
+                machine="x86_64",
+            )
+            self.assertEqual(
+                str(repo_root / "custom-shared-install"), nested_config["shared_install_dir"]
+            )
 
     def test_output_base_generation_changes_only_when_output_base_is_replaced(self):
         with tempfile.TemporaryDirectory() as temp_dir:

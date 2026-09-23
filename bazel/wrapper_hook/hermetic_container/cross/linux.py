@@ -46,11 +46,14 @@ from ..env import (
     _env_is_false,
     _env_is_true,
     _info,
+    _warning,
 )
 from ..fsutil import (
     _container_user,
+    _effective_linux_shared_install_dir,
+    _host_temp_shared_install_dir,
+    _is_relative_to,
     _linux_action_sandbox_base,
-    _linux_native_shared_install_dir,
     _linux_shared_install_dir,
     _run_container_network_command,
     _sha256_file,
@@ -950,11 +953,22 @@ def _write_linux_container_actions_config_unlocked(
     output_base = _bazel_output_base(args, env, repo_root=repo_root)
     config["sandbox_base"] = str(_linux_action_sandbox_base(output_base))
     # Native MongoInstallRule actions publish outside their declared outputs. Use the same
-    # host-temp tree for native actions and for containerized local actions so that the convenience
-    # symlink always points at the artifacts that the build actually installed. The tree is mounted
-    # explicitly into the container below; the wrapper chooses the action strategy at invocation
-    # time.
-    shared_install_dir = _linux_native_shared_install_dir(output_base)
+    # output-base-sibling tree for native actions and for containerized local actions so that the
+    # convenience symlink always points at the artifacts that the build actually installed. The
+    # tree is mounted explicitly into the container below; the wrapper chooses the action strategy
+    # at invocation time.
+    shared_install_dir = _effective_linux_shared_install_dir(output_base, env)
+    if shared_install_dir == _linux_shared_install_dir(output_base) and _is_relative_to(
+        shared_install_dir, repo_root
+    ):
+        # An explicit --output_base inside the workspace nests the writable shared-install bind
+        # inside the read-only repository bind below, which rootless runtimes reject and which
+        # otherwise hides the tree from the container. Keep the tree in host temp for that
+        # layout, as this wrapper did before the sibling layout existed. Native fallback actions
+        # still publish into the sibling for it, and the post-build publication here re-points
+        # bazel-bin/install at this tree.
+        _warning("output base is inside the workspace; using host temp for the shared install tree")
+        shared_install_dir = _host_temp_shared_install_dir(output_base)
     config["shared_install_dir"] = str(shared_install_dir)
     # Keep the output base in the trusted descriptor so post-build publication can recover the
     # action-private install tree even when Bazel could not create its workspace convenience
@@ -982,14 +996,15 @@ def _write_linux_container_actions_config_unlocked(
     if not re.fullmatch(r"[0-9a-f]{32}", generation):
         raise RuntimeError(f"Invalid Linux action container generation: {generation_path}")
     if new_generation:
-        for stale_shared_install_dir in (
-            shared_install_dir,
-            _linux_shared_install_dir(output_base),
-        ):
-            if stale_shared_install_dir.is_dir() and not stale_shared_install_dir.is_symlink():
-                shutil.rmtree(stale_shared_install_dir)
-            elif stale_shared_install_dir.exists() or stale_shared_install_dir.is_symlink():
-                stale_shared_install_dir.unlink()
+        # The output-base sibling is live across generations: native fallbacks and container
+        # actions publish into it concurrently, synchronized only by its own per-configuration
+        # lock, so removing it here would delete an in-flight publication. Only migrate the
+        # legacy host-temp tree, which nothing publishes into anymore.
+        stale_shared_install_dir = _host_temp_shared_install_dir(output_base)
+        if stale_shared_install_dir.is_dir() and not stale_shared_install_dir.is_symlink():
+            shutil.rmtree(stale_shared_install_dir)
+        elif stale_shared_install_dir.exists() or stale_shared_install_dir.is_symlink():
+            stale_shared_install_dir.unlink()
     shared_install_dir.mkdir(parents=True, exist_ok=True)
     config["output_base_generation"] = generation
     prefix = config.get("container_prefix", "mongo_linux_action")

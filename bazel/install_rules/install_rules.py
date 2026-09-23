@@ -2,8 +2,8 @@ import argparse
 import contextlib
 import json
 import os
-import signal
 import shutil
+import signal
 import stat
 import sys
 import tempfile
@@ -133,9 +133,17 @@ def _darwin_shared_install_root(output_base: str) -> str:
 
 
 def _linux_native_shared_install_root(output_base: str) -> str:
-    """Return the host-temp shared install root used by native Linux actions."""
-    output_base_name = os.path.basename(os.path.normpath(output_base))
-    return os.path.join(tempfile.gettempdir(), f"{output_base_name}-mongo-shared-install")
+    """Return the output-base-sibling shared install root used by native Linux actions."""
+    normalized_output_base = os.path.normpath(output_base)
+    output_base_name = os.path.basename(normalized_output_base)
+    if not output_base_name:
+        # Exotic execution environments can normalize the output base to the filesystem root.
+        # Degrade to the legacy host-temp layout instead of failing every install action in
+        # the build.
+        return os.path.join(tempfile.gettempdir(), "-mongo-shared-install")
+    return os.path.join(
+        os.path.dirname(normalized_output_base), f"{output_base_name}-mongo-shared-install"
+    )
 
 
 action_output_base = _output_base(args.install_dir)
@@ -198,9 +206,12 @@ elif sys.platform == "darwin" and action_output_base is not None and bazel_outpu
     external_shared_install = True
 elif sys.platform == "linux" and action_output_base is not None and bazel_output_base is not None:
     # Linux install actions run locally even when the rest of the build uses remote execution.
-    # The output root can be protected after another local action completes. Keep the implicit
-    # native fallback in the host temp directory; Linux container actions receive an explicit
-    # output-base-sibling root through MONGO_BAZEL_SHARED_INSTALL_DIR instead.
+    # Keep the implicit native fallback beside Bazel's output base so publication can hardlink
+    # into the same filesystem; Linux container actions receive the same output-base-sibling
+    # root through MONGO_BAZEL_SHARED_INSTALL_DIR. The sibling lives inside the output-root
+    # hierarchy, which local action runners can protect after another action completes (the
+    # hazard the Darwin branch escapes by always using host temp), so the creation below
+    # restores write access the same way the rename stage does.
     shared_install_root = _linux_native_shared_install_root(bazel_output_base)
     install_link = os.path.abspath(
         os.path.join(shared_install_root, _configuration_name(args.install_dir))
@@ -210,10 +221,40 @@ else:
     # Keep the legacy path for non-Bazel invocations, where there is no output base from which to
     # derive the shared tree.
     install_link = os.path.abspath(os.path.join(args.install_dir, os.pardir, "install"))
-os.makedirs(install_link, exist_ok=True)
+
+
+def _ensure_shared_install_dir(path: str) -> None:
+    """Create path, restoring write access when the host protects the parent directory.
+
+    Local action runners can protect the Bazel output-root hierarchy after another local
+    action completes. The shared install tree lives inside that hierarchy, so creation and
+    the rename stage below recover the same way.
+    """
+    try:
+        os.makedirs(path, exist_ok=True)
+    except PermissionError:
+        _make_directory_writable(os.path.dirname(path))
+        os.makedirs(path, exist_ok=True)
+
+
+def _ensure_shared_install_tree() -> None:
+    """Recreate the shared install tree and staging directory after external deletion."""
+    _ensure_shared_install_dir(install_link)
+    _ensure_shared_install_dir(shared_install_staging)
+
+
+_ensure_shared_install_dir(install_link)
 shared_install_lock = install_link + ".lock"
 shared_install_staging = install_link + ".staging"
-os.makedirs(shared_install_staging, exist_ok=True)
+_ensure_shared_install_dir(shared_install_staging)
+
+# The installed tree is published through hardlinks into Bazel's output tree, so consumers
+# must treat it as read-only. MONGO_BAZEL_SHARED_INSTALL_COPY=1 opts out into copies.
+_shared_install_copy_requested = os.environ.get("MONGO_BAZEL_SHARED_INSTALL_COPY", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 @contextlib.contextmanager
@@ -293,7 +334,13 @@ def _copy_file_atomically(src: str, dst: str) -> None:
 
 
 def _link_or_copy_file(src: str, dst: str) -> None:
-    """Hardlink stable inputs when possible, copying cross-device or unsafe inputs."""
+    """Hardlink stable inputs when possible, copying cross-device or unsafe inputs.
+
+    Hardlinked install outputs share inodes with their Bazel source artifacts, so consumers
+    must treat the installed tree as read-only. Set MONGO_BAZEL_SHARED_INSTALL_COPY=1 (for
+    example with --action_env) to publish copies instead, for packaging pipelines that
+    rewrite installed files in place.
+    """
     source_stat = os.stat(src)
     # Clearing the Windows read-only bit on one hardlink changes it for every link, including
     # the Bazel source. Copy read-only Windows inputs so later cleanup cannot mutate the source.
@@ -301,7 +348,11 @@ def _link_or_copy_file(src: str, dst: str) -> None:
     source_is_symlink = os.path.islink(src)
     stable_symlink_target = _stable_output_symlink_target(src)
 
-    if (
+    if _shared_install_copy_requested:
+        # The escape hatch publishes copies so installed files neither share inodes with nor
+        # resolve into Bazel's output tree.
+        pass
+    elif (
         not source_is_symlink and stat.S_ISREG(source_stat.st_mode) and not windows_readonly
     ) or stable_symlink_target is not None:
         try:
@@ -433,7 +484,14 @@ def _install_shared_destination(src: str, dst: str) -> None:
 
     # Keep the workspace beside install_link. This guarantees same-filesystem renames without
     # exposing an active or stale stage through bazel-bin/install.
-    workspace = tempfile.mkdtemp(prefix=".stage-", dir=shared_install_staging)
+    try:
+        workspace = tempfile.mkdtemp(prefix=".stage-", dir=shared_install_staging)
+    except FileNotFoundError:
+        # Cache hygiene can remove the shared install tree mid-build (it lives inside Bazel's
+        # user cache on Linux). Recreate it so this publication repairs the tree instead of
+        # failing with ENOENT.
+        _ensure_shared_install_tree()
+        workspace = tempfile.mkdtemp(prefix=".stage-", dir=shared_install_staging)
     staged_destination = os.path.join(workspace, "new")
     previous_destination = os.path.join(workspace, "old")
     preserve_workspace = False

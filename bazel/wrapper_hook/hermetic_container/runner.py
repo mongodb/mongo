@@ -124,11 +124,15 @@ from .env import (
     _warn_native_fallback,
 )
 from .fsutil import (
+    _clear_recorded_shared_install_dir,
+    _effective_linux_shared_install_dir,
     _hermetic_container_lock,
     _hermetic_container_state_dir,
-    _linux_native_shared_install_dir,
     _linux_shared_install_dir,
     _macos_shared_install_dir,
+    _record_shared_install_dir,
+    _recorded_shared_install_dir,
+    _remove_linux_shared_install_trees,
     _remove_path,
 )
 from .symlinks import (
@@ -420,14 +424,48 @@ def _run_linux_native_fallback(bazel_real: str, args: Sequence[str], env: Mappin
     )
     rc = _run_direct(bazel_real, native_args)
     if _bazel_command(args) in {"build", "coverage", "run", "test"}:
-        _publish_linux_shared_install_symlink(
-            {
-                "shared_install_dir": str(
-                    _linux_native_shared_install_dir(_bazel_output_base(args, env))
-                )
-            }
-        )
+        _publish_linux_shared_install_symlink(_linux_shared_install_publish_config(args, env))
     return rc
+
+
+def _build_command_requested(args: Sequence[str]) -> bool:
+    """Return True when the invocation runs a command that publishes install outputs.
+
+    Bazel accepts multiple commands in one invocation, for example `bazel clean build //...`.
+    The build half repopulates the shared install trees after the clean half, so clean-time
+    removal must not run for such invocations.
+    """
+    command_index = _bazel_command_index(args)
+    if command_index is None:
+        return False
+    return any(arg in {"build", "coverage", "run", "test"} for arg in args[command_index + 1 :])
+
+
+def _record_published_shared_install_dir(
+    args: Sequence[str],
+    env: Mapping[str, str],
+    shared_install_dir: str | pathlib.Path,
+) -> None:
+    """Record a derived published root for clean-time removal.
+
+    The removal keys the shared trees off the current invocation's output base, which can
+    drift when the environment changes between build and clean (for example TEST_TMPDIR).
+    Caller-owned MONGO_BAZEL_SHARED_INSTALL_DIR overrides are not recorded, so cleanup never
+    deletes paths the caller owns.
+    """
+    derived = _linux_shared_install_dir(_bazel_output_base(args, env))
+    if pathlib.Path(shared_install_dir) != derived:
+        return
+    _record_shared_install_dir(REPO_ROOT, derived)
+
+
+def _linux_shared_install_publish_config(
+    args: Sequence[str], env: Mapping[str, str]
+) -> dict[str, str]:
+    """Return the publication config for the shared install tree, recording derived roots."""
+    shared_install_dir = _effective_linux_shared_install_dir(_bazel_output_base(args, env), env)
+    _record_published_shared_install_dir(args, env, shared_install_dir)
+    return {"shared_install_dir": str(shared_install_dir)}
 
 
 def run_hermetic_container(
@@ -441,16 +479,17 @@ def run_hermetic_container(
         if system == "Darwin" and _bazel_command(args) in {"build", "coverage", "run", "test"}:
             _publish_macos_shared_install_symlink(args, env)
         if system == "Linux" and _bazel_command(args) in {"build", "coverage", "run", "test"}:
-            _publish_linux_shared_install_symlink(
-                {
-                    "shared_install_dir": str(
-                        _linux_native_shared_install_dir(_bazel_output_base(args, env))
-                    )
-                }
-            )
+            _publish_linux_shared_install_symlink(_linux_shared_install_publish_config(args, env))
         if rc == 0 and system == "Linux" and _bazel_command(args) == "clean":
-            _remove_path(_linux_native_shared_install_dir(_bazel_output_base(args, env)))
-            _remove_path(_linux_shared_install_dir(_bazel_output_base(args, env)))
+            if not _build_command_requested(args):
+                _remove_linux_shared_install_trees(_bazel_output_base(args, env))
+                # The invocation's output-base key can drift between the build and the clean
+                # (for example when TEST_TMPDIR changes), so also remove the last published
+                # root recorded by _publish_linux_shared_install_symlink.
+                recorded_shared_install_dir = _recorded_shared_install_dir(REPO_ROOT)
+                if recorded_shared_install_dir is not None:
+                    _remove_path(recorded_shared_install_dir)
+                _clear_recorded_shared_install_dir(REPO_ROOT)
         if rc == 0 and system == "Darwin" and _bazel_command(args) == "clean":
             _remove_path(_macos_shared_install_dir(_bazel_output_base(args, env)))
         return rc
@@ -578,6 +617,9 @@ def run_hermetic_container(
                     f"{image_identifier}."
                 )
             rc = _run_direct(bazel_real, host_args, env=cross_process_env)
+            _record_published_shared_install_dir(
+                args, env, container_config.get("shared_install_dir", "")
+            )
             _publish_linux_shared_install_symlink(container_config)
             return rc
 
@@ -694,6 +736,11 @@ def run_hermetic_container(
             )
         rc = _run_direct(
             bazel_real, _bazel_args_with_container_bes_keyword(host_args, containerized=True)
+        )
+        # `bazel clean` is not a host-container command and routes to the direct integration,
+        # which owns the clean-time removal of the shared install trees.
+        _record_published_shared_install_dir(
+            args, env, container_config.get("shared_install_dir", "")
         )
         _publish_linux_shared_install_symlink(container_config)
         if f"--symlink_prefix={HERMETIC_CONTAINER_SYMLINK_PREFIX}" in host_args:
@@ -950,6 +997,9 @@ def run_hermetic_container(
 
     run_file = pathlib.Path(docker_instance.hermetic_container_run_file)
     if _bazel_command(args) == "clean":
+        # Full-container integration is only selected on Darwin test commands, and Linux
+        # clean invocations always route to the direct integration above, which owns the
+        # clean-time removal of the shared install trees.
         with _hermetic_container_lock(run_file):
             rc = _clean_host_outputs(bazel_real, args)
             if rc:
