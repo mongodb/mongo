@@ -18,7 +18,7 @@ const auto getMongotMockStateDecoration = ServiceContext::declareDecoration<Mong
  * "parent.childA.childB", "childA.childB" and "childB".
  **/
 const std::set<std::string> ignoredFields = {
-    "lsid", "uid", "$db", "$traceCtx", "comment", "cursorOptions.batchSize", "batchSize"};
+    "lsid", "uid", "$db", "comment", "cursorOptions.batchSize", "batchSize"};
 
 // Checks that fieldName + "." is a prefix of an ignored field.
 bool isParentPathOfAnIgnoredField(std::string fieldName) {
