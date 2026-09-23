@@ -207,6 +207,15 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
                           static_cast<long long>(_expectedXxh3CollectionHash.value()));
     }
 
+    // The diff is what a repairReplicatedMetadata command folds into the replicated metadata
+    // system's hash to yield the accumulated one.
+    if (_hashComparison == HashComparison::kMismatched && _expectedXxh3CollectionHash.has_value() &&
+        _xxh3CollectionHash.has_value()) {
+        resultObj->append("xxh3AllDiff",
+                          static_cast<long long>(*_expectedXxh3CollectionHash) ^
+                              static_cast<long long>(*_xxh3CollectionHash));
+    }
+
     if (_hashComparison.has_value()) {
         resultObj->append("hashComparison", toString(_hashComparison.value()));
     }

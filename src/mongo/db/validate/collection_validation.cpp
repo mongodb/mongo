@@ -618,7 +618,8 @@ void _compareCollectionHash(OperationContext* opCtx,
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()),
                       "expectedHash"_attr = *expected,
-                      "accumulatedHash"_attr = accumulated);
+                      "accumulatedHash"_attr = accumulated,
+                      "hashDiff"_attr = static_cast<int64_t>(accumulated) ^ *expected);
     }
 } catch (const DBException& e) {
     if (!opCtx->checkForInterruptNoAssert().isOK() || e.code() == ErrorCodes::Interrupted) {

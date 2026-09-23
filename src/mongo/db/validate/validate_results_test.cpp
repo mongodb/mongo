@@ -373,10 +373,15 @@ TEST(ValidateResultsTest, RecordHashComparisonReportsAMatch) {
     ASSERT_TRUE(vr.getHashComparison().has_value());
     EXPECT_EQ(toString(*vr.getHashComparison()), "matched");
     EXPECT_TRUE(vr.getWarnings().empty());
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    EXPECT_FALSE(bob.obj().hasField("xxh3AllDiff"));
 }
 
 TEST(ValidateResultsTest, RecordHashComparisonWarnsOnMismatch) {
     ValidateResults vr;
+    vr.setXxh3CollectionHash(0x1234);
     EXPECT_FALSE(vr.recordHashComparison(/*accumulated=*/0x1234, /*expected=*/int64_t{0x4321}));
 
     ASSERT_TRUE(vr.getHashComparison().has_value());
@@ -393,8 +398,28 @@ TEST(ValidateResultsTest, RecordHashComparisonWarnsOnMismatch) {
     const BSONObj obj = bob.obj();
     EXPECT_EQ(obj.getField("expectedXxh3All").Long(), 0x4321);
     EXPECT_EQ(obj.getField("hashComparison").String(), "mismatched");
+    // Folding the diff into the replicated metadata system's hash yields the accumulated one.
+    EXPECT_EQ(obj.getField("xxh3AllDiff").Long(), int64_t{0x1234} ^ int64_t{0x4321});
     EXPECT_EQ(obj.getField("warnings").Array().size(), 1u);
     EXPECT_TRUE(obj.getField("valid").Bool());
+}
+
+TEST(ValidateResultsTest, Xxh3CollectionHashDiffKeepsItsBitsWhenReported) {
+    // BSON has no unsigned 64-bit type, so a diff with the high bit set is reported as a negative
+    // long long carrying the same bits.
+    const uint64_t accumulated = 0xffff'ffff'ffff'fffeULL;
+    const int64_t expected = 1;
+
+    ValidateResults vr;
+    vr.setXxh3CollectionHash(accumulated);
+    EXPECT_FALSE(vr.recordHashComparison(accumulated, expected));
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const BSONObj obj = bob.obj();
+    const auto elem = obj.getField("xxh3AllDiff");
+    EXPECT_EQ(elem.type(), BSONType::numberLong);
+    EXPECT_EQ(static_cast<uint64_t>(elem.Long()), accumulated ^ static_cast<uint64_t>(expected));
 }
 
 TEST(ValidateResultsTest, HighBitHashesMatchRatherThanFalselyDiverging) {
