@@ -21,7 +21,6 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -36,9 +35,6 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
-using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHash,
-                                                       query_settings::QueryShapeConfiguration,
-                                                       QueryShapeHashHasher>;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QuerySettings);
 
