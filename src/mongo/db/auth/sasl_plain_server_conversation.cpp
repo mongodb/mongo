@@ -156,9 +156,6 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
     }
 
     return Status(ErrorCodes::AuthenticationFailed, str::stream() << "No credentials available.");
-
-
-    return std::make_tuple(true, std::string());
 }
 
 namespace {
