@@ -303,19 +303,6 @@ protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
-IndexEntry makeIndexEntry(BSONObj keyPattern) {
-    return {keyPattern,
-            IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-            IndexConfig::kLatestIndexVersion,
-            false /* multiKey */,
-            {{}, {}} /* multiKeyPaths */,
-            {} /* multikeyPathSet */,
-            false /* sp */,
-            false /* unq */,
-            CoreIndexInfo::Identifier(DBClientBase::genIndexName(keyPattern)),
-            {} /* io */,
-            nullptr /* wildcardProjection */};
-}
 
 TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
     createCollection(
@@ -418,11 +405,12 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimitSkip) {
 }
 
 std::unique_ptr<IndexScanNode> makeIdxScanNode(const NamespaceString& nss,
-                                               BSONObj idxPattern,
+                                               IndexEntry indexEntry,
                                                std::string key,
                                                boost::optional<double> lowerBound,
                                                boost::optional<double> upperBound) {
-    auto indexScanNode = std::make_unique<IndexScanNode>(nss, makeIndexEntry(idxPattern));
+    auto keyPattern = indexEntry.keyPattern;
+    auto indexScanNode = std::make_unique<IndexScanNode>(nss, std::move(indexEntry));
     IndexBounds bounds{};
     if (lowerBound && upperBound) {
         OrderedIntervalList oil(key);
@@ -430,7 +418,7 @@ std::unique_ptr<IndexScanNode> makeIdxScanNode(const NamespaceString& nss,
         bounds.fields.emplace_back(std::move(oil));
     }
     indexScanNode->bounds = std::move(bounds);
-    indexScanNode->sortSet = ProvidedSortSet{idxPattern};
+    indexScanNode->sortSet = ProvidedSortSet{keyPattern};
     return indexScanNode;
 }
 
@@ -454,11 +442,11 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortCovered) {
         indexKeyPattern);
 
     // Build an index scan node for covered sort.
-    auto coveredSortNode =
-        std::make_unique<SortNodeDefault>(makeIdxScanNode(_nss, indexKeyPattern, "a", 1, 3),
-                                          BSON("a" << -1) /* pattern */,
-                                          -1 /* limit */,
-                                          LimitSkipParameterization::Disabled);
+    auto coveredSortNode = std::make_unique<SortNodeDefault>(
+        makeIdxScanNode(_nss, makeIndexEntry(indexKeyPattern), "a", 1, 3),
+        BSON("a" << -1) /* pattern */,
+        -1 /* limit */,
+        LimitSkipParameterization::Disabled);
 
     // Build covered projection so that sort stage doesn't need to return whole document and becomes
     // covered sort.
@@ -477,11 +465,11 @@ TEST_F(GoldenSbeStageBuilderTest, TestMergeSort) {
 
     auto mergeSortNode = std::make_unique<MergeSortNode>();
     // The first branch has [{_id: 0, a: 1}, {_id: 1, a: 2}]
-    mergeSortNode->children.push_back(
-        std::make_unique<FetchNode>(makeIdxScanNode(_nss, BSON("a" << 1), "a", 1, 2), _nss));
+    mergeSortNode->children.push_back(std::make_unique<FetchNode>(
+        makeIdxScanNode(_nss, makeIndexEntry(BSON("a" << 1)), "a", 1, 2), _nss));
     // The second branch has [{_id: 1, a: 2}, {_id: 2, a: 3}]
-    mergeSortNode->children.push_back(
-        std::make_unique<FetchNode>(makeIdxScanNode(_nss, BSON("a" << 1), "a", 2, 3), _nss));
+    mergeSortNode->children.push_back(std::make_unique<FetchNode>(
+        makeIdxScanNode(_nss, makeIndexEntry(BSON("a" << 1)), "a", 2, 3), _nss));
     mergeSortNode->sort = BSON("a" << 1);
     mergeSortNode->dedup = true;
 

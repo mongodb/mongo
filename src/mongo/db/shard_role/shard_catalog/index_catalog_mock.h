@@ -124,9 +124,14 @@ public:
     }
 
     const IndexCatalogEntry* findIndexByIdent(OperationContext*,
-                                              StringData,
+                                              StringData ident,
                                               InclusionPolicy) const override {
-        MONGO_UNREACHABLE;
+        for (const auto& entry : _indexEntries) {
+            if (entry->getIdent() == ident) {
+                return entry.get();
+            }
+        }
+        return nullptr;
     }
 
     const IndexCatalogEntry* refreshEntry(OperationContext*,
@@ -177,11 +182,9 @@ public:
                                         Collection* collection,
                                         IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags) override {
-        auto entry = std::make_shared<IndexCatalogEntryMock>(opCtx,
-                                                             CollectionPtr(collection),
-                                                             "" /* ident */,
-                                                             std::move(descriptor),
-                                                             false /* isFrozen */);
+        const auto ident = descriptor.indexName();
+        auto entry = std::make_shared<IndexCatalogEntryMock>(
+            opCtx, CollectionPtr(collection), ident, std::move(descriptor), false /* isFrozen */);
 
         auto save = entry.get();
         _indexEntries.add(std::move(entry));

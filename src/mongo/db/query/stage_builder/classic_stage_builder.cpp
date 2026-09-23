@@ -117,9 +117,10 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
                 invariant(collectionPtr);
-                auto entry = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, ixn->index.identifier.catalogName);
-                tassert(8862202,
+                const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
                         str::stream() << "Index descriptor not found. Namespace: "
                                       << collectionPtr->ns().toStringForErrorMsg()
                                       << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()

@@ -51,12 +51,14 @@ public:
         tearDown();
     }
 
-    std::unique_ptr<IndexScanNode> makeIndexScanNode(std::string index,
-                                                     std::string indexName,
-                                                     double lowBound,
-                                                     double highBound) {
-        auto child =
-            std::make_unique<IndexScanNode>(kNss, createIndexEntry(BSON(index << 1), indexName));
+    std::unique_ptr<IndexScanNode> makeIndexScanNode(
+        std::string index,
+        std::string indexName,
+        double lowBound,
+        double highBound,
+        std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr) {
+        auto child = std::make_unique<IndexScanNode>(
+            kNss, createIndexEntry(BSON(index << 1), indexName, std::move(iceStorage)));
         IndexBounds bounds{};
         OrderedIntervalList oil(index);
         oil.intervals.emplace_back(BSON("" << lowBound << "" << highBound), true, true);
@@ -92,7 +94,9 @@ private:
         CatalogTestFixture::tearDown();
     }
 
-    IndexEntry createIndexEntry(BSONObj keyPattern, std::string indexName) {
+    IndexEntry createIndexEntry(BSONObj keyPattern,
+                                std::string indexName,
+                                std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr) {
         return IndexEntry(keyPattern,
                           IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                           IndexConfig::kLatestIndexVersion,
@@ -103,7 +107,8 @@ private:
                           false /*unique*/,
                           IndexEntry::Identifier{indexName},
                           BSONObj() /*infoObj*/,
-                          nullptr /*wildcardProjection*/);
+                          nullptr /*wildcardProjection*/,
+                          std::move(iceStorage));
     }
 };
 
@@ -142,8 +147,18 @@ void BM_Simple(benchmark::State& state) {
     });
     cq->setSbeCompatible(true);
 
-    // Create QuerySolution
-    auto child = fixture.makeIndexScanNode("x1", "index1", -INFINITY, kIndexUpperBound);
+    // Look up the real IndexCatalogEntry so the stage builder can find it by ident.
+    std::shared_ptr<const IndexCatalogEntry> iceStorage;
+    for (auto&& ice : collections.getMainCollection()->getIndexCatalog()->getEntriesShared(
+             IndexCatalog::InclusionPolicy::kReady)) {
+        if (ice->descriptor()->indexName() == "index1") {
+            iceStorage = ice;
+            break;
+        }
+    }
+    ASSERT(iceStorage);
+
+    auto child = fixture.makeIndexScanNode("x1", "index1", -INFINITY, kIndexUpperBound, iceStorage);
     auto root = std::make_unique<FetchNode>(std::move(child), kNss);
 
     auto bsonObj = fixture.buildFilter(state.range(0), false);

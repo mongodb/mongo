@@ -106,6 +106,24 @@ export function getCBRConfig(db) {
     };
 }
 
+export function setCBRConfig(
+    db,
+    {
+        featureFlagCostBasedRanker = true,
+        internalQueryCBRCEMode = "automaticCE",
+        automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
+    } = {},
+) {
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker,
+            internalQueryCBRCEMode,
+            automaticCEPlanRankingStrategy,
+        }),
+    );
+}
+
 export function restoreCBRConfig(db, config) {
     assert.commandWorked(
         db.adminCommand({
