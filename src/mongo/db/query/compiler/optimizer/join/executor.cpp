@@ -880,36 +880,50 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "in use",
                 cacheKey.has_value() && collectionTags.has_value());
 
-        auto fingerprints = makeNodeFingerprints(
-            model.getGraph(), model.getResolvedPaths(), eligibleIdxs, *reordered.cachedJoinPlan);
-        const auto& currentTags = *collectionTags;
-        const auto planCacheKeyHex = joinPlanCacheKeyForLog(*cacheKey);
-        // 'serializeForLogging()' handles redaction of user content per the 'redactClientLogData'
-        // policy.
-        const auto queryShapeForLog = pipeline.serializeForLogging();
-        const NamespaceString baseNss = model.getGraph().getNode(reordered.baseNode).collectionName;
-        const auto logVersions = collectionVersionsForLog(currentTags);
+        // A yield may have occurred during sampling above. Re-check CollectionTags and skip caching
+        // if the live CollectionTags have advanced.
+        if (classifyCollectionTags(*collectionTags, graphOnlyMca).status !=
+            CollectionTagStatus::kCurrent) {
+            LOGV2_DEBUG(135049,
+                        5,
+                        "Skipping join plan cache write: index DDL occurred during planning",
+                        "planCacheKey"_attr = joinPlanCacheKeyForLog(*cacheKey));
+        } else {
+            auto fingerprints = makeNodeFingerprints(model.getGraph(),
+                                                     model.getResolvedPaths(),
+                                                     eligibleIdxs,
+                                                     *reordered.cachedJoinPlan);
+            const auto& currentTags = *collectionTags;
+            const auto planCacheKeyHex = joinPlanCacheKeyForLog(*cacheKey);
+            // 'serializeForLogging()' handles redaction of user content per the
+            // 'redactClientLogData' policy.
+            const auto queryShapeForLog = pipeline.serializeForLogging();
+            const NamespaceString baseNss =
+                model.getGraph().getNode(reordered.baseNode).collectionName;
+            const auto logVersions = collectionVersionsForLog(currentTags);
 
-        auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
-                                                          reordered.baseNode,
-                                                          currentTags,
-                                                          std::move(fingerprints));
-        const BSONObj planShapeForLog =
-            entry->joinTree ? entry->joinTree->toBSONForLog() : BSONObj();
-        const long long estimatedSizeBytes = static_cast<long long>(entry->estimatedEntrySizeBytes);
-        const size_t numEntriesEvicted = JoinPlanCache::get(opCtx->getServiceContext())
-                                             .put(std::move(*cacheKey), std::move(entry));
+            auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
+                                                              reordered.baseNode,
+                                                              currentTags,
+                                                              std::move(fingerprints));
+            const BSONObj planShapeForLog =
+                entry->joinTree ? entry->joinTree->toBSONForLog() : BSONObj();
+            const long long estimatedSizeBytes =
+                static_cast<long long>(entry->estimatedEntrySizeBytes);
+            const size_t numEntriesEvicted = JoinPlanCache::get(opCtx->getServiceContext())
+                                                 .put(std::move(*cacheKey), std::move(entry));
 
-        LOGV2(13445400,
-              "Join plan cache entry put",
-              "planCacheKey"_attr = planCacheKeyHex,
-              "queryShape"_attr = queryShapeForLog,
-              "planShape"_attr = planShapeForLog,
-              "nss"_attr = redact(toStringForLogging(baseNss)),
-              "baseNode"_attr = static_cast<int>(reordered.baseNode),
-              "estimatedSizeBytes"_attr = estimatedSizeBytes,
-              "collections"_attr = logVersions,
-              "entriesEvicted"_attr = static_cast<long long>(numEntriesEvicted));
+            LOGV2(13445400,
+                  "Join plan cache entry put",
+                  "planCacheKey"_attr = planCacheKeyHex,
+                  "queryShape"_attr = queryShapeForLog,
+                  "planShape"_attr = planShapeForLog,
+                  "nss"_attr = redact(toStringForLogging(baseNss)),
+                  "baseNode"_attr = static_cast<int>(reordered.baseNode),
+                  "estimatedSizeBytes"_attr = estimatedSizeBytes,
+                  "collections"_attr = logVersions,
+                  "entriesEvicted"_attr = static_cast<long long>(numEntriesEvicted));
+        }
     }
 
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the

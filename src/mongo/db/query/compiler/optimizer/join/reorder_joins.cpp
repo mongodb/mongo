@@ -666,7 +666,10 @@ std::unique_ptr<QuerySolutionNode> fromCachedJoinPlan(OperationContext* opCtx,
                 params.mainCollectionInfo.indexes = std::move(indexes);
 
                 auto solnStatus = QueryPlanner::planFromCache(*cq, params, *ap.solnCacheData);
-                tassert(12926303, "planFromCache failed for cached access path", solnStatus.isOK());
+                tassert(12926303,
+                        fmt::format("planFromCache failed for cached access path: {}",
+                                    solnStatus.getStatus().toString()),
+                        solnStatus.isOK());
                 return solnStatus.getValue()->root()->clone();
             },
             [&](const CachedInljNode& inlj) -> std::unique_ptr<QuerySolutionNode> {

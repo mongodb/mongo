@@ -106,7 +106,6 @@ const kAcceptableQueryErrorCodes = interruptedQueryErrors.concat([
     ErrorCodes.StaleConfig,
     ErrorCodes.NetworkInterfaceExceededTimeLimit,
     3994303, // TODO(SERVER-134942):$expr comparison predicates on multikey paths cannot use an index
-    12926303, // TODO(SERVER-135049): planFromCache failed for cached access path
 ]);
 
 // First row count per query that was observed, used to assert that later executions return the same number of rows.
