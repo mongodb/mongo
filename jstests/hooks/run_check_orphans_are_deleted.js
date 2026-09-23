@@ -31,19 +31,6 @@ if (topology.type == Topology.kShardedCluster) {
             shardName,
         );
     }
-} else if (topology.type == Topology.kReplicaSet && topology.configsvr) {
-    // TODO SERVER-130827 The following assert(false) is only here to establish if this branch
-    // can still be reached. If the following assert(false) triggers, it means this branch can
-    // still be reached. In this case, the conditions under which it is reached should be
-    // documented here, and the assert(false) should be removed. If the assert(false) is not
-    // triggered, this whole else if branch for replica set topology can be removed safely without
-    // losing test coverage.
-    assert(false, "Replica set topology is not expected here");
-    CheckOrphansAreDeletedHelpers.runCheck(
-        db.getMongo(),
-        newMongoWithRetry(topology.primary),
-        "config",
-    );
 } else {
     throw new Error(
         "Orphan documents check must be run against a sharded cluster, but got: " +
