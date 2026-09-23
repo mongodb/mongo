@@ -27,8 +27,6 @@ export const $config = (function () {
     };
 
     const kAcceptableErrors = [
-        ErrorCodes.MaxTimeMSExpired,
-        ErrorCodes.LockTimeout,
         ErrorCodes.Interrupted,
         ErrorCodes.NamespaceNotFound,
         ErrorCodes.ConflictingOperationInProgress,
