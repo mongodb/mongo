@@ -962,7 +962,8 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
 
     auto& registry = MessageCompressorRegistry::get();
     const auto& compressorNames = registry.getCompressorNames();
-    if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+    if (std::find(compressorNames.begin(), compressorNames.end(), "snappy") ==
+        compressorNames.end()) {
         registry.setSupportedCompressors({"snappy"});
         registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
         uassertStatusOK(registry.finalizeSupportedCompressors());
