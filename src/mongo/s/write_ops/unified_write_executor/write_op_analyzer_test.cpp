@@ -188,6 +188,32 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
     }
 
     /**
+     * Set up a routing context that mirrors a real viewful timeseries collection: the logical view
+     * namespace 'nss' is untracked (has no routing table), while its buckets namespace is a
+     * tracked, sharded timeseries collection. This is the only shape under which the analyzer
+     * should translate a write on 'nss' to its buckets namespace.
+     */
+    std::unique_ptr<RoutingContext> createRoutingContextViewfulTimeseries(
+        const NamespaceString& nss, const UUID& bucketsUuid) {
+        const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
+        TypeCollectionTimeseriesFields tsFields;
+        tsFields.setTimeField(std::string("ts"));
+        tsFields.setMetaField(std::string("x"));
+
+        auto dbVersion = DatabaseVersion(bucketsUuid, Timestamp{1, 1});
+        stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
+        criMap.emplace(
+            nss, CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, kShard1Name, dbVersion));
+        criMap.emplace(nssBuckets,
+                       CollectionRoutingInfo(
+                           createChunkManager(
+                               bucketsUuid, nssBuckets, tsFields, true /* isViewfulTimeseries */),
+                           DatabaseTypeValueHandle(
+                               DatabaseType{nssBuckets.dbName(), kShard1Name, dbVersion})));
+        return RoutingContext::createSynthetic(criMap);
+    }
+
+    /**
      * Set up a routing context for testing analyze() with unsharded collections.
      */
     std::unique_ptr<RoutingContext> createRoutingContextUnsharded() {
@@ -901,10 +927,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
     RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -935,10 +959,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesNonTargeted) {
     RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -962,10 +984,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(TxnNumber(1));
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -983,6 +1003,38 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
 
     rtx->onRequestSentForNss(nss);
 }
+
+// A client must not be able to redirect a write on a normal (tracked) collection 'db.X' to its
+// 'db.system.buckets.X' namespace merely by also listing the buckets namespace in the request. When
+// 'nss' is itself tracked, the analyzer must not perform the viewful-timeseries namespace
+// translation even though the buckets namespace is present in the routing context.
+TEST_F(WriteOpAnalyzerTestImpl, DeclaredBucketsNssDoesNotRedirectTrackedCollection) {
+    RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
+        "featureFlagTimeseriesUpdatesSupport", true);
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
+    UUID uuid = UUID::gen();
+    UUID bucketsUuid = UUID::gen();
+    // 'nss' is a normal sharded (tracked) collection, and the client has additionally declared the
+    // buckets namespace, which is also registered in the routing context.
+    auto rtx = createRoutingContextSharded({{uuid, nss}, {bucketsUuid, nssBuckets}});
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteUpdateOp(0,
+                              BSON("x" << -1),
+                              write_ops::UpdateModification(BSON("$set" << BSON("x" << -10)))),
+        },
+        {NamespaceInfoEntry(nss), NamespaceInfoEntry(nssBuckets)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    // The write must stay on 'nss' and must not be flagged as a viewful timeseries translation.
+    ASSERT_FALSE(analysis.isViewfulTimeseries);
+
+    rtx->onRequestSentForNss(nss);
+}
+
 }  // namespace
 }  // namespace unified_write_executor
 }  // namespace mongo
