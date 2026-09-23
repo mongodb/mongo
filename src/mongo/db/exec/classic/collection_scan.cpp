@@ -418,19 +418,36 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 }
 
 void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
-    auto tsElem = record.data.toBson()[repl::OpTime::kTimestampFieldName];
-    uassert(ErrorCodes::Error(4382100),
-            str::stream() << "CollectionScan was asked to track latest operation time, "
-                             "but found a result without a valid 'ts' field: "
-                          << record.data.toBson().toString(),
-            tsElem.type() == BSONType::timestamp);
+    auto extractTimestampFromTsField = [&]() {
+        auto tsElem = record.data.toBson()[repl::OpTime::kTimestampFieldName];
+        uassert(ErrorCodes::Error(4382100),
+                str::stream() << "CollectionScan was asked to track latest operation time, "
+                                 "but found a result without a valid 'ts' field: "
+                              << record.data.toBson().toString(),
+                tsElem.type() == BSONType::timestamp);
+        return tsElem.timestamp();
+    };
+
+    const Timestamp ts = [&]() {
+        // For oplog records, the RecordId is the timestamp key, so the scan can avoid reparsing
+        // BSON just to read the 'ts' field.
+        if (record.id.isLong()) {
+            Timestamp tsFromId = Timestamp(static_cast<unsigned long long>(record.id.getLong()));
+            dassert(tsFromId == extractTimestampFromTsField());
+            return tsFromId;
+        }
+
+        // Fallback: extract timestamp from "ts" field of BSON record.
+        return extractTimestampFromTsField();
+    }();
+
     LOGV2_DEBUG(550450,
                 5,
                 "Setting _latestOplogEntryTimestamp to the max of the timestamp of the current "
                 "latest oplog entry and the timestamp of the current record",
                 "latestOplogEntryTimestamp"_attr = _latestOplogEntryTimestamp,
-                "currentRecordTimestamp"_attr = tsElem.timestamp());
-    _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
+                "currentRecordTimestamp"_attr = ts);
+    _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, ts);
 }
 
 BSONObj CollectionScan::getPostBatchResumeToken() const {

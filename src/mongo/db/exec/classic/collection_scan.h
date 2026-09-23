@@ -94,9 +94,8 @@ private:
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
     /**
-     * Extracts the timestamp from the 'ts' field of 'record', and sets '_latestOplogEntryTimestamp'
-     * to that time if it isn't already greater. Throws an exception if the 'ts' field cannot be
-     * extracted.
+     * Extracts the timestamp from 'record', and sets '_latestOplogEntryTimestamp' to that time if
+     * it isn't already greater. Throws an exception if the timestamp cannot be extracted.
      */
     void setLatestOplogEntryTimestamp(const Record& record);
 
