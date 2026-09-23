@@ -372,26 +372,38 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
         // state. Such an update therefore writes one of its surviving keys as a delete and an
         // insert on top of the real difference: that leaves the index exactly as it was while
         // giving the insert record something to carry the state
+        //
+        // `sideWrite` decides multikey from the keys it is handed, which for an update is the
+        // difference between the old and new keys. That answer can differ from the document's own:
+        // an index without path-level tracking is multikey purely because a document generates
+        // several keys, so growing a document from one indexed term to two adds a single key and
+        // the difference looks non-multikey.
+        bool documentIsMultikey = shouldMarkIndexAsMultikey(updateTicket.newKeys.size(),
+                                                            updateTicket.newMultikeyMetadataKeys,
+                                                            updateTicket.newMultikeyPaths);
+        bool recordsWillBeWritten =
+            !updateTicket.added.empty() || !updateTicket.newMultikeyMetadataKeys.empty();
+        bool recordsWouldConveyIt = recordsWillBeWritten &&
+            shouldMarkIndexAsMultikey(updateTicket.added.size(),
+                                      updateTicket.newMultikeyMetadataKeys,
+                                      updateTicket.newMultikeyPaths);
+
         // TODO (SERVER-135300): Remove once a side write can carry multikey state on its own.
         bool needsCarrierForMultikeyState =
-            entry->indexBuildInterceptor() && updateTicket.added.empty() &&
-            !updateTicket.newKeys.empty() &&
-            // Wildcard indexes write their multikey metadata keys in full rather than as a
-            // difference, so for those the metadata records are already a carrier.
-            updateTicket.newMultikeyMetadataKeys.empty() &&
-            shouldMarkIndexAsMultikey(updateTicket.newKeys.size(),
-                                      updateTicket.newMultikeyMetadataKeys,
-                                      updateTicket.newMultikeyPaths) &&
+            effectiveIndexBuildInterceptor(opCtx, entry) && documentIsMultikey &&
+            !recordsWouldConveyIt && !updateTicket.newKeys.empty() &&
             index_builds::primary_driven::enabled(
                 opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         KeyStringSet carrierRemoved;
         KeyStringSet carrierAdded;
         if (needsCarrierForMultikeyState) {
-            // Any surviving key will do; `added` being empty means every new key is an old one too,
-            // so re-inserting it is a no-op for the index.
+            // Carry one of the document's own keys alongside the real difference: written as both a
+            // delete and an insert it leaves the index as it was, while making the insert record
+            // describe enough of the document for `sideWrite` to reach the same answer as above.
             const auto& carrier = *updateTicket.newKeys.begin();
             carrierRemoved = updateTicket.removed;
             carrierRemoved.insert(carrier);
+            carrierAdded = updateTicket.added;
             carrierAdded.insert(carrier);
         }
         auto& keysRemoved = needsCarrierForMultikeyState ? carrierRemoved : updateTicket.removed;

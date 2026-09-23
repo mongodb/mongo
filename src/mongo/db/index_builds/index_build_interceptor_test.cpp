@@ -554,6 +554,64 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecord
     assertRecordCarriesMultikeyPaths(sideWrites[1], MultikeyPaths{MultikeyComponents{0}});
 }
 
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithoutPathTrackingRecordsMultikeyState) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'c_2d', key: {c: '2d'}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        auto* writableEntry = writer.getWritableCollection(operationContext())
+                                  ->getIndexCatalog()
+                                  ->getWritableEntryByName(operationContext(),
+                                                           "c_2d",
+                                                           IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(writableEntry);
+        writableEntry->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+
+    auto* entry = getIndexEntry("c_2d");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        // A second point: one key added, the existing one unchanged.
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(entry->accessMethod()->update(
+            operationContext(),
+            *shard_role_details::getRecoveryUnit(operationContext()),
+            pooledBuilder,
+            BSON("_id" << 0 << "c" << BSON_ARRAY(BSON_ARRAY(1 << 2))),
+            BSON("_id" << 0 << "c" << BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3 << 4))),
+            RecordId{1},
+            _coll->getCollectionPtr(),
+            entry,
+            InsertDeleteOptions{},
+            &numInserted,
+            &numDeleted));
+        wuow.commit();
+    }
+
+    // Some record must report the state, and the key the update genuinely adds must still be
+    // inserted.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    std::size_t inserts = 0;
+    bool sawMultikey = false;
+    for (const auto& record : sideWrites) {
+        if (record.getStringField("op") == "i") {
+            ++inserts;
+            sawMultikey = sawMultikey ||
+                record[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue();
+        }
+    }
+    EXPECT_TRUE(sawMultikey) << "no record carried the multikey state";
+    EXPECT_GE(inserts, 2) << "the added key and the carrier must both be inserted";
+}
+
 TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingKeysPairsASingleCarrierKey) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
