@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/inlined_vector.h>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -875,33 +876,65 @@ void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context
     }
 }
 
-Status validateBSONDepthForUserStorage(const BSONObj& obj) {
-    std::vector<BSONObjIterator> frames;
-    frames.reserve(16);
+namespace {
+
+/**
+ * Shared implementation of validateBSONDepthForUserStorage. If not a nullptr, 'topLevelVisitor' is
+ * invoked for every top-level element of 'obj' while the depth validation traversal is already
+ * visiting those elements. Does not return a status, but throws when encountering validation
+ * errors. If not a nullptr, the visitor is expected to be cheap (or a no-op) because it is called
+ * once per top-level field.
+ */
+template <typename F>
+void validateBSONDepthForUserStorageImpl(const BSONObj& obj, const F& topLevelVisitor) {
+    absl::InlinedVector<BSONObjIterator, 32> frames;
     frames.emplace_back(obj);
 
     while (!frames.empty()) {
-        const auto elem = frames.back().next();
-        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
-            auto subObj = elem.embeddedObject();
-            // Empty subdocuments do not count toward the depth of a document.
-            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage() &&
-                               !subObj.isEmpty())) {
-                // We're exactly at the limit, so descending to the next level would exceed
-                // the maximum depth.
-                return {ErrorCodes::Overflow,
-                        str::stream() << "object exceeds " << BSONDepth::getMaxDepthForUserStorage()
-                                      << " levels of nesting"};
-            }
-            frames.emplace_back(subObj);
-        }
-
         if (!frames.back().more()) {
             frames.pop_back();
+            continue;
+        }
+
+        const auto elem = frames.back().next();
+        if constexpr (!std::is_same_v<F, std::nullptr_t>) {
+            if (frames.size() == 1) {
+                topLevelVisitor(elem);
+            }
+        }
+
+        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+            if (auto subObj = elem.embeddedObject(); !subObj.isEmpty()) {
+                // Empty subdocuments do not count toward the depth of a document.
+                const auto maxDepth = BSONDepth::getMaxDepthForUserStorage();
+                uassert(ErrorCodes::Overflow,
+                        fmt::format("object exceeds {} levels of nesting", maxDepth),
+                        frames.size() < maxDepth);
+                frames.emplace_back(subObj);
+            }
         }
     }
+}
 
-    return Status::OK();
+}  // namespace
+
+Status validateBSONDepthForUserStorage(const BSONObj& obj) {
+    try {
+        validateBSONDepthForUserStorageImpl(obj, nullptr);
+        return Status::OK();
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+}
+
+Status validateBSONDepthForUserStorage(
+    const BSONObj& obj, const std::function<void(const BSONElement&)>& topLevelVisitor) {
+    try {
+        validateBSONDepthForUserStorageImpl(obj, topLevelVisitor);
+        return Status::OK();
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
 }
 
 }  // namespace mongo

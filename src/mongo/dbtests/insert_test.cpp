@@ -78,5 +78,74 @@ TEST_F(InsertTest, FixDocumentForInsertFailsOnDeeplyNestedDocuments) {
                                    makeNestedArray(BSONDepth::getMaxDepthForUserStorage() + 1)),
               ErrorCodes::Overflow);
 }
+
+TEST_F(InsertTest, FixDocumentForInsertReturnsOriginalWhenIdIsFirstAndNoChangesNeeded) {
+    auto doc = BSON("_id" << 1 << "x" << 2);
+    auto result = fixDocumentForInsert(getOperationContext(), doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT(result.getValue().isEmpty());
+}
+
+TEST_F(InsertTest, FixDocumentForInsertFixesTimestampWhenIdIsFirst) {
+    auto doc = BSON("_id" << 1 << "ts" << Timestamp(0, 0));
+    auto result = fixDocumentForInsert(getOperationContext(), doc);
+    ASSERT_OK(result.getStatus());
+
+    auto fixed = result.getValue();
+    ASSERT(!fixed.isEmpty());
+    ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
+    ASSERT_EQ(fixed.firstElement().numberInt(), 1);
+
+    auto ts = fixed["ts"];
+    ASSERT_EQ(ts.type(), BSONType::timestamp);
+    ASSERT_NE(ts.timestamp(), Timestamp(0, 0));
+}
+
+TEST_F(InsertTest, FixDocumentForInsertMovesIdToFront) {
+    auto doc = BSON("x" << 1 << "_id" << 2 << "y" << 3);
+    auto result = fixDocumentForInsert(getOperationContext(), doc);
+    ASSERT_OK(result.getStatus());
+
+    auto fixed = result.getValue();
+    ASSERT(!fixed.isEmpty());
+    ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
+    ASSERT_EQ(fixed.firstElement().numberInt(), 2);
+    ASSERT_EQ(fixed.nFields(), 3);
+}
+
+TEST_F(InsertTest, FixDocumentForInsertFailsOnDuplicateId) {
+    auto doc = BSON("_id" << 1 << "_id" << 2);
+    ASSERT_EQ(fixDocumentForInsert(getOperationContext(), doc), ErrorCodes::BadValue);
+}
+
+TEST_F(InsertTest, FixDocumentForInsertDetectsDollarField) {
+    bool containsDotsAndDollarsField = false;
+    auto doc = BSON("$x" << 1 << "_id" << 2);
+    auto result = fixDocumentForInsert(getOperationContext(),
+                                       doc,
+                                       false /* bypassEmptyTsReplacement */,
+                                       &containsDotsAndDollarsField);
+    ASSERT_OK(result.getStatus());
+    ASSERT(containsDotsAndDollarsField);
+
+    auto fixed = result.getValue();
+    ASSERT(!fixed.isEmpty());
+    ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
+}
+
+TEST_F(InsertTest, FixDocumentForInsertBypassesTimestampReplacement) {
+    auto doc = BSON("ts" << Timestamp(0, 0) << "_id" << 1);
+    auto result =
+        fixDocumentForInsert(getOperationContext(), doc, true /* bypassEmptyTsReplacement */);
+    ASSERT_OK(result.getStatus());
+
+    auto fixed = result.getValue();
+    ASSERT(!fixed.isEmpty());
+    ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
+
+    auto ts = fixed["ts"];
+    ASSERT_EQ(ts.type(), BSONType::timestamp);
+    ASSERT_EQ(ts.timestamp(), Timestamp(0, 0));
+}
 }  // namespace
 }  // namespace mongo

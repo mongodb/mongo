@@ -40,6 +40,7 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -1585,6 +1586,60 @@ TEST(BSONValidateDepthForUserStorage, EmptySubobjectDoesNotCountTowardDepth) {
         obj = BSON("a" << obj);
     }
     ASSERT_OK(validateBSONDepthForUserStorage(obj));
+}
+
+TEST(BSONValidateDepthForUserStorage, VisitorInvokedForTopLevelElements) {
+    auto obj = BSON("a" << 1 << "b" << BSON("c" << 2) << "d" << BSON_ARRAY(3 << 4));
+    std::vector<std::string> visited;
+    auto status = validateBSONDepthForUserStorage(
+        obj, [&](const BSONElement& e) { visited.emplace_back(e.fieldNameStringData()); });
+    ASSERT_OK(status);
+    ASSERT_THAT(visited, testing::ElementsAre("a", "b", "d"));
+}
+
+TEST(BSONValidateDepthForUserStorage, VisitorNotInvokedForNestedElements) {
+    auto obj = BSON("a" << BSON("b" << BSON("c" << 1)));
+    size_t count = 0;
+    auto status = validateBSONDepthForUserStorage(obj, [&](const BSONElement& e) {
+        ++count;
+        ASSERT_EQ(e.fieldNameStringData(), "a");
+    });
+    ASSERT_OK(status);
+    ASSERT_EQ(count, 1U);
+}
+
+TEST(BSONValidateDepthForUserStorage, VisitorNotInvokedForEmptyNestedObject) {
+    auto obj = BSON("a" << BSONObj());
+    size_t count = 0;
+    auto status = validateBSONDepthForUserStorage(obj, [&](const BSONElement& e) {
+        ++count;
+        ASSERT_EQ(e.fieldNameStringData(), "a");
+    });
+    ASSERT_OK(status);
+    ASSERT_EQ(count, 1U);
+}
+
+TEST(BSONValidateDepthForUserStorage, VisitorErrorIsReturned) {
+    auto obj = BSON("a" << 1 << "b" << 2);
+    auto status = validateBSONDepthForUserStorage(obj, [&](const BSONElement& e) {
+        if (e.fieldNameStringData() == "b") {
+            uasserted(ErrorCodes::BadValue, "bad b");
+        }
+    });
+    namespace m = unittest::match;
+    ASSERT_THAT(status, m::StatusIs(ErrorCodes::BadValue, "bad b"));
+}
+
+TEST(BSONValidateDepthForUserStorage, DepthValidationStillEnforcedWithVisitor) {
+    const auto tooDeep = makeNestedObject(BSONDepth::getMaxDepthForUserStorage() + 1);
+    bool visited = false;
+    auto status = validateBSONDepthForUserStorage(tooDeep, [&](const BSONElement& e) {
+        visited = true;
+        ASSERT_EQ(e.fieldNameStringData(), "a");
+    });
+    namespace m = unittest::match;
+    ASSERT_THAT(status, m::StatusIs(ErrorCodes::Overflow, testing::_));
+    ASSERT(visited);
 }
 
 }  // namespace

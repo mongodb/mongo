@@ -283,6 +283,32 @@ void BM_validate_contents(benchmark::State& state) {
     state.SetBytesProcessed(totalSize);
 }
 
+void BM_validateDepthForUserStorage(benchmark::State& state) {
+    auto arrayLen = state.range(0);
+    auto numFields = state.range(1);
+    auto nestingLimit = state.range(2);
+
+    BSONArrayBuilder builder;
+    size_t totalSize = 0;
+    for (auto i = 0; i < arrayLen; ++i) {
+        builder.append(buildDeepObj(i, numFields, nestingLimit));
+    }
+    BSONObj array = builder.done();
+
+    const auto& elem = array[0].Obj();
+    auto status = validateBSONDepthForUserStorage(elem);
+    if (!status.isOK())
+        LOGV2(10101801, "Depth validation failed", "elem"_attr = elem, "status"_attr = status);
+    invariant(status);
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(validateBSONDepthForUserStorage(array));
+        totalSize += array.objsize();
+    }
+    state.SetBytesProcessed(totalSize);
+}
+
 /**
  * Benchmark BSON validation for objects that have no nesting but many field names. The first range
  * argument (state.range(0)) indicates the number of wide objects to validate. The second range
@@ -347,6 +373,9 @@ BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kExtended)
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kFull)
     ->Ranges({{64, 512}, {10, 20}, {2, 5}})
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_validateDepthForUserStorage)
+    ->Ranges({{1, 64}, {1, 32}, {1, 4}})
     ->Unit(benchmark::kMicrosecond);
 
 void BM_objBuilderAppendInt(benchmark::State& state) {

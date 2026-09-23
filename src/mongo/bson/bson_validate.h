@@ -10,6 +10,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <functional>
 #include <string_view>
 
 [[MONGO_MOD_PUBLIC]];
@@ -73,5 +74,15 @@ void uassertValidBSONFromJavaScript(const BSONObj& obj, std::string_view context
  * 'obj' in an oplog entry or a command reply.
  */
 Status validateBSONDepthForUserStorage(const BSONObj& obj);
+
+/**
+ * Same as validateBSONDepthForUserStorage(const BSONObj&), but additionally invokes
+ * 'topLevelVisitor' for every top-level element of 'obj' while the depth validation traversal is
+ * already visiting those elements. This allows callers to perform top-level validation work in the
+ * same pass as the depth check. If the visitor encounters an error, it should throw a
+ * 'DBException'; this function will catch it and return the corresponding Status.
+ */
+Status validateBSONDepthForUserStorage(
+    const BSONObj& obj, const std::function<void(const BSONElement&)>& topLevelVisitor);
 
 }  // namespace mongo
