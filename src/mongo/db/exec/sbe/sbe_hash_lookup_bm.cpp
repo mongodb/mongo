@@ -10,6 +10,15 @@
 
 #include <benchmark/benchmark.h>
 
+namespace {
+class NoopStreamBuffer : public std::streambuf {
+public:
+    int_type overflow(int_type c) override {
+        return traits_type::not_eof(c);
+    }
+};
+}  // namespace
+
 namespace mongo::sbe {
 
 class HashLookupDummyTest : public HashLookupSharedTest {
@@ -37,7 +46,13 @@ public:
         HashLookupDummyTest sharedTest;
         sharedTest.setUp();
 
-        auto& stream = std::cout;
+        // By default, this benchmark does not print out details for all variations to std::cout.
+        // The printing makes the benchmark pretty unusable. In case you want to see all the details
+        // for debugging, uncomment the following line containing 'std::cout' and comment out the
+        // two following lines that redirect output to the 'NoopStreamBuffer'. auto& stream =
+        // std::cout;
+        NoopStreamBuffer streamBuffer;
+        std::ostream stream(&streamBuffer);
 
         // Avoid using 'std::endl' here because it unnecessarily flushes the stream, which can lead
         // to poor performance.

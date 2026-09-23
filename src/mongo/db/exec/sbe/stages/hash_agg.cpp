@@ -245,22 +245,23 @@ void HashAggStage::open(bool reOpen) {
             for (auto& p : _inKeyAccessors) {
                 key.reset(idx++, p->getViewOfValue());
             }
-            _htIt = _ht->find(key);
+
+            // Look up the key in the hash table and, only if it is not present, construct and
+            // insert an owned copy of the key together with a fresh accumulator row. Using
+            // lazy_emplace avoids hashing/probing the key twice (once in find() and again in
+            // emplace()) and avoids copying the key when the key is already present.
+            _htIt = _ht->lazy_emplace(key, [&](const TableType::constructor& ctor) {
+                newKey = true;
+                value::MaterializedRow keyCopy(key);
+                keyCopy.makeOwned();
+                ctor(std::move(keyCopy), value::MaterializedRow{_outAggAccessors.size()});
+            });
+
+            dassert(_htIt == _ht->find(key));
             firstDoc = false;
         }
-        dassert(_htIt == _ht->find(key));
-        if (_htIt == _ht->end()) {
-            // The key is not present in the hash table yet, so we insert it and initialize the
-            // corresponding accumulator. Note that as a future optimization, we could avoid
-            // doing a lookup both in the 'find()' call and in 'emplace()'.
-            newKey = true;
-            value::MaterializedRow keyCopy(key);
-            keyCopy.makeOwned();
-            auto [it, _] =
-                _ht->emplace(std::move(keyCopy), value::MaterializedRow{_outAggAccessors.size()});
 
-            _htIt = it;
-
+        if (newKey) {
             // Run all acc initializers for this key.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
                 _accumulatorList[idx]->initialize(_bytecode, *_outHashAggAccessors[idx]);
