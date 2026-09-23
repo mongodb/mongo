@@ -118,7 +118,24 @@ protected:
     const std::string kNss = std::string(kDB) + "." + kCollection;
 };
 
-class UpdateCommandTest : public CommandMirroringTest {
+enum class UpdateMessageFormat {
+    DocumentSequence,
+    Inline,
+};
+
+std::string updateMessageFormatToString(UpdateMessageFormat format) {
+    switch (format) {
+        case UpdateMessageFormat::DocumentSequence:
+            return "DocumentSequence";
+        case UpdateMessageFormat::Inline:
+            return "Inline";
+    }
+    MONGO_UNREACHABLE;
+}
+
+// Parameterized test for update commands with different message formats
+class UpdateCommandTest : public CommandMirroringTest,
+                          public ::testing::WithParamInterface<UpdateMessageFormat> {
 public:
     void setUp() override {
         CommandMirroringTest::setUp();
@@ -145,18 +162,44 @@ public:
             args.push_back(rawData.value());
         }
 
-        auto request = CommandMirroringTest::makeCommand(coll, args);
+        switch (GetParam()) {
+            case UpdateMessageFormat::DocumentSequence: {
+                auto request = CommandMirroringTest::makeCommand(coll, args);
 
-        // Directly add `updates` to `OpMsg::sequences` to emulate `OpMsg::parse()` behavior.
-        OpMsg::DocumentSequence seq;
-        seq.name = "updates";
+                // Directly add `updates` to `OpMsg::sequences` to emulate `OpMsg::parse()`
+                // behavior.
+                OpMsg::DocumentSequence seq;
+                seq.name = "updates";
 
-        for (auto update : updates) {
-            seq.objs.emplace_back(std::move(update));
+                for (auto update : updates) {
+                    seq.objs.emplace_back(std::move(update));
+                }
+                request.sequences.emplace_back(std::move(seq));
+
+                return request;
+            }
+            case UpdateMessageFormat::Inline: {
+                BSONObjBuilder bob;
+                bob << "update" << coll;
+                bob << "lsid" << makeLogicalSessionIdForTest().toBSON();
+
+                for (const auto& arg : args) {
+                    bob << arg.firstElement();
+                }
+
+                BSONArrayBuilder updateArrayBuilder(bob.subarrayStart("updates"));
+                for (const auto& update : updates) {
+                    updateArrayBuilder.append(update);
+                }
+                updateArrayBuilder.doneFast();
+
+                return OpMsgRequestBuilder::create(
+                    auth::ValidatedTenancyScope::kNotRequired,
+                    DatabaseName::createDatabaseName_forTest(boost::none, kDB),
+                    bob.obj());
+            }
         }
-        request.sequences.emplace_back(std::move(seq));
-
-        return request;
+        MONGO_UNREACHABLE;
     }
 
     boost::optional<BSONObj> shardVersion;
@@ -165,7 +208,7 @@ public:
     boost::optional<BSONObj> rawData;
 };
 
-TEST_F(UpdateCommandTest, NoQuery) {
+TEST_P(UpdateCommandTest, NoQuery) {
     auto update = BSON("q" << BSONObj() << "u" << BSON("$set" << BSON("_id" << 1)));
     auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
 
@@ -176,7 +219,7 @@ TEST_F(UpdateCommandTest, NoQuery) {
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
 }
 
-TEST_F(UpdateCommandTest, SingleQuery) {
+TEST_P(UpdateCommandTest, SingleQuery) {
     auto update =
         BSON("q" << BSON("qty" << BSON("$lt" << 50.0)) << "u" << BSON("$inc" << BSON("qty" << 1)));
     auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
@@ -188,7 +231,7 @@ TEST_F(UpdateCommandTest, SingleQuery) {
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
 }
 
-TEST_F(UpdateCommandTest, SingleQueryWithHintAndCollation) {
+TEST_P(UpdateCommandTest, SingleQueryWithHintAndCollation) {
     auto update = BSON("q" << BSON("price" << BSON("$gt" << 100)) << "hint" << BSON("price" << 1)
                            << "collation" << BSON("locale" << "fr") << "u"
                            << BSON("$inc" << BSON("price" << 10)));
@@ -203,7 +246,7 @@ TEST_F(UpdateCommandTest, SingleQueryWithHintAndCollation) {
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
 }
 
-TEST_F(UpdateCommandTest, MultipleQueries) {
+TEST_P(UpdateCommandTest, MultipleQueries) {
     constexpr int kUpdatesQ = 10;
     std::vector<BSONObj> updates;
     for (auto i = 0; i < kUpdatesQ; i++) {
@@ -219,7 +262,7 @@ TEST_F(UpdateCommandTest, MultipleQueries) {
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
 }
 
-TEST_F(UpdateCommandTest, ValidateShardVersionAndDatabaseVersion) {
+TEST_P(UpdateCommandTest, ValidateShardVersionAndDatabaseVersion) {
     auto update = BSON("q" << BSONObj() << "u" << BSON("$set" << BSON("_id" << 1)));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
@@ -240,7 +283,7 @@ TEST_F(UpdateCommandTest, ValidateShardVersionAndDatabaseVersion) {
     }
 }
 
-TEST_F(UpdateCommandTest, ValidateEncryptionInformation) {
+TEST_P(UpdateCommandTest, ValidateEncryptionInformation) {
     auto update = BSON("q" << BSONObj() << "u" << BSON("$set" << BSON("_id" << 1)));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
@@ -257,7 +300,7 @@ TEST_F(UpdateCommandTest, ValidateEncryptionInformation) {
     }
 }
 
-TEST_F(UpdateCommandTest, ValidateRawData) {
+TEST_P(UpdateCommandTest, ValidateRawData) {
     auto update =
         BSON("q" << BSON("control.count" << 2) << "u" << BSON("$set" << BSON("meta" << 3)));
 
@@ -273,6 +316,14 @@ TEST_F(UpdateCommandTest, ValidateRawData) {
         ASSERT_TRUE(mirroredObj["rawData"].Bool());
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(UpdateCommandMessageFormats,
+                         UpdateCommandTest,
+                         ::testing::Values(UpdateMessageFormat::DocumentSequence,
+                                           UpdateMessageFormat::Inline),
+                         [](const ::testing::TestParamInfo<UpdateMessageFormat>& info) {
+                             return updateMessageFormatToString(info.param);
+                         });
 
 class BulkWriteTest : public CommandMirroringTest {
 public:

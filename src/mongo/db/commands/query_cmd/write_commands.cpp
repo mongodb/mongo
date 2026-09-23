@@ -400,8 +400,19 @@ public:
                 // Assuming identical collation for all elements in `updates`, future design could
                 // use the disjunction primitive (i.e, `$or`) to compile all queries into a single
                 // filter. Such a design also requires a sound way of combining hints.
+                // TODO (SERVER-134509): Make update commands mirror all elements in the updates
+                // array.
                 invariant(seq->objs.front().isOwned());
                 _updateOpObj = seq->objs.front();
+            } else if (_commandObj.hasField("updates")) {
+                // When updates are not sent as a DocumentSequence, extract the first update object
+                // from the command body.
+                // TODO (SERVER-134509): Make update commands mirror all elements in the updates
+                // array.
+                auto updatesArray = _commandObj["updates"].Array();
+                if (!updatesArray.empty()) {
+                    _updateOpObj = updatesArray[0].Obj();
+                }
             }
         }
 
@@ -434,9 +445,6 @@ public:
                 // "filter", "sort", "hint", and "collation" fields are optional.
                 if (update.isEmpty())
                     return;
-
-                // The constructor verifies the following.
-                invariant(update.isOwned());
 
                 if (update.hasField("q"))
                     bob->append("filter", update["q"].Obj());
