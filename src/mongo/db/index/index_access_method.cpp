@@ -943,10 +943,17 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                 return IndexBuildInterceptor::Op::kInsert;
             case 'd':
                 return IndexBuildInterceptor::Op::kDelete;
+            case 'm':
+                return IndexBuildInterceptor::Op::kMultikey;
             default:
                 MONGO_UNREACHABLE;
         }
     }();
+
+    if (opType == IndexBuildInterceptor::Op::kMultikey) {
+        // TODO (SERVER-135300): Handle multikey side writes.
+        return Status::OK();
+    }
 
     // Deserialize the encoded key_string::Value.
     int keyLen;

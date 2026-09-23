@@ -38,7 +38,7 @@ public:
     static constexpr std::string_view kSideWriteMultikeyFieldName = "multikey";
     static constexpr std::string_view kSideWriteMultikeyPathsFieldName = "multikeyPaths";
 
-    enum class Op { kInsert, kDelete };
+    enum class Op { kInsert, kDelete, kMultikey };
 
     /**
      * Indicates whether to record duplicate keys that have been inserted into the index. When set

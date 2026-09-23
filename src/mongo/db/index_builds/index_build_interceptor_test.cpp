@@ -789,6 +789,58 @@ TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecor
     EXPECT_EQ(multikey_paths::toString(*recovered), multikey_paths::toString(multikeyPaths));
 }
 
+TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    auto* entry = getIndexEntry("a_1");
+
+    key_string::HeapBuilder ksBuilder{key_string::Version::kLatestVersion};
+    ksBuilder.appendNumberLong(10);
+    ksBuilder.appendRecordId(RecordId{1});
+    key_string::Value keyString{ksBuilder.release()};
+
+    // A record this binary cannot interpret, followed by an ordinary one: the drain must skip the
+    // first and still apply the second.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        auto table = getTable(*indexBuildInfo.sideWritesIdent);
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+        auto multikeyOnly = BSON("op" << "m"
+                                      << "multikey" << true);
+        ASSERT_OK(table->insertRecord(
+            operationContext(), ru, multikeyOnly.objdata(), multikeyOnly.objsize(), Timestamp()));
+
+        BufBuilder bufBuilder;
+        keyString.serialize(bufBuilder);
+        auto keyRecord =
+            BSON("op" << "i"
+                      << "key" << BSONBinData(bufBuilder.buf(), bufBuilder.len(), BinDataGeneral));
+        ASSERT_OK(table->insertRecord(
+            operationContext(), ru, keyRecord.objdata(), keyRecord.objsize(), Timestamp()));
+        wuow.commit();
+    }
+
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                _coll->getCollectionPtr(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                /*onMultikeyPathsRecovered=*/{},
+                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // Both records are consumed, and the key from the second one reached the index.
+    EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
+    ASSERT(indexCursor->seekForKeyString(ru, keyString.getView()));
+    EXPECT_FALSE(indexCursor->nextKeyString(ru));
+}
+
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven) {
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
