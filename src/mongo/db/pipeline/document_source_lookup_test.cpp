@@ -2013,6 +2013,90 @@ TEST_F(DocumentSourceLookUpTest, LookupParseSerializedStageWithAbsorbedUnwind) {
     ASSERT(dynamic_cast<DocumentSourceLookUp*>(lookup.get())->hasUnwindSrc());
 }
 
+// The internal-only fields $_internalFromIsAView and $_internalFieldMatchPipelineIdx
+// are set by the router on the mongos->shard dispatch path and must still be accepted from an
+// internal client. The default test client has no transport session, so it counts as internal
+// (see isInternalClient in allowed_contexts.cpp:isInternalClient).
+TEST_F(DocumentSourceLookUpTest, AcceptsInternalFromIsAViewFromInternalClient) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookup = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "localField" << "x"
+                                      << "foreignField" << "y"
+                                      << "as" << "out"
+                                      << "$_internalFromIsAView" << true))
+            .firstElement(),
+        expCtx);
+
+    ASSERT_TRUE(dynamic_cast<DocumentSourceLookUp*>(lookup.get())->fromNsIsAView());
+}
+
+TEST_F(DocumentSourceLookUpTest, AcceptsInternalFieldMatchPipelineIdxFromInternalClient) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    // Combined localField/foreignField + user pipeline sets _fieldMatchPipelineIdx and inserts an
+    // empty $match placeholder at index 0 of a size-2 resolved pipeline. The requested index is a
+    // post-erase index, so 1 (== placeholder-free size) relocates the placeholder to the end.
+    auto lookup = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "localField" << "x"
+                               << "foreignField" << "y"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$match" << BSON("z" << BSON("$gte" << 0))))
+                               << "as" << "out"
+                               << "$_internalFieldMatchPipelineIdx" << 1LL))
+            .firstElement(),
+        expCtx);
+
+    const auto& resolved =
+        dynamic_cast<DocumentSourceLookUp*>(lookup.get())->getResolvedPipelineForTest();
+    ASSERT_EQ(resolved.size(), 2u);
+    // The empty $match placeholder has been relocated to the end; the user $match precedes it.
+    ASSERT_TRUE(resolved.back().hasField("$match"));
+    ASSERT_TRUE(resolved.back()["$match"].Obj().isEmpty());
+    ASSERT_FALSE(resolved.front()["$match"].Obj().isEmpty());
+}
+
+// An external (user) client that supplies any of the internal-only $lookup fields
+// must be rejected with 5491300, before the field is consumed (in particular before
+// relocateFieldMatchPlaceholder, which would otherwise tassert on an out-of-range index).
+TEST_F(DocumentSourceLookUpTest, RejectsInternalFieldsFromExternalClient) {
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(fromNs).build();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    const std::vector<BSONObj> rejectedSpecs = {
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "localField" << "x" << "foreignField" << "y" << "as"
+                                      << "out"
+                                      << "$_internalFromIsAView" << true)),
+        BSON("$lookup" << BSON("from" << "coll"
+                                      << "localField" << "x" << "foreignField" << "y" << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("z" << 1))) << "as"
+                                      << "out"
+                                      << "$_internalFieldMatchPipelineIdx" << 999999LL))};
+
+    for (const auto& spec : rejectedSpecs) {
+        ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(spec.firstElement(), expCtx),
+                           AssertionException,
+                           5491300);
+    }
+}
+
 static boost::intrusive_ptr<DocumentSourceLookUp> makeLookupWithLet(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, NamespaceString fromNs) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});

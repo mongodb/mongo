@@ -607,6 +607,21 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
 }
 
 namespace {
+// The $_internalFieldMatchPipelineIdx and $_internalFromIsAView fields are internal-only: they are
+// set by the router when it serializes a $lookup for dispatch to a shard, and re-parsed by the
+// receiving (internal) shard. Reject them when an external client supplies them directly.
+void validateLookupInternalFieldsNotSetByUser(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const BSONObj& spec) {
+    using Spec = DocumentSourceLookupSpec;
+    for (std::string_view fieldName :
+         {Spec::kInternalFieldMatchPipelineIdxFieldName, Spec::kInternalFromIsAViewFieldName}) {
+        if (spec.hasField(fieldName)) {
+            assertAllowedInternalIfRequired(
+                expCtx->getOperationContext(), fieldName, AllowedWithClientType::kInternal);
+        }
+    }
+}
+
 // TODO SERVER-121094 Remove when legacy mongot branches are removed from pipeline
 // parsing/desugaring/resolution.
 // Computes where the localField/foreignField equality $match placeholder must live in a mongot
@@ -809,6 +824,7 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
         originalSpec.type() == BSONType::object) {
         hybrid_scoring_util::validateIsHybridSearchNotSetByUser(expCtx,
                                                                 originalSpec.embeddedObject());
+        validateLookupInternalFieldsNotSetByUser(expCtx, originalSpec.embeddedObject());
     }
     return DocumentSourceLookUp::createFromStageParams(*typedParams, expCtx);
 }
@@ -1624,6 +1640,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     // sub-pipeline is serialized across the wire, and re-parsed by internal clients. Reject it when
     // a user supplies it directly.
     hybrid_scoring_util::validateIsHybridSearchNotSetByUser(pExpCtx, elem.Obj());
+    validateLookupInternalFieldsNotSetByUser(pExpCtx, elem.Obj());
 
     auto lookupSpec = DocumentSourceLookupSpec::parse(elem.Obj(), IDLParserContext(kStageName));
 
