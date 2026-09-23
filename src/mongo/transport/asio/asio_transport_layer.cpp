@@ -1468,7 +1468,9 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     dnsStatsBuilder.done();
 }
 
-void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}
+void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
+    bob.append("numSelfConnections", _numNonUDSSelfConnections.get());
+}
 
 Status AsioTransportLayer::start() {
     std::unique_lock lk(_mutex);
@@ -1651,6 +1653,12 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
+            // Do not count UDS connections towards the number of self connections
+            if ((session->remote().isLocalHost() ||
+                 session->local().host() == session->remote().host()) &&
+                !isUnixDomainSocket(session->remote().host())) {
+                _numNonUDSSelfConnections.increment();
+            }
             if (session->isConnectedToLoadBalancerPort() ||
                 session->isConnectedToProxyUnixSocket()) {
                 // This session is not counted towards the number of accepted connections until the

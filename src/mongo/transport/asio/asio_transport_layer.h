@@ -438,6 +438,10 @@ private:
     // an arithmetic type for atomic operations.
     Atomic<std::int64_t> _listenerProcessingTotalMicros;
 
+    // Tracks the number of connections that are initiated to itself, where the remote and local
+    // addresses are the same. This excludes connections over Unix Domain Sockets.
+    Counter64 _numNonUDSSelfConnections;
+
     // Tracks the number of connections that are dropped by the client before the server gets to
     // process them (e.g. perform TLS handshake).
     Counter64 _discardedDueToClientDisconnect;
