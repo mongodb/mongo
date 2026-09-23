@@ -6,6 +6,7 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // Shrink the WiredTiger cache so we can easily fill it up
 let replSet = new ReplSetTest({
@@ -139,24 +140,101 @@ assert.eq(
     "Prepared transaction was aborted unexpectedly",
 );
 
-jsTestLog("Aborting remaining transactions...");
-
-// Abort remaining transactions while handling temporarily unavailable errors
-let numTemporarilyUnavailable = 0;
-for (let i = 0; i < sessions.length; i++) {
-    let res = sessions[i].abortTransaction_forTesting();
-    if (res.ok == 0 && res.code == ErrorCodes.TemporarilyUnavailable) {
-        numTemporarilyUnavailable++;
+// Runs in a child thread. Keeps one transaction holding dirty, uncommitted data so cache pressure
+// persists through the drain loop, aborting and restarting it when cache pressure kills it. Trips
+// the ready latch once it holds dirty data, and exits when the parent trips the stop latch.
+function fillerWork(host, readyLatch, stopLatch) {
+    const connection = new Mongo(host);
+    const session = connection.startSession();
+    const doc = {a: 1, x: "a".repeat(0.5 * 1024 * 1024)};
+    let ready = false;
+    try {
+        while (stopLatch.getCount() > 0) {
+            session.startTransaction();
+            let shouldRestart = false;
+            while (!shouldRestart && stopLatch.getCount() > 0) {
+                try {
+                    assert.commandWorked(
+                        session.getDatabase("test").runCommand({"insert": "c", documents: [doc]}),
+                    );
+                    // First dirty insert: the drain can now rely on live cache pressure.
+                    if (!ready) {
+                        readyLatch.countDown();
+                        ready = true;
+                    }
+                } catch (e) {
+                    shouldRestart = true;
+                }
+            }
+            // A failed insert may leave the transaction in progress; abort it so the next
+            // startTransaction() is not rejected as already in progress.
+            if (shouldRestart) {
+                try {
+                    session.abortTransaction_forTesting();
+                } catch (e) {
+                    // Already aborted (e.g. by cache pressure); ignore.
+                }
+            }
+        }
+    } finally {
+        session.endSession();
     }
-    // End the session now, while the server is still up, instead of leaving it for the shell's
-    // GC finalizer to clean up after stopSet() has already killed the server. Otherwise, every
-    // leaked session logs a failed endSessions attempt once per second until the resmoke hang
-    // analyzer aborts the shell.
-    sessions[i].endSession();
 }
 
-// At least one of the transactions should return with the temporarily unavailable error code.
-assert(numTemporarilyUnavailable > 0, "Expected TemporarilyUnavailable error but none occurred.");
-jsTestLog("All transactions aborted as expected.");
+jsTestLog("Aborting remaining transactions...");
 
-replSet.stopSet();
+// Keep a filler thread inserting through the drain loop. Without live writes, cache pressure decays
+// below the stall proportion before the drain finishes and eviction stops aborting. Both signals are
+// latches (shared across Thread serialization), which involve no DB write and so are unaffected by
+// the TemporarilyUnavailable state this test forces.
+const fillerReady = new CountDownLatch(1);
+const fillerStop = new CountDownLatch(1);
+const fillerThread = new Thread(fillerWork, db.getMongo().host, fillerReady, fillerStop);
+fillerThread.start();
+
+// Thread.start() returns before the child connects, so wait until the filler is running, then confirm
+// the server still reports cache pressure before draining. The wait-time threshold is what the
+// background abort thread watches; without live writes the wait-time delta drops below it, so this
+// ensures pressure is sustained rather than assumed from a single filler insert.
+fillerReady.await();
+assert.soon(
+    () => {
+        const cp = db.serverStatus().metrics.cachePressure;
+        return cp.waitTimeThresholdExceeded && (cp.cacheUpdatesThreshold || cp.cacheDirtyThreshold);
+    },
+    "Timed out waiting for cache pressure before draining.",
+    2 * 60 * 1000,
+);
+
+try {
+    // Abort remaining transactions while handling temporarily unavailable errors
+    let numTemporarilyUnavailable = 0;
+    for (let i = 0; i < sessions.length; i++) {
+        let res = sessions[i].abortTransaction_forTesting();
+        if (res.ok == 0 && res.code == ErrorCodes.TemporarilyUnavailable) {
+            numTemporarilyUnavailable++;
+        }
+        // End the session now, while the server is still up, instead of leaving it for the shell's
+        // GC finalizer to clean up after stopSet() has already killed the server. Otherwise, every
+        // leaked session logs a failed endSessions attempt once per second until the resmoke hang
+        // analyzer aborts the shell.
+        sessions[i].endSession();
+    }
+
+    // At least one of the transactions should return with the temporarily unavailable error code.
+    assert(
+        numTemporarilyUnavailable > 0,
+        "Expected TemporarilyUnavailable error but none occurred.",
+    );
+    jsTestLog("All transactions aborted as expected.");
+} finally {
+    // Stop the filler and wait for it to release its session before teardown, unconditionally, so
+    // a thrown abort above cannot leave it running with an active transaction.
+    fillerStop.countDown();
+    try {
+        fillerThread.join();
+    } catch (error) {
+        jsTestLog("Ignoring non-critical error " + error);
+    }
+    replSet.stopSet();
+}
