@@ -1085,6 +1085,15 @@ public:
         OperationContext* opCtx, const std::vector<std::string>& indexIdents) const {
         return 0;
     }
+
+    /**
+     * Returns the compressed size of the shared history store table
+     * (`WiredTigerSharedHS.wt_stable`) as of the last checkpoint. Returns 0 if the engine does not
+     * support this operation, is not disaggregated, or the table is missing.
+     */
+    virtual StatusWith<int64_t> getSharedHistoryStoreStorageSize(OperationContext* opCtx) const {
+        return 0;
+    }
 };
 
 }  // namespace mongo

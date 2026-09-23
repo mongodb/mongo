@@ -995,6 +995,16 @@ TEST_F(WiredTigerKVEngineTest, GetIndexStorageSizeAbsentStableFileContributesZer
     EXPECT_EQ(swSize.getValue(), 0);
 }
 
+TEST_F(WiredTigerKVEngineTest, GetSharedHistoryStoreStorageSizeAbsentFileContributesZero) {
+    auto opCtxPtr = _makeOperationContext();
+    // Attached-storage WiredTiger cannot create WiredTigerSharedHS.wt_stable: the disaggregated
+    // block manager requires a page log. This fixture only covers the missing-file path.
+    const StatusWith<int64_t> swSize =
+        _helper->getWiredTigerKVEngine()->getSharedHistoryStoreStorageSize(opCtxPtr.get());
+    ASSERT_OK(swSize.getStatus());
+    EXPECT_EQ(swSize.getValue(), 0);
+}
+
 // Pausing auto-compact in background is applied asynchronously, so a pause issued while a
 // previous one is still being consumed is transiently rejected with ObjectIsBusy. Production wraps
 // these calls in a retry loop (see StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock);

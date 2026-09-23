@@ -744,6 +744,13 @@ public:
     }
 
     /**
+     * See StorageEngine::getSharedHistoryStoreStorageSize for details.
+     */
+    virtual StatusWith<int64_t> getSharedHistoryStoreStorageSize(OperationContext*) const {
+        return 0;
+    }
+
+    /**
      * Pauses background auto-compaction for a replica set write block transition. Auto-compaction
      * must be explicitly re-enabled after the write block is released.
      */

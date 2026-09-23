@@ -318,6 +318,8 @@ public:
     StatusWith<int64_t> getIndexStorageSize(
         OperationContext* opCtx, const std::vector<std::string>& indexIdents) const override;
 
+    StatusWith<int64_t> getSharedHistoryStoreStorageSize(OperationContext* opCtx) const override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

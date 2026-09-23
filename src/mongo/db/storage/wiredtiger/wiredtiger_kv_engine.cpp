@@ -3490,6 +3490,24 @@ StatusWith<int64_t> WiredTigerKVEngineBase::getIndexStorageSize(
     return total;
 }
 
+StatusWith<int64_t> WiredTigerKVEngineBase::getSharedHistoryStoreStorageSize(
+    OperationContext*) const {
+    auto session = getConnection().getUninterruptibleSession();
+    const std::string statsUri = str::stream()
+        << "statistics:" << WiredTigerUtil::kSharedHistoryStoreFileUri;
+    auto swSize = WiredTigerUtil::getStatisticsValue(
+        *session, statsUri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
+    if (!swSize.isOK()) {
+        const Status& status = swSize.getStatus();
+        // Missing shared history store (not disaggregated, or not yet created) contributes zero.
+        if (status == ErrorCodes::NoSuchKey) {
+            return 0;
+        }
+        return status;
+    }
+    return swSize.getValue();
+}
+
 Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, const char* config) {
     int ret = session.drop(uri, config);
 

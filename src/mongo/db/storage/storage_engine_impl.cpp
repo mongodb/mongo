@@ -1264,4 +1264,9 @@ StatusWith<int64_t> StorageEngineImpl::getIndexStorageSize(
     return _engine->getIndexStorageSize(opCtx, indexIdents);
 }
 
+StatusWith<int64_t> StorageEngineImpl::getSharedHistoryStoreStorageSize(
+    OperationContext* opCtx) const {
+    return _engine->getSharedHistoryStoreStorageSize(opCtx);
+}
+
 }  // namespace mongo
