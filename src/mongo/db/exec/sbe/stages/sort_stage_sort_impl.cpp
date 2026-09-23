@@ -52,9 +52,10 @@ public:
             _limitCode = _stage._limitExpr->compile(ctx);
         }
 
-        _stage._memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
-            _stage._opCtx,
-            MemoryUsageLimit{static_cast<int64_t>(_stage._specificStats.maxMemoryUsageBytes)});
+        _stage._memoryTracker =
+            OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+                _stage._opCtx,
+                MemoryUsageLimit{static_cast<int64_t>(_stage._specificStats.maxMemoryUsageBytes)});
     }
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {
