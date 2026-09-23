@@ -121,6 +121,12 @@ TEST_F(QueryLatencyAccumulatorTest, RoutesEachStrategyToItsOwnHistogram) {
         {PlanSelectionStrategy::kCachedPlan,
          otel::metrics::MetricNames::kQueryLatencyCachedPlan,
          750},
+        {PlanSelectionStrategy::kJoinOptimization,
+         otel::metrics::MetricNames::kQueryLatencyJoinOptimization,
+         1250},
+        {PlanSelectionStrategy::kJoinCachedPlan,
+         otel::metrics::MetricNames::kQueryLatencyJoinCachedPlan,
+         1750},
     };
 
     for (const auto& [strategy, name, micros] : cases) {

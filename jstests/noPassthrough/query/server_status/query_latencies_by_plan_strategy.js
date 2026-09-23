@@ -1,14 +1,18 @@
 /**
  * Verifies the query latency OTel histograms per plan selection strategy. Published under
  * serverStatus "metrics.queryLatencies.<strategy>" for strategy in {multiPlanner, costBased,
- * singlePlan, cachedPlan}. Each is a bucket-count histogram exposing per-bucket "count" fields and a
- * "totalCount" (the number of queries observed for that strategy). Zero-count buckets are omitted,
- * so the set of per-bucket fields varies with the latencies actually observed.
+ * singlePlan, cachedPlan, joinOptimization, joinCachedPlan}. Each is a bucket-count histogram
+ * exposing per-bucket "count" fields and a "totalCount" (the number of queries observed for that
+ * strategy). Zero-count buckets are omitted, so the set of per-bucket fields varies with the
+ * latencies actually observed.
  *
  * Each plan ranker exercises the strategies it can produce:
  *   - multiPlanning: singlePlan, multiPlanner, cachedPlan
  *   - costBased:     singlePlan, costBased,    cachedPlan
  *   - mixed:         singlePlan, multiPlanner, costBased, cachedPlan
+ *
+ * Join order optimization plans outside the plan ranker and records the dedicated
+ * joinOptimization / joinCachedPlan strategies.
  *
  * @tags: [
  *   requires_fcv_90,
@@ -16,8 +20,17 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
-const kStrategies = ["multiPlanner", "costBased", "singlePlan", "cachedPlan"];
+const kStrategies = [
+    "multiPlanner",
+    "costBased",
+    "singlePlan",
+    "cachedPlan",
+    "joinOptimization",
+    "joinCachedPlan",
+];
 
 // Asserts `explain` ran under the engine implied by the framework control.
 function assertEngine(explain, frameworkControl) {
@@ -441,6 +454,140 @@ function defineLifecycleSuite() {
     });
 }
 
+// Join order optimization plans outside the multi-planner / plan ranker, so its queries record the
+// dedicated joinOptimization / joinCachedPlan strategies. A fresh enumeration misses the join plan
+// cache (joinOptimization); an identical query recovers its plan from the cache (joinCachedPlan).
+function defineJoinOptimizationSuite() {
+    describe("join optimization", function () {
+        let db;
+        let conn;
+        let base;
+        let left;
+        let right;
+        const suite = makeSuite(() => db);
+        const joinPipeline = () => [
+            {$lookup: {from: left.getName(), localField: "lk", foreignField: "lk", as: "jl"}},
+            {$unwind: "$jl"},
+            {$lookup: {from: right.getName(), localField: "rk", foreignField: "rk", as: "jr"}},
+            {$unwind: "$jr"},
+        ];
+
+        before(function () {
+            conn = MongoRunner.runMongod({
+                setParameter: {
+                    featureFlagPathArrayness: true,
+                    featureFlagOtelMetrics: true,
+                    internalEnableJoinOptimization: true,
+                    internalEnableJoinPlanCache: true,
+                },
+            });
+            assert.neq(conn, null, "mongod failed to start");
+            db = conn.getDB("test");
+
+            const prefix = jsTestName();
+            base = db[prefix + "_base"];
+            left = db[prefix + "_left"];
+            right = db[prefix + "_right"];
+            base.drop();
+            left.drop();
+            right.drop();
+
+            assert.commandWorked(
+                base.insert(Array.from({length: 5}, (_, i) => ({_id: i, lk: 1, rk: 1}))),
+            );
+            assert.commandWorked(left.insert({_id: "left", lk: 1, a: 1}));
+            assert.commandWorked(right.insert({_id: "right", rk: 1, b: 1}));
+            assert.commandWorked(base.createIndex({lk: 1, rk: 1}));
+            assert.commandWorked(left.createIndex({lk: 1}));
+            assert.commandWorked(right.createIndex({rk: 1}));
+        });
+
+        after(function () {
+            MongoRunner.stopMongod(conn);
+        });
+
+        // Runs fn and asserts `strategy` gained exactly `expected` observations and no other
+        // strategy recorded anything.
+        function expectOnly(strategy, expected, fn) {
+            const before = suite.getQueryLatencies();
+            fn();
+            const after = suite.getQueryLatencies();
+            assert.eq(
+                suite.queriesFor(after, strategy),
+                suite.queriesFor(before, strategy) + expected,
+                `expected ${expected} new ${strategy} observation(s)`,
+                {before, after},
+            );
+            assert.eq(
+                suite.totalQueries(after),
+                suite.totalQueries(before) + expected,
+                `only ${strategy} should have recorded`,
+                {before, after},
+            );
+        }
+
+        it("records joinOptimization for a freshly enumerated aggregate", function () {
+            const explain = base.explain().aggregate(joinPipeline());
+            assert(joinOptUsed(explain), "Expected join optimization to be used", {explain});
+
+            // This is the first execution of the shape: the join plan cache is empty, so
+            // join-order enumeration runs and the query is attributed to joinOptimization.
+            expectOnly("joinOptimization", 1, () => {
+                assert.eq(5, base.aggregate(joinPipeline()).itcount());
+            });
+        });
+
+        it("records joinCachedPlan for an identical aggregate served from the join plan cache", function () {
+            // The previous identical execution populated the join plan cache; this one is a
+            // cache hit and must be attributed to joinCachedPlan, not re-enumeration.
+            expectOnly("joinCachedPlan", 1, () => {
+                assert.eq(5, base.aggregate(joinPipeline()).itcount());
+            });
+        });
+
+        it("records one joinCachedPlan observation across the aggregate and its getMores", function () {
+            // batchSize 2 over 5 documents: one aggregate plus several getMores. The single
+            // observation is taken only when the cursor is exhausted.
+            expectOnly("joinCachedPlan", 1, () => {
+                const res = assert.commandWorked(
+                    db.runCommand({
+                        aggregate: base.getName(),
+                        pipeline: joinPipeline(),
+                        cursor: {batchSize: 2},
+                    }),
+                );
+                let cursorId = res.cursor.id;
+                assert.neq(cursorId, NumberLong(0), "expected an open cursor", {res});
+                while (cursorId.compare(NumberLong(0)) !== 0) {
+                    const getMore = assert.commandWorked(
+                        db.runCommand({getMore: cursorId, collection: base.getName()}),
+                    );
+                    cursorId = getMore.cursor.id;
+                }
+            });
+        });
+
+        it("does not record a join strategy when the same shape plans without join opt", function () {
+            assert.commandWorked(
+                conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}),
+            );
+            // The $lookup-$unwind shape is still present, but the query plans normally and must
+            // not be attributed to a join strategy just because it could have been optimized.
+            const before = suite.getQueryLatencies();
+            assert.eq(5, base.aggregate(joinPipeline()).itcount());
+            const after = suite.getQueryLatencies();
+            for (const strategy of ["joinOptimization", "joinCachedPlan"]) {
+                assert.eq(
+                    suite.queriesFor(after, strategy),
+                    suite.queriesFor(before, strategy),
+                    `a non-JOO query must not create a ${strategy} observation`,
+                    {before, after},
+                );
+            }
+        });
+    });
+}
+
 describe("queryLatencies serverStatus metrics by plan-selection strategy", function () {
     // Each ranker exercises the strategies it can produce on the classic engine.
     defineSuiteForRanker("forceClassicEngine", "multiPlanning", [
@@ -479,4 +626,11 @@ describe("queryLatencies serverStatus metrics by plan-selection strategy", funct
 
     // Ranker-independent behaviors.
     defineLifecycleSuite();
+
+    // Join order optimization, which plans outside the multi-planner / plan ranker. JOO requires
+    // SBE, so on classic-only builds (internalQueryFrameworkControl forced to classic per the
+    // variant's TestData) the suite is not registered at all.
+    if (!checkSbeCompletelyDisabled(null)) {
+        defineJoinOptimizationSuite();
+    }
 });

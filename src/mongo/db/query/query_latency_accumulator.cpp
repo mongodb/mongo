@@ -39,7 +39,7 @@ otel::metrics::Histogram<int64_t>& makeQueryLatencyHistogram(otel::metrics::Metr
              otel::metrics::HistogramSerializationFormat::kNonEmptyBucketCounts});
 }
 
-// Register histograms for all four plan-selection strategies.
+// Register histograms for all plan-selection strategies.
 otel::metrics::Histogram<int64_t>& multiPlannerHistogram = makeQueryLatencyHistogram(
     otel::metrics::MetricNames::kQueryLatencyMultiPlanner, "multiPlanner");
 otel::metrics::Histogram<int64_t>& costBasedHistogram =
@@ -48,6 +48,10 @@ otel::metrics::Histogram<int64_t>& singlePlanHistogram =
     makeQueryLatencyHistogram(otel::metrics::MetricNames::kQueryLatencySinglePlan, "singlePlan");
 otel::metrics::Histogram<int64_t>& cachedPlanHistogram =
     makeQueryLatencyHistogram(otel::metrics::MetricNames::kQueryLatencyCachedPlan, "cachedPlan");
+otel::metrics::Histogram<int64_t>& joinOptimizationHistogram = makeQueryLatencyHistogram(
+    otel::metrics::MetricNames::kQueryLatencyJoinOptimization, "joinOptimization");
+otel::metrics::Histogram<int64_t>& joinCachedPlanHistogram = makeQueryLatencyHistogram(
+    otel::metrics::MetricNames::kQueryLatencyJoinCachedPlan, "joinCachedPlan");
 
 // No default case: a new PlanSelectionStrategy fails to compile until it names its histogram.
 otel::metrics::Histogram<int64_t>& queryLatencyHistogramFor(PlanSelectionStrategy strategy) {
@@ -60,6 +64,10 @@ otel::metrics::Histogram<int64_t>& queryLatencyHistogramFor(PlanSelectionStrateg
             return singlePlanHistogram;
         case PlanSelectionStrategy::kCachedPlan:
             return cachedPlanHistogram;
+        case PlanSelectionStrategy::kJoinOptimization:
+            return joinOptimizationHistogram;
+        case PlanSelectionStrategy::kJoinCachedPlan:
+            return joinCachedPlanHistogram;
     }
     MONGO_UNREACHABLE_TASSERT(12765301);
 }

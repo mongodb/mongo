@@ -669,6 +669,10 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.queryLatencies.singlePlan");
     static constexpr MetricName kQueryLatencyCachedPlan =
         MetricNameMaker::make("mongodb.serverStatus.queryLatencies.cachedPlan");
+    static constexpr MetricName kQueryLatencyJoinOptimization =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.joinOptimization");
+    static constexpr MetricName kQueryLatencyJoinCachedPlan =
+        MetricNameMaker::make("mongodb.serverStatus.queryLatencies.joinCachedPlan");
 
     // Op Counters
     static constexpr MetricName kInsertOpCount =

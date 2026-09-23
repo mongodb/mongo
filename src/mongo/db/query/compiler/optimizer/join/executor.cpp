@@ -27,6 +27,7 @@
 #include "mongo/db/query/plan_cache/join_plan_cache_key.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -634,7 +635,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
                                             nullptr /* remoteCursors */,
                                             nullptr /* remoteExplains */,
                                             nullptr /* classicRuntimePlannerStage */,
-                                            boost::none /* maybeExplainData */);
+                                            boost::none /* maybeExplainData */,
+                                            PlanSelectionStrategy::kJoinCachedPlan);
     return exec;
 }
 
@@ -1019,7 +1021,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                             nullptr /* remoteCursors */,
                                             nullptr /* remoteExplains */,
                                             nullptr /* classicRuntimePlannerStage */,
-                                            std::move(maybeExplainData));
+                                            std::move(maybeExplainData),
+                                            PlanSelectionStrategy::kJoinOptimization);
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

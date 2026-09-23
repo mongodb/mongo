@@ -1462,6 +1462,9 @@ void orderV3PlanCandidates(PlanSelectionStrategy decidingPlanRanker,
         case PlanSelectionStrategy::kCachedPlan:
             // No ranking decision (single plan, cached plan): enumeration order.
             return;
+        case PlanSelectionStrategy::kJoinOptimization:
+        case PlanSelectionStrategy::kJoinCachedPlan:
+            MONGO_UNIMPLEMENTED_TASSERT(13518400);
     }
     MONGO_UNREACHABLE_TASSERT(13052907);
 }
