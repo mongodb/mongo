@@ -60,6 +60,7 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -106,6 +107,11 @@ namespace {
 using namespace std::literals::string_view_literals;
 MONGO_FAIL_POINT_DEFINE(queryPlannerAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planFromCacheAlwaysFails);
+
+// Rate-limits rejection logging per namespace: first at Info, subsequent within the window at
+// Debug(2).
+logv2::KeyedSeveritySuppressor<std::string> maxEstimatedScanBytesRejectionLogSeverity{
+    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 /**
  * Attempts to apply the index tags from 'branchCacheData' to 'orChild'. If the index assignments
@@ -764,14 +770,17 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                 }
             } else {
                 if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
-                    LOGV2(13466400,
-                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
-                          "COLLSCAN on a collection that exceeds the configured size threshold",
-                          "namespace"_attr = query.nss().toStringForErrorMsg(),
-                          "estimatedSize"_attr =
-                              params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                          "threshold"_attr =
-                              params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                    LOGV2_DEBUG(
+                        13466400,
+                        maxEstimatedScanBytesRejectionLogSeverity(query.nss().toStringForErrorMsg())
+                            .toInt(),
+                        "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                        "COLLSCAN on a collection that exceeds the configured size threshold",
+                        "namespace"_attr = query.nss().toStringForErrorMsg(),
+                        "estimatedSize"_attr =
+                            params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                        "threshold"_attr =
+                            params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
                     maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
                 }
                 return Status(
@@ -953,13 +962,16 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
             }
         } else {
             if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
-                LOGV2(13466401,
-                      "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
-                      "COLLSCAN on a collection that exceeds the configured size threshold",
-                      "namespace"_attr = query.nss().toStringForErrorMsg(),
-                      "estimatedSize"_attr =
-                          params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                      "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                LOGV2_DEBUG(
+                    13466401,
+                    maxEstimatedScanBytesRejectionLogSeverity(query.nss().toStringForErrorMsg())
+                        .toInt(),
+                    "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                    "COLLSCAN on a collection that exceeds the configured size threshold",
+                    "namespace"_attr = query.nss().toStringForErrorMsg(),
+                    "estimatedSize"_attr =
+                        params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                    "threshold"_attr = params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
                 maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
             }
             return Status(ErrorCodes::NoQueryExecutionPlans,
@@ -1821,14 +1833,17 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 }
             } else {
                 if (query.getExpCtx()->tryClaimMaxEstimatedScanBytesMetric()) {
-                    LOGV2(13466402,
-                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
-                          "COLLSCAN on a collection that exceeds the configured size threshold",
-                          "namespace"_attr = query.nss().toStringForErrorMsg(),
-                          "estimatedSize"_attr =
-                              params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
-                          "threshold"_attr =
-                              params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
+                    LOGV2_DEBUG(
+                        13466402,
+                        maxEstimatedScanBytesRejectionLogSeverity(query.nss().toStringForErrorMsg())
+                            .toInt(),
+                        "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                        "COLLSCAN on a collection that exceeds the configured size threshold",
+                        "namespace"_attr = query.nss().toStringForErrorMsg(),
+                        "estimatedSize"_attr =
+                            params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize,
+                        "threshold"_attr =
+                            params.mainCollectionInfo.maxEstimatedScanBytesThreshold);
                     maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
                 }
                 return Status(

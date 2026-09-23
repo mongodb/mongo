@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 
@@ -72,6 +73,10 @@ using std::vector;
 //
 
 namespace {
+
+// Rate-limits $lookup rejection logging per foreign namespace.
+logv2::KeyedSeveritySuppressor<std::string> maxEstimatedScanBytesRejectionLogSeverity{
+    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 /**
  * Walk the tree 'root' and output all leaf nodes into 'leafNodes'.
@@ -1139,14 +1144,18 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
                       "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
                 maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
             } else {
-                LOGV2(13466403,
-                      "Query rejected by maxEstimatedScanBytes: $lookup foreign collection scan "
-                      "requires an unbounded COLLSCAN on a collection that exceeds the "
-                      "configured size threshold",
-                      "namespace"_attr = foreignCollName.toStringForErrorMsg(),
-                      "estimatedSize"_attr =
-                          foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
-                      "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
+                LOGV2_DEBUG(
+                    13466403,
+                    maxEstimatedScanBytesRejectionLogSeverity(foreignCollName.toStringForErrorMsg())
+                        .toInt(),
+                    "Query rejected by maxEstimatedScanBytes: $lookup foreign collection "
+                    "scan "
+                    "requires an unbounded COLLSCAN on a collection that exceeds the "
+                    "configured size threshold",
+                    "namespace"_attr = foreignCollName.toStringForErrorMsg(),
+                    "estimatedSize"_attr =
+                        foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
+                    "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
                 maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
                 uasserted(ErrorCodes::NoQueryExecutionPlans,
                           "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
