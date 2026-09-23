@@ -92,6 +92,7 @@ mongo_cc_library(
         ":pipeline_dependency_graph",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/compiler/metadata:schema_type_info",
     ],
 )
 

@@ -1028,6 +1028,9 @@ Status _collModInternal(OperationContext* opCtx,
             auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
             if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
                 collectionQueryInfo.rebuildSchemaTypeInfo(opCtx, writableColl);
+                // TODO: think whether to invalidate the cache only if there was change of the
+                // schema type info
+                collectionQueryInfo.clearQueryCache(opCtx, CollectionPtr(writableColl));
             } else {
                 collectionQueryInfo.invalidateSchemaTypeInfo();
             }
