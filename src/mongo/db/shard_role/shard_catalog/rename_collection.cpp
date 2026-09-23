@@ -92,6 +92,7 @@ MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesBeforeFinalize);
 MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeButBeforeSourceDrop);
 MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeAndAfterSourceDrop);
+MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesAfterAcquiringDbLocks);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
@@ -920,6 +921,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         }
     }();
 
+    hangRenameCollectionAcrossDatabasesAfterAcquiringDbLocks.pauseWhileSet(opCtx);
+
     // Acquire MODE_X collection locks for all involved collections.
     struct RenameAcrossDatabasesCollectionLocks {
         boost::optional<AutoGetCollection> sourceColl;
@@ -1033,8 +1036,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
     // is sharded.
     auto catalog = CollectionCatalog::get(opCtx);
-    const auto targetColl =
-        targetDB.getDb() ? catalog->lookupCollectionByNamespace(opCtx, target) : nullptr;
+    const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
     if (targetColl) {
         // If the target collection already exists and has the correct UUID, then a prior run of the
         // operation completed and simply failed to drop the source collection.
