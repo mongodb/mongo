@@ -56,9 +56,8 @@ public:
         alternativePaths = {{a, pa1}, {b, pb1}, {c, pc1}, {d, pd1}, {e, pe1}, {f, pf1}};
 
         for (size_t i = 0; i <= kMaxEdgeId; ++i) {
-            edgeSelectivities.emplace_back(
-                cost_based_ranker::SelectivityType{static_cast<double>(i + 1) / (2.0 * kMaxEdgeId)},
-                cost_based_ranker::EstimationSource::Code);
+            edgeSelectivities.push_back(
+                makeJoinSelectivityEstimate(static_cast<double>(i + 1) / (2.0 * kMaxEdgeId)));
         }
     }
 
@@ -100,9 +99,7 @@ public:
     }
 
     void setSelectivity(EdgeId edgeId, double newSelectivity) {
-        edgeSelectivities[edgeId] = cost_based_ranker::SelectivityEstimate(
-            cost_based_ranker::SelectivityType(newSelectivity),
-            cost_based_ranker::EstimationSource::Code);
+        edgeSelectivities[edgeId] = makeJoinSelectivityEstimate(newSelectivity);
     }
 
     GraphCycleBreaker makeCycleBreaker() {

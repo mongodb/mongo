@@ -128,10 +128,27 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
         plannerBob.append("joinPlanCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
     }
 
-    if (const auto& joinMetrics = CurOp::get(exec->getOpCtx())->debug().joinOptimizationMetrics;
-        joinMetrics && joinMetrics->fallbackReason) {
-        plannerBob.append("joinFallbackReason",
-                          join_ordering::toReasonName(*joinMetrics->fallbackReason));
+    if (const auto& joinMetrics = CurOp::get(exec->getOpCtx())->debug().joinOptimizationMetrics) {
+        if (joinMetrics->fallbackReason) {
+            plannerBob.append("joinFallbackReason",
+                              join_ordering::toReasonName(*joinMetrics->fallbackReason));
+        }
+
+        BSONObjBuilder joinOptBob(plannerBob.subobjStart("joinOptimizationMetrics"));
+        joinOptBob.appendNumber("joinModelingTimeMicros",
+                                static_cast<long long>(joinMetrics->joinModelingTimeMicros));
+        joinOptBob.appendNumber("sbeLoweringTimeMicros",
+                                static_cast<long long>(joinMetrics->sbeLoweringTimeMicros));
+        if (const auto& pe = joinMetrics->planEnumerationMetrics) {
+            joinOptBob.appendNumber("samplingTimeMicros",
+                                    static_cast<long long>(pe->samplingTimeMicros));
+            joinOptBob.appendNumber("cbrPlanningTimeMicros",
+                                    static_cast<long long>(pe->cbrPlanningTimeMicros));
+            joinOptBob.appendNumber("planEnumerationTimeMicros",
+                                    static_cast<long long>(pe->planEnumerationTimeMicros));
+            joinOptBob.appendNumber("ceTimeMicros", static_cast<long long>(pe->ceTimeMicros));
+            joinOptBob.append("wtLeafPagesAvailable", pe->numApproxLeafPagesUnavailable == 0);
+        }
     }
 
     if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {

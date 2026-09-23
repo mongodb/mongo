@@ -5,7 +5,6 @@
 
 #include "mongo/db/op_debug.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
-#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
@@ -30,9 +29,10 @@ public:
         OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     /**
-     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
+     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling, along with
+     * metadata about how this estimate was obtained.
      */
-    static cost_based_ranker::SelectivityEstimate joinPredicateSel(
+    static JoinEdgeSelectivityEstimate joinPredicateSel(
         const JoinReorderingContext& ctx,
         const SamplingEstimatorMap& samplingEstimators,
         const JoinEdge& edge,
@@ -55,6 +55,14 @@ public:
      * Returns the selectivity of the given edge.
      */
     SelectivityEstimate getEdgeSelectivity(EdgeId edge) const;
+
+    /**
+     * Returns information about the estimated NDV recorded for 'edge' if we have any, or nullptr if
+     * none is available.
+     */
+    const JoinEdgeSelectivityEstimate* getEdgeSelectivityEstimate(EdgeId edge) const {
+        return edge < _edgeSelectivities.size() ? &_edgeSelectivities[edge] : nullptr;
+    }
 
     /**
      * Returns the total time spent estimating cardinalities on this estimator: the up-front edge

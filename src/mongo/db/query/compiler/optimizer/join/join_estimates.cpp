@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string_util.h"
 
 #include <string_view>
 
@@ -28,6 +29,19 @@ void JoinExtraEstimateInfo::serialize(BSONObjBuilder& bob) const {
         // QSNEstimate::serialize() (see estimates.h). CardinalityEstimate::toBSON() would instead
         // produce a nested {Cardinality, Source} object that is incompatible with that shape.
         bob.append("cardinalityRHSBeforeJoinPred", cardinalityRHSBeforeJoinPred->toDouble());
+    }
+
+    if (!edgeSelectivities.empty()) {
+        BSONArrayBuilder arr(bob.subarrayStart("ndvEstimates"));
+        for (const auto& est : edgeSelectivities) {
+            BSONObjBuilder sub(arr.subobjStart());
+            sub.append("assumedPkSide",
+                       NamespaceStringUtil::serialize(est.assumedPkSide,
+                                                      SerializationContext::stateDefault()));
+            sub.append("ndv", est.ndv.toDouble());
+            sub.append("ndvSource", toStringData(est.source));
+            sub.append("selectivity", est.selectivity.toDouble());
+        }
     }
 
     BSONObjBuilder subBob(bob.subobjStart("joinCostComponents"));

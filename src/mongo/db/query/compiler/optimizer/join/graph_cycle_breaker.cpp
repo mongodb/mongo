@@ -210,7 +210,8 @@ EdgeId GraphCycleBreaker::breakCycle(const Bitset& cycleBitset,
         absl::InlinedVector<std::pair<cost_based_ranker::SelectivityEstimate, EdgeId>, 3>
             selectivities;
         for (auto edgeId : makePopulationView(cycleBitset)) {
-            selectivities.emplace_back(edgeSelectivities.at(edgeId), static_cast<EdgeId>(edgeId));
+            selectivities.emplace_back(edgeSelectivities.at(edgeId).selectivity,
+                                       static_cast<EdgeId>(edgeId));
         }
         // Sort by selectivity using an exact (strict-weak-ordering) comparison; the estimates'
         // approximate ordering is not transitive and is unsafe for std::sort.

@@ -5,8 +5,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/util/modules.h"
 
+#include <string>
 #include <string_view>
 
 #include <boost/optional.hpp>
@@ -168,6 +170,7 @@ public:
     double randomIOPages{0};
     double localOpCost{0};
     double totalCost{0};
+    std::vector<JoinEdgeSelectivityEstimate> edgeSelectivities;
     // Only set for INDEXED_NESTED_LOOP_JOIN nodes; absent for HJ and NLJ.
     boost::optional<MackertLohmanCase> mackertLohmanCase;
     boost::optional<CardinalityEstimate> cardinalityRHSBeforeJoinPred;

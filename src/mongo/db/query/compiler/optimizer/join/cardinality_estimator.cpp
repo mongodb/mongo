@@ -13,6 +13,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
+#include <algorithm>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryJoin
 
 namespace mongo::join_ordering {
@@ -107,7 +109,7 @@ EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
 //
 // If we are in case (2), we again can estimate Card(P) via NDV(FK) on either side, since we assume
 // both sides reference the primary key. Again, we use the side with the smaller CE for simplicity.
-cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
+JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     const JoinReorderingContext& ctx,
     const SamplingEstimatorMap& samplingEstimators,
     const JoinEdge& edge,
@@ -149,20 +151,27 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
     // estimation for the "primary key".
     bool ndvFieldsAreUnique = ctx.uniqueFieldInfo.contains(primaryKeyNode.collectionName) &&
         fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(primaryKeyNode.collectionName));
-    CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics]() {
-        if (ndvFieldsAreUnique) {
-            ++metrics.numUniqueIndexesUsedForNDV;
-            return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
-                                       EstimationSource::Metadata);
-        }
-        return samplingEstimator->estimateNDV(fields);
-    }();
 
-    cost_based_ranker::SelectivityEstimate res{cost_based_ranker::oneSel};
+    JoinNdvEstimateSource source = JoinNdvEstimateSource::kSampling;
+    CardinalityEstimate ndv =
+        [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics, &source]() {
+            if (ndvFieldsAreUnique) {
+                source = JoinNdvEstimateSource::kUniqueIndex;
+                ++metrics.numUniqueIndexesUsedForNDV;
+                return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
+                                           EstimationSource::Metadata);
+            }
+
+            // TODO SERVER-135494: report HLL when used/available.
+            return samplingEstimator->estimateNDV(fields);
+        }();
+
+    cost_based_ranker::SelectivityEstimate sel{cost_based_ranker::oneSel};
     // Ensure we don't accidentally produce a selectivity > 1
     if (cost_based_ranker::exactGt(ndv, cost_based_ranker::oneCE)) {
-        res = cost_based_ranker::oneCE / ndv;
+        sel = cost_based_ranker::oneCE / ndv;
     }
+
     LOGV2_DEBUG(11352504,
                 5,
                 "Performed estimation of selectivity of join edge",
@@ -173,8 +182,13 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
                 "fields"_attr = fields,
                 "ndvEstimate"_attr = ndv,
                 "ndvFieldsAreUnique"_attr = ndvFieldsAreUnique,
-                "selectivityEstimate"_attr = res);
-    return res;
+                "selectivityEstimate"_attr = sel,
+                "source"_attr = toStringData(source));
+
+    return {.assumedPkSide = primaryKeyNode.collectionName,
+            .ndv = ndv,
+            .selectivity = sel,
+            .source = source};
 }
 
 cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSubsetCardinality(
@@ -225,7 +239,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
 
     auto edges = _cycleBreaker.breakCycles(_ctx.joinGraph.getEdgesForSubgraph(nodes));
     for (const auto& edgeId : edges) {
-        ce = ce * _edgeSelectivities.at(edgeId);
+        ce = ce * _edgeSelectivities.at(edgeId).selectivity;
     }
 
     LOGV2_DEBUG(11514603,
@@ -240,7 +254,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
 }
 
 SelectivityEstimate JoinCardinalityEstimator::getEdgeSelectivity(EdgeId edge) const {
-    return _edgeSelectivities[edge];
+    return _edgeSelectivities[edge].selectivity;
 }
 
 

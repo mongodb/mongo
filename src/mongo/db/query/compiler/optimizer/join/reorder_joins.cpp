@@ -137,17 +137,15 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
     return preds;
 }
 
-void addEstimatesIfExplain(const JoinReorderingContext& ctx,
-                           const PlanEnumeratorContext& peCtx,
-                           QuerySolutionNode* node,
-                           NodeSet set,
-                           const JoinCostEstimate& cost,
-                           cost_based_ranker::EstimateMap& estimates) {
-    if (!ctx.explain) {
-        return;
-    }
-
-    auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
+void addEstimatesForExplain(const JoinReorderingContext& ctx,
+                            const PlanEnumeratorContext& peCtx,
+                            QuerySolutionNode* node,
+                            NodeSet set,
+                            const JoinCostEstimate& cost,
+                            const std::vector<EdgeId>& edges,
+                            cost_based_ranker::EstimateMap& estimates) {
+    auto* ceEstimator = peCtx.getJoinCardinalityEstimator();
+    auto ce = ceEstimator->getOrEstimateSubsetCardinality(set);
     auto est = std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost());
     if (internalQueryExplainJoinCostComponents.load()) {
         auto joinEst = std::make_unique<JoinExtraEstimateInfo>(ce, cost.getTotalCost());
@@ -160,6 +158,11 @@ void addEstimatesIfExplain(const JoinReorderingContext& ctx,
         joinEst->totalCost = cost.getTotalCost().toDouble();
         joinEst->mackertLohmanCase = cost.getMackertLohmanCase();
         joinEst->cardinalityRHSBeforeJoinPred = cost.getCardinalityRHSBeforeJoinPred();
+        for (const auto edgeId : edges) {
+            if (const auto* ndv = ceEstimator->getEdgeSelectivityEstimate(edgeId)) {
+                joinEst->edgeSelectivities.push_back(*ndv);
+            }
+        }
         est = std::move(joinEst);
     }
     estimates.insert_or_assign(node, std::move(est));
@@ -195,14 +198,27 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
                                break;
                        }
                        qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates, metrics);
-                       addEstimatesIfExplain(
-                           ctx, peCtx, qsn.get(), join.bitset, join.cost, estimates);
+
+                       if (ctx.explain) {
+                           const auto joinEdges =
+                               ctx.joinGraph.getJoinEdges(peCtx.registry().getBitset(join.left),
+                                                          peCtx.registry().getBitset(join.right));
+                           addEstimatesForExplain(
+                               ctx, peCtx, qsn.get(), join.bitset, join.cost, joinEdges, estimates);
+                       }
                    },
                    [&](const BaseNode& base) {
                        // TODO SERVER-111913: Avoid this clone
                        qsn = base.soln->root()->clone();
-                       addEstimatesIfExplain(
-                           ctx, peCtx, qsn.get(), NodeSet().set(base.node), base.cost, estimates);
+                       if (ctx.explain) {
+                           addEstimatesForExplain(ctx,
+                                                  peCtx,
+                                                  qsn.get(),
+                                                  NodeSet().set(base.node),
+                                                  base.cost,
+                                                  {} /* edges */,
+                                                  estimates);
+                       }
                    },
                    [&](const INLJRHSNode& ip) {
                        qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);

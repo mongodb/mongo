@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
@@ -66,8 +67,7 @@ public:
             jCtx,
             subsetCards,
             // Just assume all edges are 10% selective.
-            EdgeSelectivities(jCtx.joinGraph.numEdges(),
-                              {SelectivityType{0.1}, EstimationSource::Code}));
+            EdgeSelectivities(jCtx.joinGraph.numEdges(), makeJoinSelectivityEstimate(0.1)));
     }
 
     auto makeCoster(const JoinReorderingContext& jCtx, JoinCardinalityEstimator& ce) {

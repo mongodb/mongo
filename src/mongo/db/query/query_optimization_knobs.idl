@@ -738,7 +738,9 @@ server_parameters:
             numDocsTransmitted, sequentialIOPages, randomIOPages, localOpCost, totalCost). For
             indexed nested loop join nodes it also includes a 'cardinalityRHSBeforeJoinPred' field
             reporting the RHS cardinality before the join predicate is applied (i.e. after the
-            RHS's own single-table predicates).
+            RHS's own single-table predicates). Join embedding nodes additionally include an
+            'ndvEstimates' array with the NDV estimate and its provenance ('ndv' and 'ndvSource')
+            for each join edge the node applies.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExplainJoinCostComponents"
         cpp_vartype: Atomic<bool>

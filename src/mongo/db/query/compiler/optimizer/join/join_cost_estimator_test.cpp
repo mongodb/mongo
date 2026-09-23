@@ -76,11 +76,15 @@ public:
             {makeNodeSet(smallNodeId, rangeRightNodeId), makeCard(100)},
         };
         EdgeSelectivities edgeSel{
-            makeSel(1000.0 / (1'000 * 20'000)),   // smallNode <--> unselectiveNode
-            makeSel(1000.0 / (20'000 * 20'000)),  // largeNode <--> unselectiveNode
-            makeSel(1.0 / (1000 * 20'000)),       // smallNode <--> largeId
-            makeSel(1.0 / 20'000),                // smallNode <--> pointRightNode: 1 doc/probe
-            makeSel(100.0 / 20'000),              // smallNode <--> rangeRightNode: 100 docs/probe
+            makeJoinSelectivityEstimate(1000.0 /
+                                        (1'000 * 20'000)),  // smallNode <--> unselectiveNode
+            makeJoinSelectivityEstimate(1000.0 /
+                                        (20'000 * 20'000)),      // largeNode <--> unselectiveNode
+            makeJoinSelectivityEstimate(1.0 / (1000 * 20'000)),  // smallNode <--> largeId
+            makeJoinSelectivityEstimate(1.0 /
+                                        20'000),  // smallNode <--> pointRightNode: 1 doc/probe
+            makeJoinSelectivityEstimate(100.0 /
+                                        20'000),  // smallNode <--> rangeRightNode: 100 docs/probe
         };
         cardEstimator = std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel);
 
