@@ -245,6 +245,31 @@ inline bool rSplitOn(std::string_view s,
     return true;
 }
 
+class SplitIterator {
+public:
+    SplitIterator(std::string_view input, char delim) : _remaining(input), _delim(delim) {
+        if (input.empty()) {
+            _remaining = boost::none;
+        }
+    }
+
+    boost::optional<std::string_view> next();
+
+    std::vector<std::string_view> collect();
+
+private:
+    boost::optional<std::string_view> _remaining;
+    char _delim;
+};
+
+/**
+ * @return a generator for the components of `input` delimited by `delim`
+ */
+inline SplitIterator split_iter(std::string_view input, char delim) {
+    return SplitIterator(input, delim);
+}
+
+
 /** @return number of occurrences of c in s */
 inline unsigned count(const std::string& s, char c) {
     unsigned n = 0;

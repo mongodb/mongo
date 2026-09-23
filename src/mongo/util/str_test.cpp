@@ -447,5 +447,105 @@ TEST(StringEscapeTest, ValidUTF8) {
     }
 }
 
+namespace detail {
+template <typename T>
+struct assert_helper {
+    template <typename U>
+    static boost::optional<T> to_optional(U value) {
+        return boost::optional<T>(T(value));
+    }
+
+    template <typename U>
+    static boost::optional<T> to_optional(boost::optional<U> value) {
+        return value.map([](auto s) { return T(s); });
+    }
+
+    static boost::optional<T> to_optional(boost::none_t) {
+        return boost::none;
+    }
+};
+}  // namespace detail
+
+#define EXPECT_OPTEQ(lhs, rhs)                                        \
+    EXPECT_EQ(detail::assert_helper<std::string>::to_optional((lhs)), \
+              detail::assert_helper<std::string>::to_optional((rhs)))
+
+TEST(SplitTest, Example) {
+    auto it = split_iter("one.two.three.four", '.');
+    EXPECT_OPTEQ("one", it.next());
+    EXPECT_OPTEQ("two", it.next());
+    EXPECT_OPTEQ("three", it.next());
+    EXPECT_OPTEQ("four", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, Empty) {
+    auto it = split_iter("", '.');
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, DelimiterNotFound) {
+    auto it = split_iter("one.two.three.four", '$');
+    EXPECT_OPTEQ("one.two.three.four", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, DelimOnly) {
+    auto it = split_iter(".", '.');
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+
+    it = split_iter("...", '.');
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, SplitStringDelimEquivalence) {
+    auto splitStringDelimCollect = [](std::string_view input, char delim) {
+        std::vector<std::string> splitVec;
+        splitStringDelim(std::string(input), &splitVec, delim);
+        return splitVec;
+    };
+
+    auto splitIterCollect = [](std::string_view input, char delim) {
+        const auto views = split_iter(input, delim).collect();
+        std::vector<std::string> owned;
+        for (const auto& view : views) {
+            owned.push_back(std::string(view));
+        }
+        return owned;
+    };
+
+#define INSTANCE(input, delim) \
+    ASSERT_EQ((splitStringDelimCollect((input), (delim))), (splitIterCollect((input), (delim))))
+
+    INSTANCE("", '$');
+    INSTANCE("", '/');
+    INSTANCE("one.two.three.four", '.');
+    INSTANCE("one.two.three.four", '$');
+    INSTANCE("one/two/three$four", '$');
+    INSTANCE("one/two/three$four", '/');
+    INSTANCE("one/two/three$four", '-');
+    INSTANCE("one/two/three$four", 'o');
+    INSTANCE("one/two/three$four", 'r');
+    INSTANCE("one/two/three$four", '-');
+}
+
+TEST(SplitTest, Collect) {
+    EXPECT_EQ(std::vector<std::string_view>{}, split_iter("", '.').collect());
+    EXPECT_EQ(std::vector<std::string_view>{"foo"}, split_iter("foo", '.').collect());
+    EXPECT_EQ((std::vector<std::string_view>{"", ""}), split_iter(".", '.').collect());
+    EXPECT_EQ((std::vector<std::string_view>{"one", "two", "three", "four"}),
+              split_iter("one.two.three.four", '.').collect());
+}
+
+
 }  // namespace
 }  // namespace mongo::str

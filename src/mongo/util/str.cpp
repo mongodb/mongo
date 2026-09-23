@@ -33,6 +33,31 @@ void splitStringDelim(const std::string& str, std::vector<std::string>* res, cha
     res->push_back(str.substr(beg));
 }
 
+boost::optional<std::string_view> SplitIterator::next() {
+    if (!_remaining.has_value()) {
+        return boost::none;
+    }
+
+    auto it = _remaining->find(_delim);
+    if (it == std::string::npos) {
+        auto r = _remaining.value();
+        _remaining = boost::none;
+        return r;
+    } else {
+        auto r = _remaining->substr(0, it);
+        _remaining = _remaining->substr(it + 1);
+        return r;
+    }
+}
+
+std::vector<std::string_view> SplitIterator::collect() {
+    std::vector<std::string_view> components;
+    for (auto maybe = next(); maybe.has_value(); maybe = next()) {
+        components.push_back(*maybe);
+    }
+    return components;
+}
+
 void joinStringDelim(const std::vector<std::string>& strs, std::string* res, char delim) {
     for (auto it = strs.begin(); it != strs.end(); ++it) {
         if (it != strs.begin())
