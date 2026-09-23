@@ -80,6 +80,10 @@ public:
         _lastSent = Message();
     }
 
+    void setRequestFlags(uint32_t flags) {
+        _requestFlags = flags;
+    }
+
 private:
     Message _call(Message& toSend, std::string* actualServer) override {
 
@@ -87,6 +91,12 @@ private:
         const auto reqId = nextMessageId();
         toSend.header().setId(reqId);
         toSend.header().setResponseToMsgId(0);
+
+        // Apply any configured flags to the request (e.g., 'moreToCome').
+        if (_requestFlags != 0) {
+            OpMsg::setFlag(&toSend, _requestFlags);
+        }
+
         OpMsg::appendChecksum(&toSend);
         _lastSent = toSend;
 
@@ -103,6 +113,7 @@ private:
     Message _mockRecvResponse;
     Message _lastSent;
     stdx::unordered_set<long long> _killedCursorIds;
+    uint32_t _requestFlags = 0;
 };
 
 class DBClientCursorTest : public unittest::Test {
@@ -1082,6 +1093,77 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_Existi
         ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
 
         cursorId++;
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDetectsUnexpectedResponseToMoreToComeInitialRequest) {
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+
+    // Configure the mock connection to set the 'moreToCome' flag on the next outgoing requests.
+    conn.setRequestFlags(OpMsg::kMoreToCome);
+
+    // Create a response without the required 'cursor' field to verify that a ProtocolError error
+    // is thrown before the response is even parsed.
+    OpMsgBuilder builder;
+    BSONObjBuilder bodyBob;
+    bodyBob.append("ok", 1);
+    builder.setBody(bodyBob.done());
+    Message malformedResponseMsg = builder.finish();
+
+    conn.setCallResponse(malformedResponseMsg);
+    try {
+        cursor.init();
+        FAIL("Expected ProtocolError exception");
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ProtocolError);
+        ASSERT_STRING_SEARCH_REGEX(
+            ex.what(),
+            "Received an unexpected response for a request with the 'moreToCome' flag set\\. "
+            "Reply: op=msg, size=\\d+, requestID=\\d+, responseTo=\\d+");
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDetectsUnexpectedResponseToMoreToComeGetMoreRequest) {
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+
+    // Initialize the cursor normally with a response that indicates more data is available.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor.init());
+
+    // Consume the initial batch.
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Configure the mock connection to set the 'moreToCome' flag the next outgoing requests.
+    conn.setRequestFlags(OpMsg::kMoreToCome);
+
+    // Create a malformed response to verify that a ProtocolError error is thrown before the
+    // response is even parsed.
+    OpMsgBuilder builder;
+    BSONObjBuilder bodyBob;
+    bodyBob.append("ok", 1);
+    builder.setBody(bodyBob.done());
+    Message malformedResponseMsg = builder.finish();
+
+    conn.setCallResponse(malformedResponseMsg);
+    try {
+        cursor.more();
+        FAIL("Expected ProtocolError exception");
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ProtocolError);
+        ASSERT_STRING_SEARCH_REGEX(
+            ex.what(),
+            "Received an unexpected response for a request with the 'moreToCome' flag set\\. "
+            "Reply: op=msg, size=\\d+, requestID=\\d+, responseTo=\\d+");
     }
 }
 

@@ -315,6 +315,7 @@ private:
     bool _wasError = false;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
+    bool _lastRequestHadMoreToCome = false;
 
     int _batchSize = 0;
 

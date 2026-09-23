@@ -127,6 +127,8 @@ bool DBClientCursor::init() {
     Message reply;
     try {
         reply = _client->call(toSend, &_originalHost);
+
+        _lastRequestHadMoreToCome = OpMsg::isFlagSet(toSend, OpMsg::kMoreToCome);
     } catch (const DBException&) {
         // log msg temp?
         LOGV2(20127, "DBClientCursor::init call() failed");
@@ -157,6 +159,9 @@ void DBClientCursor::requestMore() {
     auto doRequestMore = [&] {
         Message toSend = assembleGetMore();
         Message response = _client->call(toSend);
+
+        _lastRequestHadMoreToCome = OpMsg::isFlagSet(toSend, OpMsg::kMoreToCome);
+
         dataReceived(response);
     };
     if (_client)
@@ -218,6 +223,19 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
 void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& host) {
     _batch.objs.clear();
     _batch.pos = 0;
+
+    // Per the wire protocol, requests with the 'moreToCome' flag set must not receive a reply.
+    // That is, the receiver must not send a message until receiving one with 'moreToCome' set
+    // to 0 as sends may block, causing deadlock.
+    if (_lastRequestHadMoreToCome) {
+        const auto& hdr = reply.header();
+        uasserted(
+            ErrorCodes::ProtocolError,
+            str::stream()
+                << "Received an unexpected response for a request with the 'moreToCome' flag set. "
+                << "Reply: op=" << networkOpToString(reply.operation()) << ", size=" << reply.size()
+                << ", requestID=" << hdr.getId() << ", responseTo=" << hdr.getResponseToMsgId());
+    }
 
     const auto replyObj = commandDataReceived(reply);
 
