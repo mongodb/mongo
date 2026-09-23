@@ -123,19 +123,11 @@ let runTest = function (testMode) {
         awaitRSClientHosts(st.s, {host: newPrimary.host}, {ok: true, ismaster: true}, st.rs0);
     } else if (testMode == TestMode.kWithRestart) {
         TestData.skipCollectionAndIndexValidation = true;
-        // TODO(SERVER-113373): We can't use the new failpoint in multiversion
-        // tests until 9.0 becomes last-lts.
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-            Boolean(TestData.multiversionBinVersion);
-        const rsOpts = isMultiversion
-            ? null
-            : {
-                  setParameter: {
-                      ["failpoint." + hangBeforeFinishingInitAndListenFpName]:
-                          "{'mode':'alwaysOn'}",
-                  },
-              };
+        const rsOpts = {
+            setParameter: {
+                ["failpoint." + hangBeforeFinishingInitAndListenFpName]: "{'mode':'alwaysOn'}",
+            },
+        };
         st.rs0.restart(st.rs0.getPrimary(), rsOpts);
         st.rs0.waitForPrimary();
         TestData.skipCollectionAndIndexValidation = false;
