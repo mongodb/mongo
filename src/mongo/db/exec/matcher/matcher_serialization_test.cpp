@@ -6,6 +6,7 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::evaluate_serialize_matcher_test {
@@ -1325,6 +1326,84 @@ TEST(SerializeInternalBinDataSubType, ExpressionBinDataSubTypeSerializesCorrectl
 
     obj = BSON("x" << BSONBinData(bytes, 5, BinDataType::Function));
     ASSERT_TRUE(exec::matcher::matches(&original, obj));
+}
+
+TEST(SerializeBasic, OptimizedAwayElemMatchValueBodyRoundTripsCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto parsed = MatchExpressionParser::parse(
+        fromjson("{array: {$elemMatch: {$not: {$elemMatch: {a: {$in: []}}}}}}"), expCtx);
+    ASSERT_OK(parsed.getStatus());
+    auto optimized = optimizeMatchExpression(std::move(parsed.getValue()));
+
+    // The inner $elemMatch can never match, because {$in: []} is unsatisfiable. $not of it is
+    // always true. The optimized tree keeps the value form, with a child of an empty $and. It is
+    // serialized as '{$elemMatch: {$nin: []}}', which parses unambiguously as a value predicate
+    // that matches any element, so the round trip below must reproduce the same tree.
+    ASSERT_BSONOBJ_EQ(optimized->serialize(), fromjson("{array: {$elemMatch: {$nin: []}}}"));
+
+    auto reparsed = MatchExpressionParser::parse(optimized->serialize(), expCtx);
+    ASSERT_OK(reparsed.getStatus());
+
+    // The serialized body '$nin: []' needs no special-case parsing: it is a plain value predicate,
+    // so it parses into a value form whose body is $not: {$in: []}. Re-serializing it yields the
+    // same, still unambiguous, value predicate.
+    ASSERT_BSONOBJ_EQ(reparsed.getValue()->serialize(),
+                      fromjson("{array: {$elemMatch: {$not: {$in: []}}}}"));
+
+    // The eventFilter path re-parses the predicate and then re-optimizes it
+    // (document_source_internal_unpack_bucket.cpp). Optimizing the parsed '$nin: []' folds the
+    // body back into the same empty $and, so the optimized round trip reproduces the original tree.
+    auto reparsedOptimized = optimizeMatchExpression(std::move(reparsed.getValue()));
+    ASSERT_TRUE(optimized->equivalent(reparsedOptimized.get()));
+    ASSERT_BSONOBJ_EQ(optimized->serialize(), reparsedOptimized->serialize());
+
+    // '{$elemMatch: {}}' parses into the object form, which only matches elements that are
+    // themselves objects or arrays. It is therefore not equivalent to the value form above, and is
+    // included here to show the difference the serialization has to preserve.
+    auto objectForm = MatchExpressionParser::parse(fromjson("{array: {$elemMatch: {}}}"), expCtx);
+    ASSERT_OK(objectForm.getStatus());
+
+    // {document, matches value form, matches object form}
+    const std::vector<std::tuple<BSONObj, bool, bool>> testCases{
+        // No 'array' field at all: nothing to iterate, so neither form matches.
+        {fromjson("{b: 1}"), false, false},
+        // 'array' is a scalar: $elemMatch never matches non-arrays.
+        {fromjson("{array: 5}"), false, false},
+        // 'array' is a non-empty array of scalars: only the value form matches.
+        {fromjson("{array: [0]}"), true, false},
+        // 'array' is an array of objects: both forms match.
+        {fromjson("{array: [{a: 1}]}"), true, true},
+        // 'array' is an array of arrays: both forms match, since an array is a BSON object.
+        {fromjson("{array: [[1, 2]]}"), true, true},
+    };
+
+    for (auto&& [obj, valueFormMatches, objectFormMatches] : testCases) {
+        ASSERT_EQ(exec::matcher::matchesBSON(optimized.get(), obj), valueFormMatches) << obj;
+        ASSERT_EQ(exec::matcher::matchesBSON(reparsedOptimized.get(), obj), valueFormMatches)
+            << obj;
+        ASSERT_EQ(exec::matcher::matchesBSON(objectForm.getValue().get(), obj), objectFormMatches)
+            << obj;
+    }
+
+    // '{$elemMatch: {$alwaysTrue: 1}}' must keep selecting the object form (as it did before),
+    // now that the value-form serialization no longer uses '$alwaysTrue'. '$alwaysTrue' is a
+    // pathless operator, so the object form - matching only object/array elements - is the only
+    // meaning of that spelling.
+    auto alwaysTrueObjForm =
+        MatchExpressionParser::parse(fromjson("{array: {$elemMatch: {$alwaysTrue: 1}}}"), expCtx);
+    ASSERT_OK(alwaysTrueObjForm.getStatus());
+    ASSERT_EQ(
+        exec::matcher::matchesBSON(alwaysTrueObjForm.getValue().get(), fromjson("{array: [0]}")),
+        false);
+    ASSERT_EQ(exec::matcher::matchesBSON(alwaysTrueObjForm.getValue().get(),
+                                         fromjson("{array: [{a: 1}]}")),
+              true);
+    // An array-typed element (here [[12]]) is also matched: the object form treats arrays as
+    // objects.
+    ASSERT_EQ(
+        exec::matcher::matchesBSON(alwaysTrueObjForm.getValue().get(), fromjson("{array: [[12]]}")),
+        true);
 }
 
 }  // namespace mongo::evaluate_serialize_matcher_test

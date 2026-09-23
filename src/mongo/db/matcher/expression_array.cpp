@@ -7,9 +7,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <boost/move/utility_core.hpp>
@@ -56,8 +56,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
     BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
-    query_shape::SerializationOptions options = opts;
-    _sub->serialize(&elemMatchBob, options, true);
+    _sub->serialize(&elemMatchBob, opts, true);
     elemMatchBob.doneFast();
 }
 
@@ -92,9 +91,28 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
 void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
     BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
-    query_shape::SerializationOptions options = opts;
-    for (auto&& child : _subs) {
-        child->serialize(&emBob, options, false);
+    // A body that imposes no condition on the elements matches any element, i.e. it means "this
+    // field is a non-empty array".
+    const bool bodyIsAlwaysTrue = std::all_of(
+        _subs.begin(), _subs.end(), [](const auto& child) { return child->isTriviallyTrue(); });
+    if (bodyIsAlwaysTrue) {
+        // Encode the trivially-true body as {$elemMatch: {$nin: []}}, instead of {$elemMatch:
+        // {}}. {$elemMatch: {$nin: []}} is parsed into ElemMatchValue with exactly the same
+        // semantics, whereas {$elemMatch: {}} is parsed into ElemMatchObject with an empty $and,
+        // which requires each element to be either an object or an array.
+        //
+        // Two other encodings were considered but not used:
+        //   - {$elemMatch: {$alwaysTrue: 1}} is parsed into ElemMatchObject, not the value form.
+        //   - {$elemMatch: {$exists: true}} is parsed into ElemMatchValue, but no optimizer
+        //     rewrite folds the resulting empty-path Exists back into the empty $and body, so
+        //     the re-parsed and re-optimized tree is not structurally equivalent to the original
+        //     shape, even though both match the same documents.
+        BSONArrayBuilder arrBob;
+        opts.appendLiteral(&emBob, "$nin", arrBob.arr());
+    } else {
+        for (auto&& child : _subs) {
+            child->serialize(&emBob, opts, false);
+        }
     }
     emBob.doneFast();
 }

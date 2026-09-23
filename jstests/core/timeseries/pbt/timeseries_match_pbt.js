@@ -8,6 +8,7 @@
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
+ * multiversion_incompatible,
  * ]
  */
 
@@ -18,9 +19,6 @@ import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workl
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {matchFirstStageAggModel} from "jstests/libs/property_test_helpers/common_models.js";
-
-// TODO SERVER-126813: Re-enable this test.
-quit();
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
