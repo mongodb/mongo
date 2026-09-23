@@ -641,6 +641,9 @@ public:
 
     // True if this ExpressionContext is used to parse a collection validator expression.
     bool isParsingCollectionValidator = false;
+    // True if this ExpressionContext belongs to a profile filter. Like a collection validator,
+    // a profile filter outlives the OperationContext it was parsed under.
+    bool isProfileFilter = false;
 
     // Indicates where there is any chance this operation will be profiled. Must be set at
     // construction.
