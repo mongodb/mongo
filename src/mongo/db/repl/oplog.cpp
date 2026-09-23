@@ -710,6 +710,10 @@ void createOplog(OperationContext* opCtx,
                  bool isReplSet) {
     Lock::GlobalWrite lk(opCtx);
 
+    // Nothing supplies a commit timestamp when the oplog is created: 'local' is unreplicated so no
+    // oplog entry is logged, and this runs before any timestamp exists.
+    shard_role_details::allowOneUntimestampedWrite(opCtx);
+
     const auto service = opCtx->getServiceContext();
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();

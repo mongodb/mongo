@@ -110,6 +110,10 @@ public:
         LOGV2(20505, "Test-only command 'godinsert' invoked", "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
+        // The insert below runs under an UnreplicatedWritesBlock, so no oplog entry is logged and
+        // nothing supplies a commit timestamp, even though the target collection is replicated.
+        shard_role_details::allowOneUntimestampedWrite(opCtx);
+
         AutoGetDb autodb(
             opCtx,
             dbName,

@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
@@ -540,6 +541,12 @@ private:
         auto originalValue = WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled();
         ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
         WriteBlockBypass::get(opCtx).set(true);
+
+        // A no-op collMod logs no oplog entry, and the sweep below also covers unreplicated
+        // collections, so these catalog writes commit without a timestamp. The sweep issues one
+        // WriteUnitOfWork per collection, hence the recovery-unit-wide variant; it stays in effect
+        // for the rest of the setFeatureCompatibilityVersion command.
+        shard_role_details::allowAllUntimestampedWrites(opCtx);
 
         catalog::forEachCollectionFromAllDbs(opCtx, MODE_X, [&](const Collection* collection) {
             // Issue a no-op collMod command to each collection to trigger removal of

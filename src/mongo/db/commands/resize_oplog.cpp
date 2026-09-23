@@ -21,6 +21,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/idl_parser.h"
@@ -88,6 +89,10 @@ public:
                                   << *sizeMB << "MB",
                     *sizeMB >= minSizeMB);
         }
+
+        // Resizing updates the oplog's durable catalog entry. 'local' is unreplicated, so no oplog
+        // entry is logged and nothing supplies a commit timestamp.
+        shard_role_details::allowOneUntimestampedWrite(opCtx);
 
         // Use LocalWrite intent so the IntentRegistry does not enforce primary-only
         // write access, allowing replSetResizeOplog to run on secondaries as intended.

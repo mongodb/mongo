@@ -277,6 +277,32 @@ inline const Locker* getLocker(const OperationContext* opCtx) {
 }
 
 /**
+ * Declares that a write commits without a commit timestamp, which the storage engine otherwise
+ * rejects for disaggregated tables. Use only in well-understood cases since doing an untimestamped
+ * write for disaggregated tables can easily lead to a data corruption.
+ *
+ * On non-disaggregated deployments this only suppresses an assertion for a write
+ * that was already untimestamped.
+ *
+ * The declaration is part of the begin_transaction configuration, so it applies to the next
+ * transaction and is reset when that transaction closes. Any snapshot a caller left open is
+ * abandoned first, so call this before anything opens a storage transaction.
+ *
+ * TODO SERVER-134926: supply a real commit timestamp instead, where possible.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline void allowOneUntimestampedWrite(OperationContext* opCtx) {
+    auto& ru = *getRecoveryUnit(opCtx);
+    ru.abandonSnapshot();
+    ru.allowOneUntimestampedWrite();
+}
+
+[[MONGO_MOD_NEEDS_REPLACEMENT]] inline void allowAllUntimestampedWrites(OperationContext* opCtx) {
+    auto& ru = *getRecoveryUnit(opCtx);
+    ru.abandonSnapshot();
+    ru.allowAllUntimestampedWrites();
+}
+
+/**
  * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
  * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
  * ownership. Sets the RecoveryUnit to NULL. Requires holding the client lock.
