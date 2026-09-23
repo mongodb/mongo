@@ -162,7 +162,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                     exprConst);
 
             defaultValue = exprConst->getValue();
-            defaultValue.addToBsonObj(&switchObjBuilder, "default");
+            // defaultValue is missing when the 'default' option is omitted or when a supplied
+            // expression optimizes to a missing value (for example, $$REMOVE). In either case,
+            // omit the field.
+            if (!defaultValue.missing()) {
+                ExpressionConstant::serializeConstant({}, defaultValue)
+                    .addToBsonObj(&switchObjBuilder, "default");
+            }
         } else if ("output" == argName) {
             outputFieldSpecified = true;
             uassert(
@@ -205,10 +211,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     for (size_t i = 1; i < boundaryValues.size(); ++i) {
         Value lower = boundaryValues[i - 1];
         Value upper = boundaryValues[i];
+        auto wrappedLower = ExpressionConstant::serializeConstant({}, lower);
+        auto wrappedUpper = ExpressionConstant::serializeConstant({}, upper);
         BSONObj caseExpr =
-            BSON("$and" << BSON_ARRAY(BSON("$gte" << BSON_ARRAY(groupByField << lower))
-                                      << BSON("$lt" << BSON_ARRAY(groupByField << upper))));
-        branchesBuilder.append(BSON("case" << caseExpr << "then" << lower));
+            BSON("$and" << BSON_ARRAY(BSON("$gte" << BSON_ARRAY(groupByField << wrappedLower))
+                                      << BSON("$lt" << BSON_ARRAY(groupByField << wrappedUpper))));
+        branchesBuilder.append(BSON("case" << caseExpr << "then" << wrappedLower));
     }
 
     // Add the $switch expression to the group BSON object.

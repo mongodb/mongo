@@ -219,6 +219,27 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenDefaultIsConstantExpression)
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 
+TEST_F(BucketReturnsGroupAndSort, LiteralDefaultIsSerializedAsConst) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 2], default : {$literal : '$color'}}}");
+    auto expectedGroupExplain = Value(fromjson(
+        "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
+        "['$x', {$const : 2}]}]}, then : {$const : 0}}], default : {$const : '$color'}}}, count : "
+        "{$sum : {$const : 1}}, $willBeMerged: false}"));
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
+TEST_F(BucketReturnsGroupAndSort, LiteralBoundariesAreSerializedAsConst) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [{$literal : '$l'}, {$literal : '$n'}], default "
+        ": "
+        "'other'}}");
+    auto expectedGroupExplain = Value(fromjson(R"boundary(
+        {_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : '$l'}]}, {$lt : ['$x', {$const : '$n'}]}]}, then : {$const : '$l'}}], default : {$const : 'other'}}}, count : {$sum : {$const : 1}}, $willBeMerged : false}
+    )boundary"));
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
 TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 1, 2]}}");
     auto expectedGroupExplain =
@@ -376,5 +397,101 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     groupStage->setSource(stage.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }
+
+class BucketLiteralInjection : public AggregationContextFixture {};
+
+TEST_F(BucketLiteralInjection, DefaultLiteralDollarStringIsNotAFieldPath) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 1], default : {$literal : '$color'}}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << 5 << "color" << "red"), BSON("x" << 10 << "color" << "blue")},
+        getExpCtx());
+    groupStage->setSource(mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$color")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketLiteralInjection, DefaultLiteralRootVariableIsNotAVariableReference) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 1], default : {$literal : '$$ROOT'}}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << 5 << "color" << "red"), BSON("x" << 10 << "color" << "blue")},
+        getExpCtx());
+    groupStage->setSource(mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$$ROOT")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketLiteralInjection, BoundaryLiteralDollarStringIsNotAFieldPath) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [{$literal : '$l'}, {$literal : '$n'}], default "
+        ": "
+        "'other'}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << "$m" << "l" << "$j" << "n" << "$o"),
+                    BSON("x" << "$m" << "l" << "$i" << "n" << "$p")},
+        getExpCtx());
+    groupStage->setSource(mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$l")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketReturnsGroupAndSort, NoDefaultOmitsDefaultFromSwitchSerialization) {
+    const auto spec =
+        fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 2], default : '$$REMOVE'}}");
+    list<intrusive_ptr<DocumentSource>> result =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(result.size(), 2UL);
+
+    const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
+    ASSERT(groupStage);
+
+    auto explain = SerializationOptions{
+        .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+    vector<Value> explainedStages;
+    groupStage->serializeToArray(explainedStages, explain);
+    ASSERT_EQUALS(explainedStages.size(), 1UL);
+
+    auto switchDoc =
+        explainedStages[0].getDocument()["$group"].getDocument()["_id"].getDocument()["$switch"];
+    ASSERT_TRUE(switchDoc.getDocument()["default"].missing());
+}
+
 }  // namespace
 }  // namespace mongo
