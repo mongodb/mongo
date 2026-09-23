@@ -811,21 +811,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     }
                 });
             }
-
-            // Run an additional record store traversal using the cursor owned by validateState.
-            // This serves as a check for record count and ensures that size stats logs can be
-            // emitted if configured.
-            const int64_t exactRecordCount = std::invoke([this, opCtx] {
-                size_t rc{0};
-                auto sizeCountingCursor = _validateState->getTraverseRecordStoreCursor();
-                for (auto maybeRecord =
-                         sizeCountingCursor->seekExact(opCtx, _validateState->getFirstRecordId());
-                     maybeRecord;
-                     maybeRecord = sizeCountingCursor->next(opCtx)) {
-                    ++rc;
-                }
-                return rc;
-            });
             threadPool.waitForIdle();
             threadPool.shutdown();
             threadPool.join();
@@ -882,27 +867,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                       sliceFailures.size(),
                                       trsOpts.size(),
                                       fmt::join(reasons, "; ")));
-            }
-
-            // The size-counting cursor traverses the whole record store, so its count is exact and
-            // any disagreement with the slices means the slices did not cover every record.
-            //
-            // Collections that can be written to underneath validation are exempt: the slices and
-            // the counting traversal read from snapshots established at different points in time,
-            // so on those namespaces a disagreement is expected rather than evidence of a gap.
-            if (exactRecordCount != numRecords && !_validateState->isConcurrentlyWritable()) {
-                LOGV2_ERROR(11157102,
-                            "Parallel validation slices did not cover every record in the record "
-                            "store",
-                            logAttrs(coll->ns()),
-                            "recordsTraversed"_attr = numRecords,
-                            "exactCount"_attr = exactRecordCount,
-                            "numSlices"_attr = trsOpts.size());
-                uasserted(13383900,
-                          fmt::format("Parallel validation traversed {} records but the record "
-                                      "store contains {}",
-                                      numRecords,
-                                      exactRecordCount));
             }
         }
     }

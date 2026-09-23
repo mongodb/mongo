@@ -801,13 +801,20 @@ void startupRepair(OperationContext* opCtx,
 StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
                                            NamespaceString nss,
                                            bool skipAtClusterTime = false) {
-    auto collectionValidateOptionsParam =
+    const auto collectionValidateOptionsParam =
         ServerParameterSet::getNodeParameterSet()->get<CollectionValidateOptionsServerParameter>(
             "collectionValidateOptions");
-    auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
-    auto parsedOptions = !validateOptions.isEmpty()
+    const auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
+
+    // Enabling parallel record store traversal disables sizeStats.
+    const bool slicingDisabled = !collection_validation::getTargetRecordsPerRecordStoreSlice() ||
+        *collection_validation::getTargetRecordsPerRecordStoreSlice() == 0;
+    const bool onlyOneSlice = collection_validation::getMaxRecordStoreSlices() == 1;
+    const bool enableSizeStats = slicingDisabled || onlyOneSlice;
+
+    const auto parsedOptions = !validateOptions.isEmpty()
         ? collection_validation::parseValidateOptions(
-              opCtx, nss, validateOptions, skipAtClusterTime, /*enableSizeStats=*/true)
+              opCtx, nss, validateOptions, skipAtClusterTime, enableSizeStats)
         : collection_validation::ValidationOptions(
               collection_validation::ValidateMode::kForegroundFull,
               collection_validation::RepairMode::kNone,

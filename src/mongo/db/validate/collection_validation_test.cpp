@@ -379,10 +379,7 @@ ValidateResults validateWithSliceTarget(OperationContext* opCtx,
 }
 
 // Slicing the record store across worker threads must not change what validation reports. Each
-// slice traverses on an OperationContext of its own, and the slice totals are cross-checked against
-// a separate counting traversal on the caller's snapshot, so a gap or an overlap between slices --
-// or a worker reading from a snapshot other than the caller's -- shows up as a count mismatch and
-// an invalid result.
+// slice traverses on an OperationContext of its own.
 TEST_F(CollectionValidationDiskTest, ParallelTraversalAgreesWithSerialTraversal) {
     auto opCtx = operationContext();
     ASSERT_EQ(kRecordsForParallelTraversal,

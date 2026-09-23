@@ -35,6 +35,12 @@ namespace collection_validation {
 boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice();
 
 /**
+ * The maximum number of slices to use when splitting a collection or 1 when parallel validation is
+ * not enabled.
+ */
+int64_t getMaxRecordStoreSlices();
+
+/**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
  * validation.
  * Optionally skips parsing 'atClusterTime' for unreplicated collections, which is desired with

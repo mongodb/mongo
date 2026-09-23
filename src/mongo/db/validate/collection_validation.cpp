@@ -705,6 +705,13 @@ boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice() {
     return gValidateParallelTargetRecordsPerSlice.load();
 }
 
+int64_t getMaxRecordStoreSlices() {
+    if (!gFeatureFlagParallelCollectionValidation.isEnabled()) {
+        return 1;
+    }
+    return gValidateParallelMaxRecordStoreSlices.load();
+}
+
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj,

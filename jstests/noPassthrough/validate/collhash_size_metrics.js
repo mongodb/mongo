@@ -6,9 +6,14 @@
  *     store and each index), and
  *   - a non-collHash startup '--validate' emits nothing.
  *
+ * The collection record store line requires a full forward walk of the size-stats cursor to
+ * completion. Parallel validation traverses the record store with separate per-slice cursors
+ * instead, so it never completes that walk and the collection line is not emitted.
+ *
  * @tags: [
  *   requires_persistence,
  *   requires_wiredtiger,
+ *   featureFlagParallelCollectionValidation_incompatible,
  * ]
  */
 
@@ -112,8 +117,18 @@ MongoRunner.stopMongod(conn);
 // Runs 'mongod --validate' scoped to our collection with the given inner options, asserts a clean
 // exit, and returns the emitted size-metrics log 'attr' objects.
 function runModalValidate(innerOptions) {
+    const exitCode = runModalValidateWithExitCode(innerOptions);
+    assert.eq(
+        MongoRunner.EXIT_CLEAN,
+        exitCode,
+        `modal '--validate' with options ${innerOptions} did not exit cleanly`,
+    );
+    return getSizeMetricAttrsFromRawLog();
+}
+
+function runModalValidateWithExitCode(innerOptions, ...extraArgs) {
     clearRawMongoProgramOutput();
-    const exitCode = runMongoProgram(
+    return runMongoProgram(
         "mongod",
         "--validate",
         "--port",
@@ -126,13 +141,8 @@ function runModalValidate(innerOptions) {
         `validateCollectionName=${collName}`,
         "--setParameter",
         `collectionValidateOptions={options: ${innerOptions}}`,
+        ...extraArgs,
     );
-    assert.eq(
-        MongoRunner.EXIT_CLEAN,
-        exitCode,
-        `modal '--validate' with options ${innerOptions} did not exit cleanly`,
-    );
-    return getSizeMetricAttrsFromRawLog();
 }
 
 // A collHash startup validation emits one size-metrics line per b-tree.
@@ -210,4 +220,59 @@ assert.eq(
     0,
     runModalValidate("{collHash: false}").length,
     "size metrics emitted for a non-collHash startup validation",
+);
+
+// Enabling parallel record store traversal disables sizeStats logging, so a collHash startup
+// validation still succeeds but emits no size metrics.
+assert.eq(
+    MongoRunner.EXIT_CLEAN,
+    runModalValidateWithExitCode(
+        "{collHash: true}",
+        "--setParameter",
+        "featureFlagParallelCollectionValidation=true",
+    ),
+    "collHash startup validation with parallel validation enabled should succeed",
+);
+assert.eq(
+    0,
+    getSizeMetricAttrsFromRawLog().length,
+    "size metrics emitted with parallel record store traversal enabled",
+);
+
+// Disabling record store slicing keeps the traversal serial, so size metrics are still allowed.
+
+// Disable with 0 target records per slice
+assert.eq(
+    MongoRunner.EXIT_CLEAN,
+    runModalValidateWithExitCode(
+        "{collHash: true}",
+        "--setParameter",
+        "featureFlagParallelCollectionValidation=true",
+        "--setParameter",
+        "validateParallelTargetRecordsPerSlice=0",
+    ),
+    "collHash startup validation with slicing disabled should succeed",
+);
+assert.eq(
+    1,
+    getSizeMetricAttrsFromRawLog().filter((m) => m.uri.includes("collection-")).length,
+    "expected a collection size-metrics line with slicing disabled",
+);
+
+// Disable with max slices
+assert.eq(
+    MongoRunner.EXIT_CLEAN,
+    runModalValidateWithExitCode(
+        "{collHash: true}",
+        "--setParameter",
+        "featureFlagParallelCollectionValidation=true",
+        "--setParameter",
+        "validateParallelMaxRecordStoreSlices=1",
+    ),
+    "collHash startup validation with slicing disabled should succeed",
+);
+assert.eq(
+    1,
+    getSizeMetricAttrsFromRawLog().filter((m) => m.uri.includes("collection-")).length,
+    "expected a collection size-metrics line with slicing disabled",
 );
