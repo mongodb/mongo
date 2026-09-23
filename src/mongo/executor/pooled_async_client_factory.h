@@ -58,12 +58,12 @@ public:
         const HostAndPort& target,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const CancellationToken& token = CancellationToken::uncancelable()) override {
+        const CancellationToken& token = CancellationToken::uncancelable(),
+        ConnectionAcquisitionPurpose purpose = ConnectionAcquisitionPurpose::kNormal) override {
 
-        return _pool->get(target, sslMode, timeout, token)
+        return _pool->get(target, sslMode, timeout, token, purpose)
             .unsafeToInlineFuture()
-            .then([target](
-                      ConnectionPool::ConnectionHandle conn) -> std::shared_ptr<AsyncClientHandle> {
+            .then([](ConnectionPool::ConnectionHandle conn) -> std::shared_ptr<AsyncClientHandle> {
                 return std::make_shared<Handle>(std::move(conn));
             })
             .semi();
@@ -108,7 +108,7 @@ public:
 private:
     class Handle : public AsyncClientFactory::AsyncClientHandle {
     public:
-        Handle(ConnectionPool::ConnectionHandle handle) : _conn(std::move(handle)) {}
+        explicit Handle(ConnectionPool::ConnectionHandle handle) : _conn(std::move(handle)) {}
 
         AsyncDBClient& getClient() override {
             return *getTLConnection().client();

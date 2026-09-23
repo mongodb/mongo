@@ -14,6 +14,8 @@
 
 namespace mongo::executor {
 
+enum class ConnectionAcquisitionPurpose { kNormal, kKillOperation };
+
 /**
  * Abstract interface for AsyncDBClient factories to be used by NetworkInterfaceTL.
  * The factory dictates which transport protocol the TransportLayer provided to startup() should
@@ -77,7 +79,8 @@ public:
         const HostAndPort& target,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const CancellationToken& token = CancellationToken::uncancelable()) = 0;
+        const CancellationToken& token = CancellationToken::uncancelable(),
+        ConnectionAcquisitionPurpose purpose = ConnectionAcquisitionPurpose::kNormal) = 0;
 
     /**
      * "Lease" a client from this factory. This method behaves similarly

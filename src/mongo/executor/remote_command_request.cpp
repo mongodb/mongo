@@ -53,6 +53,7 @@ RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
       opCtx(opCtx_),
       timeout(options_.timeout),
       fireAndForget(options_.fireAndForget),
+      isKillOp(options_.isKillOp),
       operationKey(options_.operationKey),
       telemetryContext(options_.telemetryContext) {
 

@@ -650,8 +650,9 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         DatabaseName::kAdmin,
         BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(*operationKey)),
         nullptr,
-        increaseTimeoutOnKillOp.shouldFail() ? kCancelCommandTimeout_forTest
-                                             : kCancelCommandTimeout);
+        {.timeout = increaseTimeoutOnKillOp.shouldFail() ? kCancelCommandTimeout_forTest
+                                                         : kCancelCommandTimeout,
+         .isKillOp = true});
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
     auto killOpCmdState = std::make_shared<CommandState>(
         this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
@@ -843,7 +844,12 @@ NetworkInterfaceTL::CommandStateBase::getClient(AsyncClientFactory& factory) {
         }
     }
 
-    return factory.get(request.target, request.sslMode, poolTimeout, cancelSource.token());
+    return factory.get(request.target,
+                       request.sslMode,
+                       poolTimeout,
+                       cancelSource.token(),
+                       request.isKillOp ? ConnectionAcquisitionPurpose::kKillOperation
+                                        : ConnectionAcquisitionPurpose::kNormal);
 }
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::sendRequest(

@@ -23,6 +23,13 @@ const HostAndPort kTestTarget("localhost", 27017);
 const DatabaseName kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 const BSONObj kTestCmd = BSON("find" << "testcoll");
 
+TEST(RemoteCommandRequestTest, CopiesKillOperationOption) {
+    RemoteCommandRequest request(
+        kTestTarget, kTestDb, kTestCmd, BSONObj(), nullptr, {.isKillOp = true});
+
+    EXPECT_TRUE(request.isKillOp);
+}
+
 class RemoteCommandRequestDeadlineTest : public ServiceContextTest {
 public:
     void setUp() override {

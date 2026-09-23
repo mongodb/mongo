@@ -7,6 +7,8 @@
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_test_fixture.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
@@ -36,6 +38,26 @@ namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
 using namespace std::literals::string_view_literals;
+
+struct ReadEgressConnectionsCounterOptions {
+    std::string_view purpose = kNormalConnectionPurpose;
+    std::string_view poolAttribute = kOtherConnectionPoolAttribute;
+};
+
+int64_t readEgressConnectionsCreatedCounterOrZero(
+    otel::metrics::OtelMetricsCapturer& capturer,
+    const ReadEgressConnectionsCounterOptions& options = {}) {
+    try {
+        return capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkEgressConnectionsCreated,
+            std::tuple{options.purpose, options.poolAttribute});
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::KeyNotFound) {
+            return 0;
+        }
+        throw;
+    }
+}
 
 class ConnectionPoolTest : public unittest::Test {
 public:
@@ -92,6 +114,13 @@ protected:
         dynamic_cast<ConnectionImpl*>(conn.get())->indicateFailure(error);
 
         ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
+    }
+
+    /** Cleans up a connection future by ensuring it is properly destroyed (returned). */
+    void cleanupConnectionFuture(SemiFuture<ConnectionPool::ConnectionHandle> connFuture) {
+        ASSERT_TRUE(connFuture.isReady());
+        auto conn = std::move(connFuture).get();
+        doneWith(conn);
     }
 
     /**
@@ -478,6 +507,271 @@ TEST_F(ConnectionPoolCheckoutTest, ReturnedConnectionIsReusedOnNextCheckout) {
     ASSERT(conn1Id);
     ASSERT(conn2Id);
     ASSERT_EQ(conn1Id, conn2Id);
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricOnlyCountsNewConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+    auto pool = makePool();
+    auto getConnection = [&](ConnectionAcquisitionPurpose purpose) {
+        return getFromPool(HostAndPort(),
+                           transport::kGlobalSSLMode,
+                           Seconds(1),
+                           CancellationToken::uncancelable(),
+                           purpose);
+    };
+
+    ConnectionImpl::pushSetup(Status::OK());
+    auto ordinaryConnection = std::move(getConnection(ConnectionAcquisitionPurpose::kNormal)).get();
+    doneWith(ordinaryConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    auto killOperationReuse =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(killOperationReuse);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    pool->dropConnections(HostAndPort());
+    ConnectionImpl::pushSetup(Status::OK());
+    auto newConnection =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(newConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    auto reusedConnection =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(reusedConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricCountsQueuedNewConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+    auto pool = makePool();
+
+    auto ordinaryFuture = getFromPool(HostAndPort(),
+                                      transport::kGlobalSSLMode,
+                                      Seconds(1),
+                                      CancellationToken::uncancelable(),
+                                      ConnectionAcquisitionPurpose::kNormal);
+    ASSERT_FALSE(ordinaryFuture.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_TRUE(ordinaryFuture.isReady());
+    auto ordinaryConnection = std::move(ordinaryFuture).get();
+
+    auto killOperationFuture = getFromPool(HostAndPort(),
+                                           transport::kGlobalSSLMode,
+                                           Seconds(1),
+                                           CancellationToken::uncancelable(),
+                                           ConnectionAcquisitionPurpose::kKillOperation);
+    ASSERT_FALSE(killOperationFuture.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+    ConnectionImpl::pushSetup(Status::OK());
+    cleanupConnectionFuture(std::move(killOperationFuture));
+
+    auto reusedConnection = std::move(getFromPool(HostAndPort(),
+                                                  transport::kGlobalSSLMode,
+                                                  Seconds(1),
+                                                  CancellationToken::uncancelable(),
+                                                  ConnectionAcquisitionPurpose::kKillOperation))
+                                .get();
+    doneWith(reusedConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    doneWith(ordinaryConnection);
+}
+
+TEST_F(ConnectionPoolSpawningTest, EgressConnectionsCreatedMetricAttributesProactiveConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+
+    ConnectionPool::Options options;
+    options.minConnections = 2;
+    auto pool = makePool(options);
+
+    auto killOperationFuture = getFromPool(HostAndPort(),
+                                           transport::kGlobalSSLMode,
+                                           Seconds(1),
+                                           CancellationToken::uncancelable(),
+                                           ConnectionAcquisitionPurpose::kKillOperation);
+    ASSERT_FALSE(killOperationFuture.isReady());
+    // Since min connections is 2, when we get the first connection for a kill operation, we also
+    // create a normal connection.
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    cleanupConnectionFuture(std::move(killOperationFuture));
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+}
+
+// This test shows that connection creation purposes are preserved when requests are queued and
+// are fulfilled in a different order than they were requested.
+TEST_F(ConnectionPoolSpawningTest, EgressConnectionsCreatedMetricAttributesQueuedRequests) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+
+    ConnectionPool::Options options;
+    options.minConnections = 0;
+    options.maxConnecting = 1;
+    auto pool = makePool(options);
+    // The futures will and purposes will be the order of timeouts (normal(1s), kill(2s), kill(3s),
+    // normal(4s)). Running on _executor guarantees all four requests are sent to the pool before
+    // connections are spawned.
+    auto [future2sKill, future1sNormal, future4sNormal, future3sKill] =
+        ExecutorFuture(_executor)
+            .then([pool] {
+                return std::make_tuple(pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(2),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kKillOperation),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(1),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kNormal),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(4),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kNormal),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(3),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kKillOperation));
+            })
+            .get();
+
+    ASSERT_EQ(ConnectionImpl::setupQueueDepth(), 1);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future1sNormal.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future2sKill.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future3sKill.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 2);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future4sNormal.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 2);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    cleanupConnectionFuture(std::move(future1sNormal));
+    cleanupConnectionFuture(std::move(future2sKill));
+    cleanupConnectionFuture(std::move(future3sKill));
+    cleanupConnectionFuture(std::move(future4sNormal));
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricConnectionPoolAttribute) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+
+    // Helper that acquires one connection from the pool, returns it to the pool, and shuts the pool
+    // down. Returns the counter values keyed by pool attribute.
+    auto acquireAndReturnConnection = [this](ConnectionPool& pool,
+                                             otel::metrics::OtelMetricsCapturer& capturer) {
+        ConnectionImpl::pushSetup(Status::OK());
+        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+            pool.get_forTest(HostAndPort(),
+                             Seconds(1),
+                             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                                 monitor.exec([&]() {
+                                     ASSERT_OK(swConn.getStatus());
+                                     doneWith(swConn.getValue());
+                                 });
+                             });
+        });
+
+        auto read = [&](std::string_view poolAttribute) {
+            return readEgressConnectionsCreatedCounterOrZero(
+                capturer, {.purpose = kNormalConnectionPurpose, .poolAttribute = poolAttribute});
+        };
+        pool.shutdown();
+        return std::make_tuple(read(kTaskExecutorPoolConnectionPoolAttribute),
+                               read(kShardingFixedConnectionPoolAttribute),
+                               read(kOtherConnectionPoolAttribute));
+    };
+
+    // A pool whose name contains "TaskExecutorPool" is attributed to "TaskExecutorPool".
+    {
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto pool = std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor),
+                                                     "NetworkInterfaceTL-TaskExecutorPool-0");
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 1);
+        EXPECT_EQ(shardingFixed, 0);
+        EXPECT_EQ(other, 0);
+    }
+
+    // A pool whose name contains "Sharding-Fixed" is attributed to "Sharding-Fixed".
+    {
+        auto pool = std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor),
+                                                     "NetworkInterfaceTL-Sharding-Fixed");
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 0);
+        EXPECT_EQ(shardingFixed, 1);
+        EXPECT_EQ(other, 0);
+    }
+
+    // Any other pool name is attributed to "other".
+    {
+        auto pool =
+            std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor), "test pool");
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 0);
+        EXPECT_EQ(shardingFixed, 0);
+        EXPECT_EQ(other, 1);
+    }
 }
 
 /**

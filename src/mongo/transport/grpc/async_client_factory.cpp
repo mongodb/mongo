@@ -64,7 +64,8 @@ SemiFuture<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsync
     const HostAndPort& target,
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
-    const CancellationToken& token) {
+    const CancellationToken& token,
+    executor::ConnectionAcquisitionPurpose /*purpose*/) {
 
     return _get(false, target, sslMode, timeout, token).semi();
 }

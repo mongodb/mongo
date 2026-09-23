@@ -8,6 +8,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
@@ -254,8 +255,9 @@ public:
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        CancellationToken token = CancellationToken::uncancelable()) {
-        return _get(hostAndPort, sslMode, timeout, false /*lease*/, std::move(token));
+        CancellationToken token = CancellationToken::uncancelable(),
+        ConnectionAcquisitionPurpose purpose = ConnectionAcquisitionPurpose::kNormal) {
+        return _get(hostAndPort, sslMode, timeout, false /*lease*/, std::move(token), purpose);
     }
 
     void get_forTest(const HostAndPort& hostAndPort,
@@ -274,7 +276,12 @@ public:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
         CancellationToken token = CancellationToken::uncancelable()) {
-        return _get(hostAndPort, sslMode, timeout, true /*lease*/, std::move(token));
+        return _get(hostAndPort,
+                    sslMode,
+                    timeout,
+                    true /*lease*/,
+                    std::move(token),
+                    ConnectionAcquisitionPurpose::kNormal);
     }
 
     void lease_forTest(const HostAndPort& hostAndPort,
@@ -296,11 +303,16 @@ private:
                                       transport::ConnectSSLMode sslMode,
                                       Milliseconds timeout,
                                       bool leased,
-                                      const CancellationToken& token);
+                                      const CancellationToken& token,
+                                      ConnectionAcquisitionPurpose purpose);
 
     void retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb);
 
     std::string _name;
+
+    // The value reported in the "connection_pool" metric attribute. Set from the pool name when
+    // the pool is created.
+    std::string_view _connectionPoolAttribute;
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
     const Options _options;
@@ -622,6 +634,17 @@ inline ClockSource* ConnectionPool::_getFastClockSource() const {
     }
     return _fastClockSource;
 }
+
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kNormalConnectionPurpose = "normal";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kKillOperationConnectionPurpose =
+    "kill_operation";
+
+// Possible values for the "connection_pool" metric attribute, derived from the pool name.
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kTaskExecutorPoolConnectionPoolAttribute =
+    "TaskExecutorPool";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kShardingFixedConnectionPoolAttribute =
+    "Sharding-Fixed";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kOtherConnectionPoolAttribute = "other";
 
 }  // namespace executor
 }  // namespace mongo

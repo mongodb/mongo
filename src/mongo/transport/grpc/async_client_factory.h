@@ -44,11 +44,16 @@ public:
         return transport::TransportProtocol::GRPC;
     }
 
+    /**
+     * Note that purpose is currently ignored, as the only current uses don't go through grpc.
+     */
     SemiFuture<std::shared_ptr<AsyncClientHandle>> get(
         const HostAndPort& target,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const CancellationToken& token = CancellationToken::uncancelable()) override;
+        const CancellationToken& token = CancellationToken::uncancelable(),
+        executor::ConnectionAcquisitionPurpose purpose =
+            executor::ConnectionAcquisitionPurpose::kNormal) override;
 
     SemiFuture<std::shared_ptr<AsyncClientHandle>> lease(
         const HostAndPort& target,

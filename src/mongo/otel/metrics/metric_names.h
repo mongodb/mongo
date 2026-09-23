@@ -111,6 +111,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.network.egress.bytesOut");
     static constexpr MetricName kNetworkEgressNumRequests =
         MetricNameMaker::make("mongodb.serverStatus.network.egress.numRequests");
+    static constexpr MetricName kNetworkEgressConnectionsCreated =
+        MetricNameMaker::make("mongodb.network.egress.connections_created");
     static constexpr MetricName kNetworkNumSlowDNSOperations =
         MetricNameMaker::make("mongodb.serverStatus.network.numSlowDNSOperations");
     static constexpr MetricName kNetworkNumSlowSSLOperations =

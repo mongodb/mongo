@@ -168,6 +168,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/transport:transport_layer",
         "//src/mongo/transport:transport_layer_manager",
     ],
@@ -315,6 +316,7 @@ mongo_cc_library(
         ":remote_command",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/net:network",
     ],
 )
@@ -482,6 +484,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:clock_source_mock",
     ],
 )

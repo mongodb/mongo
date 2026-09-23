@@ -42,6 +42,7 @@ struct [[MONGO_MOD_PUBLIC]] RemoteCommandRequest {
     struct Options {
         Milliseconds timeout = kNoTimeout;
         bool fireAndForget = false;
+        bool isKillOp = false;
         boost::optional<UUID> operationKey = boost::none;
 
         // When set, the telemetry context is carried on the request so that the transport layer can
@@ -143,6 +144,8 @@ struct [[MONGO_MOD_PUBLIC]] RemoteCommandRequest {
     boost::optional<ErrorCodes::Error> timeoutCode;
 
     bool fireAndForget = false;
+
+    bool isKillOp = false;
 
     boost::optional<UUID> operationKey;
 
