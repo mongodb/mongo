@@ -2,6 +2,7 @@
 
 import os
 import platform
+import subprocess
 import tempfile
 import time
 import unittest
@@ -178,6 +179,37 @@ class TestBinaryParsing(unittest.TestCase):
         args = run.call_args[0][0]
         self.assertIn(core_path, args)
         self.assertNotIn("-ex", args)
+
+    def test_gdb_failure_includes_context(self):
+        """When gdb exits non-zero, the raised error must carry gdb's stdout/stderr for debugging."""
+        core_path = "dump_eviction-ser 1.187693.core"
+        err = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["/opt/mongodbtoolchain/v5/bin/gdb", "-batch", "--quiet", "--core", core_path],
+            output="some gdb stdout",
+            stderr="some gdb stderr",
+        )
+
+        with patch("buildscripts.resmokelib.hang_analyzer.dumper.subprocess.run") as run:
+            run.side_effect = err
+            with self.assertRaises(RuntimeError) as ctx:
+                self.dumper.get_binary_from_core_dump(core_path)
+
+        msg = str(ctx.exception)
+        self.assertIn(core_path, msg)
+        self.assertIn("some gdb stdout", msg)
+        self.assertIn("some gdb stderr", msg)
+        # The gdb output is also logged so it appears even when the error is swallowed upstream.
+        self.logger.error.assert_called()
+
+    def test_no_match_includes_gdb_output(self):
+        """When gdb's output is unparseable, the error must include the actual gdb output."""
+        gdb_output = "gdb crashed before printing anything useful"
+
+        with self.assertRaises(RuntimeError) as ctx:
+            self._get_binary_from_core_dump(gdb_output)
+
+        self.assertIn(gdb_output, str(ctx.exception))
 
 
 class TestSigabrtDumperFallback(unittest.TestCase):
