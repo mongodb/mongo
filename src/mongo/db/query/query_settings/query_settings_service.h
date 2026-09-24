@@ -230,19 +230,6 @@ public:
     virtual void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const = 0;
 
     /**
-     * Drops 'queryShapeRepresentativeQueries' collection locally. Throws an exception in case of
-     * collection drop failure, unless the collection doesn't exist.
-     */
-    virtual void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const = 0;
-
-    /**
-     * Performs any query settings data migrations needed when upgrading to 'targetFCV'. The
-     * required actions are derived from which feature flags are enabled on 'targetFCV'.
-     */
-    virtual void upgradeQuerySettings(
-        OperationContext* opCtx, multiversion::FeatureCompatibilityVersion targetFCV) const = 0;
-
-    /**
      * Performs any query settings data migrations needed when downgrading to 'targetFCV'. The
      * required actions are derived from which feature flags are enabled on 'targetFCV'.
      */

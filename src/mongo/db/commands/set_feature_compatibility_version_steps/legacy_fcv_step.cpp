@@ -601,13 +601,6 @@ private:
                 LockMode::MODE_IX);
         }
 
-        // TODO SERVER-94927: Remove once 9.0 becomes last lts.
-        const bool isReplSet = !role.has_value();
-        if (isReplSet || isConfigsvr) {
-            query_settings::QuerySettingsService::get(opCtx).upgradeQuerySettings(opCtx,
-                                                                                  requestedVersion);
-        }
-
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (role && role->has(ClusterRole::ShardServer) &&
             feature_flags::gAuthoritativeShardsCRUD.isEnabledOnVersion(requestedVersion)) {

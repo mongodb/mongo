@@ -237,12 +237,8 @@ bool BackfillCoordinator::shouldBackfill(const boost::intrusive_ptr<ExpressionCo
         return false;
     }
 
-    // We shouldn't attempt the backfill if it's not enabled.
-    const bool isPQSBackfillEnabled = (!internalQuerySettingsDisableBackfill.load()) &&
-        feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(expCtx->getOperationContext()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (!isPQSBackfillEnabled) {
+    // We shouldn't attempt the backfill if it's disabled via the server parameter.
+    if (internalQuerySettingsDisableBackfill.load()) {
         return false;
     }
 

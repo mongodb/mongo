@@ -181,13 +181,6 @@ feature_flags:
         version: 8.3
         fcv_gated: true
 
-    featureFlagPQSBackfill:
-        description: "Enables PQS representative query backfilling"
-        cpp_varname: gFeatureFlagPQSBackfill
-        default: true
-        version: 8.3
-        fcv_gated: true
-
     featureFlagConvertObjectToBinData:
         description: "Feature flag to enable converting from Object to BinData"
         cpp_varname: gFeatureFlagConvertObjectToBinData

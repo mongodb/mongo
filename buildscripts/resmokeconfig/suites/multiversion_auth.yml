@@ -22,13 +22,6 @@ selector:
     # TODO SERVER-94362: now that last-LTS is 9.0, this test is obsolete and should be deleted
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/create_and_drop_database_multiversion_coordination.js
 
-    # TODO SERVER-133009: featureFlagPQSBackfill is FCV-gated at 8.3. The test
-    # assumes representative queries are NOT migrated while FCV is last-LTS. Now that last-LTS is 9.0
-    # (>= 8.3), backfill is active at last-LTS and the queries are migrated, breaking the empty-
-    # representative-queries expectations. Re-enable once the test accounts for backfill being enabled
-    # at last-LTS.
-    - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_upgrade_downgrade.js
-
     # TODO SERVER-133004: this test verifies that downgrading FCV below 8.3 fails
     # when v4 2dsphere indexes exist, downgrading to last-lts (8.0). It is documented (SERVER-118561)
     # to be removed once 9.0 is last LTS, which this version bump does: last-lts is now 9.0 (>= 8.3),

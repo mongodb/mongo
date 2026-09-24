@@ -27,7 +27,6 @@ selector:
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
     - jstests/multiVersion/genericBinVersion/extensions_api/upgrade_enables_extension_foo.js
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/create_and_drop_database_multiversion_coordination.js
-    - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_upgrade_downgrade.js
     - jstests/multiVersion/genericSetFCVUsage/s2_index_v4_downgrade.js
     - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js
     - jstests/multiVersion/genericChangeStreams/change_streams_event_resumability.js

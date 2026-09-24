@@ -42,13 +42,9 @@ QuerySettingsUsageTracker& QuerySettingsUsageTracker::get(OperationContext* opCt
 BSONObj QuerySettingsUsageTracker::generateServerStatusSection(OperationContext* opCtx) const {
     BSONObjBuilder root;
     serializeUsageMetrics(root);
-    if (feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        BSONObjBuilder nested(root.subobjStart("backfill"));
-        serializeBackfillMetrics(nested);
-        nested.doneFast();
-    }
+    BSONObjBuilder nested(root.subobjStart("backfill"));
+    serializeBackfillMetrics(nested);
+    nested.doneFast();
     return root.obj();
 }
 

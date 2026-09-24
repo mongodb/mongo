@@ -27,7 +27,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
@@ -85,7 +84,6 @@
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
-#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -707,10 +705,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto role = ShardingState::get(opCtx)->pollClusterRole();
     const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
     const bool isReplSet = !role.has_value();
-    if (::mongo::feature_flags::gFeatureFlagPQSBackfill.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        (isConfigsvr || isReplSet)) {
+    if (isConfigsvr || isReplSet) {
         query_settings::QuerySettingsService::get(opCtx)
             .createQueryShapeRepresentativeQueriesCollection(opCtx);
     }
