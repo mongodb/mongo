@@ -223,8 +223,6 @@ last-continuous:
       ticket: SERVER-124967
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
-    - test_file: jstests/replsets/atlas_initialsync_workflows.js
-      ticket: SERVER-128307
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/aggregation/expressions/expression_function.js
@@ -348,8 +346,6 @@ last-lts:
       ticket: SERVER-92665
     - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
       ticket: SERVER-86253
-    - test_file: jstests/replsets/atlas_initialsync_workflows.js
-      ticket: SERVER-128307
     - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
       ticket: SERVER-89018
     - test_file: jstests/sharding/auth_catalog_shard_localhost_exception.js
