@@ -91,6 +91,8 @@ public:
         boost::optional<LogicalTime> placementConflictTimeForNonSnapshotReadConcern;
 
         bool isInternalTransactionForRetryableWrite;
+
+        bool isServerInitiatedTransaction;
     };
 
     /**

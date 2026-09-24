@@ -8453,6 +8453,43 @@ TEST_F(TransactionRouterTest, ParticipantCannotBeAddedOnRetryableStmtInRetryable
     }
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession,
+       IsServerInitiatedTransactionAttachedOncePerParticipant) {
+    // TODO SERVER-135549: Remove this guard once
+    // featureFlagServerInitiatedTransactionClassification is
+    // enabled by default, and update the existing attachTxnFieldsIfNeeded test cases to assert on
+    // isServerInitiatedTransaction.
+    unittest::ServerParameterGuard ff("featureFlagServerInitiatedTransactionClassification", true);
+
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    // The fixture's client has no network session, so the router classifies this transaction as
+    // server-initiated and forwards that to every participant it recruits.
+    auto firstCmd =
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("insert" << "test"));
+    ASSERT_TRUE(firstCmd["startTransaction"].booleanSafe());
+    ASSERT_TRUE(firstCmd["isServerInitiatedTransaction"].booleanSafe());
+
+    // shard1 has already begun the transaction, so neither field is repeated.
+    auto secondCmd =
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("update" << "test"));
+    ASSERT_FALSE(secondCmd.hasField("startTransaction"));
+    ASSERT_FALSE(secondCmd.hasField("isServerInitiatedTransaction"));
+
+    // shard2 is new to the transaction, so it receives the classification on its own first
+    // statement.
+    auto newParticipantCmd =
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, BSON("update" << "test"));
+    ASSERT_TRUE(newParticipantCmd["startTransaction"].booleanSafe());
+    ASSERT_TRUE(newParticipantCmd["isServerInitiatedTransaction"].booleanSafe());
+}
+
 class TransactionRouterSnapshotReadConcern : public TransactionRouterTestWithDefaultSession {
 protected:
     void runTest(TransactionRouter::TransactionActions startAction,

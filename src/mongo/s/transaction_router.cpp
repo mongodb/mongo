@@ -596,6 +596,14 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
                       *sharedOptions.txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
+    if (mustStartTransaction && sharedOptions.isServerInitiatedTransaction &&
+        feature_flags::gServerInitiatedTransactionClassification
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        newCmd.append(GenericArguments::kIsServerInitiatedTransactionFieldName, true);
+    }
+
     return newCmd.obj();
 }
 
@@ -1036,7 +1044,8 @@ TransactionRouter::Participant TransactionRouter::Router::_createParticipant(
                                               os.readConcernArgs,
                                               os.atClusterTimeForSnapshotReadConcern,
                                               os.placementConflictTimeForNonSnapshotReadConcern,
-                                              isInternalSessionForRetryableWrite(_sessionId())};
+                                              isInternalSessionForRetryableWrite(_sessionId()),
+                                              os.isServerInitiatedTransaction};
 
     std::lock_guard<Client> lk(*opCtx->getClient());
     auto resultPair = o(lk).participants.try_emplace(
