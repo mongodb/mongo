@@ -47,6 +47,11 @@ public:
     StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
     StatusWith<int> incrementRollbackID(OperationContext* opCtx) override;
 
+    Status initializeCleanShutdownCollection(OperationContext* opCtx) override;
+    StatusWith<boost::optional<CleanShutdownDocument>> getLastCleanShutdownDocument(
+        OperationContext* opCtx) override;
+    Status recordCleanShutdown(OperationContext* opCtx, Timestamp lastCheckpointTs) override;
+
     /**
      *  Allocates a new TaskRunner for use by the passed in collection.
      */

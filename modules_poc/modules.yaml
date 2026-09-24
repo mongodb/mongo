@@ -1049,6 +1049,7 @@ replication.initial_sync:
     - src/mongo/db/repl/*multiapplier*
     - src/mongo/db/repl/*storage_interface*
     - src/mongo/db/repl/*collection_bulk_loader*
+    - src/mongo/db/repl/clean_shutdown.idl
 
 replication.configs:
   meta:

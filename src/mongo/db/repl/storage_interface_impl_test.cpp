@@ -11,6 +11,7 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/clean_shutdown_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
@@ -400,6 +401,216 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
                            Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDoc)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, storage.getRollbackID(opCtx).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, InitializeCleanShutdownCollectionCreatesACappedCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+    NamespaceString nss = NamespaceString::kCleanShutdownLogNamespace;
+
+    {
+        const auto coll = getCollectionForRead(opCtx, nss);
+        ASSERT_FALSE(coll.exists());
+    }
+
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    {
+        const auto coll = getCollectionForRead(opCtx, nss);
+        ASSERT_TRUE(coll.exists());
+        ASSERT_TRUE(coll.getCollectionPtr()->isCapped());
+    }
+}
+
+TEST_F(StorageInterfaceImplTest, InitializeCleanShutdownCollectionIsIdempotent) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    // Unlike initializeRollbackID, this runs on every startup, so an existing collection is not an
+    // error and must not disturb the documents already recorded in it.
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp(1, 1)));
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    auto doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(0LL, doc->getId());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       GetLastCleanShutdownDocumentReturnsNamespaceNotFoundOnMissingCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    // Startup creates the collection before anything reads it, so a missing collection here is a
+    // broken invariant rather than a state to report as "nothing recorded".
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.getLastCleanShutdownDocument(opCtx).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, GetLastCleanShutdownDocumentReturnsNoneOnEmptyCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    // Created directly rather than through initializeCleanShutdownCollection, which seeds a
+    // sentinel document precisely so that this state does not arise in practice.
+    ASSERT_OK(storage.createCollection(opCtx, NamespaceString::kCleanShutdownLogNamespace, {}));
+    ASSERT_FALSE(unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx)));
+}
+
+TEST_F(StorageInterfaceImplTest, InitializeCleanShutdownCollectionSeedsASentinelDocument) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    // The collection is never left present and empty, so that "has never cleanly shut down" stays
+    // distinct from "has no such collection". The sentinel's _id is one below the first real
+    // shutdown's, which is what makes it read as the absence of one.
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    auto doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(-1LL, doc->getId());
+    ASSERT_TRUE(doc->getCleanShutdownLastCheckpointTimestamp().isNull());
+}
+
+TEST_F(StorageInterfaceImplTest, InitializeCleanShutdownCollectionSeedsTheSentinelOnlyOnce) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    _assertDocumentsInCollectionEquals(
+        opCtx,
+        NamespaceString::kCleanShutdownLogNamespace,
+        {BSON("_id" << -1LL << "cleanShutdownLastCheckpointTimestamp" << Timestamp())});
+}
+
+TEST_F(StorageInterfaceImplTest, RecordCleanShutdownIncrementsIdAndRoundTripsTheTimestamp) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    // The first clean shutdown recorded on a node uses _id 0, and each subsequent one is exactly
+    // one greater, so a gap in the ids means the capped collection truncated documents away.
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp(1, 1)));
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp(2, 2)));
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp(3, 3)));
+
+    auto doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(2LL, doc->getId());
+    ASSERT_EQUALS(Timestamp(3, 3), doc->getCleanShutdownLastCheckpointTimestamp());
+
+    _assertDocumentsInCollectionEquals(
+        opCtx,
+        NamespaceString::kCleanShutdownLogNamespace,
+        {BSON("_id" << -1LL << "cleanShutdownLastCheckpointTimestamp" << Timestamp()),
+         BSON("_id" << 0LL << "cleanShutdownLastCheckpointTimestamp" << Timestamp(1, 1)),
+         BSON("_id" << 1LL << "cleanShutdownLastCheckpointTimestamp" << Timestamp(2, 2)),
+         BSON("_id" << 2LL << "cleanShutdownLastCheckpointTimestamp" << Timestamp(3, 3))});
+}
+
+TEST_F(StorageInterfaceImplTest, CleanShutdownCollectionTruncatesTheOldestDocumentsWhenFull) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+    const auto nss = NamespaceString::kCleanShutdownLogNamespace;
+
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    // Fill the collection past its cap so that the sentinel and the oldest records are truncated
+    // away. In practice a node only reaches this state after tens of thousands of clean shutdowns;
+    // the filler documents here are padded instead so that a handful of them suffice, which only
+    // works because nothing ever parses them: getLastCleanShutdownDocument parses the last document
+    // in the collection, and the real record appended below takes that place.
+    const long long kCollectionSizeBytes = 1 * 1024 * 1024;
+    const int kPaddingSizeBytes = 16 * 1024;
+    const std::size_t kPaddingCount = 5 * kCollectionSizeBytes / 4 / kPaddingSizeBytes;
+    const std::string padding(kPaddingSizeBytes, 'x');
+    std::vector<BSONObj> fillerDocs;
+    for (std::size_t i = 0; i < kPaddingCount; i++) {
+        fillerDocs.push_back(BSON("_id" << static_cast<long long>(i) << "padding" << padding));
+    }
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(fillerDocs)));
+
+    // The last document has to be one that getLastCleanShutdownDocument can parse, so the filler
+    // stands in for the shutdowns recorded before this one rather than after it.
+    const long long lastId = static_cast<long long>(kPaddingCount);
+    ASSERT_OK(storage.insertDocument(
+        opCtx,
+        nss,
+        TimestampedBSONObj{
+            BSON("_id" << lastId << "cleanShutdownLastCheckpointTimestamp" << Timestamp(1, 1)),
+            Timestamp()},
+        OpTime::kUninitializedTerm));
+
+    {
+        // The collection stayed within its cap, and the sentinel is one of the documents it dropped
+        // to do so. Nothing depends on the sentinel surviving: it exists only to keep the
+        // collection from being present and empty, which a collection that has wrapped never is.
+        const auto coll = getCollectionForRead(opCtx, nss);
+        ASSERT_LESS_THAN(coll.getCollectionPtr()->numRecords(opCtx),
+                         static_cast<long long>(kPaddingCount + 1));
+
+        auto oldest =
+            unittest::assertGet(storage.findDocuments(opCtx,
+                                                      nss,
+                                                      boost::none,  // Collection scan.
+                                                      StorageInterface::ScanDirection::kForward,
+                                                      BSONObj(),
+                                                      BoundInclusion::kIncludeStartKeyOnly,
+                                                      1U));
+        // The sentinel is the only document with a negative _id, and it was the first one written,
+        // so an oldest surviving document with a non-negative _id means truncation happened and
+        // took the sentinel with it.
+        ASSERT_EQUALS(1U, oldest.size());
+        ASSERT_GREATER_THAN_OR_EQUALS(oldest.front()["_id"].numberLong(), 0LL);
+    }
+
+    // Truncation takes documents off the front, so the most recent one is still the last in natural
+    // order and the ids continue from it rather than restarting at 0.
+    auto doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(lastId, doc->getId());
+
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp(2, 2)));
+    doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(lastId + 1, doc->getId());
+    ASSERT_EQUALS(Timestamp(2, 2), doc->getCleanShutdownLastCheckpointTimestamp());
+
+    // The next startup must not seed a second sentinel behind the records that outlived the first
+    // one, which would put an _id of -1 at the end of the collection and read as a node that has
+    // never cleanly shut down.
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+    doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(lastId + 1, doc->getId());
+}
+
+TEST_F(StorageInterfaceImplTest, RecordCleanShutdownRecordsANullTimestampAsIs) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_OK(storage.initializeCleanShutdownCollection(opCtx));
+
+    // A node with no stable checkpoint records a null timestamp rather than skipping the document,
+    // so the shutdown still shows up in the history.
+    ASSERT_OK(storage.recordCleanShutdown(opCtx, Timestamp()));
+
+    auto doc = unittest::assertGet(storage.getLastCleanShutdownDocument(opCtx));
+    ASSERT_TRUE(doc);
+    ASSERT_EQUALS(0LL, doc->getId());
+    ASSERT_TRUE(doc->getCleanShutdownLastCheckpointTimestamp().isNull());
+}
+
+TEST_F(StorageInterfaceImplTest, RecordCleanShutdownReturnsNamespaceNotFoundOnMissingCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.recordCleanShutdown(opCtx, Timestamp(1, 1)));
 }
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsReturnsOKWhenNoOperationsAreGiven) {
