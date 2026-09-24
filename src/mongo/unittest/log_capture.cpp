@@ -89,6 +89,30 @@ public:
         });
     }
 
+    std::vector<size_t> indicesOfTextContaining(std::string_view needle) const {
+        const auto sync = *_text;
+        auto&& in = *sync;
+        std::vector<size_t> out;
+        for (size_t i = 0; i < in.size(); ++i) {
+            if (in[i].find(needle) != std::string::npos) {
+                out.push_back(i);
+            }
+        }
+        return out;
+    }
+
+    std::vector<size_t> indicesOfBSONContainingSubset(const BSONObj& needle) const {
+        const auto sync = *_bson;
+        auto&& in = *sync;
+        std::vector<size_t> out;
+        for (size_t i = 0; i < in.size(); ++i) {
+            if (_isSubset(BSONObj(in[i].c_str()), needle)) {
+                out.push_back(i);
+            }
+        }
+        return out;
+    }
+
 private:
     class Listener : public logv2::LogLineListener {
     public:
@@ -167,6 +191,14 @@ public:
     size_t countBSONContainingSubset(const BSONObj& needle) const {
         return globalLogs().countBSONContainingSubset(needle);
     }
+
+    std::vector<size_t> indicesOfTextContaining(std::string_view needle) const {
+        return globalLogs().indicesOfTextContaining(needle);
+    }
+
+    std::vector<size_t> indicesOfBSONContainingSubset(const BSONObj& needle) const {
+        return globalLogs().indicesOfBSONContainingSubset(needle);
+    }
 };
 
 LogCaptureGuard::LogCaptureGuard(bool willStart) : _impl{std::make_unique<Impl>(willStart)} {}
@@ -188,6 +220,12 @@ size_t LogCaptureGuard::countTextContaining(const std::string& needle) const {
 }
 size_t LogCaptureGuard::countBSONContainingSubset(const BSONObj& needle) const {
     return _impl->countBSONContainingSubset(needle);
+}
+std::vector<size_t> LogCaptureGuard::indicesOfTextContaining(std::string_view needle) const {
+    return _impl->indicesOfTextContaining(needle);
+}
+std::vector<size_t> LogCaptureGuard::indicesOfBSONContainingSubset(const BSONObj& needle) const {
+    return _impl->indicesOfBSONContainingSubset(needle);
 }
 
 }  // namespace mongo::unittest

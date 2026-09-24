@@ -94,6 +94,24 @@ public:
      */
     size_t countBSONContainingSubset(const BSONObj& needle) const;
 
+    /**
+     * Returns indices of lines captured since the last call to `start()` whose text matches
+     * `needle`.
+     */
+    std::vector<size_t> indicesOfTextContaining(std::string_view needle) const;
+
+    /**
+     * Returns indices of lines captured since the last call to `start()` whose BSON has `needle` as
+     * a "subset" of that line. For `needle` to be a "subset" in this sense, every element in
+     * `needle` must be a top-level element of the line. Any `Obj` nodes in the `needle` element
+     * must exist in the corresponding nodes of the line, and again the line's subtree `Obj` node
+     * may contain other elements.
+     *
+     * For examples, see `countBSONContainingSubset()`.
+     */
+    std::vector<size_t> indicesOfBSONContainingSubset(const BSONObj& needle) const;
+
+
 private:
     class Impl;
     std::unique_ptr<Impl> _impl;
