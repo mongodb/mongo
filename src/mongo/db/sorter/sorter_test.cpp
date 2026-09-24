@@ -7,6 +7,7 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/sorter/typed_sorter_test_utils.h"
+#include "mongo/db/stats/counters_sort.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -133,6 +134,30 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     EXPECT_EQ(sorterFileStats.bytesSpilledUncompressed(), 56);
     EXPECT_LT(sorterFileStats.bytesSpilled(), 100);
     EXPECT_GT(sorterFileStats.bytesSpilled(), 0);
+}
+
+// One SortedFileWriter is one logical spill, but it flushes its buffer to the file once per
+// kSortedFileBufferSize worth of data. The 'query.sort.spillToDisk' counter must count the logical
+// spill rather than the individual buffer flushes.
+TEST_F(InMemIterTest, SpillLargerThanWriteBufferCountsAsOneSpill) {
+    const auto spillDir = makeSpillDir();
+    auto writer = FileTraits<>::makeWriter(SortOptions(), spillDir.path());
+
+    const auto spillsBefore = sortCounters.sortSpillsCounter.get();
+    const auto bytesBefore = sortCounters.sortSpillBytesCounter.get();
+
+    // The bytes counter only advances when the buffer is flushed, so write until it moves to get
+    // exactly one flush, then write one more pair so that done() flushes a second one. Both chunks
+    // belong to the same logical spill.
+    int i = 0;
+    while (sortCounters.sortSpillBytesCounter.get() == bytesBefore) {
+        writer->addAlreadySorted(IntWrapper(i), IntWrapper(-i));
+        ++i;
+    }
+    writer->addAlreadySorted(IntWrapper(i), IntWrapper(-i));
+    writer->done();
+
+    EXPECT_EQ(sortCounters.sortSpillsCounter.get() - spillsBefore, 1);
 }
 
 class ContainerInMemIterTest : public ServiceContextMongoDTest {
