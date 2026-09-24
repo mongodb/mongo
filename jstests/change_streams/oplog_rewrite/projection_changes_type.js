@@ -8,7 +8,7 @@ import {
     getAllChangeStreamEvents,
     isPlainObject,
 } from "jstests/libs/query/change_stream_rewrite_util.js";
-import {getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {advanceClusterTime, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 
 const dbName = jsTestName();
 const collName = "coll1";
@@ -21,8 +21,19 @@ const numDocs = 8;
 // Generate a write workload for the change stream to consume.
 generateChangeStreamWriteWorkload(testDB, collName, numDocs);
 
+const endPoint = getClusterTime(db);
+
+// Make sure cluster time advances beyond endpoint even if the no-op oplog writer is disabled.
+advanceClusterTime(db);
+
 // Obtain a list of all events that occurred during the write workload.
-const fullEvents = getAllChangeStreamEvents(testDB, [], {showExpandedEvents: true}, startPoint);
+const fullEvents = getAllChangeStreamEvents(
+    testDB,
+    [],
+    {showExpandedEvents: true},
+    startPoint,
+    endPoint,
+);
 assert.gt(fullEvents.length, 0, "expecting fullEvents to be non-empty");
 
 // Traverse each of the events and build up a projection which empties objects and arrays, and
@@ -61,6 +72,7 @@ function assertProjection(testProjection) {
             [{[projType]: testProjection}],
             {showExpandedEvents: true},
             startPoint,
+            endPoint,
         );
 
         // Assert that we see the same events in the projected stream as in the original.
