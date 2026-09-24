@@ -38,6 +38,11 @@ public:
     static void analyzeGeo(const QueryPlannerParams& params, QuerySolutionNode* solnRoot);
 
     /**
+     * Rewrites the query solution tree for geo-related optimizations.
+     */
+    static void rewriteGeo(std::unique_ptr<QuerySolutionNode>& solnRoot);
+
+    /**
      * Takes an index key pattern and returns an object describing the "maximal sort" that this
      * index can provide.  Returned object is in normalized sort form (all elements have value 1
      * or -1).

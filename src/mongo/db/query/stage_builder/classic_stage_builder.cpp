@@ -319,6 +319,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.nearQuery = node->nq;
                 params.baseBounds = node->baseBounds;
                 params.filter = node->filter.get();
+                // Mirror what FetchStage does with its filter: a trivially true predicate is not
+                // worth evaluating per document.
+                params.residualFilter =
+                    (node->residualFilter && !node->residualFilter->isTriviallyTrue())
+                    ? node->residualFilter.get()
+                    : nullptr;
                 params.addPointMeta = node->addPointMeta;
                 params.addDistMeta = node->addDistMeta;
 
@@ -343,6 +349,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.nearQuery = node->nq;
                 params.baseBounds = node->baseBounds;
                 params.filter = node->filter.get();
+                // Mirror what FetchStage does with its filter: a trivially true predicate is not
+                // worth evaluating per document.
+                params.residualFilter =
+                    (node->residualFilter && !node->residualFilter->isTriviallyTrue())
+                    ? node->residualFilter.get()
+                    : nullptr;
                 params.addPointMeta = node->addPointMeta;
                 params.addDistMeta = node->addDistMeta;
 

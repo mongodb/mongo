@@ -419,14 +419,25 @@ void geoSkipValidationOn(const std::set<std::string_view>& twoDSphereFields,
     //
     // This does not mean that there is necessarily an IXSCAN using this 2dsphere index,
     // only that there exists a 2dsphere index on this field.
-    MatchExpression* expr = solnRoot->filter.get();
-    if (expr) {
+    const auto skipValidationIfGeoOn2dSphereField = [&](MatchExpression* expr) {
+        if (!expr) {
+            return;
+        }
         std::string_view nodeField = expr->path();
         if (expr->matchType() == MatchExpression::GEO &&
             twoDSphereFields.find(nodeField) != twoDSphereFields.end()) {
             GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(expr);
             gme->setCanSkipValidation(true);
         }
+    };
+
+    skipValidationIfGeoOn2dSphereField(solnRoot->filter.get());
+
+    // A $geoNear node carries a second, document-level predicate that was pushed down from the
+    // FETCH which used to sit above it (see pushResidualFilterIntoGeoNear). It is evaluated on the
+    // fetched document just like 'filter' was, so the same reasoning applies to it.
+    if (auto* residualFilter = getGeoNearDocFilter(*solnRoot); residualFilter) {
+        skipValidationIfGeoOn2dSphereField(residualFilter->get());
     }
 
     for (auto&& child : solnRoot->children) {
@@ -992,6 +1003,14 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
             expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(root.filter));
     }
 
+    // $geoNear nodes carry a second, document-level predicate pushed down from the FETCH that
+    // used to sit above them (see pushResidualFilterIntoGeoNear). It is evaluated on the fetched
+    // document, so the same reasoning applies to it as to 'filter' on a fetched node.
+    if (auto* residualFilter = getGeoNearDocFilter(root); residualFilter && *residualFilter) {
+        *residualFilter =
+            expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(*residualFilter));
+    }
+
     for (auto& child : root.children) {
         removeImpreciseInternalExprFilters(params, *child);
     }
@@ -1230,6 +1249,61 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
     if (twoDSphereFields.size() > 0) {
         geoSkipValidationOn(twoDSphereFields, solnRoot);
     }
+}
+
+namespace {
+/**
+ * If 'solnRoot' is a FETCH whose only job is to apply a residual filter over a $geoNear node, push
+ * that filter into the $geoNear node's 'residualFilter' and drop the FETCH.
+ * Trailing $match expressions are currently not merged into geo stages.
+ * TODO SERVER-134855: adjust this comment once this is possible.
+ *
+ * This is result-equivalent: the same MatchExpression is evaluated against the same documents,
+ * just lower in the tree. The geo node already reports fetched() == true and provides all fields,
+ * so removing the FETCH above it is legal. NearStage evaluates 'residualFilter' after the distance
+ * check for the current interval, so the predicate still sees exactly the documents the FETCH
+ * above would have seen -- which matters because a predicate such as $expr can throw on a
+ * document. The win is that documents the predicate rejects no longer pay for BSON ownership or
+ * the distance sorter inside the near stage.
+ *
+ * Note this deliberately uses 'residualFilter', not 'filter': GeoNear2DStage routes
+ * GeoNearParams::filter to its covered IndexScan as a KEY-level filter, which masserts on a
+ * predicate naming a field that is not in the index key pattern.
+ */
+void pushResidualFilterIntoGeoNear(std::unique_ptr<QuerySolutionNode>& solnRoot) {
+    if (solnRoot->getType() != STAGE_FETCH || !solnRoot->filter || solnRoot->children.size() != 1) {
+        return;
+    }
+
+    QuerySolutionNode* child = solnRoot->children[0].get();
+    const StageType childType = child->getType();
+    if (childType != STAGE_GEO_NEAR_2D && childType != STAGE_GEO_NEAR_2DSPHERE) {
+        return;
+    }
+
+    // This is the only place that ever populates 'residualFilter', and it runs once per solution,
+    // so the node cannot already carry one.
+    auto setDocFilter = [&](auto* geoNode) {
+        tassert(13351401,
+                "$geoNear node already has a residual document filter",
+                !geoNode->residualFilter);
+        geoNode->residualFilter = std::move(solnRoot->filter);
+    };
+
+    if (childType == STAGE_GEO_NEAR_2D) {
+        setDocFilter(static_cast<GeoNear2DNode*>(child));
+    } else {
+        setDocFilter(static_cast<GeoNear2DSphereNode*>(child));
+    }
+
+    // Replace the FETCH with its (now filtering) child.
+    solnRoot = std::move(solnRoot->children[0]);
+}
+}  // namespace
+
+// static
+void QueryPlannerAnalysis::rewriteGeo(std::unique_ptr<QuerySolutionNode>& solnRoot) {
+    pushResidualFilterIntoGeoNear(solnRoot);
 }
 
 BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
@@ -1635,6 +1709,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     auto soln = std::make_unique<QuerySolution>();
 
     soln->indexFilterApplied = params.indexFiltersApplied;
+
+    rewriteGeo(solnRoot);
 
     solnRoot->computeProperties();
 

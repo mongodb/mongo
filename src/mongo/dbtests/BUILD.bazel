@@ -109,6 +109,7 @@ mongo_cc_binary(
         "query_stage_merge_sort.cpp",
         "query_stage_multi_range_clustered_scan.cpp",
         "query_stage_near.cpp",
+        "query_stage_near_residual_filter.cpp",
         "query_stage_sort.cpp",
         "query_stage_sort_key_generator.cpp",
         "query_stage_subplan.cpp",

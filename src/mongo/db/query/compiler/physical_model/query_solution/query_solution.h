@@ -1401,6 +1401,12 @@ struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
     IndexEntry index;
     bool addPointMeta;
     bool addDistMeta;
+
+    // Residual predicate to evaluate on the fetched document inside the stage, after the distance
+    // check and before BSON ownership and the distance sorter. Unlike 'filter' -- which
+    // GeoNear2DStage applies to the index KEY -- this may reference fields that are not in the
+    // index key pattern.
+    std::unique_ptr<MatchExpression> residualFilter;
 };
 
 struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
@@ -1439,6 +1445,12 @@ struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
     IndexEntry index;
     bool addPointMeta;
     bool addDistMeta;
+
+    // Residual predicate to evaluate on the fetched document inside the stage, after the distance
+    // check and before BSON ownership and the distance sorter. This predicate is evaluated against
+    // the fetched document, so it may reference fields that are not part of the geo index key
+    // pattern.
+    std::unique_ptr<MatchExpression> residualFilter;
 };
 
 //
@@ -2353,5 +2365,11 @@ struct IndexProbeNode : public QuerySolutionNode {
     NamespaceString nss;
     IndexEntry index;
 };
+
+/**
+ * Returns the address of the 'residualFilter' member if 'node' is a $geoNear node, otherwise
+ * nullptr.
+ */
+std::unique_ptr<MatchExpression>* getGeoNearDocFilter(QuerySolutionNode& node);
 
 }  // namespace mongo

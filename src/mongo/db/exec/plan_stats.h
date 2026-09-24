@@ -985,6 +985,11 @@ struct IntervalStats {
     long long numResultsBuffered = 0;
     // Number of documents in this interval returned to the parent stage.
     long long numResultsReturned = 0;
+    // Number of documents in this interval that passed the distance checks but were rejected by
+    // the residual predicate pushed into this stage. Without a pushed-down predicate this is
+    // always 0. Interval sizing must account for these, since they measure local document density
+    // just as well as the documents that were returned.
+    long long numRejectedByFilter = 0;
 
     // Min distance of this interval - always inclusive.
     double minDistanceAllowed = -1;

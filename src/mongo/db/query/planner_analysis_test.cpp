@@ -8,6 +8,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
@@ -388,6 +389,127 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     expr->setCanSkipValidation(false);
     QueryPlannerAnalysis::analyzeGeo(params, &orNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
+}
+
+TEST(QueryPlannerAnalysis, GeoSkipValidationOnGeoNearDocFilter) {
+    auto relevantIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
+    relevantIndex.infoObj = fromjson("{'2dsphereIndexVersion': 3}");
+    auto differentFieldIndex = buildSimpleIndexEntry(fromjson("{'geometry.blah': '2dsphere'}"));
+    differentFieldIndex.infoObj = fromjson("{'2dsphereIndexVersion': 3}");
+
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
+    // A geo predicate that has been pushed into the $geoNear node as its residual document filter
+    // must be treated exactly like a filter on a fetched node: validation can be skipped when a
+    // relevant 2dsphere index exists.
+    const auto makeGeoNear2DSphereNodeWithDocFilter = [&](GeoMatchExpression** exprOut) {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}")));
+        auto exprPtr = std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        *exprOut = exprPtr.get();
+        node->residualFilter = std::move(exprPtr);
+        return node;
+    };
+
+    {
+        GeoMatchExpression* expr = nullptr;
+        auto node = makeGeoNear2DSphereNodeWithDocFilter(&expr);
+
+        // No indexes: no skipping.
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+        // A 2dsphere index on a different field: no skipping.
+        params.mainCollectionInfo.indexes.push_back(differentFieldIndex);
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+        // A relevant 2dsphere index: skip validation.
+        params.mainCollectionInfo.indexes.push_back(relevantIndex);
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), true);
+    }
+
+    // The same holds for a $geoNear node nested below another node, and for a node that carries
+    // both a 'filter' and a 'residualFilter'.
+    {
+        GeoMatchExpression* residualFilterExpr = nullptr;
+        auto geoNode = makeGeoNear2DSphereNodeWithDocFilter(&residualFilterExpr);
+
+        auto filterPtr =
+            std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        GeoMatchExpression* filterExpr = filterPtr.get();
+        geoNode->filter = std::move(filterPtr);
+
+        ShardingFilterNode shardFilterNode;
+        shardFilterNode.children.push_back(std::move(geoNode));
+
+        QueryPlannerAnalysis::analyzeGeo(params, &shardFilterNode);
+        ASSERT_EQ(filterExpr->getCanSkipValidation(), true);
+        ASSERT_EQ(residualFilterExpr->getCanSkipValidation(), true);
+    }
+
+    // A GeoNear2DNode's 'residualFilter' is handled as well.
+    {
+        auto node = std::make_unique<GeoNear2DNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{'geometry.field': '2d'}")));
+        auto exprPtr = std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        GeoMatchExpression* expr = exprPtr.get();
+        node->residualFilter = std::move(exprPtr);
+
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), true);
+    }
+}
+
+TEST(QueryPlannerAnalysis, GeoNearNodeClonePreservesDocFilter) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    const BSONObj kThree = BSON("" << 3);
+    // appendToString() dereferences 'nq', so the nodes need a near query even though its contents
+    // are irrelevant here.
+    const GeoNearExpression nearExpr("a");
+
+    const auto assertClonedDocFilter = [](const auto& original) {
+        auto clone = original->clone();
+        auto* clonedNode = dynamic_cast<decltype(original.get())>(clone.get());
+        ASSERT(clonedNode);
+        ASSERT(clonedNode->residualFilter);
+        // The clone must own a separate copy of the predicate, not alias the original's.
+        ASSERT_NOT_EQUALS(clonedNode->residualFilter.get(), original->residualFilter.get());
+        ASSERT_BSONOBJ_EQ(clonedNode->residualFilter->serialize(),
+                          original->residualFilter->serialize());
+        // The predicate is part of the node's string representation, which explain and log output
+        // rely on.
+        ASSERT_STRING_CONTAINS(clone->toString(), "residualFilter");
+    };
+
+    {
+        auto node =
+            std::make_unique<GeoNear2DNode>(testNss, buildSimpleIndexEntry(fromjson("{a: '2d'}")));
+        node->nq = &nearExpr;
+        node->residualFilter = std::make_unique<GTMatchExpression>("b"sv, kThree.firstElement());
+        assertClonedDocFilter(node);
+    }
+
+    {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{a: '2dsphere'}")));
+        node->nq = &nearExpr;
+        node->residualFilter = std::make_unique<GTMatchExpression>("b"sv, kThree.firstElement());
+        assertClonedDocFilter(node);
+    }
+
+    // A node without a 'residualFilter' clones into a node without one, and does not mention it in
+    // its string representation.
+    {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{a: '2dsphere'}")));
+        node->nq = &nearExpr;
+        auto clone = node->clone();
+        ASSERT_FALSE(static_cast<GeoNear2DSphereNode*>(clone.get())->residualFilter);
+        ASSERT_STRING_OMITS(clone->toString(), "residualFilter");
+    }
 }
 
 TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemoved) {

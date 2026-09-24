@@ -102,6 +102,26 @@ protected:
      */
     virtual double computeDistance(WorkingSetMember* member) = 0;
 
+    /**
+     * Returns the largest distance this search can ever return, in the same units as
+     * computeDistance(). This is the maximum distance of the last interval, so a document beyond it
+     * fails the interval check of every interval and can never be returned. bufferNext() therefore
+     * discards such a document right away instead of buffering it. Defaults to no limit.
+     */
+    virtual double maxSearchDistance() const {
+        return std::numeric_limits<double>::infinity();
+    }
+
+    /**
+     * Returns the residual document-level predicate to apply to each buffered document, or nullptr
+     * if there is none. This predicate is evaluated only on documents that the near search would
+     * otherwise return, that is, after the distance checks against the current interval and against
+     * maxSearchDistance(). See the call site in bufferNext() for why the ordering matters.
+     */
+    virtual const MatchExpression* residualFilter() const {
+        return nullptr;
+    }
+
     /*
      * Initialize near stage before buffering the data.
      * Return IS_EOF if subclass finishes the initialization.

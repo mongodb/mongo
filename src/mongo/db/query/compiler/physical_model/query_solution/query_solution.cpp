@@ -1598,6 +1598,17 @@ std::unique_ptr<QuerySolutionNode> SkipNode::clone() const {
     return std::make_unique<SkipNode>(*this);
 }
 
+std::unique_ptr<MatchExpression>* getGeoNearDocFilter(QuerySolutionNode& node) {
+    switch (node.getType()) {
+        case STAGE_GEO_NEAR_2D:
+            return &static_cast<GeoNear2DNode&>(node).residualFilter;
+        case STAGE_GEO_NEAR_2DSPHERE:
+            return &static_cast<GeoNear2DSphereNode&>(node).residualFilter;
+        default:
+            return nullptr;
+    }
+}
+
 //
 // GeoNear2DNode
 //
@@ -1615,6 +1626,10 @@ void GeoNear2DNode::appendToString(str::stream* ss, int indent) const {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString();
     }
+    if (nullptr != residualFilter) {
+        addIndent(ss, indent + 1);
+        *ss << " residualFilter = " << residualFilter->debugString();
+    }
 }
 
 std::unique_ptr<QuerySolutionNode> GeoNear2DNode::clone() const {
@@ -1625,6 +1640,9 @@ std::unique_ptr<QuerySolutionNode> GeoNear2DNode::clone() const {
     copy->baseBounds = this->baseBounds;
     copy->addPointMeta = this->addPointMeta;
     copy->addDistMeta = this->addDistMeta;
+    if (this->residualFilter) {
+        copy->residualFilter = this->residualFilter->clone();
+    }
 
     return copy;
 }
@@ -1648,6 +1666,10 @@ void GeoNear2DSphereNode::appendToString(str::stream* ss, int indent) const {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString();
     }
+    if (nullptr != residualFilter) {
+        addIndent(ss, indent + 1);
+        *ss << " residualFilter = " << residualFilter->debugString();
+    }
 }
 
 std::unique_ptr<QuerySolutionNode> GeoNear2DSphereNode::clone() const {
@@ -1658,6 +1680,9 @@ std::unique_ptr<QuerySolutionNode> GeoNear2DSphereNode::clone() const {
     copy->baseBounds = this->baseBounds;
     copy->addPointMeta = this->addPointMeta;
     copy->addDistMeta = this->addDistMeta;
+    if (this->residualFilter) {
+        copy->residualFilter = this->residualFilter->clone();
+    }
 
     return copy;
 }

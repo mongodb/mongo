@@ -4,6 +4,7 @@
 
 #include "mongo/db/exec/classic/near.h"
 
+#include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/file_based_spiller.h"
@@ -184,7 +185,12 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     }
 
     auto memberDistance = computeDistance(&nextMember);
-    if (memberDistance < _nextInterval->minDistance) {
+    // Documents outside of the search annulus can never be returned and are dropped right away:
+    // one closer than the current interval's minimum was already covered by an earlier interval,
+    // and one beyond the largest distance of the search fails the interval check of every interval,
+    // including the last one. Dropping them here also means the residual predicate below is only
+    // ever evaluated on documents that the search actually returns.
+    if (memberDistance < _nextInterval->minDistance || memberDistance > maxSearchDistance()) {
         if (nextMember.hasRecordId()) {
             _seenDocuments.freeMemory(nextMember.recordId);
             const uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
@@ -194,6 +200,17 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
             _memoryTracker.add(dedupBytesDiff);
             _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         }
+        return PlanStage::NEED_TIME;
+    }
+
+    // Apply the residual document-level predicate that was pushed down from the FETCH stage which
+    // used to sit above this one. This has to happen after the distance checks above: a document
+    // that the near search discards must never be handed to the predicate, both because that is
+    // wasted work and because predicates such as $expr can throw errors on documents that the
+    // query would never have returned. Documents rejected here are still recorded in
+    // '_seenDocuments', which is what the equivalent plan with a FETCH above this stage did.
+    if (!Filter::passes(&nextMember, residualFilter())) {
+        ++_nextIntervalStats->numRejectedByFilter;
         return PlanStage::NEED_TIME;
     }
 
@@ -303,8 +320,16 @@ bool NearStage::isEOF() const {
 }
 
 std::unique_ptr<PlanStageStats> NearStage::getStats() {
+    // Report the residual predicate that was pushed into this stage as the stage's filter, the same
+    // way FetchStage reports its own filter. Without this the predicate would disappear from
+    // explain output entirely once the FETCH above this stage is optimized away.
+    if (const MatchExpression* filter = residualFilter();
+        nullptr != filter && _commonStats.filter.isEmpty()) {
+        _commonStats.filter = filter->serialize();
+    }
     auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific = std::make_unique<NearStats>(_specificStats);
+    ret->children.reserve(_childrenIntervals.size());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }

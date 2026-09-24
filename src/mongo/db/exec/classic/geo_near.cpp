@@ -386,21 +386,96 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
 
 static const string kTwoDIndexNearStage("GEO_NEAR_2D");
 
+namespace {
+/**
+ * The maximum axis-aligned distance error of a FLAT search over a 2d index. FLAT searches have to
+ * treat containment and distance separately, so the outer bound of the search is stretched by this
+ * amount. See GeoNear2DStage::nextInterval() for details.
+ */
+double twoDFlatDistanceEpsilon(const R2Annulus& fullBounds) {
+    return std::numeric_limits<double>::epsilon() *
+        (max(abs(fullBounds.center().x), abs(fullBounds.center().y)) + fullBounds.getOuter());
+}
+
+/**
+ * The largest distance a 2d search can ever return. Depends only on the query CRS and the full
+ * bounds, both of which are fixed for the lifetime of the stage, so this is computed once at
+ * construction rather than per document. See GeoNear2DStage::maxSearchDistance().
+ */
+double twoDMaxSearchDistance(const GeoNearParams& nearParams, const R2Annulus& fullBounds) {
+    // A FLAT search stretches the outer bound of its last interval by an epsilon, so a document may
+    // legitimately be returned from slightly beyond 'fullBounds'. See nextInterval().
+    if (FLAT == nearParams.nearQuery->centroid->crs) {
+        return fullBounds.getOuter() + twoDFlatDistanceEpsilon(fullBounds);
+    }
+    return fullBounds.getOuter();
+}
+}  // namespace
+
+GeoNearStage::GeoNearStage(const GeoNearParams& nearParams,
+                           ExpressionContext* expCtx,
+                           std::string_view typeName,
+                           StageType type,
+                           WorkingSet* workingSet,
+                           CollectionAcquisition collection,
+                           const IndexCatalogEntry* indexEntry,
+                           R2Annulus fullBounds)
+    : NearStage(expCtx, typeName, type, workingSet, collection, indexEntry),
+      _nearParams(nearParams),
+      _fullBounds(std::move(fullBounds)),
+      _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
+      _boundsIncrement(0.0) {}
+
+bool GeoNearStage::prepareNextInterval(R2Annulus* nextBounds,
+                                       bool* isLastInterval,
+                                       double minBoundsIncrement) {
+    // The search is finished if we searched at least once and all the way to the edge
+    if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
+        return false;
+    }
+
+    if (!_specificStats.intervalStats.empty()) {
+        const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
+
+        // TODO: Generally we want small numbers of results fast, then larger numbers later
+        // This heuristic estimates local document density, so it must count every document the
+        // interval found, including those the pushed-down residual predicate rejected. Counting
+        // only the survivors makes a selective predicate look like a sparse region and grows the
+        // annulus exponentially, scanning far more index keys than the limit needs.
+        const long long lastIntervalDensity =
+            lastIntervalStats.numResultsReturned + lastIntervalStats.numRejectedByFilter;
+        if (lastIntervalDensity < 300)
+            _boundsIncrement *= 2;
+        else if (lastIntervalDensity > 600)
+            _boundsIncrement /= 2;
+    }
+
+    _boundsIncrement = max(_boundsIncrement, minBoundsIncrement);
+
+    R2Annulus next(_currBounds.center(),
+                   _currBounds.getOuter(),
+                   min(_currBounds.getOuter() + _boundsIncrement, _fullBounds.getOuter()));
+
+    *isLastInterval = (next.getOuter() == _fullBounds.getOuter());
+    _currBounds = next;
+    *nextBounds = next;
+    return true;
+}
+
 GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                ExpressionContext* expCtx,
                                WorkingSet* workingSet,
                                CollectionAcquisition collection,
                                const IndexCatalogEntry* twoDIndex)
-    : NearStage(expCtx,
-                kTwoDIndexNearStage.c_str(),
-                STAGE_GEO_NEAR_2D,
-                workingSet,
-                collection,
-                twoDIndex),
-      _nearParams(nearParams),
-      _fullBounds(twoDDistanceBounds(nearParams, twoDIndex->descriptor())),
-      _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
-      _boundsIncrement(0.0) {
+    : GeoNearStage(nearParams,
+                   expCtx,
+                   kTwoDIndexNearStage,
+                   STAGE_GEO_NEAR_2D,
+                   workingSet,
+                   collection,
+                   twoDIndex,
+                   twoDDistanceBounds(nearParams, twoDIndex->descriptor())),
+      _maxSearchDistance(twoDMaxSearchDistance(_nearParams, _fullBounds)) {
     _specificStats.keyPattern = twoDIndex->descriptor()->keyPattern();
     _specificStats.indexName = twoDIndex->descriptor()->indexName();
     _specificStats.indexVersion = static_cast<int>(twoDIndex->descriptor()->version());
@@ -456,34 +531,13 @@ static R2Annulus projectBoundsToTwoDDegrees(R2Annulus sphereBounds) {
 
 std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(OperationContext* opCtx,
                                                                          WorkingSet* workingSet) {
-    // The search is finished if we searched at least once and all the way to the edge
-    if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
+    R2Annulus nextBounds;
+    bool isLastInterval = false;
+    if (!prepareNextInterval(&nextBounds,
+                             &isLastInterval,
+                             min2DBoundsIncrement(*_nearParams.nearQuery, indexDescriptor()))) {
         return nullptr;
     }
-
-    //
-    // Setup the next interval
-    //
-
-    if (!_specificStats.intervalStats.empty()) {
-        const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
-
-        // TODO: Generally we want small numbers of results fast, then larger numbers later
-        if (lastIntervalStats.numResultsReturned < 300)
-            _boundsIncrement *= 2;
-        else if (lastIntervalStats.numResultsReturned > 600)
-            _boundsIncrement /= 2;
-    }
-
-    _boundsIncrement =
-        max(_boundsIncrement, min2DBoundsIncrement(*_nearParams.nearQuery, indexDescriptor()));
-
-    R2Annulus nextBounds(_currBounds.center(),
-                         _currBounds.getOuter(),
-                         min(_currBounds.getOuter() + _boundsIncrement, _fullBounds.getOuter()));
-
-    const bool isLastInterval = (nextBounds.getOuter() == _fullBounds.getOuter());
-    _currBounds = nextBounds;
 
     //
     // Get a covering region for this interval
@@ -513,9 +567,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(Operati
         // internally into a $within query with $near just as sort.
 
         // Compute the maximum axis-aligned distance error
-        const double epsilon = std::numeric_limits<double>::epsilon() *
-            (max(abs(_fullBounds.center().x), abs(_fullBounds.center().y)) +
-             _fullBounds.getOuter());
+        const double epsilon = twoDFlatDistanceEpsilon(_fullBounds);
 
         if (nextBounds.getInner() > 0 && nextBounds.getInner() == _fullBounds.getInner()) {
             nextBounds = R2Annulus(nextBounds.center(),
@@ -634,16 +686,14 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            WorkingSet* workingSet,
                                            CollectionAcquisition collection,
                                            const IndexCatalogEntry* s2Index)
-    : NearStage(expCtx,
-                kS2IndexNearStage.c_str(),
-                STAGE_GEO_NEAR_2DSPHERE,
-                workingSet,
-                collection,
-                s2Index),
-      _nearParams(nearParams),
-      _fullBounds(geoNearDistanceBounds(*nearParams.nearQuery)),
-      _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
-      _boundsIncrement(0.0) {
+    : GeoNearStage(nearParams,
+                   expCtx,
+                   kS2IndexNearStage,
+                   STAGE_GEO_NEAR_2DSPHERE,
+                   workingSet,
+                   collection,
+                   s2Index,
+                   geoNearDistanceBounds(*nearParams.nearQuery)) {
     _specificStats.keyPattern = s2Index->descriptor()->keyPattern();
     _specificStats.indexName = s2Index->descriptor()->indexName();
     _specificStats.indexVersion = static_cast<int>(s2Index->descriptor()->version());
@@ -872,33 +922,13 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 
 std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
     OperationContext* opCtx, WorkingSet* workingSet) {
-    // The search is finished if we searched at least once and all the way to the edge
-    if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
+    R2Annulus nextBounds;
+    bool isLastInterval = false;
+    if (!prepareNextInterval(&nextBounds, &isLastInterval)) {
         return nullptr;
     }
 
-    //
-    // Setup the next interval
-    //
-
-    if (!_specificStats.intervalStats.empty()) {
-        const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
-
-        // TODO: Generally we want small numbers of results fast, then larger numbers later
-        if (lastIntervalStats.numResultsReturned < 300)
-            _boundsIncrement *= 2;
-        else if (lastIntervalStats.numResultsReturned > 600)
-            _boundsIncrement /= 2;
-    }
-
     tassert(9911926, "", _boundsIncrement > 0.0);
-
-    R2Annulus nextBounds(_currBounds.center(),
-                         _currBounds.getOuter(),
-                         min(_currBounds.getOuter() + _boundsIncrement, _fullBounds.getOuter()));
-
-    bool isLastInterval = (nextBounds.getOuter() == _fullBounds.getOuter());
-    _currBounds = nextBounds;
 
     //
     // Setup the covering region and stages for this interval

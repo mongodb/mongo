@@ -54,12 +54,43 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 namespace {
 
 using namespace mongo;
 
 using std::string;
+
+// Error codes shared between the generic stage verification helpers and the $geoNear
+// verification helpers. They are defined here so that each numeric code only appears
+// once in this file.
+constexpr ErrorCodes::Error kMismatchingKeyPatternError{5619243};
+constexpr ErrorCodes::Error kMalformedStageObjectError{5619258};
+constexpr ErrorCodes::Error kCollationNotAnObjectError{5619259};
+constexpr ErrorCodes::Error kUnexpectedFilterError{5619260};
+constexpr ErrorCodes::Error kFilterNotAnObjectError{5619261};
+constexpr ErrorCodes::Error kMissingChildNodeError{5619262};
+constexpr ErrorCodes::Error kUnspecifiedDocFilterError{13351400};
+
+/**
+ * Optimizes every NOT/NOR subtree of 'expr' in place, leaving the rest of the tree structurally
+ * untouched. The parser wraps the argument of a $not in a single-child $and which canonicalization
+ * of the real query has already collapsed, so a nested $not would otherwise never compare equal,
+ * e.g. {a: {$elemMatch: {$gte: 0, $not: {$gte: 10}}}}. This is deliberately narrower than
+ * optimizing the whole tree, which would also rewrite single-arg $or expressions that some tests
+ * depend on comparing structurally.
+ */
+std::unique_ptr<MatchExpression> optimizeNotSubtrees(std::unique_ptr<MatchExpression> expr) {
+    if (expr->matchType() == mongo::MatchExpression::NOT ||
+        expr->matchType() == mongo::MatchExpression::NOR) {
+        return optimizeMatchExpression(std::move(expr));
+    }
+    if (auto* children = expr->getChildVector()) {
+        for (auto& child : *children) {
+            child = optimizeNotSubtrees(std::move(child));
+        }
+    }
+    return expr;
+}
 
 Status filterMatches(const BSONObj& testFilter,
                      const MatchExpression* trueFilter,
@@ -78,14 +109,11 @@ Status filterMatches(const BSONObj& testFilter,
             "match expression provided by the test did not parse successfully");
     }
     std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
-    if (root->matchType() == mongo::MatchExpression::NOT ||
-        root->matchType() == mongo::MatchExpression::NOR) {
-        // 1. Ideally we would optimize() everything, but some of the tests depend on structural
-        // equivalence of single-arg $or expressions.
-        // 2. NOR with a single child is optimized to NOT during canonicalization, so we need to
-        // optimize here for the comparison to match.
-        root = optimizeMatchExpression(std::move(root));
-    }
+    // Ideally we would optimize() everything, but some of the tests depend on structural
+    // equivalence of single-arg $or expressions. NOR with a single child is optimized to NOT
+    // during canonicalization, so NOT/NOR subtrees must be optimized here for the comparison to
+    // match. See optimizeNotSubtrees().
+    root = optimizeNotSubtrees(std::move(root));
     sortMatchExpressionTree(root.get());
     if (!trueFilterClone->equivalent(root.get())) {
         return {ErrorCodes::Error{5619211},
@@ -105,12 +133,17 @@ Status filterMatches(const BSONObj& testFilter,
     return Status::OK();
 }
 
-Status nodeHasMatchingFilter(const BSONObj& testFilter,
-                             const BSONObj& testCollation,
-                             const QuerySolutionNode* trueFilterNode) {
-    if (nullptr == trueFilterNode->filter) {
+/**
+ * Compares 'testFilter' against 'trueFilter', which need not be the node's own 'filter' member --
+ * $geoNear nodes also carry a 'residualFilter'.
+ */
+Status expressionMatchesFilter(const BSONObj& testFilter,
+                               const BSONObj& testCollation,
+                               const MatchExpression* trueFilter,
+                               const QuerySolutionNode* trueFilterNode) {
+    if (nullptr == trueFilter) {
         return {ErrorCodes::Error{5619210},
-                str::stream() << "No filter found in query solution node"
+                str::stream() << "No filter found in query solution node: "
                               << trueFilterNode->toString()};
     }
 
@@ -125,7 +158,74 @@ Status nodeHasMatchingFilter(const BSONObj& testFilter,
         testCollator = std::move(collator.getValue());
     }
 
-    return filterMatches(testFilter, trueFilterNode->filter.get(), std::move(testCollator));
+    return filterMatches(testFilter, trueFilter, std::move(testCollator));
+}
+
+Status nodeHasMatchingFilter(const BSONObj& testFilter,
+                             const BSONObj& testCollation,
+                             const QuerySolutionNode* trueFilterNode) {
+    return expressionMatchesFilter(
+        testFilter, testCollation, trueFilterNode->filter.get(), trueFilterNode);
+}
+
+/**
+ * Verifies the 'residualFilter' of a $geoNear expectation against the node's pushed-down residual
+ * predicate. 'residualFilter: null' asserts that no predicate was pushed down.
+ *
+ * Specifying 'residualFilter' is mandatory whenever the node carries a pushed-down predicate: an
+ * expectation that stays silent about it would still pass if the planner pushed down the wrong
+ * predicate, which silently changes query results. Expectations for nodes without a pushed-down
+ * predicate may omit it.
+ */
+Status geoNearDocFilterMatches(const BSONObj& geoObj,
+                               const MatchExpression* residualFilter,
+                               const QuerySolutionNode* node,
+                               std::string_view stageName) {
+    BSONElement residualFilterElt = geoObj["residualFilter"];
+    if (residualFilterElt.eoo()) {
+        if (nullptr != residualFilter) {
+            return {kUnspecifiedDocFilterError,
+                    str::stream()
+                        << "found a " << stageName
+                        << " stage with a pushed-down document filter, but the provided JSON did "
+                           "not specify 'residualFilter'. Specify the expected filter, or "
+                           "'residualFilter: null' to assert that nothing is pushed down. Found: "
+                        << residualFilter->serialize()};
+        }
+        return Status::OK();
+    }
+
+    if (residualFilterElt.isNull()) {
+        if (nullptr != residualFilter) {
+            return {kUnexpectedFilterError,
+                    str::stream() << "Expected a " << stageName
+                                  << " stage without a pushed-down document filter, but found: "
+                                  << residualFilter->toString()};
+        }
+        return Status::OK();
+    }
+
+    if (!residualFilterElt.isABSONObj()) {
+        return {kFilterNotAnObjectError,
+                str::stream() << "Provided JSON gave a '" << stageName
+                              << "' with a 'residualFilter' which was not an object: "
+                              << residualFilterElt};
+    }
+
+    BSONObj collation;
+    if (BSONElement collationElt = geoObj["collation"]) {
+        if (!collationElt.isABSONObj()) {
+            return {kCollationNotAnObjectError,
+                    str::stream() << "Provided JSON gave a '" << stageName
+                                  << "' stage with a 'collation' which was not an object: "
+                                  << collationElt};
+        }
+        collation = collationElt.Obj();
+    }
+
+    return expressionMatchesFilter(residualFilterElt.Obj(), collation, residualFilter, node)
+        .withContext(str::stream()
+                     << "mismatching 'residualFilter' for '" << stageName << "' node");
 }
 
 Status columnIxScanFiltersByPathMatch(
@@ -730,14 +830,40 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "corresponding 'geoNear2d' object in the provided JSON"};
         }
         BSONObj geoObj = el.Obj();
-        if (SimpleBSONObjComparator::kInstance.evaluate(geoObj == node->index.keyPattern)) {
-            return Status::OK();
+
+        // Two accepted forms. The legacy one names the key pattern directly:
+        //     {geoNear2d: {a: '2d'}}
+        // The extended one allows the residual document filter pushed into the stage to be
+        // asserted as well:
+        //     {geoNear2d: {pattern: {a: '2d'}, residualFilter: {b: 1}}}
+        // The legacy form is still the majority of call sites, so both are supported.
+        const bool isExtendedForm =
+            bsonObjFieldsAreInSet(geoObj, {"pattern", "residualFilter", "collation"}) &&
+            geoObj["pattern"].isABSONObj();
+        if (!isExtendedForm) {
+            if (SimpleBSONObjComparator::kInstance.evaluate(geoObj == node->index.keyPattern)) {
+                return Status::OK();
+            }
+            return {kMismatchingKeyPatternError,
+                    str::stream() << "found a geoNear2d stage in the solution with mismatching "
+                                     "keyPattern. Expected: "
+                                  << geoObj << " Found: " << node->index.keyPattern};
         }
-        return {
-            ErrorCodes::Error{5619243},
-            str::stream()
-                << "found a geoNear2d stage in the solution with mismatching keyPattern. Expected: "
-                << geoObj << " Found: " << node->index.keyPattern};
+
+        BSONElement pattern = geoObj["pattern"];
+        if (!pattern.isABSONObj()) {
+            return {kMalformedStageObjectError,
+                    "found a geoNear2d stage in the solution but 'pattern' was not an object "
+                    "in the provided JSON"};
+        }
+        if (SimpleBSONObjComparator::kInstance.evaluate(pattern.Obj() != node->index.keyPattern)) {
+            return {kMismatchingKeyPatternError,
+                    str::stream() << "found a geoNear2d stage in the solution with mismatching "
+                                     "keyPattern. Expected: "
+                                  << pattern.Obj() << " Found: " << node->index.keyPattern};
+        }
+
+        return geoNearDocFilterMatches(geoObj, node->residualFilter.get(), node, "geoNear2d");
     } else if (STAGE_GEO_NEAR_2DSPHERE == trueSoln->getType()) {
         const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(trueSoln);
         BSONElement el = testSoln["geoNear2dsphere"];
@@ -747,7 +873,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "corresponding 'geoNear2dsphere' object in the provided JSON"};
         }
         BSONObj geoObj = el.Obj();
-        invariant(bsonObjFieldsAreInSet(geoObj, {"pattern", "bounds"}));
+        invariant(
+            bsonObjFieldsAreInSet(geoObj, {"pattern", "bounds", "residualFilter", "collation"}));
 
         BSONElement pattern = geoObj["pattern"];
         if (pattern.eoo() || !pattern.isABSONObj()) {
@@ -779,7 +906,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             }
         }
 
-        return Status::OK();
+        return geoNearDocFilterMatches(geoObj, node->residualFilter.get(), node, "geoNear2dsphere");
     } else if (STAGE_TEXT_MATCH == trueSoln->getType()) {
         // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
         const TextMatchNode* node = static_cast<const TextMatchNode*>(trueSoln);
@@ -961,7 +1088,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement el = testSoln["fetch"];
         if (el.eoo() || !el.isABSONObj()) {
-            return {ErrorCodes::Error{5619258},
+            return {kMalformedStageObjectError,
                     "found a fetch in the solution but no corresponding 'fetch' object in "
                     "the provided JSON"};
         }
@@ -971,7 +1098,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONObj collation;
         if (BSONElement collationElt = fetchObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return {ErrorCodes::Error{5619259},
+                return {kCollationNotAnObjectError,
                         str::stream()
                             << "Provided JSON gave a 'fetch' with a 'collation', but the collation "
                                "was not an object:"
@@ -984,13 +1111,13 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!filter.eoo()) {
             if (filter.isNull()) {
                 if (nullptr != fn->filter) {
-                    return {ErrorCodes::Error{5619260},
+                    return {kUnexpectedFilterError,
                             str::stream()
                                 << "Expected a fetch stage without a filter, but found a filter: "
                                 << fn->filter->toString()};
                 }
             } else if (!filter.isABSONObj()) {
-                return {ErrorCodes::Error{5619261},
+                return {kFilterNotAnObjectError,
                         str::stream()
                             << "Provided JSON gave a 'fetch' stage with a 'filter', but the filter "
                                "was not an object."
@@ -1003,7 +1130,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement child = fetchObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return {ErrorCodes::Error{5619262},
+            return {kMissingChildNodeError,
                     str::stream() << "found a fetch stage in the solution but no 'node' sub-object "
                                      "in the provided "
                                      "JSON"
