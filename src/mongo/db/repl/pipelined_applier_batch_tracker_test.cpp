@@ -53,10 +53,12 @@ TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispat
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(1));
     ASSERT_EQ(completed->remainingWorkers, first);
+    tracker.onBatchPublished();
     completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(2));
     ASSERT_EQ(completed->remainingWorkers, second);
+    tracker.onBatchPublished();
     ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
 }
 
@@ -69,10 +71,12 @@ TEST(PipelinedApplierBatchTrackerTest, ZeroWorkerBatchWaitsForEarlierBatch) {
 
     tracker.onWorkerCompletion(first);
     ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
+    tracker.onBatchPublished();
     auto completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(2));
     ASSERT_EQ(completed->remainingWorkers, empty);
+    tracker.onBatchPublished();
 }
 
 TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
@@ -82,6 +86,7 @@ TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
     auto completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(1));
+    tracker.onBatchPublished();
 }
 
 // The last worker to finish a batch wakes the waiting consumer before its timeout expires.
@@ -110,6 +115,7 @@ TEST(PipelinedApplierBatchTrackerTest, LastWorkerWakesConsumer) {
     auto completed = result.get();
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(1));
+    tracker.onBatchPublished();
 }
 
 TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
@@ -133,6 +139,83 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
     auto completed = result.get();
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, batchTime(1));
+    tracker.onBatchPublished();
+}
+
+TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFinishes) {
+    PipelinedApplierBatchTracker tracker;
+    tracker.addBatch(batchTime(1), 0);
+    ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
+    std::promise<bool> promise;
+    auto idle = promise.get_future();
+    stdx::thread waiter;
+    bool published = false;
+    ON_BLOCK_EXIT([&] {
+        if (!published) {
+            tracker.onBatchPublished();
+        }
+        if (waiter.joinable()) {
+            waiter.join();
+        }
+    });
+    {
+        FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+        waiter = stdx::thread([&] { promise.set_value(tracker.waitUntilIdle()); });
+        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        // The only batch is already popped, but the waiter must still see the advancer as busy.
+        ASSERT_EQ(idle.wait_for(Milliseconds(0).toSystemDuration()), std::future_status::timeout);
+    }
+    tracker.onBatchPublished();
+    published = true;
+    ASSERT_EQ(idle.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
+    ASSERT_TRUE(idle.get());
+}
+
+TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutCompletingTheBatch) {
+    PipelinedApplierBatchTracker tracker;
+    auto remaining = tracker.addBatch(batchTime(1), 1);
+    std::promise<bool> promise;
+    auto idle = promise.get_future();
+    stdx::thread waiter;
+    ON_BLOCK_EXIT([&] {
+        tracker.onWorkerAbandonment();
+        if (waiter.joinable()) {
+            waiter.join();
+        }
+    });
+    {
+        FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+        waiter = stdx::thread([&] { promise.set_value(tracker.waitUntilIdle()); });
+        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+    }
+    tracker.onWorkerAbandonment();
+    ASSERT_EQ(idle.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
+    ASSERT_FALSE(idle.get());
+    ASSERT_EQ(remaining->load(), 1);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+}
+
+TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesConsumerWithoutPoppingWork) {
+    PipelinedApplierBatchTracker tracker;
+    tracker.addBatch(batchTime(1), 1);
+    std::promise<boost::optional<PipelinedApplierBatchTracker::InflightBatch>> promise;
+    auto result = promise.get_future();
+    stdx::thread consumer;
+    ON_BLOCK_EXIT([&] {
+        tracker.shutdown();
+        if (consumer.joinable()) {
+            consumer.join();
+        }
+    });
+    {
+        FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
+        consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
+        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+    }
+    tracker.shutdown();
+    ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
+    ASSERT_FALSE(result.get());
+    ASSERT_TRUE(tracker.isShutdown());
 }
 
 }  // namespace

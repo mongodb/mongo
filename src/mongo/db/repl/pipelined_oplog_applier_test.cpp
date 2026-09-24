@@ -18,6 +18,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -140,6 +142,7 @@ protected:
         // Every successfully consumed item completes its batch exactly once.
         for (size_t i = 0; i < items.size(); ++i) {
             ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
+            tracker.onBatchPublished();
         }
         ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
     }
@@ -347,6 +350,7 @@ TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
     auto completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
     ASSERT_EQ(completed->lastOpTime, lastOpTime);
+    tracker.onBatchPublished();
     ASSERT_EQ(counter->load(), 0);
     ASSERT_EQ(countDocs(kNss), 0);
 }
@@ -424,6 +428,13 @@ class PipelinedOplogApplierRunTest : public OplogApplierImplTest {
 protected:
     static constexpr size_t kNumWorkers = 4;
 
+    // Checks that lastApplied matches the batch's final op time and wall time.
+    void assertPublished(const OplogEntry& batchEnd) {
+        auto* replCoord = ReplicationCoordinator::get(serviceContext);
+        const OpTimeAndWallTime expected{batchEnd.getOpTime(), batchEnd.getWallClockTime()};
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), expected);
+    }
+
     enum class WriteKind { kInsert, kDelete };
 
     // Tracks metadata about writes in tests, used to make correctness assertions.
@@ -448,6 +459,11 @@ protected:
 
     void setUp() override {
         OplogApplierImplTest::setUp();
+        // Synthetic optimes bypass the oplog writer, so allDurable can move backwards during apply.
+        // Disable the mock's automatic committed-snapshot updates while still recording
+        // lastApplied.
+        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext))
+            ->setUpdateCommittedSnapshot(false);
         ThreadPool::Options options;
         options.poolName = "PipelinedOplogApplierRunTest";
         options.maxThreads = 1;
@@ -575,11 +591,10 @@ protected:
         ASSERT_TRUE(_buffer.isEmpty());
     }
 
-    // Blocks until the applier has begun shutting its workers down, which it does only after the
-    // batcher has stopped and every batch has been dispatched.
-    void waitForWorkerShutdownToBegin(const unittest::LogCaptureGuard& logs) {
+    // Waits for dispatcher exit to begin joining the advancer after all batches are dispatched.
+    void waitForAdvancerShutdownToBegin(const unittest::LogCaptureGuard& logs) {
         const auto deadline = Date_t::now() + Seconds(60);
-        while (logs.countTextContaining("Shutting down pipelined oplog applier workers") == 0) {
+        while (logs.countTextContaining("Shutting down pipelined oplog applier advancer") == 0) {
             ASSERT_LT(Date_t::now(), deadline);
             sleepmillis(1);
         }
@@ -837,6 +852,61 @@ TEST_F(PipelinedOplogApplierRunTest, AppliesEveryBatchInTheBufferOnTheWorkers) {
     applyThroughBuffer(ops);
 
     assertCollectionContainsExactly(kNss, expected);
+    assertPublished(ops.back());
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesLastBatchWithItsOriginalWallTime) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    std::vector<OplogEntry> ops;
+    for (int i = 0; i < 8; ++i) {
+        // Decreasing wall times must not be used to order batches or replace the original wall
+        // time.
+        ops.emplace_back(DurableOplogEntry{DurableOplogEntryParams{
+            .opTime = nextOpTime(),
+            .opType = OpTypeEnum::kInsert,
+            .nss = kNss,
+            .oField = BSON("_id" << i),
+            .wallClockTime = Date_t::fromMillisSinceEpoch(1000 - i),
+        }});
+    }
+    applyThroughBuffer(ops);
+    assertPublished(ops.back());
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesWhileDispatcherIsWaitingForMoreData) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto op = insertOp(kNss, BSON("_id" << 0));
+    pushToBuffer({op});
+    startApplier();
+
+    const auto deadline = Date_t::now() + Seconds(60);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    while (replCoord->getMyLastAppliedOpTime() < op.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+    ASSERT_FALSE(_finished->isReady());
+    assertPublished(op);
+    finishApplier();
+}
+
+TEST_F(PipelinedOplogApplierRunTest, ShutdownDoesNotPublishAnAbandonedBatchOrItsSuccessor) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    const auto writtenBefore = replCoord->getMyLastWrittenOpTimeAndWallTime();
+    applyThroughBuffer({insertOp(kNss, BSON("_id" << 0)), insertOp(kNss, BSON("_id" << 1))});
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+    ASSERT_EQ(replCoord->getMyLastWrittenOpTimeAndWallTime(), writtenBefore);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 1)});
 }
 
 // Every op is applied by the worker the router selects for it, and the batch reaches more than one
@@ -1024,12 +1094,24 @@ TEST_F(PipelinedOplogApplierRunTest, ExpandsPackedContainerOpsInsideApplyOps) {
     assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
 }
 
-// A packed container op with no keys writes nothing, so it must not produce a work item.
-TEST_F(PipelinedOplogApplierRunTest, IgnoresAPackedContainerOpWithNoKeys) {
+TEST_F(PipelinedOplogApplierRunTest, PublishesAPackedContainerBatchWithNoWorkerSlices) {
     auto ident = createBytesContainer();
     auto value = BSONBinData("V", 1, BinDataGeneral);
-    applyThroughBuffer(
-        {containerOp(ident, OpTypeEnum::kContainerInsert, packedInsertOf({}, value))});
+    auto empty = containerOp(ident, OpTypeEnum::kContainerInsert, packedInsertOf({}, value));
+    applyThroughBuffer({empty});
+    assertPublished(empty);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesOriginalBatchBoundaryWhenExpansionRemovesTheLastOp) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ident = createBytesContainer();
+    auto insert = insertOp(kNss, BSON("_id" << 0));
+    auto empty = containerOp(ident,
+                             OpTypeEnum::kContainerInsert,
+                             packedInsertOf({}, BSONBinData("V", 1, BinDataGeneral)));
+    applyThroughBuffer({insert, empty});
+    assertPublished(empty);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
 }
 
 // The collection's in-memory record count follows the writes the workers make.
@@ -1064,24 +1146,30 @@ TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIs
     auto& held = watchWriteOf(heldId, true /* hold */);
     auto& later = watchWriteOf(laterId, false /* hold */);
 
-    pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto firstOp = insertOp(kNss, BSON("_id" << heldId));
+    pushToBuffer({firstOp});
     startApplier();
     waitForGate(held);
 
     // Pushed after the applier started, while worker 0 is held mid-batch.
-    pushToBuffer({insertOp(kNss, BSON("_id" << laterId))});
+    auto laterOp = insertOp(kNss, BSON("_id" << laterId));
+    pushToBuffer({laterOp});
     waitForGate(later);
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
 
-    // Shutdown is requested while the worker is still held. The applier gets as far as shutting
-    // its workers down, then cannot exit until the held worker is released and finishes its item.
+    // Joining the advancer must wait for the held worker to finish and its batch to be published.
     unittest::LogCaptureGuard logs;
     shutdownApplier();
-    waitForWorkerShutdownToBegin(logs);
+    waitForAdvancerShutdownToBegin(logs);
     ASSERT_FALSE(_finished->isReady());
+    ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier workers"), 0);
     held.release.set();
     _finished->get();
     _finished.reset();
 
+    assertPublished(laterOp);
     assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << laterId)});
 }
 

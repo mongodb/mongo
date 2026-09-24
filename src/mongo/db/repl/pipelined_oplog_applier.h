@@ -9,6 +9,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/pipelined_applier_advancer.h"
 #include "mongo/db/repl/pipelined_applier_batch_tracker.h"
 #include "mongo/db/repl/pipelined_applier_worker_pool.h"
 #include "mongo/db/repl/pipelined_op_router.h"
@@ -54,6 +55,9 @@ private:
      */
     void _dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
+    // Publishes a completed batch's replication progress and wakes oplog waiters.
+    void _publishBatch(const PipelinedApplierBatchTracker::InflightBatch& batch);
+
     ReplicationCoordinator* const _replCoord;
     StorageInterface* const _storageInterface;
 
@@ -66,6 +70,9 @@ private:
     // Classifies each oplog entry as pipelined or requiring inline application, and selects the
     // worker for pipelined entries by hash so ops on one document are applied in order.
     PipelinedOpRouter _router;
+
+    // Declared last so the advancer shuts down before the workers and batch tracker are destroyed.
+    PipelinedApplierAdvancer _advancer;
 };
 
 /**

@@ -7,6 +7,7 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
@@ -52,7 +53,8 @@ PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
                   [this](size_t workerIdx, const PipelinedApplierWorkerPool::WorkItem& item) {
                       consumeWorkItem(workerIdx, getOptions(), item, _batchTracker);
                   }),
-      _router(numWorkers) {}
+      _router(numWorkers),
+      _advancer(_batchTracker, [this](const auto& batch) { _publishBatch(batch); }) {}
 
 PipelinedOplogApplier::~PipelinedOplogApplier() = default;
 
@@ -63,6 +65,9 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
 
     _oplogBatcher->startup(_storageInterface);
     ON_BLOCK_EXIT([this] { _oplogBatcher->shutdown(); });
+
+    _advancer.startup();
+    ON_BLOCK_EXIT([this] { _advancer.shutdownAndJoin(); });
 
     // Every batch must start after the last op dispatched before it. lastApplied sets the initial
     // bound: it trails dispatch, since batches still on the workers have not been published yet.
@@ -189,6 +194,12 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
     }
 }
 
+void PipelinedOplogApplier::_publishBatch(
+    const PipelinedApplierBatchTracker::InflightBatch& batch) {
+    _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(batch.lastOpTime);
+    signalOplogWaiters();
+}
+
 Status applyWorkItem(OperationContext* opCtx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item) {
@@ -236,6 +247,7 @@ void consumeWorkItem(size_t workerIdx,
     // A global-shutdown interrupt abandons the item unapplied; lastApplied stays below this
     // batch and restart recovery re-applies it.
     if (ErrorCodes::isShutdownError(status.code())) {
+        batchTracker.onWorkerAbandonment();
         LOGV2(13322101,
               "Pipelined oplog applier worker interrupted by shutdown",
               "workerIdx"_attr = workerIdx,
