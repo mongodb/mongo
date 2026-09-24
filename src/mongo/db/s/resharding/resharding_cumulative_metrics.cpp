@@ -371,7 +371,7 @@ void ReshardingCumulativeMetrics::reportCountsForAllStates(
 
 const ReshardingMetricsObserver* ReshardingCumulativeMetrics::getOldestOperation(WithLock,
                                                                                  Role role) const {
-    auto set = getMetricsSetForRole(role);
+    const auto& set = getMetricsSetForRole(role);
     if (set.empty()) {
         return nullptr;
     }
