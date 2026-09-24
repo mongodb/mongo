@@ -105,6 +105,14 @@ bool AsyncDBClient::maybeEndExhaustSpan(boost::optional<otel::traces::Span>& spa
     return true;
 }
 
+std::shared_ptr<AsyncDBClient> AsyncDBClient::create(HostAndPort peer,
+                                                     std::shared_ptr<transport::Session> session,
+                                                     ServiceContext* svcCtx,
+                                                     transport::ReactorHandle reactor) {
+    return std::shared_ptr<AsyncDBClient>(
+        new AsyncDBClient(std::move(peer), std::move(session), svcCtx, std::move(reactor)));
+}
+
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
@@ -125,7 +133,7 @@ Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
                        std::move(connectionMetrics),
                        std::move(transientSSLContext))
         .then([peer, context, reactor](std::shared_ptr<transport::Session> session) {
-            return std::make_shared<AsyncDBClient>(peer, std::move(session), context, reactor);
+            return AsyncDBClient::create(peer, std::move(session), context, reactor);
         });
 }
 
@@ -197,7 +205,7 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
 
 auth::RunCommandHook AsyncDBClient::_makeAuthRunCommandHook() {
     return [this](OpMsgRequest request) {
-        return runCommand(std::move(request)).then([](rpc::UniqueReply reply) -> Future<BSONObj> {
+        return _runCommand(std::move(request)).then([](rpc::UniqueReply reply) -> Future<BSONObj> {
             auto status = getStatusFromCommandResult(reply->getCommandReply());
             if (!status.isOK()) {
                 return status;
@@ -363,11 +371,11 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
-                                                   const BatonHandle& baton,
-                                                   bool fireAndForget,
-                                                   std::shared_ptr<Timer> fromConnAcquiredTimer,
-                                                   const CancellationToken& token) {
+Future<rpc::UniqueReply> AsyncDBClient::_runCommand(OpMsgRequest request,
+                                                    const BatonHandle& baton,
+                                                    bool fireAndForget,
+                                                    std::shared_ptr<Timer> fromConnAcquiredTimer,
+                                                    const CancellationToken& token) {
     auto msgId = nextMessageId();
     auto requestMsg = request.serialize();
     if (fireAndForget) {
@@ -434,11 +442,11 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
         request.telemetryContext, opMsgRequest.getCommandName(), request.fireAndForget);
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
 
-    return runCommand(std::move(opMsgRequest),
-                      baton,
-                      request.fireAndForget,
-                      std::move(fromConnAcquiredTimer),
-                      token)
+    return _runCommand(std::move(opMsgRequest),
+                       baton,
+                       request.fireAndForget,
+                       std::move(fromConnAcquiredTimer),
+                       token)
         .onCompletion([this, startTimer = std::move(startTimer), span = std::move(span)](
                           StatusWith<rpc::UniqueReply> swResponse) mutable
                           -> StatusWith<executor::RemoteCommandResponse> {
@@ -492,7 +500,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
     return _continueReceiveExhaustResponse(ClockSource::StopWatch(), boost::none, baton, token);
 }
 
-Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
+Future<executor::RemoteCommandResponse> AsyncDBClient::_runExhaustCommand(
     OpMsgRequest request, const BatonHandle& baton, const CancellationToken& token) {
     auto msgId = nextMessageId();
     auto requestMsg = request.serialize();
@@ -518,7 +526,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     _exhaustSpan = startEgressSpan(
         request.telemetryContext, opMsgRequest.getCommandName(), /*fireAndForget=*/false);
     opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
-    return runExhaustCommand(std::move(opMsgRequest), baton, token);
+    return _runExhaustCommand(std::move(opMsgRequest), baton, token);
 }
 
 void AsyncDBClient::cancel(const BatonHandle& baton) {

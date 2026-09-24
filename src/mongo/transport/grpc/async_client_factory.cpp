@@ -199,7 +199,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                   connMetrics)
         .then([target, reactor = _reactor, svcCtx = _svcCtx](
                   std::shared_ptr<transport::Session> session) {
-            return std::make_shared<AsyncDBClient>(target, std::move(session), svcCtx, reactor);
+            return AsyncDBClient::create(target, std::move(session), svcCtx, reactor);
         })
         .tapError([target](Status s) {
             LOGV2_DEBUG(9936103,

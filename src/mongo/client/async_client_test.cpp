@@ -374,11 +374,10 @@ public:
     void setUp() override {
         EgressSpanTest::setUp();
         _session = std::make_shared<FakeAsyncSession>();
-        _client =
-            std::make_shared<AsyncDBClient>(HostAndPort("localhost", 27017),
-                                            _session,
-                                            getServiceContext(),
-                                            std::make_shared<transport::test::InlineReactor>());
+        _client = AsyncDBClient::create(HostAndPort("localhost", 27017),
+                                        _session,
+                                        getServiceContext(),
+                                        std::make_shared<transport::test::InlineReactor>());
     }
 
 protected:

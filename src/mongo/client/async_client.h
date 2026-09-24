@@ -49,16 +49,33 @@
 
 namespace mongo {
 
+/**
+ * Client for asynchronously communicating with another MongoDB node, as contrasted with
+ * DBClientConnection which is synchronous. Even though it is asynchronous, only one in-flight
+ * command is allowed at a time per client, so in particular the returned futures must resolve
+ * (with moreToCome false) before sending additional commands via this client. This constraint means
+ * that access by multiple threads must be coordinated around these futures, except for `cancel`
+ * which may be called concurrently.
+ *
+ * The expected lifecycle is:
+ * 1. Create an instance via a factory function
+ * 2. Call `initWireVersion`.
+ * 3. Authenticate (optional in some cases).
+ *    a. Call `completeSpeculativeAuth`, which may complete authentication faster.
+ *    b. If it did not complete, call `authenticate` or `authenticateInternal`, depending on
+ *       if we have user credentials or are doing internal authentication.
+ * 4. Repeat as needed:
+ *   a. Use runCommandRequest() or the exhaust command APIs to send commands.
+ *   b. Wait for response (or responses, in the case of exhaust commands).
+ * 5. Destroy the instance when done. Note that this releases the client's reference to the session
+ *    but does not cancel work or end the session.
+ */
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
-    explicit AsyncDBClient(HostAndPort peer,
-                           std::shared_ptr<transport::Session> session,
-                           ServiceContext* svcCtx,
-                           transport::ReactorHandle reactor)
-        : _peer(std::move(peer)),
-          _session(std::move(session)),
-          _svcCtx(svcCtx),
-          _reactor(std::move(reactor)) {}
+    static std::shared_ptr<AsyncDBClient> create(HostAndPort peer,
+                                                 std::shared_ptr<transport::Session> session,
+                                                 ServiceContext* svcCtx,
+                                                 transport::ReactorHandle reactor);
 
     static Future<std::shared_ptr<AsyncDBClient>> connect(
         const HostAndPort& peer,
@@ -76,44 +93,61 @@ public:
         std::shared_ptr<Timer> fromConnAcquiredTimer = nullptr,
         const CancellationToken& token = CancellationToken::uncancelable());
 
-    Future<rpc::UniqueReply> runCommand(
-        OpMsgRequest request,
-        const BatonHandle& baton = nullptr,
-        bool fireAndForget = false,
-        std::shared_ptr<Timer> fromConnAcquiredTimer = nullptr,
-        const CancellationToken& token = CancellationToken::uncancelable());
-
+    /**
+     * Begins an exhaust command. The response will set `moreToCome` to indicate whether this client
+     * should call `awaitExhaustCommand` for the next response, or may immediately send another
+     * command. Note that calling with a non-exhaust command is safe, it will just result in
+     * `moreToCome` being false.
+     */
     Future<executor::RemoteCommandResponse> beginExhaustCommandRequest(
         executor::RemoteCommandRequest request,
         const BatonHandle& baton = nullptr,
         const CancellationToken& token = CancellationToken::uncancelable());
 
-    Future<executor::RemoteCommandResponse> runExhaustCommand(
-        OpMsgRequest request,
-        const BatonHandle& baton = nullptr,
-        const CancellationToken& token = CancellationToken::uncancelable());
-
+    /**
+     * Awaits the next response for an exhaust command previously started with
+     * beginExhaustCommandRequest. As with beginExhaustCommandRequest, `moreToCome` indicates what
+     * the client should do as the next action.
+     */
     Future<executor::RemoteCommandResponse> awaitExhaustCommand(
         const BatonHandle& baton = nullptr,
         const CancellationToken& token = CancellationToken::uncancelable());
 
+    /** Authenticates from user credentials. */
     Future<void> authenticate(const auth::Credential& credential);
 
+    /** Authenticates as another MongoDB server. */
     Future<void> authenticateInternal(
         boost::optional<std::string> mechanismHint,
         std::shared_ptr<auth::InternalAuthParametersProvider> authProvider);
 
+    /**
+     * Returns if speculative authentication has completed successfully. If so, the other
+     * authenticate methods do not need to be called, but if not they should be.
+     */
     Future<bool> completeSpeculativeAuth(std::shared_ptr<SaslClientSession> session,
                                          std::string authDB,
                                          BSONObj specAuth,
                                          auth::SpeculativeAuthType speculativeAuthtype);
 
+    /** Must be called prior to authenticating. */
     Future<void> initWireVersion(const std::string& appName, executor::NetworkConnectionHook* hook);
 
+    /**
+     * Cancels the in-progress read or write, if any. The client is generally unusable after this
+     * call, and `end` should be called or the session discarded in addition to calling `cancel`.
+     * May be called from any thread at any time.
+     */
     void cancel(const BatonHandle& baton = nullptr);
 
     bool isStillConnected();
 
+    /**
+     * Ends the session, making this client unusable for future requests. See
+     * transport::Session::end. Note that this may not interrupt an in-progress request, `cancel`
+     * must be called to guarantee that. This is not thread-safe, and in particular, if the session
+     * is backed by a socket, it must be called from the thread that owns the socket.
+     */
     void end();
 
     transport::Session& getTransportSession() {
@@ -123,6 +157,10 @@ public:
     const HostAndPort& remote() const;
     static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 
+    Future<rpc::UniqueReply> runCommand_forTest(OpMsgRequest request) {
+        return _runCommand(std::move(request));
+    };
+
     /**
      * Returns the TelemetryContextSection to attach to the egress OpMsg for `request`. Returns
      * boost::none if the target does not support it (wire version < WIRE_VERSION_90 or INT_MAX
@@ -130,8 +168,8 @@ public:
      *
      * This is a static helper to allow unit testing without a live connection.
      */
-    [[nodiscard]] static boost::optional<TelemetryContextSection> makeEgressTelemetrySection(
-        const executor::RemoteCommandRequest& request, int maxWireVersion);
+    [[MONGO_MOD_FILE_PRIVATE]] [[nodiscard]] static boost::optional<TelemetryContextSection>
+    makeEgressTelemetrySection(const executor::RemoteCommandRequest& request, int maxWireVersion);
 
     /**
      * Starts a Span for an outgoing `commandName`, registering the command name if needed and
@@ -143,7 +181,7 @@ public:
      *
      * This is a static helper to allow unit testing without a live connection.
      */
-    [[nodiscard]] static otel::traces::Span startEgressSpan(
+    [[MONGO_MOD_FILE_PRIVATE]] [[nodiscard]] static otel::traces::Span startEgressSpan(
         std::shared_ptr<otel::TelemetryContext>& telemetryContext,
         std::string_view commandName,
         bool fireAndForget);
@@ -155,11 +193,40 @@ public:
      *
      * This is a static helper to allow unit testing without a live connection.
      */
-    static bool maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,
-                                    bool isMoreToComeSet,
-                                    const Status& status);
+    [[MONGO_MOD_FILE_PRIVATE]] static bool maybeEndExhaustSpan(
+        boost::optional<otel::traces::Span>& span, bool isMoreToComeSet, const Status& status);
 
 private:
+    /**
+     * This constructor is private because instances must be owned by a shared_ptr and the factory
+     * functions enforce this requirement.
+     */
+    explicit AsyncDBClient(HostAndPort peer,
+                           std::shared_ptr<transport::Session> session,
+                           ServiceContext* svcCtx,
+                           transport::ReactorHandle reactor)
+        : _peer(std::move(peer)),
+          _session(std::move(session)),
+          _svcCtx(svcCtx),
+          _reactor(std::move(reactor)) {}
+
+    Future<rpc::UniqueReply> _runCommand(
+        OpMsgRequest request,
+        const BatonHandle& baton = nullptr,
+        bool fireAndForget = false,
+        std::shared_ptr<Timer> fromConnAcquiredTimer = nullptr,
+        const CancellationToken& token = CancellationToken::uncancelable());
+
+    /**
+     * Runs an exhaust command from the given `request`. Assumes the `_exhaustSpan` has already been
+     * created and `request` is the finalized request to be sent (e.g. has telemetry context if
+     * needed).
+     */
+    Future<executor::RemoteCommandResponse> _runExhaustCommand(
+        OpMsgRequest request,
+        const BatonHandle& baton = nullptr,
+        const CancellationToken& token = CancellationToken::uncancelable());
+
     static const inline Status kCanceledStatus{ErrorCodes::CallbackCanceled,
                                                "Async network operation was canceled"};
     struct OperationState {

@@ -195,11 +195,10 @@ private:
                      PinnedConnectionTaskExecutorTest* fixture)
             : _fixture{fixture} {
             invariant(session);
-            _client =
-                std::make_shared<AsyncDBClient>(std::move(hp),
-                                                std::move(session),
-                                                nullptr,
-                                                std::make_shared<transport::test::InlineReactor>());
+            _client = AsyncDBClient::create(std::move(hp),
+                                            std::move(session),
+                                            nullptr,
+                                            std::make_shared<transport::test::InlineReactor>());
         }
         ~LeasedStream() override {
             _fixture->_streamDestroyedCalls.fetchAndAdd(1);
