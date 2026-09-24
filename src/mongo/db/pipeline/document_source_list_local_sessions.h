@@ -88,6 +88,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
         std::unique_ptr<StageParams> getStageParams() const final {
             return std::make_unique<ListLocalSessionsStageParams>(_originalBson);
         }

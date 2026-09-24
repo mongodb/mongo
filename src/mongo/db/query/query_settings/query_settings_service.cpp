@@ -54,21 +54,6 @@ const auto kSerializationContext =
                          SerializationContext::CallerType::Request,
                          SerializationContext::Prefix::ExcludePrefix};
 
-const stdx::unordered_set<std::string_view, StringMapHasher> rejectionIncompatibleStages = {
-    "$querySettings"sv,
-    "$planCacheStats"sv,
-    "$joinPlanCacheStats"sv,
-    "$collStats"sv,
-    "$indexStats"sv,
-    "$listSessions"sv,
-    "$listSampledQueries"sv,
-    "$queryStats"sv,
-    "$currentOp"sv,
-    "$listCatalog"sv,
-    "$listLocalSessions"sv,
-    "$listSearchIndexes"sv,
-};
-
 const auto getQuerySettingsService =
     ServiceContext::declareDecoration<std::unique_ptr<QuerySettingsService>>();
 
@@ -77,52 +62,52 @@ static constexpr auto kQuerySettingsClusterParameterName = "querySettings"sv;
 MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
 /**
- * If the pipeline starts with a "system"/administrative document source to which query settings
- * should not be applied, return the relevant stage name.
+ * If the pipeline contains a "system"/administrative document source that bypasses rejection by
+ * query settings, return the name of the first such stage.
  */
-boost::optional<std::string> getStageExemptedFromRejection(const std::vector<BSONObj>& pipeline) {
-    if (pipeline.empty()) {
-        return boost::none;
+boost::optional<std::string> getStageExemptedFromRejection(const LiteParsedPipeline& pipeline) {
+    for (const auto& stage : pipeline.getStages()) {
+        if (stage->shouldBypassQuerySettingsRejection()) {
+            return std::string{stage->getParseTimeName()};
+        }
     }
-
-    if (canPipelineBeRejected(pipeline)) {
-        // No pipeline stages are incompatible with rejection.
-        return boost::none;
-    }
-
-    // Currently, all "system" queries are always the first stage in a pipeline.
-    std::string firstStageName{pipeline.at(0).firstElementFieldName()};
-    return {std::move(firstStageName)};
+    return boost::none;
 }
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {
-    if (expCtx->getExplain() || !expCtx->canBeRejected()) {
-        // Explaining queries which _would_ be rejected if executed is still useful;
-        // do not fail here.
+    if (!settings.getReject()) {
         return;
     }
 
-    if (settings.getReject()) {
-        auto* opCtx = expCtx->getOperationContext();
-        auto* curOp = CurOp::get(opCtx);
-
-        auto query = curOp->opDescription();
-        mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
-        if (auto cmdInvocation = CommandInvocation::get(opCtx)) {
-            cmdInvocation->definition()->snipForLogging(&cmdToLog);
-        }
-
-        LOGV2_DEBUG_OPTIONS(8687100,
+    auto* opCtx = expCtx->getOperationContext();
+    const auto& invocation = CommandInvocation::get(opCtx);
+    tassert(13453200, "Command invocation must be set before query settings rejection", invocation);
+    auto* curOp = CurOp::get(opCtx);
+    if (invocation->shouldBypassQuerySettingsRejection()) {
+        LOGV2_DEBUG_OPTIONS(13453201,
                             2,
                             {logv2::LogComponent::kQueryRejected},
-                            "Query rejected by QuerySettings",
+                            "Command is exempt from QuerySettings rejection",
                             "queryShapeHash"_attr =
                                 curOp->debug().getQueryShapeHash()->toHexString(),
                             "ns"_attr = curOp->getNS(),
-                            "command"_attr = redact(cmdToLog.getObject()));
-        uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
+                            "command"_attr = invocation->definition()->getName());
+        return;
     }
+
+    auto query = curOp->opDescription();
+    mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
+    invocation->definition()->snipForLogging(&cmdToLog);
+
+    LOGV2_DEBUG_OPTIONS(8687100,
+                        2,
+                        {logv2::LogComponent::kQueryRejected},
+                        "Query rejected by QuerySettings",
+                        "queryShapeHash"_attr = curOp->debug().getQueryShapeHash()->toHexString(),
+                        "ns"_attr = curOp->getNS(),
+                        "command"_attr = redact(cmdToLog.getObject()));
+    uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
 }
 
 /*
@@ -275,7 +260,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         .involvedNamespaces = std::move(involvedNamespaces),
         .encryptionInformation = aggregateCommandRequest.getEncryptionInformation(),
         .isIdHackQuery = false,
-        .systemStage = getStageExemptedFromRejection(aggregateCommandRequest.getPipeline()),
+        .systemStage = getStageExemptedFromRejection(parsedPipeline),
         .isRawDataQuery = aggregateCommandRequest.getRawData().value_or(false),
     };
 }
@@ -1059,11 +1044,6 @@ bool QuerySettingsService::isEligbleForQuerySettings(
     return true;
 }
 
-const stdx::unordered_set<std::string_view, StringMapHasher>&
-QuerySettingsService::getRejectionIncompatibleStages() {
-    return rejectionIncompatibleStages;
-};
-
 void QuerySettingsService::initializeForRouter(ServiceContext* serviceContext) {
     getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
 }
@@ -1092,12 +1072,6 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
         return createRepresentativeInfoDistinct(opCtx, cmd, tenantId);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
-}
-
-bool canPipelineBeRejected(const std::vector<BSONObj>& pipeline) {
-    return pipeline.empty() ||
-        !QuerySettingsService::getRejectionIncompatibleStages().contains(
-            pipeline.at(0).firstElementFieldName());
 }
 
 bool allowQuerySettingsFromClient(Client* client) {

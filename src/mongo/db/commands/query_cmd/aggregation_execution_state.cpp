@@ -971,9 +971,6 @@ bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
 
 boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext() {
     auto [collator, collationMatchesDefault] = resolveCollator();
-    const bool canPipelineBeRejected =
-        query_settings::canPipelineBeRejected(_aggExState.getRequest().getPipeline());
-
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check. Route through the memoized accessor so that if the
     // proactive kickback path already resolved involved namespaces earlier in _runAggregate(), we
@@ -997,7 +994,6 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
         .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
         .collationMatchesDefault(collationMatchesDefault)
-        .canBeRejected(canPipelineBeRejected)
         .explain(_aggExState.getVerbosity())
         .ifrContext(_aggExState.getIfrContext());
 

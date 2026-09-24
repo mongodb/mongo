@@ -977,6 +977,16 @@ public:
     }
 
     /**
+     * Returns true to bypass rejection by query settings with 'reject: true'.
+     *
+     * Reserved for admin operations whose rejection would render the cluster unusable
+     * (e.g. explain). Do NOT override for ordinary user-facing commands.
+     */
+    virtual bool shouldBypassQuerySettingsRejection() const {
+        return false;
+    }
+
+    /**
      * The command definition that this invocation runs.
      * Note: nonvirtual.
      */

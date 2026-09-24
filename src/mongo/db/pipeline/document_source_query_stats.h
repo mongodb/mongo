@@ -78,6 +78,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
         void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }

@@ -203,7 +203,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inRouter' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
-    const bool canBeRejected = query_settings::canPipelineBeRejected(request.getPipeline());
     auto mergeCtx = ExpressionContextBuilder{}
                         .fromRequest(opCtx, request)
                         .explain(verbosity)
@@ -216,7 +215,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .mayDbProfile(true)
                         .inRouter(true)
                         .collUUID(uuid)
-                        .canBeRejected(canBeRejected)
                         .collationMatchesDefault(collationMatchesDefault)
                         .build();
 

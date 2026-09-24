@@ -4,6 +4,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_internal_hybrid_search.h"
@@ -315,6 +316,18 @@ TEST(LiteParsedPipelineTest, GetParseNssMatchesConstructorNss) {
     std::vector<BSONObj> stages = {BSON("$match" << BSON("x" << 1))};
     LiteParsedPipeline pipeline(kTestNss, stages);
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+}
+
+TEST(LiteParsedPipelineTest, RejectableStagesDoNotBypassQuerySettingsRejection) {
+    LiteParsedPipeline pipeline(kTestNss, {fromjson("{$match: {x: 1}}"), fromjson("{$limit: 10}")});
+    ASSERT_FALSE(pipeline.shouldBypassQuerySettingsRejection());
+}
+
+TEST(LiteParsedPipelineTest, RejectionIncompatibleStageBypassesQuerySettingsRejection) {
+    // A single rejection-incompatible ("system") stage exempts the whole pipeline.
+    LiteParsedPipeline pipeline(kTestNss,
+                                {fromjson("{$indexStats: {}}"), fromjson("{$match: {x: 1}}")});
+    ASSERT_TRUE(pipeline.shouldBypassQuerySettingsRejection());
 }
 
 TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollection) {

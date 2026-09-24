@@ -1030,13 +1030,6 @@ public:
         return _params.isFleQuery;
     }
 
-    /**
-     * Returns if query can be rejected via query settings.
-     */
-    inline bool canBeRejected() const {
-        return _params.canBeRejected;
-    }
-
     bool shouldParserAllowStreams() const {
         return shouldParserIgnoreFeatureFlagCheck() || _featureFlagStreams.get(_params.vCtx);
     }
@@ -1287,9 +1280,6 @@ protected:
 
         // Indicates if query contains encryption information as part of the request.
         bool isFleQuery = false;
-
-        // Indicates if query can be rejected via query settings.
-        bool canBeRejected = true;
 
         // Allows the foreign collection of a lookup to be in a different database than the local
         // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used

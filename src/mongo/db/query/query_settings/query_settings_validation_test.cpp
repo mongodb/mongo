@@ -14,7 +14,9 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/version/releases.h"
 
+#include <array>
 #include <string_view>
+#include <utility>
 
 namespace mongo::query_settings {
 namespace {
@@ -114,27 +116,22 @@ TEST_F(QuerySettingsValidationTestFixture,
     unittest::ServerParameterGuard joinPlanCacheGuard{"internalEnableJoinPlanCache", true};
 
     auto collectionlessNss = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
-    const stdx::unordered_set<std::string_view, StringMapHasher>
-        collectionLessRejectionIncompatibleStages = {
-            "$querySettings"sv,
-            "$listSessions"sv,
-            "$listSampledQueries"sv,
-            "$queryStats"sv,
-            "$currentOp"sv,
-            "$listCatalog"sv,
-            "$listLocalSessions"sv,
-            "$joinPlanCacheStats"sv,
-        };
 
-    for (auto&& stage : QuerySettingsService::getRejectionIncompatibleStages()) {
-        // Avoid testing these stages, as they require more complex setup.
-        if (stage == "$listLocalSessions" || stage == "$listSessions" ||
-            stage == "$listSampledQueries") {
-            continue;
-        }
-
+    // Stages that bypass query settings rejection. $listLocalSessions, $listSessions and
+    // $listSampledQueries are omitted as they require more complex setup.
+    for (auto&& [stage, isCollectionless] : std::array<std::pair<std::string_view, bool>, 9>{{
+             {"$querySettings"sv, true},
+             {"$planCacheStats"sv, false},
+             {"$joinPlanCacheStats"sv, true},
+             {"$collStats"sv, false},
+             {"$indexStats"sv, false},
+             {"$queryStats"sv, true},
+             {"$currentOp"sv, true},
+             {"$listCatalog"sv, true},
+             {"$listSearchIndexes"sv, false},
+         }}) {
         auto aggCmdBSON = [&]() {
-            if (collectionLessRejectionIncompatibleStages.contains(stage)) {
+            if (isCollectionless) {
                 return BSON("aggregate" << collectionlessNss.coll() << "$db"
                                         << collectionlessNss.db_forTest() << "pipeline"
                                         << BSON_ARRAY(BSON(stage << BSONObj())));

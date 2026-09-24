@@ -654,8 +654,6 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
                              uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(opCtx)))
                          .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                          .collationMatchesDefault(expCtx->getCollationMatchesDefault())
-                         .canBeRejected(query_settings::canPipelineBeRejected(
-                             aggExState.getRequest().getPipeline()))
                          .build();
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.

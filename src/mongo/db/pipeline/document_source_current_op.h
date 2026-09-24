@@ -103,6 +103,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
         bool isExemptFromIngressAdmissionControl() const final {
             return true;
         }

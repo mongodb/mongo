@@ -469,6 +469,16 @@ public:
     }
 
     /**
+     * Rejection applies to the command as a whole, so a single bypassing stage exempts the
+     * entire pipeline. See LiteParsedDocumentSource::shouldBypassQuerySettingsRejection().
+     */
+    bool shouldBypassQuerySettingsRejection() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](const auto& stage) {
+            return stage->shouldBypassQuerySettingsRejection();
+        });
+    }
+
+    /**
      * The number of stages at the front of this pipeline that came from a prepended view definition
      * rather than from the user's request. See '_numPrependedViewStages'.
      *

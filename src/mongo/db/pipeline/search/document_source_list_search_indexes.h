@@ -50,6 +50,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(getParseTimeName(), level, isImplicitDefault);

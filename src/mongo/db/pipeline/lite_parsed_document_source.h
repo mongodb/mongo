@@ -415,6 +415,16 @@ public:
     }
 
     /**
+     * Returns true to bypass rejection by query settings with 'reject: true'.
+     *
+     * Reserved for admin operations whose rejection would render the cluster unusable
+     * (e.g. $querySettings). Do NOT override for ordinary stages.
+     */
+    virtual bool shouldBypassQuerySettingsRejection() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a $currentOp stage.
      */
     virtual bool isCurrentOpStage() const {

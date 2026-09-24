@@ -90,6 +90,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
     private:
         const NamespaceString _nss;
         const DocumentSourceCollStatsSpec _spec;

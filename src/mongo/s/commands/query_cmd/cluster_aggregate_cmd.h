@@ -90,6 +90,10 @@ public:
             return !_liteParsedPipeline.endsWithWriteStage();
         }
 
+        bool shouldBypassQuerySettingsRejection() const override {
+            return _liteParsedPipeline.shouldBypassQuerySettingsRejection();
+        }
+
     private:
         bool supportsWriteConcern() const override {
             return true;

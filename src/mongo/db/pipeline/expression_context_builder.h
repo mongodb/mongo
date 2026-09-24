@@ -60,7 +60,6 @@ public:
     ExpressionContextBuilder& isReparsingRepresentativeQueryShape(bool);
     ExpressionContextBuilder& isIdHackQuery(bool);
     ExpressionContextBuilder& isFleQuery(bool);
-    ExpressionContextBuilder& canBeRejected(bool);
     ExpressionContextBuilder& exprUnstableForApiV1(bool);
     ExpressionContextBuilder& exprDeprecatedForApiV1(bool);
     ExpressionContextBuilder& enabledCounters(bool);

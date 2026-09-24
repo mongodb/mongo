@@ -187,11 +187,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::isFleQuery(bool isFleQuery) 
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::canBeRejected(bool canBeRejected) {
-    params.canBeRejected = canBeRejected;
-    return *this;
-}
-
 ExpressionContextBuilder& ExpressionContextBuilder::blankExpressionContext(
     bool blankExpressionContext) {
     params.blankExpressionContext = blankExpressionContext;
