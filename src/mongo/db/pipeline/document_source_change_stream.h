@@ -78,23 +78,17 @@ public:
         ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            PrivilegeVector privileges;
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
-                privileges.push_back(
-                    Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions));
+                return {Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions)};
             } else if (_nss.isCollectionlessAggregateNS()) {
                 // Watching a whole database.
-                privileges.push_back(
-                    Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions));
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions)};
             } else {
                 // Watching a single collection. Note if this is in the admin database it will fail
                 // at parse time.
-                privileges.push_back(Privilege(ResourcePattern::forExactNamespace(_nss), actions));
+                return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
             }
-
-            _addShowSystemEventsPrivilegesIfNeeded(&privileges);
-            return privileges;
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
@@ -144,10 +138,6 @@ public:
 
     protected:
         const NamespaceString _nss;
-
-    private:
-        // Require a system.js privilege for showSystemEvents on db/cluster-scoped streams.
-        void _addShowSystemEventsPrivilegesIfNeeded(PrivilegeVector* privileges) const;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -287,8 +277,7 @@ public:
     // Regex matching all user collections plus collections exposed when 'showSystemEvents' is set.
     // Does not match a collection named $ or a collection with 'system.' in the name.
     // However, it will still match collection names starting with system.buckets or
-    // system.resharding, or a collection exactly named system.js or system.views.
-    // Keep in sync with LiteParsed::_addShowSystemEventsPrivilegesIfNeeded.
+    // system.resharding, or a collection exactly named system.js
     static constexpr std::string_view kRegexAllCollectionsShowSystemEvents{
         R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"};
 

@@ -113,10 +113,6 @@ commands:
                 - privilege: # $changeStream
                       resource_pattern: any_normal
                       action_type: find
-                - privilege: # $changeStream with 'showSystemEvents' on a whole-cluster stream;
-                      # the whole-db case is covered by the exact_namespace entries above.
-                      resource_pattern: collection
-                      action_type: [find, changeStream]
                 - privilege: # $changeStream, $_internalListCollections
                       resource_pattern: cluster
                       action_type: internal
