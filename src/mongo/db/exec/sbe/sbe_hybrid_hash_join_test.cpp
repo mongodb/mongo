@@ -131,9 +131,10 @@ protected:
     static constexpr uint64_t kDefaultMemLimit = 256;
     HashJoinStats stats;
 
-    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr) {
+    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr,
+                                            uint64_t memLimit = kDefaultMemLimit) {
         stats = {};
-        return std::make_unique<HybridHashJoin>(kDefaultMemLimit, collator, boost::none, stats);
+        return std::make_unique<HybridHashJoin>(memLimit, collator, boost::none, stats);
     }
 };
 
@@ -1100,11 +1101,11 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterReducesProbeSpills) {
 }
 
 TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
-    auto hhj = makeHHJ();
+    auto hhj = makeHHJ(nullptr, /*memLimit=*/32 * 1024);
 
     // Build side with string keys
     std::set<std::string> buildKeys;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 5000; ++i) {
         std::string key = "key_" + std::to_string(i * 2);  // Even numbers
         hhj->addBuild(makeStringKeyRow(key), makeProjectRow("build_" + key));
         buildKeys.insert(key);
@@ -1115,7 +1116,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
 
     auto cursor = JoinCursor::empty();
     // Probe with odd-numbered keys (not in build) - should be filtered by bloom filter
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         std::string key = "key_" + std::to_string(i * 2 + 1);  // Odd numbers
         auto probeKeyRow = makeStringKeyRow(key);
         auto probeProjectRow = makeProjectRow("probe_" + key);
@@ -1125,7 +1126,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
     }
 
     // Probe with even-numbered keys (in build)
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         std::string key = "key_" + std::to_string(i * 2);  // Even numbers
         auto probeKeyRow = makeStringKeyRow(key);
         auto probeProjectRow = makeProjectRow("probe_" + key);
@@ -1139,6 +1140,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
     ASSERT_GT(stats.numProbeRecordsDiscarded, 0);
 
     // Process spilled partitions and verify correctness
+    size_t numMatches = 0;
     while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             std::string buildKey = getStringValue(matchOpt->buildKeyRow);
@@ -1146,8 +1148,10 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
             ASSERT_EQ(buildKey, probeKey);
             ASSERT_TRUE(buildKeys.count(buildKey) > 0)
                 << "Matched key " << buildKey << " should be in build set";
+            numMatches++;
         }
     }
+    ASSERT_EQ(numMatches, 2500);
 }
 
 TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
