@@ -236,9 +236,6 @@ describe("write command slow query logs", function () {
         });
     });
 
-    // TODO SERVER-134826 findAndModify slow query logs currently omit queryShapeHash. The two
-    // tests below assert its absence; see the disabled 'findAndModify logs queryShapeHash' test
-    // that should be enabled once the follow-up lands.
     it("findAndModify (update) logs ns, collectionType and nreturned", function () {
         resetColl(this.db);
         const comment = comments.findAndModifyUpdate;
@@ -267,7 +264,6 @@ describe("write command slow query logs", function () {
         });
     });
 
-    // TODO SERVER-134826 findAndModify slow query logs currently omit queryShapeHash.
     it("findAndModify (remove) logs ns, collectionType and nreturned", function () {
         resetColl(this.db);
         const comment = comments.findAndModifyRemove;
@@ -349,31 +345,6 @@ describe("write command slow query logs", function () {
             expectedNs: fullNs,
             expectQueryShapeHash: false,
             expectedMetrics: {ndeleted: 1},
-        });
-    });
-
-    it.skip("FAM TODO SERVER-134826: findAndModify logs queryShapeHash", function () {
-        // Current (incorrect) behavior: findAndModify slow query log entries omit queryShapeHash,
-        // unlike insert/update/delete. See the enabled findAndModify tests above, which pin the
-        // hash's absence.
-        resetColl(this.db);
-        const comment = comments.findAndModifyUpdate;
-        assert.commandWorked(
-            this.db.runCommand({
-                findAndModify: collName,
-                query: {a: 1},
-                update: {$set: {b: 5}},
-                new: true,
-                comment,
-            }),
-        );
-        checkWriteFields({
-            db: this.db,
-            comment,
-            type: "command",
-            expectedNs: fullNs,
-            expectedNReturned: 1,
-            expectQueryShapeHash: true,
         });
     });
 
