@@ -44,6 +44,10 @@ class test_app_thread_evict01(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
+    @wttest.skip_for_hook(
+        "disagg",
+        "app-thread eviction may not refresh its snapshot before deferred btree publication",
+        param="schema_epochs")
     def test_app_thread_evict01(self):
         format='key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, format)

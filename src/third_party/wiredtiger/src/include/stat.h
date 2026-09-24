@@ -41,23 +41,21 @@
  * number of CPUs (presumably, the application architect has figured out how many CPUs are
  * available). However, inside WiredTiger we don't know when the application creates its threads.
  *
- * For now, we use a fixed number of slots. Ideally, we would approximate the largest number of
- * cores we expect on any machine where WiredTiger might be run, however, we don't want to waste
- * that much memory on smaller machines. As of 2015, machines with more than 24 CPUs are relatively
- * rare.
+ * Connection statistics use a fixed number of slots. Ideally, we would approximate the largest
+ * number of cores we expect on any machine where WiredTiger might be run, however, we don't want to
+ * waste that much memory on smaller machines. As of 2015, machines with more than 24 CPUs are
+ * relatively rare.
  *
  * Default hash table size; use a prime number of buckets rather than assuming a good hash
  * (Reference Sedgewick, Algorithms in C, "Hash Functions").
  *
  * The counter slots are split into two separate counters, one for connection and the other for
- * data-source. This is because we want to be able to independently increase one counter slot
- * without increasing the other, as for example, increasing the data-source counter by a small
- * number would have a greater impact than increasing the connection counter by the same number -
- * depending on the number of dhandles in the system.
+ * data-source, so either count can change on its own. The data-source count is small because each
+ * open btree dhandle pays for every slot.
  *
  */
 #define WT_STAT_CONN_COUNTER_SLOTS 23
-#define WT_STAT_DSRC_COUNTER_SLOTS 23
+#define WT_STAT_DSRC_COUNTER_SLOTS 4
 
 /*
  * WT_STATS_###_SLOT_ID is the thread's slot ID for the array of structures.

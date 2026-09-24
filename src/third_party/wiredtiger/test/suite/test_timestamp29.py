@@ -40,6 +40,10 @@ class test_timestamp29(wttest.WiredTigerTestCase):
             self.timestamp_str(expected_ts))
 
 
+    @wttest.skip_for_hook(
+        "disagg",
+        "this test requires exclusive control of schema epoch calls",
+        param="schema_epochs")
     def test_base(self):
         '''
         Test setting and querying the stable disaggregated schema epoch, including validation of

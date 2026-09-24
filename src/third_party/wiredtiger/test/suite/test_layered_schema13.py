@@ -112,8 +112,8 @@ class test_layered_schema13(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
         conn_follow, session_follow = self.open_follower()
 
-        session_follow.create(self.uri, self.table_config)
         self.set_stable_epoch(10, conn_follow)
+        session_follow.create(self.uri, self.table_config)
 
         # Epoch equal to stable must fail.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

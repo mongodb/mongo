@@ -510,6 +510,12 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
      */
     entry->in_step_down_window =
       __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE;
+    /*
+     * A table created before the stable schema epoch is set never awaits publication. The epoch
+     * cannot be unset again, so NONE here means it was NONE when the table was created.
+     */
+    entry->before_stable_epoch =
+      __wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE;
     WT_ERR(__wt_strdup(session, stable_uri, &entry->stable_uri));
     WT_ERR(__wt_strdup(session, table_name, &entry->table_name));
 
@@ -1277,6 +1283,11 @@ __wt_disagg_shared_metadata_queue_publish(
 
         /* Update unpublished schema epochs before any ordering or range checks. */
         if (entry->schema_epoch == WT_SCHEMA_EPOCH_UNPUBLISHED) {
+            if (entry->metadata_op == WT_SHARED_METADATA_CREATE && entry->before_stable_epoch)
+                WT_ERR_PANIC(session, EINVAL,
+                  "Publish requires table \"%s\" to be created after the stable disaggregated "
+                  "schema epoch is set",
+                  table_name);
             WT_ERR(__disagg_publish_check_step_down(session, table_name, schema_epoch));
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Publishing metadata operation %s for table \"%s\" to schema epoch %" PRIu64,

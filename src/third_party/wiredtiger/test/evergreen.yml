@@ -2872,6 +2872,76 @@ tasks:
           # as there are a few files that contain a large number of slower tests.
           unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 4/5
 
+  - name: unit-test-hook-disagg-leader-publish-tsan-bucket00
+    tags: ["pull_request", "unit_test_tsan", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # FIXME-WT-16313: Disable deadlock detection in TSAN as it causes false positives when
+          # used with parallel checkpoints.
+          additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
+          unit_test_ignore: test/suite/fail_lists/tsan.fail test/suite/fail_lists/hook_disagg.fail
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 0/5
+
+  - name: unit-test-hook-disagg-leader-publish-tsan-bucket01
+    tags: ["pull_request", "unit_test_tsan", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # FIXME-WT-16313: Disable deadlock detection in TSAN as it causes false positives when
+          # used with parallel checkpoints.
+          additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
+          unit_test_ignore: test/suite/fail_lists/tsan.fail test/suite/fail_lists/hook_disagg.fail
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 1/5
+
+  - name: unit-test-hook-disagg-leader-publish-tsan-bucket02
+    tags: ["pull_request", "unit_test_tsan", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # FIXME-WT-16313: Disable deadlock detection in TSAN as it causes false positives when
+          # used with parallel checkpoints.
+          additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
+          unit_test_ignore: test/suite/fail_lists/tsan.fail test/suite/fail_lists/hook_disagg.fail
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 2/5
+
+  - name: unit-test-hook-disagg-leader-publish-tsan-bucket03
+    tags: ["pull_request", "unit_test_tsan", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # FIXME-WT-16313: Disable deadlock detection in TSAN as it causes false positives when
+          # used with parallel checkpoints.
+          additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
+          unit_test_ignore: test/suite/fail_lists/tsan.fail test/suite/fail_lists/hook_disagg.fail
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 3/5
+
+  - name: unit-test-hook-disagg-leader-publish-tsan-bucket04
+    tags: ["pull_request", "unit_test_tsan", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # FIXME-WT-16313: Disable deadlock detection in TSAN as it causes false positives when
+          # used with parallel checkpoints.
+          additional_san_vars: export TSAN_OPTIONS="$TSAN_OPTIONS:detect_deadlocks=0"
+          unit_test_ignore: test/suite/fail_lists/tsan.fail test/suite/fail_lists/hook_disagg.fail
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 4/5
+
   - name: unit-test-hook-disagg-follower-tsan
     tags: ["pull_request", "unit_test_tsan", "python"]
     depends_on:
@@ -3040,6 +3110,76 @@ tasks:
           # The timeout for this command is on a test file basis. Make the timeouts long,
           # as there are a few files that contain a large number of slower tests.
           unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 4/5
+
+  - name: unit-test-hook-disagg-leader-publish-bucket00
+    tags: ["pull_request", "python", "unit_test_disagg"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/fail_lists/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 0/5
+
+  - name: unit-test-hook-disagg-leader-publish-bucket01
+    tags: ["pull_request", "python", "unit_test_disagg"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/fail_lists/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 1/5
+
+  - name: unit-test-hook-disagg-leader-publish-bucket02
+    tags: ["pull_request", "python", "unit_test_disagg"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/fail_lists/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 2/5
+
+  - name: unit-test-hook-disagg-leader-publish-bucket03
+    tags: ["pull_request", "python", "unit_test_disagg"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/fail_lists/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 3/5
+
+  - name: unit-test-hook-disagg-leader-publish-bucket04
+    tags: ["pull_request", "python", "unit_test_disagg"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/fail_lists/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,schema_epochs=true)" --batch 4/5
 
   - name: unit-test-hook-disagg-follower
     tags: ["pull_request", "python"]
@@ -7153,6 +7293,16 @@ buildvariants:
       distros: ubuntu2004-large
     - name: unit-test-hook-disagg-leader-tsan
       distros: ubuntu2004-large
+    - name: unit-test-hook-disagg-leader-publish-tsan-bucket00
+      distros: ubuntu2004-small
+    - name: unit-test-hook-disagg-leader-publish-tsan-bucket01
+      distros: ubuntu2004-small
+    - name: unit-test-hook-disagg-leader-publish-tsan-bucket02
+      distros: ubuntu2004-small
+    - name: unit-test-hook-disagg-leader-publish-tsan-bucket03
+      distros: ubuntu2004-small
+    - name: unit-test-hook-disagg-leader-publish-tsan-bucket04
+      distros: ubuntu2004-small
     - name: unit-test-hook-disagg-follower-tsan
       distros: ubuntu2004-large
     # FIXME-WT-16309: Remove TSAN-specific jobs once the common tag works

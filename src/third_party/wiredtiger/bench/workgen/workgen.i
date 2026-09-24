@@ -44,6 +44,19 @@
  */
 %feature("flatnested");
 
+/*
+ * WT_CURSOR is only referenced for its type below, never wrapped, so
+ * drop the unused next field rather than rename it; the actual struct
+ * tag behind the WT_CURSOR typedef is __wt_cursor.
+ */
+%ignore __wt_cursor::next;
+
+/* help() shadows a Python built-in, which SWIG flags as Warning 321. */
+%rename(help_str) workgen::TableOptions::help;
+%rename(help_str) workgen::ParetoOptions::help;
+%rename(help_str) workgen::ThreadOptions::help;
+%rename(help_str) workgen::WorkloadOptions::help;
+
 /* We only need to reference WiredTiger types. */
 %import "wiredtiger.h"
 
@@ -125,6 +138,24 @@ InterruptableFunction(workgen::Workload::run)
 %module workgen
 /* Parse the header to generate wrappers. */
 %include "workgen.h"
+
+/*
+ * Keep help() working for existing workload scripts written against the
+ * pre-rename API.
+ */
+%define OptionsHelpCompat(classname)
+%extend classname {
+%pythoncode %{
+    def help(self):
+        return self.help_str()
+%}
+}
+%enddef
+
+OptionsHelpCompat(workgen::TableOptions)
+OptionsHelpCompat(workgen::ParetoOptions)
+OptionsHelpCompat(workgen::ThreadOptions)
+OptionsHelpCompat(workgen::WorkloadOptions)
 
 %template(OpList) std::vector<workgen::Operation>;
 %template(ThreadList) std::vector<workgen::Thread>;

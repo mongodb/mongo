@@ -48,9 +48,36 @@
 #
 from __future__ import print_function
 
+from contextlib import closing
 import os, re, unittest, wthooks, wttest
 from wttest import WiredTigerTestCase
 from helper_disagg import DisaggConfigMixin, gen_disagg_storages, disagg_ignore_expected_output
+
+def _query_schema_epoch(connection, name):
+    """Return the named schema epoch as an integer."""
+    return int(connection.query_timestamp(f"get={name}"), 16)
+
+def seed_stable_schema_epoch(connection):
+    """Initialize the stable schema epoch on a newly opened connection."""
+    # Stable is unset after open but the last checkpoint tells us where to resume.
+    last_checkpoint_epoch = _query_schema_epoch(
+        connection, "last_disaggregated_schema_epoch"
+    )
+
+    # Zero disables schema epochs, therefore we should start new databases at 1.
+    epoch = max(last_checkpoint_epoch, 1)
+    connection.set_timestamp(f"stable_disaggregated_schema_epoch={epoch:x}")
+
+def publish_then_advance_stable_epoch(session, uri):
+    """Publish a schema change and advance stable. Callers must exclude no-ops."""
+    connection = session.connection
+
+    # Advancing stable after each publish lets us use it as the epoch counter.
+    epoch = _query_schema_epoch(connection, "stable_disaggregated_schema_epoch") + 1
+    session.publish(uri, f"disaggregated=(schema_epoch={epoch:x})")
+
+    # Advance now so writes can evict pages before the next checkpoint.
+    connection.set_timestamp(f"stable_disaggregated_schema_epoch={epoch:x}")
 
 # These are the hook functions that are run when particular APIs are called.
 
@@ -222,6 +249,9 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     # Disaggregated storage generates some extra verbose output which must be ignored.
     disagg_ignore_expected_output(testcase)
 
+    if disagg_parameters.schema_epochs:
+        seed_stable_schema_epoch(result)
+
     return result
 
 def testcase_has_failed():
@@ -263,6 +293,11 @@ def replace_uri(uri):
     else:
         return uri
 
+def layered_table_exists(session, uri):
+    with closing(session.open_cursor('metadata:')) as cursor:
+        cursor.set_key('layered:' + uri.split(':', 1)[1])
+        return cursor.search() == 0
+
 # Called to replace Session.alter.
 def session_alter_replace(orig_session_alter, session_self, uri, config):
     uri = replace_uri(uri)
@@ -293,12 +328,16 @@ def session_create_replace(orig_session_create, session_self, uri, config):
 
     # If the test isn't creating a table (i.e., it's a column store or lsm) create it as a
     # regular (not layered) object.  Otherwise we get disagg storage from the connection defaults.
-    if uri.startswith("table:") \
-       and not 'colgroups=' in config_str \
-       and not 'import=' in config_str \
-       and not 'key_format=r' in config_str \
-       and not 'type=lsm' in config_str \
-       and not marked_as_non_layered(uri):
+    mark_table_as_layered = (
+        uri.startswith("table:")
+        and 'colgroups=' not in config_str
+        and 'import=' not in config_str
+        and 'key_format=r' not in config_str
+        and 'type=lsm' not in config_str
+        and not marked_as_non_layered(uri)
+    )
+
+    if mark_table_as_layered:
         mark_as_layered(uri)
         if (disagg_parameters.table_prefix == "layered"):
             WiredTigerTestCase.verbose(None, 2, f'    Replacing, old uri = "{uri}"')
@@ -340,14 +379,39 @@ def session_create_replace(orig_session_create, session_self, uri, config):
             WiredTigerTestCase.verbose(None, 3, f'    SKIPPING "{base_uri}"')
             skip_test('indices do not work in disagg storage')
 
+    # Creating an existing table can succeed without queuing a schema change.
+    should_publish = (
+        disagg_parameters.schema_epochs
+        and (uri.startswith("layered:") or mark_table_as_layered)
+        and not layered_table_exists(session_self, uri)
+    )
+
     ret = orig_session_create(session_self, uri, config_str)
+
+    if should_publish:
+        publish_then_advance_stable_epoch(session_self, uri)
     return ret
 
 # Called to replace Session.drop
 def session_drop_replace(orig_session_drop, session_self, uri, config):
+    testcase = WiredTigerTestCase.getCurrentTestCase()
+    disagg_parameters = testcase.platform_api.getDisaggParameters()
+
+    # A forced drop of a missing table has nothing to publish.
+    # Check the URI too as unrelated objects can share a layered table's name.
+    should_publish = (
+        disagg_parameters.schema_epochs
+        and (uri.startswith("layered:") or uri in testcase.layered_uris)
+        and layered_table_exists(session_self, uri)
+    )
+
     if uri.startswith("table:"):
         uri = replace_uri(uri)
-    return orig_session_drop(session_self, uri, config)
+    ret = orig_session_drop(session_self, uri, config)
+
+    if should_publish:
+        publish_then_advance_stable_epoch(session_self, uri)
+    return ret
 
 # Called to replace Session.open_cursor.  We skip calls that do backup
 # as that is not yet supported in disaggregated storage.
@@ -427,6 +491,9 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
 
     def get_platform_api(self):
         return self.platform_api
+
+    def has_param(self, param):
+        return self.platform_api.params.get(param) == 'true'
 
     def setup_hooks(self):
         orig_session_alter = self.Session['alter']
@@ -509,6 +576,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         self.disagg_key_provider= None
         self.disagg_page_log = None
         self.disagg_role = 'leader'
+        self.schema_epochs = False
         self.table_prefix = 'layered'
 
         for param_key, param_value in params:
@@ -518,12 +586,18 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
                 self.disagg_key_provider = param_value
             elif param_key == 'page_log':
                 self.disagg_page_log = param_value
+            elif param_key == 'schema_epochs':
+                if param_value not in ('true', 'false'):
+                    raise ValueError(
+                        f"hook_disagg: schema_epochs must be 'true' or 'false', got {param_value!r}")
+                self.schema_epochs = param_value == 'true'
             elif param_key == 'role':
                 self.disagg_role = param_value
             elif param_key == 'table_prefix':
                 self.table_prefix = param_value
             else:
                 raise Exception('hook_disagg: unknown parameter {}'.format(param_key))
+        self.params = dict(params)
 
     def setUp(self, testcase):
         # Keep a set of table uris on the test case that we have
@@ -560,6 +634,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         result.config = self.disagg_config
         result.role = self.disagg_role
         result.page_log = self.disagg_page_log if self.disagg_page_log else WiredTigerTestCase.vars().page_log
+        result.schema_epochs = self.schema_epochs
         result.table_prefix = self.table_prefix
         result.key_provider = self.disagg_key_provider
         return result

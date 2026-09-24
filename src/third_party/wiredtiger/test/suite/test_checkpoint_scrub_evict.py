@@ -179,12 +179,16 @@ class test_checkpoint_scrub_evict(eviction_util):
 
         With fuzzy checkpoint this path is never taken.
         """
+        if self.precise:
+            # Connection close requires a stable timestamp even when the test is skipped.
+            self.conn.set_timestamp('stable_timestamp=1')
+            if self.runningHook("disagg") and self.getDisaggParameters().schema_epochs:
+                self.skipTest(
+                    "scrub-restore is unreliable when schema epochs change the page layout")
+
         nrows = 5000
 
         self.session.create(self.uri, 'key_format=i,value_format=S')
-
-        if self.precise:
-            self.conn.set_timestamp('stable_timestamp=1')
 
         self._populate(nrows, self.vsize)
         self.session.checkpoint()

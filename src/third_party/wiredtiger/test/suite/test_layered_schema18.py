@@ -57,10 +57,31 @@ class test_layered_schema18(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
             silent=True)
         self.assertNotEqual(returncode, 0)
         self.check_file_contains(os.path.join(home, 'stderr.txt'),
-            'publish requires the stable disaggregated schema epoch to be set')
+            'Publish requires the stable disaggregated schema epoch to be set')
 
     def test_publish_with_epoch_succeeds(self):
         """With the stable epoch set first, create then publish is accepted."""
         self.set_stable_epoch(5)
         self.session.create('layered:after', 'key_format=i,value_format=S')
         self.publish('layered:after', 10)
+
+    def subprocess_publish_created_before_epoch_panics(self):
+        """Subprocess body: publishing a table created before the stable schema epoch panics."""
+        self.session.create('layered:before', 'key_format=i,value_format=S')
+        self.set_stable_epoch(5)
+        self.publish('layered:before', 10)  # Expected to panic.
+
+    def test_publish_created_before_epoch_panics(self):
+        """A table created before the stable schema epoch was set never awaited publication."""
+        self.run_panic_subprocess('publish_created_before_epoch_panics',
+            'Publish requires table "before" to be created after the stable disaggregated schema '
+            'epoch is set')
+
+    def test_publish_drop_created_before_epoch_succeeds(self):
+        """The drop of a table created before the stable schema epoch was set can be published."""
+        self.session.create('layered:before', 'key_format=i,value_format=S')
+        # With no stable epoch set, the checkpoint applies the queued create.
+        self.leader_checkpoint(1)
+        self.set_stable_epoch(5)
+        self.session.drop('layered:before')
+        self.publish('layered:before', 10)

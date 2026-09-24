@@ -103,6 +103,14 @@ class test_drop(wttest.WiredTigerTestCase):
 
     # Test drop of an object.
     def test_drop(self):
+        # FIXME-WT-18703: Investigate if this is intended behavior or not.
+        if (
+            self.runningHook("disagg")
+            and self.getDisaggParameters().schema_epochs
+            and self.uri == 'table:'
+        ):
+            self.skipTest(
+                "a drop returning EBUSY can still discard untimestamped data with schema epochs")
         cnt = 0
         # SimpleDataSet: Simple file or table object.
         # Try all combinations except dropping the index, the simple

@@ -35,6 +35,10 @@ class test_verify2(wttest.WiredTigerTestCase):
     # Create an empty table and insert content.
     # The first call to verify is expected to return to EBUSY due to the dirty content. Call
     # checkpoint to make the table clean, the next verify call should succeed.
+    @wttest.skip_for_hook(
+        "disagg",
+        "verify skips tables awaiting btree publication, so it never returns the expected EBUSY",
+        param="schema_epochs")
     def test_verify_ckpt(self):
         self.assertEqual(self.session.create(self.uri, self.params), 0)
         self.assertEqual(self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10)), 0)

@@ -209,6 +209,9 @@ struct __wt_disagg_metadata_op {
     /* The operation was issued inside the step-down window, so it belongs to the next era. */
     bool in_step_down_window;
 
+    /* The operation was queued before a stable schema epoch was set. */
+    bool before_stable_epoch;
+
     TAILQ_ENTRY(__wt_disagg_metadata_op) q; /* Linked list of entries. */
 };
 

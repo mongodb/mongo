@@ -41,7 +41,7 @@ race:conn_reconfig.c
 # FIXME-WT-14958 ex_backup warnings. This work has been split out into a separate ticket to keep PR sizes down.
 race:__wt_free_int
 race:__wt_free_update_list
-race:__wt_page_out
+race:__page_out
 race:__posix_file_close
 race:__handle_close
 race:__sweep_remove_handles

@@ -251,6 +251,10 @@ class WiredTigerHookManager(object):
                 ret.append(hook.name)
         return ret
 
+    # Returns True if the named hook has the parameter set to true
+    def hook_has_param(self, hookname, param):
+        return any(hook.name == hookname and hook.has_param(param) for hook in self.hooks)
+
 class HookCreatorProxy(object):
     def __init__(self, hookmgr, clazz):
         self.hookmgr = hookmgr
@@ -295,12 +299,18 @@ class WiredTigerHookCreator(ABC):
     def uses(self, use_list):
         return False
 
+    # default version of has_param, can be overridden.  If the hook was configured
+    # with the parameter set to true, it should return True.
+    def has_param(self, param):
+        return False
+
 # Used by hooks to encapsulate all disagg parameters
 class DisaggParameters(object):
     def __init__(self):
         self.config = None
         self.role = 'leader'
         self.page_log = 'palite'
+        self.schema_epochs = False
 
 class WiredTigerHookPlatformAPI(object):
     def setUp(self, testcase):

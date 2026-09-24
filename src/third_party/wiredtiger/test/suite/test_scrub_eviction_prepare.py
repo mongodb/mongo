@@ -55,6 +55,9 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         self.assertEqual(cur2.search(), 0)
         cur2.close()
 
+    @wttest.skip_for_hook(
+        "disagg", "release eviction may not write pages before deferred btree publication",
+        param="schema_epochs")
     def test_scrub_eviction_prepare(self):
         uri = f'table:{self.test_name}'
 

@@ -41,6 +41,10 @@ class test_eviction01(wttest.WiredTigerTestCase):
     nrows = 100
     iterations = 500
 
+    @wttest.skip_for_hook(
+        "disagg",
+        "deferred btree publication changes eviction timing and bumps the no-progress stat",
+        param="schema_epochs")
     def test_eviction(self):
         uri = f"table:{self.test_name}"
         ds = SimpleDataSet(self, uri, self.nrows, key_format='S', value_format='u')

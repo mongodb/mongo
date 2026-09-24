@@ -35,6 +35,11 @@ class test_prepare42(test_prepare_preserve_prepare_base):
     test_name = __qualname__
     uri = f'table:{test_name}'
 
+    # FIXME-WT-18704: Remove this skip once prepared rollback handles pending publication.
+    @wttest.skip_for_hook(
+        "disagg",
+        "prepared insert rollback before deferred btree publication can assert in eviction",
+        param="schema_epochs")
     def test_prepare_insert_rollback(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))

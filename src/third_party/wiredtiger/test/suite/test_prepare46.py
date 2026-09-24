@@ -58,9 +58,14 @@ class test_prepare46(wttest.WiredTigerTestCase):
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
     uri = f'table:{test_name}'
 
+    # FIXME-WT-18705: Remove this skip once eviction preserves prepared state before publication.
+    @wttest.skip_for_hook(
+        "disagg", "eviction before deferred btree publication can discard prepared state",
+        param="schema_epochs")
     def test_prepared_cell_preserved_after_eviction_at_unstable_prepare_ts(self):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
         self.session.create(self.uri, 'key_format=i,value_format=S')
         cursor = self.session.open_cursor(self.uri)
 

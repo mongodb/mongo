@@ -1116,27 +1116,38 @@ def prevent(what):
     else:
         return runit_decorator
 
-def skip_for_hook(hookname, description):
+def _hook_active(hookname, param):
+    if param is None:
+        return hookname in WiredTigerTestCase.hook_names
+    return WiredTigerTestCase._hookmgr.hook_has_param(hookname, param)
+
+def _hook_label(hookname, param):
+    return f"hook '{hookname}'" if param is None else f"hook '{hookname}' ({param}=true)"
+
+def skip_for_hook(hookname, description, param=None):
     """
     Used as a function decorator, for example, @wttest.skip_for_hook("disagg", "fails at commit_transaction").
     The decorator indicates that this test function fails with the hook, which should be investigated.
+    If param is given, the test is skipped only when the hook runs with that parameter set to true,
+    for example, @wttest.skip_for_hook("disagg", "fails at commit_transaction", param="schema_epochs").
     """
     def runit_decorator(func):
         return func
-    if hookname in WiredTigerTestCase.hook_names:
-        return unittest.skip("because running with hook '{}': {}".format(hookname, description))
+    if _hook_active(hookname, param):
+        return unittest.skip("because running with {}: {}".format(_hook_label(hookname, param), description))
     else:
         return runit_decorator
 
-def only_for_hook(hookname, description):
+def only_for_hook(hookname, description, param=None):
     """
     Used as a function decorator, e.g., @wttest.only_for_hook("disagg", "only runs with the disagg hook").
-    The test will be skipped unless the specified hook is active.
+    The test will be skipped unless the specified hook is active. If param is given, the hook must
+    also run with that parameter set to true.
     """
     def runit_decorator(func):
         return func
-    if hookname not in WiredTigerTestCase.hook_names:
-        return unittest.skip(f"only runs with hook '{hookname}': {description}")
+    if not _hook_active(hookname, param):
+        return unittest.skip(f"only runs with {_hook_label(hookname, param)}: {description}")
     else:
         return runit_decorator
 

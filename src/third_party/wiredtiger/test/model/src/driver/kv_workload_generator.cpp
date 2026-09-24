@@ -698,13 +698,16 @@ kv_workload_generator::run()
      * get executed roughly at the positions selected by the serial workload generation above. To do
      * this, we will make each preceding transaction, and the last special sequences, as
      * dependencies.
+     *
+     * Walk backwards so that each special sequence already has its edge to the next one when the
+     * preceding sequences merge its must-finish-before set.
      */
-    for (size_t last_nontransaction = 0, i = 0; i < _sequences.size(); i++)
-        if (_sequences[i]->type() != kv_workload_sequence_type::transaction) {
-            for (size_t prev = last_nontransaction; prev < i; prev++)
-                _sequences[prev]->must_finish_before(_sequences[i].get());
-            last_nontransaction = i;
-        }
+    for (size_t next_nontransaction = _sequences.size(), i = _sequences.size(); i-- > 0;) {
+        if (next_nontransaction < _sequences.size())
+            _sequences[i]->must_finish_before(_sequences[next_nontransaction]);
+        if (_sequences[i]->type() != kv_workload_sequence_type::transaction)
+            next_nontransaction = i;
+    }
 
     /*
      * Rollback to stable must be executed outside of transactions, so make sure to add the
@@ -712,10 +715,11 @@ kv_workload_generator::run()
      */
     for (size_t i = 0; i < _sequences.size(); i++)
         if (_sequences[i]->type() == kv_workload_sequence_type::rollback_to_stable) {
-            for (size_t j = 0; j < i; j++)
-                _sequences[j]->must_finish_before(_sequences[i].get());
+            /* Add the outgoing edges first, so that the preceding sequences inherit them. */
             for (size_t j = i + 1; j < _sequences.size(); j++)
-                _sequences[i]->must_finish_before(_sequences[j].get());
+                _sequences[i]->must_finish_before(_sequences[j]);
+            for (size_t j = 0; j < i; j++)
+                _sequences[j]->must_finish_before(_sequences[i]);
         }
 
     /*
@@ -723,11 +727,20 @@ kv_workload_generator::run()
      * must be run serially to preserve the serial workload's semantics. It is not sufficient to
      * just ensure that conflicting transactions commit in the correct order, because WiredTiger
      * would abort the second transaction with WT_ROLLBACK.
+     *
+     * Walk backwards so that each later sequence has all of its outgoing edges, and thus its
+     * complete must-finish-before set, by the time an earlier sequence merges it. That lets us skip
+     * the expensive overlap check for pairs that are already ordered.
+     *
+     * The inner loop goes forward, from the nearest later sequence to the farthest. Once the
+     * current sequence must finish before a nearby sequence, it must also finish before everything
+     * that the nearby sequence must finish before, so we can skip checking those farther sequences.
      */
-    for (size_t i = 0; i < _sequences.size(); i++)
+    for (size_t i = _sequences.size(); i-- > 0;)
         for (size_t j = i + 1; j < _sequences.size(); j++)
-            if (_sequences[i]->overlaps_with(_sequences[j]))
-                _sequences[i]->must_finish_before(_sequences[j].get());
+            if (!_sequences[i]->ordered_before(_sequences[j]) &&
+              _sequences[i]->overlaps_with(_sequences[j]))
+                _sequences[i]->must_finish_before(_sequences[j]);
 
     /*
      * Fill in the timestamps. Break up the collection of sequences into blocks of transactions

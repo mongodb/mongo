@@ -118,6 +118,10 @@ class test_drop_cache_discard01(wttest.WiredTigerTestCase):
         # With the checkpoint handle free, the drop succeeds.
         self.session.drop(uri, None)
 
+    @wttest.skip_for_hook(
+        "disagg",
+        "tables awaiting btree publication skip checkpoint-on-close, so drop may not return EBUSY",
+        param="schema_epochs")
     def test_dirty_drop_still_fails(self):
         """
         A non-forced drop of a table with committed but uncheckpointed content must still fail

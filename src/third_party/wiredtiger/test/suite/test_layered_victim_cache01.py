@@ -43,11 +43,19 @@ class test_layered_victim_cache01(wttest.WiredTigerTestCase):
     table_name = test_name
     nitems = 1000
 
+    common_table_config = 'block_manager=disagg,log=(enabled=false),leaf_page_max=32KB,'
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, [
-        ('shared', dict(prefix='table:',
-            table_config='block_manager=disagg,log=(enabled=false),leaf_page_max=4KB')),
+        ('uncompressed', dict(prefix='table:', compress=None, table_config=common_table_config)),
+        ('snappy', dict(prefix='table:', compress='snappy', table_config=common_table_config + 'block_compressor=snappy')),
     ])
+
+    def conn_extensions(self, extlist):
+        self.add_scenario_config()
+        if self.compress:
+            extlist.skip_if_missing = True
+            extlist.extension('compressors', self.compress)
+        return self.disagg_conn_extensions(extlist)
 
     def evict(self, uri, key):
         self.session.begin_transaction()

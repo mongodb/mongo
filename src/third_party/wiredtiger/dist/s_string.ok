@@ -55,6 +55,7 @@ BUF
 BUILDDIR
 Bazel
 Bitfield
+Bitset
 Bitstring
 Bitwise
 BqRv
@@ -748,6 +749,7 @@ bitflip
 bitflips
 bitlist
 bitpack
+bitset
 bitstr
 bitstring
 bitwise
