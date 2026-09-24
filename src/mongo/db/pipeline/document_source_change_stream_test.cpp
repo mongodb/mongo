@@ -351,13 +351,12 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 }
 
-TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
+TEST_F(ChangeStreamStageTest, ShowMigrationsSucceedsOnMongos) {
     auto expCtx = getExpCtx();
     expCtx->setInRouter(true);
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(spec.firstElement(), expCtx));
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
@@ -7187,8 +7186,7 @@ TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersIncrementOnTrue) {
         }
 
         // mongos
-        // 'showMigrationEvents' is not supported on mongos.
-        if (c.optionKey != "showMigrationEvents") {
+        {
             const long long before = readCsMetric(c.metricRelPath);
             openOnMongos(
                 BSON("$changeStream" << BSON(c.optionKey << true).addFields(c.extraOptions)));
@@ -7222,8 +7220,7 @@ TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenExplicitl
         }
 
         // mongos
-        // 'showMigrationEvents' is not supported on mongos.
-        if (c.optionKey != "showMigrationEvents") {
+        {
             const long long before = readCsMetric(c.metricRelPath);
             openOnMongos(BSON("$changeStream" << BSON(c.optionKey << false)));
             ASSERT_EQ(before, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;

@@ -12,9 +12,6 @@
  * shard. This generates 'create' and 'createIndexes' DDL events on the recipient shard that also
  * carry 'fromMigrate: true' when 'changeStreamsEmitFromMigrate' is enabled.
  *
- * NOTE: 'showMigrationEvents: true' is only accepted on individual shard mongod nodes; mongos
- * rejects it with error 31123.
- *
  * @tags: [
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,

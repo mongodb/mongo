@@ -77,15 +77,6 @@ const changeStreamShardOne = changeStreamTestShardOne.startWatchingChanges({
     collection: st.shard1.getCollection("test.chunk_mig"),
 });
 
-// Change streams opened on mongos do not allow showMigrationEvents to be set to true.
-const changeStreamTestMongos = new ChangeStreamTest(mongosDB);
-assert.throwsWithCode(() => {
-    changeStreamTestMongos.startWatchingChanges({
-        pipeline: [{$changeStream: {showMigrationEvents: true}}],
-        collection: mongosColl,
-    });
-}, 31123);
-
 changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
 changeStreamTestShardOne.assertNoChange(changeStreamShardOne);
 
@@ -142,9 +133,9 @@ assert.commandWorked(
 );
 
 // Insert again, into all three chunks.
-assert.commandWorked(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(mongosColl.insert({_id: 22}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(mongosColl.insert({_id: -2}));
+assert.commandWorked(mongosColl.insert({_id: 2}));
+assert.commandWorked(mongosColl.insert({_id: 22}));
 
 let shardZeroEvents = [
     makeEvent(1, "insert", undefined),

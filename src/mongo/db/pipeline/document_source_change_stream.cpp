@@ -572,10 +572,6 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !expCtx->getNamespaceString().isSystem() ||
                 (spec.getAllowToRunOnSystemNS() && !expCtx->getInRouter()));
 
-    uassert(31123,
-            "Change streams from router may not show migration events",
-            !(expCtx->getInRouter() && spec.getShowMigrationEvents()));
-
     uassert(12888201,
             "matchCollectionUUIDForUpdateLookup may only be specified when fullDocument is "
             "'updateLookup'",

@@ -10,7 +10,7 @@ The following flags can be passed to `$changeStream` to control which events app
 | fullDocumentBeforeChange | string | "off"     | "off", "whenAvailable", "required"                                                                                           |
 | showExpandedEvents       | bool   | false     | Enables DDL events and additional fields; not permitted with API strict version 1                                            |
 | showSystemEvents         | bool   | false     | Enables events on system collections; not permitted with API strict version 1                                                |
-| showMigrationEvents      | bool   | false     | Allows chunk migration writes to appear; only valid on direct shard connections, rejected by mongos (error 31123)            |
+| showMigrationEvents      | bool   | false     | Allows chunk migration writes to appear                                                                                      |
 | showRawUpdateDescription | bool   | false     | (Internal) Returns raw oplog update description instead of parsed updateDescription; not permitted with API strict version 1 |
 | showCommitTimestamp      | bool   | false     | (Internal) Adds commitTimestamp to CRUD events inside prepared transactions                                                  |
 
@@ -532,10 +532,7 @@ Fields:
 | operationDescription | Object            | Yes                                | {shardId: "<shard name>"}   |
 | collectionUUID       | UUID              | Yes (when showExpandedEvents=true) |                             |
 
-### Group 7 — Migration Events (showMigrationEvents=true, shard-level only)
-
-showMigrationEvents: true is only accepted on direct shard connections — mongos rejects it with
-error code 31123.
+### Group 7 — Migration Events (showMigrationEvents=true)
 
 Without this flag, all oplog entries with fromMigrate: true are excluded from the change stream.
 With this flag, chunk-migration writes become visible as ordinary CRUD events (insert, delete):

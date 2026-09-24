@@ -34,8 +34,6 @@ function openAndClose(stageOpts) {
 
 function buildTests(isMongos) {
     describe("metrics.changeStreams.option boolean counters", function () {
-        // 'showMigrationEvents' cannot be used on mongos. It will always produce error
-        // 31123 ("Change streams from router may not show migration events").
         const booleanOptions = [
             "showExpandedEvents",
             "showMigrationEvents",
@@ -44,33 +42,8 @@ function buildTests(isMongos) {
             "ignoreRemovedShards",
         ];
 
-        if (isMongos) {
-            it("showMigrationEvents metric is present and remains 0 on mongos", function () {
-                const before = getCsMetrics().option.showMigrationEvents;
-                assert.eq(0, before, "showMigrationEvents should be 0 on mongos");
-                assert.commandFailedWithCode(
-                    testDB.runCommand({
-                        aggregate: testColl.getName(),
-                        pipeline: [{$changeStream: {showMigrationEvents: true}}],
-                        cursor: {},
-                    }),
-                    31123,
-                );
-                assert.eq(
-                    before,
-                    getCsMetrics().option.showMigrationEvents,
-                    "showMigrationEvents counter should not increment on mongos",
-                );
-            });
-        }
-
         booleanOptions.forEach((option) => {
             it(`${option} increments when set to true`, function () {
-                if (isMongos && option === "showMigrationEvents") {
-                    // 'showMigrationEvents' cannot be used on mongos.
-                    return;
-                }
-
                 const before = getCsMetrics().option[option];
                 openAndClose({[option]: true});
                 assert.eq(
