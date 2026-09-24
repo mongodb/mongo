@@ -40,6 +40,12 @@ describe("change stream and update lookup read preference", function () {
             assert.commandWorked(coll.update({_id: -1}, {$set: {updated: true}}));
             assert.commandWorked(coll.update({_id: 1}, {$set: {updated: true}}));
 
+            // The updates above use the default write concern, so the secondaries may not have applied
+            // them yet. Applying an update on a secondary is itself an _id idhack that records an '_id_'
+            // index access; if it lands after we sample $indexStats below, it inflates the observed delta.
+            // Wait for both replica sets to catch up so the only in-window access is the update lookup.
+            st.awaitReplicationOnShards();
+
             // Consume both updates while observing where the post-image lookup ran on each shard.
             let changes;
             const lookupFn = () => (changes = cst.getNextChanges(stream, 2));
@@ -134,6 +140,7 @@ describe("change stream and update lookup read preference", function () {
                 moveChunk: coll.getFullName(),
                 find: {_id: 1},
                 to: st.rs1.getURL(),
+                _waitForDelete: true,
             }),
         );
 
@@ -155,6 +162,7 @@ describe("change stream and update lookup read preference", function () {
     afterEach(function () {
         // Drop all documents.
         assert.commandWorked(coll.deleteMany({}));
+        st.awaitReplicationOnShards();
     });
 
     after(function () {
