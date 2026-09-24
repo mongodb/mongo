@@ -18,6 +18,7 @@
  */
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 export const $config = (function () {
     const states = {
@@ -97,9 +98,7 @@ export const $config = (function () {
     };
 
     const teardown = function (db, collName, cluster) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {

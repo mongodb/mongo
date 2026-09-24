@@ -22,6 +22,7 @@
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 // Errors that are expected transiently while reads run concurrently with FCV transitions:
 //  - InterruptedDueToTimeseriesUpgradeDowngrade: a concurrent FCV transition interrupted the read.
@@ -205,9 +206,7 @@ export const $config = (function () {
             configureFailPoint(adminDb, "hangBeforePublishingCatalogUpdates", {}, "off");
         });
 
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {

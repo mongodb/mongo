@@ -23,6 +23,7 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Counts the number of time the setFeatureCompatibility command succeeds.
@@ -209,9 +210,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.teardown = function (db, collName, cluster) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
 
         const fcvExecutions = db
             .getSiblingDB($config.data.succesfullSetFCVDbName)
