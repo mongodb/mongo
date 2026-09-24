@@ -260,6 +260,10 @@ describe("change stream pre-image truncation persists across crash + recovery", 
             rst.waitForPrimary();
         }
 
+        // After recovery the restarted node has lost its own truncate oplog entries, so wait for
+        // it to re-fetch them from the new primary before callers assert on its pre-images.
+        rst.awaitReplication();
+
         return restarted;
     }
 
@@ -326,6 +330,10 @@ describe("change stream pre-image truncation persists across crash + recovery", 
         setRemoverCurrentTime(primary, expireAt);
         waitForPreImageTruncation(primary, 2 /* remaining */);
         freezePreImageTruncationJob(primary);
+
+        // The crashed node's own post-stable oplog entries are discarded during recovery, so the
+        // truncation must be present on the surviving node before the crash for it to survive.
+        rst.awaitReplication();
 
         const preImagesBefore = getPreImages(nodeToTest);
         jsTest.log.info("Pre-images before crash", {preImagesBefore});
@@ -411,6 +419,10 @@ describe("change stream pre-image truncation persists across crash + recovery", 
         setRemoverCurrentTime(primary, expireAt);
         waitForPreImageTruncation(primary, 0 /* remaining */);
         freezePreImageTruncationJob(primary);
+
+        // The crashed node's own post-stable oplog entries are discarded during recovery, so the
+        // truncation must be present on the surviving node before the crash for it to survive.
+        rst.awaitReplication();
 
         const preImagesBefore = getPreImages(primary);
         jsTest.log.info("Pre-images before crash (all expired)", {preImagesBefore});
