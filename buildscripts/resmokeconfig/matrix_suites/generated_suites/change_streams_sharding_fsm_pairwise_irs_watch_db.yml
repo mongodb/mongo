@@ -46,9 +46,9 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/change_stream_fsm/test_change_stream_sharding_fsm_continuous.js
+    - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
     - jstests/change_stream_fsm/test_change_stream_sharding_fsm_fetch_and_resume.js
     - jstests/change_stream_fsm/test_change_stream_sharding_fsm_resume.js
-    - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
   roots:
     - jstests/change_stream_fsm/test_change_stream_sharding_fsm_*.js
 test_kind: js_test
