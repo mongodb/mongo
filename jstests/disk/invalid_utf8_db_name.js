@@ -131,7 +131,6 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
     const validateModes = {
         serial: {
             args: ["--validate", "--setParameter", "featureFlagParallelCollectionValidation=false"],
-            expectSummary: true,
         },
         parallel: {
             args: [
@@ -141,11 +140,10 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
                 "--setParameter",
                 "validateParallelMaxConcurrentNamespaces=2",
             ],
-            expectSummary: false,
         },
     };
 
-    for (const [mode, {args, expectSummary}] of Object.entries(validateModes)) {
+    for (const [mode, {args}] of Object.entries(validateModes)) {
         it(`makes ${mode} skip the database and validate the rest`, function () {
             const modeDbpath = MongoRunner.dataPath + "invalid_utf8_db_name" + mode + "/";
             makeCorruptDbpath(modeDbpath);
@@ -220,12 +218,10 @@ describe("a database name that is not valid UTF-8 in the durable catalog", funct
                 `${mode} did not validate the database with a valid name`,
             );
             assert.eq(true, validDbResults[0].valid, `${mode} reported validDb.coll as invalid`);
-            if (expectSummary) {
-                assert(
-                    logIdRegex(9437304).test(output),
-                    `${mode} did not report that validation found issues`,
-                );
-            }
+            assert(
+                logIdRegex(9437304).test(output),
+                `${mode} did not report that validation found issues`,
+            );
             assert(logIdRegex(9437300).test(output), `${mode} did not report validation failure`);
         });
     }

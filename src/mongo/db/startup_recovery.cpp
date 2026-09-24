@@ -1082,13 +1082,6 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
             offlineValidateResults.allValidationComplete && isComplete;
         offlineValidateResults.allResultsValid = offlineValidateResults.allResultsValid && isValid;
     }
-
-    if (offlineValidateResults.allResultsValid) {
-        LOGV2(9437303, "Offline validation detected no issues");
-    } else {
-        LOGV2(9437304, "Offline validation found issues in some collections, see logs for details");
-    }
-
     return offlineValidateResults;
 }
 
@@ -1218,20 +1211,24 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     } else if (storageGlobalParams.validate) {
         // If the feature flag is enabled and a collection is not specified, run concurrent
         // validations across the database instance.
-        if (gFeatureFlagParallelCollectionValidation.isEnabled() &&
-            gValidateCollectionName.empty()) {
-            const auto offlineValidateResults = offlineValidateParallel(
-                opCtx, std::move(lk), gValidateParallelMaxConcurrentNamespaces.load());
-            if (!offlineValidateResults.allValidationComplete) {
-                uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                                 "Offline validation didn't complete for some collections"});
-            }
+        const bool runParallel =
+            gFeatureFlagParallelCollectionValidation.isEnabled() && gValidateCollectionName.empty();
+
+        const auto offlineValidateResults = runParallel
+            ? offlineValidateParallel(
+                  opCtx, std::move(lk), gValidateParallelMaxConcurrentNamespaces.load())
+            : offlineValidate(opCtx);
+
+        if (offlineValidateResults.allResultsValid) {
+            LOGV2(9437303, "Offline validation detected no issues");
         } else {
-            const auto offlineValidateResults = offlineValidate(opCtx);
-            if (!offlineValidateResults.allValidationComplete) {
-                uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                                 "Offline validation didn't complete for some collections"});
-            }
+            LOGV2(9437304,
+                  "Offline validation found issues in some collections, see logs for details");
+        }
+
+        if (!offlineValidateResults.allValidationComplete) {
+            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                             "Offline validation didn't complete for some collections"});
         }
     } else {
         startupRecovery(opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);

@@ -103,6 +103,26 @@ describe("Modal Validate can specify target Databases and Collections", () => {
             assert.eq(2, firstResult.nIndexes);
             assert.eq(2, secondResult.nIndexes);
         });
+
+        it(`Reports successful log for ${validateMode.name}`, () => {
+            generateResults(dbpath, validateMode.params);
+            const successLogs = rawMongoProgramOutput("9437303")
+                .split("\n")
+                .filter((line) => line.trim() !== "");
+            assert.eq(1, successLogs.length, "Expected exactly one success log", {successLogs});
+        });
+
+        it(`Reports unsuccessful log for ${validateMode.name}`, () => {
+            generateResults(dbpath, {
+                ...validateMode.params,
+                "failpoint.failRecordStoreTraversal": tojson({mode: "alwaysOn"}),
+            });
+            const failureLogs = rawMongoProgramOutput("9437304")
+                .split("\n")
+                .filter((line) => line.trim() !== "");
+            assert.eq(1, failureLogs.length, "Expected exactly one failure log", {failureLogs});
+            assert.eq(0, rawMongoProgramOutput("9437303").trim().length, "Unexpected success log");
+        });
     }
 
     it("Command validates everything in the specified collection", () => {
