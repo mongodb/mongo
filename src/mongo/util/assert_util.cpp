@@ -314,12 +314,16 @@ void iassertFailed(const Status& status, SourceLocation loc) {
     error_details::throwExceptionForStatus(status);
 }
 
-void tassertFailed(const Status& status, SourceLocation loc) {
+void tassertNoThrowFailed(const Status& status, SourceLocation loc) {
     bumpAssertion(AssertionKind::kTripwire);
     LOGV2_ERROR(
         TRIPWIRE_ASSERTION_ID, "Tripwire assertion", "error"_attr = status, "location"_attr = loc);
     logErrorBlock();
     breakpoint();
+}
+
+void tassertFailed(const Status& status, SourceLocation loc) {
+    tassertNoThrowFailed(status, loc);
     error_details::throwExceptionForStatus(status);
 }
 

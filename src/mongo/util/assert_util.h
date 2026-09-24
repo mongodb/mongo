@@ -526,6 +526,9 @@ template <typename ErrorDetail,
     return Status(std::forward<ErrorDetail>(detail), std::forward<StringLike>(message));
 }
 
+/** Assertion trigger impacts control flow (ie. throw, abort) */
+enum [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] AssertionTriggerReturns : bool {};
+
 }  // namespace error_details
 
 /**
@@ -534,24 +537,26 @@ template <typename ErrorDetail,
  * Using an immediately invoked lambda to give the compiler an easy way to inline the check (expr)
  * and out-of-line the error path. This is most helpful when the error path involves building a
  * complex error message in the expansion of msg. The call to the lambda is followed by
- * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
- * The source location is captured outside of the lambda, so that it represents
- * the function name of the macro invocation site.
+ * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn. Unreachable is omitted
+ * if the assertion variant trigger returns. The source location is captured outside of the
+ * lambda, so that it represents the function name of the macro invocation site.
  */
-#define MONGO_BASE_ASSERT_FAILED(fail_func, ...)                             \
+#define MONGO_BASE_ASSERT_FAILED(fail_func, doesTriggerReturn, ...)          \
     do {                                                                     \
         auto loc = MONGO_SOURCE_LOCATION();                                  \
         [&]() MONGO_COMPILER_COLD_FUNCTION {                                 \
             fail_func(::mongo::error_details::makeStatus(__VA_ARGS__), loc); \
         }();                                                                 \
-        MONGO_COMPILER_UNREACHABLE;                                          \
+        if constexpr (!doesTriggerReturn) {                                  \
+            MONGO_COMPILER_UNREACHABLE;                                      \
+        }                                                                    \
     } while (false)
 
-#define MONGO_BASE_ASSERT(fail_func, code, msg, cond)       \
-    do {                                                    \
-        if (MONGO_unlikely(!(cond))) {                      \
-            MONGO_BASE_ASSERT_FAILED(fail_func, code, msg); \
-        }                                                   \
+#define MONGO_BASE_ASSERT(fail_func, doesTriggerReturn, code, msg, cond)       \
+    do {                                                                       \
+        if (MONGO_unlikely(!(cond))) {                                         \
+            MONGO_BASE_ASSERT_FAILED(fail_func, doesTriggerReturn, code, msg); \
+        }                                                                      \
     } while (false)
 
 namespace error_details {
@@ -593,10 +598,17 @@ template <typename T, typename ContextExpr>
  * "user assert".  if asserts, user did something wrong, not our code.
  * On failure, throws an exception.
  */
-#define uasserted(msgid, msg) \
-    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::uassertedWithLocation, msgid, msg)
-#define uassert(msgid, msg, expr) \
-    MONGO_BASE_ASSERT(::mongo::error_details::uassertedWithLocation, msgid, msg, expr)
+#define uasserted(msgid, msg)                                                        \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::uassertedWithLocation,          \
+                             ::mongo::error_details::AssertionTriggerReturns{false}, \
+                             msgid,                                                  \
+                             msg)
+#define uassert(msgid, msg, expr)                                             \
+    MONGO_BASE_ASSERT(::mongo::error_details::uassertedWithLocation,          \
+                      ::mongo::error_details::AssertionTriggerReturns{false}, \
+                      msgid,                                                  \
+                      msg,                                                    \
+                      expr)
 
 #define uassertStatusOK(...) \
     ::mongo::error_details::uassertStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())
@@ -632,31 +644,39 @@ template <typename T>
 /**
  * massert is like uassert but it logs the message before throwing.
  */
-#define massert(msgid, msg, expr) \
-    MONGO_BASE_ASSERT(::mongo::error_details::massertedWithLocation, msgid, msg, expr)
+#define massert(msgid, msg, expr)                                             \
+    MONGO_BASE_ASSERT(::mongo::error_details::massertedWithLocation,          \
+                      ::mongo::error_details::AssertionTriggerReturns{false}, \
+                      msgid,                                                  \
+                      msg,                                                    \
+                      expr)
 
-#define masserted(msgid, msg) \
-    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::massertedWithLocation, msgid, msg)
+#define masserted(msgid, msg)                                                        \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::massertedWithLocation,          \
+                             ::mongo::error_details::AssertionTriggerReturns{false}, \
+                             msgid,                                                  \
+                             msg)
 
 #define massertStatusOK(...) \
     ::mongo::error_details::massertStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())
 
-#define MONGO_BASE_ASSERT_VA_4(fail_func, code, msg, cond)      \
-    do {                                                        \
-        if (MONGO_unlikely(!(cond)))                            \
-            MONGO_BASE_ASSERT_FAILED(fail_func, (code), (msg)); \
+#define MONGO_BASE_ASSERT_VA_5(fail_func, doesTriggerReturn, code, msg, cond)      \
+    do {                                                                           \
+        if (MONGO_unlikely(!(cond)))                                               \
+            MONGO_BASE_ASSERT_FAILED(fail_func, doesTriggerReturn, (code), (msg)); \
     } while (false)
 
-#define MONGO_BASE_ASSERT_VA_2(fail_func, statusExpr)                              \
+#define MONGO_BASE_ASSERT_VA_3(fail_func, doesTriggerReturn, statusExpr)           \
     do {                                                                           \
         if (const auto& stLocal_ = (statusExpr); MONGO_unlikely(!stLocal_.isOK())) \
-            MONGO_BASE_ASSERT_FAILED(fail_func, stLocal_);                         \
+            MONGO_BASE_ASSERT_FAILED(fail_func, doesTriggerReturn, stLocal_);      \
     } while (false)
 
 #define MONGO_BASE_ASSERT_VA_EXPAND(x) x /**< MSVC workaround */
-#define MONGO_BASE_ASSERT_VA_PICK(_1, _2, _3, _4, x, ...) x
+#define MONGO_BASE_ASSERT_VA_PICK(_1, _2, _3, _4, _5, x, ...) x
 #define MONGO_BASE_ASSERT_VA_DISPATCH(...)                                        \
     MONGO_BASE_ASSERT_VA_EXPAND(MONGO_BASE_ASSERT_VA_PICK(__VA_ARGS__,            \
+                                                          MONGO_BASE_ASSERT_VA_5, \
                                                           MONGO_BASE_ASSERT_VA_4, \
                                                           MONGO_BASE_ASSERT_VA_3, \
                                                           MONGO_BASE_ASSERT_VA_2, \
@@ -665,7 +685,7 @@ template <typename T>
 namespace error_details {
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void iassertFailed(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
-}
+}  // namespace error_details
 
 /**
  * `iassert` is provided as an alternative for `uassert` variants (e.g., `uassertStatusOK`)
@@ -675,46 +695,52 @@ namespace error_details {
  * interface (i.e., `iassert(...)`) for all possible assertion variants, and use function
  * overloading to expand type support as needed.
  */
-#define iassert(...) \
-    MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::error_details::iassertFailed, __VA_ARGS__)
-#define iasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::error_details::iassertFailed, __VA_ARGS__)
+#define iassert(...)                                                                      \
+    MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::error_details::iassertFailed,                  \
+                                  ::mongo::error_details::AssertionTriggerReturns{false}, \
+                                  __VA_ARGS__)
+#define iasserted(...)                                                               \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::iassertFailed,                  \
+                             ::mongo::error_details::AssertionTriggerReturns{false}, \
+                             __VA_ARGS__)
 
 namespace error_details {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] void tassertNoThrowFailed(
+    const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void tassertFailed(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
-}
+}  // namespace error_details
 
 /**
  * "tripwire/test assert". Like uassert, but with a deferred-fatality tripwire that gets
  * checked prior to normal shutdown. Used to ensure that this assertion will both fail the
  * operation and also cause a test suite failure.
  */
-#define tassert(...) \
-    MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::error_details::tassertFailed, __VA_ARGS__)
-#define tasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::error_details::tassertFailed, __VA_ARGS__)
+#define tassert(...)                                                                      \
+    MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::error_details::tassertFailed,                  \
+                                  ::mongo::error_details::AssertionTriggerReturns{false}, \
+                                  __VA_ARGS__)
+#define tasserted(...)                                                               \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::tassertFailed,                  \
+                             ::mongo::error_details::AssertionTriggerReturns{false}, \
+                             __VA_ARGS__)
 
 /**
  * Log assertion failure, like tassert, but then continues execution without
  * throwing or aborting. Used in cases where a failed check indicates
  * a bug that we want to intentionally **ignore** semantically in production.
  *
- * `bugLog()` and `bugLogOn()` use the same trigger semantics as standard asserts; a false condition
- * triggers it. True condition is a no-op.
+ * `tassertNoThrow()` and `tassertedNoThrow()` use the same trigger semantics as standard asserts; a
+ * false condition triggers it. True condition is a no-op.
  */
-#define bugLogOn(...)                  \
-    do {                               \
-        try {                          \
-            tassert(__VA_ARGS__);      \
-        } catch (const DBException&) { \
-        }                              \
-    } while (false)
-#define bugLog(...)                    \
-    do {                               \
-        try {                          \
-            tasserted(__VA_ARGS__);    \
-        } catch (const DBException&) { \
-        }                              \
-    } while (false)
+#define tassertNoThrow(...)                                                              \
+    MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::error_details::tassertNoThrowFailed,          \
+                                  ::mongo::error_details::AssertionTriggerReturns{true}, \
+                                  __VA_ARGS__)
+#define tassertedNoThrow(...)                                                       \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::tassertNoThrowFailed,          \
+                             ::mongo::error_details::AssertionTriggerReturns{true}, \
+                             __VA_ARGS__)
 
 /**
  * Return true if tripwire conditions have occurred.

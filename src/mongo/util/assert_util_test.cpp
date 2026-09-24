@@ -18,9 +18,13 @@
 #include <ostream>
 #include <type_traits>
 
+#include "gmock/gmock.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo {
 namespace {
+constexpr int kTripwireLogId = 4457000;
+
 struct PrinterMockTassert {
     auto format(auto& fc) const {
         tasserted(9513401, "tasserting in mock printer");
@@ -68,6 +72,9 @@ struct formatter<mongo::PrinterMockInvariant> : mongo::MemberCallFormatter {};
 
 namespace mongo {
 namespace {
+
+using ::testing::ElementsAre;
+
 #define ASSERT_CATCHES(code, Type)                                         \
     ([] {                                                                  \
         try {                                                              \
@@ -232,7 +239,7 @@ TEST(AssertUtils, UassertIncrementsUserAssertionCounter) {
     auto userAssertions = assertionCount.user.load();
     auto asserted = false;
     try {
-        Status status = {ErrorCodes::BadValue, "Test"};
+        Status status{ErrorCodes::BadValue, "Test"};
         uassertStatusOK(status);
     } catch (const DBException&) {
         asserted = true;
@@ -244,7 +251,7 @@ TEST(AssertUtils, UassertIncrementsUserAssertionCounter) {
 TEST(AssertUtils, InternalAssertWithStatus) {
     auto userAssertions = assertionCount.user.load();
     try {
-        Status status = {ErrorCodes::BadValue, "Test"};
+        Status status{ErrorCodes::BadValue, "Test"};
         iassert(status);
     } catch (const DBException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
@@ -294,16 +301,16 @@ void doTassert() {
     auto tripwireAssertions = assertionCount.tripwire.load();
 
     try {
-        Status status = {ErrorCodes::BadValue, "Test with Status"};
+        Status status{ErrorCodes::BadValue, "Test with Status"};
         tassert(status);
     } catch (const DBException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
         ASSERT_EQ(ex.reason(), "Test with Status");
     }
-    ASSERT_EQ(tripwireAssertions + 1, assertionCount.tripwire.load());
+    ASSERT_EQ(assertionCount.tripwire.load(), tripwireAssertions + 1);
 
     tassert(Status::OK());
-    ASSERT_EQ(tripwireAssertions + 1, assertionCount.tripwire.load());
+    ASSERT_EQ(assertionCount.tripwire.load(), tripwireAssertions + 1);
 
     try {
         tassert(4457090, "Test with expression", false);
@@ -311,10 +318,10 @@ void doTassert() {
         ASSERT_EQ(ex.code(), 4457090);
         ASSERT_EQ(ex.reason(), "Test with expression");
     }
-    ASSERT_EQ(tripwireAssertions + 2, assertionCount.tripwire.load());
+    ASSERT_EQ(assertionCount.tripwire.load(), tripwireAssertions + 2);
 
     tassert(4457091, "Another test with expression", true);
-    ASSERT_EQ(tripwireAssertions + 2, assertionCount.tripwire.load());
+    ASSERT_EQ(assertionCount.tripwire.load(), tripwireAssertions + 2);
 
     try {
         tasserted(4457092, "Test with tasserted");
@@ -322,7 +329,7 @@ void doTassert() {
         ASSERT_EQ(ex.code(), 4457092);
         ASSERT_EQ(ex.reason(), "Test with tasserted");
     }
-    ASSERT_EQ(tripwireAssertions + 3, assertionCount.tripwire.load());
+    ASSERT_EQ(assertionCount.tripwire.load(), tripwireAssertions + 3);
 }
 
 DEATH_TEST_REGEX(TassertTerminationTestDeathTest,
@@ -356,6 +363,114 @@ DEATH_TEST_REGEX(TassertTerminationTestDeathTest,
     } catch (const DBException&) {
         // Catch the DBException, to ensure that we eventually abort during clean exit.
     }
+}
+
+/**
+ * Resets tripwires at teardown.
+ */
+class TripwireTest : public unittest::Test {
+public:
+    void setUp() override {
+        _initialTripwireCount = _getTripwireCount();
+    }
+
+    void tearDown() override {
+        assertionCount.tripwire.store(_initialTripwireCount);
+    }
+
+protected:
+    /** Number of tripwires that occurred during the test. */
+    [[nodiscard]] int getTestTripwireCount() const {
+        return assertionCount.tripwire.load() - _initialTripwireCount;
+    }
+
+private:
+    [[nodiscard]] int _getTripwireCount() const {
+        return assertionCount.tripwire.load();
+    }
+
+    int _initialTripwireCount = 0;
+};
+
+/**
+ * Captures log and resets tripwires at teardown.
+ */
+class AssertUtilsTripwireTest : public TripwireTest {
+protected:
+    [[nodiscard]] const unittest::LogCaptureGuard& getLog() const {
+        return _logs;
+    }
+
+    /**
+     * Assert log line is generated correctly.
+     *
+     * Wrap calls in `ASSERT_NO_FATAL_FAILURE()` so test body stops running on failure.
+     */
+    void assertLogFormat(int code, std::string_view errmsg) const {
+        const auto idLines = getLog().indicesOfBSONContainingSubset(BSON("id" << kTripwireLogId));
+        ASSERT_EQ(idLines.size(), 1);
+        const size_t expectedLineIdx = idLines[0];
+
+        ASSERT_THAT(getLog().indicesOfBSONContainingSubset(
+                        BSON("attr" << BSON("error" << BSON("errmsg" << errmsg)))),
+                    ElementsAre(expectedLineIdx));
+        ASSERT_THAT(getLog().indicesOfBSONContainingSubset(
+                        BSON("attr" << BSON("error" << BSON("code" << code)))),
+                    ElementsAre(expectedLineIdx));
+    }
+    void assertLogFormat(Status status) const {
+        assertLogFormat(status.code(), status.reason());
+    }
+
+    /**
+     * Assert no log line is generated.
+     *
+     * Wrap calls in `ASSERT_NO_FATAL_FAILURE()` so test body stops running on failure.
+     */
+    void assertNoLog() const {
+        ASSERT_EQ(getLog().countBSONContainingSubset(BSON("id" << kTripwireLogId)), 0);
+    }
+
+private:
+    unittest::LogCaptureGuard _logs;
+};
+
+TEST_F(AssertUtilsTripwireTest, TassertNoThrowTestWithStatusTrigger) {
+    Status status{ErrorCodes::BadValue, "Test with Status"};
+    tassertNoThrow(status);
+    ASSERT_NO_FATAL_FAILURE(assertLogFormat(status));
+    ASSERT_EQ(getTestTripwireCount(), 1);
+}
+
+TEST_F(AssertUtilsTripwireTest, TassertNoThrowTestWithStatusNoTrigger) {
+    static constexpr Status status = Status::OK();
+    tassertNoThrow(status);
+    ASSERT_EQ(getTestTripwireCount(), 0);
+    ASSERT_NO_FATAL_FAILURE(assertNoLog());
+}
+
+TEST_F(AssertUtilsTripwireTest, TassertNoThrowTestWithExpressionTrigger) {
+    static constexpr int code = 13313500;
+    std::string_view errmsg = "Test with expression";
+    tassertNoThrow(code, errmsg, false);
+    ASSERT_NO_FATAL_FAILURE(assertLogFormat(code, errmsg));
+    ASSERT_EQ(getTestTripwireCount(), 1);
+}
+
+TEST_F(AssertUtilsTripwireTest, TassertNoThrowTestWithExpressionNoTrigger) {
+    static constexpr int code = 4457091;
+    std::string_view errmsg = "Another test with expression";
+    tassertNoThrow(code, errmsg, true);
+    ASSERT_EQ(getTestTripwireCount(), 0);
+    ASSERT_NO_FATAL_FAILURE(assertNoLog());
+}
+
+TEST_F(AssertUtilsTripwireTest, TassertedNoThrowTest) {
+    static constexpr int code = 13313501;
+    std::string_view errmsg = "Test with tassertedNoThrow";
+    tassertedNoThrow(code, errmsg);
+    ASSERT_NO_FATAL_FAILURE(assertLogFormat(code, errmsg));
+    ASSERT_EQ(getTestTripwireCount(), 1);
 }
 
 // fassert and its friends
@@ -740,6 +855,10 @@ constexpr bool checkCanUseUMITassertInConstexprCode = [] {
     tassert(Status::OK());
     tassert(StatusWith(1));
 
+    tassertNoThrow(ErrorCodes::BadValue, "with message", true);
+    tassertNoThrow(Status::OK());
+    tassertNoThrow(StatusWith(1));
+
     return true;
 }();
 
@@ -820,6 +939,8 @@ struct InstallGuard {
 };
 }  // namespace observer_probe
 
+class AssertionIncrementObserverTripwireTest : public TripwireTest {};
+
 TEST(AssertionIncrementObserver, UassertNotifiesUser) {
     observer_probe::InstallGuard guard(&observer_probe::record);
     try {
@@ -830,7 +951,7 @@ TEST(AssertionIncrementObserver, UassertNotifiesUser) {
     ASSERT(observer_probe::lastKind.load() == AssertionKind::kUser);
 }
 
-TEST(AssertionIncrementObserver, MassertNotifiesMsg) {
+TEST_F(AssertionIncrementObserverTripwireTest, MassertNotifiesMsg) {
     observer_probe::InstallGuard guard(&observer_probe::record);
     try {
         masserted(ErrorCodes::BadValue, "probe");
@@ -840,7 +961,7 @@ TEST(AssertionIncrementObserver, MassertNotifiesMsg) {
     ASSERT(observer_probe::lastKind.load() == AssertionKind::kMsg);
 }
 
-TEST(AssertionIncrementObserver, TassertNotifiesTripwire) {
+TEST_F(AssertionIncrementObserverTripwireTest, TassertNotifiesTripwire) {
     observer_probe::InstallGuard guard(&observer_probe::record);
     try {
         tasserted(Status(ErrorCodes::BadValue, "probe"));
@@ -848,9 +969,14 @@ TEST(AssertionIncrementObserver, TassertNotifiesTripwire) {
     }
     ASSERT_EQ(observer_probe::count.load(), 1);
     ASSERT(observer_probe::lastKind.load() == AssertionKind::kTripwire);
-    // tassert leaves a tripwire flag set; clear it so the process-exit check in the test harness
-    // doesn't fail.
-    assertionCount.tripwire.subtractAndFetch(1);
+}
+
+TEST_F(AssertionIncrementObserverTripwireTest, TassertNoThrowNotifiesTripwire) {
+    observer_probe::InstallGuard guard(&observer_probe::record);
+    tassertedNoThrow(ErrorCodes::BadValue, "probe");
+
+    ASSERT_EQ(observer_probe::count.load(), 1);
+    ASSERT_EQ(observer_probe::lastKind.load(), AssertionKind::kTripwire);
 }
 
 TEST(AssertionIncrementObserver, ClearingObserverStopsNotifications) {
