@@ -14,10 +14,12 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -54,8 +56,39 @@ static const std::vector<std::pair<std::string, std::string>> kInternalSearchFie
     {"docsNeededBounds", R"({$search: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
 };
 
-class SearchTest : service_context_test::WithSetupTransportLayer,
-                   public AggregationContextFixture {};
+// Owns the pipelines referenced by a DocumentSource::DistributedPlanContext so the ctx can be
+// passed by pointer into distributedPlanLogic() without dangling.
+class OwningDistributedPlanContext : public DocumentSource::DistributedPlanContext {
+public:
+    OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
+                                 std::unique_ptr<Pipeline> pipelineSuffix,
+                                 boost::optional<OrderedPathSet> shardKeys)
+        : DocumentSource::DistributedPlanContext{*pipelinePrefix, *pipelineSuffix, this->shardKeys},
+          pipelinePrefix(std::move(pipelinePrefix)),
+          pipelineSuffix(std::move(pipelineSuffix)),
+          shardKeys(std::move(shardKeys)) {}
+    std::unique_ptr<Pipeline> pipelinePrefix;
+    std::unique_ptr<Pipeline> pipelineSuffix;
+    boost::optional<OrderedPathSet> shardKeys;
+};
+
+class SearchTest : service_context_test::WithSetupTransportLayer, public AggregationContextFixture {
+protected:
+    // Builds a DistributedPlanContext whose suffix is the given pipeline. The prefix is empty.
+    auto makePlanCtx(std::string_view pipelineJson) {
+        auto bson = fromjson(pipelineJson);
+        std::vector<BSONObj> rawPipeline;
+        for (const auto& element : bson) {
+            rawPipeline.push_back(element.Obj());
+        }
+        auto pipelinePrefix = pipeline_factory::makePipeline(
+            std::vector<BSONObj>{}, getExpCtx(), {.attachCursorSource = false});
+        auto pipelineSuffix =
+            pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
+        return OwningDistributedPlanContext(
+            std::move(pipelinePrefix), std::move(pipelineSuffix), boost::none);
+    }
+};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
@@ -419,6 +452,63 @@ TEST_F(SearchTest, SerializeForExplainEmitsFullSpecOnlyOnRouter) {
                            .getField("mongotQuery")
                            .getDocument(),
                        Document(mongotQuery));
+}
+
+// distributedPlanLogic() must not recompute requiresSearchMetaCursor from the current pipeline for
+// a spec stamped by a router: the $$SEARCH_META reference may live in the merging half, which
+// isn't visible to the shard-side pipeline. The recompute block is gated on
+// _plannedShardedSearchLocally, which is only set when the stage planned the search itself, so a
+// router-stamped spec must keep its merge stages even when the visible suffix doesn't reference
+// $$SEARCH_META.
+TEST_F(SearchTest, DistributedPlanLogicKeepsMergeForRouterStampedSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    // A spec in its router-stamped form: the router computed the merging pipeline and stamped
+    // requiresSearchMetaCursor=true because the merging half references $$SEARCH_META.
+    const auto serializedSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: [{$group: {_id: "$type", value: {$sum: "$metaVal"}}}],
+            requiresSearchMetaCursor: true
+        }
+    })");
+    auto searchDS = DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx);
+
+    // Suffix does NOT reference $$SEARCH_META. If distributedPlanLogic() recomputed
+    // requiresSearchMetaCursor here, the merge stage would be dropped even though the merging half
+    // needs it.
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = searchDS->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+}
+
+// Informational probes (requiredToRunOnRouter()/stageCanRunInParallel() style call sites) pass
+// ctx == nullptr. They must not crash and must produce the same merge plan as a real split.
+TEST_F(SearchTest, DistributedPlanLogicProbeKeepsMergeForRouterStampedSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    const auto serializedSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: [{$group: {_id: "$type", value: {$sum: "$metaVal"}}}],
+            requiresSearchMetaCursor: true
+        }
+    })");
+    auto searchDS = DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx);
+
+    // A probe passes ctx == nullptr and must produce the same merge plan as a real split.
+    auto dpl = searchDS->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
 }
 
 }  // namespace

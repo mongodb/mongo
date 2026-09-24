@@ -220,6 +220,11 @@ private:
     // Holds all the planning information for the command's eventual mongot request.
     InternalSearchMongotRemoteSpec _spec;
 
+    // True if this stage issued the planShardedSearch call itself (i.e. the spec's metadata merge
+    // protocol version was not stamped by a router). Distinguishes the router-side split from a
+    // shard reparsing a router-sent spec in distributedPlanLogic().
+    bool _plannedShardedSearchLocally = false;
+
     // An unique id of search stage in the pipeline, currently it is hard coded to 0 because we can
     // only have one search stage and sub-pipelines are not in the same PlanExecutor.
     // We should assign unique ids when we have everything in a single PlanExecutorSBE.

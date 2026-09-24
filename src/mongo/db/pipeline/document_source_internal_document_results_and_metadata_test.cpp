@@ -29,8 +29,10 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -51,6 +53,22 @@ const auto kSourceWithMeta =
                   << "returnCursor" << false);
 const auto kFullSpec = BSON("source" << BSON("$collStats" << BSONObj()) << "metadata"
                                      << BSON("as" << "SEARCH_META") << "returnCursor" << true);
+
+// Owns the pipelines referenced by a DocumentSource::DistributedPlanContext so the ctx can be
+// passed by pointer into distributedPlanLogic() without dangling.
+class OwningDistributedPlanContext : public DocumentSource::DistributedPlanContext {
+public:
+    OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
+                                 std::unique_ptr<Pipeline> pipelineSuffix,
+                                 boost::optional<OrderedPathSet> shardKeys)
+        : DocumentSource::DistributedPlanContext{*pipelinePrefix, *pipelineSuffix, this->shardKeys},
+          pipelinePrefix(std::move(pipelinePrefix)),
+          pipelineSuffix(std::move(pipelineSuffix)),
+          shardKeys(std::move(shardKeys)) {}
+    std::unique_ptr<Pipeline> pipelinePrefix;
+    std::unique_ptr<Pipeline> pipelineSuffix;
+    boost::optional<OrderedPathSet> shardKeys;
+};
 
 class DocumentSourceInternalDocumentResultsAndMetadataTest : public AggregationContextFixture {
 protected:
@@ -73,6 +91,21 @@ protected:
             dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(_stages.front().get());
         ASSERT(docResultsAndMetadata);
         return docResultsAndMetadata;
+    }
+
+    // Builds a DistributedPlanContext whose suffix is the given pipeline. The prefix is empty.
+    auto makePlanCtx(std::string_view pipelineJson) {
+        auto bson = fromjson(pipelineJson);
+        std::vector<BSONObj> rawPipeline;
+        for (const auto& element : bson) {
+            rawPipeline.push_back(element.Obj());
+        }
+        auto pipelinePrefix = pipeline_factory::makePipeline(
+            std::vector<BSONObj>{}, getExpCtx(), {.attachCursorSource = false});
+        auto pipelineSuffix =
+            pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
+        return OwningDistributedPlanContext(
+            std::move(pipelinePrefix), std::move(pipelineSuffix), boost::none);
     }
 
     OperationContext* opCtx() {
@@ -595,6 +628,123 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_EQ(dpl->mergingStages.size(), 1u);
     ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
               "$setVariableFromSubPipeline"sv);
+}
+
+// Elision tests for the split-time metadata elision added to distributedPlanLogic(). When
+// optimization did not run, distributedPlanLogic() is the last chance to drop the metadata stream
+// (and thus the merging pipeline) if no downstream stage reads $$SEARCH_META.
+
+// The suffix does not reference $$SEARCH_META, so the metadata stream must be elided and no merge
+// stages attached.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicElidesMetadataWhenSuffixUnreferenced) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergingStages.empty());
+    ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+}
+
+// The suffix references $$SEARCH_META, so metadata must be retained: the metadata stream is
+// returned as a secondary cursor (_returnCursor = true) and the merging pipeline is attached.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicKeepsMetadataWhenSuffixReferencesSearchMeta) {
+    auto expCtx = getExpCtx();
+    // A suffix that references $$SEARCH_META without a setter trips assertSearchMetaAccessValid
+    // during pipeline construction; routers defer that check, so model the router context.
+    expCtx->setInRouter(true);
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto ctx = makePlanCtx(R"([{$project: {meta: "$$SEARCH_META"}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_TRUE(ds->getReturnCursor());
+}
+
+// Informational probes (requiredToRunOnRouter()/stageCanRunInParallel() style call sites) pass
+// ctx == nullptr and must not cause side effects: metadata must not be elided, _returnCursor must
+// not be flipped.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicProbeDoesNotMutateState) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto dpl = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    // A probe must not mutate the stage.
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+
+    // The same result must be reproducible; calling again must not mutate either.
+    auto dpl2 = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl2.has_value());
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+}
+
+// On a shard re-parse (needsMerge = true), the shard cannot see the router's merge half, so the
+// elision decision must be suppressed: metadata is kept even if the local suffix doesn't reference
+// $$SEARCH_META.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicKeepsMetadataWhenNeedsMergeTrue) {
+    auto expCtx = getExpCtx();
+    expCtx->setNeedsMerge(true);
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    // Suffix does not reference $$SEARCH_META, but the elision must be suppressed on shards.
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_TRUE(ds->getReturnCursor());
 }
 
 // InternalStreamTerminatorStage exec-level tests.

@@ -270,6 +270,22 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
         // targeting.
         search_helpers::planShardedSearch(getExpCtx(), &_spec);
         validateSortSpec(_spec.getSortSpec());
+        _plannedShardedSearchLocally = true;
+    }
+
+    // 'requiresSearchMetaCursor' is normally computed during pipeline optimization (doOptimizeAt);
+    // if optimization did not run it is still at its conservative default of true. Recompute it
+    // from the remainder of the pipeline so we don't attach a $setVariableFromSubPipeline stage
+    // that nothing reads. This must not run for specs stamped by a router, where the
+    // $$SEARCH_META reference may live in the merging half that isn't visible here. 'ctx' is null
+    // for informational probes (which may have triggered the planShardedSearch call above) and
+    // non-null for the actual split.
+    if (ctx && _plannedShardedSearchLocally && _spec.getRequiresSearchMetaCursor()) {
+        const auto& suffix = ctx->pipelineSuffix.getSources();
+        _spec.setRequiresSearchMetaCursor(
+            std::any_of(suffix.begin(), suffix.end(), [](const auto& stage) {
+                return search_helpers::hasReferenceToSearchMeta(*stage);
+            }));
     }
 
     // Construct the DistributedPlanLogic for sharded planning based on the information returned

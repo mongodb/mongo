@@ -6,3 +6,6 @@ filters:
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads
+  - "set_variable_from_subpipeline_missing_meta_cursors.js":
+    approvers:
+      - 10gen/query-integration-search

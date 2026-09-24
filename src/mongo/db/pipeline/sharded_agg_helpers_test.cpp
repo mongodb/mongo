@@ -3,8 +3,12 @@
 
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -218,6 +222,36 @@ TEST_F(
     });
 
     future.default_timed_get();
+}
+
+TEST_F(ShardedAggHelpersFixture, HasUnsourcedSetVariableStage) {
+    auto makeSetVariableStage = [&]() {
+        auto setVariableSpec =
+            BSON("$setVariableFromSubPipeline"
+                 << BSON("setVariable" << "$$SEARCH_META"
+                                       << "pipeline" << BSON_ARRAY(BSON("$match" << BSONObj()))));
+        return DocumentSourceSetVariableFromSubPipeline::createFromBson(
+            setVariableSpec.firstElement(), expCtx());
+    };
+
+    // A pipeline with no $setVariableFromSubPipeline stage is not unsourced.
+    auto pipelineWithoutSetVariable =
+        Pipeline::create({DocumentSourceMock::create(expCtx())}, expCtx());
+    ASSERT_FALSE(hasUnsourcedSetVariableStage(*pipelineWithoutSetVariable));
+
+    // A $setVariableFromSubPipeline whose sub-pipeline has no initial cursor source is unsourced:
+    // its sub-pipeline fronts a stage that requires an input document source.
+    auto setVariable = makeSetVariableStage();
+    auto unsourcedPipeline =
+        Pipeline::create({DocumentSourceMock::create(expCtx()), setVariable}, expCtx());
+    ASSERT_TRUE(hasUnsourcedSetVariableStage(*unsourcedPipeline));
+
+    // Once the metadata cursor source is attached to the sub-pipeline, the stage is sourced.
+    auto* setVariableStage =
+        dynamic_cast<DocumentSourceSetVariableFromSubPipeline*>(setVariable.get());
+    ASSERT(setVariableStage);
+    setVariableStage->addSubPipelineInitialSource(DocumentSourceMock::create(expCtx()));
+    ASSERT_FALSE(hasUnsourcedSetVariableStage(*unsourcedPipeline));
 }
 
 }  // namespace

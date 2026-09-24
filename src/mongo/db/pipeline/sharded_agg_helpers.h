@@ -85,6 +85,14 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
                                                                   const Pipeline* mergePipeline);
 
 /**
+ * Returns true if 'pipeline' contains a $setVariableFromSubPipeline stage whose sub-pipeline has
+ * not been given an initial cursor source, i.e. the SEARCH_META metadata cursors have not been
+ * injected via injectMetaCursor(). A merge pipeline in this state cannot be executed, so this is
+ * used to assert that the metadata-cursor invariant holds.
+ */
+bool hasUnsourcedSetVariableStage(const Pipeline& pipeline);
+
+/**
  * Used to indicate if a pipeline contains any data source requiring extra handling for targeting
  * shards.
  */

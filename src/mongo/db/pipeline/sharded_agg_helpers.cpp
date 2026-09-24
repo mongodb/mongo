@@ -761,6 +761,21 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
         });
 }
 
+bool hasUnsourcedSetVariableStage(const Pipeline& pipeline) {
+    for (const auto& source : pipeline.getSources()) {
+        auto* setVarStage = dynamic_cast<DocumentSourceSetVariableFromSubPipeline*>(source.get());
+        if (!setVarStage) {
+            continue;
+        }
+        auto* subPipeline = setVarStage->getSubPipeline();
+        if (subPipeline && !subPipeline->empty() &&
+            subPipeline->front()->constraints().requiresInputDocSource) {
+            return true;
+        }
+    }
+    return false;
+}
+
 boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,
                                                                   const Pipeline* mergePipeline) {
     if (internalQueryDisableExchange.load()) {
@@ -1499,6 +1514,15 @@ void partitionAndAddMergeCursorsSource(Pipeline* mergePipeline,
     if (metaCursors) {
         injectMetaCursor(mergePipeline, std::move(*metaCursors), remoteMetricsToInclude);
     }
+    // If the merge pipeline sets $$SEARCH_META from a sub-pipeline, that sub-pipeline must have
+    // received the shards' metadata cursors above. Executing or dispatching it without a cursor
+    // source is impossible (the merging node would trip a tassert). This is an internal invariant:
+    // it should be unreachable now that $setVariableFromSubPipeline is only attached when the
+    // pipeline actually references $$SEARCH_META.
+    tassert(13182000,
+            "$$SEARCH_META is required by the merging pipeline, but the shards did not return "
+            "metadata cursors",
+            !hasUnsourcedSetVariableStage(*mergePipeline));
 }
 
 void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Response>& shardResponses,

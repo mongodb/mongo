@@ -367,6 +367,22 @@ DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
         return logic;
     }
 
+    // Metadata elision normally happens during optimization (doOptimizeAt); if optimization did
+    // not run, elide here based on the actual remainder of the pipeline so we don't attach a
+    // $setVariableFromSubPipeline stage that nothing reads. Shards only see their local pipeline
+    // view, so this only applies on the router.
+    if (ctx != nullptr && !expCtx->getNeedsMerge()) {
+        const auto& suffix = ctx->pipelineSuffix.getSources();
+        const bool referencesSearchMeta =
+            std::any_of(suffix.begin(), suffix.end(), [](const auto& stage) {
+                return search_helpers::hasReferenceToSearchMeta(*stage);
+            });
+        if (!referencesSearchMeta) {
+            elideMetadata();
+            return logic;
+        }
+    }
+
     // Flip _returnCursor so the shard-side stage stashes the metadata stream as a secondary cursor
     // that the router reads, rather than consuming it in-process via $setVariableFromSubPipeline.
     // Informational probes (e.g. requiredToRunOnRouter, stageCanRunInParallel) use ctx=nullptr and
