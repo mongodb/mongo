@@ -102,10 +102,9 @@ public:
 
         // The read is deferred so it runs on whichever node ends up executing the stage.
         DocumentSourceQueue::DeferredQueue deferredConfigs{[expCtx]() {
-            auto tenantId = expCtx->getNamespaceString().tenantId();
             auto* opCtx = expCtx->getOperationContext();
             auto configs = QuerySettingsService::get(opCtx)
-                               .getAllQueryShapeConfigurations(tenantId)
+                               .getAllQueryShapeConfigurations()
                                .queryShapeConfigurations;
             std::deque<DocumentSource::GetNextResult> queue;
             for (auto&& config : configs) {

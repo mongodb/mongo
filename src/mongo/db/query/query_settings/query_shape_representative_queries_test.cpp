@@ -19,10 +19,8 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 static auto const kNss = NamespaceString::createNamespaceString_forTest("foo", "exampleColl");
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+static auto const kSerializationContext = SerializationContext{
+    SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
 class RepresentativeQueryTestFixture : public ShardingTestFixture {
 public:

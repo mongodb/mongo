@@ -43,8 +43,7 @@ protected:
 void assertInvalidQueryWithAnyQuerySettings(OperationContext* opCtx,
                                             const BSONObj& representativeQuery,
                                             size_t errorCode) {
-    auto representativeQueryInfo =
-        createRepresentativeInfo(opCtx, representativeQuery, boost::none);
+    auto representativeQueryInfo = createRepresentativeInfo(opCtx, representativeQuery);
     ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithAnyQuerySettings(
                            representativeQueryInfo),
                        DBException,
@@ -55,8 +54,7 @@ void assertInvalidQueryAndQuerySettingsCombination(OperationContext* opCtx,
                                                    const BSONObj& representativeQuery,
                                                    const QuerySettings& querySettings,
                                                    size_t errorCode) {
-    auto representativeQueryInfo =
-        createRepresentativeInfo(opCtx, representativeQuery, boost::none);
+    auto representativeQueryInfo = createRepresentativeInfo(opCtx, representativeQuery);
     ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithQuerySettings(
                            representativeQueryInfo, querySettings),
                        DBException,
@@ -65,8 +63,8 @@ void assertInvalidQueryAndQuerySettingsCombination(OperationContext* opCtx,
 
 NamespaceSpec makeNamespace(std::string_view dbName, std::string_view collName) {
     NamespaceSpec ns;
-    ns.setDb(
-        DatabaseNameUtil::deserialize(boost::none, dbName, SerializationContext::stateDefault()));
+    ns.setDb(DatabaseNameUtil::deserialize(
+        /* tenantId */ boost::none, dbName, SerializationContext::stateDefault()));
     ns.setColl(collName);
     return ns;
 }
@@ -156,10 +154,9 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
     const BSONObj representativeQ = BSON("find" << uuid1Res.getValue() << "$db"
                                                 << "testDB"
                                                 << "filter" << BSON("a" << BSONNULL));
-    ASSERT_THROWS_CODE(
-        createRepresentativeInfo(expCtx->getOperationContext(), representativeQ, boost::none),
-        DBException,
-        7746605);
+    ASSERT_THROWS_CODE(createRepresentativeInfo(expCtx->getOperationContext(), representativeQ),
+                       DBException,
+                       7746605);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameColl) {
@@ -208,7 +205,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpec
     QuerySettings querySettings;
     NamespaceSpec ns;
     ns.setDb(DatabaseNameUtil::deserialize(
-        boost::none /* tenantId */, "dbName"sv, SerializationContext::stateDefault()));
+        /* tenantId */ boost::none, "dbName"sv, SerializationContext::stateDefault()));
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
     service().simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 8727501);

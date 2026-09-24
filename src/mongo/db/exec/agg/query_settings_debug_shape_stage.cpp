@@ -36,13 +36,11 @@ REGISTER_AGG_STAGE_MAPPING(querySettingsDebugShapeStage,
                            documentSourceInternalQuerySettingsDebugShapeToStageFn);
 
 namespace {
-BSONObj createDebugQueryShape(OperationContext* opCtx,
-                              const BSONObj& representativeQuery,
-                              const boost::optional<TenantId>& tenantId) {
+BSONObj createDebugQueryShape(OperationContext* opCtx, const BSONObj& representativeQuery) {
     // Get the serialized query shape by creating the representative information for the given
     // representative query.
     const auto representativeInfo =
-        query_settings::createRepresentativeInfo(opCtx, representativeQuery, tenantId);
+        query_settings::createRepresentativeInfo(opCtx, representativeQuery);
     return representativeInfo.serializedQueryShape;
 }
 }  // namespace
@@ -64,11 +62,10 @@ GetNextResult QuerySettingsDebugShapeStage::doGetNext() {
     }
 
     auto* opCtx = getContext()->getOperationContext();
-    auto tenantId = getContext()->getNamespaceString().tenantId();
     try {
         MutableDocument out(std::move(doc));
-        out[kDebugQueryShapeFieldName] = Value(
-            createDebugQueryShape(opCtx, representativeQuery.getDocument().toBson(), tenantId));
+        out[kDebugQueryShapeFieldName] =
+            Value(createDebugQueryShape(opCtx, representativeQuery.getDocument().toBson()));
         return out.freeze();
     } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
         uasserted(ErrorCodes::BSONObjectTooLarge,

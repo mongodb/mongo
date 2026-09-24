@@ -15,10 +15,8 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 // SerializationContext used when computing QueryShapeHash.
-const auto kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+const auto kSerializationContext = SerializationContext{SerializationContext::Source::Command,
+                                                        SerializationContext::CallerType::Request};
 }  // namespace
 
 static constexpr std::string_view hintSpecialField = "$hint"sv;

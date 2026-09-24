@@ -77,8 +77,8 @@ TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
     QuerySettings settings;
     settings.setQueryFramework(mongo::QueryFrameworkControlEnum::kForceClassicEngine);
     NamespaceSpec ns;
-    ns.setDb(
-        DatabaseNameUtil::deserialize(boost::none, "testDB", SerializationContext::stateDefault()));
+    ns.setDb(DatabaseNameUtil::deserialize(
+        /* tenantId */ boost::none, "testDB", SerializationContext::stateDefault()));
     ns.setColl(std::string_view("testColl"));
     settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
     settings.setReject(true);

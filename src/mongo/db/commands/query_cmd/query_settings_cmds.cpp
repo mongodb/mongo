@@ -67,15 +67,13 @@ bool isUpgradingToVersionThatHasDedicatedRepresentativeQueriesCollection(Operati
 template <QuerySettingsCmdType CmdType>
 void readModifyWriteQuerySettingsConfigOption(
     OperationContext* opCtx,
-    const mongo::DatabaseName& dbName,
     const QueryShapeHashQueryInstanceOptPair& queryShapeHashQueryInstanceOptPair,
     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
     auto& querySettingsService = QuerySettingsService::get(opCtx);
 
-    // Read the query shape configurations for the tenant from the local copy of the query settings
+    // Read the query shape configurations from the local copy of the query settings
     // cluster-wide configuration option.
-    auto queryShapeConfigurations =
-        querySettingsService.getAllQueryShapeConfigurations(dbName.tenantId());
+    auto queryShapeConfigurations = querySettingsService.getAllQueryShapeConfigurations();
 
     // Generate a new cluster parameter time that will be used when settings new version of
     // 'querySettings' cluster parameter. This cluster time will be assigned to the corresponding
@@ -189,7 +187,6 @@ void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
  */
 void validateAndSimplifyQuerySettings(
     OperationContext* opCtx,
-    const boost::optional<TenantId>& tenantId,
     const boost::optional<const RepresentativeQueryInfo&>& representativeQueryInfo,
     const boost::optional<QueryInstance>& previousRepresentativeQuery,
     QuerySettings& querySettings) {
@@ -199,7 +196,7 @@ void validateAndSimplifyQuerySettings(
     // available, assert that query settings will be set on a valid query.
     if (!representativeQueryInfo && previousRepresentativeQuery) {
         service.validateQueryCompatibleWithAnyQuerySettings(
-            createRepresentativeInfo(opCtx, *previousRepresentativeQuery, tenantId));
+            createRepresentativeInfo(opCtx, *previousRepresentativeQuery));
     }
     if (representativeQueryInfo) {
         service.validateQueryCompatibleWithQuerySettings(*representativeQueryInfo, querySettings);
@@ -249,8 +246,8 @@ public:
                                                       queryShapeHash);
                           },
                           [&](const QueryInstance& representativeQuery) {
-                              const auto representativeQueryInfo = createRepresentativeInfo(
-                                  opCtx, representativeQuery, request().getDbName().tenantId());
+                              const auto representativeQueryInfo =
+                                  createRepresentativeInfo(opCtx, representativeQuery);
                               return setQuerySettings(opCtx,
                                                       representativeQuery,
                                                       representativeQueryInfo,
@@ -302,15 +299,11 @@ public:
             }
 
             SetQuerySettingsCommandReply reply;
-            auto&& tenantId = request().getDbName().tenantId();
             QueryShapeHashQueryInstanceOptPair queryShapeHashQueryInstanceOptPair = {
                 queryShapeHash, representativeQuery};
 
             readModifyWriteQuerySettingsConfigOption<QuerySettingsCmdType::kSet>(
-                opCtx,
-                request().getDbName(),
-                queryShapeHashQueryInstanceOptPair,
-                [&](auto& queryShapeConfigurations) {
+                opCtx, queryShapeHashQueryInstanceOptPair, [&](auto& queryShapeConfigurations) {
                     // Lookup a query shape configuration by query shape hash.
                     auto matchingQueryShapeConfigurationIt =
                         findQueryShapeConfigurationByQueryShapeHash(queryShapeConfigurations,
@@ -331,7 +324,6 @@ public:
                         // Add a new query settings entry.
                         validateAndSimplifyQuerySettings(
                             opCtx,
-                            tenantId,
                             representativeQueryInfo,
                             boost::none /*previousRepresentativeQuery*/,
                             newQueryShapeConfiguration.getSettings());
@@ -356,7 +348,6 @@ public:
                             queryShapeConfigurationToUpdate.getSettings(), request().getSettings());
                         validateAndSimplifyQuerySettings(
                             opCtx,
-                            tenantId,
                             representativeQueryInfo,
                             queryShapeConfigurationToUpdate.getRepresentativeQuery(),
                             mergedQuerySettings);
@@ -421,7 +412,6 @@ public:
 
             // Ensure FCV is not changing throughout the command execution.
             FixedFCVRegion fixedFcvRegion(opCtx);
-            auto tenantId = request().getDbName().tenantId();
             QueryShapeHashQueryInstanceOptPair queryShapeHashAndRepresentativeQuery =
                 visit(OverloadedVisitor{
                           [&](const query_shape::QueryShapeHash& queryShapeHash) {
@@ -431,7 +421,7 @@ public:
                               // Converts 'representativeQuery' into QueryShapeHash, for convenient
                               // comparison during search for the matching QueryShapeConfiguration.
                               auto representativeQueryInfo =
-                                  createRepresentativeInfo(opCtx, representativeQuery, tenantId);
+                                  createRepresentativeInfo(opCtx, representativeQuery);
 
                               return std::pair{representativeQueryInfo.queryShapeHash,
                                                boost::optional<QueryInstance>{representativeQuery}};
@@ -441,10 +431,7 @@ public:
 
             const auto& queryShapeHash = queryShapeHashAndRepresentativeQuery.first;
             readModifyWriteQuerySettingsConfigOption<QuerySettingsCmdType::kRemove>(
-                opCtx,
-                request().getDbName(),
-                queryShapeHashAndRepresentativeQuery,
-                [&](auto& queryShapeConfigurations) {
+                opCtx, queryShapeHashAndRepresentativeQuery, [&](auto& queryShapeConfigurations) {
                     // Build the new 'queryShapeConfigurations' by removing the first
                     // QueryShapeConfiguration matching the 'queryShapeHash'. There can be only one
                     // match, since 'queryShapeConfigurations' is constructed from a map where

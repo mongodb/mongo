@@ -49,7 +49,7 @@ QuerySettingsKnobOverrides QuerySettingsKnobOverrides::fromBSON(const BSONObj& o
 
             const auto& entry = reg.entry(*id);
             // fromBSON() only type-checks; validate() also enforces IDL range constraints.
-            uassertStatusOK(entry.param->validate(elem, boost::none));
+            uassertStatusOK(entry.param->validate(elem, /* tenantId */ boost::none));
             overrides._entries.emplace_back(Entry{*id, entry.fromBSON(elem)});
         } catch (const DBException& ex) {
             // Never let a single bad knob abort parsing of the rest: record and move on. Callers

@@ -37,8 +37,8 @@ ExecutorFuture<std::vector<query_shape::QueryShapeHash>> insertRepresentativeQue
  */
 class BackfillCoordinator {
 public:
-    using OnCompletionHook = std::function<void(
-        std::vector<query_shape::QueryShapeHash>, LogicalTime, boost::optional<TenantId>)>;
+    using OnCompletionHook =
+        std::function<void(std::vector<query_shape::QueryShapeHash>, LogicalTime)>;
 
     /**
      * Creates the appropriate 'BackfillCoordinator' implementation based on the current

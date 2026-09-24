@@ -8,7 +8,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -37,7 +36,7 @@ using QueryShapeConfigurationsMap = absl::
     flat_hash_map<query_shape::QueryShapeHash, QueryShapeConfigCachedEntry, QueryShapeHashHasher>;
 
 /**
- * Stores all query shape configurations for a tenant, containing the same information as the
+ * Stores all query shape configurations, containing the same information as the
  * QuerySettingsClusterParameterValue. The data present in the 'settingsArray' is stored in the
  * QueryShapeConfigurationsMap for faster access.
  */
@@ -74,9 +73,7 @@ struct QuerySettingsLookupResult {
 };
 
 /**
- * Class responsible for managing in-memory storage and fetching of query settings. Query settings
- * in-memory storage is maintained separately for each tenant. In dedicated environments the
- * 'tenantId' argument passed to the methods must be boost::none.
+ * Class responsible for managing in-memory storage and fetching of query settings.
  */
 class QuerySettingsManager {
 public:
@@ -89,31 +86,26 @@ public:
     QuerySettingsManager& operator=(const QuerySettingsManager&) = delete;
 
     /**
-     * Returns QuerySettings associated with a query which query shape hash is 'queryShapeHash' for
-     * the given tenant.
+     * Returns QuerySettings associated with a query which query shape hash is 'queryShapeHash'.
      */
     boost::optional<QuerySettingsLookupResult> getQuerySettingsForQueryShapeHash(
-        const query_shape::QueryShapeHash& queryShapeHash,
-        const boost::optional<TenantId>& tenantId) const;
+        const query_shape::QueryShapeHash& queryShape) const;
 
     /**
-     * Returns all query shape configurations and an associated timestamp for the given tenant
-     * 'tenantId'.
+     * Returns all query shape configurations and an associated timestamp.
      */
-    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
-        const boost::optional<TenantId>& tenantId) const;
+    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations() const;
 
     /**
      * Sets the QueryShapeConfigurations by replacing an existing VersionedQueryShapeConfigurations
      * with the newly built one.
      */
-    void setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp&& config,
-                                        const boost::optional<TenantId>& tenantId);
+    void setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp&& config);
 
     /**
-     * Removes all query settings documents for the given tenant.
+     * Removes all query settings documents.
      */
-    void removeAllQueryShapeConfigurations(const boost::optional<TenantId>& tenantId);
+    void removeAllQueryShapeConfigurations();
 
     /**
      * Marks the query shape configurations associated with the given 'backfilledHashes' as having a
@@ -122,18 +114,15 @@ public:
      */
     void markBackfilledRepresentativeQueries(
         const std::vector<query_shape::QueryShapeHash>& backfilledHashes,
-        const LogicalTime& clusterParameterTime,
-        const boost::optional<TenantId>& tenantId);
+        const LogicalTime& clusterParameterTime);
 
     /**
-     * Returns the cluster parameter time of the current QuerySettingsClusterParameter value for the
-     * given tenant.
+     * Returns the cluster parameter time of the current QuerySettingsClusterParameter value.
      */
-    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const;
+    LogicalTime getClusterParameterTime() const;
 
 private:
-    VersionedQueryShapeConfigurations getVersionedQueryShapeConfigurations(
-        const boost::optional<TenantId>& tenantId) const;
+    VersionedQueryShapeConfigurations getVersionedQueryShapeConfigurations() const;
 
     /**
      * Installs the new versioned query shape configurations.
@@ -145,13 +134,11 @@ private:
      */
     template <bool enforceClusterParameterTimeMatch>
     void setVersionedQueryShapeConfigurations(
-        VersionedQueryShapeConfigurations&& newQueryShapeConfigurations,
-        const boost::optional<TenantId>& tenantId);
+        VersionedQueryShapeConfigurations&& newQueryShapeConfigurations);
 
-    LogicalTime getClusterParameterTime(WithLock, const boost::optional<TenantId>& tenantId) const;
+    LogicalTime getClusterParameterTime(WithLock) const;
 
     mutable WriteRarelyRWMutex _mutex;
-    absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
-        _tenantIdToVersionedQueryShapeConfigurationsMap;
+    VersionedQueryShapeConfigurations _versionedQueryShapeConfigurations;
 };
 }  // namespace mongo::query_settings

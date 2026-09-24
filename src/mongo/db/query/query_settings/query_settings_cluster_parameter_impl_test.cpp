@@ -42,14 +42,12 @@ static bool operator==(const QueryShapeConfigurationsWithTimestamp& lhs,
 
 namespace {
 using namespace std::literals::string_view_literals;
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+static auto const kSerializationContext = SerializationContext{
+    SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
 auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
-        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+        /* tenantId */ boost::none, dbName, SerializationContext::stateDefault());
 }
 
 NamespaceSpec makeNsSpec(std::string_view collName) {
@@ -84,11 +82,9 @@ public:
         return QuerySettingsService::get(opCtx());
     }
 
-    QueryShapeConfiguration makeQueryShapeConfiguration(
-        const BSONObj& cmdBSON,
-        const QuerySettings& querySettings,
-        boost::optional<TenantId> tenantId = boost::none) {
-        auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON, tenantId).queryShapeHash;
+    QueryShapeConfiguration makeQueryShapeConfiguration(const BSONObj& cmdBSON,
+                                                        const QuerySettings& querySettings) {
+        auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON).queryShapeHash;
         QueryShapeConfiguration config(queryShapeHash, querySettings);
         config.setRepresentativeQuery(cmdBSON);
         return config;
@@ -108,7 +104,7 @@ public:
     }
 
     LogicalTime nextClusterParameterTime() {
-        auto clusterParameterTime = service().getClusterParameterTime(/* tenantId */ boost::none);
+        auto clusterParameterTime = service().getClusterParameterTime();
         clusterParameterTime.addTicks(1);
         return clusterParameterTime;
     }
@@ -142,13 +138,11 @@ public:
         // Set the new 'clusterParamValue' for "querySettings" cluster parameter.
         const auto clusterParamValue = makeQuerySettingsClusterParameter(configsWithTs);
         ASSERT_OK(
-            sp->set(BSON("" << clusterParamValue).firstElement(), boost::none /* tenantId */));
+            sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
 
         // Assert that parsing after transforming invalid settings (if any) works.
         ASSERT_EQ(expectedQueryShapeConfigurations,
-                  service()
-                      .getAllQueryShapeConfigurations(/* tenantId */ boost::none)
-                      .queryShapeConfigurations);
+                  service().getAllQueryShapeConfigurations().queryShapeConfigurations);
     }
 
 private:
@@ -161,19 +155,20 @@ private:
  * serializing cluster parameter.
  */
 TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset) {
-    boost::optional<TenantId> tenantId;
     auto sp = std::make_unique<QuerySettingsClusterParameter>(
         QuerySettingsService::getQuerySettingsClusterParameterName(),
         ServerParameterType::kClusterWide);
 
     // Ensure no clusterParameterTime is specified for "querySettings" cluster parameter, if no
     // settings are specified.
-    ASSERT_EQ(sp->getClusterParameterTime(tenantId), LogicalTime());
-    ASSERT_EQ(service().getClusterParameterTime(tenantId), LogicalTime());
+    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), LogicalTime());
+    ASSERT_EQ(service().getClusterParameterTime(), LogicalTime());
     {
         BSONObjBuilder bob;
-        sp->append(
-            opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName(), tenantId);
+        sp->append(opCtx(),
+                   &bob,
+                   QuerySettingsService::getQuerySettingsClusterParameterName(),
+                   /* tenantId */ boost::none);
         ASSERT_BSONOBJ_EQ(
             bob.done(), makeQuerySettingsClusterParameter(QueryShapeConfigurationsWithTimestamp()));
     }
@@ -191,30 +186,34 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
     // Ensure that after parameter is set, the query shape configurations are present in the
     // QuerySettingsService.
     const auto clusterParamValue = makeQuerySettingsClusterParameter(configsWithTs);
-    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), tenantId));
-    ASSERT_EQ(service().getAllQueryShapeConfigurations(tenantId), configsWithTs);
-    ASSERT_EQ(sp->getClusterParameterTime(tenantId), clusterParameterTime);
-    ASSERT_EQ(service().getClusterParameterTime(tenantId), clusterParameterTime);
+    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+    ASSERT_EQ(service().getAllQueryShapeConfigurations(), configsWithTs);
+    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), clusterParameterTime);
+    ASSERT_EQ(service().getClusterParameterTime(), clusterParameterTime);
 
     // Ensure the serialized parameter value contains 'settingsArray' with 'config' as value as well
     // parameter id and clusterParameterTime.
     {
         BSONObjBuilder bob;
-        sp->append(
-            opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName(), tenantId);
+        sp->append(opCtx(),
+                   &bob,
+                   QuerySettingsService::getQuerySettingsClusterParameterName(),
+                   /* tenantId */ boost::none);
         ASSERT_BSONOBJ_EQ(bob.done(), clusterParamValue);
     }
 
     // Ensure that after parameter is reset, no query shape configurations are present in the
     // QuerySettingsService and clusterParameterTime is reset.
-    ASSERT_OK(sp->reset(tenantId));
-    ASSERT(service().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations.empty());
-    ASSERT_EQ(sp->getClusterParameterTime(tenantId), LogicalTime());
-    ASSERT_EQ(service().getClusterParameterTime(tenantId), LogicalTime());
+    ASSERT_OK(sp->reset(/* tenantId */ boost::none));
+    ASSERT(service().getAllQueryShapeConfigurations().queryShapeConfigurations.empty());
+    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), LogicalTime());
+    ASSERT_EQ(service().getClusterParameterTime(), LogicalTime());
     {
         BSONObjBuilder bob;
-        sp->append(
-            opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName(), tenantId);
+        sp->append(opCtx(),
+                   &bob,
+                   QuerySettingsService::getQuerySettingsClusterParameterName(),
+                   /* tenantId */ boost::none);
         ASSERT_BSONOBJ_EQ(
             bob.done(), makeQuerySettingsClusterParameter(QueryShapeConfigurationsWithTimestamp()));
     }
@@ -226,7 +225,6 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
  */
 TEST_F(QuerySettingsClusterParameterTest,
        QuerySettingsClusterParameterSetInvalidQSWithSanitization) {
-    boost::optional<TenantId> tenantId;
     auto sp = std::make_unique<QuerySettingsClusterParameter>(
         QuerySettingsService::getQuerySettingsClusterParameterName(),
         ServerParameterType::kClusterWide);
@@ -250,8 +248,8 @@ TEST_F(QuerySettingsClusterParameterTest,
     // Assert that parsing after transforming invalid settings (if any) works.
     const auto clusterParamValue =
         makeQuerySettingsClusterParameter({{config}, LogicalTime(Timestamp(3, 4))});
-    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), tenantId));
-    ASSERT(service().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations.empty());
+    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+    ASSERT(service().getAllQueryShapeConfigurations().queryShapeConfigurations.empty());
 }
 
 /**
@@ -333,7 +331,6 @@ TEST_F(QuerySettingsClusterParameterTest, SetClusterParameterAndAssertResultIsSa
  * applied.
  */
 TEST_F(QuerySettingsClusterParameterTest, SetClearsKnobOverrideErrorsAfterLogging) {
-    boost::optional<TenantId> tenantId;
     auto sp = std::make_unique<QuerySettingsClusterParameter>(
         QuerySettingsService::getQuerySettingsClusterParameterName(),
         ServerParameterType::kClusterWide);
@@ -353,11 +350,11 @@ TEST_F(QuerySettingsClusterParameterTest, SetClearsKnobOverrideErrorsAfterLoggin
         // value is (re-)applied; testIntKnobWire remains valid.
         FailPointEnableBlock fp("failQueryKnobOverridesParsing",
                                 BSON("name" << "testBoolKnobWire"));
-        ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), tenantId));
+        ASSERT_OK(
+            sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
     }
 
-    auto storedConfigs =
-        service().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations;
+    auto storedConfigs = service().getAllQueryShapeConfigurations().queryShapeConfigurations;
     ASSERT_EQ(storedConfigs.size(), 1u);
     auto knobs = storedConfigs[0].getSettings().getQueryKnobs();
     ASSERT_TRUE(knobs.has_value());

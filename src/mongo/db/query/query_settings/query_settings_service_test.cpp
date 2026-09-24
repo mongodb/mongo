@@ -54,10 +54,8 @@ static bool operator==(const QueryShapeConfigurationsWithTimestamp& lhs,
 namespace {
 using namespace std::literals::string_view_literals;
 using namespace query_settings_details;
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+static auto const kSerializationContext = SerializationContext{
+    SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
 BSONObj makeSettingsClusterParameter(const QueryShapeConfigurationsWithTimestamp& config) {
     BSONArrayBuilder settings;
@@ -92,7 +90,7 @@ QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints, bool setFramew
 
 auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
-        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+        /* tenantId */ boost::none, dbName, SerializationContext::stateDefault());
 }
 
 NamespaceSpec makeNsSpec(std::string_view collName) {
@@ -108,20 +106,18 @@ public:
                        std::vector<QueryShapeConfiguration> queryShapeConfigurations)
         : _opCtx(opCtx),
           _previousQueryShapeConfigurationsWithTimestamp(
-              QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations(
-                  boost::none /* tenantId */)) {
+              QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations()) {
         LogicalTime newTime = _previousQueryShapeConfigurationsWithTimestamp.clusterParameterTime;
         newTime.addTicks(1);
 
         QuerySettingsService::get(_opCtx).setAllQueryShapeConfigurations(
-            QueryShapeConfigurationsWithTimestamp{queryShapeConfigurations, newTime},
-            boost::none /* tenantId */);
+            QueryShapeConfigurationsWithTimestamp{queryShapeConfigurations, newTime});
     }
 
     ~QuerySettingsScope() {
         _previousQueryShapeConfigurationsWithTimestamp.clusterParameterTime.addTicks(1);
         QuerySettingsService::get(_opCtx).setAllQueryShapeConfigurations(
-            std::move(_previousQueryShapeConfigurationsWithTimestamp), boost::none /* tenantId */);
+            std::move(_previousQueryShapeConfigurationsWithTimestamp));
     }
 
 private:
@@ -173,26 +169,25 @@ public:
 
     static NamespaceString nss() {
         return NamespaceStringUtil::deserialize(
-            boost::none, kDbName, kCollName, kSerializationContext);
+            /* tenantId */ boost::none, kDbName, kCollName, kSerializationContext);
     }
 
     query_shape::QueryShapeHash hashForShape(const query_shape::DeferredQueryShape& shape) {
         return shape().getValue()->sha256Hash(opCtx(), kSerializationContext);
     }
 
-    QueryShapeConfiguration makeQueryShapeConfiguration(
-        const BSONObj& cmdBSON,
-        const QuerySettings& querySettings,
-        boost::optional<TenantId> tenantId = boost::none) {
-        auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON, tenantId).queryShapeHash;
+    QueryShapeConfiguration makeQueryShapeConfiguration(const BSONObj& cmdBSON,
+                                                        const QuerySettings& querySettings) {
+        auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON).queryShapeHash;
         QueryShapeConfiguration config(queryShapeHash, querySettings);
         config.setRepresentativeQuery(cmdBSON);
         return config;
     }
 
-    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(TenantId tenantId) {
+    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations() {
         NamespaceSpec ns;
-        ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
+        ns.setDb(DatabaseNameUtil::deserialize(
+            /* tenantId */ boost::none, kDbName, kSerializationContext));
         ns.setColl(kCollName);
 
         const QuerySettings settings = makeQuerySettings({IndexHintSpec(ns, {IndexHint("a_1")})});
@@ -200,8 +195,8 @@ public:
             BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << 2));
         QueryInstance queryB =
             BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL));
-        return {makeQueryShapeConfiguration(queryA, settings, tenantId),
-                makeQueryShapeConfiguration(queryB, settings, tenantId)};
+        return {makeQueryShapeConfiguration(queryA, settings),
+                makeQueryShapeConfiguration(queryB, settings)};
     }
 
     void assertQuerySettingsLookup(const BSONObj& cmdBSON,
@@ -448,7 +443,7 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
         DistinctCommandRequest::parse(distinctCmdBSON,
                                       IDLParserContext("distinctCommandRequest",
                                                        auth::ValidatedTenancyScope::get(opCtx()),
-                                                       boost::none,
+                                                       /* tenantId */ boost::none,
                                                        SerializationContext::stateDefault())));
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx(),

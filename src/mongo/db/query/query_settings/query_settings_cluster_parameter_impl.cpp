@@ -41,9 +41,9 @@ void logQueryKnobOverrideErrors(std::vector<QueryShapeConfiguration>& settingsAr
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
                                            std::string_view name,
-                                           const boost::optional<TenantId>& tenantId) {
+                                           const boost::optional<TenantId>&) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    auto config = querySettingsService.getAllQueryShapeConfigurations(tenantId);
+    auto config = querySettingsService.getAllQueryShapeConfigurations();
 
     bob->append(QuerySettingsClusterParameterValue::k_idFieldName,
                 querySettingsService.getQuerySettingsClusterParameterName());
@@ -59,21 +59,20 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
 }
 
 Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
-                                          const boost::optional<TenantId>& tenantId) {
+                                          const boost::optional<TenantId>&) {
     auto* serviceContext = getGlobalServiceContext();
     auto& querySettingsService = QuerySettingsService::get(serviceContext);
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         newValueElement.Obj(),
         IDLParserContext("querySettingsParameterValue",
                          boost::none /* vts */,
-                         tenantId,
+                         /* tenantId */ boost::none,
                          SerializationContext::stateDefault()));
 
     // Skip installing the new settings if the incoming 'clusterParameterTime' did not change.
     // The cluster parameter time acts as the version of the configuration, meaning if it hasn't
     // changed, the configuration hasn't either, making this a no-op.
-    if (newSettings.getClusterParameterTime() ==
-        querySettingsService.getClusterParameterTime(tenantId)) {
+    if (newSettings.getClusterParameterTime() == querySettingsService.getClusterParameterTime()) {
         return Status::OK();
     }
 
@@ -99,19 +98,19 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                       /* size */ static_cast<int>(newValueElement.valuesize()),
                                       /* rejectCount */ static_cast<int>(rejectCount));
     querySettingsService.setAllQueryShapeConfigurations(
-        {std::move(settingsArray), newSettings.getClusterParameterTime()}, tenantId);
+        {std::move(settingsArray), newSettings.getClusterParameterTime()});
     return Status::OK();
 }
 
-Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>& tenantId) {
+Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>&) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    querySettingsService.removeAllQueryShapeConfigurations(tenantId);
+    querySettingsService.removeAllQueryShapeConfigurations();
     return Status::OK();
 }
 
 LogicalTime QuerySettingsClusterParameter::getClusterParameterTime(
-    const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>&) const {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    return querySettingsService.getClusterParameterTime(tenantId);
+    return querySettingsService.getClusterParameterTime();
 }
 };  // namespace mongo::query_settings

@@ -17,7 +17,7 @@ namespace mongo::query_settings::index_hints {
 
 auto makeDbName(std::string_view dbName) {
     return DatabaseNameUtil::deserialize(
-        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+        /* tenantId */ boost::none, dbName, SerializationContext::stateDefault());
 }
 
 TEST(IndexHintSpecsSerialization, TestSerialization) {
@@ -73,7 +73,7 @@ TEST(IndexHintSpecsSerialization, TestDeserializationSingleSpec) {
       },
       "allowedIndexes": [{"$natural": -1}]
     })");
-    auto parsedIndexHintSpecs = parse(boost::none /*tenantId=*/,
+    auto parsedIndexHintSpecs = parse(/* tenantId */ boost::none,
                                       BSON("" << obj).firstElement(),
                                       SerializationContext::stateDefault());
 
@@ -113,7 +113,7 @@ TEST(IndexHintSpecsSerialization, TestDeserializationMultipleSpecs) {
       "allowedIndexes": [{a: 1}, {b: 1}]
     })");
     BSONArray array = BSON_ARRAY(indexHintSpecA << indexHintSpecB);
-    auto parsedIndexHintSpecs = parse(boost::none /*tenantId=*/,
+    auto parsedIndexHintSpecs = parse(/* tenantId */ boost::none,
                                       BSON("" << array).firstElement(),
                                       SerializationContext::stateDefault());
 
@@ -125,12 +125,12 @@ TEST(IndexHintSpecsSerialization, TestDeserializationMultipleSpecs) {
 
 TEST(IndexHintSpecsSerialization, TestFailedDeserialization) {
     BSONObj invalidIndexHintsSpecs;
-    ASSERT_THROWS_CODE(parse(boost::none /*tenantId=*/,
+    ASSERT_THROWS_CODE(parse(/* tenantId */ boost::none,
                              BSON("" << invalidIndexHintsSpecs).firstElement(),
                              SerializationContext::stateDefault()),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
-    ASSERT_THROWS_CODE(parse(boost::none /*tenantId=*/,
+    ASSERT_THROWS_CODE(parse(/* tenantId */ boost::none,
                              BSON("" << 1).firstElement(),
                              SerializationContext::stateDefault()),
                        DBException,

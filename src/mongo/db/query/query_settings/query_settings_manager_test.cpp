@@ -45,20 +45,18 @@ QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints) {
 }
 }  // namespace
 
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+static auto const kSerializationContext = SerializationContext{
+    SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
 class QuerySettingsManagerTest : public ServiceContextTest {
 public:
     static constexpr std::string_view kCollName = "exampleCol"sv;
     static constexpr std::string_view kDbName = "foo"sv;
 
-    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
-        boost::optional<TenantId> tenantId) {
+    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations() {
         NamespaceSpec ns;
-        ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
+        ns.setDb(DatabaseNameUtil::deserialize(
+            /* tenantId */ boost::none, kDbName, kSerializationContext));
         ns.setColl(kCollName);
 
         const QuerySettings settings = makeQuerySettings({IndexHintSpec(ns, {IndexHint("a_1")})});
@@ -66,14 +64,13 @@ public:
             BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << 2));
         QueryInstance queryB =
             BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL));
-        return {makeQueryShapeConfiguration(settings, queryA, tenantId),
-                makeQueryShapeConfiguration(settings, queryB, tenantId)};
+        return {makeQueryShapeConfiguration(settings, queryA),
+                makeQueryShapeConfiguration(settings, queryB)};
     }
 
     QueryShapeConfiguration makeQueryShapeConfiguration(const QuerySettings& settings,
-                                                        QueryInstance query,
-                                                        boost::optional<TenantId> tenantId) {
-        auto queryShapeHash = createRepresentativeInfo(opCtx(), query, tenantId).queryShapeHash;
+                                                        QueryInstance query) {
+        auto queryShapeHash = createRepresentativeInfo(opCtx(), query).queryShapeHash;
         QueryShapeConfiguration result(queryShapeHash, settings);
         result.setRepresentativeQuery(query);
         return result;
@@ -91,14 +88,12 @@ public:
         return _manager;
     }
 
-    static NamespaceString nss(boost::optional<TenantId> tenantId) {
-        static auto const kSerializationContext =
-            SerializationContext{SerializationContext::Source::Command,
-                                 SerializationContext::CallerType::Request,
-                                 SerializationContext::Prefix::ExcludePrefix};
+    static NamespaceString nss() {
+        static auto const kSerializationContext = SerializationContext{
+            SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
         return NamespaceStringUtil::deserialize(
-            tenantId, kDbName, kCollName, kSerializationContext);
+            /* tenantId */ boost::none, kDbName, kCollName, kSerializationContext);
     }
 
 private:
@@ -107,79 +102,57 @@ private:
 };
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
-    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
-    TenantId tenantId1(OID::fromTerm(1));
-    TenantId tenantId2(OID::fromTerm(2));
-
-    auto configs = getExampleQueryShapeConfigurations(tenantId1);
-    manager().setAllQueryShapeConfigurations({{configs}, LogicalTime()}, tenantId1);
+    auto configs = getExampleQueryShapeConfigurations();
+    manager().setAllQueryShapeConfigurations({{configs}, LogicalTime()});
 
     // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found.
-    ASSERT_EQ(manager().getQuerySettingsForQueryShapeHash(query_shape::QueryShapeHash(), tenantId1),
+    ASSERT_EQ(manager().getQuerySettingsForQueryShapeHash(query_shape::QueryShapeHash()),
               boost::none);
 
     // Ensure QuerySettingsManager returns a valid QuerySettings on lookup.
-    ASSERT_EQ(manager()
-                  .getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId1)
-                  ->querySettings,
-              configs[1].getSettings());
-
-    // Ensure QuerySettingsManager does not return a valid QuerySettings of 'tenantId1', when
-    // performing lookup as 'tenantId2'.
     ASSERT_EQ(
-        manager().getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId2),
-        boost::none);
+        manager().getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash())->querySettings,
+        configs[1].getSettings());
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsMarkBackfilled) {
-    const boost::optional<TenantId> tenantId = boost::none;
-    const auto configs = getExampleQueryShapeConfigurations(tenantId);
+    const auto configs = getExampleQueryShapeConfigurations();
     const auto& hash0 = configs[0].getQueryShapeHash();
     const auto& hash1 = configs[1].getQueryShapeHash();
 
     // Ensure that the 'hasRepresentativeQuery' flag is initially set to false for both queries.
     LogicalTime time;
-    manager().setAllQueryShapeConfigurations({{configs}, time}, tenantId);
-    ASSERT_FALSE(
-        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
-    ASSERT_FALSE(
-        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+    manager().setAllQueryShapeConfigurations({{configs}, time});
+    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(hash0)->hasRepresentativeQuery);
+    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(hash1)->hasRepresentativeQuery);
 
     // Mark the first query as backfilled and ensure that the 'hasRepresentativeQuery' flag is now
     // set to true for the first one, and false for the second one.
-    manager().markBackfilledRepresentativeQueries({hash0}, time, tenantId);
-    ASSERT_TRUE(
-        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
-    ASSERT_FALSE(
-        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+    manager().markBackfilledRepresentativeQueries({hash0}, time);
+    ASSERT_TRUE(manager().getQuerySettingsForQueryShapeHash(hash0)->hasRepresentativeQuery);
+    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(hash1)->hasRepresentativeQuery);
 
     // Mark the second query as backfilled and ensure that both flags are now set to true.
-    manager().markBackfilledRepresentativeQueries({hash1}, time, tenantId);
-    ASSERT_TRUE(
-        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
-    ASSERT_TRUE(
-        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+    manager().markBackfilledRepresentativeQueries({hash1}, time);
+    ASSERT_TRUE(manager().getQuerySettingsForQueryShapeHash(hash0)->hasRepresentativeQuery);
+    ASSERT_TRUE(manager().getQuerySettingsForQueryShapeHash(hash1)->hasRepresentativeQuery);
 
     // Set a new configuration with an advanced timestamp and assert that both flags are now false.
     LogicalTime nextTime = time;
     nextTime.addTicks(1);
-    manager().setAllQueryShapeConfigurations({{configs}, nextTime}, tenantId);
-    ASSERT_FALSE(
-        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
-    ASSERT_FALSE(
-        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+    manager().setAllQueryShapeConfigurations({{configs}, nextTime});
+    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(hash0)->hasRepresentativeQuery);
+    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(hash1)->hasRepresentativeQuery);
 
     // Ensure that calling markBackfilledRepresentativeQueries() with a stale time throws a
     // "ConflictingOperationsInProgress" error.
-    ASSERT_THROWS_CODE(manager().markBackfilledRepresentativeQueries({hash0}, time, tenantId),
+    ASSERT_THROWS_CODE(manager().markBackfilledRepresentativeQueries({hash0}, time),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
 
     // Ensure that it's possible to mark both queries with the new time.
-    manager().markBackfilledRepresentativeQueries({hash0, hash1}, nextTime, tenantId);
-    ASSERT_TRUE(
-        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
-    ASSERT_TRUE(
-        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+    manager().markBackfilledRepresentativeQueries({hash0, hash1}, nextTime);
+    ASSERT_TRUE(manager().getQuerySettingsForQueryShapeHash(hash0)->hasRepresentativeQuery);
+    ASSERT_TRUE(manager().getQuerySettingsForQueryShapeHash(hash1)->hasRepresentativeQuery);
 }
 }  // namespace mongo::query_settings

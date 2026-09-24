@@ -37,7 +37,6 @@ std::pair<QueryShapeHash, QueryInstance> makeMockQueryShapeHashAndInstance(
 struct BackfillOnCompletionHookResponse {
     std::vector<QueryShapeHash> hashes;
     LogicalTime time;
-    boost::optional<TenantId> tenantId;
 };
 
 /**
@@ -89,15 +88,13 @@ public:
         ShardingTestFixture::setUp();
         query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
         BackfillCoordinator::OnCompletionHook setPromise =
-            [this](std::vector<QueryShapeHash> hashes,
-                   LogicalTime time,
-                   boost::optional<TenantId> tenantId) {
+            [this](std::vector<QueryShapeHash> hashes, LogicalTime time) {
                 // Ensure that 'expectFutureBackfill()' was called beforehand.
                 ASSERT(optionalPromise.has_value());
                 // Ensure that emplacing the promise won't throw any exceptions. Setting a promise
                 // more than once will throw 'BrokenPromise'.
-                ASSERT_DOES_NOT_THROW(optionalPromise->emplaceValue(
-                    std::move(hashes), std::move(time), std::move(tenantId)));
+                ASSERT_DOES_NOT_THROW(
+                    optionalPromise->emplaceValue(std::move(hashes), std::move(time)));
             };
         _backfiilCoordinator =
             std::make_unique<BackfillCoordinatorForTest>(std::move(setPromise), executor());
@@ -196,9 +193,8 @@ TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBuff
                                                       {hash1, QuerySettings()},
                                                       {bigQueryHash, QuerySettings()},
                                                   },
-                                              .clusterParameterTime = clusterParameterTime},
-        /* tenantId */ boost::none);
-    ON_BLOCK_EXIT([&] { service().removeAllQueryShapeConfigurations(/* tenantId */ boost::none); });
+                                              .clusterParameterTime = clusterParameterTime});
+    ON_BLOCK_EXIT([&] { service().removeAllQueryShapeConfigurations(); });
 
     // Mark one query and expect it to be buffered and scheduled for
     // execution.
@@ -250,7 +246,7 @@ TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBuff
     coordinator()->markForBackfillAndScheduleIfNeeded(operationContext(), bigQueryHash, bigQuery);
     waitAndExecuteTasks(Seconds{1});
     ASSERT_TRUE(future.isReady());
-    auto [backfilledHashes0, backfillLastModifiedTime0, _tenantId0] = future.get();
+    auto [backfilledHashes0, backfillLastModifiedTime0] = future.get();
     ASSERT_EQ(backfilledHashes0[0], hash0);
     ASSERT_EQ(backfilledHashes0[1], hash1);
     ASSERT_EQ(backfillLastModifiedTime0, clusterParameterTime);
@@ -277,7 +273,7 @@ TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBuff
         });
     waitAndExecuteTasks(Seconds{30});
     ASSERT_TRUE(future.isReady());
-    auto [backfilledHashes1, backfillLastModifiedTime1, _tenantId1] = future.get();
+    auto [backfilledHashes1, backfillLastModifiedTime1] = future.get();
     ASSERT_EQ(backfilledHashes1[0], bigQueryHash);
     ASSERT_EQ(backfillLastModifiedTime1, clusterParameterTime);
 
@@ -295,14 +291,11 @@ TEST_F(BackfillCoordinatorTest, ExecuteDoesNotInsertQueriesWithoutSettings) {
     // Start by setting some settings on 'hash, mark it and expect it to be buffered.
     auto future = expectFutureBackfillCompletion();
     const auto [hash, query] = makeMockQueryShapeHashAndInstance("SoonToBeRemoved");
-    LogicalTime clusterParameterTime =
-        service().getClusterParameterTime(/* tenantId */ boost::none);
+    LogicalTime clusterParameterTime = service().getClusterParameterTime();
     clusterParameterTime.addTicks(1);
-    service().setAllQueryShapeConfigurations(
-        QueryShapeConfigurationsWithTimestamp{
-            .queryShapeConfigurations = {QueryShapeConfiguration{hash, QuerySettings()}},
-            .clusterParameterTime = clusterParameterTime},
-        /* tenantId */ boost::none);
+    service().setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp{
+        .queryShapeConfigurations = {QueryShapeConfiguration{hash, QuerySettings()}},
+        .clusterParameterTime = clusterParameterTime});
     coordinator()->markForBackfillAndScheduleIfNeeded(operationContext(), hash, query);
     auto state = peekCoordinatorState();
     ASSERT_TRUE(state->taskScheduled);
@@ -312,7 +305,7 @@ TEST_F(BackfillCoordinatorTest, ExecuteDoesNotInsertQueriesWithoutSettings) {
     // Remove all the settings, increment the current time to start the backfill operation, and
     // expect no inserts to happen and the BackfillCoordinator::OnCompletionHook callback to never
     // be called.
-    service().removeAllQueryShapeConfigurations(/* tenantId */ boost::none);
+    service().removeAllQueryShapeConfigurations();
     setInsertRepresentativeQueriesImpl([](auto&&) {
         // Fail if any inserts are dispatched.
         ASSERT(false);
