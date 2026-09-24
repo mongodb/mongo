@@ -2370,6 +2370,28 @@ bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
 
     return false;
 }
+
+bool queryCollatorMatchesIndexCollation(OperationContext* opCtx,
+                                        const CollatorInterface* queryCollator,
+                                        const BSONObj& indexCollation) {
+    const bool queryHasSimpleCollator = CollatorInterface::isSimpleCollator(queryCollator);
+    const bool indexHasSimpleCollator = indexCollation.isEmpty();
+    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+        return false;
+    }
+
+    if (indexHasSimpleCollator) {
+        return true;
+    }
+
+    const auto serviceCtx = opCtx->getServiceContext();
+    const auto collatorFactory = CollatorFactoryInterface::get(serviceCtx);
+    const auto indexCollator = collatorFactory->makeFromBSON(indexCollation);
+    tassert(indexCollator.getStatus().withContext(
+        "Duplicate key error contained an invalid index collation"));
+    return CollatorInterface::collatorsMatch(queryCollator, indexCollator.getValue().get());
+}
+
 }  // namespace
 
 bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
@@ -2392,7 +2414,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
 
     // There was a bug where an upsert sending a document into a partial/sparse unique index would
     // retry indefinitely. To avoid this, cap the number of retries.
-    int upsertMaxRetryAttemptsOnDuplicateKeyError =
+    const int upsertMaxRetryAttemptsOnDuplicateKeyError =
         write_ops::gUpsertMaxRetryAttemptsOnDuplicateKeyError.load();
     if (retryAttempts > upsertMaxRetryAttemptsOnDuplicateKeyError) {
         LOGV2(9552300,
@@ -2426,37 +2448,25 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
         return false;
     }
 
-    // Check that collation of the query matches the unique index. To avoid calling
-    // CollatorFactoryInterface when possible, first check the simple collator case.
-    bool queryHasSimpleCollator = CollatorInterface::isSimpleCollator(cq.getCollator());
-    bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
-    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+    if (!queryCollatorMatchesIndexCollation(opCtx, cq.getCollator(), errorInfo.getCollation())) {
         return false;
     }
 
-    if (!indexHasSimpleCollator) {
-        auto indexCollator =
-            uassertStatusOK(CollatorFactoryInterface::get(cq.getOpCtx()->getServiceContext())
-                                ->makeFromBSON(errorInfo.getCollation()));
-        if (!CollatorInterface::collatorsMatch(cq.getCollator(), indexCollator.get())) {
-            return false;
-        }
-    }
-
-    const auto& keyValue = errorInfo.getDuplicatedKeyValue();
-
+    // A retry is safe only if the query equality predicates match the duplicate-key error's index
+    // fields and values.
+    const BSONObj& duplicatedKeyValue = errorInfo.getDuplicatedKeyValue();
+    const bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
+    const BSONElementComparator comparator{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
     BSONObjIterator keyPatternIter(keyPattern);
-    BSONObjIterator keyValueIter(keyValue);
+    BSONObjIterator keyValueIter(duplicatedKeyValue);
     while (keyPatternIter.more() && keyValueIter.more()) {
-        auto keyPatternElem = keyPatternIter.next();
-        auto keyValueElem = keyValueIter.next();
-
-        auto keyName = keyPatternElem.fieldNameStringData();
-        auto equalityIt = equalities.find(keyName);
-        if (equalityIt == equalities.end()) {
+        const auto keyPatternElem = keyPatternIter.next();
+        const auto it = equalities.find(keyPatternElem.fieldNameStringData());
+        if (it == equalities.end()) {
             return false;
         }
-        const BSONElement& equalityElem = equalityIt->second->getData();
+        const auto equalityElem = it->second->getData();
+        const auto keyValueElem = keyValueIter.next();
 
         // If the index have collation and we are comparing strings, we need to compare
         // ComparisonStrings instead of the raw value to respect collation.
@@ -2464,26 +2474,23 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
             if (keyValueElem.type() != BSONType::string) {
                 return false;
             }
-            auto equalityComparisonString =
-                cq.getCollator()->getComparisonString(equalityElem.valueStringData());
-            if (equalityComparisonString != keyValueElem.valueStringData()) {
+            const auto* collator = cq.getCollator();
+            tassert(13424100, "Expected a query collator for a collated index", collator);
+            if (collator->getComparisonString(equalityElem.valueStringData()) !=
+                keyValueElem.valueStringData()) {
                 return false;
             }
-        } else {
-            // Comparison which obeys field ordering but ignores field name.
-            BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
-            if (cmp.evaluate(equalityElem != keyValueElem)) {
-                return false;
-            }
+        } else if (comparator.evaluate(equalityElem != keyValueElem)) {
+            return false;
         }
     }
+
     tassert(11052017,
             fmt::format("Expected number of elements in keyPattern {} to match number of elements "
                         "in keyValue {}",
                         keyPattern.toString(),
-                        keyValue.toString()),
+                        duplicatedKeyValue.toString()),
             !keyPatternIter.more() && !keyValueIter.more());
-
     return true;
 }
 

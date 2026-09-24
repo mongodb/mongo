@@ -10,11 +10,16 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/write_ops/parsed_writes_common.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -38,7 +43,151 @@ using namespace std::literals::string_view_literals;
 class WriteOpsExecTest : public CatalogTestFixture {
 protected:
     using CatalogTestFixture::setUp;
+
+    struct DuplicateKeyRetryCase {
+        std::string_view query;
+        std::string_view keyPattern;
+        std::string_view keyValue;
+        // Used instead of 'keyValue' when set, for values that cannot be expressed as JSON.
+        BSONObj keyValueObj;
+        std::string_view queryCollation;
+        std::string_view indexCollation;
+        bool upsert = true;
+        bool multi = false;
+        int retryAttempts = 0;
+    };
+
+    /** Returns whether an upsert failing with the given duplicate key error may be retried. */
+    bool shouldRetryDuplicateKey(const DuplicateKeyRetryCase& testCase) {
+        auto opCtx = operationContext();
+
+        // Build the upsert request.
+        auto modification =
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$set: {x: 1}}"));
+        write_ops::UpdateOpEntry update(fromjson(testCase.query), std::move(modification));
+        update.setUpsert(testCase.upsert);
+        update.setMulti(testCase.multi);
+        if (!testCase.queryCollation.empty()) {
+            update.setCollation(fromjson(testCase.queryCollation));
+        }
+        UpdateRequest request(update);
+        request.setNamespaceString(
+            NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test.retry"));
+
+        // CanonicalQuery reads its collator from the ExpressionContext, so the request
+        // collation must be resolved onto it for the retry check to see it.
+        std::unique_ptr<CollatorInterface> requestCollator;
+        if (const auto& collation = request.getCollation(); !collation.isEmpty()) {
+            const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+            requestCollator = uassertStatusOK(collatorFactory->makeFromBSON(collation));
+        }
+        auto expCtx = ExpressionContextBuilder{}
+                          .fromRequest(opCtx, request)
+                          .collator(std::move(requestCollator))
+                          .build();
+        auto cq = uassertStatusOK(parseWriteQueryToCQ(expCtx.get(), request));
+
+        const auto indexCollation =
+            testCase.indexCollation.empty() ? BSONObj{} : fromjson(testCase.indexCollation);
+        const auto keyValue =
+            testCase.keyValueObj.isEmpty() ? fromjson(testCase.keyValue) : testCase.keyValueObj;
+        DuplicateKeyErrorInfo dupKeyError(
+            fromjson(testCase.keyPattern), keyValue, indexCollation, std::monostate{}, boost::none);
+        return write_ops_exec::shouldRetryDuplicateKeyException(
+            opCtx, request, *cq, dupKeyError, testCase.retryAttempts);
+    }
 };
+
+TEST_F(WriteOpsExecTest, RetryDuplicateKeyWhenEqualitiesMatchKeyValues) {
+    ASSERT_TRUE(shouldRetryDuplicateKey(
+        {.query = "{a: 1, b: 2}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForNonUpsertUpdate) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .upsert = false}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenMaxRetryAttemptsExceeded) {
+    unittest::ServerParameterGuard maxRetries("upsertMaxRetryAttemptsOnDuplicateKeyError", 1);
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .retryAttempts = 2}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenQueryCoversOnlyPartOfIndexKey) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: 1}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForNonEqualityQuery) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: {$gt: 1}}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenKeyValuesMismatch) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: 1, b: 2}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 3}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForMultiUpdate) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .multi = true}));
+}
+
+TEST_F(WriteOpsExecTest, RetryDuplicateKeyWithMatchingCollation) {
+    // A collated index stores collation comparison strings as keys, so the duplicate key error
+    // reports the comparison string of the offending value rather than the value itself.
+    const auto collator =
+        uassertStatusOK(CollatorFactoryInterface::get(operationContext()->getServiceContext())
+                            ->makeFromBSON(fromjson("{locale: 'en', strength: 2}")));
+    // A case-insensitive collator makes 'foo' equal to 'FOO'.
+    ASSERT_TRUE(
+        shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                 .keyPattern = "{a: 1}",
+                                 .keyValueObj = BSON("" << collator->getComparisonString("FOO")),
+                                 .queryCollation = "{locale: 'en', strength: 2}",
+                                 .indexCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenCollatedKeyValueDiffers) {
+    const auto collator =
+        uassertStatusOK(CollatorFactoryInterface::get(operationContext()->getServiceContext())
+                            ->makeFromBSON(fromjson("{locale: 'en', strength: 2}")));
+    ASSERT_FALSE(
+        shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                 .keyPattern = "{a: 1}",
+                                 .keyValueObj = BSON("" << collator->getComparisonString("bar")),
+                                 .queryCollation = "{locale: 'en', strength: 2}",
+                                 .indexCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenQueryAndIndexCollationsDiffer) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .queryCollation = "{locale: 'en', strength: 2}",
+                                          .indexCollation = "{locale: 'fr', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenOnlyQueryHasCollation) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .queryCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenOnlyIndexHasCollation) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .indexCollation = "{locale: 'en', strength: 2}"}));
+}
 
 TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
     // Basic test case.
