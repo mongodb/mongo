@@ -3019,6 +3019,109 @@ export const authCommandsLib = {
                 },
             ],
         },
+        // showSystemEvents re-admits system.js into db/cluster-scoped streams, requiring an extra privilege.
+        {
+            testname: "aggregate_changeStream_whole_db_showSystemEvents",
+            command: {
+                aggregate: 1,
+                pipeline: [{$changeStream: {showSystemEvents: true}}],
+                cursor: {},
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        read: 1,
+                        readAnyDatabase: 1,
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        dbOwner: 1,
+                        root: 1,
+                        searchCoordinator: 1,
+                        __system: 1,
+                    },
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: ""},
+                            actions: ["changeStream", "find"],
+                        },
+                        {
+                            resource: {db: firstDbName, collection: "system.js"},
+                            actions: ["changeStream", "find"],
+                        },
+                    ],
+                    expectFail: true, // because no replication enabled
+                },
+                {
+                    // A role scoped to firstDbName's system.js (e.g. 'read') must not satisfy this
+                    // check against a different database.
+                    runOnDb: secondDbName,
+                    roles: {
+                        readAnyDatabase: 1,
+                        readWriteAnyDatabase: 1,
+                        root: 1,
+                        searchCoordinator: 1,
+                        __system: 1,
+                    },
+                    privileges: [
+                        {
+                            resource: {db: secondDbName, collection: ""},
+                            actions: ["changeStream", "find"],
+                        },
+                        {
+                            resource: {db: secondDbName, collection: "system.js"},
+                            actions: ["changeStream", "find"],
+                        },
+                    ],
+                    expectFail: true, // because no replication enabled
+                },
+                {
+                    expectAuthzFailure: true,
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: ""},
+                            actions: ["changeStream", "find"],
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            testname: "aggregate_changeStream_whole_cluster_showSystemEvents",
+            command: {
+                aggregate: 1,
+                pipeline: [{$changeStream: {allChangesForCluster: true, showSystemEvents: true}}],
+                cursor: {},
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {
+                        readAnyDatabase: 1,
+                        readWriteAnyDatabase: 1,
+                        root: 1,
+                        searchCoordinator: 1,
+                        __system: 1,
+                    },
+                    privileges: [
+                        {resource: {db: "", collection: ""}, actions: ["changeStream", "find"]},
+                        {
+                            resource: {db: "", collection: "system.js"},
+                            actions: ["changeStream", "find"],
+                        },
+                    ],
+                    expectFail: true, // because no replication enabled
+                },
+                {
+                    expectAuthzFailure: true,
+                    runOnDb: adminDbName,
+                    privileges: [
+                        {resource: {db: "", collection: ""}, actions: ["changeStream", "find"]},
+                    ],
+                },
+            ],
+        },
         {
             testname: "aggregate_changeStreamSplitLargeEvent_one_collection",
             command: {
