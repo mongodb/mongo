@@ -10,7 +10,10 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
-const replTest = new ReplSetTest({name: testName, nodes: 2});
+// The secondary is stepped up below, so it has to be electable. Declare that explicitly
+// rather than relying on the default, since some configurations default every node other
+// than the first to priority 0.
+const replTest = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 1}}]});
 replTest.startSet();
 replTest.initiate();
 
@@ -38,8 +41,19 @@ ops.push({op: "i", ns: dbName + "." + collName, o: {_id: 1}, o2: {_id: 1}, rid: 
 assert.commandWorked(primDB.runCommand({create: collName}));
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
 
-// Now make the secondary step up.
-replTest.stepUp(secondary);
+// Now make the secondary step up. This steps the current primary down rather than stepping the
+// secondary up, because a primary that has a node step up underneath it can be forced to step down
+// abruptly and leave the set. A commanded step down instead hands the primary role to an electable
+// node and leaves the old primary running as a secondary, which this test reads from below.
+assert.adminCommandWorkedAllowingNetworkError(primary, {replSetStepDown: 60});
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, secondary);
+replTest.awaitSecondaryNodes(null, [primary]);
+// Agreeing on the primary happens before that node finishes transitioning and starts accepting
+// writes, so wait for it to be writable before inserting below.
+assert.soon(
+    () => assert.commandWorked(secondary.adminCommand({hello: 1})).isWritablePrimary,
+    "the new primary never started accepting writes",
+);
 const newPrimDB = secondary.getDB(dbName);
 
 // Insert documents onto the new primary, and ensure that no original recordIds were reused.
