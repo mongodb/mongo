@@ -158,27 +158,34 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session, const void *buffer, size
     p = (const uint8_t *)buffer;
     end = p + size;
 
-    WT_ERR(__wt_buf_init(session, buf, 0));
+    /* The buffer is reused across calls. Set the buffer to an empty string to reset it. */
+    WT_ERR(__wt_buf_fmt(session, buf, "%s", ""));
 
     WT_ERR(__pack_init(session, &pack, format));
     for (sep = ""; (ret = __pack_next(&pack, &pv)) == 0;) {
         WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
+        /* Padding isn't printed and doesn't take a separator. */
+        if (pv.type == 'x')
+            continue;
+
+        /* Separate multiple fields with a comma. */
+        WT_ERR(__wt_buf_catfmt(session, buf, "%s", sep));
+        sep = ",";
+
         switch (pv.type) {
-        case 'x':
-            break;
         case 's':
         case 'S':
-            WT_ERR(__wt_buf_catfmt(session, buf, "%s%s", sep, pv.u.s));
-            sep = ",";
+            WT_ERR(__wt_buf_catfmt(session, buf, "%s", pv.u.s));
             break;
         case 'U':
         case 'u':
+            /* A zero-length item prints as an empty field. */
             if (pv.u.item.size == 0)
                 break;
 
             if (tmp == NULL)
                 WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-            WT_ERR(__wt_buf_catfmt(session, buf, "%s%s", sep,
+            WT_ERR(__wt_buf_catfmt(session, buf, "%s",
               __wt_buf_set_printable(session, pv.u.item.data, pv.u.item.size, hexonly, tmp)));
             break;
         case 'b':
@@ -186,8 +193,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session, const void *buffer, size
         case 'i':
         case 'l':
         case 'q':
-            WT_ERR(__wt_buf_catfmt(session, buf, "%s%" PRId64, sep, pv.u.i));
-            sep = ",";
+            WT_ERR(__wt_buf_catfmt(session, buf, "%" PRId64, pv.u.i));
             break;
         case 'B':
         case 't':
@@ -197,8 +203,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session, const void *buffer, size
         case 'Q':
         case 'r':
         case 'R':
-            WT_ERR(__wt_buf_catfmt(session, buf, "%s%" PRIu64, sep, pv.u.u));
-            sep = ",";
+            WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64, pv.u.u));
             break;
         default:
             WT_ERR(__wt_illegal_value(session, pv.type));

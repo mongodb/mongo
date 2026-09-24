@@ -2108,6 +2108,7 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: cached bytes updated",
   "block-cache: cold collection pages not added to the disaggregated victim cache during eviction",
   "block-cache: evicted blocks",
+  "block-cache: failed page inserts into the disaggregated victim cache",
   "block-cache: file size causing bypass",
   "block-cache: lookups",
   "block-cache: maximum time spent adding a single page to the disaggregated victim cache, reset "
@@ -3287,6 +3288,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_bytes_update = 0;
     stats->block_cache_cold_not_cached = 0;
     stats->block_cache_blocks_evicted = 0;
+    stats->block_cache_put_failures = 0;
     stats->block_cache_bypass_filesize = 0;
     stats->block_cache_lookups = 0;
     /* not clearing block_cache_put_time_max */
@@ -4384,6 +4386,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_bytes_update += WT_STAT_CONN_READ(from, block_cache_bytes_update);
     to->block_cache_cold_not_cached += WT_STAT_CONN_READ(from, block_cache_cold_not_cached);
     to->block_cache_blocks_evicted += WT_STAT_CONN_READ(from, block_cache_blocks_evicted);
+    to->block_cache_put_failures += WT_STAT_CONN_READ(from, block_cache_put_failures);
     to->block_cache_bypass_filesize += WT_STAT_CONN_READ(from, block_cache_bypass_filesize);
     to->block_cache_lookups += WT_STAT_CONN_READ(from, block_cache_lookups);
     to->block_cache_put_time_max += WT_STAT_CONN_READ(from, block_cache_put_time_max);

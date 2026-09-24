@@ -96,8 +96,8 @@ const cases = [
             (uri) => cd(ns, uri, [binC, binD]),
         ],
         expected: {
-            "A": "(null)",
-            "B": "(null)",
+            "A": "",
+            "B": "",
         },
     },
     {

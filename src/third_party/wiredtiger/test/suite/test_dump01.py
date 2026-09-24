@@ -44,6 +44,7 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
     pretty_dump_file = 'pretty_dump.out'
     pretty_hex_dump_file = 'pretty_hex_dump.out'
     hex_dump_file = 'hex.out'
+    json_dump_file = 'json.out'
 
     pretty_hex_format = 'Format=print hex\n'
     data_header = 'Data\n'
@@ -125,3 +126,70 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertEqual(True, h == px,
                     'Data section starts at different lines.\n' + 'Hex: ' + h + 'Pretty_hex: ' + px)
                 data_started = True
+
+    def test_dump_zero_length_value(self):
+        """
+        Generates a test table with some zero-length values. A zero-length value must be dumped as
+        a blank value rather than the previously dumped record's value.
+        """
+        uri = 'table:test_dump_zero_length'
+
+        # The empty values following a non-empty one are the ones that catch a stale dump buffer.
+        k_v_pairs = [(1, b''), (2, b'A'), (3, b''), (5, b'B'), (6, b'C')]
+
+        self.session.create(uri, self.table_format)
+        cursor = self.session.open_cursor(uri, None, None)
+        for k, v in k_v_pairs:
+            cursor[k] = v
+        cursor.close()
+
+        self.runWt(['dump', '-p', uri], outfilename=self.pretty_dump_file)
+        self.runWt(['dump', '-x', uri], outfilename=self.hex_dump_file)
+        self.runWt(['dump', '-j', uri], outfilename=self.json_dump_file)
+
+        # Pretty format: the zero-length values are dumped as empty lines.
+        pretty_expected = []
+        for k, v in k_v_pairs:
+            pretty_expected.append(f'{k}')
+            pretty_expected.append(v.decode())
+        self.check_file_contains(self.pretty_dump_file,
+            self.data_header + '\n'.join(pretty_expected))
+
+        # Hex format: keys are packed integers, values are the raw bytes.
+        hex_expected = []
+        for k, v in k_v_pairs:
+            hex_expected.append(f'{k + 0x80:x}')
+            hex_expected.append(v.hex())
+        self.check_file_contains(self.hex_dump_file, self.data_header + '\n'.join(hex_expected))
+
+        # JSON format: the zero-length values are dumped as empty strings.
+        self.check_file_contains(self.json_dump_file, '"key0" : 1,\n"value0" : ""\n')
+        self.check_file_contains(self.json_dump_file, '"key0" : 3,\n"value0" : ""\n')
+
+    def test_dump_field_separators(self):
+        """
+        Dumps a table with a multi-field value format. Every field is comma separated, including a
+        field that prints nothing: a zero-length item still takes up a field in the output.
+        """
+        uri = 'table:test_dump_separators'
+
+        # (key, item, string, expected pretty-printed value)
+        rows = [
+            (1, b'', 'x', ',x'),
+            (2, b'AB', 'x', 'AB,x'),
+            (3, b'', '', ','),
+        ]
+
+        self.session.create(uri, 'key_format=i,value_format=uS')
+        cursor = self.session.open_cursor(uri, None, None)
+        for k, item, string, _ in rows:
+            cursor[k] = (item, string)
+        cursor.close()
+
+        self.runWt(['dump', '-p', uri], outfilename=self.pretty_dump_file)
+
+        expected = []
+        for k, _, _, value in rows:
+            expected.append(f'{k}')
+            expected.append(value)
+        self.check_file_contains(self.pretty_dump_file, self.data_header + '\n'.join(expected))

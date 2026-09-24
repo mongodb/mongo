@@ -704,6 +704,11 @@ connection_runtime_config = [
             instead of the optimized range delete. Intended for debugging the disaggregated
             slow/fast truncate split; leader always uses fast truncate.''',
             type='boolean', undoc=True),
+        # FIXME-WT-18723: remove once prepared transactions are supported across a step-down.
+        Config('disagg_stepdown_prepare', 'false', r'''
+            !!! FOR INTERNAL TESTING ONLY. If true, bypass the asserts that otherwise abort a
+            prepared transaction while the step-down timestamp is set.''',
+            type='boolean', undoc=True),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force history store eviction
             to happen more aggressively. This includes but is not limited to not skewing newest,

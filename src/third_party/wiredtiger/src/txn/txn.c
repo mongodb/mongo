@@ -2143,9 +2143,15 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
 
-    WT_ASSERT_ALWAYS(session,
-      __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp) == WT_TS_NONE,
-      "prepared transactions are not supported while the step-down timestamp is set");
+    /*
+     * FIXME-WT-18723: remove this bypass once prepared transactions are supported across a
+     * step-down.
+     */
+    if (!FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_DISAGG_STEPDOWN_PREPARE))
+        WT_ASSERT_ALWAYS(session,
+          __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp) ==
+            WT_TS_NONE,
+          "prepared transactions are not supported while the step-down timestamp is set");
 
     /*
      * A transaction should not have updated any of the logged tables, if debug mode logging is not

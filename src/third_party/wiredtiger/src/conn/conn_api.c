@@ -2378,6 +2378,13 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_DISAGG_SLOW_TRUNCATE_FOLLOWER);
 
+    /* Internal testing only: lets the test suite bypass the step-down/prepare bans. */
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_stepdown_prepare", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_DISAGG_STEPDOWN_PREPARE);
+    else
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_DISAGG_STEPDOWN_PREPARE);
+
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
         FLD_SET(conn->debug.flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);

@@ -565,7 +565,13 @@ export let rewriteCatalogTableHex = function (conn, modifyHexLine) {
 export function wtExtractRecordsFromDump(lines) {
     const start = lines.findIndex((l) => l.trim() === "Data");
     if (start < 0) return [];
-    return lines.slice(start + 1).filter((l) => l.trim() !== "");
+    const records = lines.slice(start + 1);
+    // A zero-length value dumps as a blank line, so interior blanks count as data. Only the final
+    // element is noise: it comes from splitting on the dump file's trailing newline.
+    if (records.length > 0 && records[records.length - 1] === "") {
+        records.pop();
+    }
+    return records;
 }
 
 /**

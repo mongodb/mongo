@@ -57,25 +57,21 @@ class test_layered_checkpoint08(checkpoint_util):
         # Avoid checkpoint error with precise checkpoint
         self.conn.set_timestamp('stable_timestamp=1')
 
-        # Create an empty table
+        # Create an empty table and close the session so its handles become idle.
         session2 = self.conn.open_session('')
         session2.create(self.uri, self.create_session_config)
-
-        # Take the sweep baseline after all initial sweeps has been settled. Any future sweeps is
-        # exclusively from the test table.
-        time.sleep(2)
-        sweep_closes_before = self.get_stat(wiredtiger.stat.conn.dh_sweep_expired_close)
-
         session2.close()
 
-        # Wait until the sweep has closed any idle handles. With close_scan_interval=1 and
-        # close_idle_time=1, an idle handle expires within a couple of sweep cycles, so bound the
-        # wait to fail fast with a clear error rather than spin until the task timeout if the sweep
-        # never makes progress.
-        self.assertStatGreaterSoon(wiredtiger.stat.conn.dh_sweep_expired_close, sweep_closes_before,
-            timeout=120, msg='sweep server did not close the idle table handle within 120 seconds')
-        self.pr(f"Dhandles closed by sweep: "
-            f"{self.get_stat(wiredtiger.stat.conn.dh_sweep_expired_close) - sweep_closes_before}")
+        # Wait until the sweep server has closed the idle table handle. Sweep only closes a table
+        # handle once the file handles it depends on are gone, so the table handle count dropping
+        # back to zero means every idle handle from this table has been swept. With
+        # close_scan_interval=1 and close_idle_time=1 this takes a few sweep passes, so bound the
+        # wait to fail fast with a clear error rather than spin until the task timeout.
+        deadline = time.time() + 120
+        while self.get_stat(wiredtiger.stat.conn.dh_conn_handle_table_count) != 0:
+            self.assertLess(time.time(), deadline,
+                'sweep server did not close the idle table handle within 120 seconds')
+            time.sleep(0.1)
 
         # Start a checkpoint in a separate thread
         def checkpoint_thread_fn(conn):

@@ -212,13 +212,32 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
         blk = WT_BLOCK_HEADER_REF(current->data);
         __wt_block_disagg_header_byteswap_copy(blk, &swap);
 
-        /*
-         * TODO(WT-16511): When we have the original checksum stored in the page, we should check
-         * that instead of skipping the check entirely for cached pages.
-         */
-        if (F_ISSET(&swap, WT_BLOCK_DISAGG_MODIFIED))
+        /* Determine if the page was read from the cache based on the modified flag. */
+        if (F_ISSET(&swap, WT_BLOCK_DISAGG_MODIFIED)) {
+            /*
+             * A page modified "offline" is written as a standalone base image, so it is the only
+             * result. Deltas on top of one would leave the checksum chain below comparing the wrong
+             * field.
+             *
+             * FIXME-WT-18666: This restriction will go away once we have a dedicated field for the
+             * original page checksum.
+             */
+            if (*results_count != 1) {
+                __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
+                  page_id, lsn, is_delta, result,
+                  "a page modified offline must be the only result, but %u results were returned",
+                  (u_int)*results_count);
+                goto corrupt;
+            }
             from_cache = true;
-        if (F_ISSET(&swap, WT_BLOCK_DISAGG_MODIFIED) || swap.checksum == checksum) {
+        }
+
+        /*
+         * The checksum field must match the expected checksum, except for a page that was modified
+         * "offline", where it covers the rewritten image; there the previous_checksum field holds
+         * the checksum that the internal page still references.
+         */
+        if (from_cache ? swap.previous_checksum == checksum : swap.checksum == checksum) {
             blk->checksum = 0;
             if (__wt_checksum_match(current->data,
                   F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_MIN(size, WT_BLOCK_COMPRESS_SKIP),
