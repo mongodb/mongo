@@ -114,8 +114,6 @@ mongo_cc_library(
         # CollectionRouter, CollectionRoutingInfo, CatalogCache::getCollectionRoutingInfo.
         "//src/mongo/s:grid",
         "//src/mongo/s:sharding_router_api",
-        # getTargetedShardsForQuery.
-        "//src/mongo/s/query:shard_targeting_helpers",
     ],
 )
 

@@ -187,12 +187,45 @@ TEST_F(ShardedEligibilityTest, NonIdShardKeySplitLocalityDependsOnLookupValue) {
         decideFromHeldFilter(cri, Document{{"_id", 1}, {"sk", 5}})));
 }
 
+// A shard-key value that is a subdocument containing dollar-prefixed field names must be
+// treated as a literal value when determining locality.
+TEST_F(ShardedEligibilityTest, DollarPrefixedSubdocShardKeyValueIsTreatedAsLiteral) {
+    // Single-chunk collection owned by this shard, sharded on 'sk'.
+    auto cri = CatalogCacheMock::makeCollectionRoutingInfoSharded(
+        kNss,
+        kThisShard /* dbPrimary */,
+        dbVersion(),
+        KeyPattern(BSON("sk" << 1)),
+        {{ChunkRange(BSON("sk" << MINKEY), BSON("sk" << MAXKEY)), kThisShard}});
+
+    const Document key{{"_id", 1}, {"sk", Document{{"$type", 2}}}};
+
+    auto routed = decideFromCri(cri, key);
+    ASSERT_TRUE(LocalLookupEligibility::isLocal(routed));
+    ASSERT_TRUE(std::get<Local>(routed).shardVersion.has_value());
+    ASSERT_FALSE(std::get<Local>(routed).dbVersion.has_value());
+
+    auto held = decideFromHeldFilter(cri, key);
+    ASSERT_TRUE(LocalLookupEligibility::isLocal(held));
+    ASSERT_FALSE(std::get<Local>(held).shardVersion.has_value());
+    ASSERT_FALSE(std::get<Local>(held).dbVersion.has_value());
+}
+
 TEST_F(ShardedEligibilityTest, DocumentKeyNotCoveringShardKeyStraddlesShardsReturnsUnknown) {
     // Routing path only: a documentKey that does not constrain the shard key targets all shards,
     // so it is not provably local. The held arm is never reached with a partial key in practice
     // (a change-event documentKey always carries the full shard key), so it is not exercised here.
     auto cri = splitOn("sk");
     ASSERT_FALSE(LocalLookupEligibility::isLocal(decideFromCri(cri, Document{{"_id", 1}})));
+}
+
+TEST_F(ShardedEligibilityTest, DocumentKeyWithArrayShardKeyValueReturnsUnknownFromCri) {
+    // Routing path only: an array shard-key value causes ShardKeyPattern to return an empty
+    // extracted key. keyBelongsToShard() treats an empty key as non-local, so we return Unknown
+    // without throwing.
+    auto cri = shardedOnId(kThisShard);
+    ASSERT_FALSE(LocalLookupEligibility::isLocal(
+        decideFromCri(cri, Document{{"_id", Value(std::vector<Value>{Value(1), Value(2)})}})));
 }
 
 TEST_F(ShardedEligibilityTest, PlacementConflictTimeIsStampedOntoLocalShardVersion) {
