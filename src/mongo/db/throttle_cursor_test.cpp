@@ -28,6 +28,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
+#include <limits>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -57,6 +58,11 @@ protected:
 
 public:
     void setDataThrottle(Date_t time);
+
+    /**
+     * Builds a throttle with rate 'maxMBPerSec'.
+     */
+    void setDataThrottle(Date_t time, int maxMBPerSec);
 
     void setMaxMbPerSec(int maxMbPerSec);
 
@@ -97,6 +103,11 @@ void ThrottleCursorTest::tearDown() {
 void ThrottleCursorTest::setDataThrottle(Date_t time) {
     _dataThrottle = std::make_unique<DataThrottle>(time.toMillisSinceEpoch(),
                                                    [&]() { return gMaxValidateMBperSec.load(); });
+}
+
+void ThrottleCursorTest::setDataThrottle(Date_t time, int maxMBPerSec) {
+    _dataThrottle = std::make_unique<DataThrottle>(time.toMillisSinceEpoch(),
+                                                   [maxMBPerSec]() { return maxMBPerSec; });
 }
 
 void ThrottleCursorTest::setMaxMbPerSec(int maxMbPerSec) {
@@ -491,6 +502,37 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
 
         ASSERT_EQ(numRecords, 20);
         ASSERT_GTE(end - start, Milliseconds(2000) - kErrorMargin);
+    }
+}
+
+TEST_F(ThrottleCursorTest, SettingNegativeMaxMBPerSecDoesNotThrottle) {
+    auto opCtx = operationContext();
+
+    const int64_t kOneGB = 1LL * 1024 * 1024 * 1024;
+
+    Date_t start = getTime();
+    setDataThrottle(start, -1);
+    _dataThrottle->awaitIfNeeded(opCtx, kOneGB);
+
+    // If the throttle had engaged, at least a full second would have elapsed.
+    ASSERT_LT(getTime() - start, Milliseconds(1000));
+}
+
+TEST_F(ThrottleCursorTest, SettingLargeMaxMBPerSecDoesNotOverflow) {
+    auto opCtx = operationContext();
+
+    // Without overflow protection, setting the throttle to 2048 MB or higher (2048 * 1024 * 1024
+    // bytes) would overflow, effectively disabling the throttle.
+    // Set large values as the max rate and then pass in that same value for the number of bytes
+    // processed. If the rates didn't overflow, the throttle should be engaged.
+    for (int maxMBPerSec : {2048, std::numeric_limits<int>::max()}) {
+        Date_t start = getTime();
+        setDataThrottle(start, maxMBPerSec);
+
+        _dataThrottle->awaitIfNeeded(opCtx, int64_t{maxMBPerSec} * 1024 * 1024);
+
+        // Assert that the throttle was engaged (at least one second elapsed).
+        ASSERT_GTE(getTime() - start, Milliseconds(1000) - kErrorMargin);
     }
 }
 

@@ -150,11 +150,12 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         return;
     }
 
-    // No throttling should take place if '_maxMBperSec()' is zero.
-    uint64_t maxBytesPerSec = _maxMBperSec() * 1024 * 1024;
-    if (maxBytesPerSec == 0) {
+    // No throttling should take place if '_maxMBperSec()' is zero or negative.
+    const int maxMBPerSec = _maxMBperSec();
+    if (maxMBPerSec <= 0) {
         return;
     }
+    const uint64_t maxBytesPerSec = static_cast<uint64_t>(maxMBPerSec) * 1024 * 1024;
 
     if (_bytesProcessed < maxBytesPerSec) {
         return;

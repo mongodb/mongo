@@ -141,7 +141,7 @@ public:
 
     /**
      * If throttling is not enabled by calling turnThrottlingOff(), or if
-     * 'maxValidateMBperSec' == 0, then this is a no-op.
+     * 'maxValidateMBperSec' is not a positive number, then this is a no-op.
      *
      * When the accumulated number of bytes processed in each second reaches or exceeds the limit
      * set by the 'maxValidateMBperSec' server parameter, the throttle mechanism gets engaged to
@@ -170,7 +170,7 @@ private:
     // Whether the throttle should be active.
     bool _shouldNotThrottle;
 
-    // Will return the rate to throttle, 0 means turn off throttling.
+    // Will return the rate to throttle. Zero or negative means turn off throttling.
     std::function<int()> _maxMBperSec;
 };
 
