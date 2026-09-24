@@ -47,7 +47,6 @@ inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findC
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
- * TODO SERVER-123100: Remove isIdHackEligibleQuery() in favor of ExpCtx::isIdHackQuery() checks.
  */
 inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
     return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
