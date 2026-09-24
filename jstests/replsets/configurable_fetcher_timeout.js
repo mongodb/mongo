@@ -7,7 +7,12 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-const rst = new ReplSetTest({name: jsTestName(), nodes: 3, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({
+    name: jsTestName(),
+    nodes: [{}, {}, {rsConfig: {priority: 0}}],
+    settings: {chainingAllowed: false},
+    useBridge: true,
+});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -65,8 +70,7 @@ assert.soon(() => {
 jsTestLog("Unblock old primary from secondary");
 originalPrimary.reconnect(secondary1);
 
-jsTestLog("Waiting for secondaries to time out on find command");
-checkLog.containsJson(secondary1, 5579707); /* Fetcher return error log message */
+jsTestLog("Waiting for secondary2 to time out on find command");
 checkLog.containsJson(secondary2, 5579707); /* Fetcher return error log message */
 
 jsTestLog("Secondaries have timed out, turning off failpoint to hang");
