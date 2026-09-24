@@ -562,8 +562,17 @@ function verifyFetchAndResume(env, watchMode) {
                 suffix: "foar",
                 configOverrides: {readingMode: ChangeStreamReadingMode.kFetchOneAndResume},
             },
+            {
+                suffix: "pbrt",
+                configOverrides: {
+                    readingMode: ChangeStreamReadingMode.kFetchOneAndResumeFromPbrt,
+                },
+            },
         ],
-        createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
+        createTestCases: (m) => [
+            new SequentialPairwiseFetchingTestCase(m.cont, m.foar),
+            new SequentialPairwiseFetchingTestCase(m.cont, m.pbrt),
+        ],
         extraVerifierConfig: {shardConnections: getShardConnections(env.fsmSt)},
     });
 }

@@ -350,3 +350,108 @@ export function runResumePbrtMonotonicTests({ctx, watchMode, getInvalidateToken}
         });
     }
 }
+
+/**
+ * Runs a control-event scenario for a single change-stream watch mode.
+ *
+ * The v2 change stream reader swallows internal control events (e.g. namespacePlacementChanged,
+ * moveChunk) before DSCSEnsureResumeTokenPresent. Their event resume tokens therefore cannot be
+ * used to resume, and must never be exposed as a client-visible postBatchResumeToken (PBRT).
+ *
+ * The 'changeStreamKeepLastEventResumeTokenAsPBRT' fail point pins each shard's PBRT to the last
+ * returned event's resume token, which removes the otherwise racy dependency on whether the shard
+ * has already scanned past its last returned event. A placement-changing DDL is then performed and
+ * every PBRT delivered to the client is validated by 'ChangeStreamTest' (which rejects swallowed
+ * control-event tokens).
+ *
+ * Parameters:
+ *   - ctx: must have 'cst', 'db', and 'coll' populated, and 'ctx.st' set to the ShardingTest.
+ *   - watchMode: one of ChangeStreamWatchMode.kCollection/kDb/kCluster.
+ */
+export function runControlEventPbrtResumableTest({ctx, watchMode}) {
+    const kFailPointName = "changeStreamKeepLastEventResumeTokenAsPBRT";
+    const kControlOpTypes = ["namespacePlacementChanged", "moveChunk", "movePrimary"];
+
+    describe(`${watchModeToString(watchMode)}-level control-event PBRT leak`, function () {
+        it("does not expose a swallowed control event's resume token as PBRT", function () {
+            const st = ctx.st;
+            const failPointNodes = [st.rs0.getPrimary(), st.rs1.getPrimary()];
+            if (st.configRS) {
+                failPointNodes.push(st.configRS.getPrimary());
+            }
+
+            const setFailPoint = (mode) => {
+                for (const node of failPointNodes) {
+                    try {
+                        node.getDB("admin").runCommand({
+                            configureFailPoint: kFailPointName,
+                            mode: mode,
+                        });
+                    } catch (e) {
+                        // Ignore cleanup errors (e.g. the primary changed).
+                    }
+                }
+            };
+
+            setFailPoint("alwaysOn");
+            try {
+                // Earlier scenarios in these tests may have dropped and recreated the watched
+                // collection (e.g. the invalidate scenarios). Recreate it unsharded so that
+                // 'shardCollection' below emits a namespacePlacementChanged control event.
+                assertDropCollection(ctx.db, ctx.coll.getName());
+                assertCreateCollection(ctx.db, ctx.coll.getName());
+                assert.commandWorked(ctx.coll.createIndex({x: 1}));
+
+                const cursor = ctx.cst.getChangeStream({watchMode, coll: ctx.coll});
+
+                // 'shardCollection' commits placement metadata and emits a namespacePlacementChanged
+                // control event for the watched collection.
+                assert.commandWorked(
+                    ctx.db.adminCommand({
+                        shardCollection: ctx.coll.getFullName(),
+                        key: {x: 1},
+                    }),
+                );
+
+                // For a whole-cluster stream, also generate a config-server control event after the
+                // shard's control event so that the config cursor's promise is not the minimum.
+                if (watchMode === ChangeStreamWatchMode.kCluster) {
+                    assert.commandWorked(
+                        ctx.db.adminCommand({enableSharding: "controlEventDb_" + jsTestName()}),
+                    );
+                }
+
+                const observed = [];
+                for (let i = 0; i < 40; i++) {
+                    const pbrt = cursor.postBatchResumeToken;
+                    if (pbrt) {
+                        const decoded = decodeResumeToken(pbrt);
+                        const opType =
+                            decoded.eventIdentifier && decoded.eventIdentifier.operationType;
+                        observed.push({
+                            clusterTime: decoded.clusterTime,
+                            tokenType: decoded.tokenType,
+                            operationType: opType,
+                        });
+                        if (decoded.tokenType !== highWaterMarkResumeTokenType) {
+                            assert(
+                                !kControlOpTypes.includes(opType),
+                                "PBRT is the resume token of an internally swallowed control event",
+                                {pbrt, decoded},
+                            );
+                        }
+                    }
+                    // 'getNextBatch' validates the batch's PBRT via 'ChangeStreamTest' and advances
+                    // the cursor.
+                    ctx.cst.getNextBatch(cursor);
+                }
+                jsTest.log.info("Observed PBRTs in control-event scenario", {
+                    watchMode: watchModeToString(watchMode),
+                    observed,
+                });
+            } finally {
+                setFailPoint("off");
+            }
+        });
+    });
+}

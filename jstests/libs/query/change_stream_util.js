@@ -346,6 +346,23 @@ export function assertGetMoreFailsWithExpectedError({db, cursorId, collName, exp
     }, msg);
 }
 
+/**
+ * Verify that 'resumeToken' is not a resume token from a control event. Currently only tests for "namespacePlacementChanged" events.
+ */
+export function assertNoControlEventToken(resumeToken) {
+    const decodedPbrt = decodeResumeToken(resumeToken);
+    if (decodedPbrt.tokenType !== highWaterMarkResumeTokenType) {
+        const opType = decodedPbrt.eventIdentifier && decodedPbrt.eventIdentifier.operationType;
+        assert.neq(
+            opType,
+            "namespacePlacementChanged",
+            "postBatchResumeToken is the resume token of an internally swallowed " +
+                "control event and cannot be resumed",
+            {pbrt: resumeToken, decodedPbrt},
+        );
+    }
+}
+
 export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.
@@ -435,6 +452,12 @@ export function ChangeStreamTest(_db, options) {
                         "postBatchResumeToken",
                     );
                 }
+
+                // A PBRT that is an event token must be a resumable event. The v2 change stream
+                // reader swallows internal control events before they reach
+                // DSCSEnsureResumeTokenPresent, so their event tokens are not resumable and must
+                // never be exposed as a PBRT.
+                assertNoControlEventToken(cursor.postBatchResumeToken);
                 previousToken = cursor.postBatchResumeToken;
             }
 

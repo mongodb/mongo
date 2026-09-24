@@ -105,7 +105,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     const auto currentResumeTokenData =
         resumeToken.getDocument()[ResumeToken::kDataFieldName].getString();
     if (_previousResumeTokenData) {
-        tassert(13479500,
+        tassert(13536500,
                 str::stream() << "Encountered an event whose resume token regressed to before the "
                                  "previously returned resume token. Previous: "
                               << *_previousResumeTokenData

@@ -101,6 +101,12 @@ public:
      */
     void disablePromisedSortKeyHighWaterMarkAdvancement();
 
+    /**
+     * Re-enables high-water-mark advancement based on promised sort keys in the underlying
+     * results merger.
+     */
+    void enablePromisedSortKeyHighWaterMarkAdvancement();
+
     void setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer);
 

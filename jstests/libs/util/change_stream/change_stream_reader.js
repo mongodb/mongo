@@ -41,6 +41,7 @@ function tryCleanUp(cst, instanceName) {
 const ChangeStreamReadingMode = {
     kContinuous: "continuous",
     kFetchOneAndResume: "fetchOneAndResume",
+    kFetchOneAndResumeFromPbrt: "fetchOneAndResumeFromPbrt",
     kReadUntilDone: "readUntilDone",
     kFetchOneAndResumeUntilDone: "fetchOneAndResumeUntilDone",
 };
@@ -154,6 +155,9 @@ class ChangeStreamReader {
                 break;
             case ChangeStreamReadingMode.kFetchOneAndResume:
                 ChangeStreamReader._readFetchOneAndResume(conn, config);
+                break;
+            case ChangeStreamReadingMode.kFetchOneAndResumeFromPbrt:
+                ChangeStreamReader._readFetchOneAndResume(conn, config, /*resumeFromPbrt=*/ true);
                 break;
             case ChangeStreamReadingMode.kReadUntilDone:
                 ChangeStreamReader._drainEvents(conn, config, false);
@@ -305,7 +309,7 @@ class ChangeStreamReader {
     /**
      * Validate and record a change event. Shared by both reading modes.
      */
-    static _processEvent(conn, cfg, changeEvent, count, readEventTypes) {
+    static _processEvent(conn, cfg, changeEvent, count, readEventTypes, extraFields = {}) {
         assert(changeEvent, `Expected change event at index ${count}, but got none`);
         assert(changeEvent._id, `Change event at index ${count} missing _id (resume token)`);
 
@@ -323,6 +327,7 @@ class ChangeStreamReader {
         Connector.writeChangeEvent(conn, cfg.instanceName, {
             changeEvent,
             cursorClosed: isInvalidate,
+            ...extraFields,
         });
 
         return isInvalidate;
@@ -399,13 +404,11 @@ class ChangeStreamReader {
         let {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, null, false);
 
         while (true) {
-            cursor = cst.getNextBatch(cursor);
-            const batch = cursor.nextBatch || [];
-            if (batch.length === 0) {
+            const event = ChangeStreamReader._tryGetNextEvent(cst, cursor);
+            if (event === null) {
                 break;
             }
 
-            const event = batch[0];
             const isInvalidate = ChangeStreamReader._processEvent(
                 conn,
                 cfg,
@@ -437,16 +440,29 @@ class ChangeStreamReader {
      * Read events one at a time, closing and reopening the cursor after each event.
      * Uses resumeAfter with the previous event's token.
      * After an invalidate, uses startAfter to reopen the cursor.
+     *
+     * '_readOneEvent' blocks until an event arrives, so it never sees an empty batch and can
+     * only resume from an event token. With 'resumeFromPbrt' the cursor is kept open for up to
+     * kMaxPbrtGetMores more getMores; the first empty batch yields a postBatchResumeToken,
+     * which is then used to resume, as drivers do on an idle stream.
+     *
      * @private
      */
-    static _readFetchOneAndResume(conn, cfg) {
-        jsTest.log.debug("ChangeStreamReader Starting fetch-one-and-resume", cfg);
+    static _readFetchOneAndResume(conn, cfg, resumeFromPbrt = false) {
+        jsTest.log.debug(
+            `ChangeStreamReader Starting fetch-one-and-resume (resumeFromPbrt=${resumeFromPbrt})`,
+            cfg,
+        );
         let resumeToken = null;
         let useStartAfter = false;
+        // null, "eventToken" or "pbrt": how the current cursor was opened.
+        let resumedFrom = null;
         const readEventTypes = [];
+        const resumeStats = {pbrt: 0, eventToken: 0};
 
-        for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
-            const result = ChangeStreamReader._readOneEvent(
+        let count = 0;
+        while (count < cfg.numberOfEventsToRead) {
+            const {changeEvent, cst, cursor} = ChangeStreamReader._readOneEvent(
                 conn,
                 cfg,
                 null,
@@ -454,24 +470,69 @@ class ChangeStreamReader {
                 resumeToken,
                 useStartAfter,
             );
-
-            const isInvalidate = ChangeStreamReader._processEvent(
+            let isInvalidate = ChangeStreamReader._processEvent(
                 conn,
                 cfg,
-                result.changeEvent,
-                count,
+                changeEvent,
+                count++,
                 readEventTypes,
+                {resumedFrom},
             );
-            resumeToken = result.changeEvent._id;
+            resumeToken = changeEvent._id;
+            resumedFrom = "eventToken";
+
+            // An invalidate closes the cursor, so there is nothing left to poll.
+            if (resumeFromPbrt && !isInvalidate) {
+                for (
+                    let i = 0;
+                    i < ChangeStreamReader.kMaxPbrtGetMores && count < cfg.numberOfEventsToRead;
+                    i++
+                ) {
+                    const event = ChangeStreamReader._tryGetNextEvent(cst, cursor);
+                    if (event === null) {
+                        resumeToken = cst.getResumeToken(cursor);
+                        resumedFrom = "pbrt";
+                        break;
+                    }
+                    isInvalidate = ChangeStreamReader._processEvent(
+                        conn,
+                        cfg,
+                        event,
+                        count++,
+                        readEventTypes,
+                    );
+                    resumeToken = event._id;
+                    if (isInvalidate) {
+                        break;
+                    }
+                }
+            }
+            resumeStats[resumedFrom]++;
             useStartAfter = isInvalidate;
 
-            tryCleanUp(result.cst, cfg.instanceName);
+            tryCleanUp(cst, cfg.instanceName);
         }
 
-        jsTest.log.debug("ChangeStreamReader Read events", {
+        jsTest.log.info("ChangeStreamReader Read events", {
             instanceName: cfg.instanceName,
+            resumeStats,
             readEventTypes,
         });
+    }
+
+    /** Max getMores per cursor when looking for an empty batch (see resumeFromPbrt). */
+    static kMaxPbrtGetMores = 3;
+
+    /**
+     * Issues one getMore (batchSize 1) and returns the event, or null on an empty batch.
+     * Does not block or retry. The cursor is updated in place.
+     * @private
+     */
+    static _tryGetNextEvent(cst, cursor) {
+        cst.getNextBatch(cursor);
+        const batch = cursor.nextBatch || [];
+        assert.lte(batch.length, 1, "expected at most one event per batch", {batch});
+        return batch.length === 0 ? null : batch[0];
     }
 }
 

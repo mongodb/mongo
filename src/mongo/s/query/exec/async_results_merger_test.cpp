@@ -1232,6 +1232,134 @@ TEST_F(AsyncResultsMergerTest, GetHighWaterMarkForClientIgnoresPromisedSortKeysW
     ASSERT_BSONOBJ_EQ(clientToken, arm->getHighWaterMarkForClient());
 }
 
+// When promised-sort-key advancement is enabled (as it is for ignore-removed-shards change streams
+// while reading an unbounded segment), an idle stream must keep advancing its post-batch resume
+// token from the minimum promised sort key of the shards.
+TEST_F(AsyncResultsMergerTest, GetHighWaterMarkForClientAdvancesFromPromisedSortKeysWhenEnabled) {
+    AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
+
+    std::vector<RemoteCursor> cursors;
+    auto initialPBRT = makePostBatchResumeToken(Timestamp(42, 1));
+    cursors.push_back(makeRemoteCursor(kTestShardIds[0],
+                                       kTestShardHosts[0],
+                                       CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    auto clientToken = makePostBatchResumeToken(Timestamp(42, 5));
+    arm->setHighWaterMark(clientToken);
+    ASSERT_BSONOBJ_EQ(clientToken, arm->getHighWaterMarkForClient());
+
+    // Promise a sort key that is ahead of the current high water mark without returning any
+    // documents, i.e. simulate idle shards.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    auto advancedPBRT = makePostBatchResumeToken(Timestamp(42, 9));
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(
+        kTestNss, CursorId(1), std::vector<BSONObj>{}, boost::none, advancedPBRT);
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_FALSE(arm->ready());
+
+    // Both the internal and client-visible high water marks advance from the promised sort key.
+    ASSERT_BSONOBJ_EQ(advancedPBRT, arm->getHighWaterMark());
+    ASSERT_BSONOBJ_EQ(advancedPBRT, arm->getHighWaterMarkForClient());
+}
+
+// Disabling promised-sort-key advancement and then re-enabling it must let the client-visible high
+// water mark catch up to the internal one, without ever regressing.
+TEST_F(AsyncResultsMergerTest, ClientHighWaterMarkCatchesUpAfterReEnablingPromisedAdvancement) {
+    AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
+
+    std::vector<RemoteCursor> cursors;
+    auto initialPBRT = makePostBatchResumeToken(Timestamp(42, 1));
+    cursors.push_back(makeRemoteCursor(kTestShardIds[0],
+                                       kTestShardHosts[0],
+                                       CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    auto clientToken = makePostBatchResumeToken(Timestamp(42, 5));
+    arm->setHighWaterMark(clientToken);
+    arm->disablePromisedSortKeyHighWaterMarkAdvancement();
+
+    // Idle shards promise a higher sort key. The client-visible value must not move while disabled.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    auto advancedPBRT = makePostBatchResumeToken(Timestamp(42, 9));
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(
+        kTestNss, CursorId(1), std::vector<BSONObj>{}, boost::none, advancedPBRT);
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_BSONOBJ_EQ(advancedPBRT, arm->getHighWaterMark());
+    ASSERT_BSONOBJ_EQ(clientToken, arm->getHighWaterMarkForClient());
+
+    // Once advancement is re-enabled, the client-visible value catches up (never regresses).
+    arm->enablePromisedSortKeyHighWaterMarkAdvancement();
+    ASSERT_BSONOBJ_EQ(advancedPBRT, arm->getHighWaterMarkForClient());
+}
+
+// A shard's promised sort key can be the resume token of a control event that the change stream
+// swallows internally (e.g. namespacePlacementChanged). Such a token is not resumable by the
+// client, so it must never be adopted into the high water mark / PBRT. This is the deterministic
+// unit-level reproducer for the destination-cluster-auditor failure.
+TEST_F(AsyncResultsMergerTest, PromisedControlEventResumeTokenDoesNotLeakIntoHighWaterMark) {
+    AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
+
+    auto initialPBRT = makePostBatchResumeToken(Timestamp(42, 1));
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(makeRemoteCursor(kTestShardIds[0],
+                                       kTestShardHosts[0],
+                                       CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
+    params.setRemotes(std::move(cursors));
+
+    auto arm = buildARM(std::move(params), true /* recognizeControlEvents */);
+
+    // An *event* resume token for a control event, also promised by the shard as its PBRT.
+    auto controlEventToken = makeResumeToken(Timestamp(42, 5), UUID::gen(), BSON("_id" << 1));
+    auto controlEventDoc =
+        BSON("_id" << controlEventToken << "$sortKey" << BSON_ARRAY(controlEventToken)
+                   << Document::metaFieldChangeStreamControlEvent << 1 << "value" << "control");
+
+    // First response: the control event is the only document and the PBRT is its event token.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss,
+                           CursorId(1),
+                           std::vector<BSONObj>{controlEventDoc},
+                           boost::none,
+                           controlEventToken);
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    // Consume the control event. Its token must be degraded to a high-water-mark token.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(controlEventDoc, *unittest::assertGet(arm->nextReady()).getResult());
+    auto expectedHighWaterMark = makePostBatchResumeToken(Timestamp(42, 5));
+    ASSERT_BSONOBJ_EQ(expectedHighWaterMark, arm->getHighWaterMark());
+
+    // Second response: empty batch whose PBRT still points at the swallowed control event.
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    responses.clear();
+    responses.emplace_back(
+        kTestNss, CursorId(1), std::vector<BSONObj>{}, boost::none, controlEventToken);
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+
+    ASSERT_FALSE(arm->ready());
+
+    // The control-event token must not be adopted from the promised sort key.
+    ASSERT_BSONOBJ_EQ(expectedHighWaterMark, arm->getHighWaterMark());
+}
+
 TEST_F(AsyncResultsMergerTest, UndoNextReadyRestoresClientHighWaterMark) {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
 

@@ -307,6 +307,34 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
         ErrorCodes::InvalidResumeToken);
 }
 
+TEST_F(ChangeStreamStageTest, ShouldRejectResumeFromNamespacePlacementChangedEvent) {
+    auto expCtx = getExpCtx();
+    auto opCtx = expCtx->getOperationContext();
+
+    // Need to put the collection in the collection catalog so the resume token is valid.
+    {
+        Lock::GlobalWrite lk(opCtx);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+        });
+    }
+
+    // An event resume token from a 'namespacePlacementChanged' control event is not a valid point
+    // to resume a change stream from.
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName
+                                << BSON("resumeAfter" << makeResumeToken(
+                                            kDefaultTs,
+                                            testUuid(),
+                                            Value(),
+                                            DSChangeStream::kNamespacePlacementChangedOpType)))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidResumeToken);
+}
+
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
     const auto spec = fromjson("{$changeStream: {}}");
 

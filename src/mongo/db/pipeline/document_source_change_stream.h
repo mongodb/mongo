@@ -256,6 +256,10 @@ public:
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr std::string_view kNewShardDetectedOpType{"migrateChunkToNewShard"};
 
+    // Internal control event signalling a change in the placement of a namespace. These events are
+    // not exposed to users, and a stream may not be resumed from one of their resume tokens.
+    static constexpr std::string_view kNamespacePlacementChangedOpType{"namespacePlacementChanged"};
+
     // These events are guarded behind the 'showExpandedEvents' flag.
     static constexpr std::string_view kCreateOpType{"create"};
     static constexpr std::string_view kCreateIndexesOpType{"createIndexes"};

@@ -15,6 +15,7 @@ import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/query/change
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     runChainedResumePbrtMonotonicTest,
+    runControlEventPbrtResumableTest,
     runResumePbrtMonotonicTests,
     setupShardedCollection,
 } from "jstests/libs/query/change_stream_resume_pbrt_monotonic_helpers.js";
@@ -36,6 +37,7 @@ describe("whole-cluster change stream resume token monotonicity", function () {
         ctx.db = st.s.getDB(jsTestName());
         ctx.adminDb = st.s.getDB("admin");
         ctx.coll = ctx.db.test;
+        ctx.st = st;
 
         setupShardedCollection({db: ctx.db, coll: ctx.coll, st});
 
@@ -53,6 +55,11 @@ describe("whole-cluster change stream resume token monotonicity", function () {
     });
 
     runResumePbrtMonotonicTests({
+        ctx,
+        watchMode: ChangeStreamWatchMode.kCluster,
+    });
+
+    runControlEventPbrtResumableTest({
         ctx,
         watchMode: ChangeStreamWatchMode.kCluster,
     });

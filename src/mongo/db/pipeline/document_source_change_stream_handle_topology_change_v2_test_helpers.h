@@ -93,6 +93,8 @@ public:
 
     void setHighWaterMark(Timestamp highWaterMark) override;
 
+    void setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) override;
+
     Timestamp getTimestampFromCurrentHighWaterMark() const override;
 
     bool undoGetNextCalled() const;
@@ -100,6 +102,8 @@ public:
     boost::optional<bool> getUndoNextMode() const;
 
     boost::optional<Timestamp> getRestoredHighWaterMark() const;
+
+    boost::optional<bool> getPromisedSortKeyHighWaterMarkAdvancement() const;
 
     void setTimestampForCurrentHighWaterMark(Timestamp ts);
 
@@ -149,6 +153,9 @@ private:
     // The timestamp used in a call to 'setHighWaterMark()' will be recorded here after overfetching
     // in degraded mode.
     boost::optional<Timestamp> _restoredHighWaterMark;
+
+    // Records the last value passed to 'setPromisedSortKeyHighWaterMarkAdvancement()', if any.
+    boost::optional<bool> _promisedSortKeyHighWaterMarkAdvancement;
 
     // The aggregation stage that is used as input for the v2 stage. Necessary here so we can
     // perform an "undo" operation it if necessary.

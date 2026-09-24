@@ -236,6 +236,10 @@ TEST_F(
     // Undo mode must have been turned on when entering the degraded fetching state.
     ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
 
+    // Promised sort keys must not advance the client-visible high water mark while reading a
+    // bounded segment, as a promise could point beyond the segment end.
+    ASSERT_FALSE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
+
     // Calling the state machine will start a new segment.
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 3));
 
@@ -248,6 +252,10 @@ TEST_F(
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
+    // Entering an unbounded segment must re-enable advancement of the client-visible high water
+    // mark from promised sort keys.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
 
     const stdx::unordered_set<ShardId> expectedShardCursors = {ShardId("shardB")};
     ASSERT_FALSE(params->cursorManager->isCursorOnConfigServerOpen());

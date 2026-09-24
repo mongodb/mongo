@@ -426,6 +426,10 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
     ASSERT_FALSE(docSource->getSegmentEndTimestamp_forTest().has_value());
 
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
+    // An unbounded segment allows promised sort keys to advance the client-visible high water mark,
+    // so the post-batch resume token keeps moving while shards are idle.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
 }
 
 // Tests state machine for input state kFetchingStartingChangeStreamSegment, when the shard targeter
@@ -476,6 +480,10 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     // Undo mode must have been turned on when entering the degraded fetching state.
     ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
+
+    // Promised sort keys must not advance the client-visible high water mark while reading a
+    // bounded segment, as a promise could point beyond the segment end.
+    ASSERT_FALSE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
 }
 
 // Tests state machine for input state kFetchingStartingChangeStreamSegment, when we try to open a
@@ -545,6 +553,10 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     // Undo mode must have been turned on when entering the degraded fetching state.
     ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
+
+    // Promised sort keys must not advance the client-visible high water mark while reading a
+    // bounded segment, as a promise could point beyond the segment end.
+    ASSERT_FALSE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
 }
 
 // Tests state machine for input state kFetchingStartingChangeStreamSegment, when we try to open a

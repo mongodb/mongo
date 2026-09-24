@@ -595,6 +595,18 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             "invalidate notification",
             !(spec.getResumeAfter() && resumeToken->fromInvalidate));
 
+    // A resume token from a 'namespacePlacementChanged' control event cannot be used to resume a
+    // change stream. These events are not exposed to users, so an event resume token referring to
+    // one is not a valid resumption point. High-water-mark tokens are unaffected.
+    uassert(ErrorCodes::InvalidResumeToken,
+            "Attempting to resume a change stream from a 'namespacePlacementChanged' event is not "
+            "allowed",
+            !resumeToken || ResumeToken::isHighWaterMarkToken(*resumeToken) ||
+                Value::compare(
+                    resumeToken->eventIdentifier[DocumentSourceChangeStream::kOperationTypeField],
+                    Value(DocumentSourceChangeStream::kNamespacePlacementChangedOpType),
+                    nullptr) != 0);
+
     // If we are resuming a single-collection stream, the resume token should always contain a
     // UUID unless the token is from endOfTransaction event or a high water mark.
     uassert(ErrorCodes::InvalidResumeToken,
