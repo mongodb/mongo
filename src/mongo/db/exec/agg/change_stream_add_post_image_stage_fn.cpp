@@ -31,7 +31,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(forceAggregationSingleDocumentLookupExecutor);
 MONGO_FAIL_POINT_DEFINE(forceChangeStreamUpdateLookupEngine);
 
 // Different engine types used for updateLookup. Can be enforced via failpoint

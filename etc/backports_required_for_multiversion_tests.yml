@@ -102,6 +102,8 @@ last-continuous:
       ticket: SERVER-129785
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/change_streams/change_stream_large_event_resumption.js
+      ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-133661
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
@@ -156,6 +158,12 @@ last-continuous:
       ticket: SERVER-134715
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
       ticket: SERVER-134952
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_cluster.js
+      ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_collection.js
+      ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_database.js
+      ticket: SERVER-134795
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
@@ -189,6 +197,8 @@ last-lts:
       ticket: SERVER-132414
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/change_streams/change_stream_large_event_resumption.js
+      ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-133661
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
@@ -253,6 +263,12 @@ last-lts:
       ticket: SERVER-134715
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
       ticket: SERVER-134952
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_cluster.js
+      ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_collection.js
+      ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_database.js
+      ticket: SERVER-134795
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js

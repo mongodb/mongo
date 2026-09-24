@@ -10,6 +10,17 @@ import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.j
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
+// The resume-token monotonicity checks in this file assume a consistent v2 change stream
+// implementation. Mixed-version clusters may observe non-monotonic tokens, so the checks are disabled in multiversion tests.
+// TODO SERVER-134853 Enable the check in multiversion tests as well.
+const isMultiversion = Boolean(
+    jsTest.options().useRandomBinVersionsWithinReplicaSet ||
+        (TestData &&
+            (TestData.multiversionBinVersion ||
+                TestData.mixedBinVersions ||
+                TestData.mongosBinVersion)),
+);
+
 /**
  * Enumeration of the possible types of change streams.
  */
@@ -350,6 +361,16 @@ export function ChangeStreamTest(_db, options) {
         return isResumableChangeStreamError(error) || _extraRetryableErrors.includes(error.code);
     }
 
+    function _getResumeTokenComparable(token) {
+        assert(token, "Resume token must be present", {token});
+        assert.eq(typeof token, "object", "Resume token must be an object", {token});
+        assert(token.hasOwnProperty("_data"), "Resume token must have _data field", {token});
+        assert.eq(typeof token._data, "string", "Resume token must have string _data field", {
+            token,
+        });
+        return token._data;
+    }
+
     function updateResumeToken(cursor, changeEvents) {
         // This isn't fool proof since anyone can just a getMore command on the raw cursor.
         const cursorId = String(cursor.id);
@@ -358,11 +379,76 @@ export function ChangeStreamTest(_db, options) {
         }
         const cursorInfo = _cursorData.get(cursorId);
 
-        if (changeEvents && changeEvents.length > 0) {
-            cursorInfo.resumeToken =
-                changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
-        } else if (cursor.postBatchResumeToken) {
-            cursorInfo.resumeToken = cursor.postBatchResumeToken;
+        const events = changeEvents && changeEvents.length > 0 ? changeEvents : null;
+
+        const getRequestedResumeToken = () => {
+            const cursorInfo = _cursorData.get(String(cursor.id));
+            if (!cursorInfo || !cursorInfo.pipeline || cursorInfo.pipeline.length === 0) {
+                return null;
+            }
+            const stage = cursorInfo.pipeline[0];
+            const options = stage && stage.$changeStream ? stage.$changeStream : {};
+            return options.resumeAfter || options.startAfter || null;
+        };
+
+        // Verify that 'current' sorts greater-or-equal to 'requested'.
+        const assertNotRegressed = (current, requested, label) => {
+            assert.gte(
+                bsonWoCompare(
+                    _getResumeTokenComparable(current),
+                    _getResumeTokenComparable(requested),
+                ),
+                0,
+                label + " regressed below the preceding token",
+                {requested, current},
+            );
+        };
+
+        // Outside of multiversion tests, the server must never return a resume token that sorts
+        // before the resume/start point requested by the caller.
+        // TODO SERVER-134853 Enable the check in multiversion tests as well.
+        if (!isMultiversion) {
+            const requestedToken = getRequestedResumeToken(cursor);
+            let previousToken = requestedToken || cursorInfo.resumeToken || null;
+
+            // Check every event token in order. They must not regress, but need not be strictly
+            // monotonic: some DDL/resharding events (e.g. reshardBlockingWrites) are emitted once
+            // per shard, and the resume token does not include the recipient shard id, so events
+            // from different shards may produce exactly the same resume token.
+            if (events) {
+                for (let i = 0; i < events.length; i++) {
+                    const eventToken = events[i]._id;
+                    if (previousToken) {
+                        assertNotRegressed(eventToken, previousToken, "event token at index " + i);
+                    }
+                    previousToken = eventToken;
+                }
+            }
+
+            // Check the postBatchResumeToken against the previous token (last event, or
+            // requested/previous if no events). PBRT must not regress.
+            if (cursor.postBatchResumeToken) {
+                if (previousToken) {
+                    assertNotRegressed(
+                        cursor.postBatchResumeToken,
+                        previousToken,
+                        "postBatchResumeToken",
+                    );
+                }
+                previousToken = cursor.postBatchResumeToken;
+            }
+
+            // Persist the latest seen resume token for the next getMore.
+            cursorInfo.resumeToken = previousToken;
+        } else {
+            // In multiversion mode, just track the latest token without validation.
+            // TODO SERVER-134853 Remove this branch.
+            if (events) {
+                const lastEvent = events[events.length - 1];
+                cursorInfo.resumeToken = lastEvent._id;
+            } else {
+                cursorInfo.resumeToken = cursor.postBatchResumeToken || cursorInfo.resumeToken;
+            }
         }
     }
 
@@ -873,10 +959,22 @@ export function ChangeStreamTest(_db, options) {
      * {fullDocument: "updateLookup"}) are merged in; the watchMode-derived and resumeAfter fields
      * take precedence over them.
      */
-    self.getChangeStreamStage = function (watchMode, resumeAfter, extraOptions = {}) {
+    self.getChangeStreamStage = function (
+        watchMode,
+        resumeAfter,
+        startAtOperationTime,
+        extraOptions = {},
+    ) {
+        if (resumeAfter && startAtOperationTime) {
+            throw new Error("cannot use both resumeAfter and startAtOperationTime");
+        }
+
         const changeStreamDoc = {...extraOptions};
         if (resumeAfter) {
             changeStreamDoc.resumeAfter = resumeAfter;
+        }
+        if (startAtOperationTime) {
+            changeStreamDoc.startAtOperationTime = startAtOperationTime;
         }
 
         if (watchMode == ChangeStreamWatchMode.kCluster) {
@@ -890,13 +988,29 @@ export function ChangeStreamTest(_db, options) {
      * collection. Will resume from a given point if resumeAfter is specified. Any 'options' are
      * merged into the $changeStream stage (e.g. {fullDocument: "updateLookup"}).
      */
-    self.getChangeStream = function ({watchMode, coll, resumeAfter, options = {}}) {
+    self.getChangeStream = function ({
+        watchMode,
+        coll,
+        resumeAfter,
+        startAtOperationTime,
+        batchSize = 0,
+        options = {},
+    }) {
         return self.startWatchingChanges({
-            pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter, options)}],
+            pipeline: [
+                {
+                    $changeStream: self.getChangeStreamStage(
+                        watchMode,
+                        resumeAfter,
+                        startAtOperationTime,
+                        options,
+                    ),
+                },
+            ],
             collection: watchMode == ChangeStreamWatchMode.kCollection ? coll : 1,
-            // Use a batch size of 0 to prevent any notifications from being returned in the first
+            // Use a default batch size of 0 to prevent any notifications from being returned in the first
             // batch. These would be ignored by ChangeStreamTest.getOneChange().
-            aggregateOptions: {cursor: {batchSize: 0}},
+            aggregateOptions: {cursor: {batchSize}},
         });
     };
 

@@ -19,7 +19,9 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -82,5 +84,9 @@ private:
 
     // May be null if this pipeline runs exclusively on mongos without contacting the shards at all.
     boost::intrusive_ptr<exec::agg::MergeCursorsStage> _mergeCursorsStage;
+
+    // The '_data' component of the resume token returned with the most recent change stream event.
+    // Used to enforce that resume tokens are monotonically increasing.
+    boost::optional<std::string> _previousResumeTokenData;
 };
 }  // namespace mongo

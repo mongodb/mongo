@@ -132,6 +132,10 @@ BSONObj MergeCursorsStage::getHighWaterMark() {
     return _blockingResultsMerger->getHighWaterMark();
 }
 
+BSONObj MergeCursorsStage::getHighWaterMarkForClient() {
+    return _blockingResultsMerger->getHighWaterMarkForClient();
+}
+
 bool MergeCursorsStage::remotesExhausted() const {
     return _blockingResultsMerger->remotesExhausted();
 }
@@ -169,6 +173,10 @@ void MergeCursorsStage::recognizeControlEvents() {
 
 void MergeCursorsStage::setHighWaterMark(const BSONObj& highWaterMark) {
     _blockingResultsMerger->setHighWaterMark(highWaterMark);
+}
+
+void MergeCursorsStage::disablePromisedSortKeyHighWaterMarkAdvancement() {
+    _blockingResultsMerger->disablePromisedSortKeyHighWaterMarkAdvancement();
 }
 
 void MergeCursorsStage::setNextHighWaterMarkDeterminingStrategy(

@@ -309,22 +309,38 @@ public:
     /**
      * For sorted tailable cursors, returns the most recent available sort key. This guarantees that
      * we will never return any future results which precede this key. If no results are ready to be
-     * returned, this method may cause the high water mark to advance to the lowest promised sortkey
-     * received from the shards. Returns an empty BSONObj if no such sort key is available.
-     *
-     * A side-effect of calling this method is that it can advance the 'AsyncResultsMerger's high
-     * watermark.
+     * returned, the returned value may be advanced to the lowest promised sortkey received from the
+     * shards, provided that doing so would not regress the current high water mark. Returns an
+     * empty BSONObj if no such sort key is available.
      */
     BSONObj getHighWaterMark();
 
     /**
-     * Unconditionally sets the current high water mark of the 'AsyncResultsMerger'.
-     * Called from change streams-specific code in the 'ChangeStreamsHandleTopologyChangeV2' stage,
-     * when the initial cursors for V2 change streams or opened. Also called for v2 change streams
-     * in degraded mode when reversing the high water mark to the resume token of an already
-     * returned event.
+     * Returns the high water mark to be exposed to the client as the post-batch resume token. In
+     * normal mode this is equivalent to 'getHighWaterMark()'. For change streams that ignore
+     * removed shards, it returns the client high water mark, which is advanced only by returned
+     * documents and by explicit 'setHighWaterMark()' calls, and is never rolled back.
+     */
+    BSONObj getHighWaterMarkForClient();
+
+    /**
+     * Sets the current high water mark of the 'AsyncResultsMerger'. Called from change
+     * streams-specific code in the 'ChangeStreamsHandleTopologyChangeV2' stage, when the initial
+     * cursors for V2 change streams are opened. Also called for v2 change streams in degraded mode
+     * when reversing the high water mark to the resume token of an already returned event.
+     *
+     * This setter intentionally permits rollback when degraded-mode overfetch is undone.
      */
     void setHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Disables high-water-mark advancement based on the minimum promised sort key from the shards.
+     * Once disabled, the high water mark advances only via returned documents and via explicit
+     * calls to 'setHighWaterMark()'. This is required for change streams that ignore removed
+     * shards, because promises made by a shard that is later removed can be withdrawn, which would
+     * otherwise allow the client-visible post-batch resume token to regress.
+     */
+    void disablePromisedSortKeyHighWaterMarkAdvancement();
 
     /**
      * Sets the strategy to determine the next high water mark.
@@ -650,6 +666,12 @@ private:
      */
     bool _remotesExhausted(WithLock) const;
 
+    /**
+     * Computes and returns the current high water mark. The caller must already hold '_mutex'.
+     * May advance '_highWaterMark' from the minimum promised sort key.
+     */
+    BSONObj _getHighWaterMark(WithLock);
+
     //
     // Helpers for ready().
     //
@@ -926,8 +948,22 @@ private:
     absl::btree_set<MinSortKeyRemotePair, PromisedMinSortKeyComparator> _promisedMinSortKeys;
 
     // For sorted tailable cursors, records the current high-water-mark sort key. Empty
-    // otherwise.
+    // otherwise. This value may be advanced from the minimum promised sort key and may be rolled
+    // back by 'setHighWaterMark()' when degraded-mode overfetch is undone.
     BSONObj _highWaterMark;
+
+    // For sorted tailable cursors, records the high-water-mark sort key that has been exposed to
+    // clients via 'getHighWaterMarkForClient()'. Unlike '_highWaterMark', this value is never
+    // advanced from promised sort keys and is never rolled back, ensuring that the client-visible
+    // post-batch resume token never regresses.
+    BSONObj _clientHighWaterMark;
+
+    // For sorted tailable cursors, whether 'getHighWaterMarkForClient()' may advance the high
+    // water mark based on the minimum promised sort key from the shards. Defaults to true.
+    // Disabled for change streams that ignore removed shards, because a removed shard's promise can
+    // be withdrawn, which would otherwise allow the client-visible post-batch resume token to
+    // regress.
+    bool _advanceHighWaterMarkFromPromisedSortKeys = true;
 
     // Strategy for determining the next high watermark in tailable, awaitData mode. Not used in
     // other modes.
@@ -943,6 +979,12 @@ private:
      * 'nextReady()' so it can be undone later.
      */
     bool _undoModeEnabled = false;
+
+    // High-water-mark values saved before the most recent '_updateHighWaterMark()' when undo
+    // mode is enabled. 'undoNextReady()' restores these values so that an undone event does not
+    // leave the high water marks advanced beyond the last actually-returned event.
+    BSONObj _highWaterMarkBeforeUndo;
+    BSONObj _clientHighWaterMarkBeforeUndo;
 
     /**
      * State required to undo a previous invocation of the function 'nextReady()'. Will only be

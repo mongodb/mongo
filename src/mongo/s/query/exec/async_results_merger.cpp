@@ -60,6 +60,13 @@ MONGO_FAIL_POINT_DEFINE(stallBeforeReDispatchingArmRetry);
 // waits that could not prove the alarm was armed and were vulnerable to a deadline-shift race.
 MONGO_FAIL_POINT_DEFINE(armRetryScheduledForTesting);
 
+// Test-only. Overrides the batchSize field used for getMore requests that the AsyncResultsMerger
+// sends to shards. The batch size normally comes from the originating command's parameters, which
+// are not populated for change stream merge pipelines. This failpoint lets tests force a bounded
+// batch size (e.g. 1) on the to-shard requests. It is a no-op unless explicitly enabled and its
+// data contains a 'batchSize' field.
+MONGO_FAIL_POINT_DEFINE(overrideBatchSizeForShardGetMore);
+
 namespace {
 
 // How often 'StallableRetryCallback' re-checks 'stallBeforeReDispatchingArmRetry'.
@@ -503,6 +510,8 @@ void AsyncResultsMerger::disableUndoNextReadyMode() {
     std::lock_guard<std::mutex> lk(_mutex);
     _undoModeEnabled = false;
     _stateForNextReadyCallUndo.reset();
+    _highWaterMarkBeforeUndo = BSONObj();
+    _clientHighWaterMarkBeforeUndo = BSONObj();
 }
 
 void AsyncResultsMerger::undoNextReady() {
@@ -531,6 +540,12 @@ void AsyncResultsMerger::undoNextReady() {
         // because the remote may have a different document in the merge queue already.
         _rebuildMergeQueueFromRemainingRemotes(lk);
     }
+
+    // Restore the high water marks to their state before the undone 'nextReady()' call.
+    _highWaterMark = std::move(_highWaterMarkBeforeUndo);
+    _clientHighWaterMark = std::move(_clientHighWaterMarkBeforeUndo);
+    _highWaterMarkBeforeUndo = BSONObj();
+    _clientHighWaterMarkBeforeUndo = BSONObj();
 
     _stateForNextReadyCallUndo.reset();
     _eofNext = false;
@@ -584,20 +599,18 @@ std::size_t AsyncResultsMerger::numberOfBufferedRemoteResponses_forTest() const 
     return _remoteResponses.size();
 }
 
-BSONObj AsyncResultsMerger::getHighWaterMark() {
-    std::lock_guard<std::mutex> lk(_mutex);
-
+BSONObj AsyncResultsMerger::_getHighWaterMark(WithLock lk) {
     // At this point, the high water mark may be the resume token of the last document we returned.
-    // If no further results are eligible for return, we advance to the minimum promised sort key.
-    // If the remote associated with the minimum promised sort key is not currently eligible to
-    // provide a high water mark, then we do not advance even if no further results are ready.
+    // If no further results are eligible for return, we advance to the minimum promised sort key,
+    // but only if doing so would not cause the high water mark to regress. A remote whose minimum
+    // promised sort key has not yet caught up to the current high water mark (e.g. a config-server
+    // cursor opened at the resume cluster time) must not be allowed to pull the high water mark
+    // backward.
     if (auto minPromisedSortKey = _getMinPromisedSortKey(lk); minPromisedSortKey && !_ready(lk)) {
         const auto& minRemote = minPromisedSortKey->second;
-        if (minRemote->eligibleForHighWaterMark) {
-            // The following check is potentially very costly on large resume tokens, so we only
-            // execute it in debug mode.
-            dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
-                _highWaterMark, minPromisedSortKey->first, *_params.getSort()));
+        if (minRemote->eligibleForHighWaterMark &&
+            (_highWaterMark.isEmpty() ||
+             compareSortKeys(_highWaterMark, minPromisedSortKey->first, *_params.getSort()) < 0)) {
             _highWaterMark = std::move(minPromisedSortKey->first);
             LOGV2_DEBUG(12163603,
                         5,
@@ -616,14 +629,56 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
+BSONObj AsyncResultsMerger::getHighWaterMark() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    return _getHighWaterMark(lk);
+}
+
+BSONObj AsyncResultsMerger::getHighWaterMarkForClient() {
+    std::lock_guard<std::mutex> lk(_mutex);
+
+    // For change streams that ignore removed shards, promises from data-bearing shards can be
+    // withdrawn when those shards are removed. We therefore expose only the client high water
+    // mark, which is advanced by returned documents and by explicit 'setHighWaterMark()' calls
+    // from the V2 topology-change stage and is never rolled back. The internal 'getHighWaterMark()'
+    // path still considers promised sort keys so that the V2 stage can detect segment boundaries
+    // and avoid stalling.
+    if (!_advanceHighWaterMarkFromPromisedSortKeys) {
+        return _clientHighWaterMark.isEmpty()
+            ? BSONObj()
+            : _clientHighWaterMark.firstElement().Obj().getOwned();
+    }
+
+    return _getHighWaterMark(lk);
+}
+
 void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
     // Extra wrapping necessary here because the high water mark is stored in sort-key format: {"":
     // <high watermark>}.
     auto newHighWaterMark = BSON("" << highWaterMark);
     LOGV2_DEBUG(12163600, 5, "Setting high water mark", "highWaterMark"_attr = newHighWaterMark);
 
+    // This setter permits rollback of the internal high water mark when degraded-mode overfetch is
+    // undone, but it must never roll back below the most recent event that has actually been
+    // returned to the client. Doing so would allow the merge queue to re-deliver already-returned
+    // events. The client-visible high water mark itself is never rolled back.
     std::lock_guard<std::mutex> lk(_mutex);
     _highWaterMark = std::move(newHighWaterMark);
+
+    if (!_clientHighWaterMark.isEmpty() &&
+        compareSortKeys(_highWaterMark, _clientHighWaterMark, *_params.getSort()) < 0) {
+        _highWaterMark = _clientHighWaterMark;
+    }
+
+    if (_clientHighWaterMark.isEmpty() ||
+        compareSortKeys(_highWaterMark, _clientHighWaterMark, *_params.getSort()) > 0) {
+        _clientHighWaterMark = _highWaterMark;
+    }
+}
+
+void AsyncResultsMerger::disablePromisedSortKeyHighWaterMarkAdvancement() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _advanceHighWaterMarkFromPromisedSortKeys = false;
 }
 
 boost::optional<AsyncResultsMerger::MinSortKeyRemotePair>
@@ -944,6 +999,13 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLoc
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
         smallestRemote->eligibleForHighWaterMark) {
+        // If the caller may undo this 'nextReady()' call, save the current high water marks so
+        // that 'undoNextReady()' can restore them. This prevents an undone overfetched event from
+        // advancing the client-visible high water mark.
+        if (_undoModeEnabled) {
+            _highWaterMarkBeforeUndo = _highWaterMark;
+            _clientHighWaterMarkBeforeUndo = _clientHighWaterMark;
+        }
         _updateHighWaterMark(lk, *std::get<ClusterQueryResult>(result).getResult());
     }
 
@@ -1000,6 +1062,12 @@ void AsyncResultsMerger::_updateHighWaterMark(WithLock, const BSONObj& value) {
         _highWaterMark, nextHighWaterMark, *_params.getSort()));
     _highWaterMark = std::move(nextHighWaterMark);
     LOGV2_DEBUG(12163602, 5, "Updated high water mark", "highWaterMark"_attr = _highWaterMark);
+
+    // Advance the client-visible high water mark to match, but never roll it back.
+    if (_clientHighWaterMark.isEmpty() ||
+        compareSortKeys(_highWaterMark, _clientHighWaterMark, *_params.getSort()) > 0) {
+        _clientHighWaterMark = _highWaterMark;
+    }
 }
 
 boost::optional<Milliseconds> AsyncResultsMerger::_calculateEffectiveAwaitDataTimeout(
@@ -1024,6 +1092,12 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
+
+    // Test-only override, only reachable while the failpoint is enabled.
+    if (auto scoped = overrideBatchSizeForShardGetMore.scoped();
+        MONGO_unlikely(scoped.isActive())) {
+        getMoreRequest.setBatchSize(scoped.getData().getIntField("batchSize"));
+    }
 
     if (auto effectiveAwaitDataTimeout = _calculateEffectiveAwaitDataTimeout(lk)) {
         getMoreRequest.setMaxTimeMS(
