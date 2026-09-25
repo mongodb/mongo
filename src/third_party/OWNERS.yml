@@ -99,16 +99,16 @@ filters:
       - 10gen/server-workload-resilience
   - "opentelemetry-cpp":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "opentelemetry-proto":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "pcre2":
     approvers:
       - 10gen/query-execution
   - "prometheus-cpp":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "protobuf":
     approvers:
       - 10gen/server-networking-and-observability
