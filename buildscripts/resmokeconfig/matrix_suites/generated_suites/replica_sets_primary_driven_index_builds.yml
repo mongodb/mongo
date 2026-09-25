@@ -34,7 +34,6 @@ selector:
     - requires_rollbacks
     - requires_index_build_resumability
   roots:
-    - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js
     - jstests/replsets/container_operations.js
 test_kind: js_test

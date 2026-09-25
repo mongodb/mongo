@@ -124,7 +124,6 @@
     selector:
       exclude_files: null
       roots:
-        - jstests/replsets/*index_build*.js
         - jstests/replsets/**/*index_build*.js
         - jstests/replsets/container_operations.js
 - name: all_sharding_index_builds_tests_selector

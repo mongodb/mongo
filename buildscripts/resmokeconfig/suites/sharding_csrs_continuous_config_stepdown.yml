@@ -83,7 +83,6 @@ selector:
     - jstests/sharding/analyze_shard_key/persist_sampled_read_queries.js
     - jstests/sharding/analyze_shard_key/persist_sampled_write_queries.js
     - jstests/sharding/analyze_shard_key/refresh_sample_rates.js
-    - jstests/sharding/clear_jumbo.js
     - jstests/sharding/cluster_cardinality_parameter_interrupt.js
     - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
     - jstests/sharding/read_after_optime.js
@@ -115,7 +114,6 @@ selector:
     # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
     # retries aren't supported.
     - jstests/sharding/coll_epoch_test1.js
-    - jstests/sharding/move_stale_mongos.js
     - jstests/sharding/shard4.js
     - jstests/sharding/shard5.js
     - jstests/sharding/split_stale_mongos.js
@@ -327,7 +325,6 @@ selector:
     - jstests/sharding/index_and_collection_option_propagation.js
     - jstests/sharding/mongos_rs_shard_failure_tolerance.js
     - jstests/sharding/mongos_shard_failure_tolerance.js
-    - jstests/sharding/read_pref.js
     - jstests/sharding/query/change_streams/config_server_data_shard_error_handling.js
     - jstests/sharding/query/count/count_secondaryok.js
     - jstests/sharding/query/allow_partial_results.js

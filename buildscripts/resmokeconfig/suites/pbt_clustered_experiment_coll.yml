@@ -18,7 +18,7 @@ selector:
     # Tests require sharding
     - jstests/core_sharding/**/*.js
     # Tests that do not use setupCollection() or otherwise bypass creating an experiment collection.
-    - jstests/core/query/express_pbt.js
+    - jstests/core/index/express_pbt.js
     - jstests/aggregation/sources/documents/collectionless_options_pbt.js
 
 executor:

@@ -5,8 +5,6 @@ selector:
     - jstests/core/**/*.js
 
   exclude_files:
-    # Compound wildcard indexes aren't available in API V1.
-    - jstests/core/administrative/validate_db_metadata_command.js
     # The following tests check $indexStats and are not expecting to see implicitly created indexes.
     - jstests/core/timeseries/ddl/timeseries_index_stats.js
     # The following tests already create some of the indexes we would create implicitly, and may
