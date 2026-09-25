@@ -5,6 +5,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
@@ -85,9 +86,7 @@ public:
     QueryShapeConfiguration makeQueryShapeConfiguration(const BSONObj& cmdBSON,
                                                         const QuerySettings& querySettings) {
         auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON).queryShapeHash;
-        QueryShapeConfiguration config(queryShapeHash, querySettings);
-        config.setRepresentativeQuery(cmdBSON);
-        return config;
+        return QueryShapeConfiguration(queryShapeHash, querySettings);
     }
 
     BSONObj makeQuerySettingsClusterParameter(const QueryShapeConfigurationsWithTimestamp& config) {
@@ -217,6 +216,47 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
         ASSERT_BSONOBJ_EQ(
             bob.done(), makeQuerySettingsClusterParameter(QueryShapeConfigurationsWithTimestamp()));
     }
+}
+
+/**
+ * Tests that a legacy cluster parameter value carrying the removed inline 'representativeQuery'
+ * field (written by binaries predating the dedicated representative queries collection) is
+ * accepted, and that the field does not round-trip back into the serialized parameter.
+ */
+TEST_F(QuerySettingsClusterParameterTest, LegacyInlineRepresentativeQueryIsIgnored) {
+    boost::optional<TenantId> tenantId;
+    auto sp = std::make_unique<QuerySettingsClusterParameter>(
+        QuerySettingsService::getQuerySettingsClusterParameterName(),
+        ServerParameterType::kClusterWide);
+
+    // The legacy inline 'representativeQuery' field (written by binaries predating the dedicated
+    // representative queries collection) must be accepted but ignored. Field names are literal on
+    // purpose: this test pins the wire format. The empty-named root element matches 'set()'.
+    ASSERT_OK(sp->set(fromjson(R"({
+        "": {
+            _id: "querySettings",
+            settingsArray: [{
+                queryShapeHash: "0000000000000000000000000000000000000000000000000000000000000001",
+                settings: {reject: true},
+                representativeQuery: {find: "exampleColl", $db: "foo"}
+            }],
+            clusterParameterTime: Timestamp(1, 2)
+        }
+    })")
+                          .firstElement(),
+                      tenantId));
+
+    BSONObjBuilder bob;
+    sp->append(
+        opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName(), tenantId);
+    ASSERT_BSONOBJ_EQ_UNORDERED(bob.done(), fromjson(R"({
+        _id: "querySettings",
+        settingsArray: [{
+            queryShapeHash: "0000000000000000000000000000000000000000000000000000000000000001",
+            settings: {reject: true}
+        }],
+        clusterParameterTime: Timestamp(1, 2)
+    })"));
 }
 
 /**

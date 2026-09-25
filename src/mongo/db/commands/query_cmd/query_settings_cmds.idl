@@ -19,6 +19,10 @@ structs:
         inline_chained_structs: true
         chained_structs:
             QueryShapeConfiguration: queryShapeConfiguration
+        fields:
+            representativeQuery:
+                type: object_owned
+                optional: true
 
 commands:
     setQuerySettings:

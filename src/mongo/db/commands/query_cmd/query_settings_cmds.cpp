@@ -300,7 +300,7 @@ public:
                         queryShapeConfigurations.push_back(newQueryShapeConfiguration);
 
                         // Update the reply with the new query shape configuration.
-                        newQueryShapeConfiguration.setRepresentativeQuery(representativeQuery);
+                        reply.setRepresentativeQuery(representativeQuery);
                         reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
                     } else {
                         // Update an existing query settings entry by updating the existing

@@ -27,8 +27,6 @@ using QueryInstance = BSONObj;
 struct QueryShapeConfigCachedEntry {
     QuerySettings querySettings;
 
-    // TODO SERVER-105064 Remove this property once 9.0 is last-lts.
-    boost::optional<QueryInstance> representativeQuery_deprecated;
     bool hasRepresentativeQuery;
 };
 

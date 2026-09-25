@@ -170,26 +170,17 @@ if (desugarAssertable) {
                 {
                     $lookup: {
                         from: {db: "config", coll: "queryShapeRepresentativeQueries"},
-                        as: "__backfilledRepresentativeQuery",
+                        pipeline: [{$replaceRoot: {newRoot: "$representativeQuery"}}],
+                        as: "representativeQuery",
                         localField: "queryShapeHash",
                         foreignField: "_id",
+                        let: {},
                     },
                 },
                 {
                     $unwind: {
-                        path: "$__backfilledRepresentativeQuery",
+                        path: "$representativeQuery",
                         preserveNullAndEmptyArrays: "?bool",
-                    },
-                },
-                {
-                    $addFields: {
-                        representativeQuery: {
-                            $ifNull: [
-                                "$__backfilledRepresentativeQuery.representativeQuery",
-                                "$representativeQuery",
-                            ],
-                        },
-                        __backfilledRepresentativeQuery: "$$REMOVE",
                     },
                 },
                 {$_internalQuerySettingsDebugShape: {}},

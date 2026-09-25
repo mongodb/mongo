@@ -1132,9 +1132,8 @@ void QuerySettingsService::sanitizeQuerySettingsHints(
         if (isDefault(settings)) {
             LOGV2_WARNING(9646003,
                           "query settings became default after index hint sanitization",
-                          "queryShapeShash"_attr = queryShapeItem.getQueryShapeHash().toHexString(),
-                          "queryInstance"_attr = queryShapeItem.getRepresentativeQuery().map(
-                              [](const BSONObj& b) { return redact(b); }));
+                          "queryShapeShash"_attr =
+                              queryShapeItem.getQueryShapeHash().toHexString());
             return true;
         }
         return false;

@@ -295,14 +295,16 @@ TEST_F(QuerySettingsValidationTestFixture,
        QueryShapeConfigurationsValidationFailsOnBSONObjectTooLarge) {
     QueryShapeConfigurationsWithTimestamp config;
     QuerySettings querySettings;
-    std::string largeString(10 * 1024 * 1024, 'a');
-    const BSONObj query = BSON("find" << "testColl" << "$db" << "testDB" << "filter"
-                                      << BSON("$gt" << BSON(largeString << 1)));
+    // Two ~10MB hint keys (a single BSON object cannot exceed BSONObjMaxUserSize = 16MB, so the
+    // overflow must come from two separate objects) push the serialized configuration past the
+    // 16MB limit.
+    std::string largeString1(10 * 1024 * 1024, 'a');
+    std::string largeString2(10 * 1024 * 1024, 'b');
     querySettings.setIndexHints({{
-        IndexHintSpec(makeNamespace("testDB", "testColl"), {IndexHint(BSON(largeString << 1))}),
+        IndexHintSpec(makeNamespace("testDB", "testColl"),
+                      {IndexHint(BSON(largeString1 << 1)), IndexHint(BSON(largeString2 << 1))}),
     }});
     QueryShapeConfiguration queryShapeConfiguration(query_shape::QueryShapeHash(), querySettings);
-    queryShapeConfiguration.setRepresentativeQuery(query);
     config.queryShapeConfigurations = {queryShapeConfiguration};
     ASSERT_THROWS_CODE(service().validateQueryShapeConfigurations(config),
                        DBException,

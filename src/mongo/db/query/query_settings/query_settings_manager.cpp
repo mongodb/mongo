@@ -23,7 +23,6 @@ auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsA
             {queryShapeConfiguration.getQueryShapeHash(),
              QueryShapeConfigCachedEntry{
                  .querySettings = queryShapeConfiguration.getSettings(),
-                 .representativeQuery_deprecated = queryShapeConfiguration.getRepresentativeQuery(),
                  // Initially assume that no representative query is present. If one is present in
                  // "config.queryShapeRepresentativeQueries", the next backfill attempt will update
                  // this flag to reflect the correct state.
@@ -146,10 +145,7 @@ QueryShapeConfigurationsWithTimestamp QuerySettingsManager::getAllQueryShapeConf
     configurations.reserve(queryShapeHashToQueryShapeConfigurationsMap.size());
     for (const auto& [queryShapeHash, queryShapeConfiguration] :
          queryShapeHashToQueryShapeConfigurationsMap) {
-        auto& newConfiguration =
-            configurations.emplace_back(queryShapeHash, queryShapeConfiguration.querySettings);
-        newConfiguration.setRepresentativeQuery(
-            queryShapeConfiguration.representativeQuery_deprecated);
+        configurations.emplace_back(queryShapeHash, queryShapeConfiguration.querySettings);
     }
     return QueryShapeConfigurationsWithTimestamp{std::move(configurations), clusterParameterTime};
 }

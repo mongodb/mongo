@@ -71,9 +71,7 @@ public:
     QueryShapeConfiguration makeQueryShapeConfiguration(const QuerySettings& settings,
                                                         QueryInstance query) {
         auto queryShapeHash = createRepresentativeInfo(opCtx(), query).queryShapeHash;
-        QueryShapeConfiguration result(queryShapeHash, settings);
-        result.setRepresentativeQuery(query);
-        return result;
+        return QueryShapeConfiguration(queryShapeHash, settings);
     }
 
     void setUp() final {

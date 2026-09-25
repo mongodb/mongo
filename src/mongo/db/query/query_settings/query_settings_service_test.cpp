@@ -179,9 +179,7 @@ public:
     QueryShapeConfiguration makeQueryShapeConfiguration(const BSONObj& cmdBSON,
                                                         const QuerySettings& querySettings) {
         auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON).queryShapeHash;
-        QueryShapeConfiguration config(queryShapeHash, querySettings);
-        config.setRepresentativeQuery(cmdBSON);
-        return config;
+        return QueryShapeConfiguration(queryShapeHash, querySettings);
     }
 
     std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations() {

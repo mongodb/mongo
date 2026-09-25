@@ -99,16 +99,14 @@ structs:
 
     QueryShapeConfiguration:
         description: >-
-            Struct representing configuration for a particular query shape of the
-            'representativeQuery'. Configuration consists of query settings that will
-            be applied to all query instances of the query shape.
+            Struct representing configuration for a particular query shape. Configuration
+            consists of query settings that will be applied to all query instances of the
+            query shape. The representative query for the query shape is stored in the
+            dedicated 'config.queryShapeRepresentativeQueries' collection.
         strict: false
         fields:
             queryShapeHash: QueryShapeHash
             settings: QuerySettings
-            representativeQuery:
-                type: object_owned
-                optional: true
 
     QueryShapeRepresentativeQuery:
         description: >-

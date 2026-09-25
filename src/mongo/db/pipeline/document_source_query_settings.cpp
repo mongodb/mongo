@@ -9,7 +9,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_internal_query_settings_debug_shape.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
@@ -158,37 +157,24 @@ DocumentSourceContainer DocumentSourceQuerySettings::createFromBson(
     pipeline.push_back(
         DocumentSourceInternalListQuerySettings::createFromBson(seedSpec.firstElement(), expCtx));
 
-    // Join the matching representative query for each configuration into
-    // '__backfilledRepresentativeQuery', distinct from 'representativeQuery' so the join does not
-    // clobber that field: before FCV 8.3, representative queries live embedded in the
-    // configuration alongside its settings; from 8.3 onward (once 'featureFlagPQSBackfill' is
-    // enabled) they are backfilled into the dedicated collection instead, and on downgrade below
-    // 8.3 they are moved back and the collection is dropped. The dedicated collection lives on the
-    // config server; $lookup merges there for us.
+    // Representative queries live in the dedicated collection on the config server, which is why
+    // the seed stage is routed there (see its stage constraints) and the join resolves locally.
+    // Unwrap the matched document in the lookup so the result is the representative query itself.
     pipeline.push_back(DocumentSourceLookUp::createFromBson(
         BSON("$lookup" << BSON("from" << BSON("db" << repQueriesNss.dbName().toStringForResourceId()
                                                    << "coll" << repQueriesNss.coll())
                                       << "localField" << "queryShapeHash" << "foreignField"
-                                      << "_id" << "as" << "__backfilledRepresentativeQuery"))
+                                      << "_id" << "pipeline"
+                                      << BSON_ARRAY(BSON("$replaceRoot" << BSON(
+                                                             "newRoot" << "$representativeQuery")))
+                                      << "as" << "representativeQuery"))
             .firstElement(),
         expCtx));
 
     // Flatten the 0-or-1 element $lookup array, keeping configurations that have no matching
-    // backfilled representative query ('includeNullIfEmptyOrMissing').
-    pipeline.push_back(DocumentSourceUnwind::create(expCtx,
-                                                    "__backfilledRepresentativeQuery",
-                                                    true /* includeNullIfEmptyOrMissing */,
-                                                    boost::none));
-
-    // Prefer the backfilled representative query. When there was no match, fall back to the
-    // pre-8.3 representative query already embedded in the configuration; otherwise the field is
-    // omitted entirely. Drop the scratch join field in the same stage.
-    pipeline.push_back(DocumentSourceAddFields::create(
-        BSON("representativeQuery"
-             << BSON("$ifNull" << BSON_ARRAY("$__backfilledRepresentativeQuery.representativeQuery"
-                                             << "$representativeQuery"))
-             << "__backfilledRepresentativeQuery" << "$$REMOVE"),
-        expCtx));
+    // representative query ('includeNullIfEmptyOrMissing' keeps the field absent).
+    pipeline.push_back(DocumentSourceUnwind::create(
+        expCtx, "representativeQuery", true /* includeNullIfEmptyOrMissing */, boost::none));
 
     // Optionally append the debug query shape computation.
     if (showDebugQueryShape) {

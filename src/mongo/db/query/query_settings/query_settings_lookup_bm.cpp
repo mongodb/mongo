@@ -233,14 +233,11 @@ public:
             BSONObjBuilder bob;
             auto parsedFind = request_generator::generateSmallParsedFindRequest(expCtx, nss, bob);
             query_shape::FindCmdShape findCmdShape(*parsedFind, expCtx);
-            auto query = bob.obj();
 
             QuerySettings querySettings;
             querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-            QueryShapeConfiguration result(
+            return QueryShapeConfiguration(
                 findCmdShape.sha256Hash(opCtx.get(), kSerializationContext), querySettings);
-            result.setRepresentativeQuery(query);
-            return result;
         };
 
         for (auto i = 0; i < dummyQuerySettingsCount; i++) {
@@ -285,7 +282,6 @@ public:
                     query_shape::FindCmdShape(*parsedFindRequest, expCtx)
                         .sha256Hash(opCtx.get(), kSerializationContext),
                     querySettings};
-                hitQueryShapeConfiguration.setRepresentativeQuery(bob.asTempObj().getOwned());
 
                 // Update the query shape configurations by adding a new one, which will be used for
                 // the lookup.

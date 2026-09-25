@@ -49,9 +49,10 @@ function testQuerySettingsUsing(params) {
         // invoking setQuerySettings command.
         {
             qsutils.assertExplainQuerySettings(params.queryA, undefined);
-            assert.commandWorked(
+            const response = assert.commandWorked(
                 db.adminCommand({setQuerySettings: params.queryA, settings: params.querySettingsA}),
             );
+            assert.neq(response.representativeQuery, undefined);
             qsutils.assertQueryShapeConfiguration([
                 qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
             ]);
