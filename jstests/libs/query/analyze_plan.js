@@ -778,7 +778,10 @@ export function getRejectedPlans(root) {
             return getRejectedPlans(root.shards[shardName]);
         }
     } else {
-        return root.stages[0]["$cursor"].queryPlanner.rejectedPlans;
+        const firstStage = root.stages[0];
+        const cursorStage = firstStage && (firstStage.$cursor || firstStage.$geoNearCursor);
+        assert(cursorStage, "expected a leading cursor stage", {root});
+        return getRejectedPlans(cursorStage);
     }
 }
 
@@ -873,6 +876,15 @@ export function getExecutionStages(root) {
 export function getExecutionStats(root) {
     if (root.hasOwnProperty("shards")) {
         return Object.values(root.shards).map((shardExplain) => shardExplain.executionStats);
+    }
+    // If the root does not have executionStats but has stages, it is likely a classic pipeline
+    // with a leading cursor stage.
+    if (!root.hasOwnProperty("executionStats") && Array.isArray(root.stages)) {
+        const firstStage = root.stages[0];
+        const cursorStage = firstStage && (firstStage.$cursor || firstStage.$geoNearCursor);
+        assert(cursorStage, root);
+        assert(cursorStage.hasOwnProperty("executionStats"), root);
+        return [cursorStage.executionStats];
     }
     assert(root.hasOwnProperty("executionStats"), root);
     if (
@@ -1033,8 +1045,15 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
     function getStagesFromQueryLayerOutput(queryLayerOutput) {
         let results = [];
 
-        assert(queryLayerOutput.hasOwnProperty("queryPlanner"));
-        assert(queryLayerOutput.queryPlanner.hasOwnProperty("winningPlan"));
+        assert(queryLayerOutput.hasOwnProperty("queryPlanner"), "missing queryPlanner section", {
+            queryLayerOutput,
+        });
+        const queryPlanner = queryLayerOutput.queryPlanner;
+        assert(
+            isV3QueryPlanner(queryPlanner) || queryPlanner.hasOwnProperty("winningPlan"),
+            "missing plans or winningPlan",
+            {queryLayerOutput},
+        );
 
         // If execution stats are available, then use the execution stats tree. Otherwise use the
         // plan info from the "queryPlanner" section.
@@ -1044,9 +1063,7 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
                 getPlanStages(queryLayerOutput.executionStats.executionStages, stage),
             );
         } else {
-            results = results.concat(
-                getPlanStages(getWinningPlanFromExplain(queryLayerOutput.queryPlanner), stage),
-            );
+            results = results.concat(getPlanStages(getWinningPlanFromExplain(queryPlanner), stage));
         }
 
         return results;

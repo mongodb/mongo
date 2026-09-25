@@ -8,6 +8,7 @@
  * future "V3-ification" of the retained section must fail here instead of shipping silently.
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -61,12 +62,14 @@ function assertExecStatsParity(explainedCommand) {
         db.runCommand({explain: explainedCommand, verbosity: "execStats"}),
     );
     assert.eq(v3.explainVersion, "3", "V3 mode must report explainVersion 3", {v3});
-    assert(legacy.executionStats, "missing legacy executionStats", {legacy});
-    assert(v3.executionStats, "missing V3 executionStats", {v3});
+    const [legacyExecStats] = getExecutionStats(legacy);
+    const [v3ExecStats] = getExecutionStats(v3);
+    assert(legacyExecStats, "missing legacy executionStats", {legacy});
+    assert(v3ExecStats, "missing V3 executionStats", {v3});
     // The designed difference vs the legacy *allPlansExecution* verbosity is the absence of the
     // allPlansExecution array; vs the legacy executionStats verbosity compared here, the sections
     // must be information-identical, so the comparison is strict in both directions.
-    assertParity(legacy.executionStats, v3.executionStats, "executionStats");
+    assertParity(legacyExecStats, v3ExecStats, "executionStats");
 }
 
 describe("V3 execStats executionStats section parity with legacy executionStats", function () {
@@ -133,6 +136,31 @@ describe("V3 execStats executionStats section parity with legacy executionStats"
 
     it("single-plan find", function () {
         assertExecStatsParity({find: collName, filter: {nonexistent: 1}});
+    });
+
+    it("fully-lowered aggregate", function () {
+        // Optimized away into a find-shaped plan, so the sections sit at the response root.
+        assertExecStatsParity({
+            aggregate: collName,
+            pipeline: [{$match: {a: {$gte: 0}, b: {$gte: 0}}}],
+            cursor: {},
+        });
+    });
+
+    it("classic pipeline aggregate", function () {
+        // $_internalInhibitOptimization keeps this a DocumentSource pipeline, so the sections are
+        // produced by DocumentSourceCursor::serialize() and nested under the $cursor stage. Only
+        // that section is compared: the sibling queryPlanner legitimately differs between the two
+        // verbosities (V3 renders a 'plans' array), which is what the rest of this directory covers.
+        assertExecStatsParity({
+            aggregate: collName,
+            pipeline: [
+                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+                {$_internalInhibitOptimization: {}},
+                {$group: {_id: "$b", c: {$sum: 1}}},
+            ],
+            cursor: {},
+        });
     });
 
     it("count", function () {

@@ -168,26 +168,13 @@ public:
 
     /**
      * Writes the explain information about the underlying pipeline to a std::vector<Value>,
-     * providing the level of detail specified by 'verbosity'.
+     * providing the level of detail and format specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
         auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
         return explainPolicyFor(verbosity).hasExecStats()
             ? mergeExplains(*_pipeline, *_execPipeline, opts)
             : _pipeline->writeExplainOps(opts);
-    }
-
-    /**
-     * The V3 analogue of writeExplainOps(): the hook where the new (version 3) pipeline "stages"
-     * output will be produced. It is invoked in place of writeExplainOps() when a V3 explain
-     * verbosity is requested. It takes the real requested V3 verbosity and, for now, maps it to the
-     * nearest legacy verbosity internally and reuses writeExplainOps().
-     *
-     * TODO SERVER-130810 Implement the V3 pipeline output format here, replacing the interim
-     * mapV3ToLegacyVerbosity() delegation.
-     */
-    std::vector<Value> writeExplainOpsV3(ExplainOptions::Verbosity v3Verbosity) const {
-        return writeExplainOps(mapV3ToLegacyVerbosity(v3Verbosity));
     }
 
     boost::optional<std::string_view> getExecutorType() const override {

@@ -21,9 +21,7 @@ inline ::MongoExtensionExplainVerbosity convertHostVerbosityToExtVerbosity(
         case mongo::ExplainOptions::Verbosity::kExecAllPlans:
             return ::MongoExtensionExplainVerbosity::kExecAllPlans;
         // The V3 verbosity modes have no distinct extension-facing representation yet, so map each
-        // to the nearest legacy verbosity. Extension stages run on the aggregation explain path,
-        // which stays legacy-delegated end-to-end. TODO SERVER-130810 revisit together with the
-        // aggregation V3 output format.
+        // to the nearest legacy verbosity. TODO SERVER-134890 revisit V3 support for extensions.
         case mongo::ExplainOptions::Verbosity::kPlanSummary:
         case mongo::ExplainOptions::Verbosity::kPlannerChoice:
             return ::MongoExtensionExplainVerbosity::kQueryPlanner;

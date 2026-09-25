@@ -51,12 +51,19 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         if (legacyRes === null) {
             return res;
         }
-        // The V3 shape assertions apply on the classic find path, where the real V3 shape is
-        // produced (other paths still delegate to mapped legacy sections).
-        if (res.ok && res.queryPlanner && res.queryPlanner.hasOwnProperty("plans")) {
-            assert(!res.hasOwnProperty("executionStats"), res);
-            assert(Array.isArray(res.queryPlanner.plans), res);
-            assert.gte(res.queryPlanner.plans.length, 1, res);
+        // Locate the subdocument holding the executionStats and plans: at the root for a find or a
+        // fully-lowered aggregate, or the leading $cursor stage for a pipeline that stayed a
+        // classic DocumentSource pipeline.
+        const container = Array.isArray(res.stages)
+            ? (res.stages[0]?.$cursor ?? res.stages[0]?.$geoNearCursor)
+            : res;
+        // The V3 shape assertions apply wherever the real V3 shape is produced: the classic find
+        // path, and the $cursor stage of a classic aggregation pipeline (other paths still
+        // delegate to mapped legacy sections).
+        if (res.ok && container && container.queryPlanner?.hasOwnProperty("plans")) {
+            assert(!container.hasOwnProperty("executionStats"), res);
+            assert(Array.isArray(container.queryPlanner.plans), res);
+            assert.gte(container.queryPlanner.plans.length, 1, res);
         }
         return legacyRes;
     }

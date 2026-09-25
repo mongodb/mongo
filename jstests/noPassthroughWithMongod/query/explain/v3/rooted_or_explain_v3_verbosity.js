@@ -46,18 +46,46 @@ describe("V3 explain verbosity on rooted $or queries", function () {
     // V3 modes: must be rejected.
     const v3Verbosities = ["planSummary", "plannerChoice", "plannerStats", "execStats"];
 
-    for (const verbosity of v3Verbosities) {
-        it(`rejects V3 verbosity '${verbosity}'`, function () {
-            assert.commandFailedWithCode(
-                db.runCommand({
-                    explain: {
-                        find: collName,
-                        filter: {$or: [{a: 2}, {b: 3}]},
-                    },
-                    verbosity,
-                }),
-                kV3OnRootedOrErrorCodes,
-            );
-        });
+    const rootedOr = {$or: [{a: 2}, {b: 3}]};
+
+    const commands = [
+        {name: "find", command: {find: collName, filter: rootedOr}},
+        {
+            name: "agg-lowered",
+            command: {aggregate: collName, pipeline: [{$match: rootedOr}], cursor: {}},
+        },
+        {
+            name: "agg-cursor-stage",
+            command: {
+                aggregate: collName,
+                pipeline: [
+                    {$match: rootedOr},
+                    // Prevent pipeline from being optimized away.
+                    {$_internalInhibitOptimization: {}},
+                    {$group: {_id: "$a", c: {$sum: 1}}},
+                ],
+                cursor: {},
+            },
+        },
+    ];
+
+    for (const {name, command} of commands) {
+        for (const verbosity of v3Verbosities) {
+            it(`rejects V3 verbosity '${verbosity}' for ${name}`, function () {
+                assert.commandFailedWithCode(
+                    db.runCommand({explain: command, verbosity}),
+                    kV3OnRootedOrErrorCodes,
+                );
+            });
+        }
+    }
+
+    // The legacy verbosities are unaffected by the restriction on either path.
+    for (const {name, command} of commands) {
+        for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
+            it(`allows legacy verbosity '${verbosity}' for ${name}`, function () {
+                assert.commandWorked(db.runCommand({explain: command, verbosity}));
+            });
+        }
     }
 });

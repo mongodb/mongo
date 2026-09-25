@@ -15,12 +15,14 @@
  * statistics without executing the query, and execStats adds exactly the retained legacy
  * kExecStats section (never an allPlansExecution array - that content lives in
  * queryPlanner.plans[]). planSummary remains legacy-delegated (-> queryPlanner) until
- * SERVER-133235. The aggregation path remains legacy-delegated end-to-end
- * (TODO SERVER-130810), so not-fully-lowered pipelines keep the mapped legacy shapes
- * (plannerStats -> allPlansExecution, still executing the pipeline).
+ * SERVER-133235.
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getQueryPlanner,
+    isV3QueryPlanner,
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 
@@ -44,14 +46,7 @@ const testQueries = [
         },
     },
     {
-        // A $unionWith followed by a $match: the trailing $match is duplicated across the union in
-        // DocumentSourceUnionWith::optimizeAt(), whose explain bookkeeping (_pushedDownStages) is
-        // driven by the policy of the originally requested (possibly V3) verbosity, while the emit side
-        // (serialize()) runs at the translated legacy verbosity until the aggregation path produces
-        // real V3 output. This case guards that the V3 planner-side modes (which now report
-        // hasExecStats() == false and record no pushed-down stages) still emit no execution content
-        // and keep producing a well-formed explain.
-        // TODO SERVER-130810 once the aggregate path threads the real V3 verbosity end-to-end.
+        // A $unionWith followed by a $match: the trailing $match is duplicated across the union.
         name: "agg-unionWith",
         command: {
             aggregate: collName,
@@ -65,25 +60,15 @@ const testQueries = [
 ];
 
 // Per verbosity: the reported explain version and the highest (inclusive) section it produces.
-// 'topSectionByQuery' overrides the default for queries on paths with a different fidelity (the
-// legacy-delegated aggregation path, TODO SERVER-130810).
 const V3 = "3";
 const LEGACY = ["1", "2"]; // engine-determined (Classic / SBE)
 const verbosityExpectations = {
     // V3 modes.
     planSummary: {version: V3, topSection: "queryPlanner"},
     plannerChoice: {version: V3, topSection: "queryPlanner"},
-    // The find path emits no execution sections at all (trial statistics live in
-    // queryPlanner.plans[] and the query is not executed); the aggregation path still executes
-    // and renders the mapped legacy allPlansExecution shape for not-fully-lowered pipelines.
-    plannerStats: {
-        version: V3,
-        topSection: "queryPlanner",
-        topSectionByQuery: {
-            "agg-pipeline": "allPlansExecution",
-            "agg-unionWith": "allPlansExecution",
-        },
-    },
+    // No execution sections at all: the trial statistics live in queryPlanner.plans[] and neither
+    // the query nor the pipeline is executed.
+    plannerStats: {version: V3, topSection: "queryPlanner"},
     execStats: {version: V3, topSection: "executionStats"},
     // Legacy modes, for regression coverage.
     queryPlanner: {version: LEGACY, topSection: "queryPlanner"},
@@ -132,9 +117,7 @@ describe("explain V3 verbosity modes", function () {
     });
 
     for (const {name, command} of testQueries) {
-        for (const [verbosity, {version, topSection, topSectionByQuery}] of Object.entries(
-            verbosityExpectations,
-        )) {
+        for (const [verbosity, {version, topSection}] of Object.entries(verbosityExpectations)) {
             it(`${name} @ ${verbosity}`, function () {
                 const explain = assert.commandWorked(db.runCommand({explain: command, verbosity}));
 
@@ -148,9 +131,7 @@ describe("explain V3 verbosity modes", function () {
                 }
 
                 // Sections are present up to and including 'topSection', and absent after it.
-                const effectiveTopSection =
-                    (topSectionByQuery && topSectionByQuery[name]) || topSection;
-                const topIndex = SECTIONS.indexOf(effectiveTopSection);
+                const topIndex = SECTIONS.indexOf(topSection);
                 SECTIONS.forEach((section, index) => {
                     assert.eq(
                         hasSection(explain, section),
@@ -280,6 +261,99 @@ describe("V3 stats-rich output shape (find path)", function () {
             !execStats.executionStats.hasOwnProperty("allPlansExecution"),
             "unexpected allPlansExecution",
             {execStats},
+        );
+    });
+});
+
+describe("V3 for aggregation pipelines", function () {
+    // $_internalInhibitOptimization keeps this a classic DocumentSource pipeline.
+    const aggCommand = {
+        aggregate: collName,
+        pipeline: [
+            {$match: {a: {$lt: 2}}},
+            {$_internalInhibitOptimization: {}},
+            {$group: {_id: "$a", c: {$sum: 1}}},
+        ],
+        cursor: {},
+    };
+    let savedFrameworkControl;
+
+    before(function () {
+        savedFrameworkControl = assert.commandWorked(
+            db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+        ).internalQueryFrameworkControl;
+        // TODO SERVER-132033 remove once SBE-eligible plans are supported in V3.
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+        );
+
+        const coll = db[collName];
+        coll.drop();
+        assert.commandWorked(
+            coll.insert([
+                {a: 1, b: 1},
+                {a: 2, b: 2},
+                {a: 2, b: 3},
+            ]),
+        );
+        assert.commandWorked(coll.createIndex({a: 1}));
+    });
+
+    after(function () {
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: savedFrameworkControl,
+            }),
+        );
+    });
+
+    for (const verbosity of ["plannerChoice", "plannerStats", "execStats"]) {
+        it(`${verbosity} renders the V3 plans[] under $cursor`, function () {
+            const explain = assert.commandWorked(db.runCommand({explain: aggCommand, verbosity}));
+            assert.eq(explain.explainVersion, "3", "unexpected explainVersion", {explain});
+
+            const queryPlanner = getQueryPlanner(explain);
+            assert(isV3QueryPlanner(queryPlanner), "expected the V3 queryPlanner shape", {explain});
+            assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
+            assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
+                explain,
+            });
+
+            const leaf = getAggPlanStage(explain, "IXSCAN") || getAggPlanStage(explain, "COLLSCAN");
+            assert(leaf, "expected the query layer's access stage to be reachable", {explain});
+        });
+    }
+
+    it("plannerChoice and plannerStats do not execute the pipeline", function () {
+        for (const verbosity of ["plannerChoice", "plannerStats"]) {
+            const explain = assert.commandWorked(db.runCommand({explain: aggCommand, verbosity}));
+            assert(
+                !sectionsContainer(explain).hasOwnProperty("executionStats"),
+                `unexpected executionStats at ${verbosity}`,
+                {explain},
+            );
+            for (const stage of explain.stages) {
+                assert(
+                    !stage.hasOwnProperty("nReturned"),
+                    `unexpected per-stage execution stats at ${verbosity}`,
+                    {explain},
+                );
+            }
+        }
+    });
+
+    it("execStats adds the executionStats section under $cursor", function () {
+        const explain = assert.commandWorked(
+            db.runCommand({explain: aggCommand, verbosity: "execStats"}),
+        );
+        const executionStats = sectionsContainer(explain).executionStats;
+        assert(executionStats, "missing executionStats", {explain});
+        assert.eq(executionStats.executionSuccess, true, {explain});
+        assert(
+            !executionStats.hasOwnProperty("allPlansExecution"),
+            "unexpected allPlansExecution",
+            {explain},
         );
     });
 });

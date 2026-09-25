@@ -411,17 +411,6 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::optimizeAt(
         _sharedState->_pipeline->addFinalSource(
             nextStage->clone(_sharedState->_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.
-        //
-        // This reads the verbosity directly from the ExpressionContext, which holds the originally
-        // requested (possibly V3) verbosity rather than the translated legacy verbosity, so the V3
-        // planner-side modes (planSummary/plannerChoice/plannerStats) report hasExecStats() ==
-        // false here and record no pushed-down stages.
-        //
-        // TODO SERVER-130810 (aggregation V3): the emit side (serialize()) still runs at the
-        // translated legacy verbosity, which for plannerStats is kExecAllPlans — its reconstructed
-        // sub-pipeline therefore omits the stages not recorded here. That interim display gap is
-        // acceptable while the aggregation path remains legacy-delegated and closes when it threads
-        // the real V3 verbosity end-to-end.
         const auto& explainVerbosity = getExpCtx()->getExplain();
         if (explainVerbosity && explainPolicyFor(*explainVerbosity).hasExecStats()) {
             _pushedDownStages.push_back(nextStage->serialize().getDocument().toBson());
@@ -522,16 +511,12 @@ Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions
         //  sub-pipeline depends on if we've started reading from it. For instance, there could be a
         //  $limit stage after the $unionWith which results in only reading from the base collection
         //  branch and not the sub-pipeline.
-        // Unlike optimizeAt(), this path never sees a V3 verbosity: the aggregation explain path
-        // translates V3 to the nearest legacy verbosity before serializing (writeExplainOpsV3(),
-        // legacy-delegated until SERVER-130810).
         std::unique_ptr<Pipeline> pipeCopy;
-        if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
+        if (!explainPolicyFor(*opts.verbosity).hasExecStats()) {
             pipeCopy = Pipeline::create(_sharedState->_pipeline->getSources(),
                                         _sharedState->_pipeline->getContext());
-        } else if (explainPolicyFor(*opts.verbosity).hasExecStats() &&
-                   _sharedState->_executionState >
-                       UnionWithSharedState::ExecutionProgress::kIteratingSource) {
+        } else if (_sharedState->_executionState >
+                   UnionWithSharedState::ExecutionProgress::kIteratingSource) {
             std::vector<BSONObj> recoveredPipeline;
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
             // cached user pipeline and pushed down stages to get the explain output since the

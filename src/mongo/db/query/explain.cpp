@@ -658,43 +658,13 @@ void Explain::explainPipeline(PlanExecutor* exec,
     auto&& explainer = pipelineExec->getPlanExplainer();
     out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
 
-    // Dispatch on the verbosity. Each V3 verbosity is routed to writeExplainOpsV3() (the hook for
-    // the future V3 pipeline format), which receives the real requested verbosity and, for now,
-    // maps it to the nearest legacy verbosity internally and reuses the legacy writeExplainOps().
-    // Handing the stages a legacy verbosity keeps every DocumentSource's threshold checks (and
-    // DocumentSourceCursor's cross-check) consistent. The legacy verbosities keep the existing
-    // behavior. Exhaustive switch (no 'default') so any future verbosity must be classified here.
-    // TODO SERVER-130810 Replace the legacy delegation in writeExplainOpsV3() with the real V3
-    // pipeline format. (TODO SERVER-32732: an execution error should be reported in explain rather
-    // than failing the explain itself.)
-    switch (verbosity) {
-        case ExplainOptions::Verbosity::kPlanSummary:
-        case ExplainOptions::Verbosity::kPlannerChoice:
-            // Planner-only: do not execute the pipeline.
-            *out << "stages" << Value(pipelineExec->writeExplainOpsV3(verbosity));
-            break;
-        case ExplainOptions::Verbosity::kPlannerStats:
-            if (executePipeline) {
-                executePlan(pipelineExec);
-            }
-            *out << "stages" << Value(pipelineExec->writeExplainOpsV3(verbosity));
-            break;
-        case ExplainOptions::Verbosity::kExecStatsV3:
-            if (executePipeline) {
-                executePlan(pipelineExec);
-            }
-            *out << "stages" << Value(pipelineExec->writeExplainOpsV3(verbosity));
-            break;
-        case ExplainOptions::Verbosity::kQueryPlanner:
-        case ExplainOptions::Verbosity::kExecStats:
-        case ExplainOptions::Verbosity::kExecAllPlans:
-        case ExplainOptions::Verbosity::kInternal:
-            if (explainPolicyFor(verbosity).hasExecStats() && executePipeline) {
-                executePlan(pipelineExec);
-            }
-            *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
-            break;
+    // Only execute the pipeline if the verbosity policy requires execution statistics.
+    if (explainPolicyFor(verbosity).hasExecStats() && executePipeline) {
+        // (TODO SERVER-32732: an execution error should be reported in explain rather than failing
+        // the explain itself.)
+        executePlan(pipelineExec);
     }
+    *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
     // Report peak tracked memory only at executionStats verbosity or higher, matching how execution
