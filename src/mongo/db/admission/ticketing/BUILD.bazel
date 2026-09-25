@@ -31,6 +31,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "ticket_semaphore.h",
+        "unordered_ticket_semaphore.h",
     ],
     deps = [
         ":admission_context",

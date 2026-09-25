@@ -4,24 +4,34 @@
 #include "mongo/db/admission/ticketing/unordered_ticket_semaphore.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/random.h"
+
+#include <algorithm>
+#include <random>
 
 
 namespace mongo {
-
 namespace {
 
-Date_t nextDeadline(Date_t until) {
+constexpr Milliseconds kBasePollInterval{500};
+
+Date_t nextDeadline(Date_t until, Date_t now, Milliseconds pollInterval) {
+    return std::min(until, now + pollInterval);
+}
+
+Milliseconds jitteredPollInterval() {
     // Timed waits can be problematic if we have a large number of waiters, since each time we
     // check for interrupt we risk waking up all waiting threads at the same time. We introduce
     // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
     // the same time.
-    constexpr auto kBaseInterval = 500;
     constexpr double kJitterFactor = 0.2;
     static thread_local XorShift128 urbg(SecureRandom().nextInt64());
-    int32_t offset = std::uniform_int_distribution<int32_t>(-kJitterFactor * kBaseInterval,
-                                                            kBaseInterval * kJitterFactor)(urbg);
-    return std::min(until, Date_t::now() + Milliseconds{kBaseInterval + offset});
+    const auto base = kBasePollInterval.count();
+    int32_t offset =
+        std::uniform_int_distribution<int32_t>(-kJitterFactor * base, kJitterFactor * base)(urbg);
+    return kBasePollInterval + Milliseconds{offset};
 }
+
 }  // namespace
 
 bool UnorderedTicketSemaphore::tryAcquire() {
@@ -53,7 +63,7 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             return true;
         }
 
-        Date_t deadline = nextDeadline(until);
+        Date_t deadline = nextDeadline(until, Date_t::now(), jitteredPollInterval());
 
         if (!hasStartedWaiting) {
             // Read maxWaiters before we increment _waiters so callers can rely on

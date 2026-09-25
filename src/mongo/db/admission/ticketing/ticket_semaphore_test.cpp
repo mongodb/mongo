@@ -16,6 +16,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/packaged_task.h"
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -31,6 +32,11 @@ constexpr auto kWaitTimeout = Minutes{1};
 
 Date_t getDeadline() {
     return Date_t::now() + kWaitTimeout;
+}
+
+// Mirrors UnorderedTicketSemaphore::acquire() poll-deadline selection.
+Date_t pollDeadline(Date_t until, Date_t now, Milliseconds pollInterval) {
+    return std::min(until, now + pollInterval);
 }
 
 /**
@@ -761,6 +767,36 @@ TEST_P(TicketSemaphoreTest, ResizePositiveButRemainsNegativeKeepsWaitersBlocked)
         ASSERT_TRUE(result);
     }
     ASSERT_EQ(rawSem->available(), 0);
+}
+
+TEST(UnorderedTicketSemaphorePollDeadlineTest, BetweenPollWindows) {
+    // A deadline between poll intervals should be selected on the second wait.
+    constexpr auto kMinPoll = Milliseconds{400};
+    constexpr auto kMaxPoll = Milliseconds{600};
+    constexpr auto kBasePoll = Milliseconds{500};
+
+    const auto now = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto until = now + Milliseconds{650};
+
+    for (auto firstPoll : {kMinPoll, kBasePoll, kMaxPoll}) {
+        const auto firstDeadline = pollDeadline(until, now, firstPoll);
+        ASSERT_EQ(firstDeadline, now + firstPoll);
+        ASSERT_LT(firstDeadline, until);
+
+        for (auto secondPoll : {kMinPoll, kBasePoll, kMaxPoll}) {
+            ASSERT_EQ(pollDeadline(until, firstDeadline, secondPoll), until);
+        }
+    }
+}
+
+TEST(UnorderedTicketSemaphorePollDeadlineTest, ShortDeadline) {
+    // A deadline shorter than the poll interval should be selected on the first wait.
+    const auto now = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto until = now + Milliseconds{50};
+
+    for (auto poll : {Milliseconds{400}, Milliseconds{500}, Milliseconds{600}}) {
+        ASSERT_EQ(pollDeadline(until, now, poll), until);
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(UnorderedTicketSemaphore,
