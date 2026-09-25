@@ -3160,7 +3160,8 @@ Timestamp WiredTigerKVEngine::getBackupCheckpointTimestamp() {
 
 void WiredTigerKVEngine::dump() const {
     int ret = _conn->debug_info(
-        _conn, "cache=true,cursors=true,handles=true,log=true,sessions=true,txn=true");
+        _conn,
+        "cache=true,cache_top=true,cursors=true,handles=true,log=true,sessions=true,txn=true");
     auto status = wtRCToStatus(ret, nullptr, "WiredTigerKVEngine::dump()");
     if (status.isOK()) {
         LOGV2(6117700, "WiredTigerKVEngine::dump() completed successfully");

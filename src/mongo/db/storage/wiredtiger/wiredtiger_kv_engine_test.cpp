@@ -2147,5 +2147,15 @@ TEST_F(WiredTigerKVEngineTest, DropIdentReturnsLockBusyWhenSchemaLockHeld) {
     _helper.reset();
 }
 
+TEST_F(WiredTigerKVEngineTest, DumpAcceptsAllDebugInfoCategories) {
+    unittest::LogCaptureGuard logs;
+    _helper->getWiredTigerKVEngine()->dump();
+    logs.stop();
+
+    // A category WiredTiger doesn't know about makes debug_info() fail with EINVAL, so a successful
+    // dump means every category in the config string is still valid.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 6117700)), 1);
+}
+
 }  // namespace
 }  // namespace mongo
