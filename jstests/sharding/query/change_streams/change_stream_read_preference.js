@@ -5,6 +5,7 @@
 //   requires_profiling,
 //   uses_change_streams,
 // ]
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {enableLocalReadLogs} from "jstests/libs/local_reads.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
@@ -40,11 +41,13 @@ describe("change stream and update lookup read preference", function () {
             assert.commandWorked(coll.update({_id: -1}, {$set: {updated: true}}));
             assert.commandWorked(coll.update({_id: 1}, {$set: {updated: true}}));
 
-            // The updates above use the default write concern, so the secondaries may not have applied
-            // them yet. Applying an update on a secondary is itself an _id idhack that records an '_id_'
-            // index access; if it lands after we sample $indexStats below, it inflates the observed delta.
-            // Wait for both replica sets to catch up so the only in-window access is the update lookup.
-            st.awaitReplicationOnShards();
+            // The updates above use the default write concern, so their change events are not yet
+            // readable by the majority-read change stream: a change event (and its post-image
+            // lookup) only surfaces once it is majority-committed. Applying an update on a
+            // secondary is itself an _id idhack that records an '_id_' index access, so wait for
+            // both replica sets to reach the commit point, making the events immediately
+            // deliverable and leaving the update lookup as the only in-window access.
+            FixtureHelpers.awaitLastOpCommitted(db);
 
             // Consume both updates while observing where the post-image lookup ran on each shard.
             let changes;
@@ -162,7 +165,7 @@ describe("change stream and update lookup read preference", function () {
     afterEach(function () {
         // Drop all documents.
         assert.commandWorked(coll.deleteMany({}));
-        st.awaitReplicationOnShards();
+        FixtureHelpers.awaitLastOpCommitted(db);
     });
 
     after(function () {
