@@ -265,12 +265,16 @@ private:
         // Make sure to attach the cancellation callback after kicking off the async work to ensure
         // cancellation can't "miss" it.
         subToken.onCancel().unsafeToInlineFuture().getAsync(
-            [this, weakSelf = weak_from_this(), weakOpState = std::weak_ptr(opState)](Status s) {
+            [reactor = _reactor, weakSelf = weak_from_this(), weakOpState = std::weak_ptr(opState)](
+                Status s) {
                 if (!s.isOK()) {
                     return;
                 }
 
-                _reactor->schedule([this, weakSelf, weakOpState](Status s) {
+                // Wait to lock weakSelf until we're on the reactor thread, so that if it becomes
+                // the last strong reference it will be destroyed on the reactor thread instead of
+                // on the cancellation thread.
+                reactor->schedule([weakSelf, weakOpState](Status s) {
                     if (!s.isOK()) {
                         return;
                     }
@@ -287,7 +291,7 @@ private:
                     if (opState->done.swap(true)) {
                         return;
                     }
-                    cancel(opState->baton);
+                    anchor->cancel(opState->baton);
                 });
             });
 
