@@ -381,8 +381,8 @@
 {
 	"setWindowFieldsSpilledBytes" : "X",
 	"setWindowFieldsSpilledDataStorageSize" : "X",
-	"setWindowFieldsSpilledRecords" : 4,
-	"setWindowFieldsSpills" : 4,
+	"setWindowFieldsSpilledRecords" : 3,
+	"setWindowFieldsSpills" : 2,
 	"sortSpilledBytes" : "X",
 	"sortSpilledDataStorageSize" : "X",
 	"sortSpilledRecords" : 13,
@@ -421,8 +421,8 @@
 {
 	"setWindowFieldsSpilledBytes" : "X",
 	"setWindowFieldsSpilledDataStorageSize" : "X",
-	"setWindowFieldsSpilledRecords" : 3,
-	"setWindowFieldsSpills" : 3,
+	"setWindowFieldsSpilledRecords" : 2,
+	"setWindowFieldsSpills" : 1,
 	"sortSpilledBytes" : "X",
 	"sortSpilledDataStorageSize" : "X",
 	"sortSpilledRecords" : 13,

@@ -11,7 +11,6 @@
 
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function getServerParameter(knob) {
@@ -393,22 +392,9 @@ try {
         {$setWindowFields: {partitionBy: "$a", sortBy: {b: 1}, output: {sum: {$sum: "$b"}}}},
     ];
 
-    function getSetWindowFieldsMemoryLimit() {
-        const explain = coll.explain().aggregate(setWindowFieldsPipeline);
-        // If $setWindowFields was pushed down to SBE, set a lower limit. We can't set it to 1 byte for
-        // Classic because DocumentSourceSetWindowFields will fail if it still doesn't fit into memory
-        // limit after spilling.
-        if (getPlanStage(getWinningPlanFromExplain(explain), "WINDOW")) {
-            return 1;
-        } else {
-            return 500;
-        }
-    }
-
-    setServerParameter(
-        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        getSetWindowFieldsMemoryLimit(),
-    );
+    // We can't set the limit to 1 byte because DocumentSourceSetWindowFields will fail if it
+    // still doesn't fit into the memory limit after spilling.
+    setServerParameter("internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 500);
 
     outputPipelineAndSlowQueryLog(coll, setWindowFieldsPipeline, "$setWindowFields");
     outputPipelineAndSlowQueryLog(

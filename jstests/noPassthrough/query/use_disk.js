@@ -12,11 +12,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
-import {
-    getAggPlanStages,
-    getPlanStage,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -237,22 +233,12 @@ const setWindowFieldsPipeline = [
     {$setWindowFields: {sortBy: {a: 1}, output: {as: {$addToSet: "$a"}}}},
 ];
 
-function getSetWindowFieldsMemoryLimit() {
-    const explain = coll.explain().aggregate(setWindowFieldsPipeline);
-    // If $setWindowFields was pushed down to SBE, set a lower limit. We can't set it to 1 byte
-    // for Classic because DocumentSourceSetWindowFields will fail if it still doesn't fit into
-    // memory limit after spilling.
-    if (getPlanStage(getWinningPlanFromExplain(explain), "WINDOW")) {
-        return 1;
-    } else {
-        return 500;
-    }
-}
-
+// We can't set the limit to 1 byte because DocumentSourceSetWindowFields will fail if it still
+// doesn't fit into the memory limit after spilling.
 assert.commandWorked(
     testDB.adminCommand({
         setParameter: 1,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: getSetWindowFieldsMemoryLimit(),
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 500,
     }),
 );
 resetCollection();

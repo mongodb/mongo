@@ -22,7 +22,6 @@
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -2251,16 +2250,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             // In the $search case, we create the $search query solution node in
             // QueryPlanner::Plan instead of here. The empty branch here assures that we don't
             // hit the tassert below and continue in creating the query plan.
-            continue;
-        }
-
-        auto windowStage = dynamic_cast<DocumentSourceInternalSetWindowFields*>(innerStage);
-        if (windowStage) {
-            auto windowNode = std::make_unique<WindowNode>(std::move(solnForAgg),
-                                                           windowStage->getPartitionBy(),
-                                                           windowStage->getSortBy(),
-                                                           windowStage->getOutputFields());
-            solnForAgg = std::move(windowNode);
             continue;
         }
 

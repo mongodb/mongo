@@ -36,13 +36,7 @@ assert.commandWorked(
     setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1),
 );
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(
-    setParameter(
-        db,
-        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        isSbeEnabled ? 129 : 440,
-    ),
-);
+assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 440));
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind
@@ -250,7 +244,8 @@ testSpillingMetrics({
 testSpillingMetrics({
     stageName: "setWindowFields",
     expectedSpillingMetrics: {spills: 10, spilledBytes: 500},
-    expectedSbeSpillingMetrics: {spills: 9, spilledBytes: 500},
+    // $_internalSetWindowFields always runs in classic, even if the preceding $sort runs in SBE.
+    expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 500},
 });
 if (isSbeEnabled) {
     // Each new aggregations increases the 'lookup' metrics by

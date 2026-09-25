@@ -248,7 +248,7 @@ runTest({
     shouldUseSbe: sbeUnpackPushdownEnabled,
 
     // Everything should get pushed into SBE except setWindowFields.
-    aggStages: sbeFullyEnabled ? [] : ["$_internalSetWindowFields"],
+    aggStages: ["$_internalSetWindowFields"],
 });
 
 // $lookup-$unwind is not lowered to SBE for time-series collections in default settings.

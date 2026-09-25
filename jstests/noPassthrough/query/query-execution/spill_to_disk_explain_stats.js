@@ -24,13 +24,7 @@ assert.commandWorked(
     setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1),
 );
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(
-    setParameter(
-        db,
-        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        isSbeEnabled ? 129 : 440,
-    ),
-);
+assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 440));
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind
@@ -129,7 +123,12 @@ function testSpillingStats(pipeline, classicStageName, SBEStageName) {
 
 testSpillingStats(pipelines["sort"], "SORT", "sort"); // classic, sbe
 testSpillingStats(pipelines["group"], "$group", "group"); // sbe, classic
-testSpillingStats(pipelines["setWindowFields"], "$_internalSetWindowFields", "window"); // classic, sbe
+// $setWindowFields always runs in classic, even when the preceding $sort is pushed down to SBE.
+testSpillingStats(
+    pipelines["setWindowFields"],
+    "$_internalSetWindowFields",
+    "$_internalSetWindowFields",
+);
 if (isSbeEnabled) {
     testSpillingStats(pipelines["lookup"], "$lookup", "hash_lookup");
     testSpillingStats(pipelines["lookup-unwind"], "$lookup", "hash_lookup_unwind");

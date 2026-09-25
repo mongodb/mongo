@@ -10,7 +10,6 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -114,7 +113,6 @@ struct CompatiblePipelineStages {
     bool sort : 1;
     bool limitSkip : 1;
     bool search : 1;
-    bool window : 1;
     bool unpackBucket : 1;
 };
 
@@ -247,13 +245,6 @@ bool pipelineStageIsCompatible(const boost::intrusive_ptr<ExpressionContext>& ex
     } else if (stageId == DocumentSourceSearchMeta::id || stageId == DocumentSourceSearch::id ||
                stageId == DocumentSourceInternalSearchMongotRemote::id) {
         if (!allowedStages.search) {
-            return false;
-        }
-        return true;
-    } else if (stageId == DocumentSourceInternalSetWindowFields::id) {
-        if (!allowedStages.window ||
-            static_cast<DocumentSourceInternalSetWindowFields*>(stage.get())->sbeCompatibility() <
-                minRequiredCompatibility) {
             return false;
         }
         return true;
@@ -631,8 +622,6 @@ bool findSbeCompatibleStagesForPushdown(
         .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         .search = false,
-
-        .window = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = meetsRequirements(SbeCompatibility::noRequirements) &&
