@@ -898,17 +898,31 @@ export class ReplSetTest {
     awaitNodesAgreeOnPrimary(timeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout = true) {
         timeout = timeout || this.timeoutMS;
         nodes = nodes || this.nodes;
-        // indexOf will return the index of the expected node. If expectedPrimaryNode is undefined,
-        // indexOf will return -1.
-        const expectedPrimaryNodeIdx = this.nodes.indexOf(expectedPrimaryNode);
-        if (expectedPrimaryNodeIdx === -1) {
-            jsTest.log.info("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
-        } else {
+
+        let expectedPrimaryNodeIdx = -1;
+        if (expectedPrimaryNode !== undefined && expectedPrimaryNode !== null) {
+            // Must be a connection, not a node id. this.nodes holds connections, so an id would
+            // fall straight through indexOf() to -1 and silently downgrade this call to "agree
+            // on any primary" rather than checking the node the caller named.
+            assert(
+                expectedPrimaryNode.getDB,
+                "AwaitNodesAgreeOnPrimary: expectedPrimaryNode must be a connection, not a node" +
+                    ` id: ${expectedPrimaryNode}`,
+            );
+            expectedPrimaryNodeIdx = this.nodes.indexOf(expectedPrimaryNode);
+            assert.gte(
+                expectedPrimaryNodeIdx,
+                0,
+                `AwaitNodesAgreeOnPrimary: expectedPrimaryNode ${expectedPrimaryNode} is not a` +
+                    ` member of this ReplSetTest`,
+            );
             jsTest.log.info(
                 "AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on " +
                     expectedPrimaryNode.name +
                     " as primary.",
             );
+        } else {
+            jsTest.log.info("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
         }
 
         assert.soonNoExcept(
@@ -3410,6 +3424,8 @@ export class ReplSetTest {
      * @param {boolean} [options.startClean] Forces clearing the data directory.
      * @param {Object} [options.auth] Object that contains the auth details for admin credentials.
      *     Should contain the fields 'user' and 'pwd'.
+     *
+     * @returns the new connection(s) to the restarted node(s)
      */
     restart(n, options, signal, wait) {
         n = resolveToNodeId(this, n);

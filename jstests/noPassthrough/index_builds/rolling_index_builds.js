@@ -77,7 +77,7 @@ IndexBuildTest.buildIndexOnNodeAsStandalone(
     "rolling_index_b_1",
 );
 
-replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.getNodeId(primary));
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, primary);
 
 jsTestLog("Build index on the primary: " + primary.host);
 assert.commandWorked(primaryDB.adminCommand({replSetStepDown: 60}));

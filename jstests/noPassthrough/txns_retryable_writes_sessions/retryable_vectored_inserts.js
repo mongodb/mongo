@@ -20,8 +20,8 @@ replTest.startSet();
 replTest.initiate();
 
 const dbName = testName;
-const primary = replTest.getPrimary();
-const primaryDB = primary.getDB(dbName);
+let primary = replTest.getPrimary();
+let primaryDB = primary.getDB(dbName);
 const secondary = replTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 const collName1 = "testcoll1";
@@ -177,7 +177,10 @@ checkRetries();
 
 // Now restart the original primary and step it back up
 jsTestLog("Restarting original primary");
-replTest.restart(primary);
+// restart() replaces this node's entry in replTest.nodes, so take the connection it returns
+// rather than continuing to use the pre-restart one.
+primary = replTest.restart(primary);
+primaryDB = primary.getDB(dbName);
 reconnect(primary);
 replTest.awaitSecondaryNodes();
 

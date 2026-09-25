@@ -66,10 +66,10 @@ export var ShardingStateTest = (function () {
         replSet.awaitReplication();
 
         jsTestLog("[ShardingStateTest] Restarting node. It should go into startup recovery.");
-        replSet.restart(node, {setParameter: startupParams});
-        replSet.waitForState(node, ReplSetTest.State.PRIMARY);
+        const restartedNode = replSet.restart(node, {setParameter: startupParams});
+        replSet.waitForState(restartedNode, ReplSetTest.State.PRIMARY);
 
-        return node;
+        return restartedNode;
     }
 
     /**

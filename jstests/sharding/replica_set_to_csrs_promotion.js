@@ -378,13 +378,14 @@ describe("operations during rolling restart", function () {
                     waitPid: true,
                 },
             );
+            let restartedSecondary;
             assert.doesNotThrow(() => {
-                rs.start(id, {
+                restartedSecondary = rs.start(id, {
                     ...startupFlags,
                     remember: false,
                 });
             });
-            rs.stepUp(secondary);
+            rs.stepUp(restartedSecondary);
         };
 
         this.restartAllSecondaries = (rs, startupFlags) => {
