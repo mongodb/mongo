@@ -171,7 +171,7 @@ TEST_F(FCVStepRegistryTest, FCVStepRegistrySimple) {
     ASSERT_EQ(0, a->numCallsBeforeStartWithoutFCVLock);
     ASSERT_EQ(0, a->numCallsBeforeStartWithFCVLock);
     ASSERT_EQ(0, a->numCallsPrepareToUpgradeActionsBeforeGlobalLock);
-    ASSERT_EQ(0, a->numCallsUserCollectionsUassertsForDowngrade);
+    ASSERT_EQ(0, a->numCallsUserCollectionsUassertsForUpgrade);
     ASSERT_EQ(0, a->numCallsUserCollectionsWorkForUpgrade);
     ASSERT_EQ(0, a->numCallsUpgradeServerMetadata);
     ASSERT_EQ(0, a->numCallsFinalizeUpgrade);
@@ -184,7 +184,7 @@ TEST_F(FCVStepRegistryTest, FCVStepRegistrySimple) {
     ASSERT_EQ(0, b->numCallsBeforeStartWithoutFCVLock);
     ASSERT_EQ(0, b->numCallsBeforeStartWithFCVLock);
     ASSERT_EQ(0, b->numCallsPrepareToUpgradeActionsBeforeGlobalLock);
-    ASSERT_EQ(0, b->numCallsUserCollectionsUassertsForDowngrade);
+    ASSERT_EQ(0, b->numCallsUserCollectionsUassertsForUpgrade);
     ASSERT_EQ(0, b->numCallsUserCollectionsWorkForUpgrade);
     ASSERT_EQ(0, b->numCallsUpgradeServerMetadata);
     ASSERT_EQ(0, b->numCallsFinalizeUpgrade);
@@ -216,7 +216,7 @@ TEST_F(FCVStepRegistryTest, FCVStepRegistrySimple) {
     ASSERT_EQ(0, a->numCallsBeforeStartWithoutFCVLock);
     ASSERT_EQ(0, a->numCallsBeforeStartWithFCVLock);
     ASSERT_EQ(0, a->numCallsPrepareToUpgradeActionsBeforeGlobalLock);
-    ASSERT_EQ(0, a->numCallsUserCollectionsUassertsForDowngrade);
+    ASSERT_EQ(0, a->numCallsUserCollectionsUassertsForUpgrade);
     ASSERT_EQ(0, a->numCallsUserCollectionsWorkForUpgrade);
     ASSERT_EQ(0, a->numCallsUpgradeServerMetadata);
     ASSERT_EQ(0, a->numCallsFinalizeUpgrade);
@@ -229,7 +229,7 @@ TEST_F(FCVStepRegistryTest, FCVStepRegistrySimple) {
     ASSERT_EQ(1, b->numCallsBeforeStartWithoutFCVLock);
     ASSERT_EQ(1, b->numCallsBeforeStartWithFCVLock);
     ASSERT_EQ(1, b->numCallsPrepareToUpgradeActionsBeforeGlobalLock);
-    ASSERT_EQ(1, b->numCallsUserCollectionsUassertsForDowngrade);
+    ASSERT_EQ(1, b->numCallsUserCollectionsUassertsForUpgrade);
     ASSERT_EQ(1, b->numCallsUserCollectionsWorkForUpgrade);
     ASSERT_EQ(1, b->numCallsUpgradeServerMetadata);
     ASSERT_EQ(1, b->numCallsFinalizeUpgrade);
