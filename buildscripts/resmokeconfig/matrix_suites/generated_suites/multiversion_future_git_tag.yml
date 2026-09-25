@@ -43,7 +43,6 @@ selector:
     - jstests/multiVersion/genericBinVersion/query-execution/error_and_log_validation_action.js
     - jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js
     - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_query_knobs_upgrade_downgrade.js
-    - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_max_time_ms_upgrade_downgrade.js
     - jstests/multiVersion/genericBinVersion/query-execution-classic/bindata_convert_numeric_view_upgrade_downgrade.js
     - jstests/multiVersion/genericSetFCVUsage/fcv_upgrade_downgrade_manages_shard_uuids.js
   exclude_with_any_tags:

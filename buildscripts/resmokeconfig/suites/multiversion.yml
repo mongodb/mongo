@@ -118,11 +118,6 @@ selector:
     # target, so queryKnobs are neither rejected nor stripped, breaking those expectations.
     - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_query_knobs_upgrade_downgrade.js
 
-    # TODO QUERY-EXECUTION-QUERY-SETTINGS: featureFlagPqsMaxTimeMS is FCV-gated at 9.0. The test
-    # expects maxTimeMS to be rejected and stripped at last-LTS. Now that last-LTS is 9.0, the feature
-    # remains enabled at the downgrade target and maxTimeMS remains in the query settings.
-    - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_max_time_ms_upgrade_downgrade.js
-
     # TODO SERVER-133010: featureFlagBinDataConvertNumeric is FCV-gated at 8.1. The
     # test expects BinData numeric $convert to fail with ConversionFailure in all last-LTS-FCV states.
     # Now that last-LTS is 9.0 (>= 8.1), the feature is enabled at last-LTS and the conversions

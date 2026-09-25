@@ -280,13 +280,6 @@ public:
     void validateQueryKnobs(OperationContext* opCtx, const QuerySettings& querySettings) const;
 
     /**
-     * Validates that 'maxTimeMS' in 'querySettings' is only used when featureFlagPqsMaxTimeMS is
-     * enabled. Must be called at every entry point accepting external query settings, mirroring
-     * validateQueryKnobs().
-     */
-    void validateMaxTimeMS(OperationContext* opCtx, const QuerySettings& querySettings) const;
-
-    /**
      * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.
      * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
      */

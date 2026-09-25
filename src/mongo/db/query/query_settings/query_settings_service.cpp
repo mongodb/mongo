@@ -390,7 +390,6 @@ public:
     enum class Op : uint8_t {
         kNone = 0,
         kRemoveUnsupportedQueryKnobs = 1 << 0,
-        kRemoveMaxTimeMS = 1 << 1,
     };
 
     friend constexpr Op operator|(Op a, Op b) {
@@ -418,9 +417,6 @@ public:
                             _config.queryShapeConfigurations.size());
             if (contains(plan, Op::kRemoveUnsupportedQueryKnobs)) {
                 removeUnsupportedQueryKnobs(targetFCV);
-            }
-            if (contains(plan, Op::kRemoveMaxTimeMS)) {
-                removeMaxTimeMS();
             }
             if (_dirty) {
                 LOGV2_DEBUG(12826801,
@@ -471,22 +467,6 @@ private:
                         "Stripping query knobs not supported on the target FCV from query "
                         "settings",
                         "queryShapeHash"_attr = configuration.getQueryShapeHash().toHexString());
-            configuration.setSettings(settings);
-            return ModifyResult::kModified;
-        });
-    }
-
-    void removeMaxTimeMS() {
-        modifySettingsArray([](QueryShapeConfiguration& configuration) {
-            auto&& settings = configuration.getSettings();
-            if (!settings.getMaxTimeMS()) {
-                return ModifyResult::kNotModified;
-            }
-            LOGV2_DEBUG(12998201,
-                        3,
-                        "Stripping maxTimeMS from query settings",
-                        "queryShapeHash"_attr = configuration.getQueryShapeHash().toHexString());
-            settings.setMaxTimeMS(boost::none);
             configuration.setSettings(settings);
             return ModifyResult::kModified;
         });
@@ -593,7 +573,6 @@ public:
             // error.
             auto userSettings = *querySettingsFromOriginalCommand;
             validateQueryKnobs(expCtx->getOperationContext(), userSettings);
-            validateMaxTimeMS(expCtx->getOperationContext(), userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -718,7 +697,6 @@ public:
             // error.
             auto& userSettings = *querySettingsFromOriginalCommand;
             validateQueryKnobs(opCtx, userSettings);
-            validateMaxTimeMS(opCtx, userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -767,17 +745,11 @@ public:
         // Query knob overrides not supported on the target FCV must be stripped on every
         // downgrade.
         auto plan = Op::kRemoveUnsupportedQueryKnobs;
-        // Strip the maxTimeMS query setting once the target FCV no longer supports it.
-        if (!feature_flags::gFeatureFlagPqsMaxTimeMS.isEnabledOnVersion(targetFCV)) {
-            plan |= Op::kRemoveMaxTimeMS;
-        }
 
         LOGV2_DEBUG(12826804,
                     2,
                     "Planning query settings FCV downgrade",
-                    "targetFCV"_attr = multiversion::toString(targetFCV),
-                    "removeMaxTimeMS"_attr =
-                        QuerySettingsMigration::contains(plan, Op::kRemoveMaxTimeMS));
+                    "targetFCV"_attr = multiversion::toString(targetFCV));
 
         QuerySettingsMigration(this).run(opCtx, plan, targetFCV);
     }
@@ -1003,16 +975,6 @@ void QuerySettingsService::validateQueryKnobs(OperationContext* opCtx,
                               << knobEntry.wireName,
                 fcvSnapshot.isGreaterThanOrEqualTo(*knobEntry.minFcv));
     }
-}
-
-void QuerySettingsService::validateMaxTimeMS(OperationContext* opCtx,
-                                             const QuerySettings& querySettings) const {
-    uassert(12998200,
-            "Unknown field 'maxTimeMS' in querySettings",
-            !querySettings.getMaxTimeMS() ||
-                feature_flags::gFeatureFlagPqsMaxTimeMS.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {
