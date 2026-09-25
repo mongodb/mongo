@@ -82,10 +82,12 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to reshard collection ${namespace}`);
 
-        // TODO(SERVER-131275): Remove reshardingUUID once the reshardCollectionCoordinator supports retryability.
-        const reshardingUUID = UUID();
         let result;
         assert.soon(() => {
+            // TODO(SERVER-131275): Remove reshardingUUID once the reshardCollectionCoordinator supports retryability.
+            // A failed user-supplied reshardingUUID stays quiesced and replays its stored
+            // error. Generate a new UUID on each attempt.
+            const reshardingUUID = UUID();
             result = db.adminCommand({
                 reshardCollection: namespace,
                 key: this.getShardKey(collName),
