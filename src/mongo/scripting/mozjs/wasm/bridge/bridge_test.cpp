@@ -2140,6 +2140,52 @@ TEST_F(WasmMozJSBridgeTest, SetGlobalValueObject) {
     ASSERT_EQ(ret["__value"].numberInt(), 3);
 }
 
+// invoke-function arguments are wrapped without an owned copy, over a buffer the bindings free
+// when the export returns, so a retained wrapper must be rejected on *any* later access.
+//
+// TODO SERVER-135002: JS_SetProperty is [[Set]], so it honours a setter the script installed
+// on this name, turning a host-initiated write into an execution point for user JS.
+// It needs to be replaced with JS_DefineProperty ([[DefineOwnProperty]]), which should prevent
+// this scenario from occuring.
+TEST_F(WasmMozJSBridgeTest, RetainedArgWrapperIsRejectedAfterItsInvocationReturns) {
+    auto init = createFunction(
+        "function(doc) {"
+        // Retain the lazy wrapper over the argument buffer without resolving it: reading a
+        // field here would populate the JS object while the buffer is still mapped.
+        "  globalThis.__saved = doc;"
+        "  Object.defineProperty(globalThis, '__accumulate', {"
+        "    configurable: true,"
+        "    set: function(fn) {"
+        "      try {"
+        "        globalThis.__leaked = String(globalThis.__saved.x);"
+        "      } catch (e) {"
+        "        globalThis.__leakErr = String(e);"
+        "      }"
+        "      Object.defineProperty(globalThis, '__accumulate',"
+        "                            {value: fn, writable: true, configurable: true});"
+        "    }"
+        "  });"
+        "  return 0;"
+        "}");
+    ASSERT_NE(init, 0u);
+
+    invokeFunction(init, BSON("0" << BSON("x" << 42)));
+
+    // The argument buffer is freed here, as the export returns.
+    setFunction("__accumulate", "function(state, val) { return state; }");
+
+    auto probe = createFunction(
+        "function() {"
+        "  return {read: globalThis.__leaked !== undefined,"
+        "          err: globalThis.__leakErr || ''};"
+        "}");
+    auto observed = invokeFunction(probe, BSONObj());
+    ASSERT_FALSE(observed["read"].booleanSafe())
+        << "the setter resolved a wrapper over the freed invoke-function argument buffer instead "
+           "of being rejected";
+    ASSERT_STRING_CONTAINS(observed["err"].str(), "Attempt to access an invalidated BSON Object");
+}
+
 // ---------------------------------------------------------------------------
 // `emit` in-WASM boundary
 // ---------------------------------------------------------------------------

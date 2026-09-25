@@ -927,6 +927,15 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
     // from a prior invocation are detected when accessed during this one.
     ++_generation;
 
+    // And advance it again on the way out. `argsObject` may point straight into a buffer the
+    // caller frees once this export returns, so wrappers over it must be invalidated when this
+    // call ends, not merely when the next one begins.
+    //
+    // TODO SERVER-135290: only invokeFunction borrows its input today, so only invokeFunction
+    // needs this. Standardize the rule across the other BSON-taking entry points so a call that
+    // later stops copying is covered without anyone having to remember.
+    auto generationGuard = _advanceGenerationOnExit();
+
     const int nargs = argsObject.nFields();
 
     JS::RootedValueVector args(_cx);

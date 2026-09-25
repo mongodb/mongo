@@ -90,8 +90,7 @@ public:
 
     void requireOwnedObjects() override {}
 
-    // generation is auto-advanced by the engine at each invocation entry; no scope-level
-    // call is needed (and the scope has no generation counter of its own).
+    // generation is auto-advanced by the engine on each invocation.
     void advanceGeneration() override {}
 
     // The following methods are not meaningful for Wasmtime.

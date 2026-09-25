@@ -360,10 +360,28 @@ private:
     bool _initialized = false;
     bool _javascriptProtection = false;
 
-    // Monotonically increasing generation counter. Incremented at the start of every
-    // invocation (invokeFunction, invokePredicate, invokeMap) and inside reset(). Any
-    // unowned BSONHolder created in a prior invocation is detected as stale when accessed
-    // in a subsequent one via uassertValid().
+    // Advances the generation counter when it leaves scope, on every path including exceptions.
+    // Each invoke method holds one for the duration of the call.
+    class GenerationGuard {
+    public:
+        explicit GenerationGuard(MozJSScriptEngine& engine) : _engine(engine) {}
+        GenerationGuard(const GenerationGuard&) = delete;
+        GenerationGuard& operator=(const GenerationGuard&) = delete;
+        ~GenerationGuard() {
+            ++_engine._generation;
+        }
+
+    private:
+        MozJSScriptEngine& _engine;
+    };
+
+    [[nodiscard]] GenerationGuard _advanceGenerationOnExit() {
+        return GenerationGuard(*this);
+    }
+
+    // Monotonically increasing generation counter. An unowned BSONHolder records it at creation
+    // and uassertValid() rejects the wrapper once it no longer matches, so the counter is what
+    // bounds the lifetime of BSON the engine did not copy.
     std::size_t _generation{1};
 
 

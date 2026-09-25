@@ -13,6 +13,9 @@ filters:
   - "collation_expressions.js":
     approvers:
       - 10gen/query-execution
+  - "globalthis_cross_invocation.js":
+    approvers:
+      - 10gen/query-integration-features
   - "internal_js*":
     approvers:
       - 10gen/query-integration-features

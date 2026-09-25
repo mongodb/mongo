@@ -111,11 +111,6 @@ static bool run_safely(F&& f, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err)
 // inputs accumulate until the wasmtime store cap traps with "cannot leave component
 // instance" (a reused bridge leaked ~333 KB of invoke-function args per
 // call until it hit the 1210 MB cap).
-//
-// invokeFunction args are the exception to the usual getOwned() rule: the engine
-// increments its generation counter at the start of each invocation, so any lazy
-// BSONHolder proxy created over an argument buffer will fail its uassertValid() check
-// if it is retained across the next call — no owned copy is needed.
 struct ArgListGuard {
     api_list_u8_t* list;
     ~ArgListGuard() {
@@ -341,8 +336,9 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
                     return return_err(err, &e);
                 }
                 // bson->ptr is WASM linear memory — not a C++ heap allocation, so ASAN does not
-                // track it. The generation counter in the engine detects any retained cross-
-                // invocation proxy before its _objdata is read, so no owned copy is needed.
+                // track it. The engine's generation counter, advanced on the way out of this
+                // invocation, invalidates any retained proxy before its _objdata can be read,
+                // so no owned copy is needed. See the ArgListGuard comment above.
                 argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr));
             }
 
