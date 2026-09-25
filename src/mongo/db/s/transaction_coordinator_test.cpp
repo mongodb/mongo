@@ -1572,6 +1572,26 @@ TEST_F(TransactionCoordinatorTest,
     ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 12111100)), 0);
 }
 
+TEST_F(TransactionCoordinatorTest, CanceledBeforeCommitStartIsNotLoggedAsUnexpectedError) {
+    unittest::LogCaptureGuard logs;
+
+    // Create the coordinator and cancel it before two-phase commit ever started, e.g. when the
+    // transaction is committed through the optimized single-shard commit path.
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    coordinator->start(operationContext());
+
+    coordinator->cancelIfCommitNotYetStarted();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    ASSERT_THROWS_CODE(
+        coordinator->onCompletion().get(), DBException, ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12111100)), 0);
+}
+
 using TransactionCoordinatorTestDeathTest = TransactionCoordinatorTest;
 DEATH_TEST_REGEX_F(TransactionCoordinatorTestDeathTest,
                    CoordinatorTerminatedWithUnexpectedErrorAfterDurablyWritingDecision,
