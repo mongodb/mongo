@@ -10,7 +10,8 @@
  * it uses the last checkpoint timestamp to determine if there could be data loss, and if so,
  * it will fail the initial sync attempt and restart.
  *
- * @tags: [requires_persistence]
+ * We don't support unclean shutdowns with restarts into a last-lts binary.
+ * @tags: [requires_persistence, multiversion_incompatible]
  */
 import {describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
