@@ -2,6 +2,9 @@
  * Resumes a sharded collection change stream from an event token, a high-water-mark token, and an invalidate token, and asserts the initial postBatchResumeToken never regresses.
  *
  * @tags: [
+ *   # Asserts on PBRT monotonicity at collection scope specifically; breaks once upconverted.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
  *   requires_fcv_90,

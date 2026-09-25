@@ -17,13 +17,22 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
     assertNoV2StageStateTransitionFrom,
     awaitLogMessageCodes,
+    changeStreamPassthroughType,
     ChangeStreamTest,
+    ChangeStreamWatchMode,
     V2TargeterLogCodes,
 } from "jstests/libs/query/change_stream_util.js";
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const ifrFlagName = "featureFlagChangeStreamReaderV2";
-const kInitStrictMode = V2TargeterLogCodes.kCollOrDbShardTargeterInitStrictMode;
+
+// Under whole-cluster passthrough, the stream is upconverted to allChangesForCluster: true, which
+// uses the AllDatabases-scope v2 targeter and therefore logs a different init code.
+const kInitStrictMode =
+    changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster
+        ? V2TargeterLogCodes.kClusterShardTargeterInitStrictMode
+        : V2TargeterLogCodes.kCollOrDbShardTargeterInitStrictMode;
 
 describe("change-stream v2", function () {
     let st;
@@ -96,8 +105,11 @@ describe("change-stream v2", function () {
         // A raw getMore on the still-open v2 cursor must throw the resumable RetryChangeStream
         // error. (A raw command is used here deliberately: ChangeStreamTest.getNextBatch would
         // transparently auto-resume on a resumable error, masking the exact code under test.)
+        // Derive the collection name from the cursor's own bound namespace rather than 'collName'
+        // directly, since a whole-db/whole-cluster passthrough may have upconverted the stream.
+        const cursorCollName = getCollectionNameFromFullNamespace(cursor.ns);
         assert.soon(() => {
-            const res = db.runCommand({getMore: cursor.id, collection: collName});
+            const res = db.runCommand({getMore: cursor.id, collection: cursorCollName});
             if (res.ok) {
                 return false; // event not surfaced yet; keep polling
             }

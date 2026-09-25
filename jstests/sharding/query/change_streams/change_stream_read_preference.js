@@ -16,6 +16,8 @@ import {
 import {
     withChangeStreamTest,
     observePostImageLookup,
+    changeStreamPassthroughType,
+    ChangeStreamWatchMode,
 } from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
@@ -68,8 +70,12 @@ describe("change stream and update lookup read preference", function () {
                 // more than one entry if we needed multiple getMores to retrieve the changes.
                 // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
                 // because the initial aggregate will not show up.
+                // Under whole-cluster passthrough, the stream's getMore is upconverted to run
+                // against 'admin', so its profiler entry lands there instead of the test db.
+                const isWholeClusterPassthrough =
+                    changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster;
                 profilerHasAtLeastOneMatchingEntryOrThrow({
-                    profileDB: nodeDB,
+                    profileDB: isWholeClusterPassthrough ? node.getDB("admin") : nodeDB,
                     filter: {"originatingCommand.comment": comment},
                 });
 
@@ -147,12 +153,15 @@ describe("change stream and update lookup read preference", function () {
             }),
         );
 
-        // Turn on the profiler and local-read logging on every node.
+        // Turn on the profiler and local-read logging on every node. Also profile 'admin' on each
+        // node, since under whole-cluster passthrough the stream's own getMore is upconverted to
+        // run there instead of the test db.
         for (let rs of [st.rs0, st.rs1]) {
-            assert.commandWorked(rs.getPrimary().getDB(dbName).setProfilingLevel(2));
-            assert.commandWorked(rs.getSecondary().getDB(dbName).setProfilingLevel(2));
-            enableLocalReadLogs(rs.getPrimary());
-            enableLocalReadLogs(rs.getSecondary());
+            for (let node of [rs.getPrimary(), rs.getSecondary()]) {
+                assert.commandWorked(node.getDB(dbName).setProfilingLevel(2));
+                assert.commandWorked(node.getDB("admin").setProfilingLevel(2));
+                enableLocalReadLogs(node);
+            }
         }
     });
 

@@ -4,6 +4,8 @@
 // which in turn allows the AsyncResultsMerger to return sorted results retrieved from the other
 // shards.
 // @tags: [
+//   # Cluster-scoped getMores aren't observed in either the test db's or admin's system.profile.
+//   do_not_run_in_whole_cluster_passthrough,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 //   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
@@ -15,6 +17,7 @@
 // data.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getConfigTime} from "jstests/libs/query/change_stream_util.js";
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -87,6 +90,14 @@ function assertAllGetMoresHaveTimeout(profileDB, nss, comment, timeout) {
     assert.eq(getMoreTimeouts[0]._id, timeout);
 }
 
+// Tracks the cursor's actual bound namespace across reopenChangeStream() calls, both at the
+// mongos level and (since shards profile their local getMore against the same virtual namespace
+// mongos reports) on the shards. Used instead of 'mongosColl.getFullName()'/'mongosColl.getName()'
+// directly, since a whole-db/whole-cluster passthrough may have upconverted the aggregate,
+// changing the cursor's real namespace to something like '<db>.$cmd.aggregate'.
+let csNs;
+let csCollName;
+
 // Kills the cursor with the given cursor id (if provided). Then opens a new change stream
 // against 'mongosColl' and returns the new change stream's cursor id.
 //
@@ -96,7 +107,7 @@ function assertAllGetMoresHaveTimeout(profileDB, nss, comment, timeout) {
 function reopenChangeStream(existingCursorId) {
     if (existingCursorId) {
         assert.commandWorked(
-            mongosDB.runCommand({killCursors: mongosColl.getName(), cursors: [existingCursorId]}),
+            mongosDB.runCommand({killCursors: csCollName, cursors: [existingCursorId]}),
         );
     }
 
@@ -110,6 +121,8 @@ function reopenChangeStream(existingCursorId) {
     );
     assert.eq(csCmdRes.cursor.firstBatch.length, 0);
     assert.neq(csCmdRes.cursor.id, 0);
+    csNs = csCmdRes.cursor.ns;
+    csCollName = getCollectionNameFromFullNamespace(csNs);
     return csCmdRes.cursor.id;
 }
 
@@ -126,7 +139,7 @@ const testComment = "change stream sharded maxTimeMS test";
 let csCursorId = reopenChangeStream();
 
 // Confirm that getMores without an explicit maxTimeMS default to one second on the shards.
-assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName()}));
+assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: csCollName}));
 for (let shardDB of [shard0DB, shard1DB]) {
     // The mongos is guaranteed to have already delivered getMores to each of the shards.
     // However, the mongos await time can expire prior to the await time on the shards.
@@ -134,14 +147,7 @@ for (let shardDB of [shard0DB, shard1DB]) {
     // shards have already been profiled. We use an assert.soon() here to wait for the maxTimeMS
     // on the shards to expire, at which point the getMores will appear in the profile
     // collection.
-    assert.soon(() =>
-        profilerHasAtLeastOneMatchingGetMore(
-            shardDB,
-            mongosColl.getFullName(),
-            testComment,
-            oneSec,
-        ),
-    );
+    assert.soon(() => profilerHasAtLeastOneMatchingGetMore(shardDB, csNs, testComment, oneSec));
 }
 
 // Verify that with no activity on the shards, a $changeStream with maxTimeMS waits for the full
@@ -151,7 +157,7 @@ let startTime = new Date().getTime();
 assert.commandWorked(
     mongosDB.runCommand({
         getMore: csCursorId,
-        collection: mongosColl.getName(),
+        collection: csCollName,
         maxTimeMS: fiveSecs,
     }),
 );
@@ -159,7 +165,7 @@ assert.gte(new Date().getTime() - startTime, fiveSecs - halfSec);
 
 // Confirm that each getMore dispatched to the shards during this period had a maxTimeMS of 1s.
 for (let shardDB of [shard0DB, shard1DB]) {
-    assertAllGetMoresHaveTimeout(shardDB, mongosColl.getFullName(), testComment, oneSec);
+    assertAllGetMoresHaveTimeout(shardDB, csNs, testComment, oneSec);
 }
 
 // Issue a getMore with a sub-second maxTimeMS. This should propagate to the shards as-is.
@@ -167,7 +173,7 @@ csCursorId = reopenChangeStream(csCursorId);
 assert.commandWorked(
     mongosDB.runCommand({
         getMore: csCursorId,
-        collection: mongosColl.getName(),
+        collection: csCollName,
         maxTimeMS: halfSec,
     }),
 );
@@ -179,14 +185,7 @@ for (let shardDB of [shard0DB, shard1DB]) {
     // shards have already been profiled. We use an assert.soon() here to wait for the maxTimeMS
     // on the shards to expire, at which point the getMores will appear in the profile
     // collection.
-    assert.soon(() =>
-        profilerHasAtLeastOneMatchingGetMore(
-            shardDB,
-            mongosColl.getFullName(),
-            testComment,
-            halfSec,
-        ),
-    );
+    assert.soon(() => profilerHasAtLeastOneMatchingGetMore(shardDB, csNs, testComment, halfSec));
 }
 
 // Write a document to shard0, and confirm that - despite the fact that shard1 is still idle - a
@@ -197,7 +196,7 @@ startTime = new Date().getTime();
 const csResult = assert.commandWorked(
     mongosDB.runCommand({
         getMore: csCursorId,
-        collection: mongosColl.getName(),
+        collection: csCollName,
         maxTimeMS: thirtyMins,
     }),
 );
@@ -208,25 +207,20 @@ assert.docEq({_id: -1}, csResult.cursor.nextBatch[0].fullDocument);
 // issuing getMores with a subsecond maxTimeMS, that mongos eventually schedules getMores on the
 // shards with this subsecond maxTimeMS value.
 csCursorId = reopenChangeStream(csCursorId);
-assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: mongosColl.getName()}));
+assert.commandWorked(mongosDB.runCommand({getMore: csCursorId, collection: csCollName}));
 assert.soon(function () {
     // Run a getMore with a 250ms maxTimeMS against mongos.
     assert.commandWorked(
         mongosDB.runCommand({
             getMore: csCursorId,
-            collection: mongosColl.getName(),
+            collection: csCollName,
             maxTimeMS: quarterSec,
         }),
     );
     // Check whether all shards now have a getMore with 250ms maxTimeMS recorded in their
     // profile collections.
     return [shard0DB, shard1DB].every(function (shardDB) {
-        return profilerHasAtLeastOneMatchingGetMore(
-            shardDB,
-            mongosColl.getFullName(),
-            testComment,
-            quarterSec,
-        );
+        return profilerHasAtLeastOneMatchingGetMore(shardDB, csNs, testComment, quarterSec);
     });
 });
 

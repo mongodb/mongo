@@ -6,6 +6,9 @@
  *  - Opening a change stream in the future, waiting for the start time to be reached before returning events
  *
  * @tags: [
+ *   # Asserts that dropping the watched collection invalidates the stream; collection-scope-only.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
  *   featureFlagChangeStreamReaderV2,

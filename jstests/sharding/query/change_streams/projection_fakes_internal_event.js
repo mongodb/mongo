@@ -5,13 +5,17 @@
  *
  * Tests that if a user fakes an internal event with a projection nothing crashes, so not valuable
  * to test with a config shard.
- * @tags: [assumes_read_preference_unchanged, config_shard_incompatible]
+ * @tags: [
+ *   assumes_read_preference_unchanged,
+ *   config_shard_incompatible,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
 import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 describe("$changeStream", function () {
     const numShards = 2;
@@ -35,6 +39,7 @@ describe("$changeStream", function () {
     before(function () {
         st = new ShardingTest({
             shards: numShards,
+            config: 1,
             rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
         });
 
@@ -274,8 +279,14 @@ describe("$changeStream", function () {
                 let res = csCursor;
                 assert.soon(() => {
                     const cursorId = res._cursorid ?? res.cursor.id;
+                    const cursorNs = res._ns ?? res.cursor.ns;
+                    const [cursorDbName, cursorCollName] =
+                        getDBNameAndCollNameFromFullNamespace(cursorNs);
                     res = assert.commandWorked(
-                        testDB.runCommand({getMore: cursorId, collection: "test"}),
+                        testDB.getSiblingDB(cursorDbName).runCommand({
+                            getMore: cursorId,
+                            collection: cursorCollName,
+                        }),
                     );
                 });
             }, [expectedErrorCode, undefined]);

@@ -696,7 +696,20 @@ export function ChangeStreamTest(_db, options) {
                 if (attemptNumber === maxRetries || !_isRetryableError(e)) {
                     throw e;
                 }
-                self.restartChangeStream(cursor);
+                try {
+                    self.restartChangeStream(cursor);
+                } catch (restartError) {
+                    // Restarting the stream can itself fail while the underlying condition that
+                    // made the getMore retryable (e.g. the cluster being unavailable) is still in
+                    // effect. Looping back would retry the getMore against the same (possibly
+                    // already-disposed) cursor, which can throw an unlabeled CursorNotFound and
+                    // mask the original, correctly-labeled error. Throw the original instead.
+                    logProgress("ChangeStreamTest.getNextBatch: restart failed", {
+                        code: restartError.code,
+                        error: restartError.message,
+                    });
+                    throw e;
+                }
             }
         }
         throw new Error("Failed to get next batch after retries");
@@ -890,6 +903,30 @@ export function ChangeStreamTest(_db, options) {
         }
 
         return changes;
+    };
+
+    /**
+     * Equivalent to the free-standing assertInvalidateOp() for a ChangeStreamTest cursor.
+     * Asserts that the given opType triggers an invalidate entry depending on the type of change
+     * stream ('cursor' must already have been drained up to the invalidating event):
+     *     - single collection streams: drop, rename, and dropDatabase.
+     *     - whole DB streams: dropDatabase.
+     *     - whole cluster streams: none.
+     * Returns the invalidate document if there was one, or null otherwise.
+     */
+    self.assertInvalidateOp = function ({cursor, opType}) {
+        if (
+            !isChangeStreamPassthrough() ||
+            (changeStreamPassthroughType() == ChangeStreamWatchMode.kDb && opType == "dropDatabase")
+        ) {
+            const changes = self.assertNextChangesEqual({
+                cursor,
+                expectedChanges: [{operationType: "invalidate"}],
+                expectInvalidate: true,
+            });
+            return changes[0];
+        }
+        return null;
     };
 
     /**

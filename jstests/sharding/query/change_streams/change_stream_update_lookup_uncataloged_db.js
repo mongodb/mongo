@@ -16,7 +16,6 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
-    ChangeStreamTest,
     ChangeStreamWatchMode,
     withChangeStreamTest,
 } from "jstests/libs/query/change_stream_util.js";
@@ -67,55 +66,47 @@ describe("change stream updateLookup on an uncataloged database", function () {
     });
 
     for (const optimizedUpdateLookup of [true, false]) {
-        for (const watchMode of Object.values(ChangeStreamWatchMode)) {
-            it(`returns the real post-image for insert and filter-only $set update events (featureFlagChangeStreamOptimizedUpdateLookup=${optimizedUpdateLookup})`, function () {
-                // Cluster-level streams must be opened against the admin database; the others
-                // against the __mdb_internal_search database itself. Both live on the same direct
-                // shard connection.
-                runWithParamsAllNonConfigNodes(
-                    st.s.getDB("admin"),
-                    {featureFlagChangeStreamOptimizedUpdateLookup: optimizedUpdateLookup},
-                    () => {
-                        const csDb = ChangeStreamTest.getDBForChangeStream(watchMode, shard0Db);
-                        withChangeStreamTest(csDb, (cst) => {
-                            const cursor = cst.getChangeStream({
-                                watchMode,
-                                coll: shard0Coll,
-                                options: {fullDocument: "updateLookup"},
-                            });
-
-                            assert.commandWorked(
-                                shard0Coll.insert({_id: 2, marker: "insert-probe"}),
-                            );
-
-                            // A filter-only update, mirroring mongot's MaterializedViewWriter path
-                            // for updates that only change a filter field: applied as a bare '$set',
-                            // not a full-document replace.
-                            assert.commandWorked(
-                                shard0Coll.update({_id: 1}, {$set: {marker: "updated"}}),
-                            );
-
-                            cst.assertNextChangesEqual({
-                                cursor,
-                                expectedChanges: [
-                                    {
-                                        operationType: "insert",
-                                        ns: {db: dbName, coll: collName},
-                                        documentKey: {_id: 2},
-                                        fullDocument: {_id: 2, marker: "insert-probe"},
-                                    },
-                                    {
-                                        operationType: "update",
-                                        ns: {db: dbName, coll: collName},
-                                        documentKey: {_id: 1},
-                                        fullDocument: {_id: 1, marker: "updated"},
-                                    },
-                                ],
-                            });
+        it(`returns the real post-image for insert and filter-only $set update events (featureFlagChangeStreamOptimizedUpdateLookup=${optimizedUpdateLookup})`, function () {
+            runWithParamsAllNonConfigNodes(
+                st.s.getDB("admin"),
+                {featureFlagChangeStreamOptimizedUpdateLookup: optimizedUpdateLookup},
+                () => {
+                    withChangeStreamTest(shard0Db, (cst) => {
+                        const cursor = cst.getChangeStream({
+                            watchMode: ChangeStreamWatchMode.kCollection,
+                            coll: shard0Coll,
+                            options: {fullDocument: "updateLookup"},
                         });
-                    },
-                );
-            });
-        }
+
+                        assert.commandWorked(shard0Coll.insert({_id: 2, marker: "insert-probe"}));
+
+                        // A filter-only update, mirroring mongot's MaterializedViewWriter path
+                        // for updates that only change a filter field: applied as a bare '$set',
+                        // not a full-document replace.
+                        assert.commandWorked(
+                            shard0Coll.update({_id: 1}, {$set: {marker: "updated"}}),
+                        );
+
+                        cst.assertNextChangesEqual({
+                            cursor,
+                            expectedChanges: [
+                                {
+                                    operationType: "insert",
+                                    ns: {db: dbName, coll: collName},
+                                    documentKey: {_id: 2},
+                                    fullDocument: {_id: 2, marker: "insert-probe"},
+                                },
+                                {
+                                    operationType: "update",
+                                    ns: {db: dbName, coll: collName},
+                                    documentKey: {_id: 1},
+                                    fullDocument: {_id: 1, marker: "updated"},
+                                },
+                            ],
+                        });
+                    });
+                },
+            );
+        });
     }
 });

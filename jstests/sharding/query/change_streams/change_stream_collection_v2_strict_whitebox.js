@@ -4,6 +4,10 @@
  * event, and that placement history is consulted at the right times.
  *
  * @tags: [
+ *   # Asserts on collection-level shard-targeting internals specifically; forcing
+ *   # whole-db/whole-cluster upconversion would target a different code path.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,

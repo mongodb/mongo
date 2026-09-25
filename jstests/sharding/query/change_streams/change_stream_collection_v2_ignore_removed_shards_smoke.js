@@ -3,6 +3,9 @@
  * cluster.
  *
  * @tags: [
+ *   # Whitebox test tied to collection-scope removed-shard bookkeeping; breaks once upconverted.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   # Assume balancer is off, and we do not get random moveChunk events during the test.
  *   assumes_balancer_off,
  *   featureFlagChangeStreamPreciseShardTargeting,

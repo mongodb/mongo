@@ -62,9 +62,20 @@ globalThis.ChangeStreamPassthroughHelpers = {
         if (cmdObj.aggregate.startsWith("system.")) {
             return false;
         }
-        // Single-collection streams cannot be opened on views.
-        if (FixtureHelpers.getViewDefinition(db, cmdObj.aggregate)) {
-            return false;
+        // Single-collection streams cannot be opened on views. getViewDefinition() issues its own
+        // listCollections command, which can itself fail (e.g. a sharded cluster with all shards
+        // unreachable) independently of the change stream request we're actually validating. If we
+        // can't answer the question, don't block the request on it - fall through and let the
+        // upconverted (or original) request surface whatever error is actually relevant.
+        try {
+            if (FixtureHelpers.getViewDefinition(db, cmdObj.aggregate)) {
+                return false;
+            }
+        } catch (e) {
+            jsTest.log.info(
+                "implicit_whole_db_changestreams.js: getViewDefinition() failed, proceeding as if not a view",
+                {error: e.message},
+            );
         }
         // This is a well-formed request.
         return true;

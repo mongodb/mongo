@@ -5,6 +5,9 @@
  * cursor assertions are used as additional cross-checks.
  *
  * @tags: [
+ *   # Asserts on state-transition internals for one specific watch-mode scope's targeter.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_balancer_off,
  *   config_shard_incompatible,
  *   does_not_support_stepdowns,

@@ -2,6 +2,10 @@
  * White box tests for $changeStream v2 in a sharded cluster.
  *
  * @tags: [
+ *   # Whitebox test asserts on the exact command shape for a specific scope; forcing
+ *   # whole-db/whole-cluster upconversion would change what's under test.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,

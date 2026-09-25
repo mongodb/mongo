@@ -3,7 +3,15 @@
  * an invalidate event, and the next matching event on the shard is another invalidating event (e.g.
  * "drop", "dropDatabase").
  *
- * @tags: [assumes_balancer_off, does_not_support_stepdowns, uses_change_streams, requires_sharding]
+ * @tags: [
+ *   # Asserts on an invalidate firing after the watched collection's second drop; collection-scope-only.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns,
+ *   uses_change_streams,
+ *   requires_sharding,
+ * ]
  */
 import {describe, it, before, after, afterEach} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

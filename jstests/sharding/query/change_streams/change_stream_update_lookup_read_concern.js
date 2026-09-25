@@ -21,6 +21,10 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {
+    changeStreamPassthroughType,
+    ChangeStreamWatchMode,
+} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {stopServerReplication} from "jstests/libs/write_concern_util.js";
@@ -150,6 +154,15 @@ describe("change stream update lookup read concern and targeting", function () {
         const closestSecondaryDB = closestSecondary.getDB(mongosDB.getName());
         assert.commandWorked(closestSecondaryDB.setProfilingLevel(2));
 
+        // Under a whole-cluster passthrough, the change stream's own getMore is upconverted to run
+        // against 'admin', so its profiler entry lands in admin's profiler rather than the test db.
+        const isWholeClusterPassthrough =
+            changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster;
+        const closestSecondaryChangeStreamDB = isWholeClusterPassthrough
+            ? closestSecondary.getDB("admin")
+            : closestSecondaryDB;
+        assert.commandWorked(closestSecondaryChangeStreamDB.setProfilingLevel(2));
+
         // The change stream we open below stays pinned to this node for the rest of the test, even
         // after the reconfig moves the 'closestSecondary' tag elsewhere. Checked here (not via the
         // router or globally), since in a multiversion cluster this node's binary determines whether
@@ -196,7 +209,7 @@ describe("change stream update lookup read concern and targeting", function () {
         // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
         // because the initial aggregate will not show up.
         profilerHasAtLeastOneMatchingEntryOrThrow({
-            profileDB: closestSecondaryDB,
+            profileDB: closestSecondaryChangeStreamDB,
             filter: {"originatingCommand.comment": changeStreamComment},
         });
         assertUpdateLookupTargeting({

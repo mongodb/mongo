@@ -4,6 +4,9 @@
  * observation of a newly created system.* collection.
  *
  * @tags: [
+ *   # The test already exercises native whole-db and whole-cluster streams directly.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_read_preference_unchanged,
  *   requires_majority_read_concern,
  *   uses_change_streams,
