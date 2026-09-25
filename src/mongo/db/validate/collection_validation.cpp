@@ -1113,6 +1113,14 @@ Status validate(OperationContext* opCtx,
                   shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
                       validateState.nss(), MODE_X));
 
+        // Report the interpreted options before starting validation.
+        LOGV2_OPTIONS(20303,
+                      {LogComponent::kIndex},
+                      "validating collection",
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()),
+                      "options"_attr = validateState.toBSON());
+
         if (validateState.isHashDrillDown()) {
             validateState.initializeCursors(opCtx);
             ValidateAdaptor recordStoreValidator(opCtx, &validateState);
@@ -1160,13 +1168,6 @@ Status validate(OperationContext* opCtx,
         }
 
         validateState.initializeCursors(opCtx);
-
-        // Validate the record store.
-        LOGV2_OPTIONS(20303,
-                      {LogComponent::kIndex},
-                      "validating collection",
-                      logAttrs(validateState.nss()),
-                      logAttrs(validateState.uuid()));
 
         ValidateAdaptor indexValidator(opCtx, &validateState);
 

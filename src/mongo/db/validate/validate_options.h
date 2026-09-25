@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
 [[MONGO_MOD_PUBLIC]];
@@ -80,6 +81,9 @@ enum class RepairMode {
     kFixErrors,
     kAdjustMultikey,
 };
+
+std::string_view toString(ValidateMode validateMode);
+std::string_view toString(RepairMode repairMode);
 
 /**
  * Additional validation options that can run in any mode.
@@ -210,6 +214,13 @@ public:
     const boost::optional<int64_t>& getTargetRecordsPerRecordStoreSlice() const {
         return _targetRecordsPerRecordStoreSlice;
     }
+
+    /**
+     * The options this validation resolved to, for reporting. The mode alone determines most of
+     * what a validation does, and nothing else logs it, so a run's workload cannot otherwise be
+     * identified from its output.
+     */
+    BSONObj toBSON() const;
 
 private:
     ValidateMode _validateMode;

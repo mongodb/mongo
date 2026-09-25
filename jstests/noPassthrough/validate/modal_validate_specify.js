@@ -20,6 +20,15 @@ function setupCollections(db) {
     assert.commandWorked(db["cheese"].createIndex({b: 1}));
 }
 
+// The "validating collection" log line reports the options validation actually resolved to, which
+// may differ from those the caller specified.
+function parseValidationOptionsFromLogs() {
+    return rawMongoProgramOutput("(20303)")
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+}
+
 function generateResults(dbpath, opts) {
     MongoRunner.runMongod({
         dbpath: dbpath,
@@ -173,6 +182,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
                 `collectionValidateOptions={options: {repair: false}}`,
             ),
         );
+        const optionLogs = parseValidationOptionsFromLogs();
+        assert.eq(1, optionLogs.length, {optionLogs});
+        assert.eq("test.ham", optionLogs[0].attr.namespace);
+        assert.eq("foreground", optionLogs[0].attr.options.mode);
+        assert.eq(false, optionLogs[0].attr.options.repair);
     });
 
     it("Cannot be run with repair:true when running modal validation.", () => {
@@ -213,6 +227,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
                 `collectionValidateOptions={options: {fixMultikey: false}}`,
             ),
         );
+        const optionLogs = parseValidationOptionsFromLogs();
+        assert.eq(1, optionLogs.length, {optionLogs});
+        assert.eq("test.ham", optionLogs[0].attr.namespace);
+        assert.eq("foreground", optionLogs[0].attr.options.mode);
+        assert.eq(false, optionLogs[0].attr.options.fixMultikey);
     });
 
     it("Cannot be run with fixMultikey:true when running modal validation.", () => {

@@ -76,6 +76,38 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsNeithe
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::neither);
 }
 
+TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
+    const ValidationOptions options(ValidateMode::kCollectionHash, RepairMode::kNone, false);
+    const BSONObj obj = options.toBSON();
+    EXPECT_EQ(obj["mode"].String(), "collectionHash");
+    EXPECT_EQ(obj["repairMode"].String(), "none");
+    EXPECT_FALSE(obj["repair"].Bool());
+    EXPECT_FALSE(obj["fixMultikey"].Bool());
+    EXPECT_FALSE(obj["logDiagnostics"].Bool());
+}
+
+TEST(ValidationOptionsToBSONTest, ReportsSliceTargetAndSizeStats) {
+    const ValidationOptions options(ValidateMode::kForegroundFull,
+                                    RepairMode::kFixErrors,
+                                    true,
+                                    currentValidationVersion,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    /*targetRecordsPerRecordStoreSlice=*/5000,
+                                    /*sizeStats=*/true);
+    const BSONObj obj = options.toBSON();
+    EXPECT_EQ(obj["mode"].String(), "foregroundFull");
+    EXPECT_EQ(obj["repairMode"].String(), "fixErrors");
+    EXPECT_TRUE(obj["repair"].Bool());
+    // kFixErrors implies kAdjustMultikey.
+    EXPECT_TRUE(obj["fixMultikey"].Bool());
+    EXPECT_TRUE(obj["logDiagnostics"].Bool());
+    EXPECT_TRUE(obj["sizeStats"].Bool());
+    EXPECT_EQ(obj["targetRecordsPerRecordStoreSlice"].numberLong(), 5000);
+}
+
 TEST(FastCountTypeToStringTest, Works) {
     EXPECT_EQ(toString(FastCountType::legacySizeStorer), "legacySizeStorer");
     EXPECT_EQ(toString(FastCountType::replicated), "replicated");
