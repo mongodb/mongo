@@ -9,7 +9,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -22,7 +21,6 @@ class MultipleCollectionAccessor;
 
 namespace mongo::sbe {
 
-using SpoolBuffer = std::vector<value::MaterializedRow>;
 class PlanStage;
 
 struct CompileCtx {
@@ -33,8 +31,6 @@ struct CompileCtx {
     RuntimeEnvironment::Accessor* getRuntimeEnvAccessor(value::SlotId slotId) {
         return _env->getAccessor(slotId);
     }
-
-    std::shared_ptr<SpoolBuffer> getSpoolBuffer(SpoolId spool);
 
     void pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor);
     void popCorrelated();
@@ -62,7 +58,6 @@ struct CompileCtx {
 
     value::SlotAccessor* accumulator{nullptr};
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> correlated;
-    stdx::unordered_map<SpoolId, std::shared_ptr<SpoolBuffer>> spoolBuffers;
     bool aggExpression{false};
     vm::LabelId lastLabelId{0};
     RemoteCursorMap* remoteCursors{nullptr};

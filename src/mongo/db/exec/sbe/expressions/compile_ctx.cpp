@@ -3,7 +3,6 @@
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 
-
 namespace mongo::sbe {
 
 value::SlotAccessor* CompileCtx::getAccessor(value::SlotId slot) {
@@ -14,13 +13,6 @@ value::SlotAccessor* CompileCtx::getAccessor(value::SlotId slot) {
     }
 
     return _env->getAccessor(slot);
-}
-
-std::shared_ptr<SpoolBuffer> CompileCtx::getSpoolBuffer(SpoolId spool) {
-    if (spoolBuffers.find(spool) == spoolBuffers.end()) {
-        spoolBuffers.emplace(spool, std::make_shared<SpoolBuffer>());
-    }
-    return spoolBuffers[spool];
 }
 
 void CompileCtx::pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor) {
