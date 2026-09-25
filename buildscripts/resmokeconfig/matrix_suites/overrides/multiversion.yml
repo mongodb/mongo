@@ -378,7 +378,7 @@
         - jstests/sharding/query/out_merge/merge_write_concern.js
 
         # Exclude change streams v2 tests from multiversion testing until v2 is rolled out everywhere.
-        # TODO SERVER-134795 SERVER-135365 Reenable these tests.
+        # TODO SERVER-134853 Reenable these tests.
         - jstests/sharding/query/change_streams/change_stream_all_databases_v2_smoke.js
         - jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
         - jstests/sharding/query/change_streams/change_stream_cluster_v2_ignore_removed_shards_smoke.js
