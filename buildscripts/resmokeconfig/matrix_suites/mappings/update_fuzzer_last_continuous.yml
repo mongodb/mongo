@@ -1,3 +1,4 @@
 base_suite: update_fuzzer
 overrides:
   - "multiversion.otel_tracing"
+  - "multiversion.update_fuzzer_multiversion_testdata_last_continuous"

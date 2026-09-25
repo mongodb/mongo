@@ -324,6 +324,28 @@
               # need to set this variable so that the right version of mongos is chosen.
               mongosBinVersion: "last-patch"
 
+- name: update_fuzzer_multiversion_testdata_last_lts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # The update fuzzer creates its own clusters, so it takes the old version from
+              # TestData rather than from a fixture. Unlike useRandomBinVersionsWithinReplicaSet,
+              # oldBin is not read by ReplSetTest, so it selects the binary without also
+              # changing FCV handling or fixture seeding.
+              oldBin: "last-lts"
+
+- name: update_fuzzer_multiversion_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              oldBin: "last-continuous"
+
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
     executor:

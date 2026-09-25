@@ -17,6 +17,7 @@ executor:
           enableOTELTracing: false
           internalQueryAppendIdToSetWindowFieldsSort: true
           internalQueryMaxAllowedDensifyDocs: 1000
+          oldBin: last-continuous
           traceExceptions: false
       nodb: ""
 matrix_suite: true
