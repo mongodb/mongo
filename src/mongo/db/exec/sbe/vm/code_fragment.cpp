@@ -61,7 +61,7 @@ void CodeFragment::removeFrame(FrameId frameId) {
             str::stream() << "Can't remove frame that has outstanding fixups. frameId:" << frameId,
             p->second.fixupOffsets.empty());
 
-    _frames.erase(frameId);
+    _frames.erase(p);
 }
 
 bool CodeFragment::hasFrames() const {
@@ -115,7 +115,7 @@ void CodeFragment::removeLabel(LabelId labelId) {
             str::stream() << "Can't remove label that has outstanding fixups. labelId:" << labelId,
             p->second.fixupOffsets.empty());
 
-    _labels.erase(labelId);
+    _labels.erase(p);
 }
 
 void CodeFragment::appendLabel(LabelId labelId) {
