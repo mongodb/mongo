@@ -95,11 +95,13 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+// This fail point allows collections to be given malformed validators. With parseValidator: true,
+// the collection stores the parse error and rejects writes instead of bypassing the parser.
+MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
+
 namespace {
 
-// This fail point allows collections to be given malformed validator. A malformed validator
-// will not (and cannot) be enforced but it will be persisted.
-MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // Simulate the behavior of mixed-schema flag of MongoDB versions without SERVER-91195:
 // Only set the legacy time-series mixed-schema flag at the top level of the catalog,
@@ -655,7 +657,8 @@ Collection::Validator CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
-    if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
+    if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail(
+            [](const BSONObj& data) { return !data.getBoolField("parseValidator"); }))) {
         return {validator, nullptr, nullptr};
     }
 
@@ -1173,7 +1176,18 @@ Status CollectionImpl::setValidationOptions(
         mustReparse) {
         _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
         if (!_validator.isOK()) {
-            return _validator.getStatus();
+            // Do not enforce an OK result during oplog application: as at startup, the
+            // validator may have been well formed on the version that wrote it. Keeping it
+            // rejects writes to the collection (fail closed) rather than allowing them
+            // unvalidated (SERVER-134863).
+            if (opCtx->writesAreReplicated()) {
+                return _validator.getStatus();
+            }
+            LOGV2_WARNING(13486300,
+                          "Re-parsing of a malformed collection validator failed during oplog "
+                          "application, keeping it",
+                          logAttrs(ns()),
+                          "validatorStatus"_attr = _validator.getStatus());
         }
     }
 
