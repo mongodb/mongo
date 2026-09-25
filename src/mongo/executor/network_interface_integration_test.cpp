@@ -872,6 +872,14 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExt
     const unittest::ServerParameterGuard bufferServerParameterRAII{"maxTimeMsLocalBufferTimeMillis",
                                                                    bufferMs.count()};
 
+    // Pre-warm the pool with a connection so the next command acquires one immediately. Connection
+    // acquisition is bounded by the request deadline (without the buffer), and the local timer with
+    // the buffer only kicks off after acquisition succeeds. If acquiring a connection (e.g.
+    // establishing a gRPC channel) takes longer than the short request timeout below, the request
+    // would fail with a connection error (e.g. HostUnreachable) before the local timer can fire,
+    // so the local buffer would not be exercised.
+    assertCommandOK(DatabaseName::kAdmin, BSON("ping" << 1));
+
     // Block the remote handling of "ping" for much longer than our timeout, so the local timer
     // is the one that fires.
     Milliseconds failCommandBlockTime(10'000);
