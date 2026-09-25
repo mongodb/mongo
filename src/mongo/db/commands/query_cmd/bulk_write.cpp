@@ -1830,6 +1830,11 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     size_t idx = 0;
 
+    // Increment the total number of retryable commands. Retried commands are counted by the below
+    // hook.
+    if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] {
         // If any statements were retried then increment command counter.
         write_ops_exec::updateRetryStats(opCtx, !responses.getRetriedStmtIds().empty());
