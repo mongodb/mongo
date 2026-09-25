@@ -25,7 +25,12 @@ server_parameters:
         redact: false
 
     defaultStartupFCV:
-        description: "Startup parameter to set a default FCV at startup"
+        description: >
+            Startup parameter to set a default FCV at startup. This parameter is also settable at
+            runtime because Atlas uses a declarative configuration model that always specifies it,
+            including when changing the FCV with setFeatureCompatibilityVersion. Changing this
+            parameter at runtime does not change the current FCV, and allows Atlas to apply its
+            configuration without requiring a restart.
         set_at: [startup, runtime]
         cpp_vartype: synchronized_value<std::string>
         cpp_varname: gDefaultStartupFCV
