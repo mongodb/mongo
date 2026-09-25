@@ -3,7 +3,7 @@
  *
  * Note: This hook won't find documents which don't have the full shard key.
  */
-import {CheckOrphansAreDeletedHelpers} from "jstests/libs/check_orphans_are_deleted_helpers.js";
+import {CheckOrphansAreDeletedHelpers} from "jstests/libs/cluster_scalability/check_orphans_are_deleted_helpers.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 

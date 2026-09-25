@@ -579,7 +579,9 @@ def mongo_shell_program(
     )
 
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
-    eval_sb.append('await import("jstests/libs/override_methods/check_orphans_are_deleted.js")')
+    eval_sb.append(
+        'await import("jstests/libs/override_methods/cluster_scalability/check_orphans_are_deleted.js")'
+    )
 
     # Load a callback to check that the info stored in config.collections and config.chunks is
     # semantically correct before shutting down a ShardingTest.
