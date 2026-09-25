@@ -1,6 +1,8 @@
 /**
  * Verify that the solutionHashUnstable of a winning plan can be used in forcedPlanSolutionHash,
  * even after the winning solution has been extended.
+ *
+ * @tags: [requires_sbe]
  */
 import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
