@@ -215,7 +215,28 @@ public:
         return {};
     }
 
+    /**
+     * Express plans are single plans by construction so no candidate is ever enumerated, ranked, or
+     * rejected. This always returns exactly one entry, the winner.
+     */
+    std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const override;
+
 private:
+    /**
+     * The per-plan formatting core shared by getWinningPlanStats() and getPlanEntries(), so the two
+     * shapes cannot drift. 'format' selects between them; see PlanStatsFormat.
+     */
+    PlanStatsDetails _formatPlanStats(const ExplainPolicy& policy, PlanStatsFormat format) const;
+
+    /**
+     * Appends the fields describing the plan's structure - the stage and what it accesses. These
+     * are common to both formats and stay flat on the node in each.
+     */
+    void _appendPlanStructure(BSONObjBuilder& bob) const;
+
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
     const express::WriteOperationStats* _writeOperationStats;

@@ -415,8 +415,9 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
         planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
     } else {
         // A strategy decided, so it must have recorded why (it populated the same explain data
-        // this value rides on). This can only fire on the classic V3 path: SBE and Express fall
-        // back to legacy-shaped output before rankerChoice is emitted.
+        // this value rides on). This can only fire on the classic V3 path: SBE falls back to
+        // legacy-shaped output before rankerChoice is emitted, and express plans are single plans
+        // that no strategy ranks, so they always take the branch above.
         tassert(13237700,
                 "a ranking strategy decided the winning plan but recorded no reason",
                 reason.has_value());
@@ -442,9 +443,9 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
  *
  * - planSummary still renders legacy-shaped output under explainVersion "3".
  *   TODO SERVER-133235 (the remaining reduction) closes that window.
- * - Explainers that do not implement the per-plan enumerator (SBE, Express: default-empty
- *   getPlanEntries()) keep the legacy delegation. TODO SERVER-132033 routes them through
- *   getPlanEntries(); the classic engine always yields at least one entry.
+ * - Explainers that do not implement the per-plan enumerator (SBE: default-empty getPlanEntries())
+ *   keep the legacy delegation. TODO SERVER-132033 routes it through getPlanEntries() as well; the
+ *   classic and express explainers always yield at least one entry.
  *
  * Both delegations must map the verbosity to legacy first: the legacy generators tassert on a V3
  * verbosity.
@@ -475,9 +476,9 @@ void generatePlannerInfoV3(PlanExecutor* exec,
         explainer.getPlanSelectionStrategy().value_or(PlanSelectionStrategy::kSinglePlan);
     auto entries = explainer.getPlanEntries(policy, PlanStatsFormat::kV3, decidingPlanRanker);
     // Zero entries means the explainer does not implement the per-plan enumerator and inherited
-    // the default-empty getPlanEntries(): SBE, Express, and the pipeline explainer. Those paths
-    // keep the legacy-shaped sections under explainVersion "3" until SERVER-132033 (engine
-    // parity); the classic explainer always returns at least the winning plan.
+    // the default-empty getPlanEntries(): SBE and the pipeline explainer. Those paths keep the
+    // legacy-shaped sections under explainVersion "3" until SERVER-132033 (engine parity); the
+    // classic and express explainers always return at least the winning plan.
     if (entries.empty()) {
         generatePlannerInfo(exec,
                             mapV3ToLegacyVerbosity(v3Verbosity),

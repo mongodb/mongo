@@ -1223,8 +1223,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     // Thin wrapper over the shared per-plan enumerator; kLegacy is exactly the legacy semantics,
     // pinned by the LegacyAccessorsMatchPlanEntriesAcrossVerbosities equivalence test and the
     // legacy explain suites.
-    // TODO SERVER-132033: route SBE/Express through getPlanEntries() as well,
-    // then remove the legacy per-plan virtuals from the PlanExplainer interface.
+    // TODO SERVER-132033: route SBE through getPlanEntries() as well then remove the legacy
+    // per-plan virtuals from the PlanExplainer interface.
     auto entries = getPlanEntries(
         explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
     tassert(13052905, "getPlanEntries() must return at least the winning plan", !entries.empty());

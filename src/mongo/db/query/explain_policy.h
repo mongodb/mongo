@@ -113,13 +113,7 @@ ExplainPolicy explainPolicyFor(ExplainOptions::Verbosity v);
 /**
  * Maps a requested (possibly V3) verbosity to the nearest legacy verbosity (planSummary /
  * plannerChoice -> queryPlanner, plannerStats -> execAllPlans, execStatsV3 -> execStats; legacy
- * verbosities map to themselves). Used by the remaining legacy-delegation code paths:
- *
- * - Find path: only the planSummary reduction (until SERVER-133235) and the explainers without a
- *   per-plan enumerator (SBE, Express; until SERVER-132033) still delegate. The modes from
- *   plannerChoice up (plannerChoice, plannerStats, execStats) render the real V3 output on the
- *   classic engine.
- * - Aggregation path: delegates end-to-end until SERVER-130810.
+ * verbosities map to themselves).
  */
 ExplainOptions::Verbosity mapV3ToLegacyVerbosity(ExplainOptions::Verbosity v);
 

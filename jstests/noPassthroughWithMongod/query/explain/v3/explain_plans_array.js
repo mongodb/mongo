@@ -565,22 +565,58 @@ describe("V3 queryPlanner.plans array", function () {
         }
     });
 
-    it("express-eligible query keeps the legacy fallback shape under explainVersion 3", function () {
+    it("express-eligible query produces a single plan entry", function () {
         setPlanRankerConfig(db); // Defaults.
-        // The Express explainer does not implement the per-plan enumerator yet (SERVER-132033),
-        // so it falls back to the legacy-shaped queryPlanner under explainVersion "3".
+        // An express query is planned by the express fast path, not by the plan enumerator: it has
+        // exactly one plan, ranked by nobody. It renders in the V3 shape all the same - one entry
+        // in plans[], and a rankerChoice reporting that no ranking took place.
+        for (const verbosity of ["plannerStats", "execStats"]) {
+            const explain = assert.commandWorked(
+                db.runCommand({explain: {find: collName, filter: {_id: 1}}, verbosity}),
+            );
+            assert.eq(explain.explainVersion, "3", "expected V3 version reporting", {explain});
+            assertChosenRanker(explain, ChosenRanker.kSinglePlan, PlanRankerReason.kSinglePlan);
+            assert(!explain.queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {
+                explain,
+                verbosity,
+            });
+
+            const plans = getV3Plans(explain);
+            assert.eq(plans.length, 1, {plans, verbosity});
+            const plan = plans[0];
+            assertWellFormedPlan(plan);
+            assert.eq(plan.isCached, false, {plan, verbosity});
+            assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {
+                plan,
+                verbosity,
+            });
+            assert.eq(plan.planStages.stage, "EXPRESS_IXSCAN", {plan, verbosity});
+            assert.eq(plan.planStages.indexName, "_id_", {plan, verbosity});
+            // Neither statistics family applies: no trial ran and the cost-based ranker never
+            // estimated the plan. This holds at execStats too - the execution counters live in the
+            // retained executionStats section, never fused into a V3 node.
+            assert(!hasMultiPlanGroup(plan), "unexpected multiPlan group", {plan, verbosity});
+            assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan, verbosity});
+            forEachNode(plan.planStages, (node) => {
+                assert(!node.hasOwnProperty("statistics"), "unexpected statistics", {
+                    node,
+                    verbosity,
+                });
+            });
+        }
+    });
+
+    it("express-eligible query still reports its execution counters at execStats", function () {
+        setPlanRankerConfig(db); // Defaults.
+        // The counters the express plan collects are not lost by the move to plans[]: they are
+        // reported by the retained legacy executionStats section, which V3 execStats emits
+        // unchanged.
         const explain = assert.commandWorked(
-            db.runCommand({explain: {find: collName, filter: {_id: 1}}, verbosity: "plannerStats"}),
+            db.runCommand({explain: {find: collName, filter: {_id: 1}}, verbosity: "execStats"}),
         );
-        assert.eq(explain.explainVersion, "3", "expected V3 version reporting", {explain});
-        assert(
-            explain.queryPlanner.hasOwnProperty("winningPlan"),
-            "expected the legacy fallback shape",
-            {explain},
-        );
-        assert(!explain.queryPlanner.hasOwnProperty("plans"), "unexpected V3 plans array", {
-            explain,
-        });
+        assert(explain.hasOwnProperty("executionStats"), "missing executionStats", {explain});
+        assert.eq(explain.executionStats.nReturned, 1, {explain});
+        assert.eq(explain.executionStats.executionStages.stage, "EXPRESS_IXSCAN", {explain});
     });
 
     it("trivial EOF plan produces a single well-formed entry", function () {

@@ -136,14 +136,14 @@ inline boost::optional<PlanExplainerData>& operator<<(boost::optional<PlanExplai
  *
  * Nor does the reported version (getVersion()) determine the format: "3" is deliberately
  * reported for legacy-shaped output throughout the mixed-fidelity windows (planSummary until
- * SERVER-133235, SBE/Express until SERVER-132033) - version reporting is
+ * SERVER-133235, SBE until SERVER-132033) - version reporting is
  * uniform by design while output fidelity varies per path, so the two must stay
  * decoupled.
  *
  * Not a transitional concept: legacy verbosities remain supported indefinitely and, since the
  * per-plan accessor consolidation, obtain their legacy-shaped entries through this same
- * enumerator as kLegacy. SERVER-132033 (engine parity) widens the enum's use to SBE/Express
- * while deleting the legacy per-plan virtuals; it does not retire the format dimension.
+ * enumerator as kLegacy. SERVER-132033 (engine parity) widens the enum's use to the remaining
+ * engines while deleting the legacy per-plan virtuals; it does not retire the format dimension.
  */
 enum class PlanStatsFormat {
     // The legacy explain node shape: structural fields and execution counters fused per node, the
@@ -299,8 +299,8 @@ public:
      *
      * The 'verbosity' level parameter determines the amount of information to be returned.
      *
-     * TODO SERVER-132033: the classic implementation is a thin wrapper over
-     * getPlanEntries(); once SBE/Express route through getPlanEntries() too, remove this virtual
+     * TODO SERVER-132033: the classic and express implementations are thin wrappers over
+     * getPlanEntries(); once SBE routes through getPlanEntries() too, remove this virtual
      * (and getRejectedPlansStats()) from the interface, completing the per-plan accessor
      * consolidation.
      */
@@ -323,7 +323,7 @@ public:
      * The 'verbosity' level parameter determines the amount of information to be returned.
      *
      * TODO SERVER-132033: remove together with getWinningPlanStats() once
-     * SBE/Express route through getPlanEntries(); see the note there.
+     * SBE routes through getPlanEntries(); see the note there.
      */
     virtual std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const = 0;
@@ -345,9 +345,9 @@ public:
      *
      * This is the accessor the V3 explain output builds its "plans[]" array
      * over. The default implementation returns no entries. Explainers whose per-plan V3
-     * parity is deferred (SBE, Express; SERVER-132033) and explainers without
-     * candidate plans (the pipeline explainer) inherit it. PlanExplainerImpl provides the real
-     * implementation.
+     * parity is deferred (SBE; SERVER-132033) and explainers without
+     * candidate plans (the pipeline explainer) inherit it. PlanExplainerImpl and
+     * PlanExplainerExpress provide real implementations.
      */
     virtual std::vector<ExplainPlanEntry> getPlanEntries(
         const ExplainPolicy& policy,
@@ -395,7 +395,9 @@ public:
      * Returns the reason the deciding plan ranker was chosen, as recorded by the ranking strategy
      * at its decision site (see PlanExplainerData::planRankerReason). Returns boost::none when no
      * strategy recorded a decision - explainers without classic ranking data (SBE, Express, the
-     * pipeline explainer) inherit this default, mirroring getPlanEntries' default-empty contract.
+     * pipeline explainer) inherit this default. For express it is not a deferral: an express plan
+     * is a single plan that no strategy ranks, so there is no choice to explain and the V3
+     * rankerChoice reports "none"/"singlePlan".
      */
     virtual boost::optional<PlanRankerReason> getPlanRankerReason() const {
         return boost::none;

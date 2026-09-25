@@ -878,6 +878,76 @@ TEST_F(PlanExplainerTest, ExpressPlanExecStatsIncludeNanoExecutionTime) {
     ASSERT_EQ(summary->executionTime.precision, QueryExecTimerPrecision::kNanos);
 }
 
+TEST_F(PlanExplainerTest, ExpressPlanGetPlanEntriesLegacyMatchesWinningPlanAccessor) {
+    // The legacy format still routes through the same per-plan core as the winning-plan accessor,
+    // so the sole entry is byte-identical to it.
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner),
+                                 PlanStatsFormat::kLegacy,
+                                 PlanSelectionStrategy::kSinglePlan);
+    ASSERT_EQ(entries.size(), 1u);
+    auto&& [winningPlan, _] =
+        explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+    ASSERT_BSONOBJ_EQ(entries[0].planStatsTree, winningPlan);
+}
+
+TEST_F(PlanExplainerTest, ExpressPlanGetPlanEntriesV3) {
+    // An express plan yields exactly one V3 entry: the express path is taken only for fast-path
+    // query shapes, so no candidate is ever enumerated and there is nothing after the winner. The
+    // entry carries no ranking provenance of either family - no trial, no score, no stop
+    // condition - and no solution hash, since express plans have no QuerySolution.
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kSinglePlan);
+    ASSERT_EQ(entries.size(), 1u);
+    const auto& entry = entries[0];
+    ASSERT_FALSE(entry.hasTrialStats) << entry.planStatsTree;
+    ASSERT_FALSE(entry.isCached) << entry.planStatsTree;
+    ASSERT_FALSE(entry.solutionHash.has_value()) << entry.planStatsTree;
+    ASSERT_FALSE(entry.stopCondition.has_value()) << entry.planStatsTree;
+
+    // 'isCached' is hoisted to the plan object, and neither statistics group applies to an express
+    // plan, so the node carries no "statistics" subobject at all.
+    ASSERT_STRING_CONTAINS(entry.planStatsTree.toString(), "EXPRESS_IXSCAN");
+    forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
+        ASSERT(node.hasField("stage")) << node;
+        ASSERT_FALSE(node.hasField("isCached")) << node;
+        ASSERT_FALSE(node.hasField("statistics")) << node;
+    });
+}
+
+TEST_F(PlanExplainerTest, ExpressPlanGetPlanEntriesV3ExcludesExecutionCounters) {
+    // Even at the V3 execStats verbosity the plans[] tree stays structural: execution counters are
+    // never fused into a V3 node. They remain reported for express in the retained legacy
+    // executionStats section, which the winning-plan accessor still produces.
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecStatsV3);
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kExecStatsV3),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kSinglePlan);
+    ASSERT_EQ(entries.size(), 1u);
+    forEachV3Node(entries[0].planStatsTree, [&](const BSONObj& node) {
+        ASSERT_FALSE(node.hasField("nReturned")) << node;
+        ASSERT_FALSE(node.hasField("keysExamined")) << node;
+        ASSERT_FALSE(node.hasField("docsExamined")) << node;
+        ASSERT_FALSE(node.hasField("executionTimeMillisEstimate")) << node;
+    });
+    // The plan-level summary is still collected, so the section that does report the counters has
+    // its source.
+    ASSERT(entries[0].summary.has_value());
+    ASSERT_EQ(entries[0].summary->nReturned, 1u);
+}
+
 TEST_F(PlanExplainerTest, ClassicPipelinePlanExplain) {
     // A pipeline query including sargable predicates on different fields will consider multiple
     // plans during planning. Its executor can be explained, and the explain output should indicate
