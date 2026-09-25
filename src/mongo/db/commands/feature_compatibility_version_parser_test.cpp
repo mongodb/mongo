@@ -36,6 +36,18 @@ private:
     unittest::ServerParameterGuard _symmetricFCV{"featureFlagSymmetricFCV", true};
 };
 
+TEST(FeatureCompatibilityVersionParserTest, InvalidVersionIncludesDocumentationLink) {
+    ASSERT_THROWS_WITH_CHECK(FeatureCompatibilityVersionParser::parseVersionForFcvString("3.2"),
+                             DBException,
+                             [](const auto& exception) {
+                                 ASSERT_EQ(exception.code(), 4926900);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "https://www.mongodb.com/docs/manual/reference/command/"
+                                     "setFeatureCompatibilityVersion/");
+                             });
+}
+
 static FeatureCompatibilityVersionDocument makeFCVDoc(FCV version,
                                                       boost::optional<FCV> targetVersion,
                                                       boost::optional<FCV> previousVersion,

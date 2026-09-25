@@ -15,10 +15,7 @@ namespace mongo::feature_compatibility_version_documentation {
     "https://docs.mongodb.com/master/release-notes"};
 
 [[MONGO_MOD_PUBLIC]] inline std::string compatibilityLink() {
-    return fmt::format(                                //
-        "{}/{}-compatibility/#feature-compatibility",  //
-        kReleaseNotesRoot,                             //
-        multiversion::toString(multiversion::GenericFCV::kLastLTS));
+    return "https://www.mongodb.com/docs/manual/reference/command/setFeatureCompatibilityVersion/";
 }
 
 [[MONGO_MOD_PUBLIC]] inline std::string upgradeLink() {
