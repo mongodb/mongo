@@ -282,7 +282,7 @@ public:
         // client when it is destroyed.
         virtual AsyncDBClient* getClient() = 0;
 
-        // Indicates that the user is done with this leased stream, and no failures on it occured.
+        // Indicates that the user is done with this leased stream, and no failures on it occurred.
         // Users MUST call either this function or indicateFailure before the LeasedStream is
         // destroyed.
         virtual void indicateSuccess() = 0;

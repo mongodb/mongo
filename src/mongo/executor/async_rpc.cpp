@@ -124,7 +124,7 @@ public:
                         // diagnosing BFs.
                         LOGV2_DEBUG(9771003,
                                     1,
-                                    "Remote error occured in async_rpc",
+                                    "Remote error occurred in async_rpc",
                                     "status"_attr =
                                         extraInfo->asRemote().getRemoteCommandResult().toString());
                         targeter

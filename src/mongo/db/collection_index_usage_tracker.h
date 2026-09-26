@@ -130,7 +130,7 @@ public:
 
     /**
      * Get the current state of the usage of collection scans. This struct will only include
-     * information about the collection scans that have occured at the time of calling.
+     * information about the collection scans that have occurred at the time of calling.
      *
      * Can be safely called by multiple threads concurrently.
      */

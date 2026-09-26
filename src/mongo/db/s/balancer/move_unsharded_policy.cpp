@@ -302,7 +302,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
         };
         tassert(8959500,
                 str::stream()
-                    << "An unexpected error occured while moving a random unsharded collection"
+                    << "An unexpected error occurred while moving a random unsharded collection"
                     << ", from: " << moveAction.from << ", to: " << moveAction.to
                     << ", nss: " << moveAction.nss.toStringForErrorMsg()
                     << ", error: " << moveResponse.toString(),

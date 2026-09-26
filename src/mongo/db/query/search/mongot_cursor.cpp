@@ -357,7 +357,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
                 taskExecutor->wait(swCbHnd.getValue(), expCtx->getOperationContext());
             } catch (const DBException& exception) {
                 LOGV2_ERROR(8049900,
-                            "An interruption occured while the MongotTaskExecutor was waiting for "
+                            "An interruption occurred while the MongotTaskExecutor was waiting for "
                             "a response",
                             "error"_attr = exception.toStatus());
                 // If waiting for the response is interrupted, like by a ClientDisconnectError, then

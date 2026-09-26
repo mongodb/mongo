@@ -2667,7 +2667,7 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
         // Return a HelloResponse with the current topology version on timeout when waiting for
         // a topology change.
         if (status == ErrorCodes::ExceededTimeLimit) {
-            // A topology change has not occured within the deadline so horizonString is still a
+            // A topology change has not occurred within the deadline so horizonString is still a
             // good indicator of whether we have a valid config.
             std::lock_guard lk(_mutex);
             const bool hasValidConfig = horizonString != boost::none;

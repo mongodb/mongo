@@ -46,7 +46,7 @@ public:
      * * The trial run tracker reached the limit of kNumResults metric.
      * * The stashed documents reached the memory limit.
      * * The plan reached EOF.
-     * * An error has occured.
+     * * An error has occurred.
      *
      * If the plan stage throws a 'QueryExceededMemoryLimitNoDiskUseAllowed', it will be caught and
      * the 'candidate->status' will be set. This failure is considered recoverable, as another

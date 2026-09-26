@@ -3110,7 +3110,7 @@ TEST_F(CollectionCatalogTimestampTest,
     // the openCollection looks for the originalNss, no collection instance should be returned.
     concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, false, false, 0, [&]() {
-            // Verify that we can find the Collection when we search by UUID when the setup occured
+            // Verify that we can find the Collection when we search by UUID when the setup occurred
             // during concurrent rename (rename is not affecting UUID), even if we can't find it by
             // namespace.
             auto coll =
@@ -3139,7 +3139,7 @@ TEST_F(CollectionCatalogTimestampTest,
     // the openCollection looks for the newNss, no collection instance should be returned.
     concurrentRenameCollectionAndEstablishConsistentCollection(
         opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, true, false, 0, [&]() {
-            // Verify that we can find the Collection when we search by UUID when the setup occured
+            // Verify that we can find the Collection when we search by UUID when the setup occurred
             // during concurrent rename (rename is not affecting UUID), even if we can't find it by
             // namespace.
             auto coll =

@@ -1331,7 +1331,7 @@ TEST(Simple8b, FlushResetsLastInPreviousWhenFlushingRle) {
     builder.flush(writeFn);
 
     // Last value written is only used for RLE so append 120 values of the same value and make sure
-    // this does _NOT_ start RLE as flush occured in between.
+    // this does _NOT_ start RLE as flush occurred in between.
     for (int i = 0; i < 120; ++i) {
         EXPECT_TRUE(builder.append(1, writeFn));
     }

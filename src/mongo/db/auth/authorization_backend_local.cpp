@@ -1000,7 +1000,7 @@ public:
 
     AuthzCollection() = default;
     explicit AuthzCollection(const NamespaceString& nss) : _tenant(nss.tenantId()) {
-        // Capture events regardless of what Tenant they occured in,
+        // Capture events regardless of what Tenant they occurred in,
         // invalidators will purge cache on a per-tenant basis as needed.
         auto db = nss.dbName();
         auto coll = nss.coll();

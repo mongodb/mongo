@@ -644,7 +644,7 @@ void HistoricalCatalogIdTracker::_renameTimestamp(const NamespaceString& from,
 
     // Then, update 'from' mapping. This is similar to a 'drop'.
     if (!fromIds.empty() && fromIds.back().ts == ts) {
-        // Re-write latest entry if timestamp match (multiple changes occured in this transaction),
+        // Re-write latest entry if timestamp match (multiple changes occurred in this transaction),
         // otherwise push at end.
         fromIds.back().id = boost::none;
     } else {

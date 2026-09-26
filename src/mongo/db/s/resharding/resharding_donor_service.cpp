@@ -461,7 +461,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](auto factory) {
             if (!_cancelState.isAbortedOrSteppingDown()) {
-                // If a failover occured after the donor transitioned to done locally, but
+                // If a failover occurred after the donor transitioned to done locally, but
                 // before it notified the coordinator, it will already be in state done here.
                 // Otherwise, it must be in blocking-writes before transitioning to done.
                 invariant(_donorCtx.getState() == DonorStateEnum::kBlockingWrites ||

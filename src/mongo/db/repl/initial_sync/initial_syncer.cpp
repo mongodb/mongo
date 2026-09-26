@@ -2834,7 +2834,7 @@ bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(Opl
         std::lock_guard<InitialSyncSharedData> lk(*_sharedData);
         return _sharedData->shouldRetryOperation(lk, &_retryingOperation);
     }
-    // A non-network error occured, so clear any network error and use the default restart
+    // A non-network error occurred, so clear any network error and use the default restart
     // strategy.
     _retryingOperation = boost::none;
     return _defaultDecision.shouldContinue(fetcher, status);

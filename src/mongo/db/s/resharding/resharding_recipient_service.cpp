@@ -554,7 +554,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                 })
                 .then([this, factory] {
                     if (_recipientCtx.getState() != RecipientStateEnum::kDone) {
-                        // If a failover occured before removing the recipient document, the
+                        // If a failover occurred before removing the recipient document, the
                         // recipient could already be in state done.
                         _transitionToDone(factory);
                     }

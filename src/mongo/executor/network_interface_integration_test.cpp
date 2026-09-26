@@ -1361,7 +1361,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     // Disable the failpoint so the reactor can proceed and attempt to send the request.
     // Shutdown and draining should then complete despite the blocking failCommand, since the
     // request will either never be sent (if the cancellation performed by shutdown has already
-    // occured) or the socket read/write will be interrupted if it has already begun.
+    // occurred) or the socket read/write will be interrupted if it has already begun.
     fpb.reset();
     shutdownFp.reset();
 

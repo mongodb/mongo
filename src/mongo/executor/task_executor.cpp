@@ -100,7 +100,7 @@ ExecutorFuture<TaskExecutor::ResponseStatus> wrapScheduleCallWithCancelTokenAndF
         auto status = args.response.status;
 
         // Only mark the future as complete when the moreToCome flag is false, even if an error has
-        // occured.
+        // occurred.
         if (!args.response.moreToCome) {
             if (status.isOK()) {
                 exclusivePromiseAccess->emplaceValue(std::move(args.response));

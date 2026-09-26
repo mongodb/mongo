@@ -1197,7 +1197,7 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1241,7 +1241,7 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1290,7 +1290,7 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1327,7 +1327,7 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1385,7 +1385,7 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1433,7 +1433,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
@@ -1494,7 +1494,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     auto now = getNet()->now();
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    // Update the current term to simulate a scenario where an election has occured
+    // Update the current term to simulate a scenario where an election has occurred
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);

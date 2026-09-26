@@ -34,12 +34,12 @@ PlanCacheInvalidator::~PlanCacheInvalidator() {
     try {
         clearPlanCache();
     } catch (const DBException& ex) {
-        LOGV2_WARNING(6006610, "DBException occured on clearing plan cache", "exception"_attr = ex);
+        LOGV2_WARNING(6006610, "DBException occurred on clearing plan cache", "exception"_attr = ex);
     } catch (const std::exception& ex) {
         LOGV2_WARNING(
-            6006611, "Exception occured on clearing plan cache", "message"_attr = ex.what());
+            6006611, "Exception occurred on clearing plan cache", "message"_attr = ex.what());
     } catch (...) {
-        LOGV2_WARNING(6006612, "Unknown exception occured on clearing plan cache");
+        LOGV2_WARNING(6006612, "Unknown exception occurred on clearing plan cache");
     }
 }
 

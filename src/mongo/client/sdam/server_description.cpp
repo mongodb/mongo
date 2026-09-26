@@ -143,7 +143,7 @@ void ServerDescription::calculateRtt(const boost::optional<HelloRTT> currentRtt,
     }
 
     if (currentRtt == boost::none) {
-        // An onServerHeartbeatSucceededEvent occured. Note: This should not be reached by an
+        // An onServerHeartbeatSucceededEvent occurred. Note: This should not be reached by an
         // onServerHeartbeatFailedEvent. Upon the failed event, the type is set to
         // ServerType::Unknown.
 
