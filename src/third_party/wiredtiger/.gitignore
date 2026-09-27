@@ -10,8 +10,7 @@ compile_commands.json
 cscope.in.out
 cscope.out
 cscope.po.out
-build/
-build_*/
+build*/
 /docs/
 test-compatibility-run/
 COMPATIBILITY_TEST/

@@ -65,7 +65,8 @@ __blkcache_read_decrypt(
         WT_RET(__blkcache_read_corrupt(
           session, WT_ERROR, addr, addr_size, "encrypted block for which no decryptor configured"));
 
-    if ((ret = __wt_decrypt(session, encryptor, bm->encrypt_skip(bm, session), in, out)) != 0)
+    if ((ret = __wt_decrypt(
+           session, encryptor, bm->encrypt_skip(bm, session, in->data), in, out)) != 0)
         WT_RET(__blkcache_read_corrupt(session, ret, addr, addr_size, "block decryption failed"));
 
     /* Clear the ENCRYPTED flag. */
@@ -827,7 +828,8 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *
         WT_ERR(bm->write_size(bm, session, &size));
         WT_ERR(__wt_scr_alloc(session, size, &etmp));
         WT_ASSERT(session, ip->size > 0);
-        WT_ERR(__wt_encrypt(session, kencryptor, bm->encrypt_skip(bm, session), ip, etmp));
+        WT_ERR(
+          __wt_encrypt(session, kencryptor, bm->encrypt_skip(bm, session, ip->data), ip, etmp));
 
         encrypted = true;
         ip = etmp;

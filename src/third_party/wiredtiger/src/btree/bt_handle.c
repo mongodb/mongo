@@ -289,7 +289,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
      * way to consider the block manager's maximum cookie size versus the
      * minimum Btree internal node size.
      */
-    btree->block_header = bm->block_header(bm);
+    btree->block_header_write_size = bm->block_header_write_size(bm, session);
 
     /*
      * Open the specified checkpoint unless it's a special command (special commands are responsible

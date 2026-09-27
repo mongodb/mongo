@@ -549,21 +549,6 @@ functions:
           fi
         done
 
-  "schema disagg abort":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${PREPARE_TEST_ENV}
-        build_dir=$(cd ../../../ && pwd)
-        for i in $(seq ${times|10}); do
-          echo "Iteration $i/${times|10}"
-          ./test_schema_disagg_abort -b "$build_dir" ${schema_args} -T 12 -u 64 -t 300
-        done
-
 #######################################
 #               Variables             #
 #######################################
@@ -649,24 +634,6 @@ variables:
             runs.predictable_replay=1 runs.rows=50000:200000 runs.ops=500000:2000000
           times: 10
 
-  - &schema-disagg-abort-smoke-test-disagg
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            # The full mode matrix in short runs: single node, lone follower, role switches,
-            # kills, and both two-node topologies.
-            bash ./smoke.sh
-
   # Configure flags for builtins.
   - &configure_flags_with_builtins
     HAVE_BUILTIN_EXTENSION_LZ4: -DHAVE_BUILTIN_EXTENSION_LZ4=1
@@ -730,100 +697,6 @@ tasks:
   - <<: *format-stress-test-disagg-snapshot
     name: format-stress-test-disagg-snapshot-2
     tags: ["stress-test-disagg-fail"]
-
-  # The schema-disagg-abort matrix. The kill variants cover their graceful counterparts, since a
-  # kill lands halfway through the run and everything before it is the graceful workload.
-  - name: schema-disagg-abort-crash-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # One node leading throughout, SIGKILLed at 150s, then recovered and verified.
-          schema_args: -r l -k 150
-
-  - name: schema-disagg-abort-switch-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # One node stepping down and back up every 30 seconds.
-          schema_args: -r l -s 30
-
-  - name: schema-disagg-abort-multi-crash-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # Leader and follower, each killed in turn, so each survivor carries on alone.
-          schema_args: -r lf -k l100 -k f200
-
-  - name: schema-disagg-abort-multi-switch-crash-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # Two nodes swapping roles every 30s, killing whoever leads at 150s: a step-up over a
-          # table the peer created, with a crash on top.
-          schema_args: -r lf -s 30 -k l150
-
-  - name: schema-disagg-abort-follower-stepup-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # A lone follower generates its own workload and never checkpoints, then steps up over
-          # the operations it accumulated: the way a fresh node bootstraps its own tables before
-          # taking leadership.
-          schema_args: -r f -s 30
-
-  # Legacy schema mode: no schema epochs and no publish, single node only.
-  - name: schema-disagg-abort-legacy-crash-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          # The only legacy shape that asserts drop absence: a step-up resurrects the drops a
-          # node applied while following.
-          schema_args: -e -r l -k 150
-
-  - name: schema-disagg-abort-legacy-switch-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-    depends_on:
-        - name: compile
-    exec_timeout_secs: 7200
-    commands:
-      - func: "fetch artifacts"
-      - func: "schema disagg abort"
-        vars:
-          schema_args: -e -r l -s 30
-
-  - <<: *schema-disagg-abort-smoke-test-disagg
-    name: schema-disagg-abort-smoke-test-disagg-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
 
 #######################################
 #            Buildvariants            #

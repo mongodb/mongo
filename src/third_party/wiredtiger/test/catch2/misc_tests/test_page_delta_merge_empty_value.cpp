@@ -25,6 +25,23 @@ extern "C" {
 
 namespace {
 
+/*
+ * The merge walks the base and delta images through the read path, which asks the block manager how
+ * large their headers are. These images are built with the standard block header, whose size is
+ * fixed.
+ */
+static u_int
+stub_block_header_read(WT_BM *, WT_SESSION_IMPL *, const void *)
+{
+    return (WT_BLOCK_HEADER_SIZE);
+}
+
+static void
+stub_block_header_init(WT_BM *, WT_SESSION_IMPL *, void *dsk)
+{
+    memset(WT_BLOCK_HEADER_REF(dsk), 0, WT_BLOCK_HEADER_SIZE);
+}
+
 static void
 init_disk_state(WT_SESSION_IMPL *session, WT_ITEM *img, WTI_DISK_LEAF_MERGE_STATE *s)
 {
@@ -34,8 +51,8 @@ init_disk_state(WT_SESSION_IMPL *session, WT_ITEM *img, WTI_DISK_LEAF_MERGE_STAT
      * __wt_cell_pack_leaf_kv appends at img->mem + img->size, so reserve the page header up front
      * (matching how the real merge seeds new_image->size before packing cells).
      */
-    img->size = WT_PAGE_HEADER_BYTE_SIZE(btree);
-    s->cell_ptr = (uint8_t *)WT_PAGE_HEADER_BYTE(btree, img->mem);
+    img->size = WT_PAGE_HEADER_WRITE_SIZE(btree);
+    s->cell_ptr = (uint8_t *)WT_PAGE_HEADER_WRITE_BYTE(btree, img->mem);
     s->all_empty_value = true;
     s->any_empty_value = false;
     s->entries = 0;
@@ -72,6 +89,7 @@ image_has_key(WT_ITEM *img, const char *key, size_t key_size)
 struct merge_empty_value_fixture {
     std::shared_ptr<mock_session> mock;
     WT_SESSION_IMPL *session;
+    WT_BM bm = {};
 
     merge_empty_value_fixture() : mock(mock_session::build_test_mock_session())
     {
@@ -94,8 +112,11 @@ struct merge_empty_value_fixture {
         WT_BTREE *btree = S2BT(session);
         btree->collator = nullptr;
         btree->prefix_compression = false;
-        btree->block_header = WT_BLOCK_HEADER_SIZE;
+        btree->block_header_write_size = WT_BLOCK_HEADER_SIZE;
         btree->base_write_gen = 1;
+        bm.block_header_read_size = stub_block_header_read;
+        bm.block_header_init = stub_block_header_init;
+        btree->bm = &bm;
     }
 
     ~merge_empty_value_fixture()

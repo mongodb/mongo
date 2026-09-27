@@ -29,11 +29,77 @@ __wt_block_disagg_header_byteswap_copy(WT_BLOCK_DISAGG_HEADER *from, WT_BLOCK_DI
 }
 
 /*
+ * __wti_block_disagg_header_write_size --
+ *     Return the size of the block header a newly opened handle should write. Only the block
+ *     manager's handle-open path calls this: everything working on an existing image takes the size
+ *     from the btree, which fixed it here when the handle opened.
+ */
+u_int
+__wti_block_disagg_header_write_size(WT_SESSION_IMPL *session)
+{
+#ifdef HAVE_DIAGNOSTIC
+    /* For testing, return a larger header size if the debug mode requests it. */
+    if (S2C(session)->debug.disagg_block_header_upgrade ==
+        WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_COMPATIBLE ||
+      S2C(session)->debug.disagg_block_header_upgrade ==
+        WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_INCOMPATIBLE)
+        return (WT_BLOCK_DISAGG_HEADER_WRITE_SIZE + WT_BLOCK_DISAGG_HEADER_DEBUG_EXTRA_SIZE);
+
+    /* The oversized version 1 mode keeps the version 1 layout and only records a wrong size. */
+#else
+    WT_UNUSED(session);
+#endif
+    return (WT_BLOCK_DISAGG_HEADER_WRITE_SIZE);
+}
+
+/*
+ * __wti_block_disagg_header_init --
+ *     Stamp the fields that identify a block header and describe its extent. A disk image laid out
+ *     for writing may be walked by the read path before it is written, and the read path recovers
+ *     the header size from the header itself, so these have to be set as soon as the image exists.
+ *     The caller owns the rest of the header, including the checksums.
+ */
+void
+__wti_block_disagg_header_init(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG_HEADER *blk)
+{
+    blk->magic = WT_BLOCK_DISAGG_MAGIC_BASE;
+    blk->version = WT_BLOCK_DISAGG_VERSION;
+    blk->compatible_version = WT_BLOCK_DISAGG_COMPATIBLE_VERSION;
+
+    /*
+     * The size has to describe the layout the image actually has, so take it from the btree, which
+     * fixed it when the handle opened. Recomputing it here would disagree with the layout for any
+     * handle that opened before the connection's debug setting changed.
+     */
+    blk->combined_header_size =
+      (uint8_t)(WT_PAGE_HEADER_SIZE + S2BT(session)->block_header_write_size);
+
+#ifdef HAVE_DIAGNOSTIC
+    switch (S2C(session)->debug.disagg_block_header_upgrade) {
+    case WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_NONE:
+        break;
+    case WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_COMPATIBLE:
+        /* A newer writer whose extra fields this build's readers may skip. */
+        blk->version = WT_BLOCK_DISAGG_VERSION + 1;
+        break;
+    case WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_INCOMPATIBLE:
+        /* A newer writer whose blocks this build's readers must refuse. */
+        blk->version = WT_BLOCK_DISAGG_VERSION + 1;
+        blk->compatible_version = WT_BLOCK_DISAGG_VERSION + 1;
+        break;
+    case WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_V1_OVERSIZED:
+        /* Recorded only in the written block; see __wti_block_disagg_write_internal. */
+        break;
+    }
+#endif
+}
+
+/*
  * __wti_block_disagg_write_size --
  *     Return the buffer size required to write a block.
  */
 int
-__wti_block_disagg_write_size(size_t *sizep)
+__wti_block_disagg_write_size(WT_SESSION_IMPL *session, size_t *sizep)
 {
     /*
      * We write the page size, in bytes, into the block's header as a 4B unsigned value, and it's
@@ -48,7 +114,7 @@ __wti_block_disagg_write_size(size_t *sizep)
      * to size a buffer, we may cause a little bit of waste (for deltas), which should not be a
      * problem.
      */
-    *sizep = (size_t)(*sizep + WT_BLOCK_DISAGG_HEADER_BYTE_SIZE);
+    *sizep = (size_t)(*sizep + WT_PAGE_HEADER_SIZE + S2BT(session)->block_header_write_size);
     return (*sizep > UINT32_MAX - 1024 ? EINVAL : 0);
 }
 
@@ -80,11 +146,13 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     WT_BLOCK_DISAGG_HEADER *blk;
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     WT_PAGE_HEADER *header;
     WT_PAGE_LOG_HANDLE *plhandle;
     WT_PAGE_LOG_PUT_ARGS put_args;
     uint64_t page_id, time_start, time_stop;
     uint32_t checksum;
+    uint8_t combined_header_size;
 
     time_start = __wt_clock(session);
     btree = S2BT(session);
@@ -106,7 +174,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
      * Clear the block header to ensure all of it is initialized, even the unused fields.
      */
     blk = WT_BLOCK_HEADER_REF(buf->mem);
-    memset(blk, 0, sizeof(*blk));
+    memset(blk, 0, btree->block_header_write_size);
 
     if (buf->size > UINT32_MAX) {
         WT_ASSERT(session, buf->size <= UINT32_MAX);
@@ -151,15 +219,11 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     if (F_ISSET(header, WT_PAGE_ENCRYPTED))
         F_SET(blk, WT_BLOCK_DISAGG_ENCRYPTED);
 
-    if (block_meta->delta_count == 0)
-        blk->magic = WT_BLOCK_DISAGG_MAGIC_BASE;
-    else {
+    __wti_block_disagg_header_init(session, blk);
+    if (block_meta->delta_count != 0) {
         blk->magic = WT_BLOCK_DISAGG_MAGIC_DELTA;
         F_SET(&put_args, WT_PAGE_LOG_DELTA);
     }
-    blk->header_size = WT_BLOCK_DISAGG_HEADER_BYTE_SIZE;
-    blk->version = WT_BLOCK_DISAGG_VERSION;
-    blk->compatible_version = WT_BLOCK_DISAGG_COMPATIBLE_VERSION;
 
     /*
      * Ensure that we don't accidentally write a block with flags that should not be written out to
@@ -176,6 +240,17 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
      */
     blk->previous_checksum = block_meta->checksum;
     blk->checksum = 0;
+
+    combined_header_size = blk->combined_header_size;
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * For testing record the wrong header size in the block. Only the stored block carries it: the
+     * in-memory image may be walked after the write and must keep the true size.
+     */
+    if (conn->debug.disagg_block_header_upgrade ==
+      WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_V1_OVERSIZED)
+        blk->combined_header_size += WT_BLOCK_DISAGG_HEADER_DEBUG_EXTRA_SIZE;
+#endif
     __block_disagg_header_byteswap(blk);
     blk->checksum = checksum = __wt_checksum(
       buf->mem, data_checksum ? buf->size : WT_MIN(buf->size, WT_BLOCK_COMPRESS_SKIP));
@@ -196,7 +271,9 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
         WT_STAT_CONN_DSRC_INCR(session, disagg_block_plh_put_failed);
         return (EBUSY);
     }
-    WT_RET(plhandle->plh_put(plhandle, &session->iface, page_id, 0, &put_args, buf));
+    ret = plhandle->plh_put(plhandle, &session->iface, page_id, 0, &put_args, buf);
+    blk->combined_header_size = combined_header_size;
+    WT_RET(ret);
 
     WT_STAT_CONN_INCR(session, disagg_block_put);
     WT_STAT_CONN_INCR(session, block_write);

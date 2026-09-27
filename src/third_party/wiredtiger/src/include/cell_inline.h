@@ -2036,29 +2036,32 @@ __wt_page_cell_data_ref_kv(
         (s)->unpacked = true;                                                             \
     } while (0)
 
-#define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                                        \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          __i -= 2) {                                                                           \
+#define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                     \
+    do {                                                                     \
+        uint32_t __i;                                                        \
+        uint8_t *__cell;                                                     \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk), \
+            __i = (dsk)->u.entries;                                          \
+          __i > 0; __i -= 2) {                                               \
             WT_CELL_DELTA_LEAF_UNPACK(session, dsk, unpack, __cell);
 
-#define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                                              \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          --__i) {                                                                              \
-            __wt_cell_unpack_addr(session, dsk, (WT_CELL *)__cell, &(unpack));                  \
+#define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                             \
+    do {                                                                       \
+        uint32_t __i;                                                          \
+        uint8_t *__cell;                                                       \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk),   \
+            __i = (dsk)->u.entries;                                            \
+          __i > 0; --__i) {                                                    \
+            __wt_cell_unpack_addr(session, dsk, (WT_CELL *)__cell, &(unpack)); \
             __cell += (unpack).__len;
 
-#define WT_CELL_FOREACH_KV(session, dsk, unpack)                                                \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          __cell += (unpack).__len, --__i) {                                                    \
+#define WT_CELL_FOREACH_KV(session, dsk, unpack)                             \
+    do {                                                                     \
+        uint32_t __i;                                                        \
+        uint8_t *__cell;                                                     \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk), \
+            __i = (dsk)->u.entries;                                          \
+          __i > 0; __cell += (unpack).__len, --__i) {                        \
             __wt_cell_unpack_kv(session, dsk, (WT_CELL *)__cell, &(unpack));
 
 #define WT_CELL_FOREACH_END \

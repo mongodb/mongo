@@ -357,6 +357,7 @@ extern const char __WT_CONFIG_CHOICE_txn_visibility[];
 extern const char __WT_CONFIG_CHOICE_uncompressed[];
 extern const char __WT_CONFIG_CHOICE_unencrypted[];
 extern const char __WT_CONFIG_CHOICE_upper[];
+extern const char __WT_CONFIG_CHOICE_v1_oversized[];
 extern const char __WT_CONFIG_CHOICE_verify[];
 extern const char __WT_CONFIG_CHOICE_version[];
 extern const char __WT_CONFIG_CHOICE_write[];

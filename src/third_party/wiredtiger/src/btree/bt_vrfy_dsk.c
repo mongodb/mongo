@@ -51,9 +51,9 @@ static int __verify_dsk_row_leaf(WT_VERIFY_INFO *);
  * WT_CELL_FOREACH macro, created because the loop can't simply unpack cells,
  * verify has to do additional work to ensure that unpack is safe.
  */
-#define WT_CELL_FOREACH_VRFY(session, dsk, cell, unpack, i)                                 \
-    for ((cell) = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), (i) = (dsk)->u.entries; (i) > 0; \
-      (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
+#define WT_CELL_FOREACH_VRFY(session, dsk, cell, unpack, i)                                      \
+    for ((cell) = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk), (i) = (dsk)->u.entries; \
+      (i) > 0; (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
  * __wt_verify_dsk_image --
@@ -923,7 +923,7 @@ __verify_dsk_chunk(WT_VERIFY_INFO *vi)
      * Overflow pages are simple chunks of data-> Verify the data doesn't overflow the end of the
      * page.
      */
-    p = WT_PAGE_HEADER_BYTE(btree, vi->dsk);
+    p = WT_PAGE_HEADER_READ_BYTE(vi->session, btree, vi->dsk);
     if (p + datalen > end)
         WT_RET_VRFY(vi->session, "data on page at %s extends past the end of the page", vi->tag);
 

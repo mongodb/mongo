@@ -18,6 +18,9 @@ post:
   - func: "upload test/model workloads"
   - func: "dump stderr/stdout"
   - func: "upload stat files"
+  # Drop the test databases of tests that passed before packaging the artifacts. This must run
+  # after the functions above, which still need the test output.
+  - func: "cleanup test artifacts"
   - func: "upload artifact"
     vars:
       postfix: -${execution}
@@ -1187,6 +1190,34 @@ functions:
           echo Iteration $i/${times}
           ./test_timestamp_abort -G -s
         done
+  "schema disagg abort":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ${additional_san_vars}
+        build_dir=$(cd ../../../ && pwd)
+        for i in $(seq ${times|10}); do
+          echo "Iteration $i/${times|10}"
+          ./test_schema_disagg_abort -b "$build_dir" ${schema_args} -T 12 -u 64 -t 300
+        done
+  "schema disagg abort smoke":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/csuite/schema_disagg_abort"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ${additional_san_vars}
+        # The full mode matrix in short runs: single node, lone follower, role switches, kills,
+        # and both two-node topologies.
+        bash ./smoke.sh
   "upload artifact":
     - command: archive.targz_pack
       type: setup
@@ -1257,6 +1288,17 @@ functions:
         content_type: application/tar
         display_name: WT_TEST
         remote_file: wiredtiger/${endian_format}/${revision}/artifacts/${remote_file}
+  "cleanup test artifacts":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        # Never fail the task on cleanup: keeping the test data is the safe outcome.
+        ${python_binary|python3} ../test/evergreen/cleanup_test_artifacts.py 2>&1 ||
+          echo "Test artifact cleanup failed, keeping all test data."
   "cleanup":
     command: shell.exec
     type: setup
@@ -5507,6 +5549,105 @@ tasks:
     name: timestamp-abort-test-disagg-2
     tags: ["stress-test-disagg"]
 
+  - name: schema-disagg-abort-smoke-test-disagg-1
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 1800
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort smoke"
+
+  # The schema-disagg-abort matrix. The kill variants cover their graceful counterparts, since a
+  # kill lands halfway through the run and everything before it is the graceful workload.
+  - name: schema-disagg-abort-crash-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # One node leading throughout, SIGKILLed at 150s, then recovered and verified.
+          schema_args: -r l -k 150
+
+  - name: schema-disagg-abort-switch-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # One node stepping down and back up every 30 seconds.
+          schema_args: -r l -s 30
+
+  - name: schema-disagg-abort-multi-crash-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # Leader and follower, each killed in turn, so each survivor carries on alone.
+          schema_args: -r lf -k l100 -k f200
+
+  - name: schema-disagg-abort-multi-switch-crash-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # Two nodes swapping roles every 30s, killing whoever leads at 150s: a step-up over a
+          # table the peer created, with a crash on top.
+          schema_args: -r lf -s 30 -k l150
+
+  - name: schema-disagg-abort-follower-stepup-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # A lone follower generates its own workload and never checkpoints, then steps up over
+          # the operations it accumulated: the way a fresh node bootstraps its own tables before
+          # taking leadership.
+          schema_args: -r f -s 30
+
+  # Legacy schema mode: no schema epochs and no publish, single node only.
+  - name: schema-disagg-abort-legacy-crash-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          # The only legacy shape that asserts drop absence: a step-up resurrects the drops a
+          # node applied while following.
+          schema_args: -e -r l -k 150
+
+  - name: schema-disagg-abort-legacy-switch-test-disagg-1
+    tags: ["stress-test-schema-disagg"]
+    depends_on:
+      - name: compile
+    exec_timeout_secs: 7200
+    commands:
+      - func: "fetch artifacts"
+      - func: "schema disagg abort"
+        vars:
+          schema_args: -e -r l -s 30
+
   - name: format-stress-test-disagg-follower-pull-request
     tags: ["pull_request"]
     depends_on:
@@ -7313,6 +7454,9 @@ buildvariants:
       distros: ubuntu2004-large
     - name: format-stress-test-disagg-switch-tsan-stepdown-async
       distros: ubuntu2004-large
+    # FIXME-WT-18743: Enable once concurrent connection API calls no longer race under TSan.
+    # - name: schema-disagg-abort-smoke-test-disagg-1
+    #   distros: ubuntu2004-large
     - name: format-stress-test-tsan
       distros: ubuntu2004-large
     # FIXME-WT-16309: Enable the common test format tag for TSAN
@@ -7405,6 +7549,7 @@ buildvariants:
     - name: format-stress-test-disagg-leader-pull-request-1
     - name: format-stress-test-disagg-follower-pull-request
     - name: format-stress-test-disagg-switch-pull-request-1
+    - name: schema-disagg-abort-smoke-test-disagg-1
     - name: make-check-test
       distros: ubuntu2004-large
     - name: cppsuite-default-all
@@ -7729,6 +7874,8 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-disagg"
       distros: ubuntu2004-large
+    - name: ".stress-test-schema-disagg"
+      distros: ubuntu2004-large
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
 
@@ -8027,6 +8174,7 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-disagg"
+    - name: ".stress-test-schema-disagg"
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
     - name: schema-abort-predictable-test
@@ -8071,6 +8219,9 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: amazon2023.3-arm64-large
+    # FIXME-WT-18739: Run legacy-switch once its checkpoint stall under ASan is fixed.
+    - name: ".stress-test-schema-disagg !schema-disagg-abort-legacy-switch-test-disagg-1"
+      distros: amazon2023.3-arm64-large
     - name: ".unit_test"
     - name: ".unit_test_disagg"
     - name: ".unit_test_long"
@@ -8105,6 +8256,9 @@ buildvariants:
       distros: amazon2023.3-arm64-large
     - name: format-stress-test-disagg-switch-tsan-stepdown-async
       distros: amazon2023.3-arm64-large
+    # FIXME-WT-18743: Enable once concurrent connection API calls no longer race under TSan.
+    # - name: schema-disagg-abort-smoke-test-disagg-1
+    #   distros: amazon2023.3-arm64-large
     - name: unit-test-hook-parallel-checkpoint-tsan
     - name: format-stress-test-tsan
       distros: amazon2023.3-arm64-large
@@ -8176,6 +8330,7 @@ buildvariants:
     - name: format-stress-test-disagg-leader-pull-request-1
     - name: format-stress-test-disagg-follower-pull-request
     - name: format-stress-test-disagg-switch-pull-request-1
+    - name: schema-disagg-abort-smoke-test-disagg-1
     - name: make-check-test
       distros: amazon2023.3-arm64-large
     - name: cppsuite-default-all

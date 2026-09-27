@@ -190,7 +190,7 @@ __page_init_base_leaf_merge_state(
   WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE_HEADER *base_dsk, WTI_BASE_LEAF_MERGE_STATE *s)
 {
     s->entries = base_dsk->u.entries;
-    s->cell = WT_PAGE_HEADER_BYTE(btree, base_dsk);
+    s->cell = WT_PAGE_HEADER_READ_BYTE(session, btree, base_dsk);
     s->unpacked = false;
     s->empty_value_cell = false;
 
@@ -226,7 +226,7 @@ __page_init_delta_leaf_merge_state(WT_SESSION_IMPL *session, WT_BTREE *btree, WT
 
     for (size_t i = 0; i < delta_size; i++) {
         WT_PAGE_HEADER *tmp = (WT_PAGE_HEADER *)deltas[i].data;
-        s[i].cell = WT_PAGE_HEADER_BYTE(btree, tmp);
+        s[i].cell = WT_PAGE_HEADER_READ_BYTE(session, btree, tmp);
         s[i].entries = tmp->u.entries;
         s[i].unpacked = false;
         WT_RET(__wt_scr_alloc(session, 0, &s[i].current_key));
@@ -284,7 +284,7 @@ static int
 __page_init_dsk_leaf_merge_state(
   WT_SESSION_IMPL *session, WT_BTREE *btree, WT_ITEM *new_image, WTI_DISK_LEAF_MERGE_STATE *s)
 {
-    s->cell_ptr = WT_PAGE_HEADER_BYTE(btree, new_image->mem);
+    s->cell_ptr = WT_PAGE_HEADER_WRITE_BYTE(btree, new_image->mem);
     s->all_empty_value = true;
     s->any_empty_value = false;
     s->entries = 0;
@@ -454,8 +454,7 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     dsk->reserved = 0;
     dsk->version = WT_PAGE_VERSION_TS;
 
-    /* Clear the memory owned by the block manager. */
-    memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
+    btree->bm->block_header_init(btree->bm, session, dsk);
 
 err:
     __wt_scr_free(session, &disk_s.last_key);
@@ -515,7 +514,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
      * pointer, delivering the next pair.
      */
     base_state.dsk = base_image_header;
-    base_state.cell = WT_PAGE_HEADER_BYTE(btree, base_image_header);
+    base_state.cell = WT_PAGE_HEADER_READ_BYTE(session, btree, base_image_header);
     base_state.entries = base_image_header->u.entries;
     base_state.unpacked = false;
 
@@ -534,7 +533,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
         WT_PAGE_HEADER *dhdr = (WT_PAGE_HEADER *)deltas[i].data;
         delta_state[i].base_dsk = base_image_header;
         delta_state[i].delta_dsk = dhdr;
-        delta_state[i].cell = WT_PAGE_HEADER_BYTE(btree, dhdr);
+        delta_state[i].cell = WT_PAGE_HEADER_READ_BYTE(session, btree, dhdr);
         delta_state[i].entries = dhdr->u.entries;
         delta_state[i].unpacked = false;
     }
@@ -548,7 +547,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
      */
     WT_CELL_BASE_INT_UNPACK(session, &base_state);
 
-    cell_ptr = WT_PAGE_HEADER_BYTE(btree, new_image->data);
+    cell_ptr = WT_PAGE_HEADER_WRITE_BYTE(btree, new_image->data);
     /*
      * Initialize the size here since the cell packing function uses it to calculate where to begin
      * writing the first packed key and value data.
@@ -681,6 +680,8 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     hdr->type = WT_PAGE_ROW_INT;
     hdr->reserved = 0;
     hdr->version = WT_PAGE_VERSION_TS;
+
+    btree->bm->block_header_init(btree->bm, session, hdr);
 
 err:
     __wt_free(session, delta_state);

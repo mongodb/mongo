@@ -79,12 +79,39 @@ __bm_addr_string(
 }
 
 /*
- * __bm_block_header --
- *     Return the size of the block header.
+ * __bm_block_header_init --
+ *     Initialize the block header of a disk image laid out for writing.
+ */
+static void
+__bm_block_header_init(WT_BM *bm, WT_SESSION_IMPL *session, void *dsk)
+{
+    WT_UNUSED(session);
+
+    memset(WT_BLOCK_HEADER_REF(dsk), 0, __wt_block_header(bm->block));
+}
+
+/*
+ * __bm_block_header_read --
+ *     Return the size of the block header when reading an existing header.
  */
 static u_int
-__bm_block_header(WT_BM *bm)
+__bm_block_header_read(WT_BM *bm, WT_SESSION_IMPL *session, const void *dsk)
 {
+    WT_UNUSED(session);
+    WT_UNUSED(dsk);
+
+    return (__wt_block_header(bm->block));
+}
+
+/*
+ * __bm_block_header_write --
+ *     Return the size of the block header for writing a new header.
+ */
+static u_int
+__bm_block_header_write(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+    WT_UNUSED(session);
+
     return (__wt_block_header(bm->block));
 }
 
@@ -365,13 +392,14 @@ __bm_compact_start_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 
 /*
  * __bm_encrypt_skip_size --
- *     Return the skip size for encryption
+ *     Return the skip size for encryption.
  */
 static size_t
-__bm_encrypt_skip_size(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_encrypt_skip_size(WT_BM *bm, WT_SESSION_IMPL *session, const void *dsk)
 {
     WT_UNUSED(bm);
     WT_UNUSED(session);
+    WT_UNUSED(dsk);
 
     return (WT_BLOCK_HEADER_BYTE_SIZE);
 }
@@ -680,7 +708,9 @@ __wti_bm_method_set(WT_BM *bm, bool readonly)
 {
     bm->addr_invalid = __bm_addr_invalid;
     bm->addr_string = __bm_addr_string;
-    bm->block_header = __bm_block_header;
+    bm->block_header_init = __bm_block_header_init;
+    bm->block_header_read_size = __bm_block_header_read;
+    bm->block_header_write_size = __bm_block_header_write;
     bm->can_truncate = __bm_can_truncate;
     bm->checkpoint = __bm_checkpoint;
     bm->checkpoint_last = __bm_checkpoint_last;

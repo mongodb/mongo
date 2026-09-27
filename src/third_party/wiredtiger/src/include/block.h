@@ -206,7 +206,9 @@ struct __wt_bm {
     /* Methods */
     int (*addr_invalid)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*addr_string)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
-    u_int (*block_header)(WT_BM *);
+    void (*block_header_init)(WT_BM *, WT_SESSION_IMPL *, void *);
+    u_int (*block_header_read_size)(WT_BM *, WT_SESSION_IMPL *, const void *);
+    u_int (*block_header_write_size)(WT_BM *, WT_SESSION_IMPL *);
     bool (*can_truncate)(WT_BM *, WT_SESSION_IMPL *);
     int (*checkpoint)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, WT_CKPT *, bool);
     int (*checkpoint_last)(WT_BM *, WT_SESSION_IMPL *, char **, char **, WT_ITEM *);
@@ -223,7 +225,7 @@ struct __wt_bm {
     void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
-    size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *);
+    size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *, const void *);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, bool);
     int (*get_page_ids)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, size_t *, uint64_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
@@ -510,7 +512,11 @@ struct __wt_block_disagg_header {
 #define WT_BLOCK_DISAGG_COMPATIBLE_VERSION 0x1u
     uint8_t compatible_version; /* 02: minimum version of reader */
 
-    uint8_t header_size; /* 03: size of unencrypted, uncompressed header */
+    /*
+     * This covers the page header as well as this one: the first release wrote it that way and the
+     * field is on disk, so readers subtract WT_PAGE_HEADER_SIZE to recover this header's own size.
+     */
+    uint8_t combined_header_size; /* 03: unencrypted, uncompressed page plus block header */
 
     /*
      * Page checksums are stored in two places. Similarly to the default block header, except that
@@ -540,18 +546,42 @@ struct __wt_block_disagg_header {
     uint8_t flags;                      /* 12: flags */
 
     /*
-     * End the structure with 3 bytes of padding: it wastes space, but it leaves the structure
-     * 32-bit aligned and having an extra couple bytes to play with in the future can't hurt.
+     * Add 3 bytes of padding: it wastes space, but it leaves the rest of the structure 32-bit
+     * aligned.
      */
     uint8_t unused[3]; /* 13-15: unused padding */
 };
 
 /*
- * WT_BLOCK_DISAGG_HEADER_SIZE is the number of bytes we allocate for a base page and delta
- * structures: if the compiler inserts padding it will break the world.
+ * WT_BLOCK_DISAGG_HEADER_WRITE_SIZE is the number of bytes we allocate for a base page and delta
+ * structures. WT_BLOCK_DISAGG_HEADER_MIN_SIZE is the minimum number of bytes that we expect for the
+ * header.
  */
-#define WT_BLOCK_DISAGG_HEADER_SIZE 16
-#define WT_BLOCK_DISAGG_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
+#define WT_BLOCK_DISAGG_HEADER_MIN_SIZE 16
+#define WT_BLOCK_DISAGG_HEADER_WRITE_SIZE 16
+#define WT_BLOCK_DISAGG_HEADER_MIN_COMBINED_SIZE \
+    (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_MIN_SIZE)
+#define WT_BLOCK_DISAGG_HEADER_WRITE_COMBINED_SIZE \
+    (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_WRITE_SIZE)
+
+/* Check that the compiler did not add any padding to the header; doing so will break the world. */
+static_assert(sizeof(WT_BLOCK_DISAGG_HEADER) == WT_BLOCK_DISAGG_HEADER_WRITE_SIZE,
+  "WT_BLOCK_DISAGG_HEADER size mismatch");
+
+/*
+ * A later release may append fields to the header. Readers locate the data with the header's own
+ * combined_header_size rather than their own, so a larger header from a newer writer stays
+ * readable. The headers have to fit in the bytes compression copies verbatim, otherwise a
+ * compressed block's header would itself be compressed and no reader could find its way in.
+ */
+#define WT_BLOCK_DISAGG_HEADER_MAX_COMBINED_SIZE WT_BLOCK_COMPRESS_SKIP
+
+/*
+ * The number of bytes debug_mode.disagg_block_header_upgrade appends to the header to stand in for
+ * a future writer. Keep the padded header within WT_BLOCK_COMPRESS_SKIP so it stays covered by the
+ * block checksum even when the data itself is not.
+ */
+#define WT_BLOCK_DISAGG_HEADER_DEBUG_EXTRA_SIZE 8
 #define WT_BLOCK_DISAGG_CHECKPOINT_BUFFER (1024)
 
 /*

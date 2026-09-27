@@ -73,7 +73,7 @@ struct block_image {
     void
     corrupt_body(size_t offset)
     {
-        REQUIRE(offset >= WT_BLOCK_DISAGG_HEADER_BYTE_SIZE);
+        REQUIRE(offset >= WT_BLOCK_DISAGG_HEADER_WRITE_COMBINED_SIZE);
         REQUIRE(offset < bytes.size());
         bytes[offset] ^= 0xff;
     }
@@ -89,12 +89,12 @@ make_block_image(uint32_t size, uint8_t magic, uint32_t previous_checksum, uint8
 {
     block_image img;
 
-    REQUIRE(size > WT_BLOCK_DISAGG_HEADER_BYTE_SIZE);
+    REQUIRE(size > WT_BLOCK_DISAGG_HEADER_WRITE_COMBINED_SIZE);
     img.bytes.assign(size, 0);
     img.flags = flags;
 
     /* Give the body a recognizable pattern so that flipping a byte in it actually changes it. */
-    for (uint32_t i = WT_BLOCK_DISAGG_HEADER_BYTE_SIZE; i < size; i++)
+    for (uint32_t i = WT_BLOCK_DISAGG_HEADER_WRITE_COMBINED_SIZE; i < size; i++)
         img.bytes[i] = static_cast<uint8_t>(i * 31 + 7);
 
     WT_PAGE_HEADER *dsk = reinterpret_cast<WT_PAGE_HEADER *>(img.bytes.data());
@@ -105,7 +105,7 @@ make_block_image(uint32_t size, uint8_t magic, uint32_t previous_checksum, uint8
     host.magic = magic;
     host.version = WT_BLOCK_DISAGG_VERSION;
     host.compatible_version = compatible_version;
-    host.header_size = WT_BLOCK_DISAGG_HEADER_BYTE_SIZE;
+    host.combined_header_size = WT_BLOCK_DISAGG_HEADER_WRITE_COMBINED_SIZE;
     host.previous_checksum = previous_checksum;
     host.flags = flags;
     host.checksum = 0;

@@ -365,13 +365,9 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
      * The disagg block header is at WT_BLOCK_HEADER_REF (after the page header).
      */
     WT_BLOCK_DISAGG_HEADER *blk = WT_BLOCK_HEADER_REF(cache_buf->data);
-    memset(blk, 0, sizeof(*blk));
+    WT_ASSERT(session,
+      blk->magic == WT_BLOCK_DISAGG_MAGIC_BASE || blk->magic == WT_BLOCK_DISAGG_MAGIC_DELTA);
 
-    /* Set disagg header fields. */
-    blk->magic = WT_BLOCK_DISAGG_MAGIC_BASE;
-    blk->version = WT_BLOCK_DISAGG_VERSION;
-    blk->compatible_version = WT_BLOCK_DISAGG_COMPATIBLE_VERSION;
-    blk->header_size = WT_BLOCK_DISAGG_HEADER_BYTE_SIZE;
     blk->previous_checksum = block_meta->checksum;
     blk->flags = 0;
     if (data_checksum)

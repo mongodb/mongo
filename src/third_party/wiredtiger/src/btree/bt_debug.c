@@ -489,7 +489,7 @@ __wt_debug_disagg_page_id(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t l
     const WT_PAGE_HEADER *base_display, *delta_display;
     WT_PAGE_LOG_GET_ARGS get_args;
     uint32_t size;
-    uint8_t expected_magic;
+    uint8_t expected_magic, recorded_header_size;
     u_int count, i;
 
     WT_ASSERT(session, S2BT_SAFE(session) != NULL);
@@ -552,6 +552,24 @@ __wt_debug_disagg_page_id(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t l
                 __wt_errx(session,
                   "corrupt result %u: page_id %" PRIu64 ", lsn %" PRIu64 ": {REDACTED}", i, page_id,
                   lsn);
+            WT_TRET(WT_ERROR);
+            continue;
+        }
+
+        if ((recorded_header_size = __wt_block_disagg_header_v1_size_fix(session, blk, &swap)) != 0)
+            __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
+              "wt page: result %u: version 1 block header has combined header size %" PRIu8
+              ", using %d",
+              i, recorded_header_size, WT_BLOCK_DISAGG_HEADER_MIN_COMBINED_SIZE);
+
+        /* Everything below walks the image with this size, so it has to describe the headers. */
+        if (!__wt_block_disagg_header_size_valid(swap.combined_header_size, size)) {
+            __wt_errx(session,
+              "wt page: result %u: header size %" PRIu8 " is outside the legal range of %d to %d",
+              i, swap.combined_header_size, WT_BLOCK_DISAGG_HEADER_MIN_COMBINED_SIZE,
+              (int)WT_BLOCK_DISAGG_HEADER_MAX_COMBINED_SIZE);
+            __wt_log_data_dump(session, results[i].data, size,
+              "corrupt result %u: page_id %" PRIu64 ", lsn %" PRIu64, i, page_id, lsn);
             WT_TRET(WT_ERROR);
             continue;
         }
@@ -1053,7 +1071,7 @@ __debug_disk_delta(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *base_dsk,
         WT_CLEAR(state);
         state.base_dsk = base_dsk;
         state.delta_dsk = delta_dsk;
-        state.cell = WT_PAGE_HEADER_BYTE(S2BT(session), delta_dsk);
+        state.cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), delta_dsk);
         state.entries = delta_dsk->u.entries;
 
         /* Each entry is a key cell plus a value cell, so the count decreases by two. */

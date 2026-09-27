@@ -262,6 +262,7 @@ restart_read:
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
         cbt->slot = WT_COL_SLOT(page, cip);
+        F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 
         /* Check any insert list for a matching record. */
         cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
@@ -626,8 +627,10 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
          * code, it's in a simple format.
          */
         if (newpage && page != NULL && page->type != WT_PAGE_ROW_LEAF &&
-          (cbt->ins_head = WT_COL_APPEND(page)) != NULL)
+          (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {
             F_SET(cbt, WT_CBT_ITERATE_APPEND);
+            F_CLR(cbt, WT_CBT_VAR_ONPAGE_MATCH);
+        }
 
         if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
             /* The page cannot be NULL if the above flag is set. */

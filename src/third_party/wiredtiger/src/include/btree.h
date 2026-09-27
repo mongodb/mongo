@@ -230,8 +230,8 @@ struct __wt_btree {
 
     bool hs_entries; /* Has entries in the history store table */
 
-    WT_BM *bm;          /* Block manager reference */
-    u_int block_header; /* WT_PAGE_HEADER_BYTE_SIZE */
+    WT_BM *bm;                     /* Block manager reference */
+    u_int block_header_write_size; /* The size of a block header when writing a new page */
 
     uint64_t write_gen;      /* Write generation */
     uint64_t base_write_gen; /* Write generation on startup. */

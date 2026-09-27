@@ -11,7 +11,8 @@
  * then drives a one-second-tick timeline: a role switch every -s seconds (directed through the
  * switch-request sentinel and confirmed through the numbered switch-done sentinel), SIGKILLs at the
  * -k times (targeting whichever node currently holds the role), and a graceful stop at the -t
- * timeout. Children dying at any other point fail the test.
+ * timeout, or as soon as every node has been killed. Children dying at any other point fail the
+ * test.
  *
  * Afterwards the parent reopens the surviving state and verifies it against the record files. It
  * never opens WiredTiger while children are running.
@@ -308,7 +309,11 @@ run_children(TEST_CONFIG *cfg, const char *self_path)
     uint32_t next_switch = cfg->switch_interval;
 
     for (uint32_t elapsed = 1; elapsed <= cfg->total_time; ++elapsed) {
-        (void)children_poll(children); /* Dying on its own fails the test. */
+        /* Dying on its own fails the test; with every node killed, nothing is left to run. */
+        if (children_poll(children) == 0) {
+            println("Parent: every node was killed; ending the run");
+            break;
+        }
         sleep(1);
 
         /* Kills first: overlapping a kill with a same-tick switch is the interesting order. */

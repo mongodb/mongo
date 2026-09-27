@@ -22,15 +22,49 @@ __bmd_addr_invalid(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, siz
 }
 
 /*
- * __bmd_block_header --
- *     Return the size of the block header.
+ * __bmd_block_header_init --
+ *     Initialize the block header of a disk image laid out for writing.
  */
-static u_int
-__bmd_block_header(WT_BM *bm)
+static void
+__bmd_block_header_init(WT_BM *bm, WT_SESSION_IMPL *session, void *dsk)
 {
     WT_UNUSED(bm);
 
-    return ((u_int)WT_BLOCK_DISAGG_HEADER_SIZE);
+    memset(WT_BLOCK_HEADER_REF(dsk), 0, S2BT(session)->block_header_write_size);
+    __wti_block_disagg_header_init(session, WT_BLOCK_HEADER_REF(dsk));
+}
+
+/*
+ * __bmd_block_header_read --
+ *     Return the size of the block header when reading an existing header.
+ */
+static u_int
+__bmd_block_header_read(WT_BM *bm, WT_SESSION_IMPL *session, const void *dsk)
+{
+    const WT_BLOCK_DISAGG_HEADER *header;
+
+    WT_UNUSED(bm);
+
+    /* Get the block disaggregated header from the disk image. */
+    header = (const WT_BLOCK_DISAGG_HEADER *)(((const uint8_t *)dsk) + WT_PAGE_HEADER_SIZE);
+    WT_ASSERT(session,
+      header->magic == WT_BLOCK_DISAGG_MAGIC_BASE || header->magic == WT_BLOCK_DISAGG_MAGIC_DELTA);
+
+    /* The stored size covers the page header as well; see the WT_BLOCK_DISAGG_HEADER definition. */
+    WT_ASSERT(session, header->combined_header_size >= WT_BLOCK_DISAGG_HEADER_MIN_COMBINED_SIZE);
+    return ((u_int)header->combined_header_size - WT_PAGE_HEADER_SIZE);
+}
+
+/*
+ * __bmd_block_header_write --
+ *     Return the size of the block header when writing a new header.
+ */
+static u_int
+__bmd_block_header_write(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+    WT_UNUSED(bm);
+
+    return (__wti_block_disagg_header_write_size(session));
 }
 
 /*
@@ -118,9 +152,8 @@ static int
 __bmd_write_size(WT_BM *bm, WT_SESSION_IMPL *session, size_t *sizep)
 {
     WT_UNUSED(bm);
-    WT_UNUSED(session);
 
-    return (__wti_block_disagg_write_size(sizep));
+    return (__wti_block_disagg_write_size(session, sizep));
 }
 
 /*
@@ -128,12 +161,13 @@ __bmd_write_size(WT_BM *bm, WT_SESSION_IMPL *session, size_t *sizep)
  *     Return the skip size for encryption
  */
 static size_t
-__bmd_encrypt_skip_size(WT_BM *bm, WT_SESSION_IMPL *session)
+__bmd_encrypt_skip_size(WT_BM *bm, WT_SESSION_IMPL *session, const void *dsk)
 {
-    WT_UNUSED(bm);
-    WT_UNUSED(session);
-
-    return (WT_BLOCK_DISAGG_HEADER_BYTE_SIZE);
+    /*
+     * Encryption skips from the start of the image, so the page header counts towards the skip as
+     * well as the block header.
+     */
+    return ((size_t)WT_PAGE_HEADER_SIZE + __bmd_block_header_read(bm, session, dsk));
 }
 
 /*
@@ -173,7 +207,9 @@ __bmd_method_set(WT_BM *bm, bool readonly)
 
     bm->addr_invalid = __bmd_addr_invalid;
     bm->addr_string = __wti_block_disagg_addr_string;
-    bm->block_header = __bmd_block_header;
+    bm->block_header_init = __bmd_block_header_init;
+    bm->block_header_read_size = __bmd_block_header_read;
+    bm->block_header_write_size = __bmd_block_header_write;
     bm->can_truncate = __bmd_can_truncate;
     bm->checkpoint = __wti_block_disagg_checkpoint;
     bm->checkpoint_load = __wti_block_disagg_checkpoint_load;
@@ -257,3 +293,15 @@ err:
     WT_TRET(bm->close(bm, session));
     return (ret);
 }
+
+#ifdef HAVE_UNITTEST
+/*
+ * __ut_bmd_block_header_read --
+ *     Unit-test wrapper for __bmd_block_header_read.
+ */
+u_int
+__ut_bmd_block_header_read(WT_BM *bm, WT_SESSION_IMPL *session, const void *dsk)
+{
+    return (__bmd_block_header_read(bm, session, dsk));
+}
+#endif

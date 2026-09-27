@@ -187,7 +187,7 @@ TEST_CASE("Block manager: block header", "[block_api_misc]")
 
     SECTION("Test block header size is correct")
     {
-        REQUIRE(bm.block_header(&bm) == (u_int)WT_BLOCK_HEADER_SIZE);
+        REQUIRE(bm.block_header_write_size(&bm, nullptr) == (u_int)WT_BLOCK_HEADER_SIZE);
     }
 }
 

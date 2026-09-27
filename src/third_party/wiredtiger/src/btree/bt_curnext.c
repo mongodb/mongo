@@ -136,6 +136,7 @@ restart_read:
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
         cbt->slot = WT_COL_SLOT(page, cip);
+        F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 
         /* Check any insert list for a matching record. */
         cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
@@ -756,6 +757,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
              */
             if (page->type != WT_PAGE_ROW_LEAF && (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {
                 F_SET(cbt, WT_CBT_ITERATE_APPEND);
+                F_CLR(cbt, WT_CBT_VAR_ONPAGE_MATCH);
                 continue;
             }
         }

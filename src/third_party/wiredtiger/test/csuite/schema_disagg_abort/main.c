@@ -409,8 +409,8 @@ print_run_banner(const TEST_CONFIG *cfg)
     size_t len = 0;
     for (int k = 0; k < KILL_TARGETS; k++)
         if (cfg->kill_time[k] != 0)
-            testutil_snprintf_len_incr(kill_args, sizeof(kill_args), &len, " -k %s%" PRIu32,
-              kill_prefix[k], cfg->kill_time[k]);
+            testutil_snprintf_len_incr(kill_args + len, sizeof(kill_args) - len, &len,
+              " -k %s%" PRIu32, kill_prefix[k], cfg->kill_time[k]);
 
     println("CONFIG: %s%s -r %s%s%s -u %" PRIu32 " -T %" PRIu32 " -t %" PRIu32
             " " TESTUTIL_SEED_FORMAT,

@@ -100,6 +100,6 @@ test_schema_disagg_abort [-b build-dir] [-e] [-h dir] [-k [l|f]N] [-p] [-r l|f|l
 ```
 
 `-r` selects a lone leader, lone follower or leader/follower pair. `-s` schedules role switches,
-`-k` schedules kills, and `-t` sets the graceful stop time. Every run prints a reproducible `CONFIG:`
-line including its random seeds. `-e` runs legacy schema operations and requires a single-node
-`-r l` or `-r f` topology.
+`-k` schedules kills, and `-t` sets the graceful stop time; a run ends early once every node has
+been killed. Every run prints a reproducible `CONFIG:` line including its random seeds. `-e` runs
+legacy schema operations and requires a single-node `-r l` or `-r f` topology.
