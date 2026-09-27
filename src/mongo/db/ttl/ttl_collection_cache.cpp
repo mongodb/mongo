@@ -27,21 +27,24 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
-    {
-        std::lock_guard<std::mutex> lock(_ttlInfosLock);
-        _ttlInfos[uuid].push_back(info);
-    }
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock, uuid, info, /*logIfMissing=*/false);
+    _ttlInfos[uuid].push_back(info);
 }
 
-void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
-    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+void TTLCollectionCache::_deregisterTTLInfo(WithLock,
+                                            const UUID& uuid,
+                                            const Info& info,
+                                            bool logIfMissing) {
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
-        LOGV2_DEBUG(9150100,
-                    3,
-                    "Tried to deregister index from TTLCollectionCache with untracked UUID",
-                    "uuid"_attr = uuid,
-                    "indexName"_attr = info.getIndexName());
+        if (logIfMissing) {
+            LOGV2_DEBUG(9150100,
+                        3,
+                        "Tried to deregister index from TTLCollectionCache with untracked UUID",
+                        "uuid"_attr = uuid,
+                        "indexName"_attr = info.getIndexName());
+        }
         return;
     }
 
@@ -66,11 +69,13 @@ void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
     }
 
     if (iter == infoVec.end()) {
-        LOGV2_DEBUG(9150101,
-                    3,
-                    "Tried to deregister untracked index from TTLCollectionCache",
-                    "uuid"_attr = uuid,
-                    "indexName"_attr = info.getIndexName());
+        if (logIfMissing) {
+            LOGV2_DEBUG(9150101,
+                        3,
+                        "Tried to deregister untracked index from TTLCollectionCache",
+                        "uuid"_attr = uuid,
+                        "indexName"_attr = info.getIndexName());
+        }
     } else {
         infoVec.erase(iter);
     }
@@ -81,12 +86,19 @@ void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
 }
 
 void TTLCollectionCache::deregisterTTLIndexByName(UUID uuid, const IndexName& indexName) {
-    _deregisterTTLInfo(std::move(uuid), TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}});
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock,
+                       uuid,
+                       TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}},
+                       /*logIfMissing=*/true);
 }
 
 void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {
-    _deregisterTTLInfo(std::move(uuid),
-                       TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+    std::lock_guard<std::mutex> lock(_ttlInfosLock);
+    _deregisterTTLInfo(lock,
+                       uuid,
+                       TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}},
+                       /*logIfMissing=*/true);
 }
 
 void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
