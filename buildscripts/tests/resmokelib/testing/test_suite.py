@@ -84,6 +84,7 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_evergreen_requester = under_test._config.EVERGREEN_REQUESTER
         self.default_evergreen_patch_build = under_test._config.EVERGREEN_PATCH_BUILD
         self.default_evergreen_task_name = under_test._config.EVERGREEN_TASK_NAME
+        self.default_evergreen_display_task_name = under_test._config.EVERGREEN_DISPLAY_TASK_NAME
         self.default_selector = under_test._selector
         self.default_evergreen_conn = under_test.evergreen_conn
 
@@ -102,6 +103,7 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_ID = self.default_evergreen_task_id
         under_test._config.EVERGREEN_PATCH_BUILD = self.default_evergreen_patch_build
         under_test._config.EVERGREEN_TASK_NAME = self.default_evergreen_task_name
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = self.default_evergreen_display_task_name
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = (
             self.default_evergreen_test_selection_strategy
         )
@@ -162,6 +164,51 @@ class TestGetTestsForKind(unittest.TestCase):
                 tests=["test1", "test2"],
                 strategies="strategy",
             )
+
+    def test_test_selection_reports_display_task_name(self):
+        """TSS must be called with the display task name, not the execution task name.
+
+        Which execution task (shard) a test lands in is not stable, but the display task those
+        shards roll up to always is, so test history has to be keyed on the display task.
+        """
+        mock_selector = MagicMock()
+        mock_selector.filter_tests.return_value = (["test1"], [])
+        mock_selector.group_tests.side_effect = lambda _kind, _cfg, tests: tests
+
+        under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = True
+        under_test._config.EVERGREEN_PROJECT_NAME = "project_name"
+        under_test._config.EVERGREEN_VARIANT_NAME = "variant_name"
+        under_test._config.EVERGREEN_REQUESTER = "requester"
+        under_test._config.EVERGREEN_TASK_ID = "task_id"
+        under_test._config.EVERGREEN_TASK_NAME = "multiversion_auth_0_variant_name"
+        under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = "strategy"
+        under_test._config.EVERGREEN_PATCH_BUILD = True
+
+        mock_evg_api = MagicMock()
+        mock_evg_api.select_tests.return_value = {"tests": ["test1"]}
+        under_test.evergreen_conn = MagicMock()
+        under_test.evergreen_conn.get_evergreen_api.return_value = mock_evg_api
+        under_test._selector = mock_selector
+
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = "multiversion_auth"
+
+        self.suite._get_tests_for_kind("js_test")
+
+        mock_evg_api.select_tests.assert_called_once_with(
+            project_id="project_name",
+            build_variant="variant_name",
+            requester="requester",
+            task_id="task_id",
+            task_name="multiversion_auth",
+            tests=["test1"],
+            strategies="strategy",
+        )
+
+    def test_test_selection_falls_back_to_execution_task_name(self):
+        """Without a display task name, send the task's own name."""
+        under_test._config.EVERGREEN_TASK_NAME = "some_task"
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = None
+        self.assertEqual(under_test.tss_task_name(), "some_task")
 
     def test_tss_cannot_add_tests_outside_tag_filtered_list(self):
         """TSS returning tests not in the tag-filtered list must not cause them to run.

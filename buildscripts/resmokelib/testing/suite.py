@@ -51,6 +51,17 @@ EXIT_CODE_MAP = {
 TSS_ENDPOINT_FREQUENCY = 1
 
 
+def tss_task_name() -> str:
+    """Return the task name to report to test selection.
+
+    Prefer the display task name: which execution task a test lands in is not stable (a test can
+    move between the shards of a generated task), but the display task those shards roll up to
+    always is, so test history stays attached to the same name across runs. Fall back to the
+    execution task name when no display task name was given.
+    """
+    return str(_config.EVERGREEN_DISPLAY_TASK_NAME or _config.EVERGREEN_TASK_NAME)
+
+
 def translate_exit_code(exit_code):
     """
     Convert the given exit code into a human readable string.
@@ -251,10 +262,13 @@ class Suite(object):
             "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
             "requester": str(_config.EVERGREEN_REQUESTER),
             "task_id": str(_config.EVERGREEN_TASK_ID),
-            "task_name": str(_config.EVERGREEN_TASK_NAME),
+            "task_name": tss_task_name(),
             "tests": tests,
             "strategies": test_selection_strategy,
         }
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"Requesting test selection for task name {request['task_name']!r}"
+        )
 
         # future thread is async
         with ThreadPoolExecutor(max_workers=1) as executor:

@@ -180,6 +180,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
         --revisionOrderId=${revision_order_id} \
         --taskId=${task_id} \
         --taskName=${task_name} \
+        --displayTaskName="${display_task_name}" \
         --variantName=${build_variant} \
         --versionId=${version_id} \
         --requester=${requester} \

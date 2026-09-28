@@ -2532,6 +2532,17 @@ class RunPlugin(PluginInterface):
         )
 
         evergreen_options.add_argument(
+            "--displayTaskName",
+            dest="display_task_name",
+            metavar="DISPLAY_TASK_NAME",
+            help=(
+                "Sets the name of the Evergreen display task that the task running the tests"
+                " rolls up to, as reported to test selection. When omitted, the task name is"
+                " reported instead."
+            ),
+        )
+
+        evergreen_options.add_argument(
             "--taskId",
             dest="task_id",
             metavar="TASK_ID",
