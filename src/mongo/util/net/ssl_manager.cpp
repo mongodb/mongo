@@ -1247,11 +1247,11 @@ StatusWith<std::vector<DERInteger>> parseTLSFeature(ConstDataRange cdrExtension)
 }
 
 std::string removeFQDNRoot(std::string name) {
-    if (name.back() == '.') {
+    if (name.ends_with('.')) {
         name.pop_back();
     }
     return name;
-};
+}
 
 namespace {
 
