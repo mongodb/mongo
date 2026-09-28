@@ -13,6 +13,9 @@
 namespace mongo {
 namespace process_health {
 
+using HealthObserverFactory [[MONGO_MOD_PUBLIC]] =
+    std::function<std::unique_ptr<HealthObserver>(ServiceContext*)>;
+
 /**
  * Registration mechanism for all health observers.
  * This is static class not requiring an instance to work.
@@ -23,10 +26,9 @@ public:
      * Registers a factory method, which will be invoked later to instantiate the observer.
      * This must be invoked by static initializers, the code is not internally synchronized.
      *
-     * @param factoryCallback creates observer instance when invoked.
+     * factoryCallback creates observer instance when invoked.
      */
-    static void registerObserverFactory(
-        std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback);
+    static void registerObserverFactory(HealthObserverFactory factory);
 
     /**
      * Invokes all registered factories and returns new instances.
@@ -35,10 +37,9 @@ public:
     static std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers(
         ServiceContext* svcCtx);
 
-    /**
-     * Test-only method to cleanup the list of registered factories.
-     */
-    static void resetObserverFactoriesForTest();
+    /** Swaps out the list of registered factories. */
+    static std::vector<HealthObserverFactory> setObserverFactories_ForTest(
+        std::vector<HealthObserverFactory> factories);
 };
 
 }  // namespace process_health

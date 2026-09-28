@@ -94,6 +94,18 @@ public:
     }
 };
 
+/** Clears the observer factory registry during its lifetime. */
+class ObserverFactoryResetGuard {
+public:
+    ~ObserverFactoryResetGuard() {
+        HealthObserverRegistration::setObserverFactories_ForTest(std::move(_saved));
+    }
+
+private:
+    std::vector<HealthObserverFactory> _saved{
+        HealthObserverRegistration::setObserverFactories_ForTest({})};
+};
+
 /**
  * Test suite for fault manager.
  */
@@ -102,7 +114,7 @@ class [[MONGO_MOD_PUBLIC]] FaultManagerTest : service_context_test::WithSetupTra
                                               public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
-        HealthObserverRegistration::resetObserverFactoriesForTest();
+        ClockSourceMockServiceContextTest::setUp();
 
         advanceTime(Seconds(100));
         bumpUpLogging();
@@ -120,6 +132,7 @@ public:
         LOGV2(6007905, "Clean up test resources");
         // Shutdown the executor before the context is deleted.
         resetManager();
+        ClockSourceMockServiceContextTest::tearDown();
     }
 
     void constructTaskExecutor() {
@@ -237,6 +250,7 @@ public:
     }
 
 private:
+    ObserverFactoryResetGuard _observerFactoryResetGuard;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 
