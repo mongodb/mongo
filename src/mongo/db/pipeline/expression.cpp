@@ -54,6 +54,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/stats/counters.h"
@@ -8493,8 +8494,21 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
 
     KeyString::HeapBuilder ksBuilder(KeyString::Version::V1);
     if (collator) {
-        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData str) {
-            return collator->getComparisonString(str);
+        const size_t maxCollationBytes =
+            static_cast<size_t>(internalQueryKeyStringValueMaxCollationBytes.load());
+        size_t collationBytes = 0;
+        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData strData) {
+            auto comparisonKey = collator->getComparisonKey(strData);
+            auto keyData = comparisonKey.getKeyData();
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream()
+                        << "$_internalKeyStringValue generated more than " << maxCollationBytes
+                        << " bytes of collation keys for a single input; either reduce the size of "
+                           "'input' or raise 'internalQueryKeyStringValueMaxCollationBytes'",
+                    collationBytes <= maxCollationBytes &&
+                        keyData.size() <= maxCollationBytes - collationBytes);
+            collationBytes += keyData.size();
+            return std::string{keyData.rawData(), keyData.size()};
         });
     } else {
         ksBuilder.appendBSONElement(inputBson.firstElement());
