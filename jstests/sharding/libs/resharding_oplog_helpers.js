@@ -308,14 +308,24 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
     jsTest.log(
         "Run aggregation pipeline on incomplete oplog with $_requestReshardingResumeToken set to false",
     );
-    assert.commandWorked(
-        localDb.runCommand({
+    // Expect the aggregation to succeed if $_requestReshardingResumeToken is false.
+    // Transient CappedPositionLost errors may occur during truncation and can safely be retried.
+    assert.soon(() => {
+        const res = localDb.runCommand({
             aggregate: "oplog.rs",
             pipeline: [{$match: {ts: {$gte: oplogEntry.ts}}}],
             $_requestReshardingResumeToken: false,
             cursor: {},
-        }),
-    );
+        });
+
+        if (!res.ok && res.code == ErrorCodes.CappedPositionLost) {
+            jsTest.log("Encountered a CappedPositionLost error, retrying the command.");
+            return false;
+        }
+
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out retrying the oplog aggregate on CappedPositionLost");
 
     jsTest.log("Run non-$gte oplog aggregation pipeline with $_requestReshardingResumeToken set");
     assert.commandFailedWithCode(
