@@ -76,6 +76,7 @@ using logv2::LogComponent;
 using std::string;
 
 MONGO_FAIL_POINT_DEFINE(pauseCollectionValidationWithLock);
+MONGO_FAIL_POINT_DEFINE(throwBeforeIndexValidation);
 
 namespace collection_validation {
 
@@ -1200,6 +1201,13 @@ Status validate(OperationContext* opCtx,
             _validationIsPausedForTest.store(false);
         }
 
+        // Throw specified test error before index validation checks for interrupt to test
+        // non-interruption errors thrown after a kill.
+        if (auto sfp = throwBeforeIndexValidation.scoped(); MONGO_unlikely(sfp.isActive())) {
+            uasserted(ErrorCodes::Error(sfp.getData()["errorCode"].safeNumberInt()),
+                      "Fail point 'throwBeforeIndexValidation' activated");
+        }
+
         // Continue validation checks are done in case previously reported errors need additional
         // metadata to be added by later calls
         if (!results.isValid() && !results.continueValidation()) {
@@ -1240,12 +1248,14 @@ Status validate(OperationContext* opCtx,
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()));
     } catch (const DBException& e) {
-        if (!opCtx->checkForInterruptNoAssert().isOK() || e.code() == ErrorCodes::Interrupted) {
+        auto interruptStatus = opCtx->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK() || e.code() == ErrorCodes::Interrupted) {
             LOGV2_OPTIONS(5160301,
                           {LogComponent::kIndex},
                           "Validation interrupted",
-                          logAttrs(validateState.nss()));
-            return e.toStatus();
+                          logAttrs(validateState.nss()),
+                          "error"_attr = e.toString());
+            return interruptStatus.isOK() ? e.toStatus() : interruptStatus;
         }
 
         string err = str::stream() << "exception during collection validation: " << e.toString();

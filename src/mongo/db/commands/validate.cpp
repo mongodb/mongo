@@ -247,9 +247,7 @@ public:
                 });
             } catch (AssertionException& e) {
                 CommandHelpers::appendCommandStatusNoThrow(
-                    result,
-                    {ErrorCodes::CommandFailed,
-                     str::stream() << "Exception thrown during validation: " << e.toString()});
+                    result, e.toStatus().withContext("Exception thrown during validation"));
                 return false;
             }
 
