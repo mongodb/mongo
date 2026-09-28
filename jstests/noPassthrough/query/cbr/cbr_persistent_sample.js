@@ -238,7 +238,6 @@ try {
         PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
     }
 
-    // TODO SERVER-127501
     // When the collection is smaller than the requested sample size, the generated sample is a full
     // collection scan. We should still successfully load a persistent sample in this case.
     const kSmallCollSize = 50;

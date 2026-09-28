@@ -234,8 +234,6 @@ CardinalityEstimate makeScaledEstimate(double matchCount,
     // Tagging these as Code prevents CardinalityEstimator::clampZeroEstimates from inflating
     // the estimates.
 
-    // TODO SERVER-127501: Revisit for a persisted sample of size 0 should be
-    // treated as authoritative.
     if (wasSamplePersisted) {
         return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
     }

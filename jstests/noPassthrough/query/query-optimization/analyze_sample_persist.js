@@ -151,7 +151,6 @@ insertDocs(20);
     );
 }
 
-// TODO SERVER-127501: Determine if analyze should permit this case
 // Sampling an empty collection produces a sample document with 0 docs
 cleanup();
 assert.commandWorked(db.createCollection(collName));

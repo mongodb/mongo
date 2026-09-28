@@ -236,7 +236,6 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
 
         // Every doc left for this page turned out to be too large to persist, so the page would be
         // empty. Don't persist an empty page unless it is the only page of an empty sample.
-        // TODO SERVER-127501
         if (docsOnPage == 0 && pageNo > 0) {
             break;
         }
