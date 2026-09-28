@@ -1244,7 +1244,6 @@ private:
             dropAuthoritativeShardCatalogCollectionsOnShards(opCtx);
         }
 
-        // TODO SERVER-94927: Remove once 9.0 becomes last lts.
         const bool isReplSet = !role.has_value();
         if (isReplSet || isConfigsvr) {
             query_settings::QuerySettingsService::get(opCtx).downgradeQuerySettings(

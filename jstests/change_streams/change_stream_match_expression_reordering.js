@@ -206,6 +206,7 @@ describe("change stream match expression reordering", () => {
         // The query settings knob mechanism is feature flagged, so this case is skipped at runtime
         // rather than tagged on the file: tagging would gate the rest of the reordering coverage
         // above on flags it does not need.
+        // TODO SERVER-135778: Remove the AllowUserFacingQuerySettings feature flag check.
         const areQueryKnobsAvailable = FeatureFlagUtil.isPresentAndEnabled(
             db,
             "AllowUserFacingQuerySettings",
