@@ -1,9 +1,25 @@
-// Tests the behavior of $_internalKeyStringValue when used in agg expressions.
+/**
+ * Tests the behavior of $_internalKeyStringValue when used in agg expressions.
+ *
+ * @tags: [
+ *   assumes_stable_shard_list,
+ *   multiversion_incompatible,
+ *   not_allowed_with_signed_security_token,
+ * ]
+ */
+
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db[jsTestName()];
+assert.commandWorked(db.createCollection(coll.getName()));
+
+// Clears the collection without dropping it, avoiding a sharded drop/recreate race.
+function clearCollection() {
+    assert.commandWorked(db.runCommand({delete: coll.getName(), deletes: [{q: {}, limit: 0}]}));
+}
 
 // Testing behavior for basic data types.
-coll.drop();
+clearCollection();
 let docs = [
     {_id: 0, a: NumberInt(1)},
     {_id: 1, a: NumberLong(2)},
@@ -35,7 +51,7 @@ assert.eq(
 );
 
 // Testing behavior for same numeric values of different types.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: NumberInt(1)},
     {_id: 1, a: NumberLong(1)},
@@ -55,7 +71,7 @@ assert(
 );
 
 // Testing behavior for same numeric values of different types inside object.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: {b: NumberInt(1)}},
     {_id: 1, a: {b: 1.0}},
@@ -74,7 +90,7 @@ assert(
 );
 
 // Testing behavior for close numeric values.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: 1},
     {_id: 1, a: 1.00001},
@@ -88,7 +104,7 @@ assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
 // Testing behavior for large numeric values.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: 1e20},
     {_id: 1, a: NumberDecimal("1e21")},
@@ -112,7 +128,7 @@ assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 assert(bsonWoCompare(results[0].c, results[1].c) === 0, results);
 
 // Testing behavior for strings under case-sensitive collation that doesn't match.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: "aAa"},
     {_id: 1, a: "AaA"},
@@ -135,7 +151,7 @@ assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
 // Testing behavior for strings under case-sensitive collation that matches.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: "aAa"},
     {_id: 1, a: "aAa"},
@@ -161,7 +177,7 @@ assert(
 );
 
 // Testing behavior for strings under case-insensitive collation that doesn't match.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: "aAa"},
     {_id: 1, a: "aBa"},
@@ -184,7 +200,7 @@ assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
 // Testing behavior for strings under case-insensitive collation that matches.
-assert(coll.drop());
+clearCollection();
 docs = [
     {_id: 0, a: "aAa"},
     {_id: 1, a: "AaA"},
@@ -208,3 +224,47 @@ assert(
     results.every((result) => bsonWoCompare(result.b, results[0].b) === 0),
     results,
 );
+
+// Lower the per-query memory limit ('internalQueryMaxMemoryUsageBytesPerOperation') to check that a
+// large input trips it whether or not a collation is requested.
+const bigArray = Array.from({length: 500}, (_, i) => "x".repeat(4096) + i);
+
+clearCollection();
+assert.commandWorked(coll.insert({_id: 0}));
+
+function runValue(input, collation) {
+    const spec = {input};
+    if (collation !== undefined) {
+        spec.collation = collation;
+    }
+    return db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$project: {k: {$_internalKeyStringValue: spec}}}],
+        cursor: {},
+    });
+}
+
+// Under the default limit, a multi-megabyte input succeeds.
+assert.commandWorked(runValue(bigArray, {locale: "en", strength: 1}));
+assert.commandWorked(runValue(bigArray));
+
+const kRestrictedLimit = 1024 * 1024;
+runWithParamsAllNonConfigNodes(
+    db,
+    {internalQueryMaxMemoryUsageBytesPerOperation: kRestrictedLimit},
+    () => {
+        assert.commandFailedWithCode(
+            runValue(bigArray),
+            ErrorCodes.ExceededMemoryLimit,
+            "a large input's copied BSON must hit the per-query memory limit without a collation",
+        );
+
+        assert.commandFailedWithCode(
+            runValue(bigArray, {locale: "en", strength: 1}),
+            ErrorCodes.ExceededMemoryLimit,
+            "a large collation-aware input must hit the per-query memory limit",
+        );
+    },
+);
+
+assert.commandWorked(runValue(["a", "b"], {locale: "en", strength: 1}));

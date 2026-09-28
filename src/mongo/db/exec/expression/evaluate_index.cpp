@@ -33,6 +33,12 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
     const Value input = expr.getInput()->evaluate(root, variables, ctx);
     auto inputBson = input.wrap("");
 
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
+    // Reject before further work if the copied input alone is already over the limit.
+    memCharger.add(static_cast<int64_t>(inputBson.objsize()));
+    memCharger.flush();
+
+    OperationContext* opCtx = expr.getExpressionContext()->getOperationContext();
     std::unique_ptr<CollatorInterface> collator = nullptr;
     if (auto collationExpr = expr.getCollation(); collationExpr) {
         const Value collation = collationExpr->evaluate(root, variables, ctx);
@@ -42,7 +48,6 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
                 collation.isObject());
         auto collationBson = collation.getDocument().toBson();
 
-        auto* opCtx = expr.getExpressionContext()->getOperationContext();
         tassert(10131413,
                 "$_internalKeyStringValue with a collation requires an OperationContext",
                 opCtx);
@@ -53,8 +58,11 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
 
     key_string::HeapBuilder ksBuilder(key_string::Version::V1);
     if (collator) {
-        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](std::string_view str) {
-            return collator->getComparisonString(str);
+        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](std::string_view strView) {
+            auto comparisonKey = collator->getComparisonKey(strView);
+            auto keyData = comparisonKey.getKeyData();
+            memCharger.add(static_cast<int64_t>(keyData.size()));
+            return std::string{keyData.data(), keyData.size()};
         });
     } else {
         ksBuilder.appendBSONElement(inputBson.firstElement());
@@ -64,6 +72,11 @@ Value evaluate(const ExpressionInternalKeyStringValue& expr,
     // binary representation.
     auto ksValue = ksBuilder.release();
     auto ksView = ksValue.getView();
+    // Without a collation the key-string wasn't charged per-element, so charge it here.
+    if (!collator) {
+        memCharger.add(static_cast<int64_t>(ksView.size()));
+    }
+    memCharger.flush();
     return Value(BSONBinData{ksView.data(), static_cast<int>(ksView.size()), BinDataGeneral});
 }
 
