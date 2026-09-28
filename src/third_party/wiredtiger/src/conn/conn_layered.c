@@ -186,7 +186,7 @@ __disagg_btree_stamp_create_epoch(
  *     best-effort and is not able to handle all cases of operation interleaving.
  */
 static int
-__layered_create_missing_stable_tables_legacy(WT_SESSION_IMPL *session)
+__layered_create_missing_stable_tables_legacy(WT_SESSION_IMPL *session, uint64_t *countp)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor_check, *cursor_scan;
@@ -242,6 +242,7 @@ __layered_create_missing_stable_tables_legacy(WT_SESSION_IMPL *session)
             WT_ERR(__wt_disagg_enqueue_metadata_operation(session, stable_uri,
               layered_uri + strlen("layered:"), WT_SHARED_METADATA_CREATE,
               WT_SCHEMA_EPOCH_UNPUBLISHED, true, NULL, NULL));
+            ++(*countp);
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Created missing stable table \"%s\" from \"%s\"", stable_uri, layered_uri);
         }
@@ -294,7 +295,7 @@ __layered_create_has_following_remove(
  *     Create missing stable tables.
  */
 static int
-__layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
+__layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session, uint64_t *countp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -311,7 +312,7 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
      * from its local metadata like any legacy node.
      */
     if (__wt_get_stable_disaggregated_schema_epoch(session) == WT_SCHEMA_EPOCH_NONE)
-        return (__layered_create_missing_stable_tables_legacy(session));
+        return (__layered_create_missing_stable_tables_legacy(session, countp));
 
     last_ckpt_epoch =
       __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_disaggregated_schema_epoch);
@@ -351,6 +352,7 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
           "Failed to create missing stable table \"%s\" with schema epoch %" PRIu64
           " from layered config \"%s\"",
           entry->stable_uri, entry->schema_epoch, entry->layered_value);
+        ++(*countp);
         __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Created missing stable table \"%s\" with schema epoch %" PRIu64 " from \"%s\"",
           entry->stable_uri, entry->schema_epoch, entry->layered_value);
@@ -388,8 +390,20 @@ static int
 __layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
+    uint64_t count, time_start, time_stop;
 
-    WT_WITH_SCHEMA_LOCK(session, ret = __layered_create_missing_stable_tables_helper(session));
+    count = 0;
+    time_start = __wt_clock(session);
+    WT_WITH_SCHEMA_LOCK(
+      session, ret = __layered_create_missing_stable_tables_helper(session, &count));
+    time_stop = __wt_clock(session);
+
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_missing_stable_create_time, WT_CLOCKDIFF_MS(time_stop, time_start));
+    WT_STAT_CONN_SET(session, disagg_step_up_missing_stable_tables_created, count);
+    __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Step up created %" PRIu64 " missing stable tables in %" PRIu64 " milliseconds", count,
+      WT_CLOCKDIFF_MS(time_stop, time_start));
     return (ret);
 }
 
@@ -1472,6 +1486,48 @@ __disagg_begin_checkpoint(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __disagg_wait_for_deferred_pickup --
+ *     Adopt any checkpoint whose pickup was deferred before stepping up: the new leader must
+ *     continue from the newest adopted checkpoint, or its own first checkpoint would fork the
+ *     shared checkpoint lineage from an older ancestor. Retry while in-flight work blocks the
+ *     adoption, the one condition that clears on its own; anything else is fatal, since a node that
+ *     cannot adopt the newest checkpoint cannot lead from it.
+ */
+static int
+__disagg_wait_for_deferred_pickup(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    uint64_t retries, time_start, time_stop;
+
+    time_start = __wt_clock(session);
+    for (retries = 0;; ++retries) {
+        ret = __wti_disagg_deferred_pickup_retry(session, true);
+        if (ret != EBUSY)
+            break;
+
+        /* The adoption is expected to be blocked briefly; report only a protracted wait. */
+        if (retries != 0 && retries % 100 == 0)
+            __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
+              "The deferred checkpoint adoption before step-up is blocked, retrying (%" PRIu64
+              " retries)",
+              retries);
+
+        __wt_sleep(0, WT_DISAGG_RETRY_SLEEP_USECS);
+    }
+    time_stop = __wt_clock(session);
+
+    WT_STAT_CONN_SET(session, disagg_step_up_deferred_pickup_retries, retries);
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_deferred_pickup_retry_time, WT_CLOCKDIFF_MS(time_stop, time_start));
+    __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Step up adopted the deferred checkpoint after %" PRIu64 " retries and %" PRIu64
+      " milliseconds",
+      retries, WT_CLOCKDIFF_MS(time_stop, time_start));
+
+    return (ret);
+}
+
+/*
  * __disagg_restart_checkpoint --
  *     Restart the current checkpoint: Abandon the current checkpoint if it is incomplete (and the
  *     operation to abandon a checkpoint is supported), and begin a new checkpoint.
@@ -1480,12 +1536,21 @@ static int
 __disagg_restart_checkpoint(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
+    uint64_t time_start, time_stop;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
+    time_start = __wt_clock(session);
     WT_ERR_MSG_CHK(
       session, __disagg_abandon_checkpoint(session), "Failed to abandon the incomplete checkpoint");
     WT_ERR_MSG_CHK(session, __disagg_begin_checkpoint(session), "Failed to begin a new checkpoint");
+    time_stop = __wt_clock(session);
+
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_checkpoint_restart_time, WT_CLOCKDIFF_MS(time_stop, time_start));
+    __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Step up restarted the checkpoint in %" PRIu64 " milliseconds",
+      WT_CLOCKDIFF_MS(time_stop, time_start));
 
 err:
     return (ret);
@@ -2112,7 +2177,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     WT_DECL_RET;
     WT_ITEM complete_checkpoint_meta;
     WT_NAMED_PAGE_LOG *npage_log;
-    uint64_t retries, time_start, time_stop;
+    uint64_t time_start, time_stop;
     bool leader, picked_up, was_leader;
 
     conn = S2C(session);
@@ -2205,28 +2270,8 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
          */
         __wt_gen_next(session, WT_GEN_DISAGG_ROLE, NULL);
 
-        /*
-         * Adopt any checkpoint whose pickup was deferred before stepping up: the new leader must
-         * continue from the newest adopted checkpoint, or its own first checkpoint would fork the
-         * shared checkpoint lineage from an older ancestor. Retry while in-flight work blocks the
-         * adoption, the one condition that clears on its own; anything else is fatal, since a node
-         * that cannot adopt the newest checkpoint cannot lead from it.
-         */
-        for (retries = 0;; ++retries) {
-            ret = __wti_disagg_deferred_pickup_retry(session, true);
-            if (ret != EBUSY)
-                break;
-
-            /* The adoption is expected to be blocked briefly; report only a protracted wait. */
-            if (retries != 0 && retries % 100 == 0)
-                __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
-                  "The deferred checkpoint adoption before step-up is blocked, retrying (%" PRIu64
-                  " retries)",
-                  retries);
-
-            __wt_sleep(0, WT_DISAGG_RETRY_SLEEP_USECS);
-        }
-        WT_ERR_MSG_CHK(session, ret, "failed to adopt a deferred checkpoint before step-up");
+        WT_ERR_MSG_CHK(session, __disagg_wait_for_deferred_pickup(session),
+          "failed to adopt a deferred checkpoint before step-up");
 
         /* Follower step-up. */
         time_start = __wt_clock(session);

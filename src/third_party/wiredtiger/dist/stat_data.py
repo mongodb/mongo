@@ -656,8 +656,16 @@ conn_stats = [
     DisaggStat('disagg_step_down_in_progress', 'step down in progress', 'no_clear,no_scale'),
     DisaggStat('disagg_step_down_time', 'step down most recent time (msecs)'),
     DisaggStat('disagg_step_down_window_creates', 'tables created without a stable constituent while the step-down timestamp is set'),
+    DisaggStat('disagg_step_up_checkpoint_restart_time', 'step up checkpoint restart most recent time (msecs)'),
     DisaggStat('disagg_step_up_clear_ingest_retry', 'step up ingest table clear truncates retried after a conflict'),
+    DisaggStat('disagg_step_up_deferred_pickup_retries', 'step up deferred checkpoint pickup retries before stepping up'),
+    DisaggStat('disagg_step_up_deferred_pickup_retry_time', 'step up deferred checkpoint pickup retry most recent time (msecs)'),
     DisaggStat('disagg_step_up_in_progress', 'step up in progress', 'no_clear,no_scale'),
+    DisaggStat('disagg_step_up_ingest_drain_bytes', 'step up ingest table drain bytes moved to stable tables'),
+    DisaggStat('disagg_step_up_ingest_drain_time', 'step up ingest table drain most recent time (msecs)'),
+    DisaggStat('disagg_step_up_ingest_tables_drained', 'step up ingest tables drained'),
+    DisaggStat('disagg_step_up_missing_stable_create_time', 'step up missing stable table create most recent time (msecs)'),
+    DisaggStat('disagg_step_up_missing_stable_tables_created', 'step up missing stable tables created'),
     DisaggStat('disagg_step_up_time', 'step up most recent time (msecs)'),
 
     ##########################################
@@ -960,7 +968,7 @@ conn_stats = [
     SessionOpStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
-    SessionOpStat('session_table_verify_hs_keys_checked', 'table verify number of keys checked against the history store', 'no_clear,no_scale'),
+    SessionOpStat('session_table_verify_hs_keys_checked', 'table verify number of history store keys checked against the data store', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
 
     ##########################################

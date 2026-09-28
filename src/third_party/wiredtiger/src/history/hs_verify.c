@@ -8,6 +8,16 @@
 
 #include "wt_internal.h"
 
+typedef struct {
+    WT_ITEM *key;             /* The key, copied out of the cursor's memory. */
+    WT_TIME_WINDOW newest_tw; /* Time window of the newest record seen for the key. */
+    WT_TIME_WINDOW live_tw;   /* Time window of the data store's value for the key. */
+    bool open;                /* Records for this key are being tracked. */
+    bool searched;            /* The data store has been searched for this key. */
+    bool exists;              /* That search found the key. */
+    bool live_valid;          /* That search resolved a visible value into live_tw. */
+} WT_HS_VERIFY_CHAIN;
+
 /*
  * __hs_verify_checkpoint_oldest --
  *     Return the oldest timestamp of the checkpoint the given data store was read at. WT_TS_NONE
@@ -40,27 +50,142 @@ __hs_verify_obsolete(WT_TIME_WINDOW *tw, wt_timestamp_t checkpoint_oldest_ts)
 }
 
 /*
+ * __hs_verify_ts_stable_cmp --
+ *     Verify that a history store record's start and stop timestamps are valid against the global
+ *     stable timestamp.
+ */
+static int
+__hs_verify_ts_stable_cmp(WT_SESSION_IMPL *session, WT_ITEM *key, const char *key_format,
+  wt_timestamp_t start_ts, wt_timestamp_t stop_ts, wt_timestamp_t stable_timestamp, WT_ITEM *tmp)
+{
+    wt_timestamp_t failed_ts;
+    char tp_string[2][WT_TS_INT_STRING_SIZE];
+    bool start;
+
+    if (!__wt_ts_stable_violation(start_ts, stop_ts, stable_timestamp, &start, &failed_ts))
+        return (0);
+
+    WT_RET_MSG(session, WT_ERROR,
+      "Value in history store for key {%s} has failed verification with a %s timestamp of %s "
+      "greater than the stable_timestamp of %s",
+      __wt_key_string(session, key->data, key->size, key_format, tmp), start ? "start" : "stop",
+      __wt_timestamp_to_string(failed_ts, tp_string[0]),
+      __wt_timestamp_to_string(stable_timestamp, tp_string[1]));
+}
+
+/*
+ * __hs_verify_ds_search --
+ *     Check the data store for a history store key. If data store entry is found and its timestamp
+ *     window is needed to check for overlaps with the history store entry, read it back.
+ */
+static int
+__hs_verify_ds_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, WT_ITEM *key,
+  bool read_time_window, WT_HS_VERIFY_CHAIN *chain)
+{
+    WT_DECL_RET;
+    uint64_t recno;
+    const uint8_t *up;
+
+    if (CUR2BT(ds_cbt)->type == BTREE_ROW) {
+        WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(ds_cbt, key, false, NULL, false, NULL));
+    } else {
+        up = (const uint8_t *)key->data;
+        WT_RET(__wt_vunpack_uint(&up, key->size, &recno));
+        WT_WITH_PAGE_INDEX(session, ret = __wt_col_search(ds_cbt, recno, NULL, false, NULL));
+    }
+    WT_RET(ret);
+
+    chain->exists = ds_cbt->compare == 0;
+    if (chain->exists && read_time_window)
+        chain->live_valid = __wt_read_cell_time_window(ds_cbt, &chain->live_tw);
+
+    return (__cursor_reset(ds_cbt));
+}
+
+/*
+ * __hs_verify_chain_close --
+ *     Verify a key's latest history store entry time window against the corresponding data store
+ *     entry's current time window, if a corresponding data store entry exists. This check doesn't
+ *     verify whether a data store entry should exist, so a missing entry is not an error.
+ */
+static int
+__hs_verify_chain_close(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, WT_HS_VERIFY_CHAIN *chain, WT_ITEM *tmp)
+{
+    WT_TIME_WINDOW *live_tw, *newest_tw;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+
+    /*
+     * A non-precise checkpoint can write a page before a later eviction moves that page's older
+     * versions into the history store, and then capture those history store records in the same
+     * checkpoint. The two files are not a snapshot of a single point in time, so only the ordering
+     * among the history store records themselves can be trusted; comparing them against the data
+     * store's page image reports overlaps that never coexisted.
+     *
+     * FIXME-WT-18319: This is the connection's current setting, not the one in effect when the
+     * checkpoint was written. A checkpoint written without precise checkpoints and then verified by
+     * a connection that enables them is still exposed to the skew, until the pages involved are
+     * reconciled again or the stale history store records become obsolete.
+     */
+    if (!F_ISSET(S2C(session), WT_CONN_PRECISE_CHECKPOINT))
+        return (0);
+
+    if (!chain->searched)
+        WT_RET(__hs_verify_ds_search(session, ds_cbt, chain->key, true, chain));
+
+    if (!chain->live_valid)
+        return (0);
+
+    live_tw = &chain->live_tw;
+    newest_tw = &chain->newest_tw;
+
+    if (live_tw->start_ts != WT_TS_NONE && newest_tw->start_ts < live_tw->start_ts &&
+      live_tw->start_ts < newest_tw->stop_ts &&
+      !(newest_tw->start_ts == WT_TS_NONE && newest_tw->stop_ts == live_tw->stop_ts))
+        WT_RET_MSG(session, WT_ERROR,
+          "key %s has an overlap of timestamp ranges between history store stop timestamp %s being "
+          "newer than the data store's timestamp range having start timestamp %s",
+          __wt_buf_set_printable_format(
+            session, chain->key->data, chain->key->size, CUR2BT(ds_cbt)->key_format, false, tmp),
+          __wt_timestamp_to_string(newest_tw->stop_ts, ts_string[0]),
+          __wt_timestamp_to_string(live_tw->start_ts, ts_string[1]));
+
+    return (0);
+}
+
+/*
  * __hs_verify_id --
  *     Verify the history store for a single btree. Given a cursor to the tree, walk all history
- *     store keys. This function assumes any caller has already opened a cursor to the history
- *     store.
+ *     store keys. History store records for a key are grouped as they are walked. For each group,
+ *     compare the timestamp ranges of adjacent history store records to check for overlaps, and
+ *     verify consistency with the data store. This function assumes any caller has already opened a
+ *     cursor to the history store.
  */
 static int
 __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *ds_cbt,
-  uint32_t this_btree_id, wt_timestamp_t checkpoint_oldest_ts)
+  uint32_t this_btree_id, wt_timestamp_t checkpoint_oldest_ts, wt_timestamp_t stable_timestamp,
+  bool per_key_checks)
 {
-    WT_DECL_ITEM(prev_key);
+    WT_DECL_ITEM(tmp);
     WT_DECL_RET;
+    WT_HS_VERIFY_CHAIN chain;
     WT_ITEM key;
     WT_TIME_WINDOW *hs_tw;
     wt_timestamp_t hs_start_ts;
-    uint64_t hs_counter, recno;
+    uint64_t hs_counter;
     uint32_t btree_id;
-    const uint8_t *up;
     int cmp;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+    bool check_data_store;
 
     WT_CLEAR(key);
-    WT_ERR(__wt_scr_alloc(session, 0, &prev_key));
+    WT_CLEAR(chain);
+    WT_TIME_WINDOW_INIT(&chain.newest_tw);
+    WT_TIME_WINDOW_INIT(&chain.live_tw);
+    check_data_store = per_key_checks && F_ISSET(S2C(session), WT_CONN_PRECISE_CHECKPOINT);
+
+    WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+    WT_ERR(__wt_scr_alloc(session, 0, &chain.key));
 
     /*
      * If using standard cursors, we need to skip the non-globally visible tombstones in the data
@@ -96,12 +221,53 @@ __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *
         }
 
         /*
-         * If we have already checked against this key, keep going to the next key. We only need to
-         * check the key once.
+         * The records for a key are contiguous and ordered oldest to newest, so a change of key
+         * closes out the records before it and starts a new group.
          */
-        WT_ERR(__wt_compare(session, NULL, &key, prev_key, &cmp));
-        if (cmp == 0)
-            continue;
+        cmp = 1;
+        if (chain.open)
+            WT_ERR(__wt_compare(session, NULL, &key, chain.key, &cmp));
+
+        if (cmp != 0) {
+            if (chain.open && per_key_checks)
+                WT_ERR(__hs_verify_chain_close(session, ds_cbt, &chain, tmp));
+
+            /*
+             * Copy the key memory into our scratch buffer. The key will get invalidated on our next
+             * cursor iteration.
+             */
+            WT_ERR(__wt_buf_set(session, chain.key, key.data, key.size));
+            chain.open = true;
+            chain.searched = chain.exists = chain.live_valid = false;
+            WT_TIME_WINDOW_INIT(&chain.live_tw);
+
+            if (per_key_checks)
+                WT_STAT_CONN_INCR(session, session_table_verify_hs_keys_checked);
+        } else if (per_key_checks) {
+            /*
+             * Verify the newer record's start is later than the older record's stop. Skip cases
+             * where we don't have a start timestamp or if we have multiple entries at the same
+             * start timestamp. In the latter case, it's because we don't want to compare the
+             * "first" entry's start timestamp to the stop timestamp of the "later" entry (or
+             * entries), because we expect those to overlap.
+             */
+            if (hs_start_ts != WT_TS_NONE && chain.newest_tw.start_ts < hs_start_ts &&
+              hs_start_ts < chain.newest_tw.stop_ts &&
+              !(chain.newest_tw.start_ts == WT_TS_NONE &&
+                chain.newest_tw.stop_ts == hs_tw->stop_ts)) {
+                WT_ERR_MSG(session, WT_ERROR,
+                  "key %s has an overlap of timestamp ranges between history store stop timestamp "
+                  "%s being newer than a more recent timestamp range having start timestamp %s",
+                  __wt_buf_set_printable_format(session, chain.key->data, chain.key->size,
+                    CUR2BT(ds_cbt)->key_format, false, tmp),
+                  __wt_timestamp_to_string(chain.newest_tw.stop_ts, ts_string[0]),
+                  __wt_timestamp_to_string(hs_start_ts, ts_string[1]));
+            }
+        }
+
+        if (per_key_checks && stable_timestamp != WT_TS_NONE)
+            WT_ERR(__hs_verify_ts_stable_cmp(session, &key, CUR2BT(ds_cbt)->key_format, hs_start_ts,
+              hs_tw->stop_ts, stable_timestamp, tmp));
 
         /*
          * A follower's own oldest timestamp trails the one that wrote the checkpoint, so its cursor
@@ -110,21 +276,10 @@ __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *
          * checked key is left alone so that any remaining record for this key is judged on its own
          * window rather than excused by this one.
          */
-        if (__hs_verify_obsolete(hs_tw, checkpoint_oldest_ts))
-            continue;
+        if (!chain.exists && !__hs_verify_obsolete(hs_tw, checkpoint_oldest_ts)) {
+            WT_ERR(__hs_verify_ds_search(session, ds_cbt, &key, check_data_store, &chain));
+            chain.searched = true;
 
-        /* Check the key can be found in the data store.*/
-        if (CUR2BT(ds_cbt)->type == BTREE_ROW) {
-            WT_WITH_PAGE_INDEX(
-              session, ret = __wt_row_search(ds_cbt, &key, false, NULL, false, NULL));
-        } else {
-            up = (const uint8_t *)key.data;
-            WT_ERR(__wt_vunpack_uint(&up, key.size, &recno));
-            WT_WITH_PAGE_INDEX(session, ret = __wt_col_search(ds_cbt, recno, NULL, false, NULL));
-        }
-        WT_ERR(ret);
-
-        if (ds_cbt->compare != 0) {
             /*
              * The history store cursor judged this record live before we searched the data store,
              * but global visibility only ever advances: a record that has since become obsolete was
@@ -132,45 +287,41 @@ __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *
              * the last checked key alone so that any remaining record for this key is judged on its
              * own window rather than excused by this one.
              */
-            if (__wt_txn_tw_stop_visible_all(session, hs_tw)) {
-                WT_ERR(__cursor_reset(ds_cbt));
-                continue;
+            if (!chain.exists && !__wt_txn_tw_stop_visible_all(session, hs_tw)) {
+                F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+                /* Note that we are reformatting the HS key here. */
+                WT_ERR_PANIC(session, WT_PANIC,
+                  "the associated history store key %s was not found in the data store %s",
+                  __wt_key_string(session, key.data, key.size, CUR2BT(ds_cbt)->key_format, &key),
+                  session->dhandle->name);
             }
-
-            F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
-            /* Note that we are reformatting the HS key here. */
-            WT_ERR_PANIC(session, WT_PANIC,
-              "the associated history store key %s was not found in the data store %s",
-              __wt_key_string(session, key.data, key.size, CUR2BT(ds_cbt)->key_format, &key),
-              session->dhandle->name);
         }
 
-        WT_ERR(__cursor_reset(ds_cbt));
-
-        /*
-         * Copy the key memory into our scratch buffer. The key will get invalidated on our next
-         * cursor iteration.
-         */
-        WT_ERR(__wt_buf_set(session, prev_key, key.data, key.size));
+        WT_TIME_WINDOW_COPY(&chain.newest_tw, hs_tw);
     }
     WT_ERR_NOTFOUND_OK(ret, true);
+
+    if (chain.open && per_key_checks)
+        WT_TRET(__hs_verify_chain_close(session, ds_cbt, &chain, tmp));
+
 err:
-    F_CLR(ds_cbt, WT_CURSTD_IGNORE_TOMBSTONE);
+    F_CLR(&ds_cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE);
     WT_ASSERT(session, key.mem == NULL && key.memsize == 0);
-    __wt_scr_free(session, &prev_key);
+    __wt_scr_free(session, &chain.key);
+    __wt_scr_free(session, &tmp);
     return (ret);
 }
 
 /*
- * __wt_hs_verify_cursor_open --
+ * __hs_verify_cursor_open --
  *     Open a history store cursor for verify. A stable btree opened from a checkpoint pins the
  *     shared history store checkpoint that goes with it, so read there rather than through a live
  *     handle: both sides of the comparison then come from the same checkpoint, and a follower does
  *     not get a live handle on a shared table. Returns a NULL cursor when the shared history store
  *     has never been checkpointed and there is nothing to verify against.
  */
-int
-__wt_hs_verify_cursor_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSOR **hs_cursorp)
+static int
+__hs_verify_cursor_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSOR **hs_cursorp)
 {
     WT_BTREE *btree;
 
@@ -192,14 +343,15 @@ __wt_hs_verify_cursor_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSO
  *     exclusive access to the btree.
  */
 int
-__wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
+__wt_hs_verify_one(
+  WT_SESSION_IMPL *session, uint32_t btree_id, wt_timestamp_t stable_timestamp, bool per_key_checks)
 {
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE ds_cbt;
     WT_DECL_RET;
     wt_timestamp_t checkpoint_oldest_ts;
 
-    WT_RET(__wt_hs_verify_cursor_open(session, btree_id, &hs_cursor));
+    WT_RET(__hs_verify_cursor_open(session, btree_id, &hs_cursor));
     if (hs_cursor == NULL) {
         /* Report the skip once per tree. */
         __wt_verbose(session, WT_VERB_VERIFY,
@@ -227,8 +379,9 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
     __wt_btcur_open(&ds_cbt);
 
     /* Note that the following call moves the hs cursor internally. */
-    WT_ERR_NOTFOUND_OK(
-      __hs_verify_id(session, hs_cursor, &ds_cbt, btree_id, checkpoint_oldest_ts), false);
+    WT_ERR_NOTFOUND_OK(__hs_verify_id(session, hs_cursor, &ds_cbt, btree_id, checkpoint_oldest_ts,
+                         stable_timestamp, per_key_checks),
+      false);
 
     WT_ERR(__wt_btcur_close(&ds_cbt, false));
 
@@ -333,7 +486,7 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
 
         /* Note that the following call moves the hs cursor internally. */
         WT_ERR_NOTFOUND_OK(__hs_verify_id(session, hs_cursor, (WT_CURSOR_BTREE *)ds_cursor,
-                             btree_id, checkpoint_oldest_ts),
+                             btree_id, checkpoint_oldest_ts, WT_TS_NONE, false),
           true);
 
         /* We are either positioned on a different btree id or the entire HS has been parsed. */

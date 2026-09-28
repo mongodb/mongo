@@ -1157,6 +1157,8 @@ struct __wt_connection_impl {
         TAILQ_HEAD(__wt_layered_drain_qh, __wt_layered_drain_entry) work_queue;
         bool running;
         uint32_t thread_count;
+        wt_shared uint64_t tables_drained; /* Ingest tables drained, current step up */
+        wt_shared uint64_t drain_bytes;    /* Bytes moved to stable tables, current step up */
     } layered_drain_data;
 
     WT_DISAGGREGATED_STORAGE disaggregated_storage;

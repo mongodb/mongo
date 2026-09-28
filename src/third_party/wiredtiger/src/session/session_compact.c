@@ -371,20 +371,6 @@ err:
 }
 
 /*
- * __wt_compact_check_eligibility --
- *     Function to check whether the specified URI is eligible for compaction.
- */
-bool
-__wt_compact_check_eligibility(WT_SESSION_IMPL *session, const char *uri)
-{
-    WT_UNUSED(session);
-    WT_UNUSED(uri);
-
-    /* FIXME-WT-18481: always returns true; delete this stub and its callers. */
-    return (true);
-}
-
-/*
  * __wti_session_compact --
  *     WT_SESSION.compact method.
  */
@@ -476,10 +462,6 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
             ret = __wt_bad_object_type(session, uri);
         goto err;
     }
-
-    /* Check the file is eligible for compaction. */
-    if (!__wt_compact_check_eligibility(session, uri))
-        WT_ERR(__wt_object_unsupported(session, uri));
 
     /* Setup the session handle's compaction state structure. */
     memset(&compact, 0, sizeof(WT_COMPACT_STATE));

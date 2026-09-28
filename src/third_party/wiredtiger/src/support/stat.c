@@ -2745,8 +2745,16 @@ static const char *const __stats_connection_desc[] = {
   "disagg: stable tombstone encoding mode: 0 not yet determined, 1 legacy escaped, 2 unescaped",
   "disagg: step down in progress",
   "disagg: step down most recent time (msecs)",
+  "disagg: step up checkpoint restart most recent time (msecs)",
+  "disagg: step up deferred checkpoint pickup retries before stepping up",
+  "disagg: step up deferred checkpoint pickup retry most recent time (msecs)",
   "disagg: step up in progress",
   "disagg: step up ingest table clear truncates retried after a conflict",
+  "disagg: step up ingest table drain bytes moved to stable tables",
+  "disagg: step up ingest table drain most recent time (msecs)",
+  "disagg: step up ingest tables drained",
+  "disagg: step up missing stable table create most recent time (msecs)",
+  "disagg: step up missing stable tables created",
   "disagg: step up most recent time (msecs)",
   "disagg: tables created without a stable constituent while the step-down timestamp is set",
   "layered: Layered table cursor insert operations",
@@ -3103,7 +3111,7 @@ static const char *const __stats_connection_desc[] = {
   "session: table truncate failed calls",
   "session: table truncate successful calls",
   "session: table verify failed calls",
-  "session: table verify number of keys checked against the history store",
+  "session: table verify number of history store keys checked against the data store",
   "session: table verify successful calls",
   "thread-state: active filesystem fsync calls",
   "thread-state: active filesystem read calls",
@@ -3874,8 +3882,16 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing disagg_stable_tombstone_encoding */
     /* not clearing disagg_step_down_in_progress */
     stats->disagg_step_down_time = 0;
+    stats->disagg_step_up_checkpoint_restart_time = 0;
+    stats->disagg_step_up_deferred_pickup_retries = 0;
+    stats->disagg_step_up_deferred_pickup_retry_time = 0;
     /* not clearing disagg_step_up_in_progress */
     stats->disagg_step_up_clear_ingest_retry = 0;
+    stats->disagg_step_up_ingest_drain_bytes = 0;
+    stats->disagg_step_up_ingest_drain_time = 0;
+    stats->disagg_step_up_ingest_tables_drained = 0;
+    stats->disagg_step_up_missing_stable_create_time = 0;
+    stats->disagg_step_up_missing_stable_tables_created = 0;
     stats->disagg_step_up_time = 0;
     stats->disagg_step_down_window_creates = 0;
     stats->layered_curs_insert = 0;
@@ -5137,9 +5153,25 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, disagg_stable_tombstone_encoding);
     to->disagg_step_down_in_progress += WT_STAT_CONN_READ(from, disagg_step_down_in_progress);
     to->disagg_step_down_time += WT_STAT_CONN_READ(from, disagg_step_down_time);
+    to->disagg_step_up_checkpoint_restart_time +=
+      WT_STAT_CONN_READ(from, disagg_step_up_checkpoint_restart_time);
+    to->disagg_step_up_deferred_pickup_retries +=
+      WT_STAT_CONN_READ(from, disagg_step_up_deferred_pickup_retries);
+    to->disagg_step_up_deferred_pickup_retry_time +=
+      WT_STAT_CONN_READ(from, disagg_step_up_deferred_pickup_retry_time);
     to->disagg_step_up_in_progress += WT_STAT_CONN_READ(from, disagg_step_up_in_progress);
     to->disagg_step_up_clear_ingest_retry +=
       WT_STAT_CONN_READ(from, disagg_step_up_clear_ingest_retry);
+    to->disagg_step_up_ingest_drain_bytes +=
+      WT_STAT_CONN_READ(from, disagg_step_up_ingest_drain_bytes);
+    to->disagg_step_up_ingest_drain_time +=
+      WT_STAT_CONN_READ(from, disagg_step_up_ingest_drain_time);
+    to->disagg_step_up_ingest_tables_drained +=
+      WT_STAT_CONN_READ(from, disagg_step_up_ingest_tables_drained);
+    to->disagg_step_up_missing_stable_create_time +=
+      WT_STAT_CONN_READ(from, disagg_step_up_missing_stable_create_time);
+    to->disagg_step_up_missing_stable_tables_created +=
+      WT_STAT_CONN_READ(from, disagg_step_up_missing_stable_tables_created);
     to->disagg_step_up_time += WT_STAT_CONN_READ(from, disagg_step_up_time);
     to->disagg_step_down_window_creates += WT_STAT_CONN_READ(from, disagg_step_down_window_creates);
     to->layered_curs_insert += WT_STAT_CONN_READ(from, layered_curs_insert);
