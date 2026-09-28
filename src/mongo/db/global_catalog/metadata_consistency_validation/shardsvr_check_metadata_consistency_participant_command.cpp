@@ -146,11 +146,10 @@ public:
             command.setCursor(request().getCursor());
 
             // Secondaries may be lagged, so we need to make sure they see a consistent metadata
-            // view.
-            // With kCheckAtPrimaryTimestamp, we achieve this by sending a readConcern with
-            // afterClusterTime set at majority commit time.
-            // With kCheckAtSecondaryTimestamp, we don't set any readConcern. That signals the
-            // secondary to perform checkMetadataConsistency assuming it may be lagged.
+            // view. With kCheckAtPrimaryTimestamp, we achieve this by sending a readConcern with
+            // afterClusterTime set at majority commit time. With kCheckAtSecondaryTimestamp, we
+            // don't set any readConcern. That signals the secondary to perform
+            // checkMetadataConsistency assuming it may be lagged.
             if (*secondaryCheckMode ==
                 CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp) {
                 const auto snapshotTimestamp = replCoord->getCurrentCommittedSnapshotOpTime();
@@ -162,8 +161,9 @@ public:
                 }
                 repl::ReadConcernArgs readConcern{
                     LogicalTime{snapshotTimestamp.getTimestamp()} /* afterClusterTime */,
-                    repl::ReadConcernLevel::kLocalReadConcern};
+                    repl::ReadConcernLevel::kMajorityReadConcern};
                 command.setReadConcern(std::move(readConcern));
+                command.setReadPreference(ReadPreferenceSetting{ReadPreference::SecondaryOnly});
             }
 
             _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
@@ -275,6 +275,25 @@ public:
                     LOGV2_DEBUG(13310700,
                                 2,
                                 "Secondary does not support the "
+                                "_shardsvrCheckMetadataConsistencySecondaryParticipant command",
+                                "hostAndPort"_attr = hostAndPort,
+                                "error"_attr = cursorWithStatus.getStatus());
+                    continue;
+                }
+
+                // In multiversion (or just when upgrading a patch version) the secondary could
+                // answer with InvalidOptions because it doesn't expect the readConcern option. Just
+                // tolerate it.
+                // TODO (SERVER-135565): this check is only needed when interacting with server
+                // binaries that do not support readConcern. After 10.0 has branched out, this
+                // situation is no longer possible.
+                if (cursorWithStatus.getStatus().code() == ErrorCodes::InvalidOptions &&
+                    cursorWithStatus.getStatus().toString().find(
+                        "Command _shardsvrCheckMetadataConsistencySecondaryParticipant does not "
+                        "support") != std::string::npos) {
+                    LOGV2_DEBUG(13556300,
+                                2,
+                                "Secondary does not accept readConcern in the "
                                 "_shardsvrCheckMetadataConsistencySecondaryParticipant command",
                                 "hostAndPort"_attr = hostAndPort,
                                 "error"_attr = cursorWithStatus.getStatus());

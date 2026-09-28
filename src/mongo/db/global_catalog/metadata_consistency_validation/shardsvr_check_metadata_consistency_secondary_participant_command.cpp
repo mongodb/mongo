@@ -132,6 +132,12 @@ public:
             return false;
         }
 
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            return {Status::OK(),
+                    Status{ErrorCodes::InvalidOptions, "default read concern not permitted"}};
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
