@@ -2,7 +2,10 @@
  * Tests that `$_internalSearchIdLookup` correctly drops orphaned documents left behind by a chunk
  * migration, across sharding strategies, `_id` shapes, and DDL timing relative to getMores.
  *
- * @tags: [requires_fcv_90]
+ * @tags: [
+ *   requires_fcv_90,
+ *   featureFlagSearchOptimizedIdLookup,
+ * ]
  */
 import {assertCreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {withFailPoint} from "jstests/libs/fail_point_util.js";
@@ -549,7 +552,7 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
     // $_internalSearchIdLookup reapplies the view's defining pipeline after the raw
     // document is resolved.
     describe("view-backed lookups", function () {
-        it("does not filter the orphan out on a _id-sharded collection", function () {
+        it("filters the orphan out on a _id-sharded collection", function () {
             const collName = "viewbacked";
             const coll = assertCreateCollection(mongosDB, collName);
             assert.commandWorked(
@@ -593,21 +596,16 @@ describe("$_internalSearchIdLookup sharding/DDL concurrency", function () {
                             shardVersion: shard0Version,
                         },
                     );
-                    assert.eq(
-                        results,
-                        [ownedDoc, orphanDoc].map((doc) => ({...doc, viewTag: "viewed"})),
-                        {results},
-                    );
+                    // The orphan is filtered: only the owned document comes back, with the
+                    // view's defining pipeline reapplied.
+                    assert.eq(results, [{...ownedDoc, viewTag: "viewed"}], {results});
                 });
 
-                // TODO SERVER-134686: a viewPipeline forces the aggregation executor, which
-                // never requests shard filtering, so the orphan is reported as found. Flip to
-                // expecting it to be filtered as an orphan once fixed.
                 const byEngine = readIdLookupDelta(delta);
                 assert.eq(byEngine.sbe, {found: 0, notFound: 0, notHandled: 0}, {byEngine, delta});
                 assert.eq(
                     byEngine.aggregation,
-                    {found: 2, notFound: 0, notHandled: 0},
+                    {found: 1, notFound: 1, notHandled: 0},
                     {byEngine, delta},
                 );
             });
