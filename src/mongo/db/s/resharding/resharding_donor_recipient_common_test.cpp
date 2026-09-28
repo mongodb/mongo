@@ -773,8 +773,6 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
                                                  ReshardingDonorDocument>(opCtx, kReshardingUUID);
 
     ASSERT(donorStateMachine != boost::none);
-
-    donorStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
@@ -800,8 +798,6 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
                                                                               kReshardingUUID);
 
     ASSERT(recipientStateMachine != boost::none);
-
-    recipientStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
@@ -1248,7 +1244,6 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, reshardingUUID);
 
     ASSERT(recoveredStateMachine != boost::none);
-    recoveredStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,

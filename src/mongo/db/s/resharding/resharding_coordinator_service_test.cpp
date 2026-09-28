@@ -803,8 +803,11 @@ public:
 
 TEST_F(ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest,
        CriticalSectionTimeoutAbortsWhileDeltaFetchIsInProgress) {
+    // The critical section timer is armed before the delta collector is launched, so a short
+    // timeout can abort resharding before the delta fetch ever starts. Keep the real timer from
+    // firing and abort with the timeout reason once the delta fetch is known to be stuck.
     unittest::ServerParameterGuard criticalSectionTimeout{"reshardingCriticalSectionTimeoutMillis",
-                                                          1};
+                                                          durationCount<Milliseconds>(Hours{1})};
 
     PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                       CoordinatorStateEnum::kAborting};
@@ -828,9 +831,9 @@ TEST_F(ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest,
     makeRecipientsFinishedCloningWithAssert(opCtx);
     coordinator->onOkayToEnterCritical();
 
-    // The coordinator now transitions to kBlockingWrites. The delta collector is launched
-    // asynchronously that is configured to be stuck forever. The delta fetcher getting
-    // stucked should not prevent the 1ms critical section timeout from aborting resharding.
+    externalState()->waitUntilBlockedInGetDocumentsDelta(opCtx);
+    coordinator->abort(
+        {resharding::kCriticalTimeoutAbortReason, resharding::AbortType::kAbortWithQuiesce});
 
     stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
@@ -867,6 +870,7 @@ TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
     makeDonorsReadyToDonateWithAssert(opCtx);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    externalState()->waitUntilBlockedInGetDocumentsToCopy(opCtx);
     makeRecipientsFinishedCloningWithAssert(opCtx);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
 
@@ -905,6 +909,7 @@ TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
     makeDonorsReadyToDonateWithAssert(opCtx);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    externalState()->waitUntilBlockedInGetDocumentsToCopy(opCtx);
 
     // Abort while the fetch is in-progress and blocked by the fixture.
     coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
@@ -920,6 +925,25 @@ TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
                        DBException,
                        ErrorCodes::ReshardCollectionAborted);
     checkCoordinatorDocumentRemoved(opCtx);
+}
+
+TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
+       TearDownWhileFetchDocumentsToCopyIsBlocked) {
+    // Returns while the coordinator is still running and its fetch is blocked, without stepping
+    // down or completing resharding, so the fixture teardown must quiesce the coordinator.
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    externalState()->waitUntilBlockedInGetDocumentsToCopy(opCtx);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, VerificationRunsWhenFetchDocumentsToCopySucceeds) {
