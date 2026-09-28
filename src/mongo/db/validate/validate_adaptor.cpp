@@ -499,7 +499,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
         }
 
         keyStringIndexConsistency.traverseRecord(
-            opCtx, coll, indexEntry, record.id, recordBson, &results);
+            opCtx, coll, *indexEntry, record.id, recordBson, results);
     }
     return {.status = Status::OK(),
             .dataSize = recordBson.objsize(),
@@ -552,7 +552,7 @@ size_t collection_validation::getNumberOfAdditionalCharactersForHashDrillDown(
 
 void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
                                           const CollectionPtr& coll,
-                                          ValidateResults* results) {
+                                          ValidateResults& results) {
     const auto& catalogEntry =
         MDBCatalog::get(opCtx)->getRawCatalogEntry(opCtx, coll->getCatalogId());
     // Zero out the initial hash.
@@ -572,10 +572,10 @@ void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
             }
         }
     }
-    results->setMetadataHash(metadataHash);
+    results.setMetadataHash(metadataHash);
 }
 
-void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* results) {
+void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults& results) {
     if (_validateState->getFirstRecordId().isNull()) {
         // The record store is empty if the first RecordId isn't initialized.
         return;
@@ -583,7 +583,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
 
     _numRecords = 0;
     ON_BLOCK_EXIT([&]() {
-        results->setNumRecords(_numRecords);
+        results.setNumRecords(_numRecords);
         _progress.finished();
     });
 
@@ -657,7 +657,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
                         std::make_pair(hashAndCount.first.toHexString(), hashAndCount.second));
     }
 
-    results->setPartialHashes(std::move(partial));
+    results.setPartialHashes(std::move(partial));
 }
 
 
@@ -1279,15 +1279,14 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
 
 
 void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
-                                            const IndexCatalogEntry* index,
+                                            const IndexCatalogEntry& index,
                                             IndexValidateResults& results) {
-    _keyBasedIndexConsistency.validateIndexKeyCount(opCtx, index, &_numRecords, results);
+    _keyBasedIndexConsistency.validateIndexKeyCount(opCtx, index, _numRecords, results);
 }
 
-void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
-                                    const IndexCatalogEntry* index,
-                                    int64_t* numTraversedKeys,
-                                    ValidateResults* results) {
+int64_t ValidateAdaptor::traverseIndex(OperationContext* opCtx,
+                                       const IndexCatalogEntry& index,
+                                       ValidateResults& results) {
     // The progress meter will be inactive after traversing the record store to allow the
     // message and the total to be set to different values.
     {
@@ -1301,30 +1300,26 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         }
     }
 
-    int64_t numKeys = _keyBasedIndexConsistency.traverseIndex(opCtx, index, _progress, results);
-
-    if (numTraversedKeys) {
-        *numTraversedKeys = numKeys;
-    }
+    return _keyBasedIndexConsistency.traverseIndex(opCtx, index, _progress, results);
 }
 
 void ValidateAdaptor::setSecondPhase() {
     _keyBasedIndexConsistency.setSecondPhase();
 }
 
-bool ValidateAdaptor::limitMemoryUsageForSecondPhase(ValidateResults* result) {
-    return _keyBasedIndexConsistency.limitMemoryUsageForSecondPhase(result);
+bool ValidateAdaptor::limitMemoryUsageForSecondPhase(ValidateResults& results) {
+    return _keyBasedIndexConsistency.limitMemoryUsageForSecondPhase(results);
 }
 
 bool ValidateAdaptor::haveEntryMismatch() const {
     return _keyBasedIndexConsistency.haveEntryMismatch();
 }
 
-void ValidateAdaptor::repairIndexEntries(OperationContext* opCtx, ValidateResults* results) {
+void ValidateAdaptor::repairIndexEntries(OperationContext* opCtx, ValidateResults& results) {
     _keyBasedIndexConsistency.repairIndexEntries(opCtx, results);
 }
 
-void ValidateAdaptor::addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results) {
+void ValidateAdaptor::addIndexEntryErrors(OperationContext* opCtx, ValidateResults& results) {
     _keyBasedIndexConsistency.addIndexEntryErrors(opCtx, results);
 }
 

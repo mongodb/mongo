@@ -190,29 +190,28 @@ public:
      **/
     void computeMetadataHash(OperationContext* opCtx,
                              const CollectionPtr& coll,
-                             ValidateResults* results);
+                             ValidateResults& results);
 
     /**
      * For a given set of hash prefixes, outputs an order independent hash of all the documents
      * whose _id hashes to each hash prefix.
      **/
-    void hashDrillDown(OperationContext* opCtx, ValidateResults* results);
+    void hashDrillDown(OperationContext* opCtx, ValidateResults& results);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
-     * for index consistency.
+     * for index consistency. Returns number of traversed keys.
      */
-    void traverseIndex(OperationContext* opCtx,
-                       const IndexCatalogEntry* index,
-                       int64_t* numTraversedKeys,
-                       ValidateResults* results);
+    int64_t traverseIndex(OperationContext* opCtx,
+                          const IndexCatalogEntry& index,
+                          ValidateResults& results);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously
      * traversed in traverseIndex().
      */
     void validateIndexKeyCount(OperationContext* opCtx,
-                               const IndexCatalogEntry* index,
+                               const IndexCatalogEntry& index,
                                IndexValidateResults& results);
 
     /**
@@ -226,7 +225,7 @@ public:
      * validation. Returns whether the memory limit is sufficient to report at least one index entry
      * inconsistency and continue with the second phase of validation.
      */
-    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
+    bool limitMemoryUsageForSecondPhase(ValidateResults& results);
 
     /**
      * Returns true if the underlying index consistency objects have entry mismatches.
@@ -236,13 +235,13 @@ public:
     /**
      * If repair mode enabled, try inserting _missingIndexEntries into indexes.
      */
-    void repairIndexEntries(OperationContext* opCtx, ValidateResults* results);
+    void repairIndexEntries(OperationContext* opCtx, ValidateResults& results);
 
     /**
      * Records the errors gathered from the second phase of index validation into the provided
      * ValidateResultsMap and ValidateResults.
      */
-    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
+    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults& results);
 
 private:
     KeyStringIndexConsistency _keyBasedIndexConsistency;

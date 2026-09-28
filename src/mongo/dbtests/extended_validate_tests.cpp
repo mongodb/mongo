@@ -138,7 +138,7 @@ public:
             ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
                               collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
-            &results1));
+            results1));
         ASSERT_TRUE(results1.isValid()) << "Validation failed when it should've worked.";
 
         ASSERT_OK(collection_validation::validate(
@@ -147,7 +147,7 @@ public:
             ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
                               collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
-            &results2));
+            results2));
         ASSERT_TRUE(results2.isValid()) << "Validation failed when it should've worked.";
 
         // Ensure that the hashes match up.

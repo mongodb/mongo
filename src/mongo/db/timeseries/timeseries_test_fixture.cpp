@@ -67,7 +67,7 @@ void TimeseriesTestFixture::validateCollectionsHelper(
                 /*mode=*/collection_validation::ValidateMode::kForegroundFull,
                 /*repairMode=*/collection_validation::RepairMode::kNone,
                 /*logDiagnostics=*/false},
-            &validateResults));
+            validateResults));
         ASSERT(validateResults.isValid());
     }
 }

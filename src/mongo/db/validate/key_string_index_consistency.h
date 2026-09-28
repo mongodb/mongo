@@ -127,9 +127,9 @@ public:
      * Traverses the column-store index via 'cursor' and accumulates the traversal results.
      */
     int64_t traverseIndex(OperationContext* opCtx,
-                          const IndexCatalogEntry* index,
+                          const IndexCatalogEntry& index,
                           ConcurrentProgressMeterHolder& progress,
-                          ValidateResults* results);
+                          ValidateResults& results);
 
     /**
      * Traverses all paths in a single record from the row-store via the given {'recordId','record'}
@@ -137,10 +137,10 @@ public:
      */
     void traverseRecord(OperationContext* opCtx,
                         const CollectionPtr& coll,
-                        const IndexCatalogEntry* index,
+                        const IndexCatalogEntry& index,
                         const RecordId& recordId,
                         const BSONObj& recordBson,
-                        ValidateResults* results);
+                        ValidateResults& results);
 
     /**
      * Returns true if any value in the `_indexKeyCount` map is not equal to 0, otherwise return
@@ -151,24 +151,24 @@ public:
     /**
      * If repair mode enabled, try inserting _missingIndexEntries into indexes.
      */
-    void repairIndexEntries(OperationContext* opCtx, ValidateResults* results);
+    void repairIndexEntries(OperationContext* opCtx, ValidateResults& results);
 
     /**
      * Records the errors gathered from the second phase of index validation into the provided
      * ValidateResultsMap and ValidateResults.
      */
-    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
+    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults& results);
 
     /**
      * Sets up this instance to limit memory usage in the second phase of index
      * validation. Returns whether the memory limit is sufficient to report at least one index entry
      * inconsistency and continue with the second phase of validation.
      */
-    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
+    bool limitMemoryUsageForSecondPhase(ValidateResults& results);
 
     void validateIndexKeyCount(OperationContext* opCtx,
-                               const IndexCatalogEntry* index,
-                               long long* numRecords,
+                               const IndexCatalogEntry& index,
+                               long long& numRecords,
                                IndexValidateResults& results);
 
     uint64_t getTotalIndexKeys() {
@@ -248,9 +248,9 @@ private:
      */
     void addDocKey(OperationContext* opCtx,
                    const key_string::Value& ks,
-                   IndexInfo* indexInfo,
+                   IndexInfo& indexInfo,
                    const RecordId& recordId,
-                   ValidateResults* results);
+                   ValidateResults& results);
 
     /**
      * During the first phase of validation, given the index entry's KeyString, decrement the
@@ -259,16 +259,16 @@ private:
      * inconsistent hash buckets during the first phase of validation to document keys.
      */
     void addIndexKey(OperationContext* opCtx,
-                     const IndexCatalogEntry* entry,
+                     const IndexCatalogEntry& entry,
                      const key_string::Value& ks,
-                     IndexInfo* indexInfo,
+                     IndexInfo& indexInfo,
                      const RecordId& recordId,
-                     ValidateResults* results);
+                     ValidateResults& results);
 
     /**
      * During the first phase of validation, tracks the multikey paths for every observed document.
      */
-    void addDocumentMultikeyPaths(IndexInfo* indexInfo, const MultikeyPaths& multikeyPaths);
+    void addDocumentMultikeyPaths(IndexInfo& indexInfo, const MultikeyPaths& multikeyPaths);
 
     /**
      * To validate $** multikey metadata paths, we first scan the collection and add a hash of all
@@ -276,9 +276,9 @@ private:
      * entries and remove any path encountered. As we expect the index to contain a super-set of
      * the collection paths, a non-empty set represents an invalid index.
      */
-    void addMultikeyMetadataPath(const key_string::Value& ks, IndexInfo* indexInfo);
-    void removeMultikeyMetadataPath(const key_string::Value& ks, IndexInfo* indexInfo);
-    size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
+    void addMultikeyMetadataPath(const key_string::Value& ks, IndexInfo& indexInfo);
+    void removeMultikeyMetadataPath(const key_string::Value& ks, IndexInfo& indexInfo);
+    size_t getMultikeyMetadataPathCount(IndexInfo& indexInfo);
 
     /**
      * Generates information about missing/extra index entries for the second phase of validation

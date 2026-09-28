@@ -65,7 +65,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,
-                ValidateResults* results);
+                ValidateResults& results);
 
 /**
  * Checks whether a failpoint has been hit in the above validate() code..

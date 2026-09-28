@@ -151,7 +151,7 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
             kNss,
             collection_validation::ValidationOptions{
                 mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
-            &results));
+            results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
     }
@@ -330,7 +330,7 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
             kTsNss,
             collection_validation::ValidationOptions{
                 mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
-            &results));
+            results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
     }

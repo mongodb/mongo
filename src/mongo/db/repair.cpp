@@ -262,7 +262,7 @@ Status repairCollection(OperationContext* opCtx,
             collection_validation::ValidateMode::kForegroundFullIndexOnly,
             collection_validation::RepairMode::kFixErrors,
             /*logDiagnostics=*/false),
-        &validateResults);
+        validateResults);
     if (!status.isOK()) {
         return status;
     }

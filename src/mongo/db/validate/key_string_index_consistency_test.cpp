@@ -38,7 +38,7 @@ using KeyStringIndexConsistencyTest = CatalogTestFixture;
 ValidateResults validate(OperationContext* opCtx) {
     ValidateResults validateResults;
     ASSERT_OK(
-        collection_validation::validate(opCtx, kNss, kDefaultValidateOptions, &validateResults));
+        collection_validation::validate(opCtx, kNss, kDefaultValidateOptions, validateResults));
     return validateResults;
 }
 
@@ -369,7 +369,7 @@ TEST_F(KeyStringIndexConsistencyTest, FailedKeygen) {
 
     ValidateResults results;
     KeyStringIndexConsistency ksic(opCtx, &state);
-    ksic.traverseRecord(opCtx, *coll, xHashedIndex, RecordId(1), unhashableDoc, &results);
+    ksic.traverseRecord(opCtx, *coll, *xHashedIndex, RecordId(1), unhashableDoc, results);
     const auto& errors = results.getErrors();
     namespace m = unittest::match;
     ASSERT_THAT(errors, m::ElementsAre(m::HasSubstr("16766")))
@@ -412,7 +412,7 @@ TEST_F(KeyStringIndexConsistencyTest, GeoKeygenFailureReportsStructuredError) {
 
     ValidateResults results;
     KeyStringIndexConsistency ksic(opCtx, &state);
-    ksic.traverseRecord(opCtx, *coll, geoIndex, RecordId(1), badGeoDoc, &results);
+    ksic.traverseRecord(opCtx, *coll, *geoIndex, RecordId(1), badGeoDoc, results);
 
     using testing::HasSubstr;
     using testing::Not;
@@ -464,7 +464,7 @@ TEST_F(KeyStringIndexConsistencyTest, GeoKeygenFailuresCollapseAcrossDocuments) 
     for (int lng : badLongitudes) {
         const auto doc =
             BSON("loc" << BSON("type" << "Point" << "coordinates" << BSON_ARRAY(lng << 0)));
-        ksic.traverseRecord(opCtx, *coll, geoIndex, RecordId(recordId++), doc, &results);
+        ksic.traverseRecord(opCtx, *coll, *geoIndex, RecordId(recordId++), doc, results);
     }
 
     using testing::HasSubstr;
@@ -509,9 +509,9 @@ TEST_F(KeyStringIndexConsistencyTest, MultikeyDocErrorsCollapseAcrossDocuments) 
     // Two distinct documents whose "a" field is an array, so both individually should mark the
     // index as multikey even though it is not currently marked as such.
     ksic.traverseRecord(
-        opCtx, *coll, index, RecordId(1), BSON("a" << BSON_ARRAY(1 << 2)), &results);
+        opCtx, *coll, *index, RecordId(1), BSON("a" << BSON_ARRAY(1 << 2)), results);
     ksic.traverseRecord(
-        opCtx, *coll, index, RecordId(2), BSON("a" << BSON_ARRAY(3 << 4)), &results);
+        opCtx, *coll, *index, RecordId(2), BSON("a" << BSON_ARRAY(3 << 4)), results);
 
     using testing::HasSubstr;
 
@@ -558,9 +558,9 @@ TEST_F(KeyStringIndexConsistencyTest, MultikeyPathCoverageErrorsCollapseAcrossDo
     // Two distinct documents whose multikey path is "b" rather than "a", which the index's
     // recorded multikey paths do not cover.
     ksic.traverseRecord(
-        opCtx, *coll, index, RecordId(1), BSON("a" << 1 << "b" << BSON_ARRAY(3 << 4)), &results);
+        opCtx, *coll, *index, RecordId(1), BSON("a" << 1 << "b" << BSON_ARRAY(3 << 4)), results);
     ksic.traverseRecord(
-        opCtx, *coll, index, RecordId(2), BSON("a" << 1 << "b" << BSON_ARRAY(5 << 6)), &results);
+        opCtx, *coll, *index, RecordId(2), BSON("a" << 1 << "b" << BSON_ARRAY(5 << 6)), results);
 
     using testing::HasSubstr;
 
@@ -623,7 +623,7 @@ TEST_F(KeyStringIndexConsistencyTest, MergeIsCommutativeAndMatchesSerialScan) {
             for (const auto& indexIdent : state.getIndexIdents()) {
                 const auto* entry = coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
                 ksic.traverseRecord(
-                    opCtx, *coll, entry, records[i].first, records[i].second, &results);
+                    opCtx, *coll, *entry, records[i].first, records[i].second, results);
             }
         }
         EXPECT_TRUE(results.isValid()) << "first-phase scan unexpectedly reported errors";
@@ -706,12 +706,12 @@ KeyStringIndexConsistency runTwoPhaseScan(OperationContext* opCtx,
             for (const auto& indexIdent : state.getIndexIdents()) {
                 const auto* entry = coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
                 ksic.traverseRecord(
-                    opCtx, coll, entry, rec->id, rec->data.toBson().getOwned(), &results);
+                    opCtx, coll, *entry, rec->id, rec->data.toBson().getOwned(), results);
             }
         }
         for (const auto& indexIdent : state.getIndexIdents()) {
             const auto* entry = coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-            ksic.traverseIndex(opCtx, entry, progress, &results);
+            ksic.traverseIndex(opCtx, *entry, progress, results);
         }
     };
 
@@ -720,7 +720,7 @@ KeyStringIndexConsistency runTwoPhaseScan(OperationContext* opCtx,
     scanAll(phaseOneResults);
 
     ksic.setSecondPhase();
-    ksic.limitMemoryUsageForSecondPhase(&phaseOneResults);
+    ksic.limitMemoryUsageForSecondPhase(phaseOneResults);
 
     // The second-phase scan records the specific keys that hashed to inconsistent buckets into the
     // '_missingIndexEntries'/'_extraIndexEntries' maps.
@@ -793,8 +793,8 @@ TEST_F(KeyStringIndexConsistencyTest, CopyConstructorPreservesSecondPhaseInconsi
     // copy this must not crash and must reproduce the original's reported entries exactly.
     ValidateResults originalResults = makeResultsWithIndexMap(opCtx, state, *coll);
     ValidateResults copyResults = makeResultsWithIndexMap(opCtx, state, *coll);
-    original.addIndexEntryErrors(opCtx, &originalResults);
-    copy.addIndexEntryErrors(opCtx, &copyResults);
+    original.addIndexEntryErrors(opCtx, originalResults);
+    copy.addIndexEntryErrors(opCtx, copyResults);
 
     // Sanity check that the scan actually produced inconsistencies, so the comparison is
     // meaningful.
@@ -823,8 +823,8 @@ TEST_F(KeyStringIndexConsistencyTest, CopyAssignmentPreservesSecondPhaseInconsis
 
     ValidateResults originalResults = makeResultsWithIndexMap(opCtx, state, *coll);
     ValidateResults assignedResults = makeResultsWithIndexMap(opCtx, state, *coll);
-    original.addIndexEntryErrors(opCtx, &originalResults);
-    assigned.addIndexEntryErrors(opCtx, &assignedResults);
+    original.addIndexEntryErrors(opCtx, originalResults);
+    assigned.addIndexEntryErrors(opCtx, assignedResults);
 
     // Sanity check that the scan actually produced inconsistencies, so the comparison is
     // meaningful.
@@ -911,7 +911,7 @@ TEST_F(KeyStringIndexConsistencyTest, TraverseIndexReportsDuplicateKeys) {
     }
 
     unittest::LogCaptureGuard logs;
-    ASSERT_EQ(2, ksic.traverseIndex(opCtx, entry, progress, &results));
+    ASSERT_EQ(2, ksic.traverseIndex(opCtx, *entry, progress, results));
     logs.stop();
 
     const auto& errors = indexResults.getErrors();

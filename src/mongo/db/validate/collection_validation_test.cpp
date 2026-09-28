@@ -142,7 +142,7 @@ std::vector<ValidateResults> foregroundValidate(
                       nss,
                       collection_validation::ValidationOptions{
                           mode, repairMode, /*logDiagnostics=*/false, validationVersion},
-                      &validateResults))
+                      validateResults))
             << "Validation Mode: " << static_cast<int>(mode);
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
@@ -374,7 +374,7 @@ ValidateResults validateWithSliceTarget(OperationContext* opCtx,
                                                  /*hashPrefixes=*/boost::none,
                                                  /*revealHashedIds=*/boost::none,
                                                  targetRecordsPerSlice},
-        &results));
+        results));
     return results;
 }
 
@@ -826,7 +826,7 @@ TEST_F(CollectionValidationTest, LargeCollectionSlicesOnParallelExecution) {
         /*hashPrefixes=*/boost::none,
         /*revealHashedIds=*/boost::none,
         /*targetRecordsPerRecordStoreSlice=*/kTargetRecordsPerSlice);
-    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
     // Do not strictly validate on a particular count, simply check that it's more than one, and the
     // value is populated.
     ASSERT_GT(results.getNumRecordStoreSlices().value_or(-1), 1)
@@ -846,7 +846,7 @@ TEST_F(CollectionValidationTest, LargeCollectionDoesNotSliceOnSerialExecution) {
                                                   /*revealHashedIds=*/boost::none,
                                                   /*targetRecordsPerRecordStoreSlice=*/boost::none);
     ValidateResults results;
-    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
     // Ensure that only one slice was run, or the value is unpopulated.
     ASSERT_EQ(results.getNumRecordStoreSlices().value_or(1), 1);
 }
@@ -867,7 +867,7 @@ TEST_F(CollectionValidationTest, ParallelTraversalAgreesWithSerialTraversal) {
             /*revealHashedIds=*/boost::none,
             /*targetRecordsPerRecordStoreSlice=*/targetRecordsPerSlice);
         ValidateResults results;
-        ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+        ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
         return results;
     };
 
@@ -907,7 +907,7 @@ TEST_F(CollectionValidationTest, SliceCountIsCappedRegardlessOfTarget) {
                                                   /*revealHashedIds=*/boost::none,
                                                   /*targetRecordsPerRecordStoreSlice=*/1);
     ValidateResults results;
-    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, &results));
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
 
     ASSERT_TRUE(results.isValid());
     ASSERT_EQ(kCountDocs, results.getNumRecords().value_or(-1));
@@ -1865,7 +1865,7 @@ protected:
                           collection_validation::ValidateMode::kCollectionHash,
                           collection_validation::RepairMode::kNone,
                           /*logDiagnostics=*/false},
-                      &results));
+                      results));
         return results;
     }
 };
@@ -2000,7 +2000,7 @@ TEST_F(CollectionHashComparisonTest, SkipsWhenTheCallerPinsAReadTimestamp) {
                                                 ->getServiceContext()
                                                 ->getStorageEngine()
                                                 ->getAllDurableTimestamp()},
-                                        &results));
+                                        results));
 
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "pinnedReadTimestamp");
@@ -2152,7 +2152,7 @@ protected:
                           collection_validation::ValidateMode::kCollectionHash,
                           collection_validation::RepairMode::kNone,
                           /*logDiagnostics=*/false},
-                      &results));
+                      results));
         return results;
     }
 
@@ -2279,7 +2279,7 @@ TEST_F(CollectionValidationTest, NoXxh3HashWithoutContinuousInternodeValidation)
                                             collection_validation::ValidateMode::kCollectionHash,
                                             collection_validation::RepairMode::kNone,
                                             /*logDiagnostics=*/false},
-                                        &results));
+                                        results));
 
     // The default attached storage provider does not record the per-document validation hashes,
     // so there is nothing for this hash to be compared against.

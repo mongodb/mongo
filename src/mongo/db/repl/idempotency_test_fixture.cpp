@@ -373,7 +373,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                 collection_validation::ValidateMode::kForegroundFull,
                 collection_validation::RepairMode::kNone,
                 /*logDiagnostics=*/false},
-            &validateResults));
+            validateResults));
         ASSERT_TRUE(validateResults.isValid());
     }
 
