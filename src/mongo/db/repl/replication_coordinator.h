@@ -146,8 +146,8 @@ public:
      * failing hello requests with ShutdownInProgress. Returns true if the server entered quiesce
      * mode.
      *
-     * We take in quiesceTime only for reporting purposes. The waiting during quiesce mode happens
-     * external to the ReplicationCoordinator.
+     * We take in quiesceTime for reporting and to bound any waiting this function does. The grace
+     * window wait happens external to the ReplicationCoordinator.
      */
     virtual bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) = 0;
 
