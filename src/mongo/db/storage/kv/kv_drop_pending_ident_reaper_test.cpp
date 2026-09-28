@@ -606,6 +606,35 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanRetriesOnWriteConflict) 
     EXPECT_EQ(identName, engine->droppedIdents[0].identName);
 }
 
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanRetriesOnObjectIsBusy) {
+    Timestamp dropTimestamp{Seconds{1}, 0};
+    std::string identName = "myident";
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+    }
+
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) -> Status {
+        return Status(ErrorCodes::ObjectIsBusy, "simulated EBUSY from WiredTiger");
+    };
+
+    auto opCtx = makeOpCtx();
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(reaper.getAllIdentNames(), (std::set<std::string>{identName}));
+
+    // Second call without the injected error completes the drop.
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) {
+        return Status::OK();
+    };
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_EQ(engine->getDroppedIdentNames(), (std::vector<std::string>{identName}));
+    EXPECT_TRUE(reaper.getAllIdentNames().empty());
+}
+
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropUnknownIdent) {
     auto engine = getEngine();
     KVDropPendingIdentReaper reaper(engine);
@@ -1010,68 +1039,6 @@ TEST_F(KVDropPendingIdentReaperTest,
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
     EXPECT_EQ(identName, engine->droppedIdents.front().identName);
     EXPECT_EQ(expectedSchemaEpoch, engine->droppedIdents.front().schemaEpoch.value());
-    EXPECT_EQ(0U, reaper.getNumIdents());
-}
-
-// A conflict can also surface after the storage-level drop has already run, because dropIdent() is
-// not transactional and is not undone when the enclosing WriteUnitOfWork aborts. The reaper must
-// redo the entire drop on a later pass so that the schema epoch handed to the storage engine always
-// matches the timestamp of the oplog entry that actually commits - secondaries recompute the epoch
-// from that timestamp when they apply the drop.
-TEST_F(KVDropPendingIdentReaperTest,
-       DropIdentsOlderThan_DSCPrimaryRedrivesIdentDropWhenCommitFails) {
-    setUsesSchemaEpochs(true);
-    setPrimary(true);
-
-    auto engine = getEngine();
-    KVDropPendingIdentReaper reaper(engine);
-    const std::string identName("my-ident");
-    const Timestamp firstOpTime(100, 0);
-    const Timestamp secondOpTime(200, 0);
-    const uint64_t firstSchemaEpoch = 42;
-    const uint64_t secondSchemaEpoch = 43;
-
-    reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{Timestamp(10, 0)},
-                               std::make_shared<Ident>(identName));
-
-    EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
-        .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
-            opTime = repl::OpTime(firstOpTime, repl::OpTime::kUninitializedTerm);
-        })
-        .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
-            opTime = repl::OpTime(secondOpTime, repl::OpTime::kUninitializedTerm);
-        });
-    expectSchemaEpochForTimestamp(firstOpTime, firstSchemaEpoch);
-    expectSchemaEpochForTimestamp(secondOpTime, secondSchemaEpoch);
-
-    // The first drop succeeds at the storage level but the WriteUnitOfWork then fails to commit.
-    bool firstDrop = true;
-    engine->dropIdentFn = [&](RecoveryUnit& ru, std::string_view) {
-        if (std::exchange(firstDrop, false)) {
-            ru.registerPreCommitHook([](OperationContext*, boost::optional<Timestamp>) {
-                throwWriteConflictException("simulated WriteConflict while committing ident drop");
-            });
-        }
-        return Status::OK();
-    };
-
-    auto opCtx = makeOpCtx();
-
-    // Must not fassert. The drop already reached the storage engine, but with no oplog entry
-    // committed the ident remains drop-pending.
-    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestamps(11));
-    ASSERT_EQUALS(1U, engine->droppedIdents.size());
-    EXPECT_EQ(firstSchemaEpoch, engine->droppedIdents.front().schemaEpoch.value());
-    EXPECT_EQ(1U, reaper.getNumIdents());
-
-    // The later pass redoes the whole drop. In production the repeated storage-level drop is
-    // harmless: WiredTigerKVEngine::_drop() treats ENOENT as success.
-    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestamps(11));
-
-    ASSERT_EQUALS(2U, engine->droppedIdents.size());
-    // The epoch of the completed drop matches the opTime of the oplog entry that committed, rather
-    // than the stale epoch from the attempt that failed to commit.
-    EXPECT_EQ(secondSchemaEpoch, engine->droppedIdents.back().schemaEpoch.value());
     EXPECT_EQ(0U, reaper.getNumIdents());
 }
 

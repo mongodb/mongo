@@ -519,9 +519,8 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
     auto status = std::visit(
         OverloadedVisitor{
             [&](const DropAsReplicatedPrimary&) -> Status {
-                // Return busy, not another error: the reaper leaves a busy ident drop-pending but
-                // treats any other failure as fatal.
                 if (MONGO_unlikely(skipCompletingReplicatedPrimaryIdentDrop.shouldFail())) {
+                    // ObjectIsBusy is the most "routine" error that leaves the ident drop pending
                     return Status(ErrorCodes::ObjectIsBusy,
                                   "skipCompletingReplicatedPrimaryIdentDrop failpoint enabled");
                 }
@@ -532,38 +531,56 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                 // the stepdown cutoff for the entire drop process.
                 auto stepdownLock = _engine->lockStepDown();
 
-                try {
-                    WriteUnitOfWork wuow(opCtx);
-                    repl::OpTime reservedIdentDropTimestamp;
+                WriteUnitOfWork wuow(opCtx);
+                repl::OpTime reservedIdentDropTimestamp;
 
-                    // Call opObserver so that it generates an oplog entry.
+                try {
                     opCtx->getServiceContext()->getOpObserver()->onReplicatedIdentDrop(
                         opCtx, identInfo.identName, reservedIdentDropTimestamp);
                     invariant(!reservedIdentDropTimestamp.isNull());
-
-                    const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(
-                        reservedIdentDropTimestamp.getTimestamp());
-                    const bool waitForLocks = false;
-                    auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                identInfo.identName,
-                                                ident::isCollectionIdent(identInfo.identName),
-                                                schemaEpoch,
-                                                waitForLocks);
-                    if (s.isOK()) {
-                        wuow.commit();
-                    }
-                    return s;
                 } catch (const DBException& ex) {
-                    // Replicating the ident drop writes an oplog entry, which can hit a transient
-                    // WriteConflict or TemporarilyUnavailable. Leave the ident drop-pending and let
-                    // the next reaper pass redo the whole drop from scratch.
-                    // dropIdent() is not transactional, so an in-place retry would either
-                    // repeat its side effects or pair a stale schema epoch with a newer oplog
-                    // entry.
-                    // Whereas if the storage-level drop already happened, redoing it is harmless -
-                    // WiredTigerKVEngine::_drop() treats ENOENT as success.
+                    // Writing the oplog entry can transiently fail due to cache pressure or
+                    // interruption due to repl state changing. We haven't dropped the table yet, so
+                    // errors here can simply roll back the transaction and try again later.
                     return ex.toStatus();
                 }
+
+                const uint64_t schemaEpoch =
+                    provider.getSchemaEpochForTimestamp(reservedIdentDropTimestamp.getTimestamp());
+                const bool waitForLocks = false;
+                auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                            identInfo.identName,
+                                            ident::isCollectionIdent(identInfo.identName),
+                                            schemaEpoch,
+                                            waitForLocks);
+                if (!s.isOK()) {
+                    // Similarly dropIdent() is allowed to transiently fail due to things like a
+                    // reader still existing even though they should have all expired, or WiredTiger
+                    // internally touching the table as part of something like checkpointing.
+                    // dropIdent() is required to have not actually dropped anything if it returns
+                    // failure, so we can roll back and try again later.
+                    return s;
+                }
+
+                try {
+                    wuow.commit();
+                } catch (const DBException& ex) {
+                    // It should be impossible for commit() to fail: no write conflicts are possible
+                    // for a plain insert into the oplog, cache pressure manifests as an error when
+                    // opening a cursor and not on commit, we're blocking stepdown, and committing
+                    // doesn't check for interruption. If something does go wrong and the commit
+                    // fails, the only mechanism we have for rolling back the drop is aborting the
+                    // process and starting over from the most recent commit which still has the
+                    // ident.
+                    LOGV2_FATAL(
+                        13526300,
+                        "Committing a replicated drop unexpectedly failed. It should not be "
+                        "possible for this to happen, and this is not a recoverable state.",
+                        "ident"_attr = identInfo.identName,
+                        "error"_attr = ex);
+                }
+
+                return Status::OK();
             },
             [&](const DropAsReplicatedApply& mode) -> Status {
                 const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(mode.timestamp);

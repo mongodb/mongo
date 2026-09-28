@@ -1984,31 +1984,43 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    wtRu.getSessionNoTxn()->closeAllCursors(uri);
+    try {
+        wtRu.getSessionNoTxn()->closeAllCursors(uri);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 
     {
         std::lock_guard lk(_identTableIdMutex);
         _identTableIds.erase(ident);
     }
 
-    // Use a separate session to avoid transactional issues, because a drop may impact the
-    // in-progress transaction.
-    WiredTigerSession session(_connection.get());
+    if (MONGO_unlikely(WTDropEBUSY.shouldFail())) {
+        return {ErrorCodes::ObjectIsBusy,
+                str::stream() << "Failed to remove drop-pending ident " << ident};
+    }
 
     std::string config = "checkpoint_wait=false";
     if (!waitForLocks) {
         config += ",lock_wait=false";
     }
-    Status status = _drop(session, uri.c_str(), config.c_str());
-    LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
 
-    if (status == ErrorCodes::ObjectIsBusy || status == ErrorCodes::LockBusy) {
-        invariant(!waitForLocks || status != ErrorCodes::LockBusy, status.codeString());
-        return status;
-    }
-    if (MONGO_unlikely(WTDropEBUSY.shouldFail())) {
-        return {ErrorCodes::ObjectIsBusy,
-                str::stream() << "Failed to remove drop-pending ident " << ident};
+    try {
+        // Dropping needs to use a separate session because a failed drop will abort the in-progress
+        // transaction attached to a session, but some callers expect to be able to attempt a drop
+        // and then continue with a transaction even if it fails. In addition, dropping a table may
+        // require checkpointing dirty data first, and that can't be done with a transaction that
+        // has performed any writes.
+        WiredTigerSession session(_connection.get());
+        Status status = _drop(session, uri.c_str(), config.c_str());
+        LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
+
+        if (!status.isOK()) {
+            invariant(!waitForLocks || status != ErrorCodes::LockBusy, status.codeString());
+            return status;
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     if (identHasSizeInfo && _sizeStorer) {
@@ -2022,7 +2034,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
         publishIdent(wtRu, uri, *schemaEpoch);
     }
 
-    return status;
+    return Status::OK();
 }
 
 void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
