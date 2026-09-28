@@ -42,6 +42,27 @@ export function watchModeToString(watchMode) {
 }
 
 /**
+ * Returns the value of the first pipeline stage's '$changeStream' key if 'cmdObj' is an
+ * 'aggregate' command with a non-empty pipeline whose first stage has that key, regardless of the
+ * value's type (so a malformed request, e.g. '$changeStream: 1', is still detected). Returns
+ * undefined otherwise.
+ */
+export function getChangeStreamStage(cmdObj) {
+    if (
+        !cmdObj ||
+        !cmdObj.aggregate ||
+        !Array.isArray(cmdObj.pipeline) ||
+        cmdObj.pipeline.length === 0 ||
+        typeof cmdObj.pipeline[0] !== "object" ||
+        cmdObj.pipeline[0] === null ||
+        !("$changeStream" in cmdObj.pipeline[0])
+    ) {
+        return undefined;
+    }
+    return cmdObj.pipeline[0].$changeStream;
+}
+
+/**
  * Validates if a 'ChangeStreamHistoryLost' exception contains the expected stable message parts,
  * including the specified timestamp.
  */
@@ -236,6 +257,10 @@ export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModif
             tojsonMaybeTruncate(expectedEvent) +
             ", Actual: " +
             tojsonMaybeTruncate(actualEvent),
+        {
+            expectedEvent,
+            actualEvent,
+        },
     );
 }
 

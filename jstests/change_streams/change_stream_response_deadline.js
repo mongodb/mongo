@@ -41,7 +41,12 @@
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
-import {ChangeStreamTest, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -299,6 +304,20 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
         });
 
         it(`returns multiple empty batches with a postBatchResumeToken - using query settings override${testCaseSuffix}`, () => {
+            // TODO SERVER-135301: querySettings is never applied to a whole-cluster stream
+            // (admin db, allChangesForCluster) because isEligbleForQuerySettings() rejects the
+            // admin namespace outright. Remove this skip once that is fixed.
+            const isDirectToShard =
+                TestData.connectedDirectlyToShard || TestData.changeStreamCommandsDirectToShard;
+            if (
+                isDirectToShard &&
+                changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster
+            ) {
+                jsTest.log.info(
+                    "Skipping case: querySettings has no effect on a whole-cluster stream when directly connected to a shard",
+                );
+                return;
+            }
             runTest(
                 {queryKnobs: {operationResponseMaxMS: NumberLong(kScanMaxMS)}},
                 restartChangeStream,

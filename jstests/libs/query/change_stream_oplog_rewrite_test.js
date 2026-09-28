@@ -7,7 +7,11 @@ import {
     getAllChangeStreamEvents,
     isPlainObject,
 } from "jstests/libs/query/change_stream_rewrite_util.js";
-import {advanceClusterTime, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    advanceClusterTime,
+    getClusterTime,
+    getNextClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Function to generate a list of all paths to be tested from those observed in the event stream.
@@ -74,8 +78,11 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 export function generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, collName) {
     const testDB = db.getSiblingDB(dbName);
 
-    // Establish a resume token at a point before anything actually happens in the test.
-    const startPoint = getClusterTime(db);
+    // Start strictly after the current cluster time so that leftover oplog entries from previously
+    // run tests (in suites that reuse the fixture) cannot leak into the harvested event window.
+    // 'startAtOperationTime' is inclusive, so using the current time directly would pick up the
+    // last entry written before this test began.
+    const startPoint = getNextClusterTime(getClusterTime(db));
     const numDocs = 8;
 
     // Generate a write workload for the change stream to consume.

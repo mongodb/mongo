@@ -7,6 +7,8 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
     runCommandChangeStreamPassthroughAware,
 } from "jstests/libs/query/change_stream_util.js";
 
@@ -320,11 +322,15 @@ cst.assertNextChangesEqualWithDeploymentAwareness({
     ],
 });
 
-// ... this time followed by an invalidate, as the collection is dropped.
-assert.soon(() => {
-    const event = cst.getNextChanges(csCursor, 1 /* numChanges */)[0];
-    return event.operationType == "invalidate";
-});
+// ... this time followed by an invalidate, as the collection is dropped. This only invalidates
+// a single-collection stream: a whole-db or whole-cluster stream is unaffected by the drop of
+// one collection within it, so there is nothing further to assert in that case.
+if (changeStreamPassthroughType() === ChangeStreamWatchMode.kCollection) {
+    assert.soon(() => {
+        const event = cst.getNextChanges(csCursor, 1 /* numChanges */)[0];
+        return event.operationType == "invalidate";
+    });
+}
 
 // Close all cursors.
 cst.cleanUp();

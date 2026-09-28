@@ -8,7 +8,10 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamWatchMode,
+    getChangeStreamStage,
+} from "jstests/libs/query/change_stream_util.js";
 
 // Helper function which tests can call to explicitly request that the command not be modified by
 // the passthrough code. When defined, ChangeStreamTest will adopt this as its default runCommand
@@ -25,14 +28,12 @@ globalThis.ChangeStreamPassthroughHelpers = {
     isValidChangeStreamRequest: function (db, cmdObj) {
         // Determine whether this command is a valid $changeStream aggregation on a single
         // collection or database.
+        const changeStreamStage = getChangeStreamStage(cmdObj);
         if (
             !(
-                cmdObj &&
-                cmdObj.aggregate &&
-                Array.isArray(cmdObj.pipeline) &&
-                cmdObj.pipeline.length > 0 &&
-                typeof cmdObj.pipeline[0].$changeStream == "object" &&
-                cmdObj.pipeline[0].$changeStream.constructor === Object
+                typeof changeStreamStage === "object" &&
+                changeStreamStage !== null &&
+                changeStreamStage.constructor === Object
             )
         ) {
             return false;

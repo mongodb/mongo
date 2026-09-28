@@ -1,0 +1,57 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_whole_db_direct_shard_connection_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+        await import('jstests/libs/override_methods/query/implicit_direct_to_shard_connection.js');;
+        await import('jstests/libs/override_methods/query/implicit_whole_db_changestreams.js');;
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
+    mongos_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+    num_mongos: 1
+    num_shards: 1
+  hooks:
+    - class: CheckReplDBHash
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/change_streams/create_event_from_chunk_migration.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+    - jstests/change_streams/metadata_notifications.js
+    - jstests/change_streams/queryable_encryption_change_stream.js
+    - jstests/change_streams/change_stream_response_deadline.js
+  exclude_with_any_tags:
+    - assumes_write_concern_unchanged
+    - do_not_run_in_whole_db_passthrough
+    - requires_sharding
+    - directly_against_shardsvrs_incompatible
+  roots:
+    - jstests/change_streams/**/*.js
+test_kind: js_test

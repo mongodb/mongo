@@ -2,6 +2,7 @@
  * Overrides the $changeStream aggregation pipeline to run in version "v1".
  */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {getChangeStreamStage} from "jstests/libs/query/change_stream_util.js";
 
 // Returns the nested aggregate command if `cmdObj` is a `$changeStream` aggregate (either directly
 // or wrapped in an `explain`), and the $changeStream stage does not already specify a version.
@@ -15,14 +16,12 @@ function getChangeStreamAggregateWithoutVersion(cmdObj) {
         : typeof cmdObj.explain === "object"
           ? cmdObj.explain
           : null;
+    const changeStreamStage = getChangeStreamStage(aggCmd);
     if (
-        aggCmd &&
-        aggCmd.aggregate &&
-        Array.isArray(aggCmd.pipeline) &&
-        aggCmd.pipeline.length > 0 &&
-        typeof aggCmd.pipeline[0].$changeStream === "object" &&
-        aggCmd.pipeline[0].$changeStream.constructor === Object &&
-        !aggCmd.pipeline[0].$changeStream.hasOwnProperty("version")
+        typeof changeStreamStage === "object" &&
+        changeStreamStage !== null &&
+        changeStreamStage.constructor === Object &&
+        !changeStreamStage.hasOwnProperty("version")
     ) {
         return aggCmd;
     }
