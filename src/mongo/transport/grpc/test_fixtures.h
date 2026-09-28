@@ -163,6 +163,9 @@ public:
     static constexpr auto kCAFile = "jstests/libs/ca.pem";
     static constexpr auto kMockedClientAddr = "client-def:123";
     static constexpr auto kDefaultConnectTimeout = Milliseconds(5000);
+    // The timeout for tests that involve concurrent connection establishment. The default timeout
+    // above may be too tight under high concurrency due to lock contention.
+    static constexpr auto kConcurrentConnectTimeout = Minutes(3);
 
     class Stub {
     public:
