@@ -532,14 +532,14 @@
     },
     "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%setup_mongo_apple_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "6nIHDL0SgQKewG95rzSAFm5yZ2i74HpCsU7/TfREsts=",
+        "bzlTransitiveDigest": "ijcGrTStmGaR4CXckKEgYQz1PwRZDtjo3fAZgmPJb6U=",
         "usagesDigest": "o5ayVVBJX4YUvvlZNW05kDxuT1rZH4Tg9DrqaLQqmo8=",
         "recordedInputs": [
           "REPO_MAPPING:,build_bazel_apple_support apple_support+"
         ],
         "generatedRepoSpecs": {
           "mongo_apple_toolchain": {
-            "repoRuleId": "@@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%mongo_apple_brew_llvm_toolchain_config",
+            "repoRuleId": "@@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%mongo_apple_llvm_toolchain_config",
             "attributes": {}
           }
         }

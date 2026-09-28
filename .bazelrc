@@ -105,9 +105,6 @@ common --define=LOCAL_RESOURCES="port_block=20000,20250,20500,20750,21000,21250,
 common --default_test_resources=memory=3584,3584,7168,14336
 common --default_test_resources=cpu=1,1,2,4
 
-# Pin down the OSS LLVM Clang version for MacOS builds.
-common:macos --repo_env=LLVM_VERSION=19
-
 # Pin down the Microsoft Visual compiler. If you would like to use
 # the default compiler version installed in this host, comment the line.
 common:windows --repo_env=BAZEL_VS="C:/Program Files/Microsoft Visual Studio/2022.14/Professional"
