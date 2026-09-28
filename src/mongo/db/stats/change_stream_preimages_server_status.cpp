@@ -64,9 +64,23 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
         return;
     }
 
+    // Catch exceptions when querying the record store, and turn them into a 0 result value.
+    // Exceptions such as "Exceeded configured WiredTiger session_max" are expected here.
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    result->append("storageSize", preImagesColl->getRecordStore()->storageSize(ru));
-    result->append("freeStorageSize", preImagesColl->getRecordStore()->freeStorageSize(ru));
+    result->append("storageSize", [&] {
+        try {
+            return preImagesColl->getRecordStore()->storageSize(ru);
+        } catch (const DBException&) {
+            return int64_t{0};
+        }
+    }());
+    result->append("freeStorageSize", [&] {
+        try {
+            return preImagesColl->getRecordStore()->freeStorageSize(ru);
+        } catch (const DBException&) {
+            return int64_t{0};
+        }
+    }());
 }
 }  // namespace
 
