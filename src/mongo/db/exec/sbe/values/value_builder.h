@@ -260,10 +260,17 @@ public:
      */
     void readValues(std::vector<OwnedValueAccessor>* accessors) {
         auto bufferLen = _valueBufferBuilder->len();
-        for (size_t i = 0; i < _tagList.size(); ++i) {
+        size_t i = 0;
+        for (; i < _tagList.size(); ++i) {
             auto [tag, val] = getValue(i, bufferLen);
             invariant(i < accessors->size());
             (*accessors)[i].reset(value::TagValueView{tag, val});
+        }
+
+        // If there are outstanding accessors that don't point to new values, reset them here,
+        // so that they don't point to stale memory and instead contain Nothing.
+        for (; i < accessors->size(); ++i) {
+            (*accessors)[i].reset();
         }
     }
 };

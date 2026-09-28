@@ -305,6 +305,7 @@ mongo_cc_unit_test(
         "sbe_hash_lookup_test.cpp",
         "sbe_hash_lookup_unwind_test.cpp",
         "sbe_hybrid_hash_join_test.cpp",
+        "sbe_ix_scan_test.cpp",
         "sbe_key_string_test.cpp",
         "sbe_limit_skip_test.cpp",
         "sbe_loop_join_test.cpp",

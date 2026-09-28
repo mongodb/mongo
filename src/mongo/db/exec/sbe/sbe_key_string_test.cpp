@@ -231,4 +231,51 @@ TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
         << "Incorrect value from accessor: " << valueDebugString(value);
 }
 
+// Regression test for SERVER-134335: outstanding accessors have to be reset (and thus contain
+// Nothing) when keys contain different component counts.
+TEST(SimpleSBEKeyStringTest, KeyComponentSizeVariance) {
+    // Key with 2 components.
+    key_string::Builder longKeyBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    longKeyBuilder.appendString(std::string(200, 'A'));
+    longKeyBuilder.appendString(std::string(75, 'B'));
+    longKeyBuilder.appendRecordId(RecordId{0});
+    auto longKey = longKeyBuilder.getValueCopy();
+
+    // Key with 1 component.
+    key_string::Builder shortKeyBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    shortKeyBuilder.appendString(std::string(60, 'C'));
+    shortKeyBuilder.appendRecordId(RecordId{0});
+    auto shortKey = shortKeyBuilder.getValueCopy();
+
+    std::vector<SortedDataKeyValueView> keyViews;
+    for (const auto& ks : {longKey, shortKey}) {
+        auto keySize =
+            key_string::getKeySize(ks.getView(), key_string::ALL_ASCENDING, ks.getVersion());
+        keyViews.emplace_back(ks.getView(),
+                              ks.getView().subspan(keySize),
+                              ks.getTypeBitsView(),
+                              ks.getVersion(),
+                              true);
+    }
+
+    std::vector<value::OwnedValueAccessor> accessors(2);
+    BufBuilder builder;
+
+    // As in ixscan.cpp, create accessors to read the components from each compound index.
+    readKeyStringValueIntoAccessors(keyViews[0], key_string::ALL_ASCENDING, &builder, &accessors);
+    ASSERT_EQ(accessors.size(), 2);
+
+    // Reset buffer.
+    builder.reset();
+    readKeyStringValueIntoAccessors(keyViews[1], key_string::ALL_ASCENDING, &builder, &accessors);
+    ASSERT_EQ(accessors.size(), 2);
+
+    auto [firstTag, firstVal] = accessors[0].getViewOfValue();
+    ASSERT(value::isString(firstTag));
+    ASSERT_EQ(value::getStringView(firstTag, firstVal), std::string(60, 'C'));
+
+    auto [secondTag, secondVal] = accessors[1].getViewOfValue();
+    ASSERT_EQ(value::TypeTags::Nothing, secondTag);
+}
+
 }  // namespace mongo::sbe
