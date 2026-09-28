@@ -71,6 +71,15 @@ protected:
             operationContext(), dbInGlobalCatalog, kMyShardName);
     }
 
+    void setFcvChangeTimestamp(Timestamp changeTimestamp) {
+        DBDirectClient client(operationContext());
+        client.update(NamespaceString::kServerConfigurationNamespace,
+                      BSON("_id" << multiversion::kParameterName),
+                      BSON("$set" << BSON("changeTimestamp" << changeTimestamp)),
+                      false /* upsert */,
+                      false /* multi */);
+    }
+
     std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyNonAuthoritative(
         const DatabaseType& dbInGlobalCatalog) {
         unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
@@ -165,6 +174,41 @@ TEST_F(CheckDatabaseMetadataConsistencyTest,
     setInMemoryDatabaseMetadata(dbInGlobalCatalog);
 
     const auto inconsistencies = checkDatabaseMetadataConsistency(dbInGlobalCatalog);
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
+}
+
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDelayedSecondarySnapshotPredatesFcvChange_ThenNoInconsistency) {
+    const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
+    setInMemoryDatabaseMetadata(dbInGlobalCatalog);
+    setFcvChangeTimestamp(Timestamp{10, 0});
+
+    const auto inconsistencies =
+        database_metadata_consistency_checks::checkDatabaseMetadataConsistency(
+            operationContext(),
+            dbInGlobalCatalog,
+            kMyShardName,
+            metadata_consistency_util::RSNodeMode::kDelayedSecondary,
+            Timestamp{5, 0});
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(CheckDatabaseMetadataConsistencyTest,
+       WhenDelayedSecondarySnapshotFollowsFcvChange_ThenInconsistency) {
+    const auto dbInGlobalCatalog = makeDatabaseMetadata(kMyShardName);
+    setInMemoryDatabaseMetadata(dbInGlobalCatalog);
+    setFcvChangeTimestamp(Timestamp{10, 0});
+
+    const auto inconsistencies =
+        database_metadata_consistency_checks::checkDatabaseMetadataConsistency(
+            operationContext(),
+            dbInGlobalCatalog,
+            kMyShardName,
+            metadata_consistency_util::RSNodeMode::kDelayedSecondary,
+            Timestamp{10, 0});
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);

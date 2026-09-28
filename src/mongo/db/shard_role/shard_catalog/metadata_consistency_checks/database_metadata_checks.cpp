@@ -229,7 +229,8 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx,
     const DatabaseType& dbInGlobalCatalog,
     const ShardId& shardId,
-    RSNodeMode rsMode) {
+    RSNodeMode rsMode,
+    boost::optional<Timestamp> shardCatalogReadTimestamp) {
     metadata_consistency_internal::OptimisticFCVFeatureFlagGuard authoritativeShardsGuard(
         opCtx, feature_flags::gAuthoritativeShardsCRUD);
 
@@ -242,6 +243,14 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
         .authoritativeShardsCRUDEnabled = authoritativeShardsGuard.wasEnabled()};
 
     if (checkCtx.dbName.isInternalDb()) {
+        return {};
+    }
+
+    // If the snapshot predates the fcv change, then skip this check as we will encounter metadata
+    // inconsistencies (because of auth shards)
+    const auto fcvChangeTimestamp = authoritativeShardsGuard.initialChangeTimestamp();
+    if (rsMode == RSNodeMode::kDelayedSecondary && shardCatalogReadTimestamp &&
+        fcvChangeTimestamp && *fcvChangeTimestamp > *shardCatalogReadTimestamp) {
         return {};
     }
 

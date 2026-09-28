@@ -3234,7 +3234,7 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
     // Check the database metadata.
     auto dbMetadataInconsistencies =
         database_metadata_consistency_checks::checkDatabaseMetadataConsistency(
-            opCtx, dbInGlobalCatalog, shardId, rsMode);
+            opCtx, dbInGlobalCatalog, shardId, rsMode, snapshotTimestamp);
     inconsistencies.insert(inconsistencies.end(),
                            std::make_move_iterator(dbMetadataInconsistencies.begin()),
                            std::make_move_iterator(dbMetadataInconsistencies.end()));

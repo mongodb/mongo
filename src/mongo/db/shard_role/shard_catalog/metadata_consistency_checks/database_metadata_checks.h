@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_util.h"
@@ -13,6 +14,8 @@
 #include "mongo/util/modules.h"
 
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace [[MONGO_MOD_PARENT_PRIVATE]] database_metadata_consistency_checks {
@@ -28,7 +31,8 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx,
     const DatabaseType& dbInGlobalCatalog,
     const ShardId& shardId,
-    metadata_consistency_util::RSNodeMode rsMode = metadata_consistency_util::RSNodeMode::kPrimary);
+    metadata_consistency_util::RSNodeMode rsMode = metadata_consistency_util::RSNodeMode::kPrimary,
+    boost::optional<Timestamp> shardCatalogReadTimestamp = boost::none);
 
 /**
  * Checks for durable and in-memory database metadata in the shard catalog for databases that do

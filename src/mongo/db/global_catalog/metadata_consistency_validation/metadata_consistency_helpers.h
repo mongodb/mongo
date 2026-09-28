@@ -35,6 +35,12 @@ public:
         return _initialEnabled;
     }
 
+    // Timestamp of the setFCV sequence visible when this guard was constructed. Both phases of a
+    // sequence share this value, and it is assigned when the sequence starts.
+    boost::optional<Timestamp> initialChangeTimestamp() const {
+        return _initialChangeTimestamp;
+    }
+
     // Returns true if the feature flag state and FCV change timestamp are unchanged, and false
     // otherwise.
     bool validateUnchanged() const {
