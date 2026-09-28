@@ -406,10 +406,18 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
 }
 
 /**
+ * The result of parsePipelineAndRegisterQueryStats() below.
+ */
+struct ParsedAggregationPipeline {
+    std::unique_ptr<Pipeline> pipeline;
+    bool untrackedIsViewlessTimeseries = false;
+};
+
+/**
  * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
  * registers the pre-optimized pipeline with query stats collection.
  */
-std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
+ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const ClusterAggregate::Namespaces& nsStruct,
     AggregateCommandRequest& request,
@@ -429,14 +437,18 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // collation, and since collectionless aggregations generally run on the 'admin'
     // database, the standard logic would attempt to resolve its non-existent UUID and
     // collation by sending a specious 'listCollections' command to the config servers.
-    auto [collationObj, collationMatchesDefault] = hasChangeStream
-        ? std::pair(request.getCollation().value_or(BSONObj()),
-                    ExpressionContextCollationMatchesDefault::kYes)
-        : cluster_aggregation_planner::getCollation(opCtx,
-                                                    cri,
-                                                    nsStruct.executionNss,
-                                                    request.getCollation().value_or(BSONObj()),
-                                                    requiresCollationForParsingUnshardedAggregate);
+    const cluster_aggregation_planner::ResolvedCollectionInfo collectionInfo = hasChangeStream
+        ? cluster_aggregation_planner::
+              ResolvedCollectionInfo{request.getCollation().value_or(BSONObj()),
+                                     ExpressionContextCollationMatchesDefault::kYes}
+        : cluster_aggregation_planner::resolveCollectionInfo(
+              opCtx,
+              cri,
+              nsStruct.executionNss,
+              request.getCollation().value_or(BSONObj()),
+              requiresCollationForParsingUnshardedAggregate);
+    const BSONObj& collationObj = collectionInfo.collation;
+    const auto collationMatchesDefault = collectionInfo.collationMatchesDefault;
 
     bool extensionsInHybridSearchEnabled = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
@@ -589,7 +601,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline->setTranslated();
     }
 
-    return pipeline;
+    return {std::move(pipeline), collectionInfo.untrackedIsViewlessTimeseries};
 }
 
 Status _parseQueryStatsAndReturnEmptyResult(
@@ -638,7 +650,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
         liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();
 
     try {
-        auto pipeline =
+        auto parsedPipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                namespaces,
                                                request,
@@ -654,7 +666,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                std::move(ifrContext),
                                                std::move(preResolvedNamespaces));
 
-        pipeline->validateCommon(false);
+        parsedPipeline.pipeline->validateCommon(false);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // Ignore redundant NamespaceNotFound errors.
         LOGV2_DEBUG(8396400,
@@ -800,7 +812,7 @@ Status runAggregateImpl(OperationContext* opCtx,
     // any policy other than "specific shard only".
     auto [pipeline, expCtx] =
         [&]() -> std::tuple<std::unique_ptr<Pipeline>, boost::intrusive_ptr<ExpressionContext>> {
-        auto pipeline =
+        auto [pipeline, untrackedIsViewlessTimeseries] =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                namespaces,
                                                request,
@@ -847,7 +859,12 @@ Status runAggregateImpl(OperationContext* opCtx,
 
         pipelineCtx->initializeReferencedSystemVariables();
 
-        // Optimize the pipeline if:
+        const bool rawData = request.getRawData().value_or(false);
+        const bool timeseriesRewriteDeferredToShard = untrackedIsViewlessTimeseries && !rawData;
+
+        // Untracked viewless timeseries collections must defer their rewrite to a shard unless this
+        // is a rawData query, which does not require the rewrite. Otherwise, optimize the pipeline
+        // if any of:
         // - We have a valid routing table.
         // - We know the collection's collation.
         // - We have a change stream.
@@ -856,9 +873,10 @@ Status runAggregateImpl(OperationContext* opCtx,
         // This is because the results of optimization may depend on knowing the collation.
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
         // tracked as unsplittable collections in the sharding catalog.
-        if (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
-            hasChangeStream || shouldDoFLERewrite ||
-            pipelineCtx->getNamespaceString().isCollectionlessAggregateNS()) {
+        if (!timeseriesRewriteDeferredToShard &&
+            (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
+             hasChangeStream || shouldDoFLERewrite ||
+             pipelineCtx->getNamespaceString().isCollectionlessAggregateNS())) {
             pipeline_optimization::optimizePipeline(*pipeline);
 
             // Validate the pipeline post-optimization.
@@ -869,6 +887,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                        "Skipping optimization!",
                        "routingTableIsAvailable"_attr = routingTableIsAvailable,
                        "requiresCollation..."_attr = requiresCollationForParsingUnshardedAggregate,
+                       "rawData"_attr = rawData,
+                       "timeseriesRewriteDeferredToShard"_attr = timeseriesRewriteDeferredToShard,
                        "hasChangeStream"_attr = hasChangeStream,
                        "shouldDoFLERewrite"_attr = shouldDoFLERewrite,
                        "collectionLess"_attr =
