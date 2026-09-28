@@ -2,8 +2,6 @@
  * Tests that a change stream will emit only a single 'dropDatabase' event in a sharded cluster.
  * @tags: [
  *   requires_fcv_81,
- *   # TODO SERVER-132343: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
  * ]
  */
 
