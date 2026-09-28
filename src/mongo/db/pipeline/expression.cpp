@@ -8889,8 +8889,21 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
 
     key_string::HeapBuilder ksBuilder(key_string::Version::V1);
     if (collator) {
-        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData str) {
-            return collator->getComparisonString(str);
+        const size_t maxCollationBytes =
+            static_cast<size_t>(internalQueryKeyStringValueMaxCollationBytes.load());
+        size_t collationBytes = 0;
+        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData strData) {
+            auto comparisonKey = collator->getComparisonKey(strData);
+            auto keyData = comparisonKey.getKeyData();
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream()
+                        << "$_internalKeyStringValue generated more than " << maxCollationBytes
+                        << " bytes of collation keys for a single input; either reduce the size of "
+                           "'input' or raise 'internalQueryKeyStringValueMaxCollationBytes'",
+                    collationBytes <= maxCollationBytes &&
+                        keyData.size() <= maxCollationBytes - collationBytes);
+            collationBytes += keyData.size();
+            return std::string{keyData.data(), keyData.size()};
         });
     } else {
         ksBuilder.appendBSONElement(inputBson.firstElement());

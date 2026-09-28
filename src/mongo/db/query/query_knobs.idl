@@ -630,6 +630,18 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
+  internalQueryKeyStringValueMaxCollationBytes:
+    description: "Limits the total size of the collation comparison strings that a single
+    $_internalKeyStringValue evaluation may generate."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryKeyStringValueMaxCollationBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 1024 * 1024
+    validator:
+        gt: 0
+    redact: false
+
   internalQueryMaxRangeBytes:
     description: "Limits the vector of values pushed into a single array while generating $range
     result."
