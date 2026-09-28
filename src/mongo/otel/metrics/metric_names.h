@@ -117,6 +117,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.network.numSlowDNSOperations");
     static constexpr MetricName kNetworkNumSlowSSLOperations =
         MetricNameMaker::make("mongodb.serverStatus.network.numSlowSSLOperations");
+    static constexpr MetricName kNetworkRpcLocalLatency =
+        MetricNameMaker::make("mongodb.network.rpc.local_latency");
     static constexpr MetricName kPrometheusFileExporterWrites =
         MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.writes");
     static constexpr MetricName kPrometheusFileExporterWritesFailed =

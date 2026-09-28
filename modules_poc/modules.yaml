@@ -698,6 +698,7 @@ networking:
     - src/mongo/executor/connection_metrics.h
     - src/mongo/executor/network*
     - src/mongo/executor/remote_command*
+    - src/mongo/executor/rpc_local_timing*
     - src/mongo/executor/test_network*
     - src/mongo/executor/mock_network*
     - src/mongo/executor/mock_async_rpc*

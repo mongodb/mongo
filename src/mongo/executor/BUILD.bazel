@@ -155,6 +155,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "rpc_local_timing",
+    srcs = [
+        "rpc_local_timing.cpp",
+    ],
+    hdrs = [
+        "rpc_local_timing.h",
+    ],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "network_interface_tl",
     srcs = [
         "exhaust_response_reader_tl.cpp",
@@ -441,6 +455,20 @@ mongo_cc_library(
         "//src/mongo/unittest:integration_test_main",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rpc_local_timing_test",
+    srcs = [
+        "rpc_local_timing_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":rpc_local_timing",
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest",
     ],
 )
 

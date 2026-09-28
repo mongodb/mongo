@@ -745,3 +745,15 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "rpc_local_timing_test",
+    srcs = [
+        "rpc_local_timing_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":async_client",
+        "//src/mongo/unittest",
+    ],
+)
