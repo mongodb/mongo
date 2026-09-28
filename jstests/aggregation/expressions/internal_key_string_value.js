@@ -1,4 +1,10 @@
-// Tests the behavior of $_internalKeyStringValue when used in agg expressions.
+/**
+ * Tests the behavior of $_internalKeyStringValue when used in agg expressions.
+ *
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
+ */
 
 const coll = db[jsTestName()];
 
@@ -198,4 +204,61 @@ assert.eq(docs.length, results.length, results);
 assert(
     results.every((result) => bsonWoCompare(result.b, results[0].b) === 0),
     results,
+);
+
+// A collation-aware evaluation is bounded by `internalQueryKeyStringValueMaxCollationBytes`;
+// this test exercises its default (1MB).
+const largeArray = Array.from({length: 500}, (_, i) => "x".repeat(4096) + i);
+
+assert(coll.drop());
+assert.commandWorked(coll.insert({_id: 0}));
+
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {
+                $project: {
+                    k: {
+                        $_internalKeyStringValue: {
+                            input: largeArray,
+                            collation: {locale: "en", strength: 1},
+                        },
+                    },
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.ExceededMemoryLimit,
+    "a collation-aware evaluation over a large input must hit the collation byte limit",
+);
+
+// An input small enough to stay under the limit still succeeds.
+assert.commandWorked(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {
+                $project: {
+                    k: {
+                        $_internalKeyStringValue: {
+                            input: ["a", "b"],
+                            collation: {locale: "en", strength: 1},
+                        },
+                    },
+                },
+            },
+        ],
+        cursor: {},
+    }),
+);
+
+// The limit does not apply when no collation is requested, since that path generates no sort keys.
+assert.commandWorked(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$project: {k: {$_internalKeyStringValue: {input: largeArray}}}}],
+        cursor: {},
+    }),
 );

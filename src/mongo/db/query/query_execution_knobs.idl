@@ -262,6 +262,19 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQueryKeyStringValueMaxCollationBytes:
+        description: >-
+            Limits the total size of the collation comparison strings that a single
+            $_internalKeyStringValue evaluation may generate.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryKeyStringValueMaxCollationBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
     internalQueryMaxAddToSetBytes:
         description: >-
             Limits the vector of values pushed into a single array while grouping with the

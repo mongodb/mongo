@@ -34,7 +34,14 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
 
 
 namespace mongo {
@@ -110,6 +117,63 @@ TEST(ExpressionToHashedIndexKeyTest, UndefinedInputSucceeds) {
     auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     Value result = expression->evaluate({}, &expCtx.variables);
     ASSERT_VALUE_EQ(result, Value::createIntOrLong(40158834000849533LL));
+}
+
+/**
+ * A collator factory handing out a string-reversing mock collator, so that each string in the input
+ * contributes a predictable number of collation bytes.
+ */
+class ReversingCollatorFactory final : public CollatorFactoryInterface {
+public:
+    StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj&) final {
+        return {std::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kReverseString)};
+    }
+};
+
+void installReversingCollatorFactory(ExpressionContextForTest& expCtx) {
+    CollatorFactoryInterface::set(expCtx.getOperationContext()->getServiceContext(),
+                                  std::make_unique<ReversingCollatorFactory>());
+}
+
+TEST(ExpressionInternalKeyStringValueTest, CollationBytesAreBounded) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    ExpressionContextForTest expCtx(opCtx.get());
+    installReversingCollatorFactory(expCtx);
+
+    // The mock collator reverses strings, so each element contributes its own length in collation
+    // bytes. Set the limit low enough that an input of a few elements crosses it.
+    RAIIServerParameterControllerForTest limit{"internalQueryKeyStringValueMaxCollationBytes", 16};
+
+    const BSONObj obj = BSON("$_internalKeyStringValue"
+                             << BSON("input" << "$a" << "collation" << BSON("locale" << "en")));
+    auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
+
+    ASSERT_THROWS_CODE(
+        expression->evaluate(
+            Document{{"a", std::vector<Value>{Value{"0123456789"_sd}, Value{"0123456789"_sd}}}},
+            &expCtx.variables),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+
+    ASSERT_DOES_NOT_THROW(
+        expression->evaluate(Document{{"a", "0123456789"_sd}}, &expCtx.variables));
+}
+
+TEST(ExpressionInternalKeyStringValueTest, NoCollationIsNotBoundedByCollationLimit) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    ExpressionContextForTest expCtx(opCtx.get());
+    installReversingCollatorFactory(expCtx);
+
+    RAIIServerParameterControllerForTest limit{"internalQueryKeyStringValueMaxCollationBytes", 1};
+
+    const BSONObj obj = BSON("$_internalKeyStringValue" << BSON("input" << "$a"));
+    auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
+    ASSERT_DOES_NOT_THROW(expression->evaluate(
+        Document{{"a", std::vector<Value>{Value{"0123456789"_sd}, Value{"0123456789"_sd}}}},
+        &expCtx.variables));
 }
 
 }  // namespace expression_evaluation_test
