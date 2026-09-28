@@ -5,6 +5,7 @@
 # FIXME-WT-16083: Resolve the warnings and remove the file.
 
 test_corrupt01.py
+test_corrupt02.py
 test_layered66.py
 test_salvage03.py
 test_tiered06.py
