@@ -208,7 +208,7 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
-        if [ "${build_variant|}" = "macos-1100" ]; then
+        if [ "${build_variant|}" = "macos-14" ]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
           # module gives us the library.
@@ -216,6 +216,8 @@ functions:
           $SYSPY -mvenv venv
           source venv/bin/activate
           pip3 install find_libpython
+          # macos-14 does not have swig installed by default.
+          pip3 install swig==4.2.1
           SYSPYLIB=`find_libpython`
           SYSPYINCDEF=
 
@@ -300,6 +302,10 @@ functions:
         else
           # Compiling with CMake generated Ninja file.
           cd cmake_build
+          # Activate the venv created during configure to pick up the swig install on macos-14.
+          if [ "${build_variant|}" = "macos-14" ]; then
+            source ../venv/bin/activate
+          fi
           ${compile_env_vars|} ${make_command|ninja} ${smp_command|} 2>&1
         fi
   "compile wiredtiger":
@@ -5694,10 +5700,10 @@ buildvariants:
     - name: fops
     - name: unittest-test
 
-- name: macos-1100
-  display_name: "macOS 11.00"
+- name: macos-14
+  display_name: "macOS 14"
   run_on:
-  - macos-1100
+  - macos-14
   batchtime: 120 # 2 hours
   expansions:
     # The cmake toolchain file is set to the mongodb toolchain gcc by default.
@@ -5724,10 +5730,10 @@ buildvariants:
     - name: memory-model-test-mac
       batchtime: 40320 # 28 days
 
-- name: macos-1100-arm64
-  display_name: "macOS 11.00 ARM64"
+- name: macos-14-arm64
+  display_name: "macOS 14 ARM64"
   run_on:
-    - macos-1100-arm64
+    - macos-14-arm64
   batchtime: 40320 # 28 days
   tasks:
     - name: memory-model-test-mac
