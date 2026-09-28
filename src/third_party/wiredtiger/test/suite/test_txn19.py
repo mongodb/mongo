@@ -318,6 +318,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             #   salvage: log file x truncated at beginning
             #   salvage: log file x truncated
             #   salvage: log file x removed
+            #   salvage: log scan truncated at ...
             #
             # The removal case may not give an informational error because
             # the log file is already missing, so salvage itself is not
@@ -325,7 +326,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             # much as it can.
             #
             if self.kind == 'removal':
-                outpat = '^$'
+                outpat = 'salvage: log scan truncated'
             else:
                 outpat = 'salvage: log file'
         else:
