@@ -24,8 +24,8 @@ namespace mongo::timeseries {
 /**
  * Translates the given query on the time-series collection to a query on the time-series
  * collection's underlying buckets collection. Creates and returns a translated query document where
- * all occurrences of metaField in query are replaced with the literal "meta". Requires that the
- * given metaField is not empty.
+ * all occurrences of metaField in query are replaced with the literal "meta". Supports all
+ * valid values for a metaField including the empty string.
  */
 BSONObj translateQuery(const BSONObj& query, std::string_view metaField);
 
@@ -33,8 +33,8 @@ BSONObj translateQuery(const BSONObj& query, std::string_view metaField);
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is an update document and that the given metaField is not empty. Returns an
- * invalid status if the update cannot be translated.
+ * that updateMod is an update document. Supports all valid values for a metaField including the
+ * empty string.
  */
 StatusWith<write_ops::UpdateModification> translateUpdate(
     const write_ops::UpdateModification& updateMod, boost::optional<std::string_view> metaField);
