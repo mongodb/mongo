@@ -5,6 +5,7 @@
 
 #include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -174,8 +175,9 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(
     }
     tassert(11163700, "Expected nonempty inputs", !inputs.empty());
 
-    return {sbe::makeS<sbe::ExtractFieldPathsStage>(
-                std::move(stage), std::move(inputs), std::move(outputs), nodeId),
-            std::move(extractionOutputs)};
+    SbBuilder b{state, nodeId};
+    return {
+        b.makeExtractFieldPaths(std::move(stage), std::move(inputs), std::move(outputs), nodeId),
+        std::move(extractionOutputs)};
 }
 }  // namespace mongo::stage_builder

@@ -22,6 +22,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe:sbe_unittest_base",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/stage_builder/sbe:stage_builder",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
     ],
 )
@@ -40,6 +41,7 @@ mongo_cc_unit_test(
         "gen_lookup_test.cpp",
         "sbe_builder_test.cpp",
         "sbe_builder_ts_test.cpp",
+        "sbe_stage_blueprint_test.cpp",
         "shard_filter_test.cpp",
         "type_checker_test.cpp",
         "value_lifetime_test.cpp",

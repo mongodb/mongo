@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -702,6 +703,10 @@ public:
                                const SbIndexInfoSlots& indexInfoSlots,
                                sbe::FetchCallbacks scanCallbacks);
 
+    SbStage makeExtractFieldPaths(SbStage child,
+                                  std::vector<sbe::PathSlot> inputs,
+                                  std::vector<sbe::PathSlot> outputs,
+                                  PlanNodeId nodeId);
 
 protected:
     SbIndexInfoSlots allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,

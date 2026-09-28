@@ -116,6 +116,7 @@ mongo_cc_library(
         "gen_lookup.cpp",
         "gen_projection.cpp",
         "gen_ts.cpp",
+        "sbe_stage_lowering.cpp",
         "sbexpr.cpp",
         "sbexpr_helpers.cpp",
         "type_checker.cpp",
