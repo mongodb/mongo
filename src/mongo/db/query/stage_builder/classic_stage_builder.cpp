@@ -584,7 +584,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
     }();
 
     if (_planStageQsnMap) {
-        _planStageQsnMap->insert({result.get(), root});
+        _planStageQsnMap->insert({result.get(), QsnMapping{root, root->nodeId()}});
     }
     return result;
 }

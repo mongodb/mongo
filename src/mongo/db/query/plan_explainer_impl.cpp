@@ -702,8 +702,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     const QuerySolutionNode* querySolutionNode = nullptr;
 
     // The subplanner currently does not populate plan stages, so entries maybe missing.
-    if (planStageQsnMap.contains(stats.common.planStage)) {
-        querySolutionNode = planStageQsnMap.at(stats.common.planStage);
+    if (auto it = planStageQsnMap.find(stats.common.planStage); it != planStageQsnMap.end()) {
+        querySolutionNode = it->second.qsn;
     }
 
     // Cost and cardinality of the stage.
@@ -772,6 +772,35 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 }
 }  // namespace
 
+void appendCostBasedStatsV3(StageType nodeType,
+                            const cost_based_ranker::QSNEstimate& est,
+                            BSONObjBuilder& statisticsBob) {
+    BSONObjBuilder costBasedBob(statisticsBob.subobjStart("costBased"));
+    est.serialize(costBasedBob);
+    // Display 'inCE' as 'numKeys' for index scan and 'numDocs' for collection scan.
+    if (est.inCE.has_value()) {
+        double ce = est.inCE->toDouble();
+        if (nodeType == STAGE_IXSCAN) {
+            costBasedBob.append("numKeysEstimate", ce);
+        } else {
+            costBasedBob.append("numDocsEstimate", ce);
+        }
+    }
+    if (est.indexSeekCE.has_value()) {
+        costBasedBob.append("indexSeekEstimate", est.indexSeekCE->toDouble());
+    }
+}
+
+boost::optional<double> rootCostOf(const cost_based_ranker::EstimateMap& estimates,
+                                   const QuerySolutionNode* rootQsn) {
+    if (rootQsn) {
+        if (auto it = estimates.find(rootQsn); it != estimates.end()) {
+            return it->second->cost.toDouble();
+        }
+    }
+    return boost::none;
+}
+
 namespace {
 /**
  * The recursive core of statsToBsonV3(). 'topLevelBob' is const: it is only read - to track the
@@ -814,17 +843,15 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     const QuerySolutionNode* querySolutionNode = nullptr;
 
     // The subplanner currently does not populate plan stages, so entries maybe missing.
-    if (planStageQsnMap.contains(stats.common.planStage)) {
-        querySolutionNode = planStageQsnMap.at(stats.common.planStage);
-    }
-    if (querySolutionNode) {
-        bob.appendNumber("planNodeId", static_cast<long long>(querySolutionNode->nodeId()));
-    }
-
-    // The join optimization feature is incompatible with the classic engine. If the knob is
-    // enabled, note that the join optimization was not used to make debugging easier.
-    if (internalEnableJoinOptimization.load()) {
-        bob.append("usedJoinOptimization", false);
+    if (auto it = planStageQsnMap.find(stats.common.planStage); it != planStageQsnMap.end()) {
+        querySolutionNode = it->second.qsn;
+        boost::optional<PlanNodeId> planNodeId = it->second.nodeId;
+        // Read the id out of the mapping rather than through 'qsn': SBE lowering can free the node
+        // this entry points at (see QsnMapping), and this is the one place that would otherwise
+        // dereference it for every mapped stage regardless of type.
+        if (planNodeId.has_value()) {
+            bob.appendNumber("planNodeId", static_cast<long long>(planNodeId.value()));
+        }
     }
 
     // Structural fields stay flat on the node.
@@ -835,32 +862,17 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob.append("filter", stats.common.filter);
     }
 
-    // The per-node statistics grouping. Sparse: the subobject (and each group inside it) is present
-    // only when the policy requests that family of statistics AND it was computed for this node -
-    // "costBased" iff the cost-based ranker estimated this node, "multiPlan" iff this tree carries
-    // multi-planning trial counters. The plannerChoice mode requests neither family, so no node
-    // carries a "statistics" subobject at all there, however the plans were ranked.
+    // The per-node statistics grouping, deliberately emitted after the node's structure: a reader
+    // sees what the stage is before what it measured, and the statistics are the one part of the
+    // node that varies with the explain policy.
     const bool hasCostBased = explainPolicy.hasCostBasedStats() && querySolutionNode &&
         estimates.contains(querySolutionNode);
     const bool hasMultiPlan = explainPolicy.hasAllPlansStats() && isTrialTree;
     if (hasCostBased || hasMultiPlan) {
         BSONObjBuilder statisticsBob(bob.subobjStart("statistics"));
         if (hasCostBased) {
-            BSONObjBuilder costBasedBob(statisticsBob.subobjStart("costBased"));
-            const auto& est = *estimates.at(querySolutionNode);
-            est.serialize(costBasedBob);
-            // Display 'inCE' as 'numKeys' for index scan and 'numDocs' for collection scan.
-            if (est.inCE.has_value()) {
-                double ce = est.inCE->toDouble();
-                if (querySolutionNode->getType() == STAGE_IXSCAN) {
-                    costBasedBob.append("numKeysEstimate", ce);
-                } else {
-                    costBasedBob.append("numDocsEstimate", ce);
-                }
-            }
-            if (est.indexSeekCE.has_value()) {
-                costBasedBob.append("indexSeekEstimate", est.indexSeekCE->toDouble());
-            }
+            appendCostBasedStatsV3(
+                stats.stageType, *estimates.at(querySolutionNode), statisticsBob);
         }
         if (hasMultiPlan) {
             BSONObjBuilder multiPlanBob(statisticsBob.subobjStart("multiPlan"));
@@ -1223,8 +1235,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     // Thin wrapper over the shared per-plan enumerator; kLegacy is exactly the legacy semantics,
     // pinned by the LegacyAccessorsMatchPlanEntriesAcrossVerbosities equivalence test and the
     // legacy explain suites.
-    // TODO SERVER-132033: route SBE through getPlanEntries() as well then remove the legacy
-    // per-plan virtuals from the PlanExplainer interface.
+    // TODO SERVER-134444: route the SBE and Express legacy-shaped output through getPlanEntries()
+    // as well, then remove the legacy per-plan virtuals from the PlanExplainer interface.
     auto entries = getPlanEntries(
         explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
     tassert(13052905, "getPlanEntries() must return at least the winning plan", !entries.empty());
@@ -1557,16 +1569,6 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
     // be merged and the set ordered before serialization.
     std::vector<NormalizedPlanInfo> candidates;
 
-    auto rootCostOf = [&](const QuerySolutionNode* rootQsn) -> boost::optional<double> {
-        if (rootQsn) {
-            if (auto it = _explainData.estimates.find(rootQsn);
-                it != _explainData.estimates.end()) {
-                return it->second->cost.toDouble();
-            }
-        }
-        return boost::none;
-    };
-
     // Candidates still inside an in-tree MultiPlanStage (their trees are trial trees).
     if (auto mps = getMultiPlanStage(_root)) {
         auto bestPlanIdx = mps->bestPlanIdx();
@@ -1579,15 +1581,16 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
             }
             const auto& candidate = mps->getCandidate(i);
             // Non-winner subtrees do not accumulate work after plan selection.
-            candidates.push_back(NormalizedPlanInfo{_root->getStats(),
-                                                    i,
-                                                    /*ranTrial*/ true,
-                                                    candidate.stopCondition,
-                                                    mps->getCandidateScore(i),
-                                                    candidate.adjustedScore,
-                                                    rootCostOf(candidate.solution->root()),
-                                                    candidate.solution->hash(),
-                                                    candidate.solution->root()});
+            candidates.push_back(
+                NormalizedPlanInfo{_root->getStats(),
+                                   i,
+                                   /*ranTrial*/ true,
+                                   candidate.stopCondition,
+                                   mps->getCandidateScore(i),
+                                   candidate.adjustedScore,
+                                   rootCostOf(_explainData.estimates, candidate.solution->root()),
+                                   candidate.solution->hash(),
+                                   candidate.solution->root()});
         }
     }
 
@@ -1602,7 +1605,7 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
                                rejected.ranTrial ? rejected.stopCondition : boost::none,
                                rejected.ranTrial ? rejected.solution->score : boost::none,
                                rejected.ranTrial ? rejected.adjustedScore : boost::none,
-                               rootCostOf(rejected.solution->root()),
+                               rootCostOf(_explainData.estimates, rejected.solution->root()),
                                rejected.solution->hash(),
                                rejected.solution->root()});
     }

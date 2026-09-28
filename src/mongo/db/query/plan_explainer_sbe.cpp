@@ -34,6 +34,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <set>
@@ -163,6 +164,55 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     statsToBSONHelper(stats, bob, topLevelBob, 0);
 }
 
+/**
+ * Whether 'solution' still carries the pushed-down pipeline that extended it upward after its
+ * find part was ranked. When it does, the tree that executes is not the tree that was ranked.
+ */
+bool hasSurvivingExtension(const QuerySolution& solution) {
+    return solution.hasExtension() && solution.root()->nodeId() != solution.unextendedRootId();
+}
+
+/**
+ * Returns the root of the ranked part of 'solution'. When the QSN is extended (e.g. via $group
+ * pushdown to SBE), this will be different than the current root.
+ */
+const QuerySolutionNode* rankedRootOf(const QuerySolution& solution) {
+    if (!hasSurvivingExtension(solution)) {
+        return solution.root();
+    }
+    for (const QuerySolutionNode* node = solution.root(); node;) {
+        if (node->nodeId() <= solution.unextendedRootId()) {
+            return node;
+        }
+        if (node->children.empty()) {
+            break;
+        }
+        node = node->children[0].get();
+    }
+    return solution.root();
+}
+
+/**
+ * Builds the stringified SBE plan for 'root' within 'lengthCap'. Returns boost::none when the
+ * tree does not fit even after being capped at that budget.
+ */
+boost::optional<BSONObj> buildSbeDebugInfoWithinBudget(const sbe::PlanStage* root,
+                                                       const stage_builder::PlanStageData* data,
+                                                       int lengthCap,
+                                                       bool printBytecode) {
+    if (lengthCap < 0) {
+        return boost::none;
+    }
+    BSONObj debugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
+        root, data, static_cast<size_t>(lengthCap), printBytecode);
+    // buildExecPlanDebugInfo() caps the pieces it appends, but the object it returns can still
+    // exceed the budget, in which case there is no room for it at all.
+    if (debugInfo.objsize() > lengthCap) {
+        return boost::none;
+    }
+    return debugInfo;
+}
+
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats& stats,
@@ -227,33 +277,37 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     plan.append("queryPlan", bob.obj());
 
     int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
-
-    if (plan.len() > explainThresholdBytes) {
-        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+    if (auto execPlanDebugInfo =
+            buildSbeDebugInfoWithinBudget(sbePlanStageRoot,
+                                          sbePlanStageData,
+                                          explainThresholdBytes - plan.len() /* lengthCap */,
+                                          printBytecode)) {
+        plan.append("slotBasedPlan", *execPlanDebugInfo);
     } else {
-        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
-            sbePlanStageRoot,
-            sbePlanStageData,
-            explainThresholdBytes - plan.len() /*lengthCap*/,
-            printBytecode);
-        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
-            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
-        } else {
-            plan.append("slotBasedPlan", execPlanDebugInfo);
-        }
+        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
     }
     if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
         plan.append("remotePlans", *remotePlanInfo);
     }
     return {plan.obj(), boost::none};
 }
-}  // namespace
-
-void statsToBSON(const QuerySolutionNode* node,
-                 BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob,
-                 const cost_based_ranker::EstimateMap& estimates,
-                 std::uint32_t currentDepth) {
+/**
+ * Serializes 'node' into 'bob' with the output dependent on 'format' and 'explainPolicy':
+ * - How the estimates are grouped: fused flat onto the node (kLegacy) versus under a sparse
+ *   "statistics.costBased" subobject (kV3). Whether they appear at all is 'explainPolicy' alone,
+ * the same predicate for both shapes.
+ * - Child nesting: a lone child collapses into an "inputStage" object (kLegacy) versus children
+ *   always forming the "inputStages" array (kV3).
+ *
+ * 'topLevelBob' is only read to size-guard against the overall explain object.
+ */
+void qsnToBson(const QuerySolutionNode* node,
+               PlanStatsFormat format,
+               const ExplainPolicy& explainPolicy,
+               const cost_based_ranker::EstimateMap& estimates,
+               BSONObjBuilder* bob,
+               const BSONObjBuilder* topLevelBob,
+               std::uint32_t currentDepth) {
     tassert(9378604, "encountered unexpected nullptr for BSONObjBuilder", bob);
     tassert(9378605, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
@@ -265,27 +319,19 @@ void statsToBSON(const QuerySolutionNode* node,
 
     // Stop as soon as the BSON object we're building becomes too deep. Use the worst-case (+2)
     // depth increment to account for stages which emit children under an array.
-    const auto maxDepth = BSONDepth::getMaxDepthForUserStorage();
-    if (currentDepth + 2 >= maxDepth) {
+    if (currentDepth + 2 >= BSONDepth::getMaxDepthForUserStorage()) {
         bob->append("warning",
                     "stats tree exceeded BSON depth limit; omitting the rest of the tree");
         return;
     }
 
+    const bool isV3 = format == PlanStatsFormat::kV3;
+    const bool hasCostEstimates = explainPolicy.hasCostBasedStats() && estimates.contains(node);
+
     bob->append("stage", nodeStageTypeToString(node));
     bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
 
-    // Cost and cardinality of the stage.
-    if (estimates.contains(node)) {
-        estimates.at(node)->serialize(*bob);
-    }
-
-    // Display the BSON representation of the filter, if there is one.
-    if (node->filter) {
-        bob->append("filter", node->filter->serialize());
-    }
-
-    // Stage-specific stats.
+    // Stage-specific stats. Structural fields stay flat on the node in both shapes.
     switch (node->getType()) {
         case STAGE_COLLSCAN: {
             auto csn = static_cast<const CollectionScanNode*>(node);
@@ -557,28 +603,70 @@ void statsToBSON(const QuerySolutionNode* node,
             break;
     }
 
+    // Display the BSON representation of the filter, if there is one.
+    if (node->filter) {
+        bob->append("filter", node->filter->serialize());
+    }
+
+    // Append the cost and cardinality estimates for the stage if they exist.
+    if (hasCostEstimates) {
+        if (isV3) {
+            BSONObjBuilder statisticsBob(bob->subobjStart("statistics"));
+            appendCostBasedStatsV3(node->getType(), *estimates.at(node), statisticsBob);
+        } else {
+            estimates.at(node)->serialize(*bob);
+        }
+    }
+
     // We're done if there are no children.
     if (node->children.empty()) {
         return;
     }
 
-    // If there's just one child (a common scenario), avoid making an array. This makes
-    // the output more readable by saving a level of nesting. Name the field 'inputStage'
-    // rather than 'inputStages'.
-    if (node->children.size() == 1) {
+    const auto appendChild =
+        [&](const QuerySolutionNode* child, BSONObjBuilder* childBob, std::uint32_t childDepth) {
+            qsnToBson(child, format, explainPolicy, estimates, childBob, topLevelBob, childDepth);
+        };
+
+    // V3 always emits 'inputStages' array even for a single child, while legacy format collapses a
+    // single child into 'inputStage'.
+    if (!isV3 && node->children.size() == 1) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(node->children[0].get(), &childBob, topLevelBob, estimates, currentDepth + 1);
+        appendChild(node->children[0].get(), &childBob, currentDepth + 1);
         return;
     }
 
-    // There is more than one child. Recursively call statsToBSON(...) on each
-    // of them and add them to the 'inputStages' array.
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto&& child : node->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child.get(), &childBob, topLevelBob, estimates, currentDepth + 2);
+        appendChild(child.get(), &childBob, currentDepth + 2);
     }
     childrenBob.doneFast();
+}
+}  // namespace
+
+void statsToBSON(const QuerySolutionNode* node,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob,
+                 const cost_based_ranker::EstimateMap& estimates,
+                 std::uint32_t currentDepth) {
+    // Legacy format always includes cost-based stats.
+    qsnToBson(node,
+              PlanStatsFormat::kLegacy,
+              ExplainPolicy{ExplainSettings::kCostBasedStats},
+              estimates,
+              bob,
+              topLevelBob,
+              currentDepth);
+}
+
+void statsToBsonV3(const QuerySolutionNode* node,
+                   const ExplainPolicy& explainPolicy,
+                   const cost_based_ranker::EstimateMap& estimates,
+                   BSONObjBuilder* bob,
+                   const BSONObjBuilder* topLevelBob,
+                   std::uint32_t currentDepth) {
+    qsnToBson(node, PlanStatsFormat::kV3, explainPolicy, estimates, bob, topLevelBob, currentDepth);
 }
 
 PlanExplainerSBEBase::PlanExplainerSBEBase(
@@ -765,16 +853,16 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                               : boost::none},
       _joinPlanCacheKeyHash{maybeExplainData ? maybeExplainData->joinPlanCacheKeyHash
                                              : boost::none},
+      _planRankerReason{maybeExplainData ? maybeExplainData->planRankerReason : boost::none},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
                                              cachedPlanHash,
                                              boost::none /* replanReason */,
                                              std::move(maybeExplainData),
-                                             // This embedded classic explainer serves only the
-                                             // legacy accessors (SBE V3 parity is
-                                             // SERVER-132033), which need no construction-time
-                                             // trial snapshot.
+                                             // No construction-time snapshot of the trial
+                                             // statistics is needed on this path, not even for the
+                                             // V3 per-plan view.
                                              false /* isExplain */,
                                              planSelectionStrategy)
               : nullptr} {
@@ -821,6 +909,90 @@ PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
     return _classicRuntimePlannerExplainer
         ? _classicRuntimePlannerExplainer->getRejectedPlansStats(verbosity)
         : std::vector<PlanExplainer::PlanStatsDetails>{};
+}
+
+ExplainPlanEntry PlanExplainerClassicRuntimePlannerForSBE::makeQsnPlanEntry(
+    const QuerySolution& solution,
+    const ExplainPolicy& policy,
+    const cost_based_ranker::EstimateMap& estimates) const {
+    ExplainPlanEntry entry;
+    entry.solutionHash = solution.hash();
+    entry.isCached = _cachedPlanHash && (*_cachedPlanHash == *entry.solutionHash);
+    BSONObjBuilder bob;
+    // Append the stats of the portion of the QSN which was ranked.
+    statsToBsonV3(rankedRootOf(solution), policy, estimates, &bob, &bob);
+    entry.planStatsTree = bob.obj();
+    return entry;
+}
+
+void PlanExplainerClassicRuntimePlannerForSBE::attachWinnerSbeInfo(
+    const ExplainPolicy& policy, std::vector<ExplainPlanEntry>& entries) const {
+    if (entries.empty()) {
+        return;
+    }
+    auto& winner = entries.front();
+
+    // The tree that ran, when the pushed-down pipeline made it differ from the ranked tree that
+    // 'planStatsTree' holds.
+    if (_solution && rankedRootOf(*_solution) != _solution->root()) {
+        BSONObjBuilder bob;
+        statsToBsonV3(_solution->root(), policy, _estimates, &bob, &bob);
+        winner.executedPlanStages = bob.obj();
+    }
+
+    if (_root && _rootData) {
+        // Include the already allocated tree sizes in the budget and return a warning if the SBE
+        // plan causes the explain to exceed the size limit.
+        const int lengthCap = internalQueryExplainSizeThresholdBytes.loadRelaxed() -
+            winner.planStatsTree.objsize() -
+            (winner.executedPlanStages ? winner.executedPlanStages->objsize() : 0);
+        if (auto debugInfo = buildSbeDebugInfoWithinBudget(
+                _root, _rootData, lengthCap, policy.hasByteCode() /*printBytecode*/)) {
+            winner.slotBasedPlan = std::move(*debugInfo);
+        } else {
+            winner.warning = "slotBasedPlan exceeded BSON size limit for explain";
+        }
+    }
+}
+
+std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::getPlanEntries(
+    const ExplainPolicy& policy,
+    PlanStatsFormat format,
+    PlanSelectionStrategy decidingPlanRanker) const {
+    tassert(13314403,
+            "SBE explainers produce only V3-format plan entries",
+            format == PlanStatsFormat::kV3);
+
+    // With no runtime planner stage there are no trial trees to read, so the plan is described by
+    // its QuerySolution alone: one entry, carrying the cost-based ranker's estimates but no trial
+    // counters, since the plan never ran a trial.
+    if (!_classicRuntimePlannerExplainer) {
+        // Without a QuerySolution there is nothing to enumerate.
+        if (!_solution) {
+            return {};
+        }
+        std::vector<ExplainPlanEntry> entries;
+        entries.push_back(makeQsnPlanEntry(*_solution, policy, _estimates));
+        attachWinnerSbeInfo(policy, entries);
+        return entries;
+    }
+
+    auto entries =
+        _classicRuntimePlannerExplainer->getPlanEntries(policy, format, decidingPlanRanker);
+    if (entries.empty()) {
+        return entries;
+    }
+
+    // The embedded classic explainer describes the trial trees only; it was built from the runtime
+    // planner stage and has no QuerySolution of its own, so the winner's identity - and hence
+    // whether the winner is the cached plan - is supplied here.
+    auto& winner = entries.front();
+    if (_solution) {
+        winner.solutionHash = _solution->hash();
+        winner.isCached = matchesCachedPlan();
+    }
+    attachWinnerSbeInfo(policy, entries);
+    return entries;
 }
 
 boost::optional<StringMap<cost_based_ranker::SamplingMetadata>>

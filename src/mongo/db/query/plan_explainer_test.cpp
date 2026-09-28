@@ -10,6 +10,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_common.h"
@@ -569,6 +570,154 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3SingleSolutionSparseStatistics) {
     });
 }
 
+TEST_F(PlanExplainerTest, GetPlanEntriesV3SBESingleSolution) {
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
+    auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
+    auto& explainer = exec->getPlanExplainer();
+    ASSERT(explainer.isSbeExplainer());
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kSinglePlan);
+    ASSERT_EQ(entries.size(), 1u);
+    ASSERT_FALSE(entries[0].hasTrialStats);
+    ASSERT_FALSE(entries[0].summary.has_value());
+    ASSERT(entries[0].solutionHash.has_value());
+    ASSERT(entries[0].slotBasedPlan.has_value());
+    ASSERT(entries[0].slotBasedPlan->hasField("stages")) << *entries[0].slotBasedPlan;
+
+    bool sawCollscan = false;
+    forEachV3Node(entries[0].planStatsTree, [&](const BSONObj& node) {
+        ASSERT(node.hasField("stage")) << node;
+        ASSERT(node.hasField("planNodeId")) << node;
+        ASSERT_FALSE(node.hasField("statistics")) << node;
+        // The V3 node shape never nests a single child as "inputStage".
+        ASSERT_FALSE(node.hasField("inputStage")) << node;
+        sawCollscan = sawCollscan || node["stage"].String() == "COLLSCAN";
+    });
+    ASSERT(sawCollscan) << entries[0].planStatsTree;
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3SBEMultiPlanner) {
+    // A multi-planned SBE query. The candidates were ranked by the classic runtime planner, so the
+    // entries are that planner's trial trees with the winner first and the compiled SBE tree
+    // attached to it.
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
+    expCtx->setExplain(ExplainOptions::Verbosity::kPlannerStats);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+    ASSERT(explainer.isSbeExplainer());
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+
+    // Only the winning plan was compiled to SBE, so only its entry describes an SBE tree.
+    ASSERT(entries[0].slotBasedPlan.has_value());
+    ASSERT(entries[0].solutionHash.has_value());
+    for (size_t i = 1; i < entries.size(); ++i) {
+        ASSERT_FALSE(entries[i].slotBasedPlan.has_value()) << entries[i].planStatsTree;
+    }
+
+    for (const auto& entry : entries) {
+        ASSERT(entry.hasTrialStats) << entry.planStatsTree;
+        ASSERT(entry.summary.has_value()) << entry.planStatsTree;
+        ASSERT(entry.stopCondition.has_value()) << entry.planStatsTree;
+
+        forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
+            ASSERT_FALSE(node.hasField("works")) << node;
+            ASSERT_FALSE(node.hasField("nReturned")) << node;
+            auto multiPlan = node["statistics"]["multiPlan"];
+            ASSERT(multiPlan.isABSONObj()) << node;
+            ASSERT(multiPlan.Obj().hasField("works")) << node;
+            if (node["stage"].String() == "IXSCAN") {
+                ASSERT(node.hasField("keyPattern")) << node;
+                ASSERT_FALSE(node.hasField("keysExamined")) << node;
+                ASSERT(multiPlan.Obj().hasField("keysExamined")) << node;
+            }
+        });
+    }
+
+    // The plans after the winner are ordered by trial score, descending (the multi-planner
+    // decided).
+    for (size_t i = 2; i < entries.size(); ++i) {
+        if (entries[i - 1].summary->score && entries[i].summary->score) {
+            ASSERT_GTE(*entries[i - 1].summary->score, *entries[i].summary->score);
+        }
+    }
+}
+
+TEST_F(PlanExplainerTest, V3SbeQueryWithDeferredEngineChoiceDisabled) {
+    // A multi-planned SBE query explained at a V3 verbosity must report why the deciding ranker was
+    // chosen, even with the deferred engine feature disabled.
+    unittest::ServerParameterGuard deferredEngineChoiceOff(
+        "featureFlagGetExecutorDeferredEngineChoice", false);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
+
+    expCtx->setExplain(ExplainOptions::Verbosity::kPlannerStats);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+
+    auto& explainer = exec->getPlanExplainer();
+    ASSERT(explainer.isSbeExplainer());
+
+    ASSERT(explainer.getPlanSelectionStrategy().has_value());
+    ASSERT_TRUE(*explainer.getPlanSelectionStrategy() == PlanSelectionStrategy::kMultiPlanner);
+
+    ASSERT_FALSE(explainer
+                     .getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats),
+                                     PlanStatsFormat::kV3,
+                                     *explainer.getPlanSelectionStrategy())
+                     .empty());
+
+    auto coll = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), kNss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+    MultipleCollectionAccessor colls{coll};
+
+    BSONObjBuilder bob;
+    Explain::explainStages(exec.get(),
+                           colls,
+                           ExplainOptions::Verbosity::kPlannerStats,
+                           Status::OK(),
+                           boost::none,
+                           BSONObj(),
+                           SerializationContext::stateCommandReply(),
+                           BSONObj(),
+                           &bob);
+    const BSONObj explained = bob.obj();
+
+    auto rankerChoice = explained["queryPlanner"]["rankerChoice"];
+    ASSERT(rankerChoice.isABSONObj()) << explained;
+    ASSERT_EQ(rankerChoice["chosenRanker"].String(), "multiPlanning") << explained;
+    // TODO SERVER-134550 Populate the reason field for SBE + deferred engine off.
+    ASSERT(!rankerChoice.Obj().hasField("reason")) << explained;
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3SBEPlannerChoiceIsStructureOnly) {
+    // As on the classic engine, plannerChoice renders the same plans[] shape.
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
+    expCtx->setExplain(ExplainOptions::Verbosity::kPlannerChoice);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kPlannerChoice),
+                                 PlanStatsFormat::kV3,
+                                 PlanSelectionStrategy::kMultiPlanner);
+    ASSERT_GTE(entries.size(), 2u);
+    for (const auto& entry : entries) {
+        ASSERT_FALSE(entry.summary.has_value()) << entry.planStatsTree;
+        forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
+            ASSERT(node.hasField("stage")) << node;
+            ASSERT_FALSE(node.hasField("statistics")) << node;
+        });
+    }
+}
+
 TEST_F(PlanExplainerTest, GetPlanEntriesV3WinnerUsesTrialSnapshot) {
     // The winner's V3 tree must show trial statistics, never final-execution statistics: executing
     // the query further must not change the winner's entry. Explain queries get the winner's trial
@@ -1046,6 +1195,43 @@ TEST_F(PlanExplainerTest, StatsToBSONTruncatesPlanExceedingMaxBSONDepth) {
               "stats tree exceeded BSON depth limit; omitting the rest of the tree");
 }
 
+// An SBE plan node's stage-specific fields come first in both explain shapes, followed by the
+// filter and then the cost estimates: flat in the legacy shape, inside the "statistics" subobject
+// in the V3 shape. This is the order statsToBsonV3Impl emits for classic plans, so SBE and classic
+// nodes read alike, and the order the query_golden tests record for SBE plans.
+TEST_F(PlanExplainerTest, StatsToBSONEstimateAndFilterPositionPerShape) {
+    using namespace cost_based_ranker;
+    auto root = std::make_unique<FetchNode>(
+        makeCollScanNode("testdb.explain"),
+        NamespaceString::createNamespaceString_forTest("testdb.explain"));
+    // The parsed filter keeps references into its BSON, which must outlive the serialization.
+    const BSONObj filterObj = fromjson("{a: 1}");
+    root->filter = uassertStatusOK(MatchExpressionParser::parse(filterObj, expCtx));
+    EstimateMap estimates;
+    estimates[root.get()] = std::make_unique<QSNEstimate>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Code},
+        CostEstimate{CostType{1}, EstimationSource::Code});
+
+    auto fieldNames = [](const BSONObj& obj) {
+        std::string names;
+        for (auto&& el : obj) {
+            names += (names.empty() ? "" : ",") + std::string{el.fieldNameStringData()};
+        }
+        return names;
+    };
+
+    BSONObjBuilder legacyBob;
+    statsToBSON(root.get(), &legacyBob, &legacyBob, estimates);
+    ASSERT_EQ(fieldNames(legacyBob.obj()),
+              "stage,planNodeId,nss,filter,costEstimate,cardinalityEstimate,estimatesMetadata,"
+              "inputStage");
+
+    BSONObjBuilder v3Bob;
+    statsToBsonV3(
+        root.get(), ExplainPolicy{ExplainSettings::kCostBasedStats}, estimates, &v3Bob, &v3Bob);
+    ASSERT_EQ(fieldNames(v3Bob.obj()), "stage,planNodeId,nss,filter,statistics,inputStages");
+}
+
 TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
     auto outerScanNode = makeCollScanNode("testdb.explain");
     auto innerScanNode = makeCollScanNode("testdb.foreign_explain");
@@ -1186,7 +1372,7 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeEmpty) {
     data1.rejectedPlansWithStages.push_back({nullptr, nullptr});
 
     PlanExplainerData data2;
-    data2.planStageQsnMap.emplace(nullptr, nullptr);
+    data2.planStageQsnMap.emplace(nullptr, stage_builder::QsnMapping{});
 
     data1 << std::move(data2);
 
@@ -1212,7 +1398,7 @@ TEST_F(PlanExplainerTest, OptionalPlanExplainerDataMerge) {
     // Both have values - merges content
     boost::optional<PlanExplainerData> data3;
     data3.emplace();
-    data3->planStageQsnMap.emplace(nullptr, nullptr);
+    data3->planStageQsnMap.emplace(nullptr, stage_builder::QsnMapping{});
 
     data1 << std::move(data3);
     ASSERT_EQ(data1->rejectedPlansWithStages.size(), 1);
@@ -1224,14 +1410,16 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
     auto qsn1 = std::make_unique<QuerySolution>();
     data1.rejectedPlansWithStages.push_back({std::move(qsn1), nullptr});
     // Use distinct pointer values to avoid key collision
-    data1.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x1), nullptr);
+    data1.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x1),
+                                  stage_builder::QsnMapping{});
     data1.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x1),
                             std::make_unique<cost_based_ranker::QSNEstimate>());
 
     PlanExplainerData data2;
     auto qsn2 = std::make_unique<QuerySolution>();
     data2.rejectedPlansWithStages.push_back({std::move(qsn2), nullptr});
-    data2.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x2), nullptr);
+    data2.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x2),
+                                  stage_builder::QsnMapping{});
     data2.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x2),
                             std::make_unique<cost_based_ranker::QSNEstimate>());
 

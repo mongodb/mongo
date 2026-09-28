@@ -139,12 +139,12 @@ Creating Index
 {
 	"stage" : "FETCH",
 	"planNodeId" : 2,
+	"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 	"filter" : {
 		"_id" : {
 			"$lte" : 5
 		}
 	},
-	"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 	"inputStage" : {
 		"stage" : "IXSCAN",
 		"planNodeId" : 1,

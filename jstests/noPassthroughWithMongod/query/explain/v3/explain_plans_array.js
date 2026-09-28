@@ -12,9 +12,6 @@
  *   "statistics" wrapper is absent when both groups are.
  * - The ordering of the plans after the winner: by the deciding ranker's metric (trial score
  *   descending when the multi-planner decided, cost ascending when the cost-based ranker did).
- *
- * The classic engine is pinned. SBE-eligible queries currently keep legacy-shaped sections under
- * explainVersion "3".
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
@@ -23,94 +20,22 @@ import {
     getV3Plans,
     MultiPlannerStopCondition,
     ChosenRanker,
+    normalizeRunVarying,
     PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {
+    assertAscending,
+    assertDescending,
+    assertWellFormedPlan,
+    forEachNode,
+    hasCostBasedGroup,
+    hasMultiPlanGroup,
+    rootCostEstimate,
+} from "jstests/libs/query/explain_v3_helpers.js";
 
 const collName = jsTestName();
 const coll = db[collName];
-
-// Local V3 accessors. The shared analyze_plan.js helpers are winningPlan-shaped by design and
-// are not converted to the V3 format (test-infra conversion is out of scope).
-
-// Invokes 'callback' on every node of a V3 plan stage tree, root to leaves. The V3 node shape
-// always nests children as the 'inputStages' array.
-function forEachNode(node, callback) {
-    callback(node);
-    for (const child of node.inputStages || []) {
-        forEachNode(child, callback);
-    }
-}
-
-// Basic well-formedness of one plans[] entry per the frozen V3 shape.
-function assertWellFormedPlan(plan) {
-    assert(plan.hasOwnProperty("isCached"), "missing isCached", {plan});
-    assert(plan.hasOwnProperty("planStages"), "missing planStages", {plan});
-    // Plans reaching here range over every ranker mode, so whether this one ran a trial is not
-    // known. A plan that did - equivalently, one carrying 'multiPlanStats' - must say how its trial
-    // ended; a plan that never ran one has no stop condition to report.
-    if (plan.hasOwnProperty("multiPlanStats")) {
-        assert(
-            plan.multiPlanStats.hasOwnProperty("stopCondition"),
-            "expected multiPlanStats.stopCondition on a plan that ran a trial",
-            {plan},
-        );
-    }
-    forEachNode(plan.planStages, (node) => {
-        assert(node.hasOwnProperty("stage"), "node missing stage", {node});
-        // Counters never appear flat on the node in the V3 shape.
-        assert(!node.hasOwnProperty("works"), "counter leaked out of statistics", {node});
-        assert(!node.hasOwnProperty("nReturned"), "counter leaked out of statistics", {node});
-        if (node.hasOwnProperty("statistics")) {
-            assert(
-                node.statistics.hasOwnProperty("costBased") ||
-                    node.statistics.hasOwnProperty("multiPlan"),
-                "statistics present but empty",
-                {node},
-            );
-        }
-    });
-}
-
-function hasMultiPlanGroup(plan) {
-    let found = false;
-    forEachNode(plan.planStages, (node) => {
-        if (node.statistics && node.statistics.multiPlan !== undefined) {
-            found = true;
-        }
-    });
-    return found;
-}
-
-function hasCostBasedGroup(plan) {
-    let found = false;
-    forEachNode(plan.planStages, (node) => {
-        if (node.statistics && node.statistics.costBased !== undefined) {
-            found = true;
-        }
-    });
-    return found;
-}
-
-function rootCostEstimate(plan) {
-    const statistics = plan.planStages.statistics;
-    assert(statistics && statistics.costBased, "missing root costBased group", {plan});
-    return statistics.costBased.costEstimate;
-}
-
-// Asserts the values are non-increasing (descending order allowing ties).
-function assertDescending(values, context) {
-    for (let i = 1; i < values.length; ++i) {
-        assert.lte(values[i], values[i - 1], "expected descending order", {values, context});
-    }
-}
-
-// Asserts the values are non-decreasing (ascending order allowing ties).
-function assertAscending(values, context) {
-    for (let i = 1; i < values.length; ++i) {
-        assert.gte(values[i], values[i - 1], "expected ascending order", {values, context});
-    }
-}
 
 function explainFind(filter, verbosity = "plannerStats") {
     return assert.commandWorked(
@@ -127,7 +52,7 @@ const matchingFilter = {a: {$gte: 0}, b: {$gte: 0}};
 // earning the EOF bonus and letting the multi-planner decide.)
 const cbrWinFilter = {a: {$gte: 0}, b: {$gte: 0}, c: 1};
 
-describe("V3 queryPlanner.plans array", function () {
+describe("V3 queryPlanner.plans array with classic engine", function () {
     let savedRankerConfig;
     let savedFrameworkControl;
 
@@ -136,8 +61,6 @@ describe("V3 queryPlanner.plans array", function () {
         savedFrameworkControl = assert.commandWorked(
             db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
         ).internalQueryFrameworkControl;
-        // Pin the classic engine: SBE-eligible queries keep legacy-shaped output until
-        // SERVER-132033.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
         );

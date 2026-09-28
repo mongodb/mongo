@@ -192,7 +192,7 @@ struct BaseCandidatePlan {
     // Remains boost::none for a candidate that never ran a trial (e.g. one constructed directly
     // from a cached plan).
     //
-    // TODO SERVER-132033: deduplicate with 'exitedEarly'. In the classic path the two are already
+    // TODO SERVER-134444: deduplicate with 'exitedEarly'. In the classic path the two are already
     // equivalent once the trial is over ('exitedEarly' iff the condition is kEof or kFullBatch),
     // but 'exitedEarly' cannot be dropped yet: the SBE trial executor sets only that flag - its
     // sole functional reader being the SBE cached-plan replan decision - and its early exits do not

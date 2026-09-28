@@ -139,6 +139,21 @@ void statsToBsonV3(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                    const BSONObjBuilder* topLevelBob);
 
 /**
+ * Appends the cost-based ranker's estimates for 'node' into the per-node "statistics" subobject
+ * 'statisticsBob'.
+ */
+void appendCostBasedStatsV3(StageType nodeType,
+                            const cost_based_ranker::QSNEstimate& est,
+                            BSONObjBuilder& statisticsBob);
+
+/**
+ * Returns the cost-based ranker's cost estimate for the plan rooted at 'rootQsn', or boost::none
+ * when that plan was not costed (or 'rootQsn' is null).
+ */
+boost::optional<double> rootCostOf(const cost_based_ranker::EstimateMap& estimates,
+                                   const QuerySolutionNode* rootQsn);
+
+/**
  * Retrieves the first stage of a given type from the plan tree, or nullptr if no such stage is
  * found.
  */

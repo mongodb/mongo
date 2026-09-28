@@ -22,6 +22,7 @@ import {
     getAggPlanStage,
     getQueryPlanner,
     isV3QueryPlanner,
+    normalizeRunVarying,
 } from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
@@ -145,19 +146,125 @@ describe("explain V3 verbosity modes", function () {
     }
 });
 
-// The stats-rich V3 modes' output shape on the find path (classic engine; the shape x ranker
-// matrix lives in explain_plans_array.js and the executionStats parity in
+// The stats-rich V3 modes' output shape on the find path, run once per execution engine (the shape x
+// ranker matrix lives in explain_plans_array.js and the executionStats parity in
 // explain_exec_stats_parity.js).
-describe("V3 stats-rich output shape (find path)", function () {
-    const findCommand = {find: collName, filter: {a: 2}};
+for (const engine of ["forceClassicEngine", "trySbeEngine"]) {
+    describe(`V3 stats-rich output shape (find path, ${engine})`, function () {
+        const findCommand = {find: collName, filter: {a: 2}};
+        let savedFrameworkControl;
+
+        before(function () {
+            savedFrameworkControl = assert.commandWorked(
+                db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+            ).internalQueryFrameworkControl;
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: engine}),
+            );
+
+            const coll = db[collName];
+            coll.drop();
+            assert.commandWorked(
+                coll.insert([
+                    {a: 1, b: 1},
+                    {a: 2, b: 2},
+                    {a: 2, b: 3},
+                ]),
+            );
+            assert.commandWorked(coll.createIndex({a: 1}));
+        });
+
+        after(function () {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: savedFrameworkControl,
+                }),
+            );
+        });
+
+        it("plannerChoice renders plans[] and no execution sections", function () {
+            const explain = assert.commandWorked(
+                db.runCommand({explain: findCommand, verbosity: "plannerChoice"}),
+            );
+            const queryPlanner = explain.queryPlanner;
+            assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
+            assert(!queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {
+                explain,
+            });
+            assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
+                explain,
+            });
+            assert(!explain.hasOwnProperty("executionStats"), "unexpected executionStats", {
+                explain,
+            });
+        });
+
+        it("plannerStats renders plans[] and no legacy keys or execution sections", function () {
+            const explain = assert.commandWorked(
+                db.runCommand({explain: findCommand, verbosity: "plannerStats"}),
+            );
+            const queryPlanner = explain.queryPlanner;
+            assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
+            assert(!queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {
+                explain,
+            });
+            assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
+                explain,
+            });
+            assert(!explain.hasOwnProperty("executionStats"), "unexpected executionStats", {
+                explain,
+            });
+        });
+
+        it("execStats adds exactly the retained executionStats section", function () {
+            const plannerStats = assert.commandWorked(
+                db.runCommand({explain: findCommand, verbosity: "plannerStats"}),
+            );
+            const execStats = assert.commandWorked(
+                db.runCommand({explain: findCommand, verbosity: "execStats"}),
+            );
+
+            // The queryPlanner section is identical across the two modes (modulo run-varying values).
+            assert.docEq(
+                normalizeRunVarying(plannerStats.queryPlanner),
+                normalizeRunVarying(execStats.queryPlanner),
+                "queryPlanner must be identical between plannerStats and execStats",
+            );
+
+            // execStats adds exactly the retained legacy section: winner executed, never an
+            // allPlansExecution array (its content lives in queryPlanner.plans[]).
+            assert(execStats.hasOwnProperty("executionStats"), "missing executionStats", {
+                execStats,
+            });
+            assert.eq(execStats.executionStats.executionSuccess, true, {execStats});
+            assert(
+                !execStats.executionStats.hasOwnProperty("allPlansExecution"),
+                "unexpected allPlansExecution",
+                {execStats},
+            );
+        });
+    });
+}
+
+describe("V3 for aggregation pipelines", function () {
+    // $_internalInhibitOptimization keeps this a classic DocumentSource pipeline.
+    const aggCommand = {
+        aggregate: collName,
+        pipeline: [
+            {$match: {a: {$lt: 2}}},
+            {$_internalInhibitOptimization: {}},
+            {$group: {_id: "$a", c: {$sum: 1}}},
+        ],
+        cursor: {},
+    };
     let savedFrameworkControl;
 
     before(function () {
         savedFrameworkControl = assert.commandWorked(
             db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
         ).internalQueryFrameworkControl;
-        // Pin the classic engine: SBE-eligible queries keep legacy-shaped output until
-        // SERVER-132033.
+        // TODO SERVER-132033 remove once SBE-eligible plans are supported in V3.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
         );
@@ -183,84 +290,52 @@ describe("V3 stats-rich output shape (find path)", function () {
         );
     });
 
-    // Strips the values that legitimately vary between two separate explain invocations of the
-    // same query - planning/trial timing and yield bookkeeping - so the queryPlanner sections
-    // can be compared for deep equality. Field *presence* is never normalized.
-    const RUN_VARYING_FIELDS = new Set([
-        "optimizationTimeMillis",
-        "optimizationTimeMicros",
-        "executionTimeMillisEstimate",
-        "executionTimeMicros",
-        "executionTimeNanos",
-        "saveState",
-        "restoreState",
-        "needYield",
-    ]);
-    function normalizeRunVarying(value) {
-        if (Array.isArray(value)) {
-            return value.map(normalizeRunVarying);
-        }
-        if (typeof value === "object" && value !== null) {
-            const out = {};
-            for (const key of Object.keys(value)) {
-                out[key] = RUN_VARYING_FIELDS.has(key)
-                    ? "<normalized>"
-                    : normalizeRunVarying(value[key]);
-            }
-            return out;
-        }
-        return value;
+    for (const verbosity of ["plannerChoice", "plannerStats", "execStats"]) {
+        it(`${verbosity} renders the V3 plans[] under $cursor`, function () {
+            const explain = assert.commandWorked(db.runCommand({explain: aggCommand, verbosity}));
+            assert.eq(explain.explainVersion, "3", "unexpected explainVersion", {explain});
+
+            const queryPlanner = getQueryPlanner(explain);
+            assert(isV3QueryPlanner(queryPlanner), "expected the V3 queryPlanner shape", {explain});
+            assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
+            assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
+                explain,
+            });
+
+            const leaf = getAggPlanStage(explain, "IXSCAN") || getAggPlanStage(explain, "COLLSCAN");
+            assert(leaf, "expected the query layer's access stage to be reachable", {explain});
+        });
     }
 
-    it("plannerChoice renders plans[] and no execution sections", function () {
-        const explain = assert.commandWorked(
-            db.runCommand({explain: findCommand, verbosity: "plannerChoice"}),
-        );
-        const queryPlanner = explain.queryPlanner;
-        assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
-        assert(!queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {explain});
-        assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
-            explain,
-        });
-        assert(!explain.hasOwnProperty("executionStats"), "unexpected executionStats", {explain});
+    it("plannerChoice and plannerStats do not execute the pipeline", function () {
+        for (const verbosity of ["plannerChoice", "plannerStats"]) {
+            const explain = assert.commandWorked(db.runCommand({explain: aggCommand, verbosity}));
+            assert(
+                !sectionsContainer(explain).hasOwnProperty("executionStats"),
+                `unexpected executionStats at ${verbosity}`,
+                {explain},
+            );
+            for (const stage of explain.stages) {
+                assert(
+                    !stage.hasOwnProperty("nReturned"),
+                    `unexpected per-stage execution stats at ${verbosity}`,
+                    {explain},
+                );
+            }
+        }
     });
 
-    it("plannerStats renders plans[] and no legacy keys or execution sections", function () {
+    it("execStats adds the executionStats section under $cursor", function () {
         const explain = assert.commandWorked(
-            db.runCommand({explain: findCommand, verbosity: "plannerStats"}),
+            db.runCommand({explain: aggCommand, verbosity: "execStats"}),
         );
-        const queryPlanner = explain.queryPlanner;
-        assert(Array.isArray(queryPlanner.plans), "missing queryPlanner.plans", {explain});
-        assert(!queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {explain});
-        assert(!queryPlanner.hasOwnProperty("rejectedPlans"), "unexpected rejectedPlans", {
-            explain,
-        });
-        assert(!explain.hasOwnProperty("executionStats"), "unexpected executionStats", {explain});
-    });
-
-    it("execStats adds exactly the retained executionStats section", function () {
-        const plannerStats = assert.commandWorked(
-            db.runCommand({explain: findCommand, verbosity: "plannerStats"}),
-        );
-        const execStats = assert.commandWorked(
-            db.runCommand({explain: findCommand, verbosity: "execStats"}),
-        );
-
-        // The queryPlanner section is identical across the two modes (modulo run-varying values).
-        assert.docEq(
-            normalizeRunVarying(plannerStats.queryPlanner),
-            normalizeRunVarying(execStats.queryPlanner),
-            "queryPlanner must be identical between plannerStats and execStats",
-        );
-
-        // execStats adds exactly the retained legacy section: winner executed, never an
-        // allPlansExecution array (its content lives in queryPlanner.plans[]).
-        assert(execStats.hasOwnProperty("executionStats"), "missing executionStats", {execStats});
-        assert.eq(execStats.executionStats.executionSuccess, true, {execStats});
+        const executionStats = sectionsContainer(explain).executionStats;
+        assert(executionStats, "missing executionStats", {explain});
+        assert.eq(executionStats.executionSuccess, true, {explain});
         assert(
-            !execStats.executionStats.hasOwnProperty("allPlansExecution"),
+            !executionStats.hasOwnProperty("allPlansExecution"),
             "unexpected allPlansExecution",
-            {execStats},
+            {explain},
         );
     });
 });

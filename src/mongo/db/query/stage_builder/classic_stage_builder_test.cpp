@@ -227,10 +227,18 @@ TEST_F(ClassicStageBuilderTest, IndexFetchTranslationPopulatesMap) {
     auto fetch = std::make_unique<FetchNode>(std::move(idxScan), kNss);
     QuerySolutionNode* fetchPtr = fetch.get();
 
-    auto stage = buildPlanStage(makeQuerySolution(std::move(fetch)));
+    auto querySolution = makeQuerySolution(std::move(fetch));
 
-    stage_builder::PlanStageToQsnMap expectedResults = {{stage.get(), fetchPtr},
-                                                        {stage->child().get(), idxScanPtr}};
+    // Read the node ids here since the call to buildPlanStage will destroy the QuerySolution and
+    // its nodes.
+    const auto fetchNodeId = fetchPtr->nodeId();
+    const auto idxScanNodeId = idxScanPtr->nodeId();
+
+    auto stage = buildPlanStage(std::move(querySolution));
+
+    stage_builder::PlanStageToQsnMap expectedResults = {
+        {stage.get(), {fetchPtr, fetchNodeId}},
+        {stage->child().get(), {idxScanPtr, idxScanNodeId}}};
     ASSERT_EQ(expectedResults, planStageQsnMap());
 }
 

@@ -72,14 +72,14 @@ function printPlanNode(node) {
         kExplainChildFieldNames,
     );
 
-    const entries = Object.entries(node).filter(([f, _]) => !bannedFieldNames.includes(f));
+    // Omit empty filters.
+    const entries = Object.entries(node).filter(
+        ([f, v]) =>
+            !bannedFieldNames.includes(f) && !(f == "filter" && Object.entries(v).length == 0),
+    );
     let str = `${node.stage}${shortenField(node, "nss")}${shortenField(node, "joinPredicates")}\n`;
     for (let i = 0; i < entries.length; i++) {
         const [f, v] = entries[i];
-        if (f == "filter" && Object.entries(v).length == 0) {
-            // Omit empty filters.
-            continue;
-        }
         str += `${f}: ${tojsononeline(v)}${i < entries.length - 1 ? "\n" : ""}`;
     }
     return str;

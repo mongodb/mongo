@@ -121,10 +121,13 @@ export function isV3QueryPlanner(queryPlanner) {
  * Presents one V3 "plans" array entry in the legacy plan shape this library's accessors consume:
  * the plan's stage tree, with the plan-level fields (isCached, multiPlanStats, ...) kept on the
  * root - the place the legacy winningPlan/rejectedPlans entries carry them.
+ *
+ * When the winner carries "executedPlanStages" (a pipeline pushed down to SBE after ranking), that
+ * tree is used instead of the ranked "planStages".
  */
 function v3PlanToLegacyShape(planEntry) {
-    const {planStages, ...planLevelFields} = planEntry;
-    return Object.assign(planLevelFields, planStages);
+    const {planStages, executedPlanStages, ...planLevelFields} = planEntry;
+    return Object.assign(planLevelFields, executedPlanStages ?? planStages);
 }
 
 /**
@@ -145,7 +148,10 @@ function getRejectedPlansFromQueryPlanner(queryPlanner) {
  * for that shard i.e, explain.queryPlanner.winningPlan.shards[shardNames[0]].
  */
 export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
-    let getWinningSBEPlan = (queryPlanner) => queryPlanner.winningPlan.slotBasedPlan;
+    let getWinningSBEPlan = (queryPlanner) =>
+        isV3QueryPlanner(queryPlanner)
+            ? queryPlanner.plans[0].slotBasedPlan
+            : queryPlanner.winningPlan.slotBasedPlan;
 
     // In the V3 shape the winner is the first entry of the unified "plans" array. Otherwise, the
     // 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
@@ -320,6 +326,49 @@ export function getV3Plans(explain) {
 }
 
 /**
+ * The values that legitimately differ between two explain invocations of the same query on the same
+ * data: planning and trial timing, and yield bookkeeping. Everything else is expected to be
+ * reproducible, so keeping this list short and named is what gives a deep explain comparison its
+ * teeth - resist adding to it.
+ *
+ */
+const kRunVaryingExplainFields = new Set([
+    "optimizationTimeMillis",
+    "optimizationTimeMicros",
+    "executionTimeMillisEstimate",
+    "executionTimeMicros",
+    "executionTimeNanos",
+    "saveState",
+    "restoreState",
+    "needYield",
+]);
+
+/**
+ * Returns a deep copy of 'value' with every run-varying field (see 'kRunVaryingExplainFields')
+ * replaced by the placeholder string "<normalized>", so that two explain outputs for the same query
+ * can be compared for deep equality.
+ *
+ * Field *presence* is never normalized: a normalized field is still present, so a field appearing or
+ * disappearing between the two outputs still fails the comparison. Recurses through both objects and
+ * arrays; scalars pass through unchanged.
+ */
+export function normalizeRunVarying(value) {
+    if (Array.isArray(value)) {
+        return value.map(normalizeRunVarying);
+    }
+    if (typeof value === "object" && value !== null) {
+        const out = {};
+        for (const key of Object.keys(value)) {
+            out[key] = kRunVaryingExplainFields.has(key)
+                ? "<normalized>"
+                : normalizeRunVarying(value[key]);
+        }
+        return out;
+    }
+    return value;
+}
+
+/**
  * How a candidate plan's multi-planner trial period ended.
  *   kEof             - the plan exhausted its results before any trial bound could stop it.
  *   kFullBatch       - the plan buffered the trial's target number of results, without hitting EOF.
@@ -344,7 +393,6 @@ export const MultiPlannerStopCondition = {
  * trial is equivalently one carrying plan-level 'multiPlanStats'; a plan that never ran one (e.g. a
  * CBR-rejected plan) has no stop condition to report and fails here.
  *
- * TODO SERVER-132033 Extend for SBE.
  */
 export function assertStopCondition(plan, expected) {
     assert(Object.values(MultiPlannerStopCondition).includes(expected), "Unknown stop condition", {

@@ -134,16 +134,9 @@ inline boost::optional<PlanExplainerData>& operator<<(boost::optional<PlanExplai
  * re-derive content decisions from a verbosity inside content code, the coupling the ExplainPolicy
  * seam exists to prevent.
  *
- * Nor does the reported version (getVersion()) determine the format: "3" is deliberately
- * reported for legacy-shaped output throughout the mixed-fidelity windows (planSummary until
- * SERVER-133235, SBE until SERVER-132033) - version reporting is
- * uniform by design while output fidelity varies per path, so the two must stay
- * decoupled.
- *
  * Not a transitional concept: legacy verbosities remain supported indefinitely and, since the
  * per-plan accessor consolidation, obtain their legacy-shaped entries through this same
- * enumerator as kLegacy. SERVER-132033 (engine parity) widens the enum's use to the remaining
- * engines while deleting the legacy per-plan virtuals; it does not retire the format dimension.
+ * enumerator as kLegacy.
  */
 enum class PlanStatsFormat {
     // The legacy explain node shape: structural fields and execution counters fused per node, the
@@ -192,8 +185,22 @@ struct ExplainPlanEntry {
     // provenance sources as 'hasTrialStats'. Emitted by the V3 assembler inside the plan-level
     // "multiPlanStats" alongside the trial totals, as "stopCondition". Being optional
     // independently of those totals, it can be absent from a multiPlanStats that is otherwise
-    // populated: SBE trials record no stop condition.
+    // populated.
     boost::optional<MultiPlannerStopCondition> stopCondition;
+    // The SBE virtual machine's view of this plan: the slot bindings and the stringified SBE stage
+    // tree (optionally with bytecode).
+    boost::optional<BSONObj> slotBasedPlan;
+    // The tree that actually executed, in the same node shape as 'planStatsTree', for the winning
+    // plan only. Set only when it differs from the ranked tree in 'planStatsTree'. This can happen
+    // with certain pipelines that are pushed down to SBE and rewritten *after* plan ranking.
+    boost::optional<BSONObj> executedPlanStages;
+    // A plan-level explain warning when the SBE plan is too large.
+    boost::optional<std::string> warning;
+    // TODO SERVER-134561: carry whether join optimization produced this plan. Legacy emits
+    // "usedJoinOptimization" whenever the join optimization knob is on; V3 emits nothing. The
+    // ticket has to settle where the value belongs - here at plan level, matching legacy's SBE
+    // placement, or once on "queryPlanner" alongside "joinPlanCacheKey", which is the scope it
+    // actually has today since it never varies across the plans of one explain.
     // TODO SERVER-131545: attach additional per-plan data (e.g. planningResult,
     // stopCondition, score) via a per-candidate record.
 };
@@ -299,10 +306,7 @@ public:
      *
      * The 'verbosity' level parameter determines the amount of information to be returned.
      *
-     * TODO SERVER-132033: the classic and express implementations are thin wrappers over
-     * getPlanEntries(); once SBE routes through getPlanEntries() too, remove this virtual
-     * (and getRejectedPlansStats()) from the interface, completing the per-plan accessor
-     * consolidation.
+     * TODO SERVER-134444: deduplicate with getPlanEntries.
      */
     [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual PlanStatsDetails getWinningPlanStats(
         ExplainOptions::Verbosity verbosity) const = 0;
@@ -322,8 +326,7 @@ public:
      *
      * The 'verbosity' level parameter determines the amount of information to be returned.
      *
-     * TODO SERVER-132033: remove together with getWinningPlanStats() once
-     * SBE routes through getPlanEntries(); see the note there.
+     * TODO SERVER-134444: remove together with getWinningPlanStats().
      */
     virtual std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const = 0;
@@ -344,8 +347,7 @@ public:
      * PlanSelectionStrategy::kSinglePlan when unknown (single plan, cached plan).
      *
      * This is the accessor the V3 explain output builds its "plans[]" array
-     * over. The default implementation returns no entries. Explainers whose per-plan V3
-     * parity is deferred (SBE; SERVER-132033) and explainers without
+     * over. The default implementation returns no entries. Explainers without
      * candidate plans (the pipeline explainer) inherit it. PlanExplainerImpl and
      * PlanExplainerExpress provide real implementations.
      */

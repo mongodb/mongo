@@ -400,6 +400,7 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
  */
 void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
                             const boost::optional<PlanRankerReason> reason,
+                            const bool isSbeExplainer,
                             BSONObjBuilder& out) {
     BSONObjBuilder planRankerBob(out.subobjStart("rankerChoice"));
 
@@ -415,14 +416,17 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
         planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
     } else {
         // A strategy decided, so it must have recorded why (it populated the same explain data
-        // this value rides on). This can only fire on the classic V3 path: SBE falls back to
-        // legacy-shaped output before rankerChoice is emitted, and express plans are single plans
-        // that no strategy ranks, so they always take the branch above.
+        // this value rides on). Express plans are single plans that no strategy ranks, so they
+        // always take the branch above.
+        // TODO SERVER-134550 Remove the condition on SBE explainer and the extra bool parameter.
         tassert(13237700,
                 "a ranking strategy decided the winning plan but recorded no reason",
-                reason.has_value());
-        planRankerBob.append("reason", getPlanRankerReasonName(reason.value()));
+                reason.has_value() || isSbeExplainer);
+        if (reason.has_value()) {
+            planRankerBob.append("reason", getPlanRankerReasonName(reason.value()));
+        }
     }
+
     planRankerBob.doneFast();
 }
 
@@ -439,13 +443,8 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
  * "multiPlanStats". The plans are still *ordered* by the deciding ranker's metric - ordering reads
  * the metric without displaying it, so the ranking that happened stays visible in the sequence.
  *
- * There are two deliberate delegation windows:
- *
- * - planSummary still renders legacy-shaped output under explainVersion "3".
+ * planSummary mode still renders legacy-shaped output under explainVersion "3".
  *   TODO SERVER-133235 (the remaining reduction) closes that window.
- * - Explainers that do not implement the per-plan enumerator (SBE: default-empty getPlanEntries())
- *   keep the legacy delegation. TODO SERVER-132033 routes it through getPlanEntries() as well; the
- *   classic and express explainers always yield at least one entry.
  *
  * Both delegations must map the verbosity to legacy first: the legacy generators tassert on a V3
  * verbosity.
@@ -476,9 +475,7 @@ void generatePlannerInfoV3(PlanExecutor* exec,
         explainer.getPlanSelectionStrategy().value_or(PlanSelectionStrategy::kSinglePlan);
     auto entries = explainer.getPlanEntries(policy, PlanStatsFormat::kV3, decidingPlanRanker);
     // Zero entries means the explainer does not implement the per-plan enumerator and inherited
-    // the default-empty getPlanEntries(): SBE and the pipeline explainer. Those paths keep the
-    // legacy-shaped sections under explainVersion "3" until SERVER-132033 (engine parity); the
-    // classic and express explainers always return at least the winning plan.
+    // the default-empty getPlanEntries().
     if (entries.empty()) {
         generatePlannerInfo(exec,
                             mapV3ToLegacyVerbosity(v3Verbosity),
@@ -494,12 +491,17 @@ void generatePlannerInfoV3(PlanExecutor* exec,
     appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
 
     // Append the rankerChoice sub-object including details around the chosen ranker and reasoning.
-    appendPlanRankerChoice(decidingPlanRanker, explainer.getPlanRankerReason(), plannerBob);
+    appendPlanRankerChoice(decidingPlanRanker,
+                           explainer.getPlanRankerReason(),
+                           explainer.isSbeExplainer(),
+                           plannerBob);
 
     BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
     for (auto&& entry : entries) {
         BSONObjBuilder planBob(plansBob.subobjStart());
         planBob.append("isCached", entry.isCached);
+        // TODO SERVER-134561: emit "usedJoinOptimization", which legacy reports whenever the join
+        // optimization knob is on.
         if (internalQueryAllowForcedPlanByHash.load() && entry.solutionHash) {
             planBob.append("solutionHashUnstable", static_cast<long long>(*entry.solutionHash));
         }
@@ -512,9 +514,8 @@ void generatePlannerInfoV3(PlanExecutor* exec,
             }
             if (entry.stopCondition) {
                 // How this plan's trial period ended. Sourced from the trial itself rather than
-                // from 'summary', so it can legitimately be absent while the totals are present
-                // (SBE trials record no stop condition).
-                // TODO SERVER-132033: unify the trial stop condition with the summary, so that this
+                // from 'summary', which is why it is optional independently of the totals.
+                // TODO SERVER-134444: unify the trial stop condition with the summary, so that this
                 // field is always present when the totals are present.
                 multiPlanStatsBob.append("stopCondition", toStringView(*entry.stopCondition));
             }
@@ -527,6 +528,18 @@ void generatePlannerInfoV3(PlanExecutor* exec,
                 "totalDocsExamined", static_cast<long long>(entry.summary->totalDocsExamined));
         }
         planBob.append("planStages", entry.planStatsTree);
+        // SBE-only, winner-only content: the compiled SBE tree behind this plan, or the warning
+        // that it did not fit in what the explain size threshold left for it.
+        if (entry.slotBasedPlan) {
+            planBob.append("slotBasedPlan", *entry.slotBasedPlan);
+        }
+        // The tree that ran, present only when it differs from the ranked tree above.
+        if (entry.executedPlanStages) {
+            planBob.append("executedPlanStages", *entry.executedPlanStages);
+        }
+        if (entry.warning) {
+            planBob.append("warning", *entry.warning);
+        }
     }
     plansBob.doneFast();
     plannerBob.doneFast();

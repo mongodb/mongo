@@ -888,8 +888,8 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "z"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "base" : { "$gt" : 3 } }
   |  direction: "forward"
+  |  filter: { "base" : { "$gt" : 3 } }
   |
   HASH_JOIN_EMBEDDING [base = base]
   leftEmbeddingField: "none"
@@ -899,8 +899,8 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 1
 `"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
@@ -914,16 +914,16 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "z"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |
   |  HASH_JOIN_EMBEDDING [base = base]
   |  leftEmbeddingField: "x"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
   |  direction: "forward"
@@ -950,15 +950,15 @@ rightEmbeddingField: "x"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
   |  direction: "forward"
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "base" : { "$gt" : 3 } }
   direction: "forward"
+  filter: { "base" : { "$gt" : 3 } }
 ```
 ### Random reordering with seed 3
 `"HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
@@ -982,12 +982,12 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "base" : { "$gt" : 3 } }
   direction: "forward"
+  filter: { "base" : { "$gt" : 3 } }
 ```
 ### Random reordering with seed 4
 `"NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), x = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) ) ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
@@ -997,8 +997,8 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "z"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "base" : { "$gt" : 3 } }
   |  direction: "forward"
+  |  filter: { "base" : { "$gt" : 3 } }
   |
   HASH_JOIN_EMBEDDING [base = x.base,base = y.base]
   leftEmbeddingField: "none"
@@ -1015,8 +1015,8 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 5
 `"HJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) )"`
@@ -1034,15 +1034,15 @@ rightEmbeddingField: "none"
   |  |  rightEmbeddingField: "z"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
   direction: "forward"
@@ -1069,12 +1069,12 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "base" : { "$gt" : 3 } }
   |  direction: "forward"
+  |  filter: { "base" : { "$gt" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 7
 `"NLJ( _ = ( HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( z = ( COLLSCAN [test.base_coll_reorder_md_base] ), y = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) )"`
@@ -1084,8 +1084,8 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   HASH_JOIN_EMBEDDING [base = y.base,base = z.base]
   leftEmbeddingField: "x"
@@ -1099,8 +1099,8 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "base" : { "$gt" : 3 } }
   |  direction: "forward"
+  |  filter: { "base" : { "$gt" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_a]
   direction: "forward"
@@ -1124,15 +1124,15 @@ rightEmbeddingField: "x"
   |  rightEmbeddingField: "z"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
   |  direction: "forward"
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 9
 `"HJ( x = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( _ = ( NLJ( y = ( COLLSCAN [test.base_coll_reorder_md_b] ), z = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
@@ -1146,16 +1146,16 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  NESTED_LOOP_JOIN_EMBEDDING [base = base]
   |  leftEmbeddingField: "y"
   |  rightEmbeddingField: "z"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$gt" : 3 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
   |  direction: "forward"
@@ -1175,8 +1175,8 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  NESTED_LOOP_JOIN_EMBEDDING [base = base]
   |  leftEmbeddingField: "x"
@@ -1189,8 +1189,8 @@ rightEmbeddingField: "none"
   |  direction: "forward"
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "base" : { "$gt" : 3 } }
   direction: "forward"
+  filter: { "base" : { "$gt" : 3 } }
 ```
 
 ## 6. 5-Node graph + filters
@@ -1203,36 +1203,36 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "bbb"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   HASH_JOIN_EMBEDDING [aaa.base = base]
   leftEmbeddingField: "none"
   rightEmbeddingField: "ccc"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "aaa"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  direction: "forward"
+  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |
   HASH_JOIN_EMBEDDING [base = base]
   leftEmbeddingField: "ddd"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
-  filter: { "b" : { "$gt" : 0 } }
   direction: "forward"
+  filter: { "b" : { "$gt" : 0 } }
 ```
 ### Random reordering with seed 1
 `"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) )"`
@@ -1250,28 +1250,28 @@ rightEmbeddingField: "none"
   |  |  rightEmbeddingField: "ccc"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |  |
   |  |  HASH_JOIN_EMBEDDING [a = a]
   |  |  leftEmbeddingField: "none"
   |  |  rightEmbeddingField: "aaa"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
-  filter: { "b" : { "$gt" : 0 } }
   direction: "forward"
+  filter: { "b" : { "$gt" : 0 } }
 ```
 ### Random reordering with seed 2
 `"NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1281,16 +1281,16 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
   rightEmbeddingField: "bbb"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   HASH_JOIN_EMBEDDING [a = aaa.a]
   leftEmbeddingField: "none"
@@ -1301,16 +1301,16 @@ rightEmbeddingField: "ddd"
   |  rightEmbeddingField: "ccc"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |  direction: "forward"
+  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  direction: "forward"
+  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 3
 `"HJ( _ = ( NLJ( _ = ( HJ( _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1320,36 +1320,36 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   NESTED_LOOP_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "none"
   rightEmbeddingField: "bbb"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   HASH_JOIN_EMBEDDING [aaa.a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   NESTED_LOOP_JOIN_EMBEDDING [base = base]
   leftEmbeddingField: "ccc"
   rightEmbeddingField: "aaa"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  direction: "forward"
+  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   direction: "forward"
+  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
 ```
 ### Random reordering with seed 4
 `"NLJ( _ = ( HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1359,8 +1359,8 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   HASH_JOIN_EMBEDDING [base = aaa.base]
   leftEmbeddingField: "ccc"
@@ -1375,20 +1375,20 @@ rightEmbeddingField: "ddd"
   |  |  rightEmbeddingField: "none"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |  direction: "forward"
+  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  direction: "forward"
+  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   direction: "forward"
+  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
 ```
 ### Random reordering with seed 5
 `"NLJ( _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( NLJ( _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1398,8 +1398,8 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   HASH_JOIN_EMBEDDING [b = b]
   leftEmbeddingField: "bbb"
@@ -1410,24 +1410,24 @@ rightEmbeddingField: "ddd"
   |  rightEmbeddingField: "none"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |
   |  NESTED_LOOP_JOIN_EMBEDDING [base = base]
   |  leftEmbeddingField: "ccc"
   |  rightEmbeddingField: "aaa"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
-  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   direction: "forward"
+  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
 ```
 ### Random reordering with seed 6
 `"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) ) ) ) ) )"`
@@ -1449,24 +1449,24 @@ rightEmbeddingField: "none"
   |  |  |  rightEmbeddingField: "bbb"
   |  |  |  |  |
   |  |  |  |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  |  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |  |  |  direction: "forward"
+  |  |  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
-  filter: { "b" : { "$gt" : 0 } }
   direction: "forward"
+  filter: { "b" : { "$gt" : 0 } }
 ```
 ### Random reordering with seed 7
 `"NLJ( _ = ( NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1476,36 +1476,36 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "bbb"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   NESTED_LOOP_JOIN_EMBEDDING [aaa.base = base]
   leftEmbeddingField: "none"
   rightEmbeddingField: "ccc"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "aaa"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  direction: "forward"
+  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |
   HASH_JOIN_EMBEDDING [base = base]
   leftEmbeddingField: "none"
   rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 8
 `"NLJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( NLJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) ) ), ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) )"`
@@ -1515,16 +1515,16 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "bbb"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   NESTED_LOOP_JOIN_EMBEDDING [base = base]
   leftEmbeddingField: "none"
   rightEmbeddingField: "ddd"
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   HASH_JOIN_EMBEDDING [a = aaa.a]
   leftEmbeddingField: "none"
@@ -1535,16 +1535,16 @@ rightEmbeddingField: "bbb"
   |  rightEmbeddingField: "aaa"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "b" : { "$eq" : 3 } }
   direction: "forward"
+  filter: { "b" : { "$eq" : 3 } }
 ```
 ### Random reordering with seed 9
 `"HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ) )"`
@@ -1558,8 +1558,8 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "aaa"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  HASH_JOIN_EMBEDDING [b = b]
   |  leftEmbeddingField: "bbb"
@@ -1570,20 +1570,20 @@ rightEmbeddingField: "none"
   |  |  rightEmbeddingField: "none"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  |  filter: { "b" : { "$gt" : 0 } }
   |  |  direction: "forward"
+  |  |  filter: { "b" : { "$gt" : 0 } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  direction: "forward"
+  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   direction: "forward"
+  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
 ```
 ### Random reordering with seed 10
 `"HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( _ = ( NLJ( _ = ( HJ( _ = ( COLLSCAN [test.base_coll_reorder_md_base] ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ), aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ) ) ), ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) )"`
@@ -1597,32 +1597,32 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "ccc"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |  direction: "forward"
+  |  |  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   |  |
   |  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   |  leftEmbeddingField: "none"
   |  rightEmbeddingField: "aaa"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  HASH_JOIN_EMBEDDING [b = b]
   |  leftEmbeddingField: "none"
   |  rightEmbeddingField: "bbb"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |  direction: "forward"
+  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  filter: { "b" : { "$eq" : 3 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$eq" : 3 } }
   |
   COLLSCAN [test.base_coll_reorder_md_b]
-  filter: { "b" : { "$gt" : 0 } }
   direction: "forward"
+  filter: { "b" : { "$gt" : 0 } }
 ```
 ### Random reordering with seed 11
 `"HJ( ccc = ( COLLSCAN [test.base_coll_reorder_md_base] ), _ = ( HJ( _ = ( HJ( ddd = ( COLLSCAN [test.base_coll_reorder_md_b] ), _ = ( HJ( aaa = ( COLLSCAN [test.base_coll_reorder_md_a] ), _ = ( COLLSCAN [test.base_coll_reorder_md_base] ) ) ) ) ), bbb = ( COLLSCAN [test.base_coll_reorder_md_b] ) ) ) )"`
@@ -1636,8 +1636,8 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "bbb"
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |  direction: "forward"
+  |  |  filter: { "$and" : [ { "b" : { "$eq" : 3 } }, { "base" : { "$gt" : 20 } } ] }
   |  |
   |  HASH_JOIN_EMBEDDING [base = base]
   |  leftEmbeddingField: "ddd"
@@ -1648,19 +1648,19 @@ rightEmbeddingField: "none"
   |  |  rightEmbeddingField: "none"
   |  |  |  |
   |  |  |  COLLSCAN [test.base_coll_reorder_md_base]
-  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |  direction: "forward"
+  |  |  |  filter: { "b" : { "$eq" : 3 } }
   |  |  |
   |  |  COLLSCAN [test.base_coll_reorder_md_a]
-  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |  direction: "forward"
+  |  |  filter: { "base" : { "$in" : [ 22, 33 ] } }
   |  |
   |  COLLSCAN [test.base_coll_reorder_md_b]
-  |  filter: { "b" : { "$gt" : 0 } }
   |  direction: "forward"
+  |  filter: { "b" : { "$gt" : 0 } }
   |
   COLLSCAN [test.base_coll_reorder_md_base]
-  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
   direction: "forward"
+  filter: { "$and" : [ { "b" : { "$lt" : 0 } }, { "base" : { "$in" : [ 22, 33 ] } } ] }
 ```
 

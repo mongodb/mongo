@@ -19,9 +19,23 @@
 namespace mongo::stage_builder {
 
 /**
- * Map from PlanStageKey to the QuerySolutionNode* which generated it.
+ * What a classic PlanStage was built from: the QuerySolutionNode that generated it, plus that
+ * node's id captured by value. Note that the QuerySolutionNode pointer is not owned here and only
+ * certain node types are guaranteed to be stable across the lifetime of the PlanStage tree.
+ *
+ * TODO SERVER-134683 Remove explain's reliance on stable (unowned) QuerySolutionNode raw pointers
  */
-using PlanStageToQsnMap = absl::flat_hash_map<PlanStageKey, const QuerySolutionNode*>;
+struct QsnMapping {
+    const QuerySolutionNode* qsn = nullptr;
+    PlanNodeId nodeId = 0;
+
+    bool operator==(const QsnMapping&) const = default;
+};
+
+/**
+ * Map from PlanStageKey to what generated it.
+ */
+using PlanStageToQsnMap = absl::flat_hash_map<PlanStageKey, QsnMapping>;
 
 /**
  * A stage builder which builds an executable tree using classic PlanStages.

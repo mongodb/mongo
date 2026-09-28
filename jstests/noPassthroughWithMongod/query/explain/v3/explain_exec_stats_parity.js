@@ -72,105 +72,106 @@ function assertExecStatsParity(explainedCommand) {
     assertParity(legacyExecStats, v3ExecStats, "executionStats");
 }
 
-describe("V3 execStats executionStats section parity with legacy executionStats", function () {
-    let savedFrameworkControl;
-    let savedYieldIterations;
-    let savedYieldPeriodMS;
+for (const engine of ["forceClassicEngine", "trySbeEngine"]) {
+    describe(`V3 execStats executionStats section parity with legacy executionStats (${engine})`, function () {
+        let savedFrameworkControl;
+        let savedYieldIterations;
+        let savedYieldPeriodMS;
 
-    before(function () {
-        savedFrameworkControl = assert.commandWorked(
-            db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-        ).internalQueryFrameworkControl;
-        // Pin the classic engine; SERVER-132033 extends the parity run to SBE.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
-        );
+        before(function () {
+            savedFrameworkControl = assert.commandWorked(
+                db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+            ).internalQueryFrameworkControl;
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: engine}),
+            );
 
-        // The test compares two separate invocations of the same query, so both must execute
-        // identically. Count-based yields do (they fire at the same work counts), but time-based
-        // yields fire nondeterministically on slow builds (sanitizers, debug) and drift
-        // yield-driven counters that are NOT normalized below, e.g. "seeks" (a restore re-seeks
-        // the index cursor) and "works" (a NEED_YIELD return adds a work cycle). Disable both
-        // yield triggers for the duration of the test.
-        const savedYieldParams = assert.commandWorked(
-            db.adminCommand({
-                getParameter: 1,
-                internalQueryExecYieldIterations: 1,
-                internalQueryExecYieldPeriodMS: 1,
-            }),
-        );
-        savedYieldIterations = savedYieldParams.internalQueryExecYieldIterations;
-        savedYieldPeriodMS = savedYieldParams.internalQueryExecYieldPeriodMS;
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: 1000000000,
-                internalQueryExecYieldPeriodMS: 1000000000,
-            }),
-        );
+            // The test compares two separate invocations of the same query, so both must execute
+            // identically. Count-based yields do (they fire at the same work counts), but time-based
+            // yields fire nondeterministically on slow builds (sanitizers, debug) and drift
+            // yield-driven counters that are NOT normalized below, e.g. "seeks" (a restore re-seeks
+            // the index cursor) and "works" (a NEED_YIELD return adds a work cycle). Disable both
+            // yield triggers for the duration of the test.
+            const savedYieldParams = assert.commandWorked(
+                db.adminCommand({
+                    getParameter: 1,
+                    internalQueryExecYieldIterations: 1,
+                    internalQueryExecYieldPeriodMS: 1,
+                }),
+            );
+            savedYieldIterations = savedYieldParams.internalQueryExecYieldIterations;
+            savedYieldPeriodMS = savedYieldParams.internalQueryExecYieldPeriodMS;
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldIterations: 1000000000,
+                    internalQueryExecYieldPeriodMS: 1000000000,
+                }),
+            );
 
-        coll.drop();
-        const docs = [];
-        for (let i = 0; i < 500; ++i) {
-            docs.push({_id: i, a: i % 100, b: i % 10});
-        }
-        assert.commandWorked(coll.insert(docs));
-        assert.commandWorked(coll.createIndex({a: 1}));
-        assert.commandWorked(coll.createIndex({b: 1}));
-    });
+            coll.drop();
+            const docs = [];
+            for (let i = 0; i < 500; ++i) {
+                docs.push({_id: i, a: i % 100, b: i % 10});
+            }
+            assert.commandWorked(coll.insert(docs));
+            assert.commandWorked(coll.createIndex({a: 1}));
+            assert.commandWorked(coll.createIndex({b: 1}));
+        });
 
-    after(function () {
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryFrameworkControl: savedFrameworkControl,
-                internalQueryExecYieldIterations: savedYieldIterations,
-                internalQueryExecYieldPeriodMS: savedYieldPeriodMS,
-            }),
-        );
-    });
+        after(function () {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: savedFrameworkControl,
+                    internalQueryExecYieldIterations: savedYieldIterations,
+                    internalQueryExecYieldPeriodMS: savedYieldPeriodMS,
+                }),
+            );
+        });
 
-    it("multi-planned find", function () {
-        assertExecStatsParity({find: collName, filter: {a: {$gte: 0}, b: {$gte: 0}}});
-    });
+        it("multi-planned find", function () {
+            assertExecStatsParity({find: collName, filter: {a: {$gte: 0}, b: {$gte: 0}}});
+        });
 
-    it("single-plan find", function () {
-        assertExecStatsParity({find: collName, filter: {nonexistent: 1}});
-    });
+        it("single-plan find", function () {
+            assertExecStatsParity({find: collName, filter: {nonexistent: 1}});
+        });
 
-    it("fully-lowered aggregate", function () {
-        // Optimized away into a find-shaped plan, so the sections sit at the response root.
-        assertExecStatsParity({
-            aggregate: collName,
-            pipeline: [{$match: {a: {$gte: 0}, b: {$gte: 0}}}],
-            cursor: {},
+        it("count", function () {
+            assertExecStatsParity({count: collName, query: {a: {$gte: 50}}});
+        });
+
+        it("fully-lowered aggregate", function () {
+            // Optimized away into a find-shaped plan, so the sections sit at the response root.
+            assertExecStatsParity({
+                aggregate: collName,
+                pipeline: [{$match: {a: {$gte: 0}, b: {$gte: 0}}}],
+                cursor: {},
+            });
+        });
+
+        it("classic pipeline aggregate", function () {
+            // $_internalInhibitOptimization keeps this a DocumentSource pipeline, so the sections are
+            // produced by DocumentSourceCursor::serialize() and nested under the $cursor stage. Only
+            // that section is compared: the sibling queryPlanner legitimately differs between the two
+            // verbosities (V3 renders a 'plans' array), which is what the rest of this directory covers.
+            assertExecStatsParity({
+                aggregate: collName,
+                pipeline: [
+                    {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+                    {$_internalInhibitOptimization: {}},
+                    {$group: {_id: "$b", c: {$sum: 1}}},
+                ],
+                cursor: {},
+            });
+        });
+
+        it("update", function () {
+            assertExecStatsParity({
+                update: collName,
+                updates: [{q: {a: {$gte: 0}, b: {$gte: 0}}, u: {$set: {c: 1}}, multi: true}],
+            });
         });
     });
-
-    it("classic pipeline aggregate", function () {
-        // $_internalInhibitOptimization keeps this a DocumentSource pipeline, so the sections are
-        // produced by DocumentSourceCursor::serialize() and nested under the $cursor stage. Only
-        // that section is compared: the sibling queryPlanner legitimately differs between the two
-        // verbosities (V3 renders a 'plans' array), which is what the rest of this directory covers.
-        assertExecStatsParity({
-            aggregate: collName,
-            pipeline: [
-                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
-                {$_internalInhibitOptimization: {}},
-                {$group: {_id: "$b", c: {$sum: 1}}},
-            ],
-            cursor: {},
-        });
-    });
-
-    it("count", function () {
-        assertExecStatsParity({count: collName, query: {a: {$gte: 50}}});
-    });
-
-    it("update", function () {
-        assertExecStatsParity({
-            update: collName,
-            updates: [{q: {a: {$gte: 0}, b: {$gte: 0}}, u: {$set: {c: 1}}, multi: true}],
-        });
-    });
-});
+}
