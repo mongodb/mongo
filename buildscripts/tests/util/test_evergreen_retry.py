@@ -1,9 +1,9 @@
-"""Unit tests for buildscripts/evergreen_activate_result_tasks.py."""
+"""Unit tests for buildscripts/util/evergreen_retry.py."""
 
 import unittest
 from unittest.mock import patch
 
-from buildscripts import evergreen_activate_result_tasks as under_test
+from buildscripts.util import evergreen_retry as under_test
 from evergreen.api import DEFAULT_HTTP_RETRY_ATTEMPTS, RetryingEvergreenApi
 
 API_SERVER = "https://evergreen.example.com"
@@ -22,7 +22,7 @@ class TestGetEvergreenApi(unittest.TestCase):
         self.assertNotIn("POST", default_adapter.max_retries.allowed_methods)
 
         with patch.object(under_test.RetryingEvergreenApi, "get_api", return_value=real_api):
-            evg_api = under_test.get_evergreen_api("ignored.yml")
+            evg_api = under_test.get_extra_retry_evergreen_api("ignored.yml")
 
         expected_total = DEFAULT_HTTP_RETRY_ATTEMPTS + under_test.EXTRA_HTTP_RETRY_ATTEMPTS
 
@@ -39,7 +39,7 @@ class TestGetEvergreenApi(unittest.TestCase):
         with patch.object(
             under_test.RetryingEvergreenApi, "get_api", return_value=real_api
         ) as mock_get_api:
-            under_test.get_evergreen_api("/path/to/.evergreen.yml")
+            under_test.get_extra_retry_evergreen_api("/path/to/.evergreen.yml")
 
         mock_get_api.assert_called_once_with(
             config_file="/path/to/.evergreen.yml", log_on_error=True

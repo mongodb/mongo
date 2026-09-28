@@ -717,10 +717,6 @@ py_library(
             group = "core",
         ),
         dependency(
-            "requests",
-            group = "core",
-        ),
-        dependency(
             "structlog",
             group = "evergreen",
         ),
