@@ -1030,9 +1030,6 @@ private:
     std::pair<SbStage, PlanStageSlots> buildSearch(const QuerySolutionNode* root,
                                                    const PlanStageReqs& reqs);
 
-    std::pair<SbStage, PlanStageSlots> buildWindow(const QuerySolutionNode* root,
-                                                   const PlanStageReqs& reqs);
-
     /**
      * Constructs an optimized SBE plan for 'root' in the case that the fields of the shard key
      * pattern are provided by the child index scan. In this case, the SBE plan for the child
@@ -1189,8 +1186,8 @@ private:
     // Hash set tracking the Collators used by the SBE plan being built.
     absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorsMap;
 
-    // Maintains a mapping from AccumulationStatements / WindowFunctionStatements to their
-    // corresponding SortSpecs (stored in slots).
+    // Maintains a mapping from AccumulationStatements to their corresponding SortSpecs (stored in
+    // slots).
     absl::flat_hash_map<const void*, sbe::value::SlotId> _sortSpecMap;
 
     const MultipleCollectionAccessor& _collections;

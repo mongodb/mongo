@@ -7,7 +7,6 @@
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
@@ -290,11 +289,6 @@ public:
     sbe::SlotExprPairVector lower(SbExprSlotVector& sbSlotSbExprVec,
                                   const VariableTypes* varTypes = nullptr);
 
-    sbe::WindowStage::Window lower(SbWindow& sbWindow, const VariableTypes* varTypes = nullptr);
-
-    std::vector<sbe::WindowStage::Window> lower(std::vector<SbWindow>& sbWindows,
-                                                const VariableTypes* varTypes = nullptr);
-
 protected:
     StageBuilderState& _state;
 };
@@ -538,29 +532,6 @@ public:
     std::tuple<SbStage, SbSlotVector> makeAggProject(const VariableTypes& varTypes,
                                                      SbStage stage,
                                                      SbBlockAggExprVector sbBlockAggExprs);
-
-    SbStage makeWindow(SbStage stage,
-                       const SbSlotVector& currSlots,
-                       const SbSlotVector& boundTestingSlots,
-                       size_t partitionSlotCount,
-                       std::vector<SbWindow> windows,
-                       boost::optional<sbe::value::SlotId> collatorSlot) {
-        return makeWindow(VariableTypes{},
-                          std::move(stage),
-                          currSlots,
-                          boundTestingSlots,
-                          partitionSlotCount,
-                          std::move(windows),
-                          collatorSlot);
-    }
-
-    SbStage makeWindow(const VariableTypes& varTypes,
-                       SbStage stage,
-                       const SbSlotVector& currSlots,
-                       const SbSlotVector& boundTestingSlots,
-                       size_t partitionSlotCount,
-                       std::vector<SbWindow> windows,
-                       boost::optional<sbe::value::SlotId> collatorSlot);
 
     std::tuple<SbStage, SbSlot, SbSlot> makeUnwind(SbStage stage,
                                                    SbSlot inputSlot,

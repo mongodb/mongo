@@ -46,7 +46,6 @@ class Projection;
 
 namespace mongo {
 class AccumulationStatement;
-struct WindowFunctionStatement;
 }  // namespace mongo
 
 namespace mongo::stage_builder {
@@ -117,30 +116,21 @@ boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* r
 std::string_view getAccumulationOpName(const AccumulationStatement& accStmt);
 
 /**
- * Retrieves the window function op name from 'accStmt' and returns it.
- */
-std::string_view getWindowFunctionOpName(const WindowFunctionStatement& wfStmt);
-
-/**
- * Return true iff 'name', 'accStmt', or 'wfStmt' is one of $topN, $bottomN, $minN, $maxN,
- * $firstN, or $lastN.
+ * Return true iff 'name' or 'accStmt' is one of $topN, $bottomN, $minN, $maxN, $firstN, or $lastN.
  */
 bool isAccumulatorN(std::string_view name);
 bool isAccumulatorN(const AccumulationStatement& accStmt);
-bool isAccumulatorN(const WindowFunctionStatement& wfStmt);
 
 /**
- * Return true iff 'name', 'accStmt', or 'wfStmt' is $topN or $bottomN.
+ * Return true iff 'name' or 'accStmt' is $topN or $bottomN.
  */
 bool isTopBottomN(std::string_view name);
 bool isTopBottomN(const AccumulationStatement& accStmt);
-bool isTopBottomN(const WindowFunctionStatement& wfStmt);
 
 /**
- * Gets the internal pointer to the SortPattern (if there is one) inside 'accStmt' or 'wfStmt'.
+ * Gets the internal pointer to the SortPattern (if there is one) inside 'accStmt'.
  */
 boost::optional<SortPattern> getSortPattern(const AccumulationStatement& accStmt);
-boost::optional<SortPattern> getSortPattern(const WindowFunctionStatement& wfStmt);
 
 /**
  * Creates a SortSpec object from a SortPattern.

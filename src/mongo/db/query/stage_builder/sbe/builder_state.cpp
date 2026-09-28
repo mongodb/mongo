@@ -109,28 +109,6 @@ sbe::value::SlotId StageBuilderState::getSortSpecSlot(const AccumulationStatemen
     return slot;
 }
 
-sbe::value::SlotId StageBuilderState::getSortSpecSlot(const WindowFunctionStatement* wf) {
-    tassert(8679707, "Expected non-null WindowFunctionStatement", wf != nullptr);
-    const void* key = static_cast<const void*>(wf);
-
-    auto it = sortSpecMap->find(key);
-    if (it != sortSpecMap->end()) {
-        auto slot = it->second;
-        return slot;
-    }
-
-    // If we don't have a SortSpec for this WindowFunctionStatement yet, create one
-    // and add it the map and return it.
-    auto sortSpec = makeSortSpecFromSortPattern(getSortPattern(*wf));
-
-    auto tag = sbe::value::TypeTags::sortSpec;
-    auto val = sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release());
-    auto slot = env->registerSlot(tag, val, true, slotIdGenerator);
-
-    (*sortSpecMap)[key] = slot;
-    return slot;
-}
-
 sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     MatchExpression::InputParamId paramId) {
     auto it = data->inputParamToSlotMap.find(paramId);

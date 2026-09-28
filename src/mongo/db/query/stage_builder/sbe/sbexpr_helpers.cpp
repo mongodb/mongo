@@ -118,32 +118,6 @@ sbe::SlotExprPairVector SbExprBuilder::lower(SbExprSlotVector& sbSlotSbExprVec,
     return slotExprVec;
 }
 
-sbe::WindowStage::Window SbExprBuilder::lower(SbWindow& sbWindow, const VariableTypes* varTypes) {
-    sbe::WindowStage::Window window;
-
-    window.windowExprSlots = lower(sbWindow.windowExprSlots, varTypes);
-    window.frameFirstSlots = lower(sbWindow.frameFirstSlots, varTypes);
-    window.frameLastSlots = lower(sbWindow.frameLastSlots, varTypes);
-    window.initExprs = lower(sbWindow.initExprs, varTypes);
-    window.addExprs = lower(sbWindow.addExprs, varTypes);
-    window.removeExprs = lower(sbWindow.removeExprs, varTypes);
-    window.lowBoundExpr = lower(sbWindow.lowBoundExpr, varTypes);
-    window.highBoundExpr = lower(sbWindow.highBoundExpr, varTypes);
-
-    return window;
-}
-
-std::vector<sbe::WindowStage::Window> SbExprBuilder::lower(std::vector<SbWindow>& sbWindows,
-                                                           const VariableTypes* varTypes) {
-    std::vector<sbe::WindowStage::Window> windows;
-    windows.reserve(sbWindows.size());
-
-    for (auto& sbWindow : sbWindows) {
-        windows.emplace_back(lower(sbWindow, varTypes));
-    }
-
-    return windows;
-}
 
 SbExpr SbExprBuilder::makeNot(SbExpr e) {
     return makeUnaryOp(abt::Operations::Not, std::move(e));
@@ -923,23 +897,6 @@ std::tuple<SbStage, SbSlotVector> SbBuilder::makeAggProject(const VariableTypes&
     stage = sbe::makeS<sbe::AggProjectStage>(std::move(stage), std::move(aggExprsVec), _nodeId);
 
     return {std::move(stage), std::move(aggOutSlots)};
-}
-
-SbStage SbBuilder::makeWindow(const VariableTypes& varTypes,
-                              SbStage stage,
-                              const SbSlotVector& currSlots,
-                              const SbSlotVector& boundTestingSlots,
-                              size_t partitionSlotCount,
-                              std::vector<SbWindow> windows,
-                              boost::optional<sbe::value::SlotId> collatorSlot) {
-    return sbe::makeS<sbe::WindowStage>(std::move(stage),
-                                        lower(currSlots, &varTypes),
-                                        lower(boundTestingSlots, &varTypes),
-                                        partitionSlotCount,
-                                        lower(windows, &varTypes),
-                                        collatorSlot,
-                                        _state.allowDiskUse,
-                                        _nodeId);
 }
 
 std::tuple<SbStage, SbSlot, SbSlot> SbBuilder::makeUnwind(SbStage stage,

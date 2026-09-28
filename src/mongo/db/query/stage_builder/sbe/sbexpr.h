@@ -684,17 +684,6 @@ struct SbHashAggAccumulator {
 };
 using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;
 
-struct SbWindow {
-    SbSlotVector windowExprSlots;
-    SbSlotVector frameFirstSlots;
-    SbSlotVector frameLastSlots;
-    SbExpr::Vector initExprs;
-    SbExpr::Vector addExprs;
-    SbExpr::Vector removeExprs;
-    SbExpr lowBoundExpr;
-    SbExpr highBoundExpr;
-};
-
 inline void addVariableTypesHelper(VariableTypes& varTypes, SbSlot slot) {
     if (auto typeSig = slot.getTypeSignature()) {
         varTypes[slot.toProjectionName()] = *typeSig;

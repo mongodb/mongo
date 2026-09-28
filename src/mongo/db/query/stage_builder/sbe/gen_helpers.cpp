@@ -9,7 +9,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_path_tracking_visitor.h"
@@ -755,24 +755,12 @@ std::string_view getAccumulationOpName(const AccumulationStatement& accStmt) {
     return accStmt.expr.name;
 }
 
-std::string_view getWindowFunctionOpName(const WindowFunctionStatement& wfStmt) {
-    return wfStmt.expr->getOpName();
-}
-
 bool isAccumulatorN(const AccumulationStatement& accStmt) {
     return isAccumulatorN(getAccumulationOpName(accStmt));
 }
 
-bool isAccumulatorN(const WindowFunctionStatement& wfStmt) {
-    return isAccumulatorN(getWindowFunctionOpName(wfStmt));
-}
-
 bool isTopBottomN(const AccumulationStatement& accStmt) {
     return isTopBottomN(getAccumulationOpName(accStmt));
-}
-
-bool isTopBottomN(const WindowFunctionStatement& wfStmt) {
-    return isTopBottomN(getWindowFunctionOpName(wfStmt));
 }
 
 boost::optional<SortPattern> getSortPattern(const AccumulationStatement& accStmt) {
@@ -791,27 +779,6 @@ boost::optional<SortPattern> getSortPattern(const AccumulationStatement& accStmt
         if (accStmt.expr.name == AccumulatorBottomN::getName()) {
             return dynamic_cast<AccumulatorBottomN*>(acc.get())->getSortPattern();
         }
-    }
-    return {};
-}
-
-boost::optional<SortPattern> getSortPattern(const WindowFunctionStatement& wfStmt) {
-    using TopExpr = window_function::ExpressionN<WindowFunctionTop, AccumulatorTop>;
-    using BottomExpr = window_function::ExpressionN<WindowFunctionBottom, AccumulatorBottom>;
-    using TopNExpr = window_function::ExpressionN<WindowFunctionTopN, AccumulatorTopN>;
-    using BottomNExpr = window_function::ExpressionN<WindowFunctionBottomN, AccumulatorBottomN>;
-
-    if (wfStmt.expr->getOpName() == AccumulatorTop::getName()) {
-        return *dynamic_cast<TopExpr*>(wfStmt.expr.get())->sortPattern;
-    }
-    if (wfStmt.expr->getOpName() == AccumulatorBottom::getName()) {
-        return *dynamic_cast<BottomExpr*>(wfStmt.expr.get())->sortPattern;
-    }
-    if (wfStmt.expr->getOpName() == AccumulatorTopN::getName()) {
-        return *dynamic_cast<TopNExpr*>(wfStmt.expr.get())->sortPattern;
-    }
-    if (wfStmt.expr->getOpName() == AccumulatorBottomN::getName()) {
-        return *dynamic_cast<BottomNExpr*>(wfStmt.expr.get())->sortPattern;
     }
     return {};
 }
