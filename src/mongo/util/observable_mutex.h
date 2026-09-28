@@ -9,12 +9,12 @@
 #include "mongo/util/scopeguard.h"
 
 #include <cstdint>
-#include <ctime>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 
+#include <absl/base/internal/cycleclock.h>
 #include <boost/optional.hpp>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
@@ -48,23 +48,29 @@ struct AcquisitionStats {
 };
 
 struct Timer {
-    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
-#if defined(__linux__) && defined(__x86_64__)
-        unsigned int lo, hi;
-        asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-        return ((uint64_t)hi << 32) | lo;
-#elif defined(__linux__) && defined(__aarch64__)
-        uint64_t tsc;
-        asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
-        return tsc;
-#else
-        return std::clock();
-#endif
+    // TODO [SERVER-106769]: Replace `Timer` with the new low-overhead timer.
+    MONGO_COMPILER_ALWAYS_INLINE int64_t getTime() const {
+        // TODO [SERVER-90115]: This absl functionality is internal-only and may be removed,
+        // replace this once we've created our own cycle clock reader.
+        return absl::base_internal::CycleClock::Now();
     }
 };
 }  // namespace observable_mutex_details
 
 using MutexAcquisitionStats = observable_mutex_details::AcquisitionStats<uint64_t>;
+
+/**
+ * Converts a raw wait-cycle count into microseconds using the CycleClock frequency. The
+ * frequency is architecture-specific but known at runtime, so dividing by it yields comparable
+ * time units across a mixed fleet.
+ */
+inline int64_t waitCyclesToMicros(uint64_t waitCycles) {
+    const double freq = absl::base_internal::CycleClock::Frequency();
+    if (MONGO_unlikely(freq <= 0.0)) {
+        return 0;
+    }
+    return static_cast<int64_t>(static_cast<double>(waitCycles) * 1e6 / freq);
+}
 
 struct MutexStats {
     MutexAcquisitionStats exclusiveAcquisitions{0, 0, 0};

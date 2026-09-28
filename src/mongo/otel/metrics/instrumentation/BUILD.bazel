@@ -294,6 +294,7 @@ mongo_cc_library(
         "//src/mongo/otel/metrics:otel_metric_name_validation",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:periodic_runner",
+        "@com_google_absl//absl/base",
     ],
 )
 

@@ -52,9 +52,11 @@ private:
         Counter<int64_t>* exclusiveTotal{nullptr};
         Counter<int64_t>* exclusiveContentions{nullptr};
         Counter<int64_t>* exclusiveWaitCycles{nullptr};
+        Counter<int64_t>* exclusiveWaitMicros{nullptr};
         Counter<int64_t>* sharedTotal{nullptr};
         Counter<int64_t>* sharedContentions{nullptr};
         Counter<int64_t>* sharedWaitCycles{nullptr};
+        Counter<int64_t>* sharedWaitMicros{nullptr};
     };
 
     struct TagState {
@@ -67,10 +69,11 @@ private:
     TagCounters _makeCounters(const std::string& tag) {
         auto passkey = ObservableMutexMetrics::dyn_metric_passkey();
         const auto makeCounter = [&](std::string_view field,
-                                     std::string desc) -> Counter<int64_t>& {
+                                     std::string desc,
+                                     MetricUnit unit = MetricUnit::kCount) -> Counter<int64_t>& {
             auto name = fmt::format("serverStatus.lockContentionMetrics.{}.{}", tag, field);
             return MetricsService::instance().createInt64Counter(
-                DynamicMetricNameMaker::make(name, passkey), std::move(desc), MetricUnit::kCount);
+                DynamicMetricNameMaker::make(name, passkey), std::move(desc), unit);
         };
 
         return TagCounters{
@@ -79,11 +82,19 @@ private:
                 &makeCounter("exclusive.contentions", "Contended exclusive acquisitions"),
             .exclusiveWaitCycles = &makeCounter("exclusive.waitCycles",
                                                 "Wait cycles for contended exclusive acquisitions"),
+            .exclusiveWaitMicros =
+                &makeCounter("exclusive.waitMicros",
+                             "Wait time for contended exclusive acquisitions in microseconds",
+                             MetricUnit::kMicroseconds),
             .sharedTotal = &makeCounter("shared.total", "Total shared acquisitions"),
             .sharedContentions =
                 &makeCounter("shared.contentions", "Contended shared acquisitions"),
             .sharedWaitCycles =
                 &makeCounter("shared.waitCycles", "Wait cycles for contended shared acquisitions"),
+            .sharedWaitMicros =
+                &makeCounter("shared.waitMicros",
+                             "Wait time for contended shared acquisitions in microseconds",
+                             MetricUnit::kMicroseconds),
         };
     }
 
@@ -107,11 +118,18 @@ private:
         state.counters.exclusiveContentions->add(delta(prevEx.contentions, curEx.contentions));
         state.counters.exclusiveWaitCycles->add(delta(prevEx.waitCycles, curEx.waitCycles));
 
+        // We convert the cycles into microseconds first before computing the delta to ensure
+        // precision.
+        state.counters.exclusiveWaitMicros->add(
+            delta(waitCyclesToMicros(prevEx.waitCycles), waitCyclesToMicros(curEx.waitCycles)));
+
         const auto& curSh = currStats.sharedAcquisitions;
         const auto& prevSh = state.prevCounters.sharedAcquisitions;
         state.counters.sharedTotal->add(delta(prevSh.total, curSh.total));
         state.counters.sharedContentions->add(delta(prevSh.contentions, curSh.contentions));
         state.counters.sharedWaitCycles->add(delta(prevSh.waitCycles, curSh.waitCycles));
+        state.counters.sharedWaitMicros->add(
+            delta(waitCyclesToMicros(prevSh.waitCycles), waitCyclesToMicros(curSh.waitCycles)));
 
         state.prevCounters = currStats;
     }

@@ -27,6 +27,8 @@ void serialize(BSONObjBuilder& bob, const MutexAcquisitionStats& stats) {
                static_cast<long long>(stats.contentions));
     bob.append(ObservableMutexRegistry::kTotalWaitCyclesFieldName,
                static_cast<long long>(stats.waitCycles));
+    bob.append(ObservableMutexRegistry::kTotalWaitMicrosFieldName,
+               static_cast<long long>(waitCyclesToMicros(stats.waitCycles)));
 }
 
 void serialize(BSONObjBuilder& bob, const MutexStats& stats) {

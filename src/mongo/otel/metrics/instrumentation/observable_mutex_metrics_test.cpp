@@ -24,12 +24,16 @@ constexpr std::string_view kTestMutexTagExContentions =
     "serverStatus.lockContentionMetrics.testMutex.exclusive.contentions";
 constexpr std::string_view kTestMutexTagExWaitCycles =
     "serverStatus.lockContentionMetrics.testMutex.exclusive.waitCycles";
+constexpr std::string_view kTestMutexTagExWaitMicros =
+    "serverStatus.lockContentionMetrics.testMutex.exclusive.waitMicros";
 constexpr std::string_view kTestMutexTagShTotal =
     "serverStatus.lockContentionMetrics.testMutex.shared.total";
 constexpr std::string_view kTestMutexTagShContentions =
     "serverStatus.lockContentionMetrics.testMutex.shared.contentions";
 constexpr std::string_view kTestMutexTagShWaitCycles =
     "serverStatus.lockContentionMetrics.testMutex.shared.waitCycles";
+constexpr std::string_view kTestMutexTagShWaitMicros =
+    "serverStatus.lockContentionMetrics.testMutex.shared.waitMicros";
 
 StringMap<MutexStats> makeTagStats(std::string_view tag,
                                    uint64_t exTotal,
@@ -78,9 +82,11 @@ TEST_F(ObservableMutexOtelMetricsTest, UpdateCreatesAllCountersForNewTag) {
     EXPECT_EQ(readCounter(kTestMutexTagExTotal), 10);
     EXPECT_EQ(readCounter(kTestMutexTagExContentions), 2);
     EXPECT_EQ(readCounter(kTestMutexTagExWaitCycles), 300);
+    EXPECT_EQ(readCounter(kTestMutexTagExWaitMicros), waitCyclesToMicros(300));
     EXPECT_EQ(readCounter(kTestMutexTagShTotal), 5);
     EXPECT_EQ(readCounter(kTestMutexTagShContentions), 1);
     EXPECT_EQ(readCounter(kTestMutexTagShWaitCycles), 200);
+    EXPECT_EQ(readCounter(kTestMutexTagShWaitMicros), waitCyclesToMicros(200));
 }
 
 TEST_F(ObservableMutexOtelMetricsTest, UpdatePreservesCountersWhenTagDisappearsAndReappears) {
@@ -101,9 +107,23 @@ TEST_F(ObservableMutexOtelMetricsTest, PositiveDeltaAccumulatesCounter) {
     EXPECT_EQ(readCounter(kTestMutexTagExTotal), 15);
     EXPECT_EQ(readCounter(kTestMutexTagExContentions), 4);
     EXPECT_EQ(readCounter(kTestMutexTagExWaitCycles), 600);
+    EXPECT_EQ(readCounter(kTestMutexTagExWaitMicros), waitCyclesToMicros(600));
     EXPECT_EQ(readCounter(kTestMutexTagShTotal), 10);
     EXPECT_EQ(readCounter(kTestMutexTagShContentions), 3);
     EXPECT_EQ(readCounter(kTestMutexTagShWaitCycles), 400);
+    EXPECT_EQ(readCounter(kTestMutexTagShWaitMicros), waitCyclesToMicros(400));
+}
+
+TEST_F(ObservableMutexOtelMetricsTest, WaitMicrosReflectsCycleConversion) {
+    // Use large cycle counts so the cycles->micros conversion is non-zero regardless of the host's
+    // CycleClock frequency.
+    constexpr uint64_t kExWaitCycles = 5'000'000'000ULL;
+    constexpr uint64_t kShWaitCycles = 3'000'000'000ULL;
+    metrics.update(makeTagStats(kTestMutexTag, 10, 2, kExWaitCycles, 5, 1, kShWaitCycles));
+
+    EXPECT_GT(waitCyclesToMicros(kExWaitCycles), 0);
+    EXPECT_EQ(readCounter(kTestMutexTagExWaitMicros), waitCyclesToMicros(kExWaitCycles));
+    EXPECT_EQ(readCounter(kTestMutexTagShWaitMicros), waitCyclesToMicros(kShWaitCycles));
 }
 
 TEST_F(ObservableMutexOtelMetricsTest, NegativeDeltaHasNoEffectOnCounter) {
