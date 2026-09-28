@@ -7,20 +7,14 @@ from typing import Annotated, Optional
 
 import structlog
 import typer
-from urllib3.util import Retry
 
-from evergreen.api import (
-    DEFAULT_HTTP_RETRY_ATTEMPTS,
-    DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
-    DEFAULT_HTTP_RETRY_CODES,
-    EvergreenApi,
-    RetryingEvergreenApi,
-)
+from evergreen.api import EvergreenApi
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.evergreen_retry import get_extra_retry_evergreen_api
 from buildscripts.util.fileops import read_yaml_file
 
 LOGGER = structlog.getLogger(__name__)
@@ -176,14 +170,7 @@ def main(
         )
         return
 
-    evg_api = RetryingEvergreenApi.get_api(config_file=evergreen_config, log_on_error=True)
-    evg_api._http_retry = Retry(
-        total=DEFAULT_HTTP_RETRY_ATTEMPTS + 10,
-        backoff_factor=DEFAULT_HTTP_RETRY_BACKOFF_FACTOR,
-        status_forcelist=DEFAULT_HTTP_RETRY_CODES,
-        raise_on_status=False,
-        raise_on_redirect=False,
-    )
+    evg_api = get_extra_retry_evergreen_api(evergreen_config)
 
     activate_result_task_group(build_variant, task_name, version_id, evg_api, build_events_file)
 
