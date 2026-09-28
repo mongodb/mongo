@@ -3450,6 +3450,12 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (olderThan80) {
             delete options.setParameter
                 .performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert;
+            // The MaxKey scan failpoints and the featureFlagMaxKeyDetection parameter were
+            // introduced by the MaxKey detection change. Binaries older than 8.0 may not know them
+            // and would fail to start if they were passed as startup parameters.
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyOrphanScanState"];
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyZoneScanState"];
+            delete options.setParameter.featureFlagMaxKeyDetection;
         }
 
         if (tojson(options) != tojson({}))

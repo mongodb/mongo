@@ -116,6 +116,16 @@ NSS_CONSTANT(kRangeDeletionNamespace, DatabaseName::kConfig, "rangeDeletions"_sd
 // Namespace containing pending range deletions snapshots for rename operations.
 NSS_CONSTANT(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename"_sd)
 
+// Namespace for the MaxKey orphan detection scan state document, replicated within the shard
+// replica set.
+NSS_CONSTANT(kConfigMaxKeyOrphanScanStateNamespace,
+             DatabaseName::kConfig,
+             "maxKeyOrphanScanState"_sd)
+
+// Namespace for the MaxKey zone detection scan state document, replicated within the config-server
+// replica set.
+NSS_CONSTANT(kConfigMaxKeyZoneScanStateNamespace, DatabaseName::kConfig, "maxKeyZoneScanState"_sd)
+
 // Namespace for the coordinator's resharding operation state.
 NSS_CONSTANT(kConfigReshardingOperationsNamespace, DatabaseName::kConfig, "reshardingOperations"_sd)
 

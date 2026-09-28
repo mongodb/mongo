@@ -37,6 +37,19 @@ feature_flags:
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
     default: false
     shouldBeFCVGated: true
+  featureFlagMaxKeyDetection:
+    description: >-
+      Feature flag protecting the one-shot MaxKey inventory scans run on each primary
+      stepup. On shards, a dedicated per-stepup detector scans for shard-key documents
+      whose shard key is the global maximum (every field is MaxKey) and records the result
+      in config.maxKeyOrphanScanState.
+      On the config server, the Balancer scan detects zones whose upper bound matches the
+      buggy trailing-MinKey fingerprint and records the result in config.maxKeyZoneScanState.
+      Disabled by default; the scans can also be enabled at runtime via the
+      enableMaxKeyDetection server parameter without turning on this flag.
+    cpp_varname: feature_flags::gMaxKeyDetection
+    default: false
+    shouldBeFCVGated: false
   featureFlagConcurrencyInChunkMigration:
     description: "Feature flag for enabling concurrency within a chunk migration"
     cpp_varname: feature_flags::gConcurrencyInChunkMigration

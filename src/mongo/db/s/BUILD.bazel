@@ -20,6 +20,28 @@ filegroup(
     ]),
 )
 
+mongo_idl_library(
+    name = "max_key_orphan_scan_state_idl",
+    src = "max_key_orphan_scan_state.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "max_key_zone_scan_state_idl",
+    src = "max_key_zone_scan_state.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
 mongo_cc_library(
     name = "balancer_stats_registry",
     srcs = [
@@ -84,6 +106,7 @@ mongo_cc_library(
         "//src/mongo/db/s:cqf_utils.cpp",
         "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution.cpp",
         "//src/mongo/db/s:drop_agg_temp_collections.cpp",
+        "//src/mongo/db/s:max_key_orphan_detection.cpp",
         "//src/mongo/db/s:metadata_consistency_util.cpp",
         "//src/mongo/db/s:metadata_manager.cpp",
         "//src/mongo/db/s:migration_batch_fetcher.cpp",
@@ -223,6 +246,7 @@ mongo_cc_library(
         "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution_idl",
         "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/db/s:global_index_crud_commands_idl",
+        "//src/mongo/db/s:max_key_orphan_scan_state_idl",
         "//src/mongo/db/s:migration_coordinator_document_idl",
         "//src/mongo/db/s:migration_recipient_recovery_document_idl",
         "//src/mongo/db/s:query_analysis_writer",
@@ -401,11 +425,13 @@ mongo_cc_library(
         "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/s:add_shard_cmd_idl",
         "//src/mongo/db/s:forwardable_operation_metadata",
+        "//src/mongo/db/s:max_key_zone_scan_state_idl",
         "//src/mongo/db/s:participant_block_idl",
         "//src/mongo/db/s:remove_tags_idl",
         "//src/mongo/db/s:sharded_index_catalog_commands_idl",
         "//src/mongo/db/s:sharding_config_server_parameters_idl",
         "//src/mongo/db/s:sharding_logging",
+        "//src/mongo/db/s:sharding_runtime_d_params_idl",
         "//src/mongo/db/s:type_shard_identity_idl",
         "//src/mongo/db/s:user_writes_recoverable_critical_section",
         "//src/mongo/db/s/resharding:resharding_server_parameters_idl",
@@ -772,6 +798,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s:database_sharding_state_test.cpp",
         "//src/mongo/db/s:ddl_lock_manager_test.cpp",
         "//src/mongo/db/s:implicit_collection_creation_test.cpp",
+        "//src/mongo/db/s:max_key_orphan_detection_test.cpp",
         "//src/mongo/db/s:metadata_consistency_util_test.cpp",
         "//src/mongo/db/s:metadata_manager_test.cpp",
         "//src/mongo/db/s:migration_batch_fetcher_test.cpp",
@@ -886,6 +913,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/s:analyze_shard_key_util",
+        "//src/mongo/db/s:max_key_orphan_scan_state_idl",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/s:sharding_catalog",
@@ -916,6 +944,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/balancer:balancer_chunk_selection_policy_test.cpp",
         "//src/mongo/db/s/balancer:balancer_commands_scheduler_test.cpp",
         "//src/mongo/db/s/balancer:balancer_defragmentation_policy_test.cpp",
+        "//src/mongo/db/s/balancer:balancer_max_key_zone_scan_test.cpp",
         "//src/mongo/db/s/balancer:balancer_policy_test.cpp",
         "//src/mongo/db/s/balancer:core_options_stub.cpp",
         "//src/mongo/db/s/balancer:migration_test_fixture.cpp",
@@ -963,6 +992,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/s:config_server_test_fixture",
+        "//src/mongo/db/s:max_key_zone_scan_state_idl",
         "//src/mongo/db/s:sharding_commands_d",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/timeseries:timeseries_options",

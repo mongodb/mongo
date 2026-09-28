@@ -134,3 +134,14 @@ server_parameters:
         cpp_varname: autoMergerMaxTimeProcessingChunksMS
         default: 500 # 500 milliseconds
         redact: false
+
+    maxKeyZoneScanEnabled:
+        description: >-
+            When set to false the MaxKey zone inventory scan is skipped. Re-enabling it will run
+            the scan on next stepup. Has no effect unless MaxKey detection is enabled (via the
+            enableMaxKeyDetection server parameter or featureFlagMaxKeyDetection).
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gMaxKeyZoneScanEnabled
+        default: true
+        redact: false

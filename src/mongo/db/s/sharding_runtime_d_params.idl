@@ -166,6 +166,18 @@ server_parameters:
         default: 900
         redact: false
 
+    enableMaxKeyDetection:
+        description: >-
+            When enabled, runs the one-shot MaxKey inventory scans on each primary stepup (the
+            shard-side orphan detector and the config-server Balancer zone scan). This setting is
+            checked only on stepup, so enabling it at runtime takes effect on the next primary
+            stepup. The scans run if either this parameter is true or featureFlagMaxKeyDetection is enabled.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gEnableMaxKeyDetection
+        default: false
+        redact: false
+
     disableResumableRangeDeleter:
         description: >-
           Disable the resumable range deleter. Ranges will not be submitted for deletion, and if an
@@ -185,4 +197,18 @@ server_parameters:
         validator:
           gte: 1
         default: 1000
+        redact: false
+
+    maxKeyOrphanScanThrottleMillis:
+        description: >-
+            Milliseconds the standalone MaxKey orphan detector sleeps before each per-collection
+            read of the collection entry from the config server. Throttles those reads so a primary
+            stepup across a shard with many collections does not overload the config server. Set to
+            0 to disable.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxKeyOrphanScanThrottleMillis
+        validator:
+            gte: 0
+        default: 10
         redact: false

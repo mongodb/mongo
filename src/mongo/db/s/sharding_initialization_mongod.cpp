@@ -79,6 +79,7 @@
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/max_key_orphan_detection.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
@@ -494,6 +495,8 @@ ShardingInitializationMongoD* ShardingInitializationMongoD::get(ServiceContext* 
 }
 
 void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
+    cancelMaxKeyOrphanDetection(opCtx->getServiceContext());
+
     auto const shardingState = ShardingState::get(opCtx);
     if (!shardingState->enabled())
         return;
@@ -623,8 +626,21 @@ void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long l
     }
 }
 
+void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, long long term) {
+    // Kick off the one-shot MaxKey orphan detector for this term. Runs asynchronously
+    // and is cancelled on stepdown.
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+        ShardingState::get(opCtx)->enabled()) {
+        launchMaxKeyOrphanDetectionOnStepUp(opCtx, term);
+    }
+}
+
 void ShardingInitializationMongoD::onStepDown() {
     _isPrimary.store(false);
+
+    // Cancel any in-flight MaxKey orphan detector so the one-shot sweep restarts cleanly on the
+    // next stepup. onStepDown may run on a thread without a Client, so avoid cc().
+    cancelMaxKeyOrphanDetection(getGlobalServiceContext());
 }
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {

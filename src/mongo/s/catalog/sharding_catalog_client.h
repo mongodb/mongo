@@ -126,7 +126,8 @@ public:
         OperationContext* opCtx,
         AggregateCommandRequest& aggRequest,
         const repl::ReadConcernArgs& readConcern,
-        const Milliseconds& maxTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load())) = 0;
+        const Milliseconds& maxTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent) = 0;
 
     /**
      * Retrieves the metadata for a given database, if it exists.

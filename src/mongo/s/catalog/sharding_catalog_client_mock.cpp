@@ -52,7 +52,8 @@ std::vector<BSONObj> ShardingCatalogClientMock::runCatalogAggregation(
     OperationContext* opCtx,
     AggregateCommandRequest& aggRequest,
     const repl::ReadConcernArgs& readConcern,
-    const Milliseconds& maxTimeout) {
+    const Milliseconds& maxTimeout,
+    Shard::RetryPolicy retryPolicy) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 

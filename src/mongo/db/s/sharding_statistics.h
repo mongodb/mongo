@@ -155,6 +155,30 @@ struct ShardingStatistics {
     // TODO (SERVER-112793) Remove once v9.0 branches out.
     AtomicWord<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
 
+    // FTDC metrics for the MaxKey orphan detection sweep run on shard primaries.
+    // The *Complete/*FoundUnownedMaxKey/*UnownedAlertEmitted fields are 0/1 flags describing the
+    // last published sweep outcome on this process. *Errors counts non-fatal per-collection errors
+    // encountered while running the sweep.
+    AtomicWord<long long> maxKeyOrphanScanComplete{0};
+    AtomicWord<long long> maxKeyOrphanScanFoundUnownedMaxKey{0};
+    AtomicWord<long long> maxKeyOrphanScanUnownedAlertEmitted{0};
+    AtomicWord<long long> maxKeyOrphanScanErrors{0};
+
+    // An accessible (owned) MaxKey doc was found on this shard. Its version could be stale if it
+    // was re-owned after some series of application operations. The
+    // *FoundOwnedMaxKey/*OwnedAlertEmitted fields are 0/1 flags describing the last published sweep
+    // outcome.
+    AtomicWord<long long> maxKeyOrphanScanFoundOwnedMaxKey{0};
+    AtomicWord<long long> maxKeyOrphanScanOwnedAlertEmitted{0};
+
+    // FTDC metrics for the MaxKey zone inventory scan run by the balancer on config primaries.
+    // The *Complete/*FoundBuggyZone/*AlertEmitted fields are 0/1 flags describing the last
+    // published scan outcome on this process. *Errors counts non-fatal scan errors.
+    AtomicWord<long long> maxKeyZoneScanComplete{0};
+    AtomicWord<long long> maxKeyZoneScanFoundBuggyZone{0};
+    AtomicWord<long long> maxKeyZoneScanAlertEmitted{0};
+    AtomicWord<long long> maxKeyZoneScanErrors{0};
+
     /**
      * Obtains the per-process instance of the sharding statistics object.
      */

@@ -142,5 +142,11 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     StringData taskDescription,
     std::function<void(OperationContext*)> doWork,
     boost::optional<Backoff> backoff = boost::none);
+
+/**
+ * Returns true iff the MaxKey detection scans should run, i.e. if either the enableMaxKeyDetection
+ * server parameter or featureFlagMaxKeyDetection is enabled.
+ */
+bool isMaxKeyDetectionEnabled();
 }  // namespace sharding_util
 }  // namespace mongo

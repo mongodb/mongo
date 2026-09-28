@@ -30,6 +30,9 @@
 
 #include "mongo/db/s/sharding_util.h"
 
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+
 #include <fmt/format.h>
 #include <string>
 #include <utility>
@@ -374,5 +377,10 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     }
 }
 
+bool isMaxKeyDetectionEnabled() {
+    // (Ignore FCV check): the flag is not FCV-gated.
+    return gEnableMaxKeyDetection.load() ||
+        feature_flags::gMaxKeyDetection.isEnabledAndIgnoreFCVUnsafe();
+}
 }  // namespace sharding_util
 }  // namespace mongo

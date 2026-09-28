@@ -77,7 +77,8 @@ public:
     std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
                                                AggregateCommandRequest& aggRequest,
                                                const repl::ReadConcernArgs& readConcern,
-                                               const Milliseconds& maxTimeout) override;
+                                               const Milliseconds& maxTimeout,
+                                               Shard::RetryPolicy retryPolicy) override;
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              const DatabaseName& db,
