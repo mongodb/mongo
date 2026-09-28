@@ -93,7 +93,9 @@ assert.eq(
     ).cursor.firstBatch.length,
 );
 
-// Implicitly recreate the ECOC collection via insert (accepting error caused by SERVER-128430)
+// Implicitly recreate the ECOC collection via insert. In sharded clusters this can fail because
+// implicit collection creation is not supported in distributed transactions (accepted risk, see
+// SERVER-128430).
 let implicitCreationSucceeded = true;
 client.runEncryptionOperation(() => {
     const ecoll = client.getDB()[collName];
@@ -118,7 +120,6 @@ if (implicitCreationSucceeded) {
         "ECOC collection missing clustered index",
     );
 } else {
-    // TODO SERVER-128430 remove `implicitCreationSucceeded` and this whole else body
     // When the implicit ECOC creation fails because it is not supported in distributed
     // transactions, the main collection must not be fully placed on the db primary shard.
     const collNs = dbName + "." + collName;
