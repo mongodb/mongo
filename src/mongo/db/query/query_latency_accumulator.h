@@ -14,7 +14,8 @@ namespace mongo {
 /**
  * Accumulates the total server-side execution time of a single logical query -- its originating
  * find/aggregate plus every getMore -- and records exactly one observation into the
- * per-plan-selection-strategy "queryLatencies" histogram when the query completes.
+ * per-plan-selection-strategy "queryLatencies" serverStatus metrics (a latency histogram plus
+ * cumulative latency and observation count) when the query completes.
  *
  * Lives as a decoration on QueryLifespan, so one instance is shared by the originating command and
  * all of its getMores. The destructor reports the measurement exactly once: when the owning

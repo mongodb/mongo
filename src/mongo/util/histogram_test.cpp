@@ -185,30 +185,5 @@ TEST(AppendHistogramTest, IncludeEmptyBucketsByDefaultEmitsEveryBucket) {
     ASSERT_EQ(hist.getIntField("totalCount"), 1);
 }
 
-TEST(AppendHistogramTest, SkippingEmptyBucketsOmitsThemButKeepsTotalCount) {
-    Histogram<int> h{{2, 4}};
-    h.increment(3);
-
-    BSONObjBuilder bob;
-    appendHistogram(bob, h, "hist", makeHistogramBucketKeys(h), {.includeEmptyBuckets = false});
-    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
-
-    ASSERT_FALSE(hist.hasField("(-inf, 2)"));
-    ASSERT_EQ(hist.getObjectField("[2, 4)").getIntField("count"), 1);
-    ASSERT_FALSE(hist.hasField("[4, inf)"));
-    ASSERT_EQ(hist.getIntField("totalCount"), 1);
-}
-
-TEST(AppendHistogramTest, SkippingEmptyBucketsOnAnEmptyHistogramStillEmitsTotalCount) {
-    Histogram<int> h{{2, 4}};
-
-    BSONObjBuilder bob;
-    appendHistogram(bob, h, "hist", makeHistogramBucketKeys(h), {.includeEmptyBuckets = false});
-    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
-
-    ASSERT_EQ(hist.nFields(), 1);
-    ASSERT_EQ(hist.getIntField("totalCount"), 0);
-}
-
 }  // namespace
 }  // namespace mongo

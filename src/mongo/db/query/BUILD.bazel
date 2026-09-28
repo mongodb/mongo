@@ -62,10 +62,9 @@ mongo_cc_library(
         ":query_lifespan",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/commands/server_status:histogram_server_status_metric",
         "//src/mongo/db/query/plan_ranking:plan_selection_strategy",
-        "//src/mongo/db/stats:top",
-        "//src/mongo/otel/metrics:metric_unit",
-        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/db/stats:counters",
     ],
 )
 
@@ -872,7 +871,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/query_settings:query_settings_context_test_util",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
-        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/rpc",
         "//src/mongo/util:clock_source_mock",
     ],

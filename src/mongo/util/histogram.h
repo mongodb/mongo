@@ -170,14 +170,6 @@ std::vector<std::string> makeHistogramBucketKeys(const Histogram<Ts...>& hist) {
     return keys;
 }
 
-struct AppendHistogramOptions {
-    /**
-     * When false, buckets with a zero count are omitted. This makes the set of emitted fields vary
-     * over time, so only use it for metrics whose consumers tolerate a sparse shape.
-     */
-    bool includeEmptyBuckets = true;
-};
-
 /**
  * Appends data (i.e. count and lower/upper bounds of all buckets) of a histogram to the provided
  * BSON object builder, using bucket keys previously built by `makeHistogramBucketKeys(hist)`.
@@ -189,8 +181,7 @@ template <typename... Ts>
 void appendHistogram(BSONObjBuilder& bob,
                      const Histogram<Ts...>& hist,
                      const std::string_view histKey,
-                     const std::vector<std::string>& bucketKeys,
-                     AppendHistogramOptions options = {}) {
+                     const std::vector<std::string>& bucketKeys) {
     BSONObjBuilder histBob(bob.subobjStart(histKey));
     long long totalCount = 0;
     size_t i = 0;
@@ -198,10 +189,8 @@ void appendHistogram(BSONObjBuilder& bob,
     invariant(bucketKeys.size() == hist.getPartitions().size() + 1,
               "bucketKeys must have one entry per histogram bucket");
     for (auto&& bucket : hist) {
-        if (bucket.count != 0 || options.includeEmptyBuckets) {
-            BSONObjBuilder(histBob.subobjStart(bucketKeys[i]))
-                .append("count", static_cast<long long>(bucket.count));
-        }
+        BSONObjBuilder(histBob.subobjStart(bucketKeys[i]))
+            .append("count", static_cast<long long>(bucket.count));
         totalCount += bucket.count;
         ++i;
     }

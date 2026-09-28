@@ -1,10 +1,15 @@
 /**
- * Verifies the query latency OTel histograms per plan selection strategy. Published under
- * serverStatus "metrics.queryLatencies.<strategy>" for strategy in {multiPlanner, costBased,
- * singlePlan, cachedPlan, joinOptimization, joinCachedPlan}. Each is a bucket-count histogram
- * exposing per-bucket "count" fields and a "totalCount" (the number of queries observed for that
- * strategy). Zero-count buckets are omitted, so the set of per-bucket fields varies with the
- * latencies actually observed.
+ * Verifies the query latency histograms per plan selection strategy. Published under serverStatus
+ * "metrics.queryLatencies.<strategy>" for strategy in {multiPlanner, costBased, singlePlan,
+ * cachedPlan, joinOptimization, joinCachedPlan}. Each is a subobject holding three
+ * metrics:
+ *   - "histogram":  an array of {lowerBound, count} buckets (a HistogramServerStatusMetric)
+ *   - "latency":    the summed latency of every observation, in microseconds
+ *   - "totalCount": the number of queries observed for that strategy
+ *
+ * The serialization is dense and fixed-shape: every bucket is emitted, including zero-count ones,
+ * so the field set never varies. FTDC depends on that, since a changed field set starts a new
+ * reference document.
  *
  * Each plan ranker exercises the strategies it can produce:
  *   - multiPlanning: singlePlan, multiPlanner, cachedPlan
@@ -32,6 +37,63 @@ const kStrategies = [
     "joinCachedPlan",
 ];
 
+// Bucket count per histogram: HistogramServerStatusMetric::pow(31, 64, 2) yields 31 boundaries,
+// so 32 buckets. Update this if the bounds ever change.
+const kExpectedBucketCount = 32;
+
+/**
+ * Asserts `entry` is a dense per-strategy entry: a "histogram" array of kExpectedBucketCount
+ * {lowerBound, count} buckets, plus "latency" and "totalCount" counters, with "totalCount" equal
+ * to the sum of the bucket counts.
+ */
+function assertDenseHistogramShape(strategy, entry) {
+    assert.eq(
+        Object.keys(entry).sort(),
+        ["histogram", "latency", "totalCount"],
+        () => `${strategy} must publish exactly histogram, latency and totalCount`,
+        {entry},
+    );
+
+    const buckets = entry.histogram;
+    assert(Array.isArray(buckets), () => `${strategy}.histogram must be an array`, {entry});
+    assert.eq(
+        buckets.length,
+        kExpectedBucketCount,
+        () =>
+            `${strategy}.histogram must hold ${kExpectedBucketCount} buckets ` +
+            `including zero-count buckets`,
+        {buckets},
+    );
+
+    let sum = 0;
+    let previousLowerBound = -1;
+    for (const bucket of buckets) {
+        assert(
+            bucket.hasOwnProperty("lowerBound") && bucket.hasOwnProperty("count"),
+            () => `${strategy} bucket is missing "lowerBound" or "count"`,
+            {bucket},
+        );
+        // The index-to-bucket mapping must be stable: that is what FTDC relies on.
+        assert.gt(
+            bucket.lowerBound,
+            previousLowerBound,
+            () => `${strategy}.histogram lowerBounds must strictly increase`,
+            {buckets},
+        );
+        previousLowerBound = bucket.lowerBound;
+        assert.gte(bucket.count, 0, () => `${strategy} bucket has a negative count`, {bucket});
+        sum += bucket.count;
+    }
+
+    assert.gte(entry.latency, 0, () => `${strategy}.latency must not be negative`, {entry});
+    assert.eq(
+        entry.totalCount,
+        sum,
+        () => `${strategy}.totalCount must equal the sum of its bucket counts`,
+        {entry},
+    );
+}
+
 // Asserts `explain` ran under the engine implied by the framework control.
 function assertEngine(explain, frameworkControl) {
     const expected = frameworkControl === "forceClassicEngine" ? "classic" : "sbe";
@@ -44,21 +106,22 @@ function makeSuite(getDb) {
         const metrics = getDb().serverStatus().metrics;
         const section = metrics.queryLatencies;
         assert(section, "serverStatus.metrics is missing the queryLatencies section", {metrics});
-        // Validate shape: each strategy is a bucket-count histogram exposing totalCount.
         for (const s of kStrategies) {
             assert(section.hasOwnProperty(s), () => `queryLatencies missing sub-category ${s}`, {
-                section,
-            });
-            assert(section[s].hasOwnProperty("totalCount"), () => `${s} missing totalCount`, {
                 section,
             });
         }
         return section;
     }
 
-    // The number of queries observed for a strategy (histogram totalCount).
+    // The number of queries observed for a strategy.
     function queriesFor(section, strategy) {
         return section[strategy].totalCount;
+    }
+
+    // The summed latency, in microseconds, observed for a strategy.
+    function latencyFor(section, strategy) {
+        return section[strategy].latency;
     }
 
     function totalQueries(section) {
@@ -95,6 +158,7 @@ function makeSuite(getDb) {
         db: getDb,
         getQueryLatencies,
         queriesFor,
+        latencyFor,
         totalQueries,
         assertStrategyIncremented,
         assertObservations,
@@ -188,6 +252,73 @@ function itCachedPlan(suite, frameworkControl) {
 // ---------------------------------------------------------------------------
 // Ranker-independent cases (single-plan collscans).
 // ---------------------------------------------------------------------------
+
+// The published shape is fixed: the same field names and the same 32 bucket lowerBounds appear
+// before and after observations are recorded, which is what FTDC depends on.
+function itDenseHistogramShape(suite) {
+    // The field names plus the bucket lowerBound sequence: everything FTDC needs to stay constant.
+    function shapeOf(entry) {
+        return {
+            fields: Object.keys(entry).sort(),
+            lowerBounds: entry.histogram.map((b) => b.lowerBound),
+        };
+    }
+
+    it("publishes a fixed dense bucket set before and after recording", function () {
+        const before = suite.getQueryLatencies();
+        const shapeBefore = {};
+        for (const s of kStrategies) {
+            assertDenseHistogramShape(s, before[s]);
+            shapeBefore[s] = shapeOf(before[s]);
+        }
+
+        const coll = suite.db().small_coll;
+        for (let i = 0; i < 5; i++) {
+            assert.eq(1, coll.find({a: i}).itcount());
+        }
+
+        const after = suite.getQueryLatencies();
+        for (const s of kStrategies) {
+            assertDenseHistogramShape(s, after[s]);
+            assert.eq(
+                shapeOf(after[s]),
+                shapeBefore[s],
+                () => `${s}'s published shape changed while observations were recorded`,
+                {before, after},
+            );
+        }
+        assert.gt(
+            suite.queriesFor(after, "singlePlan"),
+            suite.queriesFor(before, "singlePlan"),
+            "expected the coll scans to be recorded under singlePlan",
+            {before, after},
+        );
+    });
+}
+
+// The "latency" counter must advance along with the observation count.
+function itLatencyCounter(suite) {
+    it("accumulates latency alongside totalCount", function () {
+        const before = suite.getQueryLatencies();
+
+        const coll = suite.db().small_coll;
+        assert.eq(1, coll.find({a: 42}).itcount());
+
+        const after = suite.getQueryLatencies();
+        assert.eq(
+            suite.queriesFor(after, "singlePlan"),
+            suite.queriesFor(before, "singlePlan") + 1,
+            "expected exactly one new singlePlan observation",
+            {before, after},
+        );
+        assert.gt(
+            suite.latencyFor(after, "singlePlan"),
+            suite.latencyFor(before, "singlePlan"),
+            "expected singlePlan.latency to grow with the new observation",
+            {before, after},
+        );
+    });
+}
 
 // Multi-stage pipeline runs as PlanExecutorPipeline; strategy still recorded via the $cursor summary stats.
 function itAggregatePipeline(suite) {
@@ -391,7 +522,6 @@ function defineSuiteForRanker(frameworkControl, ranker, cases) {
             conn = MongoRunner.runMongod({
                 setParameter: {
                     featureFlagCostBasedRanker: true,
-                    featureFlagOtelMetrics: true,
                     featureFlagGetExecutorDeferredEngineChoice: true,
                     internalQueryFrameworkControl: frameworkControl,
                     internalQueryPlanRanker: ranker,
@@ -427,7 +557,6 @@ function defineLifecycleSuite() {
             conn = MongoRunner.runMongod({
                 setParameter: {
                     featureFlagCostBasedRanker: true,
-                    featureFlagOtelMetrics: true,
                     internalQueryFrameworkControl: "forceClassicEngine",
                     internalQueryPlanRanker: "multiPlanning",
                 },
@@ -445,6 +574,8 @@ function defineLifecycleSuite() {
             MongoRunner.stopMongod(conn);
         });
 
+        itDenseHistogramShape(suite);
+        itLatencyCounter(suite);
         itAggregatePipeline(suite);
         itGetMoreOneQuery(suite);
         itKilledCursorRecordsOnce(suite);
@@ -476,7 +607,6 @@ function defineJoinOptimizationSuite() {
             conn = MongoRunner.runMongod({
                 setParameter: {
                     featureFlagPathArrayness: true,
-                    featureFlagOtelMetrics: true,
                     internalEnableJoinOptimization: true,
                     internalEnableJoinPlanCache: true,
                 },

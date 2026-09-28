@@ -100,23 +100,6 @@ std::unique_ptr<HistogramImpl<T>> createHistogramBucketCountsFormatExplicitBound
 }
 
 template <typename T>
-std::unique_ptr<HistogramImpl<T>> createHistogramNonEmptyBucketCountsExplicitBoundaries(
-    std::vector<double> boundaries) {
-#ifdef MONGO_CONFIG_OTEL
-    return std::make_unique<HistogramImpl<T>>(
-        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
-        "name",
-        "description",
-        "unit",
-        HistogramSerializationFormat::kNonEmptyBucketCounts,
-        boundaries);
-#else
-    return std::make_unique<HistogramImpl<T>>(HistogramSerializationFormat::kNonEmptyBucketCounts,
-                                              boundaries);
-#endif  // MONGO_CONFIG_OTEL
-}
-
-template <typename T>
 std::unique_ptr<HistogramImpl<T>> createHistogram() {
     return createHistogramAverageFormatDefaultBoundaries<T>();
 }
@@ -474,19 +457,7 @@ TEST(HistogramBucketKeyCacheTest, BucketKeysSurviveReset) {
 }
 #endif  // MONGO_CONFIG_OTEL
 
-TEST(HistogramSparseBucketsTest, NonEmptyBucketCountsOmitsZeroBuckets) {
-    auto histogram = createHistogramNonEmptyBucketCountsExplicitBoundaries<int64_t>({2, 4});
-    histogram->record(3);
-
-    BSONObj hist = histogram->serializeToBson("h").getObjectField("h").getOwned();
-
-    ASSERT_FALSE(hist.hasField("(-inf, 2)"));
-    ASSERT_EQ(hist.getObjectField("[2, 4)").getIntField("count"), 1);
-    ASSERT_FALSE(hist.hasField("[4, inf)"));
-    ASSERT_EQ(hist.getIntField("totalCount"), 1);
-}
-
-TEST(HistogramSparseBucketsTest, BucketCountsStillEmitsZeroBuckets) {
+TEST(HistogramBucketCountsTest, EmitsZeroBuckets) {
     auto histogram = createHistogramBucketCountsFormatExplicitBoundaries<int64_t>({2, 4});
     histogram->record(3);
 

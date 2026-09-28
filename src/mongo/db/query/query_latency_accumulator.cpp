@@ -3,13 +3,11 @@
 
 #include "mongo/db/query/query_latency_accumulator.h"
 
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/query/query_lifespan.h"
-#include "mongo/db/stats/operation_latency_histogram.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/otel/metrics/metric_names.h"
-#include "mongo/otel/metrics/metrics_histogram.h"
-#include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/otel/metrics/server_status_options.h"
 
 #include <fmt/format.h>
 
@@ -18,56 +16,80 @@ namespace mongo {
 namespace {
 auto getQueryLatencyAccumulator = QueryLifespan::declareOpCtxDecoration<QueryLatencyAccumulator>();
 
-// Per-strategy query latency OTel histogram, published in serverStatus at
-// metrics.queryLatencies.<strategy>. Shares the opLatencies bucket edges so the two are comparable.
-otel::metrics::Histogram<int64_t>& makeQueryLatencyHistogram(otel::metrics::MetricName name,
-                                                             std::string_view strategyName) {
-    return otel::metrics::MetricsService::instance().createInt64Histogram(
-        name,
-        fmt::format("Wall-clock latency of completed user queries (originating command plus all "
-                    "getMores) that used the {} plan-selection strategy.",
-                    strategyName),
-        otel::metrics::MetricUnit::kMicroseconds,
-        {.serverStatusOptions =
-             otel::metrics::ServerStatusOptions{.dottedPath =
-                                                    fmt::format("queryLatencies.{}", strategyName),
-                                                .role = ClusterRole::ShardServer},
-         .explicitBucketBoundaries =
-             operation_latency_histogram_details::makeOperationLatencyBucketBoundaries(),
-         // Serialize only non-empty buckets.
-         .serializationFormat =
-             otel::metrics::HistogramSerializationFormat::kNonEmptyBucketCounts});
+// Bucket edges for the per-strategy latency histograms: 64us, 128us, ... ~19.1h. Every edge is
+// also an opLatencies bucket edge, so the two metrics stay comparable. The 64us floor is well
+// below any achievable whole-query time.
+std::vector<uint64_t> queryLatencyBucketBounds() {
+    return HistogramServerStatusMetric::pow(31, 64, 2);
 }
 
-// Register histograms for all plan-selection strategies.
-otel::metrics::Histogram<int64_t>& multiPlannerHistogram = makeQueryLatencyHistogram(
-    otel::metrics::MetricNames::kQueryLatencyMultiPlanner, "multiPlanner");
-otel::metrics::Histogram<int64_t>& costBasedHistogram =
-    makeQueryLatencyHistogram(otel::metrics::MetricNames::kQueryLatencyCostBased, "costBased");
-otel::metrics::Histogram<int64_t>& singlePlanHistogram =
-    makeQueryLatencyHistogram(otel::metrics::MetricNames::kQueryLatencySinglePlan, "singlePlan");
-otel::metrics::Histogram<int64_t>& cachedPlanHistogram =
-    makeQueryLatencyHistogram(otel::metrics::MetricNames::kQueryLatencyCachedPlan, "cachedPlan");
-otel::metrics::Histogram<int64_t>& joinOptimizationHistogram = makeQueryLatencyHistogram(
-    otel::metrics::MetricNames::kQueryLatencyJoinOptimization, "joinOptimization");
-otel::metrics::Histogram<int64_t>& joinCachedPlanHistogram = makeQueryLatencyHistogram(
-    otel::metrics::MetricNames::kQueryLatencyJoinCachedPlan, "joinCachedPlan");
+// The metrics published in serverStatus for one plan-selection strategy, as the single leaf
+// metrics.queryLatencies.<strategy>: {histogram: [{lowerBound, count}, ...], latency, totalCount}.
+// The 'histogram' gives the distribution and 'latency' the running sum. 'totalCount' is computed
+// at serialization time as the sum of the bucket counts just appended, so it is always consistent
+// with them. All three fields are appended by one appendTo call.
+class QueryLatencyMetrics {
+public:
+    QueryLatencyMetrics() : _histogram{queryLatencyBucketBounds()} {}
 
-// No default case: a new PlanSelectionStrategy fails to compile until it names its histogram.
-otel::metrics::Histogram<int64_t>& queryLatencyHistogramFor(PlanSelectionStrategy strategy) {
+    auto& value() {
+        return *this;
+    }
+
+    void record(Microseconds elapsed) {
+        _histogram.increment(static_cast<uint64_t>(durationCount<Microseconds>(elapsed)));
+        _latency.increment(elapsed);
+    }
+
+    void appendTo(BSONObjBuilder& b, std::string_view leafName) const {
+        BSONObjBuilder sub{b.subobjStart(leafName)};
+        long long totalCount = 0;
+        {
+            BSONArrayBuilder arr{sub.subarrayStart("histogram")};
+            for (auto&& [count, lower, upper] : _histogram.hist()) {
+                BSONObjBuilder{arr.subobjStart()}
+                    .append("lowerBound", static_cast<long long>(lower ? *lower : 0))
+                    .append("count", static_cast<long long>(count));
+                totalCount += count;
+            }
+        }
+        sub.append("latency", static_cast<long long>(_latency.get().count()));
+        sub.append("totalCount", totalCount);
+    }
+
+private:
+    HistogramServerStatusMetric _histogram;
+    DurationCounter64<Microseconds> _latency;
+};
+
+QueryLatencyMetrics& makeQueryLatencyMetrics(std::string_view strategyName) {
+    return *CustomMetricBuilder<QueryLatencyMetrics>{fmt::format("queryLatencies.{}", strategyName)}
+                .setRole(ClusterRole::ShardServer);
+}
+
+// Register metrics for all plan selection strategies.
+QueryLatencyMetrics& multiPlannerMetrics = makeQueryLatencyMetrics("multiPlanner");
+QueryLatencyMetrics& costBasedMetrics = makeQueryLatencyMetrics("costBased");
+QueryLatencyMetrics& singlePlanMetrics = makeQueryLatencyMetrics("singlePlan");
+QueryLatencyMetrics& cachedPlanMetrics = makeQueryLatencyMetrics("cachedPlan");
+QueryLatencyMetrics& joinOptimizationMetrics = makeQueryLatencyMetrics("joinOptimization");
+QueryLatencyMetrics& joinCachedPlanMetrics = makeQueryLatencyMetrics("joinCachedPlan");
+
+// No default case: a new PlanSelectionStrategy fails to compile until it names its metrics.
+QueryLatencyMetrics& queryLatencyMetricsFor(PlanSelectionStrategy strategy) {
     switch (strategy) {
         case PlanSelectionStrategy::kMultiPlanner:
-            return multiPlannerHistogram;
+            return multiPlannerMetrics;
         case PlanSelectionStrategy::kCostBasedRanker:
-            return costBasedHistogram;
+            return costBasedMetrics;
         case PlanSelectionStrategy::kSinglePlan:
-            return singlePlanHistogram;
+            return singlePlanMetrics;
         case PlanSelectionStrategy::kCachedPlan:
-            return cachedPlanHistogram;
+            return cachedPlanMetrics;
         case PlanSelectionStrategy::kJoinOptimization:
-            return joinOptimizationHistogram;
+            return joinOptimizationMetrics;
         case PlanSelectionStrategy::kJoinCachedPlan:
-            return joinCachedPlanHistogram;
+            return joinCachedPlanMetrics;
     }
     MONGO_UNREACHABLE_TASSERT(12765301);
 }
@@ -83,7 +105,7 @@ QueryLatencyAccumulator::~QueryLatencyAccumulator() {
     if (_excluded || !_strategy || _total <= Microseconds{0}) {
         return;
     }
-    queryLatencyHistogramFor(*_strategy).record(durationCount<Microseconds>(_total));
+    queryLatencyMetricsFor(*_strategy).record(_total);
 }
 
 void QueryLatencyAccumulator::recordStrategy(PlanSelectionStrategy strategy) {

@@ -22,9 +22,8 @@ enum class [[MONGO_MOD_PUBLIC]] ReportingPolicy {
 
 /** Controls how histogram metric is serialized by serializeToBson(). */
 enum class [[MONGO_MOD_PUBLIC]] HistogramSerializationFormat {
-    kAverage,               ///< Report exponential moving average and total count.
-    kBucketCounts,          ///< Report per-bucket counts (including empty buckets) and total count.
-    kNonEmptyBucketCounts,  ///< As kBucketCounts, but omit zero-count buckets.
+    kAverage,       ///< Report exponential moving average and total count.
+    kBucketCounts,  ///< Report per-bucket counts and total count.
 };
 
 /**
