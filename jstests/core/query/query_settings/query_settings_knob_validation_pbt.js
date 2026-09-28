@@ -19,7 +19,6 @@
  *   assumes_stable_shard_list,
  *   # Knobs applied to the config DB time out internal config queries.
  *   config_shard_incompatible,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */

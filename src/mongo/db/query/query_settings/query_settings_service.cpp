@@ -572,7 +572,7 @@ public:
             // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
             // error.
             auto userSettings = *querySettingsFromOriginalCommand;
-            validateQueryKnobs(expCtx->getOperationContext(), userSettings);
+            validateQueryKnobs(userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -696,7 +696,7 @@ public:
             // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
             // error.
             auto& userSettings = *querySettingsFromOriginalCommand;
-            validateQueryKnobs(opCtx, userSettings);
+            validateQueryKnobs(userSettings);
 
             settings = mergeQuerySettings(userSettings, settings);
             simplifyQuerySettings(settings);
@@ -942,17 +942,12 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     return querySettings;
 }
 
-void QuerySettingsService::validateQueryKnobs(OperationContext* opCtx,
-                                              const QuerySettings& querySettings) const {
+void QuerySettingsService::validateQueryKnobs(const QuerySettings& querySettings) const {
     const auto& knobs = querySettings.getQueryKnobs();
     if (!knobs) {
         return;
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    uassert(12324800,
-            "Unknown field 'queryKnobs' in querySettings",
-            feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(VersionContext::getDecoration(opCtx),
-                                                               fcvSnapshot));
 
     checkQueryKnobOverrideErrors(querySettings,
                                  /* uassertOnError */ true);

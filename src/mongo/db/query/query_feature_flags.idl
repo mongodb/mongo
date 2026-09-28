@@ -452,13 +452,6 @@ feature_flags:
         default: true
         fcv_gated: false
 
-    featureFlagPqsQueryKnobs:
-        description: "Feature flag to enable per-query-shape overrides of internal query parameters (query knobs) via Persistent Query Settings."
-        cpp_varname: gFeatureFlagPqsQueryKnobs
-        default: true
-        version: 9.0
-        fcv_gated: true
-
     featureFlagPersistentStats:
         description: "Feature flag to enable persistent statistics for cost estimation."
         cpp_varname: gFeatureFlagPersistentStats

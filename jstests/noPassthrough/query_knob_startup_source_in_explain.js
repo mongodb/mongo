@@ -7,7 +7,6 @@
  * $listQueryKnobs reports correct IDL default values regardless of startup overrides.
  *
  * @tags: [
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */

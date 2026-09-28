@@ -112,12 +112,6 @@ selector:
     # TODO SERVER-126212: now that 9.0 is last-LTS, this test should be removed.
     - jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js
 
-    # TODO SERVER-133009: featureFlagPqsQueryKnobs is FCV-gated at 9.0. The test
-    # expects queryKnobs to be rejected while downgraded and stripped on FCV downgrade. Now that
-    # last-LTS and last-continuous are both 9.0 (= 9.0), the feature stays enabled at the downgrade
-    # target, so queryKnobs are neither rejected nor stripped, breaking those expectations.
-    - jstests/multiVersion/genericBinVersion/query-execution-query-settings/query_settings_query_knobs_upgrade_downgrade.js
-
     # TODO SERVER-133010: featureFlagBinDataConvertNumeric is FCV-gated at 8.1. The
     # test expects BinData numeric $convert to fail with ConversionFailure in all last-LTS-FCV states.
     # Now that last-LTS is 9.0 (>= 8.1), the feature is enabled at last-LTS and the conversions

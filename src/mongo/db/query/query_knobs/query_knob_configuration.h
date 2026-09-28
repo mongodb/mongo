@@ -67,8 +67,8 @@ public:
 
     /**
      * Adds the effective knob values to the slow query log 'attrs' under "queryKnobs", using the
-     * same serialization as 'serializeForExplain()'. A no-op unless 'featureFlagPqsQueryKnobs' is
-     * enabled and at least one knob has a non-default source.
+     * same serialization as 'serializeForExplain()'. A no-op unless at least one knob has a
+     * non-default source.
      */
     void addToSlowLog(OperationContext* opCtx, logv2::DynamicAttributes& attrs) const;
 

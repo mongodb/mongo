@@ -21,7 +21,6 @@
  *   exclude_from_timeseries_crud_passthrough,
  *   does_not_support_causal_consistency,
  *   does_not_support_transactions,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */

@@ -257,7 +257,7 @@ public:
             const boost::optional<const RepresentativeQueryInfo&> representativeQueryInfo,
             const query_shape::QueryShapeHash& queryShapeHash) {
             auto& querySettingsService = QuerySettingsService::get(opCtx);
-            querySettingsService.validateQueryKnobs(opCtx, request().getSettings());
+            querySettingsService.validateQueryKnobs(request().getSettings());
 
             // Validate that both 'representativeQuery' and 'representativeQueryInfo' are either
             // empty or not empty.

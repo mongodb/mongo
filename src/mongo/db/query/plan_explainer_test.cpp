@@ -1386,18 +1386,8 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
     ASSERT_EQ(nsMeta["sampleNumPages"].numberLong(), 1) << nsMeta;
 }
 
-TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsNothingWhenFeatureFlagOff) {
-    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", false);
-
-    BSONObjBuilder bob;
-    explain_common::generateQueryKnobs(expCtx, &bob);
-
-    ASSERT_FALSE(bob.asTempObj().hasField("queryKnobs"));
-}
-
-TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobsWhenFeatureFlagOn) {
+TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobs) {
     auto* opCtx = operationContext();
-    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
     query_settings::QuerySettingsGuardForTest settingsGuard(
         opCtx, fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5}})"));
 
@@ -1415,7 +1405,6 @@ TEST_F(PlanExplainerTest, GenerateQueryKnobsEmitsQuerySettingsKnobsWhenFeatureFl
 
 TEST_F(PlanExplainerTest, GenerateQueryKnobsOmitsKnobsWhenOutputNearlyFull) {
     auto* opCtx = operationContext();
-    unittest::ServerParameterGuard flagGuard("featureFlagPqsQueryKnobs", true);
     query_settings::QuerySettingsGuardForTest settingsGuard(
         opCtx, fromjson(R"({queryKnobs: {samplingMarginOfError: 2.5, cbrCEMode: "samplingCE"}})"));
     auto testExpCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);

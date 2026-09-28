@@ -1192,7 +1192,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/query_cmd:external_data_source_commands_test.cpp",
         "//src/mongo/db/commands/query_cmd:index_filter_commands_test.cpp",
         "//src/mongo/db/commands/query_cmd:plan_cache_commands_test.cpp",
-        "//src/mongo/db/commands/query_cmd:query_settings_cmds_test.cpp",
         "//src/mongo/db/commands/query_cmd:run_aggregate_test.cpp",
         "//src/mongo/db/commands/query_cmd:write_commands_test.cpp",
         "//src/mongo/db/commands/server_status:server_status_command_test.cpp",

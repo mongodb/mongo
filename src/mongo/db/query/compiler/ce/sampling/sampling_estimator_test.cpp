@@ -597,7 +597,6 @@ TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsKnobOverri
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    unittest::ServerParameterGuard featureFlagGuard{"featureFlagPqsQueryKnobs", true};
 
     // Persistent query settings takes effect even though the global knob value is unchanged.
     query_settings::QuerySettingsGuardForTest settingsGuard{
@@ -623,7 +622,6 @@ TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsSampleSize
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    unittest::ServerParameterGuard featureFlagGuard{"featureFlagPqsQueryKnobs", true};
     query_settings::QuerySettingsGuardForTest settingsGuard{
         operationContext(), fromjson(R"({queryKnobs: {samplingSizeOverride: 77}})")};
 

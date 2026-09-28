@@ -12,7 +12,6 @@
  *   directly_against_shardsvrs_incompatible,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */

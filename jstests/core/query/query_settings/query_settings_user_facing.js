@@ -178,22 +178,6 @@ describe("User-facing querySettings when flag is on", function () {
             [9646000, 9646001],
         );
     });
-
-    // The 'queryKnobs' field is itself gated behind featureFlagPqsQueryKnobs. When that flag is
-    // disabled, passing it inline must be rejected by the shared validation.
-    const knobsFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "PqsQueryKnobs");
-    if (!knobsFlagEnabled) {
-        it("rejects queryKnobs when featureFlagPqsQueryKnobs is disabled", function () {
-            assert.commandFailedWithCode(
-                db.runCommand({
-                    find: coll.getName(),
-                    filter: {a: 1},
-                    querySettings: {queryKnobs: {samplingMarginOfError: 3.0}},
-                }),
-                [12324800],
-            );
-        });
-    }
 });
 
 // Queries that are ineligible for query settings (IDHACK/Express, FLE, internal/system

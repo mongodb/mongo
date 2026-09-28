@@ -131,11 +131,6 @@ BSONObj QueryKnobConfiguration::serializeForExplain() const {
 
 void QueryKnobConfiguration::addToSlowLog(OperationContext* opCtx,
                                           logv2::DynamicAttributes& attrs) const {
-    if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
     if (auto serializedKnobs = serializeForExplain(); !serializedKnobs.isEmpty()) {
         attrs.add("queryKnobs", serializedKnobs);
     }

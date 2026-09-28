@@ -32,7 +32,6 @@
  *   # individual statements, not just a single applyOps command.
  *   change_stream_does_not_expect_txns,
  *   featureFlagAllowUserFacingQuerySettings,
- *   featureFlagPqsQueryKnobs,
  *   incompatible_aubsan,
  *   requires_fcv_90,
  *   requires_replication,

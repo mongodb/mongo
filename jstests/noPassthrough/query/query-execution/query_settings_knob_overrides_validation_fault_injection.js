@@ -12,7 +12,6 @@
  *   requires_replication,
  *   requires_sharding,
  *   directly_against_shardsvrs_incompatible,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */

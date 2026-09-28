@@ -11,7 +11,6 @@
  *   directly_against_shardsvrs_incompatible,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  *   # Query settings are matched by query shape; the implicit view redirect changes the shape so
  *   # the settings set on the collection query never apply.

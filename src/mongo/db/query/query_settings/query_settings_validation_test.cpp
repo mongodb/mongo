@@ -345,35 +345,18 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsDuplicateKnobs) {
     ASSERT_THROWS_CODE(service().validateQuerySettings(settings), DBException, 12366201);
 }
 
-// FCV validation of user-provided knob overrides. The feature flag's version is kLatest, so at
-// any lower or transitional FCV the flag gate (12324800) rejects before the per-knob minFcv check
-// (12955401) is reached; the per-knob check takes over once a knob's minFcv exceeds the flag's
-// version in a future release. The rejection tests therefore assert rejection without pinning the
-// error code.
+// FCV validation of user-provided knob overrides: knobs whose minFcv exceeds the current FCV are
+// rejected (12955401).
 
 TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsAcceptsSupportedKnobsOnLatestFcv) {
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kLatest);
-    unittest::ServerParameterGuard featureFlagGuard("featureFlagPqsQueryKnobs", true);
 
     QuerySettings settings;
     settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
         BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5)));
-    service().validateQueryKnobs(expCtx->getOperationContext(), settings);
-}
-
-TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsWhenFlagDisabled) {
-    QueryFCVEnvironmentForTest::setUp();
-    // (Generic FCV reference): FCV-gated query knob validation test.
-    unittest::EnsureFCV fcv(multiversion::GenericFCV::kLatest);
-    unittest::ServerParameterGuard featureFlagGuard("featureFlagPqsQueryKnobs", false);
-
-    QuerySettings settings;
-    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
-    ASSERT_THROWS_CODE(service().validateQueryKnobs(expCtx->getOperationContext(), settings),
-                       DBException,
-                       12324800);
+    service().validateQueryKnobs(settings);
 }
 
 // A user write with a knob that is being downgraded away must be rejected during the whole FCV
@@ -385,12 +368,10 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsMidDown
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
-    unittest::ServerParameterGuard featureFlagGuard("featureFlagPqsQueryKnobs", true);
 
     QuerySettings settings;
     settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
-    ASSERT_THROWS(service().validateQueryKnobs(expCtx->getOperationContext(), settings),
-                  DBException);
+    ASSERT_THROWS(service().validateQueryKnobs(settings), DBException);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsOnLowerStableFcv) {
@@ -399,12 +380,10 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsOnLower
     QueryFCVEnvironmentForTest::setUp();
     // (Generic FCV reference): FCV-gated query knob validation test.
     unittest::EnsureFCV fcv(multiversion::GenericFCV::kLastLTS);
-    unittest::ServerParameterGuard featureFlagGuard("featureFlagPqsQueryKnobs", true);
 
     QuerySettings settings;
     settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
-    ASSERT_THROWS(service().validateQueryKnobs(expCtx->getOperationContext(), settings),
-                  DBException);
+    ASSERT_THROWS(service().validateQueryKnobs(settings), DBException);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsKnobOverrideParseErrors) {

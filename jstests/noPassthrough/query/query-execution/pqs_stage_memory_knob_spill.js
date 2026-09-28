@@ -9,7 +9,6 @@
  * proves the override, not ambient behaviour, is responsible.
  *
  * @tags: [
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  *   # Spilling record stores report the correct storage size only on persistent storage.
  *   requires_persistence,

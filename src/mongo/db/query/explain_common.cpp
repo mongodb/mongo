@@ -80,12 +80,6 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
 
 void generateQueryKnobs(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         BSONObjBuilder* out) {
-    auto* opCtx = expCtx->getOperationContext();
-    if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
     auto serializedKnobs = expCtx->getQueryKnobConfiguration().serializeForExplain();
     if (!serializedKnobs.isEmpty()) {
         appendIfRoom(serializedKnobs, "queryKnobs", out);
