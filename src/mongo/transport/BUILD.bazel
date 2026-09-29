@@ -102,10 +102,14 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "transport_layer_mock",
-    srcs = ["transport_layer_mock.cpp"],
+    srcs = [
+        "mock_reactor.cpp",
+        "transport_layer_mock.cpp",
+    ],
     deps = [
         ":session_util",
         ":transport_layer_common",
+        "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/net:network",
     ],
 )
@@ -395,6 +399,7 @@ mongo_cc_unit_test(
         "max_conns_override_test.cpp",
         "message_compressor_manager_test.cpp",
         "message_compressor_registry_test.cpp",
+        "mock_reactor_test.cpp",
         "proxy_protocol_header_parser_test.cpp",
         "proxy_protocol_tlv_ssl_peer_info_test.cpp",
         "service_executor_test.cpp",
