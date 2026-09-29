@@ -705,6 +705,13 @@ public:
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
                                                         &numResults);
+            // Unlike registerCursor(), the pipeline-level check cannot run here: the flag is only
+            // missing at this point when the mongot stage was established after registration (e.g.
+            // nested in a $lookup/$unionWith sub-pipeline built during this getMore). Testing the
+            // recorded mongotCursorId covers that case.
+            if (CurOp::get(opCtx)->debug().mongotCursorId.has_value()) {
+                cursorPin->setMayHoldMongotTaskExecutor();
+            }
 
             const bool isChangeStream = cursorPin->isChangeStreamQuery();
 

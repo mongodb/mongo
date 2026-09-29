@@ -7,6 +7,12 @@ selector:
   exclude_with_any_tags:
     - requires_auth
     - search_community_incompatible
+  exclude_files:
+    # TODO (SERVER-135000) Re-enable once the gRPC transport layer can shut down with a live
+    # egress client. A search cursor pinned by an in-flight getMore keeps the mongot task
+    # executor (and its gRPC client) alive past tlm->shutdown(), which aborts on the
+    # invariant(_clients.empty()) check in GRPCTransportLayerImpl::shutdown().
+    - jstests/with_mongot/search_mocked/search_executor_shutdown_with_inflight_cursor.js
 
 executor:
   config:

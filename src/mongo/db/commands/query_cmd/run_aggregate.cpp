@@ -244,6 +244,15 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
         *aggExState.getDeferredCmd(),
         aggExState.getPrivileges());
     cursorParams.setTailableMode(expCtx->getTailableMode());
+    // A pipeline with a mongot stage retains the mongot task executor from construction, even if
+    // the stage never executes (e.g. the cursor is registered with batchSize: 0), in which case
+    // OpDebug::mongotCursorId is never set. So we can't rely on execution state alone here.
+    // TODO SERVER-135852: hasMongotStage() only inspects top-level stages, so a mongot stage nested
+    // in a $lookup/$unionWith sub-pipeline is not detected here. Make detection recurse into
+    // sub-pipelines and add tests for the nested batchSize: 0 case.
+    cursorParams.mayHoldMongotTaskExecutor =
+        aggExState.getOriginalLiteParsedPipeline().hasMongotStage() ||
+        CurOp::get(opCtx)->debug().mongotCursorId.has_value();
 
     // The global cursor manager does not deliver invalidations or kill notifications; the
     // underlying PlanExecutor(s) used by the pipeline will be receiving invalidations and kill
