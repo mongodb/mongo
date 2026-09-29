@@ -31,9 +31,17 @@ assert.commandWorked(db.createCollection(collName));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
-assert.commandWorked(coll.insert({_id: 2, a: 100}));
+const insertOpTime = assert.commandWorked(
+    db.runCommand({insert: collName, documents: [{_id: 2, a: 100}]}),
+).operationTime;
 
-assert.commandWorked(db.adminCommand({fsync: 1}));
+// Background validation reads from the last checkpoint, which is taken at the stable timestamp.
+// The stable timestamp advances asynchronously, so keep checkpointing until it covers the insert.
+assert.soon(() => {
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+    const status = assert.commandWorked(db.adminCommand({replSetGetStatus: 1}));
+    return timestampCmp(status.lastStableRecoveryTimestamp, insertOpTime) >= 0;
+});
 
 let res = assert.commandWorked(coll.validate({background: true}));
 assert(res.valid);
