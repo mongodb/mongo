@@ -5,10 +5,14 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/str_escape.h"
 
+#include <algorithm>
 #include <array>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include <fmt/format.h>
 
@@ -132,11 +136,17 @@ bool isNumericType(BSONType type) {
     return typeMask(type) & kNumericTypesMask;
 }
 
+/// Returns 'typeSet' with 'type' removed.
+TypeSet withoutType(TypeSet typeSet, BSONType type) {
+    return intersectType(typeSet, complement(TypeSet(type, Extent::kAll)));
+}
+
 /**
  * Renders the types of 'typeSet' as a '|'-separated union in BSON sort order, suffixing the
  * ones covered only as a subset.
+ * 'objectRendering' stands in for the object type.
  */
-std::string renderUnion(const TypeSet& typeSet) {
+std::string renderUnion(const TypeSet& typeSet, const std::string& objectRendering = {}) {
     const bool collapseNumbers = canCollapseNumbers(typeSet);
     bool numberRendered = false;
     std::string rendered;
@@ -156,11 +166,71 @@ std::string renderUnion(const TypeSet& typeSet) {
         if (!rendered.empty()) {
             rendered += "|";
         }
+        if (type == BSONType::object && !objectRendering.empty()) {
+            rendered += objectRendering;
+            continue;
+        }
         rendered += name;
         if (isSubset(typeSet.getExtent(type))) {
             rendered += "(S)";
         }
     }
+    return rendered;
+}
+
+/// Returns the type of unset fields (any or missing).
+Type impliedType(Open open) {
+    return isOpen(open) ? Type::any() : Type::missing();
+}
+
+/// Returns true if the object is not constrained by a shape.
+bool isAnyObject(const detail::Shape& shape) {
+    return shape.fields.empty() && isOpen(shape.open);
+}
+
+/// Returns the type of the field.
+Type getFieldType(const detail::Shape& shape, std::string_view fieldName) {
+    if (const Type* named = shape.fields.find(fieldName)) {
+        return *named;
+    }
+    return impliedType(shape.open);
+}
+
+/// Stores 'fieldType' for 'fieldName', leaving a field of the implied type unnamed.
+void storeField(detail::Shape& shape, std::string_view fieldName, Type fieldType) {
+    if (fieldType == impliedType(shape.open)) {
+        shape.fields.erase(fieldName);
+        return;
+    }
+    shape.fields.set(fieldName, std::move(fieldType));
+}
+
+/// Escapes field names and adds quotes when needed.
+std::string escapeFieldName(std::string_view fieldName) {
+    if (std::all_of(fieldName.begin(), fieldName.end(), [](unsigned char c) {
+            return std::isalnum(c) != 0;
+        })) {
+        return std::string{fieldName};
+    }
+    return fmt::format("\"{}\"", str::escapeForJSON(fieldName));
+}
+
+/// Renders the objects 'shape' describes, such as '{x: number}' or '{x: number, ...}'.
+std::string renderShape(const detail::Shape& shape) {
+    std::string rendered = "{";
+    for (const auto& [fieldName, fieldType] : shape.fields) {
+        if (rendered.size() > 1) {
+            rendered += ", ";
+        }
+        rendered += escapeFieldName(fieldName);
+        rendered += ": ";
+        rendered += fieldType.toDebugString();
+    }
+    if (isOpen(shape.open)) {
+        // An open shape naming no field is not stored, so a field always precedes this.
+        rendered += ", ...";
+    }
+    rendered += "}";
     return rendered;
 }
 
@@ -264,7 +334,20 @@ TypeSet complement(TypeSet typeSet) {
 
 Type::Type(BSONType type, Extent extent) : Type(TypeSet(type, extent)) {}
 
+// A default shape leaves every object covered, so there is no extent to narrow here.
 Type::Type(TypeSet typeSet) : _typeSet(typeSet) {}
+
+Type::Type(TypeSet typeSet, detail::Shape shape) : _typeSet(typeSet), _shape(std::move(shape)) {
+    if (isAnyObject(_shape)) {
+        // The shape carries no information in this case.
+        return;
+    }
+    tassert(13459102,
+            "Type should include object when a shape is specified",
+            _typeSet.hasType(BSONType::object));
+    // If we have a shape, we only represent a subset of all objects.
+    _typeSet = intersectType(typeSet, complement(TypeSet(BSONType::object, Extent::kSubset)));
+}
 
 Type Type::any() {
     return Type(TypeSet::any());
@@ -272,6 +355,10 @@ Type Type::any() {
 
 Type Type::never() {
     return Type(TypeSet::never());
+}
+
+Type Type::missing() {
+    return Type(BSONType::eoo, Extent::kAll);
 }
 
 Type Type::fromValue(const Value& value) {
@@ -282,8 +369,26 @@ Type Type::fromMatcherTypeSet(const MatcherTypeSet& matcherTypeSet) {
     return Type(TypeSet::fromMatcherTypeSet(matcherTypeSet));
 }
 
+Type Type::object(const StringMap<Type>& fields, Open open) {
+    detail::Shape shape;
+    shape.open = open;
+    for (const auto& [name, type] : fields) {
+        if (type == Type::never()) {
+            return type;
+        }
+        if (type != impliedType(open)) {
+            shape.fields.set(name, type);
+        }
+    }
+    return Type(TypeSet(BSONType::object, Extent::kSubset), std::move(shape));
+}
+
 TypeSet Type::getTypeSet() const {
     return _typeSet;
+}
+
+const detail::Shape& Type::getShape_forTest() const {
+    return _shape;
 }
 
 bool Type::hasType(BSONType type) const {
@@ -294,8 +399,35 @@ Extent Type::getExtent(BSONType type) const {
     return _typeSet.getExtent(type);
 }
 
+Type Type::getField(std::string_view fieldName) const {
+    tassert(13459103,
+            "Type should include object to be able to have a field",
+            _typeSet.hasType(BSONType::object));
+    return getFieldType(_shape, fieldName);
+}
+
+void Type::setField(std::string_view fieldName, Type fieldType) {
+    tassert(13459104,
+            "Type should include object to be able to set a field",
+            _typeSet.hasType(BSONType::object));
+    if (fieldType == never()) {
+        // A field which can hold no value leaves no object to describe.
+        *this = Type(withoutType(_typeSet, BSONType::object));
+        return;
+    }
+    storeField(_shape, fieldName, std::move(fieldType));
+    *this = Type(_typeSet, std::move(_shape));
+}
+
+bool Type::operator==(const Type& other) const {
+    return _typeSet == other._typeSet && _shape == other._shape;
+}
+
 std::string Type::toDebugString() const {
-    return _typeSet.toDebugString();
+    if (isAnyObject(_shape)) {
+        return _typeSet.toDebugString();
+    }
+    return renderUnion(_typeSet, renderShape(_shape));
 }
 
 Type unionType(Type lhs, Type rhs) {

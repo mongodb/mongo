@@ -3,6 +3,8 @@
 
 #include "mongo/db/query/compiler/type_system/type.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::pipeline::type_system {
@@ -401,6 +403,263 @@ TEST(TypeTest, RendersItsTypeSet) {
 TEST(TypeTest, ComplementRendersAsNegation) {
     auto type = complement(Type(BSONType::array, Extent::kAll));
     ASSERT_EQ(type.toDebugString(), "~array");
+}
+
+Type object(Extent extent) {
+    return Type(BSONType::object, extent);
+}
+
+Type openObject(const StringMap<Type>& fields) {
+    return Type::object(std::move(fields), Open::kYes);
+}
+
+Type closedObject(const StringMap<Type>& fields) {
+    return Type::object(std::move(fields), Open::kNo);
+}
+
+Type allValues(BSONType type) {
+    return Type(type, Extent::kAll);
+}
+
+/// Identifies the field storage of the shape without holding a reference to it.
+const void* getFieldStorage(const Type& type) {
+    return type.getShape_forTest().fields.getStorage_forTest();
+}
+
+/// Returns true if the shape leaves every object covered, so it carries no information.
+bool describesEveryObject(const Type& type) {
+    const auto& shape = type.getShape_forTest();
+    return type.hasType(BSONType::object) && shape.fields.empty() && isOpen(shape.open);
+}
+
+TEST(TypeTest, OpenObjectWithoutFieldsDescribesOnlySomeObjects) {
+    auto type = Type::object({}, Open::kYes);
+    // The object() factory always covers a subset, even if fields are empty.
+    ASSERT_TRUE(isSubset(type.getExtent(BSONType::object)));
+    ASSERT_TRUE(describesEveryObject(type));
+    ASSERT_TRUE(isOpen(type.getShape_forTest().open));
+}
+
+TEST(TypeTest, ClosedObjectWithoutFieldsDescribesOnlySomeObjects) {
+    auto type = Type::object({}, Open::kNo);
+    ASSERT_TRUE(isSubset(type.getExtent(BSONType::object)));
+    ASSERT_FALSE(describesEveryObject(type));
+    ASSERT_FALSE(isOpen(type.getShape_forTest().open));
+}
+
+TEST(TypeTest, ObjectWithKnownFieldsIsASubset) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_TRUE(isSubset(type.getExtent(BSONType::object)));
+}
+
+TEST(TypeTest, ShapeIsDroppedWhenTheObjectTypeIsNotCovered) {
+    auto type = intersectType(openObject({{"x", allValues(BSONType::string)}}),
+                              allValues(BSONType::string));
+    ASSERT_FALSE(type.hasType(BSONType::object));
+}
+
+TEST(TypeTest, OpenObjectDoesNotStoreAFieldOfTypeAny) {
+    auto type = openObject({{"x", Type::any()}});
+    ASSERT_TRUE(describesEveryObject(type));
+}
+
+TEST(TypeTest, ClosedObjectDoesNotStoreAMissingField) {
+    auto type = closedObject({{"x", Type::missing()}});
+    ASSERT_FALSE(describesEveryObject(type));
+    ASSERT_TRUE(type.getShape_forTest().fields.empty());
+}
+
+TEST(TypeTest, ClosedObjectStoresAFieldOfTypeAny) {
+    auto type = closedObject({{"x", Type::any()}});
+    ASSERT_EQ(type.getShape_forTest().fields.size(), 1u);
+}
+
+TEST(TypeTest, OpenObjectStoresAMissingField) {
+    auto type = openObject({{"x", Type::missing()}});
+    ASSERT_EQ(type.getShape_forTest().fields.size(), 1u);
+}
+
+TEST(TypeTest, FieldCoveringNoValueRemovesTheObjectType) {
+    auto type = openObject({{"x", Type::never()}});
+    ASSERT_FALSE(type.hasType(BSONType::object));
+    ASSERT_EQ(type, Type::never());
+}
+
+TEST(TypeTest, FieldCoveringNoValueLeavesTheOtherTypesCovered) {
+    auto type = unionType(openObject({{"x", Type::never()}}), allValues(BSONType::string));
+    ASSERT_EQ(type, allValues(BSONType::string));
+}
+
+TEST(TypeTest, NestedFieldCoveringNoValueRemovesTheOuterObjectType) {
+    auto type = openObject({{"a", openObject({{"x", Type::never()}})}});
+    ASSERT_EQ(type, Type::never());
+}
+
+TEST(TypeTest, ClosedObjectWithAllFieldsMissingNamesNoField) {
+    auto type = closedObject({{"x", Type::missing()}, {"y", Type::missing()}});
+    ASSERT_EQ(type, closedObject({}));
+}
+
+TEST(TypeTest, GetFieldReturnsTheTypeOfANamedField) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, GetFieldOnOpenObjectReturnsAnyForAnUnnamedField) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(type.getField("y"), Type::any());
+}
+
+TEST(TypeTest, GetFieldOnClosedObjectReturnsMissingForAnUnnamedField) {
+    auto type = closedObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(type.getField("y"), Type::missing());
+}
+
+TEST(TypeTest, GetFieldOnBareObjectTypeReturnsAny) {
+    ASSERT_EQ(object(Extent::kAll).getField("x"), Type::any());
+}
+
+TEST(TypeTest, GetFieldRequiresObjectType) {
+    ASSERT_TASSERT_CODE(allValues(BSONType::string).getField("x"), 13459103);
+}
+
+TEST(TypeTest, SetFieldNarrowsTheNamedField) {
+    auto type = object(Extent::kAll);
+    type.setField("x", allValues(BSONType::string));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+    ASSERT_EQ(type.getField("y"), Type::any());
+}
+
+TEST(TypeTest, SetFieldToAnyOnOpenObjectDropsTheField) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    type.setField("x", Type::any());
+    ASSERT_TRUE(describesEveryObject(type));
+}
+
+TEST(TypeTest, SetFieldToMissingOnClosedObjectDropsTheField) {
+    auto type = closedObject({{"x", allValues(BSONType::string)}});
+    type.setField("x", Type::missing());
+    ASSERT_EQ(type, closedObject({}));
+}
+
+TEST(TypeTest, SetFieldToNeverRemovesTheObjectType) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    type.setField("y", Type::never());
+    ASSERT_FALSE(type.hasType(BSONType::object));
+    ASSERT_EQ(type, Type::never());
+}
+
+TEST(TypeTest, SetFieldOnUnsharedShapeReusesIt) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    const void* shape = getFieldStorage(type);
+    type.setField("y", allValues(BSONType::numberInt));
+    ASSERT_EQ(getFieldStorage(type), shape);
+    ASSERT_EQ(type.getField("y"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, SetFieldOnSharedShapeClonesIt) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    auto shared = type;
+    type.setField("x", allValues(BSONType::numberInt));
+    ASSERT_NE(getFieldStorage(type), getFieldStorage(shared));
+    ASSERT_EQ(shared.getField("x"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, SetFieldToSameTypeKeepsShape) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    const void* shape = getFieldStorage(type);
+    type.setField("x", allValues(BSONType::string));
+    ASSERT_EQ(getFieldStorage(type), shape);
+}
+
+TEST(TypeTest, SetFieldOnCopyLeavesTheOriginalUnchanged) {
+    auto original = openObject({{"x", allValues(BSONType::string)}});
+    auto narrowed = original;
+    narrowed.setField("x", allValues(BSONType::numberInt));
+    ASSERT_EQ(original.getField("x"), allValues(BSONType::string));
+    ASSERT_EQ(narrowed.getField("x"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, SetFieldOnCopyLeavesTheNestedFieldsOfTheOriginal) {
+    auto original = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    auto narrowed = original;
+    narrowed.setField("a", openObject({{"b", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(original.getField("a").getField("b"), allValues(BSONType::string));
+    ASSERT_EQ(narrowed.getField("a").getField("b"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, SetFieldOnCopyKeepsTheShapeOfAnUntouchedNestedField) {
+    auto original = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})},
+                                {"x", allValues(BSONType::string)}});
+    const void* nested = getFieldStorage(original.getField("a"));
+    auto narrowed = original;
+    narrowed.setField("x", allValues(BSONType::numberInt));
+    ASSERT_NE(getFieldStorage(narrowed), getFieldStorage(original));
+    ASSERT_EQ(getFieldStorage(narrowed.getField("a")), nested);
+}
+
+TEST(TypeTest, SuccessiveSetFieldCallsCopyTheSharedShapeOnce) {
+    auto original = openObject({{"x", allValues(BSONType::string)}});
+    auto narrowed = original;
+    narrowed.setField("a", allValues(BSONType::numberInt));
+    const void* copied = getFieldStorage(narrowed);
+    ASSERT_NE(copied, getFieldStorage(original));
+    narrowed.setField("b", allValues(BSONType::numberInt));
+    ASSERT_EQ(getFieldStorage(narrowed), copied);
+    narrowed.setField("c", allValues(BSONType::numberInt));
+    ASSERT_EQ(getFieldStorage(narrowed), copied);
+}
+
+TEST(TypeTest, SetFieldRequiresObjectType) {
+    auto type = allValues(BSONType::string);
+    ASSERT_TASSERT_CODE(type.setField("x", allValues(BSONType::numberInt)), 13459104);
+}
+
+TEST(TypeTest, ObjectsDescribingTheSameValuesCompareEqual) {
+    ASSERT_EQ(openObject({{"x", allValues(BSONType::string)}}),
+              openObject({{"x", allValues(BSONType::string)}}));
+}
+
+TEST(TypeTest, ObjectsDisagreeingOnUnnamedFieldsCompareUnequal) {
+    ASSERT_NE(openObject({{"x", allValues(BSONType::string)}}),
+              closedObject({{"x", allValues(BSONType::string)}}));
+}
+
+TEST(TypeTest, NestedObjectsCompareByTheirFields) {
+    ASSERT_EQ(openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}}),
+              openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}}));
+    ASSERT_NE(openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}}),
+              openObject({{"a", openObject({{"b", allValues(BSONType::numberInt)}})}}));
+}
+
+TEST(TypeTest, ClosedObjectRendersItsFields) {
+    ASSERT_EQ(closedObject({{"x", allValues(BSONType::string)}}).toDebugString(), "{x: string}");
+}
+
+TEST(TypeTest, OpenObjectRendersAnEllipsis) {
+    ASSERT_EQ(openObject({{"x", allValues(BSONType::string)}}).toDebugString(), "{x: string, ...}");
+}
+
+TEST(TypeTest, ClosedObjectWithoutFieldsRendersAsEmptyBraces) {
+    ASSERT_EQ(closedObject({}).toDebugString(), "{}");
+}
+
+TEST(TypeTest, ObjectFieldsRenderInNameOrder) {
+    ASSERT_EQ(
+        closedObject({{"b", allValues(BSONType::string)}, {"a", allValues(BSONType::numberInt)}})
+            .toDebugString(),
+        "{a: int, b: string}");
+}
+
+TEST(TypeTest, NestedObjectRendersRecursively) {
+    ASSERT_EQ(
+        openObject({{"a", closedObject({{"b", allValues(BSONType::numberInt)}})}}).toDebugString(),
+        "{a: {b: int}, ...}");
+}
+
+TEST(TypeTest, ObjectFieldsAreEscaped) {
+    ASSERT_EQ(openObject({{"a ", Type::missing()}, {":\"", Type::missing()}}).toDebugString(),
+              "{\":\\\"\": missing, \"a \": missing, ...}");
 }
 
 }  // namespace

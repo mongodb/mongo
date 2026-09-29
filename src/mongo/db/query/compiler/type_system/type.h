@@ -5,8 +5,10 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/db/query/compiler/type_system/field_map.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::pipeline::type_system {
 
@@ -35,6 +37,31 @@ namespace detail {
 /// Integer type used to encode all BSONTypes.
 using TypeMask = uint32_t;
 }  // namespace detail
+
+/**
+ * Specifies whether unnamed fields may hold any value.
+ */
+enum class Open : uint8_t {
+    /// A field left unnamed may hold any value.
+    kYes,
+    /// A field left unnamed is missing.
+    kNo,
+};
+
+/// Returns true if 'open' is Open::kYes.
+inline bool isOpen(Open open) {
+    return open == Open::kYes;
+}
+
+/// Returns kYes if a field left unnamed may hold any value in either of 'lhs' and 'rhs'.
+inline Open operator||(Open lhs, Open rhs) {
+    return isOpen(lhs) || isOpen(rhs) ? Open::kYes : Open::kNo;
+}
+
+/// Returns kYes if a field left unnamed may hold any value in both 'lhs' and 'rhs'.
+inline Open operator&&(Open lhs, Open rhs) {
+    return isOpen(lhs) && isOpen(rhs) ? Open::kYes : Open::kNo;
+}
 
 /**
  * Represents a set of BSON types.
@@ -91,6 +118,27 @@ private:
     detail::TypeMask _subsetTypes;
 };
 
+class Type;
+
+namespace detail {
+
+/**
+ * Describes the objects a Type covers by naming the type of some of their fields.
+ * A shape has exactly one encoding, so shapes describing the same objects compare equal.
+ * Naming no field and leaving unnamed fields open describes every object.
+ */
+struct Shape {
+    /// Returns true if 'other' describes the same objects.
+    bool operator==(const Shape& other) const = default;
+
+    /// Never holds a field of the implied type.
+    FieldMap<Type> fields;
+    /// Whether a field left unnamed may hold any value.
+    Open open = Open::kYes;
+};
+
+}  // namespace detail
+
 /**
  * Represents a type in the type system.
  * A type can be a single BSONType, a union of BSONTypes and for objects, it could also have a
@@ -104,11 +152,21 @@ public:
     /// A type covering no values at all.
     static Type never();
 
+    /// A type covering BSONType::eoo (missing).
+    static Type missing();
+
     /// A type covering the type of 'value'. Generally a kSubset, except for singleton types.
     static Type fromValue(const Value& value);
 
     /// A type covering every value of every type named by 'matcherTypeSet'.
     static Type fromMatcherTypeSet(const MatcherTypeSet& matcherTypeSet);
+
+    /**
+     * A type covering the objects whose named fields hold the given types.
+     * A field left unnamed holds any value if 'open' is kYes, and is missing otherwise.
+     * Always Extent::kSubset, to prevent accidentally setting kAll when the fields map is empty.
+     */
+    static Type object(const StringMap<Type>& fields, Open open);
 
     /// A type covering all or some of the values within 'type'.
     Type(BSONType type, Extent extent);
@@ -118,20 +176,46 @@ public:
     /// Returns the set of BSON types this type covers.
     TypeSet getTypeSet() const;
 
+    /// Returns the shape of the objects covered.
+    const detail::Shape& getShape_forTest() const;
+
     /// Returns true if 'type' is one of the types covered.
     bool hasType(BSONType type) const;
 
     /// Returns the extent of 'type'. A type which is not covered is covered in full.
     Extent getExtent(BSONType type) const;
 
-    /// Returns true if 'other' covers the same types with the same extents.
-    bool operator==(const Type& other) const = default;
+    /**
+     * Returns the type of the 'fieldName' field of the covered object subset.
+     * Returns 'never' if this type covers no object.
+     */
+    Type getField(std::string_view fieldName) const;
 
-    /// Renders the type in the debug syntax, such as 'any', 'number|string' or '~array'.
+    /**
+     * Sets the type of the 'fieldName' field of the objects covered to 'fieldType'.
+     * Does nothing if this type covers no object.
+     */
+    void setField(std::string_view fieldName, Type fieldType);
+
+    /// Returns true if 'other' covers the same values with the same extent and fields.
+    bool operator==(const Type& other) const;
+
+    /**
+     * Renders the type in the debug syntax, such as 'any', 'number|string', '~array' or
+     * '{x: number, ...}'.
+     */
     std::string toDebugString() const;
 
 private:
+    /// Constructs a Type where the 'object' type is refined by the 'shape'.
+    Type(TypeSet typeSet, detail::Shape shape);
+
     TypeSet _typeSet;
+    /**
+     * The shape of the objects covered. A shape describing every object leaves the 'object' type
+     * covered in full, which is the only state the two may agree on.
+     */
+    detail::Shape _shape;
 };
 
 /// Returns the values covered by 'lhs' or by 'rhs'.
@@ -149,7 +233,10 @@ TypeSet complement(TypeSet typeSet);
 /// Returns the type covering the values of 'lhs' and of 'rhs'.
 Type unionType(Type lhs, Type rhs);
 
-/// Returns the type covering the values overlapped by both 'lhs' and 'rhs'.
+/**
+ * Returns the type covering the values overlapped by both 'lhs' and 'rhs'.
+ * The intersection of two incompatible object types removes the 'object' type.
+ */
 Type intersectType(Type lhs, Type rhs);
 
 /**
