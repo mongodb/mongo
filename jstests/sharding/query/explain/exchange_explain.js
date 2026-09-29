@@ -2,8 +2,6 @@
  * Test $merge and exchange with explain.
  *
  * @tags: [
- *   # TODO SERVER-124190: remove the multiversion incompatible tag.
- *   multiversion_incompatible,
  *   requires_sharding
  * ]
  */
