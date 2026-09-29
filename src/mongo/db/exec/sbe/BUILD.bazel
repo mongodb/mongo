@@ -165,6 +165,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:unique.cpp",
         "//src/mongo/db/exec/sbe/stages:unwind.cpp",
         "//src/mongo/db/exec/sbe/stages:virtual_scan.cpp",
+        "//src/mongo/db/exec/sbe/stages:window.cpp",
     ],
     deps = [
         ":query_sbe",
@@ -321,6 +322,7 @@ mongo_cc_unit_test(
         "sbe_test.cpp",
         "sbe_trial_run_tracker_test.cpp",
         "sbe_unique_test.cpp",
+        "sbe_window_test.cpp",
         "write_value_to_stream_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_array_set_conversion_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_block_expr_test.cpp",

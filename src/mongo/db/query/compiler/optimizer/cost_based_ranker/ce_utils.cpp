@@ -118,6 +118,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
         case STAGE_EQ_LOOKUP:
         case STAGE_EQ_LOOKUP_UNWIND:
         case STAGE_SEARCH:
+        case STAGE_WINDOW:
         case STAGE_SENTINEL:
         case STAGE_UNPACK_TS_BUCKET:
         case STAGE_COLLSCAN:
@@ -176,6 +177,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
         case STAGE_EQ_LOOKUP:
         case STAGE_EQ_LOOKUP_UNWIND:
         case STAGE_SEARCH:
+        case STAGE_WINDOW:
         case STAGE_SENTINEL:
         case STAGE_UNPACK_TS_BUCKET: {
             return true;

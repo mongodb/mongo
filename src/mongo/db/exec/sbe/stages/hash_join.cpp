@@ -7,7 +7,6 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
