@@ -101,6 +101,11 @@ public:
 
         if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
             builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
+            // FTDC stores metrics as integers and truncates doubles, so a fractional retention
+            // in hours (e.g. 0.75h) would be lost as 0 in the FTDC metric stream. Emit the
+            // retention in minutes as an integer to preserve sub-hour precision there.
+            builder.append("oplogMinRetentionMinutes",
+                           static_cast<long long>(oplogMinRetentionHours * 60));
         }
 
         builder.append("totalTimeTruncatingMicros",

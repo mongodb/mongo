@@ -23,6 +23,7 @@ const EB = 1024 * PB;
 assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 50 * MB);
 let serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 24);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 24 * 60);
 
 // Too small: 0.5 MB
 assert.commandFailedWithCode(
@@ -65,6 +66,7 @@ assert.commandWorked(
 );
 serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 5);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 5 * 60);
 
 // Valid minRetentionHours with no size parameter.
 assert.commandWorked(
@@ -74,6 +76,7 @@ assert.commandWorked(
 assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 1 * PB);
 serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 1);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 1 * 60);
 
 // TODO (SERVER-131719): Remove this workaround
 // In disaggregated storage, listCollections reads from the secondary's in-memory catalog while
