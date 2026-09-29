@@ -234,6 +234,15 @@ py_test(
 )
 
 py_test(
+    name = "test_cs_suggest_variants",
+    srcs = ["test_cs_suggest_variants.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:cs_suggest_variants_lib",
+    ],
+)
+
+py_test(
     name = "test_debugsymb_mapper",
     srcs = ["test_debugsymb_mapper.py"],
     visibility = ["//visibility:public"],

@@ -265,6 +265,27 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "cs_suggest_variants_lib",
+    srcs = ["cs_suggest_variants.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "cs_suggest_variants",
+    srcs = ["cs_suggest_variants.py"],
+    main = "cs_suggest_variants.py",
+    visibility = ["//visibility:public"],
+    deps = [":cs_suggest_variants_lib"],
+)
+
 py_binary(
     name = "errorcodes",
     srcs = ["errorcodes.py"],
