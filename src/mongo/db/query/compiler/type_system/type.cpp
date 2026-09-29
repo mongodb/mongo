@@ -205,6 +205,57 @@ void storeField(detail::Shape& shape, std::string_view fieldName, Type fieldType
     shape.fields.set(fieldName, std::move(fieldType));
 }
 
+/// Removes the object type from 'typeSet' and clears 'shape', which is what a 'never' field means.
+void clearShape(TypeSet& typeSet, detail::Shape& shape) {
+    typeSet = withoutType(typeSet, BSONType::object);
+    shape = {};
+}
+
+/**
+ * Returns pair [mergeInto, mergeFrom] set such that mergeInto is preferably uniquely owned.
+ */
+auto orderForMerge(detail::Shape lhs, detail::Shape rhs) {
+    const bool preferRhs = lhs.fields.isShared() != rhs.fields.isShared()
+        ? lhs.fields.isShared()
+        : rhs.fields.size() > lhs.fields.size();
+    if (preferRhs) {
+        return std::make_pair(std::move(rhs), std::move(lhs));
+    }
+    return std::make_pair(std::move(lhs), std::move(rhs));
+}
+
+/// Returns true if 'lhs' and 'rhs' describe the same objects through the same storage.
+bool sameShape(const detail::Shape& lhs, const detail::Shape& rhs) {
+    return lhs.open == rhs.open && lhs.fields.sameStorage(rhs.fields);
+}
+
+/**
+ * Returns the shape of the objects 'lhs' and 'rhs' describe when their fields are combined with
+ * 'combine'. 'open' specifies the value for the resulting shape.
+ * Removes the object type from 'typeSet' and clears the shape if any field becomes 'never'.
+ */
+template <typename Combine>
+detail::Shape mergeShapes(
+    TypeSet& typeSet, detail::Shape lhs, detail::Shape rhs, Open open, Combine combine) {
+    // Fields combine the same way whichever shape they come from, so either may be merged into.
+    auto [mergeInto, mergeFrom] = orderForMerge(std::move(lhs), std::move(rhs));
+    bool hasNeverField = false;
+    mergeInto.fields.merge(mergeFrom.fields,
+                           impliedType(mergeInto.open),
+                           impliedType(mergeFrom.open),
+                           impliedType(open),
+                           [&](Type lhsField, Type rhsField) {
+                               Type merged = combine(std::move(lhsField), std::move(rhsField));
+                               hasNeverField = hasNeverField || merged == Type::never();
+                               return merged;
+                           });
+    mergeInto.open = open;
+    if (hasNeverField) {
+        clearShape(typeSet, mergeInto);
+    }
+    return mergeInto;
+}
+
 /// Escapes field names and adds quotes when needed.
 std::string escapeFieldName(std::string_view fieldName) {
     if (std::all_of(fieldName.begin(), fieldName.end(), [](unsigned char c) {
@@ -431,15 +482,90 @@ std::string Type::toDebugString() const {
 }
 
 Type unionType(Type lhs, Type rhs) {
-    return Type(unionType(lhs.getTypeSet(), rhs.getTypeSet()));
+    auto typeSet = unionType(lhs._typeSet, rhs._typeSet);
+    const bool lhsHasObject = lhs._typeSet.hasType(BSONType::object);
+    const bool rhsHasObject = rhs._typeSet.hasType(BSONType::object);
+    if (!lhsHasObject && !rhsHasObject) {
+        return Type(typeSet);
+    }
+    // A side covering no object contributes no object to describe.
+    if (!lhsHasObject) {
+        return Type(typeSet, std::move(rhs._shape));
+    }
+    if (!rhsHasObject) {
+        return Type(typeSet, std::move(lhs._shape));
+    }
+    if (sameShape(lhs._shape, rhs._shape)) {
+        // Quick identity check.
+        return Type(typeSet, std::move(lhs._shape));
+    }
+    if (isAnyObject(lhs._shape) || isAnyObject(rhs._shape)) {
+        // A side covering every object leaves every object covered.
+        return Type(typeSet);
+    }
+    // Union the individual fields in the shapes. Fields union the same way whichever shape they
+    // come from, so either may be the one merged into.
+    const Open open = lhs._shape.open || rhs._shape.open;
+    auto merged = mergeShapes(typeSet,
+                              std::move(lhs._shape),
+                              std::move(rhs._shape),
+                              open,
+                              [](Type lhsField, Type rhsField) {
+                                  return unionType(std::move(lhsField), std::move(rhsField));
+                              });
+    return Type(typeSet, std::move(merged));
 }
 
 Type intersectType(Type lhs, Type rhs) {
-    return Type(intersectType(lhs.getTypeSet(), rhs.getTypeSet()));
+    auto typeSet = intersectType(lhs._typeSet, rhs._typeSet);
+    if (!typeSet.hasType(BSONType::object)) {
+        return Type(typeSet);
+    }
+    if (sameShape(lhs._shape, rhs._shape)) {
+        // Quick identity check.
+        return Type(typeSet, std::move(lhs._shape));
+    }
+    // A side covering every object narrows no field, which leaves the other side's shape.
+    if (isAnyObject(lhs._shape)) {
+        return Type(typeSet, std::move(rhs._shape));
+    }
+    if (isAnyObject(rhs._shape)) {
+        return Type(typeSet, std::move(lhs._shape));
+    }
+    // Fields intersect the same way whichever shape they come from, so either may be the one
+    // merged into.
+    const Open open = lhs._shape.open && rhs._shape.open;
+    auto merged = mergeShapes(typeSet,
+                              std::move(lhs._shape),
+                              std::move(rhs._shape),
+                              open,
+                              [](Type lhsField, Type rhsField) {
+                                  return intersectType(std::move(lhsField), std::move(rhsField));
+                              });
+    return Type(typeSet, std::move(merged));
 }
 
 Type complement(Type type) {
-    return Type(complement(type.getTypeSet()));
+    // We cannot represent the complement of a shape. If we have a shape, the object type is already
+    // 'kSubset', so the complement will also have object(S).
+    return Type(complement(type._typeSet));
 }
 
+Type narrowField(Type input, std::string_view fieldName, Type fieldType) {
+    tassert(13459105,
+            "Type should include object to be able to modify a field",
+            input.hasType(BSONType::object));
+    // Handing the field over to the intersection, rather than reading a copy of it, is what lets an
+    // owned nested shape be narrowed without being copied.
+    bool hasNeverField = false;
+    input._shape.fields.update(fieldName, impliedType(input._shape.open), [&](Type current) {
+        Type narrowed = intersectType(std::move(current), std::move(fieldType));
+        hasNeverField = narrowed == Type::never();
+        return narrowed;
+    });
+    if (hasNeverField) {
+        clearShape(input._typeSet, input._shape);
+    }
+    return Type(input._typeSet, std::move(input._shape));
+}
 }  // namespace mongo::pipeline::type_system

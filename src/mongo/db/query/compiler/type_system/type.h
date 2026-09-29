@@ -207,6 +207,11 @@ public:
     std::string toDebugString() const;
 
 private:
+    friend Type unionType(Type lhs, Type rhs);
+    friend Type intersectType(Type lhs, Type rhs);
+    friend Type complement(Type type);
+    friend Type narrowField(Type input, std::string_view fieldName, Type fieldType);
+
     /// Constructs a Type where the 'object' type is refined by the 'shape'.
     Type(TypeSet typeSet, detail::Shape shape);
 
@@ -244,5 +249,12 @@ Type intersectType(Type lhs, Type rhs);
  * covered as subset.
  */
 Type complement(Type type);
+
+/**
+ * Returns 'input' with the type of the 'fieldName' field of the object intersected with
+ * 'fieldType', so the field never widens beyond it.
+ * Returns 'input' unchanged if it covers no object.
+ */
+Type narrowField(Type input, std::string_view fieldName, Type fieldType);
 
 }  // namespace mongo::pipeline::type_system

@@ -432,6 +432,10 @@ bool describesEveryObject(const Type& type) {
     return type.hasType(BSONType::object) && shape.fields.empty() && isOpen(shape.open);
 }
 
+Type allNumbers() {
+    return Type(TypeSet::numericTypes(Extent::kAll));
+}
+
 TEST(TypeTest, OpenObjectWithoutFieldsDescribesOnlySomeObjects) {
     auto type = Type::object({}, Open::kYes);
     // The object() factory always covers a subset, even if fields are empty.
@@ -615,6 +619,210 @@ TEST(TypeTest, SetFieldRequiresObjectType) {
     ASSERT_TASSERT_CODE(type.setField("x", allValues(BSONType::numberInt)), 13459104);
 }
 
+TEST(TypeTest, NarrowFieldIntersectsTheNamedFieldInsteadOfReplacingIt) {
+    auto type = narrowField(openObject({{"x", Type::any()}}), "x", allValues(BSONType::numberInt));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::numberInt));
+    ASSERT_EQ(narrowField(std::move(type), "x", allValues(BSONType::string)), Type::never());
+}
+
+TEST(TypeTest, NarrowFieldRequiresObjectType) {
+    auto type = allValues(BSONType::string);
+    ASSERT_TASSERT_CODE(narrowField(type, "x", allValues(BSONType::numberInt)), 13459105);
+}
+
+TEST(TypeTest, NarrowFieldLeavesItsArgumentUnchanged) {
+    auto original = openObject({{"x", Type::any()}});
+    auto narrowed = narrowField(original, "x", allValues(BSONType::string));
+    ASSERT_EQ(original.getField("x"), Type::any());
+    ASSERT_EQ(narrowed.getField("x"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, NarrowFieldOnUnsharedShapeReusesIt) {
+    auto type = openObject({{"x", allNumbers()}});
+    const void* shape = getFieldStorage(type);
+    auto narrowed = narrowField(std::move(type), "x", allValues(BSONType::numberInt));
+    ASSERT_EQ(getFieldStorage(narrowed), shape);
+    ASSERT_EQ(narrowed.getField("x"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, NarrowFieldOnUnsharedNestedShapeReusesEveryLevel) {
+    auto type = openObject({{"a", openObject({{"b", allNumbers()}})}});
+    const void* outer = getFieldStorage(type);
+    const void* inner = getFieldStorage(type.getField("a"));
+    auto narrowed =
+        narrowField(std::move(type), "a", openObject({{"b", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(getFieldStorage(narrowed), outer);
+    ASSERT_EQ(getFieldStorage(narrowed.getField("a")), inner);
+    ASSERT_EQ(narrowed.getField("a").getField("b"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, NarrowFieldOnSharedShapeLeavesTheOtherOwnerUnchanged) {
+    auto original = openObject({{"x", allNumbers()}});
+    auto shared = original;
+    const void* shape = getFieldStorage(original);
+    auto narrowed = narrowField(std::move(original), "x", allValues(BSONType::numberInt));
+    ASSERT_NE(getFieldStorage(narrowed), shape);
+    ASSERT_EQ(getFieldStorage(shared), shape);
+    ASSERT_EQ(shared.getField("x"), allNumbers());
+}
+
+TEST(TypeTest, NarrowFieldToNoValueAtDepthRemovesTheOuterObjectType) {
+    auto type = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    auto narrowed = narrowField(std::move(type), "a", openObject({{"b", allNumbers()}}));
+    ASSERT_EQ(narrowed, Type::never());
+}
+
+TEST(TypeTest, UnionOfOpenObjectsIsOpen) {
+    auto type = unionType(openObject({{"x", allValues(BSONType::string)}}),
+                          openObject({{"x", allValues(BSONType::numberInt)}}));
+    ASSERT_TRUE(isOpen(type.getShape_forTest().open));
+}
+
+TEST(TypeTest, UnionOfClosedObjectsStaysClosed) {
+    auto type = unionType(closedObject({{"x", allValues(BSONType::string)}}),
+                          closedObject({{"x", allValues(BSONType::numberInt)}}));
+    ASSERT_FALSE(isOpen(type.getShape_forTest().open));
+}
+
+TEST(TypeTest, UnionOfClosedAndOpenObjectsIsOpen) {
+    auto type = unionType(closedObject({{"x", allValues(BSONType::string)}}),
+                          openObject({{"y", allValues(BSONType::numberInt)}}));
+    ASSERT_TRUE(isOpen(type.getShape_forTest().open));
+}
+
+TEST(TypeTest, UnionOfObjectsUnionsTheTypeOfEachField) {
+    auto type = unionType(openObject({{"x", allValues(BSONType::string)}}),
+                          openObject({{"x", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(type.getField("x"),
+              unionType(allValues(BSONType::string), allValues(BSONType::numberInt)));
+}
+
+TEST(TypeTest, UnionAllowsAFieldNamedByOneObjectToBeMissing) {
+    auto type = unionType(closedObject({{"x", allValues(BSONType::string)}}),
+                          closedObject({{"y", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(type.getField("x"), unionType(allValues(BSONType::string), Type::missing()));
+    ASSERT_EQ(type.getField("y"), unionType(allValues(BSONType::numberInt), Type::missing()));
+}
+
+TEST(TypeTest, UnionWithBareFullObjectTypeDropsTheShape) {
+    auto type = unionType(openObject({{"x", allValues(BSONType::string)}}), object(Extent::kAll));
+    ASSERT_TRUE(describesEveryObject(type));
+    ASSERT_TRUE(isAll(type.getExtent(BSONType::object)));
+}
+
+TEST(TypeTest, UnionWithBareSubsetObjectTypeDropsTheShape) {
+    auto type =
+        unionType(openObject({{"x", allValues(BSONType::string)}}), object(Extent::kSubset));
+    ASSERT_TRUE(describesEveryObject(type));
+}
+
+TEST(TypeTest, UnionKeepsTheShapeOfWhicheverSideCoversObjects) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(unionType(allValues(BSONType::array), object),
+              unionType(object, allValues(BSONType::array)));
+    ASSERT_EQ(unionType(allValues(BSONType::array), object).getField("x"),
+              allValues(BSONType::string));
+}
+
+TEST(TypeTest, UnionOfClosedObjectsWithoutFieldsNamesNoField) {
+    auto type = unionType(closedObject({}), closedObject({}));
+    ASSERT_EQ(type, closedObject({}));
+    ASSERT_TRUE(type.getShape_forTest().fields.empty());
+}
+
+TEST(TypeTest, IntersectionOfClosedObjectsWithoutFieldsNamesNoField) {
+    auto type = intersectType(closedObject({}), closedObject({}));
+    ASSERT_EQ(type, closedObject({}));
+    ASSERT_TRUE(type.getShape_forTest().fields.empty());
+}
+
+TEST(TypeTest, UnionWithATypeNotCoveringObjectsKeepsTheShape) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    auto type = unionType(object, allValues(BSONType::array));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+    ASSERT_TRUE(type.hasType(BSONType::array));
+}
+
+TEST(TypeTest, UnionOfNestedObjectsRecurses) {
+    auto type = unionType(openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}}),
+                          openObject({{"a", openObject({{"b", allValues(BSONType::numberInt)}})}}));
+    ASSERT_EQ(type.getField("a").getField("b"),
+              unionType(allValues(BSONType::string), allValues(BSONType::numberInt)));
+}
+
+TEST(TypeTest, IntersectionOfOpenObjectsIsOpen) {
+    auto type = intersectType(openObject({{"x", allValues(BSONType::string)}}),
+                              openObject({{"y", allValues(BSONType::numberInt)}}));
+    ASSERT_TRUE(isOpen(type.getShape_forTest().open));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+    ASSERT_EQ(type.getField("y"), allValues(BSONType::numberInt));
+}
+
+TEST(TypeTest, IntersectionOfOpenAndClosedObjectsIsClosed) {
+    auto type =
+        intersectType(openObject({{"x", unionType(allValues(BSONType::string), Type::missing())}}),
+                      closedObject({{"x", allValues(BSONType::string)}}));
+    ASSERT_FALSE(isOpen(type.getShape_forTest().open));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, IntersectionOfObjectsIntersectsTheTypeOfEachField) {
+    auto type = intersectType(
+        openObject({{"x", unionType(allValues(BSONType::string), allValues(BSONType::numberInt))}}),
+        openObject({{"x", allValues(BSONType::string)}}));
+    ASSERT_EQ(type.getField("x"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, IntersectionWithAClosedObjectRemovingARequiredFieldRemovesTheObjectType) {
+    auto type = intersectType(openObject({{"x", allValues(BSONType::string)}}),
+                              closedObject({{"y", allValues(BSONType::numberInt)}}));
+    ASSERT_FALSE(type.hasType(BSONType::object));
+}
+
+TEST(TypeTest, IntersectionOfClosedObjectsNamingDifferentFieldsRemovesTheObjectType) {
+    auto type = intersectType(closedObject({{"x", allValues(BSONType::string)}}),
+                              closedObject({{"y", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(type, Type::never());
+}
+
+TEST(TypeTest, IntersectionWithBareObjectTypeKeepsTheShape) {
+    auto type = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(intersectType(type, object(Extent::kAll)), type);
+}
+
+TEST(TypeTest, IntersectionRemovingTheObjectTypeIsNotTheIntersectionOfTheTypeSets) {
+    auto lhs = openObject({{"x", allValues(BSONType::string)}});
+    auto rhs = closedObject({{"y", allValues(BSONType::numberInt)}});
+    ASSERT_TRUE(intersectType(lhs.getTypeSet(), rhs.getTypeSet()).hasType(BSONType::object));
+    ASSERT_FALSE(intersectType(lhs, rhs).hasType(BSONType::object));
+}
+
+TEST(TypeTest, IntersectionOfNestedObjectsRecurses) {
+    auto type =
+        intersectType(openObject({{"a",
+                                   openObject({{"b",
+                                                unionType(allValues(BSONType::string),
+                                                          allValues(BSONType::numberInt))}})}}),
+                      openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}}));
+    ASSERT_EQ(type.getField("a").getField("b"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, ComplementDropsTheShape) {
+    auto type = complement(openObject({{"x", allValues(BSONType::string)}}));
+    ASSERT_TRUE(describesEveryObject(type));
+}
+
+TEST(TypeTest, ComplementLeavesObjectsPossible) {
+    auto type = complement(openObject({{"x", allValues(BSONType::string)}}));
+    ASSERT_TRUE(type.hasType(BSONType::object));
+    ASSERT_TRUE(isSubset(type.getExtent(BSONType::object)));
+}
+
+TEST(TypeTest, ComplementOfComplementDoesNotRestoreTheShape) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_NE(complement(complement(object)), object);
+}
+
 TEST(TypeTest, ObjectsDescribingTheSameValuesCompareEqual) {
     ASSERT_EQ(openObject({{"x", allValues(BSONType::string)}}),
               openObject({{"x", allValues(BSONType::string)}}));
@@ -660,6 +868,121 @@ TEST(TypeTest, NestedObjectRendersRecursively) {
 TEST(TypeTest, ObjectFieldsAreEscaped) {
     ASSERT_EQ(openObject({{"a ", Type::missing()}, {":\"", Type::missing()}}).toDebugString(),
               "{\":\\\"\": missing, \"a \": missing, ...}");
+}
+
+TEST(TypeTest, ObjectRendersInSortOrderWithinAUnion) {
+    auto type =
+        unionType(closedObject({{"x", allValues(BSONType::string)}}), allValues(BSONType::array));
+    ASSERT_EQ(type.toDebugString(), "{x: string}|array");
+}
+
+TEST(TypeTest, ObjectWithKnownFieldsNeverRendersAsANegation) {
+    auto type = intersectType(openObject({{"x", allValues(BSONType::string)}}),
+                              complement(allValues(BSONType::array)));
+    ASSERT_EQ(type.toDebugString(), "{x: string, ...}");
+}
+
+TEST(TypeTest, UnionOfTypesWithoutKnownFieldsHasNoShape) {
+    auto type = unionType(object(Extent::kAll), Type::any());
+    ASSERT_TRUE(describesEveryObject(type));
+    ASSERT_EQ(type, Type::any());
+}
+
+TEST(TypeTest, IntersectionOfTypesWithoutKnownFieldsHasNoShape) {
+    auto type = intersectType(object(Extent::kAll), Type::any());
+    ASSERT_TRUE(describesEveryObject(type));
+    ASSERT_EQ(type, object(Extent::kAll));
+}
+
+TEST(TypeTest, UnionOfAnObjectWithItselfIsThatObject) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(unionType(object, object), object);
+}
+
+TEST(TypeTest, IntersectionOfAnObjectWithItselfIsThatObject) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(intersectType(object, object), object);
+}
+
+TEST(TypeTest, UnionOfObjectWithItselfKeepsShape) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(getFieldStorage(unionType(object, object)), getFieldStorage(object));
+}
+
+TEST(TypeTest, IntersectionOfObjectWithItselfKeepsShape) {
+    auto object = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(getFieldStorage(intersectType(object, object)), getFieldStorage(object));
+}
+
+TEST(TypeTest, UnionOfObjectsIsCommutative) {
+    auto lhs = closedObject({{"x", allValues(BSONType::string)}});
+    auto rhs = openObject({{"y", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(unionType(lhs, rhs), unionType(rhs, lhs));
+}
+
+TEST(TypeTest, IntersectionOfObjectsIsCommutative) {
+    auto lhs = openObject({{"x", allValues(BSONType::string)}});
+    auto rhs = openObject({{"y", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(intersectType(lhs, rhs), intersectType(rhs, lhs));
+}
+
+TEST(TypeTest, IntersectionWithAnUnsharedShapeReusesIt) {
+    auto lhs = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    const void* shape = getFieldStorage(lhs);
+    auto result =
+        intersectType(std::move(lhs), openObject({{"x", allValues(BSONType::numberInt)}}));
+    ASSERT_EQ(getFieldStorage(result), shape);
+    ASSERT_EQ(result.getField("x"), allValues(BSONType::numberInt));
+    ASSERT_EQ(result.getField("y"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, IntersectionReusesWhicheverSideIsUnshared) {
+    auto lhs = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto shared = lhs;
+    auto rhs = openObject({{"x", allValues(BSONType::numberInt)}});
+    const void* rhsShape = getFieldStorage(rhs);
+    auto result = intersectType(std::move(lhs), std::move(rhs));
+    ASSERT_EQ(getFieldStorage(result), rhsShape);
+    ASSERT_EQ(result.getField("x"), allValues(BSONType::numberInt));
+    ASSERT_EQ(result.getField("y"), allValues(BSONType::string));
+}
+
+TEST(TypeTest, IntersectionWithASharedShapeLeavesTheOtherOwnerUnchanged) {
+    auto lhs = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto shared = lhs;
+    const void* shape = getFieldStorage(lhs);
+    auto result =
+        intersectType(std::move(lhs), openObject({{"x", allValues(BSONType::numberInt)}}));
+    ASSERT_NE(getFieldStorage(result), shape);
+    ASSERT_EQ(getFieldStorage(shared), shape);
+    ASSERT_EQ(shared.getField("x"), allNumbers());
+}
+
+TEST(TypeTest, UnionWithAnUnsharedShapeReusesIt) {
+    auto lhs = openObject({{"x", allValues(BSONType::numberInt)}, {"y", allNumbers()}});
+    const void* shape = getFieldStorage(lhs);
+    auto result = unionType(std::move(lhs), openObject({{"y", allValues(BSONType::string)}}));
+    ASSERT_EQ(getFieldStorage(result), shape);
+    ASSERT_EQ(result.getField("x"), Type::any());
+    ASSERT_EQ(result.getField("y"), unionType(allNumbers(), allValues(BSONType::string)));
+}
+
+TEST(TypeTest, IntersectionAgreesWhetherOrNotTheShapeIsShared) {
+    auto rhs =
+        openObject({{"x", allValues(BSONType::numberInt)}, {"z", allValues(BSONType::date)}});
+    auto unshared = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto shared = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto otherOwner = shared;
+    ASSERT_EQ(intersectType(std::move(unshared), rhs), intersectType(std::move(shared), rhs));
+}
+
+TEST(TypeTest, UnionAgreesWhetherOrNotTheShapeIsShared) {
+    auto rhs =
+        openObject({{"x", allValues(BSONType::numberInt)}, {"z", allValues(BSONType::date)}});
+    auto unshared = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto shared = openObject({{"x", allNumbers()}, {"y", allValues(BSONType::string)}});
+    auto otherOwner = shared;
+    ASSERT_EQ(unionType(std::move(unshared), rhs), unionType(std::move(shared), rhs));
 }
 
 }  // namespace
