@@ -36,20 +36,154 @@ THRESHOLD_OVERRIDE_COMMENT = "perf threshold check override"
 REVERT_PREFIX = "Revert "
 GITHUB_REPO_NAME = "10gen/mongo"
 
+ATTR_TEST_NAME = "test_name"
+ATTR_MEASUREMENT = "measurement"
+ATTR_BASE_VERSION_ID = "base_version_id"
+ATTR_BASE_COMMIT_HASH = "base_commit_hash"
+ATTR_VARIANT = "variant"
+ATTR_PROJECT = "project"
+ATTR_THREAD_LEVEL = "thread_level"
+ATTR_EXCEPTION_TYPE = "exception.type"
+ATTR_EXCEPTION_MESSAGE = "exception.message"
+ATTR_RESPONSE_TYPE = "response.type"
+ATTR_LOGIN = "login"
+ATTR_TEAM = "team"
+ATTR_THRESHOLD_LOCATION = "threshold_location"
+ATTR_CHECK_RESULT = "check_result"
+ATTR_HAS_CHECKED_RESULTS = "has_checked_results"
+ATTR_REPORTED_VALUE = "reported_value"
+ATTR_BASE_VALUE = "base_value"
+ATTR_THRESHOLD_LIMIT = "threshold_limit"
+ATTR_BOUND_DIRECTION = "bound_direction"
+ATTR_ERROR_CODE = "error.code"
+ATTR_ERROR_CATEGORY = "error.category"
+
 TRACER = trace.get_tracer("resmoke")
 
 
-def _log_perf_error(logger, message: str):
+class ErrorCategory(str, Enum):
+    """What an error means for the task, and who is meant to see it.
+
+    TASK_FAILURE errors fail the benchmarks_sep task: the developer sees them in the
+    failed test's log.
+    INTERNAL_ALERT errors are non-blocking for Server engineers but are detected
+    and alerts are raised to Product Perf via telemetry.
+    """
+
+    TASK_FAILURE = "task_failure"
+    INTERNAL_ALERT = "internal_alert"
+
+
+class PerfErrorCode(str, Enum):
+    """Stable, low-cardinality identifier for each error this hook reports to telemetry.
+
+    The code and category are attached to the error event as the `error.code` and
+    `error.category` attributes so alerts can group on exact values instead of matching
+    against dynamic message text, which carries the human-readable details.
+    """
+
+    def __new__(cls, value: str, category: ErrorCategory):
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj.category = category
+        return obj
+
+    MISSING_RAW_PERF_RESULT = ("missing_raw_perf_result", ErrorCategory.INTERNAL_ALERT)
+    DUPLICATE_REPORTED_METRIC = ("duplicate_reported_metric", ErrorCategory.INTERNAL_ALERT)
+    DUPLICATE_METRIC_NAMES = ("duplicate_metric_names", ErrorCategory.INTERNAL_ALERT)
+    MISSING_PR_NUMBER = ("missing_pr_number", ErrorCategory.INTERNAL_ALERT)
+    PR_TITLE_FETCH_FAILED = ("pr_title_fetch_failed", ErrorCategory.INTERNAL_ALERT)
+    GIT_SUBJECT_FAILED = ("git_subject_failed", ErrorCategory.INTERNAL_ALERT)
+    MISSING_PROJECT_NAME = ("missing_project_name", ErrorCategory.INTERNAL_ALERT)
+    BASE_VERSION_RESOLUTION_FAILED = (
+        "base_version_resolution_failed",
+        ErrorCategory.INTERNAL_ALERT,
+    )
+    THRESHOLD_FILE_LOAD_FAILED = ("threshold_file_load_failed", ErrorCategory.INTERNAL_ALERT)
+    CHECK_RESULT_MISMATCH = ("check_result_mismatch", ErrorCategory.INTERNAL_ALERT)
+    RAW_RESULTS_REQUEST_FAILED = ("raw_results_request_failed", ErrorCategory.INTERNAL_ALERT)
+    RAW_RESULTS_NON_LIST_RESPONSE = ("raw_results_non_list_response", ErrorCategory.INTERNAL_ALERT)
+    OVERRIDE_MEMBERSHIP_CHECK_FAILED = (
+        "override_membership_check_failed",
+        ErrorCategory.INTERNAL_ALERT,
+    )
+    MISSING_REPORTED_METRIC = ("missing_reported_metric", ErrorCategory.TASK_FAILURE)
+    THRESHOLD_FAILED_LOWER = ("threshold_failed_lower", ErrorCategory.TASK_FAILURE)
+    THRESHOLD_FAILED_UPPER = ("threshold_failed_upper", ErrorCategory.TASK_FAILURE)
+
+
+def _get_github_pr_number() -> Optional[int]:
+    """Return the GitHub PR number of this build, or None if it is unavailable.
+
+    The 'github_pr_number' Evergreen expansion is only set for PR builds and may be
+    missing or non-numeric elsewhere. GitHub PR numbers start at 1, so a 0 value is
+    also treated as unavailable rather than returned as a sentinel.
+    """
+    try:
+        github_pr_number = int(get_expansion("github_pr_number"))
+    except (TypeError, ValueError):
+        return None
+    return github_pr_number or None
+
+
+def _evergreen_context_attributes() -> dict[str, Any]:
+    """Return the Evergreen context of this run as OpenTelemetry span attributes.
+
+    These use the same keys as the baggage resmoke attaches to its spans. The hook attaches
+    them explicitly because the after_test and after_suite hooks run in a separate thread
+    that does not inherit the baggage from the main thread.
+    """
+    attributes = {
+        "evergreen.task.id": _config.EVERGREEN_TASK_ID,
+        "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
+        "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
+        "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
+        "evergreen.version.id": _config.EVERGREEN_VERSION_ID,
+        "evergreen.revision": _config.EVERGREEN_REVISION,
+        "evergreen.task.execution": _config.EVERGREEN_EXECUTION
+        if _config.EVERGREEN_TASK_ID
+        else None,
+        "evergreen.requester": _config.EVERGREEN_REQUESTER,
+    }
+    attributes["github.pr.number"] = _get_github_pr_number()
+    return {key: value for key, value in attributes.items() if value is not None}
+
+
+def _log_perf_error(
+    logger,
+    message: str,
+    *,
+    code: PerfErrorCode,
+    extra_attributes: Optional[dict[str, Any]] = None,
+):
     """Log an error and report it to the current OpenTelemetry span.
 
-    Since this hook is run in PR checks, errors in the hook should not fail the task (and block developers due to tooling failures).
-    Instead, errors in the hook are logged and reported to OpenTelemetry.
+    Since this hook runs in PR checks, tooling errors must not fail the task and block
+    developers. Those errors (category=internal_alert) are only findable here, which is what
+    alerts should key on. Errors that do fail the task (category=task_failure) are
+    developer-facing in the failed test's log.
+
+    The error event carries the error code and category, the human-readable message,
+    structured details, and the Evergreen context of the run so the failure can be
+    traced back to the task that produced it. The message is dynamic so the details are
+    visible in the Evergreen logs; the code and category are the low-cardinality values
+    alerts should group on.
     """
 
     logger.error(message)
     current_span = trace.get_current_span()
     if current_span.is_recording():
-        current_span.add_event("generate_and_check_perf_results.error", {"message": message})
+        attributes = {
+            ATTR_ERROR_CODE: code.value,
+            ATTR_ERROR_CATEGORY: code.category.value,
+            "message": message,
+        }
+        attributes.update(_evergreen_context_attributes())
+        if extra_attributes:
+            attributes.update(
+                {key: value for key, value in extra_attributes.items() if value is not None}
+            )
+        current_span.add_event("generate_and_check_perf_results.error", attributes)
         current_span.set_status(
             StatusCode.ERROR, description="Error in generate_and_check_perf_results"
         )
@@ -121,7 +255,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
     def after_test(self, test, test_report):
         """Update test report."""
-        with TRACER.start_as_current_span("generate_and_check_perf_results.after_test") as span:
+        with TRACER.start_as_current_span(
+            "generate_and_check_perf_results.after_test",
+            attributes=_evergreen_context_attributes(),
+        ) as span:
             try:
                 self._after_test_impl(test, test_report)
             except (errors.ServerFailure, errors.TestFailure):
@@ -207,6 +344,14 @@ class GenerateAndCheckPerfResults(interface.Hook):
                             self.logger,
                             f"Skipping threshold check because no raw perf result found for test {test_name}, measurement {metric['name']} on variant {self.variant} in project {project}. "
                             f"This may be because the task did not run successfully on the base commit or a delay in processing results for the base commit.",
+                            code=PerfErrorCode.MISSING_RAW_PERF_RESULT,
+                            extra_attributes={
+                                ATTR_TEST_NAME: test_name,
+                                ATTR_MEASUREMENT: metric["name"],
+                                ATTR_VARIANT: self.variant,
+                                ATTR_PROJECT: project,
+                                ATTR_BASE_VERSION_ID: parent_version_id,
+                            },
                         )
                         continue
                     metrics_to_check.append(
@@ -232,6 +377,12 @@ class GenerateAndCheckPerfResults(interface.Hook):
                         _log_perf_error(
                             self.logger,
                             f"Multiple values reported for the same metric: {reported_metric}. Skipping this one.",
+                            code=PerfErrorCode.DUPLICATE_REPORTED_METRIC,
+                            extra_attributes={
+                                ATTR_TEST_NAME: reported_metric.test_name,
+                                ATTR_MEASUREMENT: reported_metric.metric_name,
+                                ATTR_THREAD_LEVEL: reported_metric.thread_level,
+                            },
                         )
                         continue
                     else:
@@ -250,26 +401,30 @@ class GenerateAndCheckPerfResults(interface.Hook):
         For mainline/waterfall builds the HEAD commit subject is fetched via git log.
         """
         if _config.EVERGREEN_REQUESTER in ("github_pr", "github_merge_queue"):
-            try:
-                github_pr_number = int(get_expansion("github_pr_number", 0))
-            except (TypeError, ValueError):
-                github_pr_number = 0
-            if not github_pr_number:
+            github_pr_number = _get_github_pr_number()
+            if github_pr_number is None:
                 _log_perf_error(
                     self.logger,
                     "Missing 'github_pr_number' expansion, cannot check PR title for revert.",
+                    code=PerfErrorCode.MISSING_PR_NUMBER,
                 )
                 return None
+
             try:
                 github = Github(get_expansion("github_token_mongo"))
                 pr = github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)
             except Exception as exc:
                 _log_perf_error(
                     self.logger,
-                    f"Failed to check PR title for revert: {exc}. "
-                    "Proceeding with threshold check.",
+                    f"Failed to check PR title for revert: {exc}. Proceeding with threshold check.",
+                    code=PerfErrorCode.PR_TITLE_FETCH_FAILED,
+                    extra_attributes={
+                        ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                        ATTR_EXCEPTION_MESSAGE: str(exc),
+                    },
                 )
                 return None
+
             return pr.title
         try:
             return subprocess.check_output(
@@ -278,8 +433,12 @@ class GenerateAndCheckPerfResults(interface.Hook):
         except Exception as exc:
             _log_perf_error(
                 self.logger,
-                f"Failed to check if this is a revert commit: {exc}. "
-                "Proceeding with threshold check.",
+                f"Failed to check if this is a revert commit: {exc}. Proceeding with threshold check.",
+                code=PerfErrorCode.GIT_SUBJECT_FAILED,
+                extra_attributes={
+                    ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                    ATTR_EXCEPTION_MESSAGE: str(exc),
+                },
             )
             return None
 
@@ -315,6 +474,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 self.logger,
                 "Unable to determine the Evergreen project name. "
                 "Cannot check performance thresholds without a project to compare against.",
+                code=PerfErrorCode.MISSING_PROJECT_NAME,
             )
             return "", None
         project = _config.EVERGREEN_PROJECT_NAME
@@ -359,6 +519,12 @@ class GenerateAndCheckPerfResults(interface.Hook):
             _log_perf_error(
                 self.logger,
                 f"Failed to resolve base commit {base_commit_hash} to an Evergreen version ID: {exc}",
+                code=PerfErrorCode.BASE_VERSION_RESOLUTION_FAILED,
+                extra_attributes={
+                    ATTR_BASE_COMMIT_HASH: base_commit_hash,
+                    ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                    ATTR_EXCEPTION_MESSAGE: str(exc),
+                },
             )
         self.logger.info(f"parent_version_id={parent_version_id}")
 
@@ -366,7 +532,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
     def before_suite(self, test_report):
         """Set suite start time."""
-        with TRACER.start_as_current_span("generate_and_check_perf_results.before_suite") as span:
+        with TRACER.start_as_current_span(
+            "generate_and_check_perf_results.before_suite",
+            attributes=_evergreen_context_attributes(),
+        ) as span:
             try:
                 self._before_suite_impl(test_report)
             except Exception as exc:
@@ -387,16 +556,25 @@ class GenerateAndCheckPerfResults(interface.Hook):
         try:
             with open(THRESHOLD_LOCATION, encoding="utf8") as fh:
                 self.performance_thresholds = yaml.safe_load(fh)["tests"]
-        except Exception:
+        except Exception as exc:
             _log_perf_error(
                 self.logger,
-                f"Could not load in the threshold file needed to check performance results. "
+                "Could not load in the threshold file needed to check performance results. "
                 f"Trying to retrieve them from {THRESHOLD_LOCATION}.",
+                code=PerfErrorCode.THRESHOLD_FILE_LOAD_FAILED,
+                extra_attributes={
+                    ATTR_THRESHOLD_LOCATION: THRESHOLD_LOCATION,
+                    ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                    ATTR_EXCEPTION_MESSAGE: str(exc),
+                },
             )
 
     def after_suite(self, test_report, teardown_flag=None):
         """Update test report."""
-        with TRACER.start_as_current_span("generate_and_check_perf_results.after_suite") as span:
+        with TRACER.start_as_current_span(
+            "generate_and_check_perf_results.after_suite",
+            attributes=_evergreen_context_attributes(),
+        ) as span:
             try:
                 self._after_suite_impl(test_report, teardown_flag)
             except Exception as exc:
@@ -420,6 +598,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 "Running generate_and_check_perf_results."
                 " Results were checked against thresholds, but configuration"
                 " indicated there shouldn't be.",
+                code=PerfErrorCode.CHECK_RESULT_MISMATCH,
+                extra_attributes={
+                    ATTR_CHECK_RESULT: self.check_result,
+                    ATTR_HAS_CHECKED_RESULTS: self.has_checked_results,
+                },
             )
         if not self.has_checked_results and self.check_result and not self._is_revert_build():
             _log_perf_error(
@@ -427,6 +610,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 "Running generate_and_check_perf_results."
                 " No results checked against thresholds, but configuration"
                 " indicated there should be.",
+                code=PerfErrorCode.CHECK_RESULT_MISMATCH,
+                extra_attributes={
+                    ATTR_CHECK_RESULT: self.check_result,
+                    ATTR_HAS_CHECKED_RESULTS: self.has_checked_results,
+                },
             )
 
     def _generate_cedar_report(
@@ -443,6 +631,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
                     _log_perf_error(
                         self.logger,
                         f"The test '{name}' has duplicated metric names.",
+                        code=PerfErrorCode.DUPLICATE_METRIC_NAMES,
+                        extra_attributes={ATTR_TEST_NAME: name},
                     )
                     has_dup = True
                     break
@@ -514,6 +704,16 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 self.logger,
                 f"Skipping threshold check because the raw perf results request failed for test {test_name}, "
                 f"measurement {measurement} on variant {variant} in project {project} (version {version_id}): {exc}",
+                code=PerfErrorCode.RAW_RESULTS_REQUEST_FAILED,
+                extra_attributes={
+                    ATTR_TEST_NAME: test_name,
+                    ATTR_MEASUREMENT: measurement,
+                    ATTR_VARIANT: variant,
+                    ATTR_PROJECT: project,
+                    ATTR_BASE_VERSION_ID: version_id,
+                    ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                    ATTR_EXCEPTION_MESSAGE: str(exc),
+                },
             )
             return None
 
@@ -521,6 +721,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
             _log_perf_error(
                 self.logger,
                 f"Unexpected non-list response from raw perf results for version {version_id}: {data!r}",
+                code=PerfErrorCode.RAW_RESULTS_NON_LIST_RESPONSE,
+                extra_attributes={
+                    ATTR_BASE_VERSION_ID: version_id,
+                    ATTR_RESPONSE_TYPE: type(data).__name__,
+                },
             )
             return None
 
@@ -600,6 +805,13 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                     f"Could not verify membership of '{login}' in team "
                     f"'{OVERRIDE_APPROVER_ORG}/{team_slug}' due to a GitHub API error: {exc}. "
                     "Treating user as not authorized to override.",
+                    code=PerfErrorCode.OVERRIDE_MEMBERSHIP_CHECK_FAILED,
+                    extra_attributes={
+                        ATTR_LOGIN: login,
+                        ATTR_TEAM: f"{OVERRIDE_APPROVER_ORG}/{team_slug}",
+                        ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                        ATTR_EXCEPTION_MESSAGE: str(exc),
+                    },
                 )
         return False
 
@@ -622,8 +834,16 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 None,
             )
             if reported_metric is None:
-                self.logger.error(
-                    f"One of the expected metrics was not able to be found in the performance results generated by this task. {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} did not report a metric called {metric_to_check.metric_name}."
+                _log_perf_error(
+                    self.logger,
+                    f"One of the expected metrics was not able to be found in the performance results generated by this task. "
+                    f"{metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} did not report a metric called {metric_to_check.metric_name}.",
+                    code=PerfErrorCode.MISSING_REPORTED_METRIC,
+                    extra_attributes={
+                        ATTR_TEST_NAME: metric_to_check.test_name,
+                        ATTR_MEASUREMENT: metric_to_check.metric_name,
+                        ATTR_THREAD_LEVEL: metric_to_check.thread_level,
+                    },
                 )
                 any_metric_has_failed = True
                 continue
@@ -635,15 +855,37 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 and metric_to_check.value - reported_metric.value >= metric_to_check.threshold_limit
             ):
                 if metric_to_check.bound_direction == BoundDirection.LOWER:
-                    self.logger.error(
+                    _log_perf_error(
+                        self.logger,
                         f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
-                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks",
+                        code=PerfErrorCode.THRESHOLD_FAILED_LOWER,
+                        extra_attributes={
+                            ATTR_TEST_NAME: metric_to_check.test_name,
+                            ATTR_MEASUREMENT: metric_to_check.metric_name,
+                            ATTR_THREAD_LEVEL: metric_to_check.thread_level,
+                            ATTR_REPORTED_VALUE: reported_metric.value,
+                            ATTR_BASE_VALUE: metric_to_check.value,
+                            ATTR_THRESHOLD_LIMIT: metric_to_check.threshold_limit,
+                            ATTR_BOUND_DIRECTION: metric_to_check.bound_direction,
+                        },
                     )
                     any_metric_has_failed = True
                 else:
-                    self.logger.error(
+                    _log_perf_error(
+                        self.logger,
                         f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
-                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks",
+                        code=PerfErrorCode.THRESHOLD_FAILED_UPPER,
+                        extra_attributes={
+                            ATTR_TEST_NAME: metric_to_check.test_name,
+                            ATTR_MEASUREMENT: metric_to_check.metric_name,
+                            ATTR_THREAD_LEVEL: metric_to_check.thread_level,
+                            ATTR_REPORTED_VALUE: reported_metric.value,
+                            ATTR_BASE_VALUE: metric_to_check.value,
+                            ATTR_THRESHOLD_LIMIT: metric_to_check.threshold_limit,
+                            ATTR_BOUND_DIRECTION: metric_to_check.bound_direction,
+                        },
                     )
                     any_metric_has_failed = True
             else:
@@ -657,11 +899,12 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 _config.EVERGREEN_REQUESTER == "github_pr"
                 or _config.EVERGREEN_REQUESTER == "github_merge_queue"
             ):
-                github_pr_number = int(get_expansion("github_pr_number", 0))
-                if not github_pr_number:
+                github_pr_number = _get_github_pr_number()
+                if github_pr_number is None:
                     _log_perf_error(
                         self.logger,
                         "Missing 'github_pr_number' expansion, cannot determine PR to check for threshold check override.",
+                        code=PerfErrorCode.MISSING_PR_NUMBER,
                     )
                 else:
                     pr = self.github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)

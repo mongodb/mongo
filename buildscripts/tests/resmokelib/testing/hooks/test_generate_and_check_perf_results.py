@@ -243,8 +243,8 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             cedar_report = self.cbr_hook._generate_cedar_report(report)
 
         self.assertTrue(
-            any(_BM_REPORT_1["name"] in msg for msg in cm.output),
-            f"Expected error about duplicated metric names in {cm.output}",
+            any("has duplicated metric names" in msg for msg in cm.output),
+            f"Expected duplicated metric error in {cm.output}",
         )
         # The duplicated benchmark should be skipped, but other benchmarks should still be present.
         self.assertEqual(len(cedar_report), 1)
@@ -554,8 +554,11 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
                 )
 
         self.assertTrue(
-            any("no raw perf result found" in line for line in log_ctx.output),
-            f"expected an alertable 'no raw perf result found' error, got: {log_ctx.output}",
+            any(
+                "Skipping threshold check because no raw perf result found for test" in line
+                for line in log_ctx.output
+            ),
+            f"expected an alertable missing raw result error, got: {log_ctx.output}",
         )
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
@@ -1457,8 +1460,8 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
 
         self.assertIsNone(value)
         self.assertTrue(
-            any("Connection error" in line for line in log_ctx.output),
-            f"expected an alertable error mentioning the failure, got: {log_ctx.output}",
+            any("raw perf results request failed" in line for line in log_ctx.output),
+            f"expected an alertable raw results request error, got: {log_ctx.output}",
         )
 
     @mock.patch(
@@ -1976,6 +1979,249 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()
+
+
+class TestGetGithubPrNumber(unittest.TestCase):
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_returns_pr_number(self, mock_get_expansion):
+        mock_get_expansion.return_value = "4321"
+        self.assertEqual(cbr._get_github_pr_number(), 4321)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_missing_expansion_returns_none(self, mock_get_expansion):
+        mock_get_expansion.return_value = None
+        self.assertIsNone(cbr._get_github_pr_number())
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_invalid_expansion_returns_none(self, mock_get_expansion):
+        mock_get_expansion.return_value = "not-a-number"
+        self.assertIsNone(cbr._get_github_pr_number())
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_zero_pr_number_returns_none(self, mock_get_expansion):
+        # GitHub PR numbers start at 1, so a 0 value is treated as unavailable.
+        mock_get_expansion.return_value = "0"
+        self.assertIsNone(cbr._get_github_pr_number())
+
+
+class TestEvergreenContextAttributes(unittest.TestCase):
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_context_attributes(self, mock_config, mock_get_expansion):
+        mock_config.EVERGREEN_TASK_ID = "task_1"
+        mock_config.EVERGREEN_TASK_NAME = "benchmarks_sep"
+        mock_config.EVERGREEN_VARIANT_NAME = "variant_1"
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_VERSION_ID = "version_1"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_config.EVERGREEN_EXECUTION = "0"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.return_value = "4321"
+
+        attributes = cbr._evergreen_context_attributes()
+
+        self.assertEqual(
+            attributes,
+            {
+                "evergreen.task.id": "task_1",
+                "evergreen.task.name": "benchmarks_sep",
+                "evergreen.variant.name": "variant_1",
+                "evergreen.project.identifier": "mongodb-mongo-master",
+                "evergreen.version.id": "version_1",
+                "evergreen.revision": "abc123",
+                "evergreen.task.execution": "0",
+                "evergreen.requester": "github_pr",
+                "github.pr.number": 4321,
+            },
+        )
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_missing_values_are_omitted(self, mock_config, mock_get_expansion):
+        mock_config.EVERGREEN_TASK_ID = "task_1"
+        mock_config.EVERGREEN_TASK_NAME = None
+        mock_config.EVERGREEN_VARIANT_NAME = None
+        mock_config.EVERGREEN_PROJECT_NAME = None
+        mock_config.EVERGREEN_VERSION_ID = None
+        mock_config.EVERGREEN_REVISION = None
+        mock_config.EVERGREEN_EXECUTION = None
+        mock_config.EVERGREEN_REQUESTER = None
+        mock_get_expansion.return_value = 0
+
+        self.assertEqual(cbr._evergreen_context_attributes(), {"evergreen.task.id": "task_1"})
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_execution_omitted_when_not_on_evergreen(self, mock_config, mock_get_expansion):
+        """A local run has no task ID but execution_number still defaults to 0.
+
+        The execution attribute must be omitted rather than claiming Evergreen execution 0,
+        matching how the resmoke baggage setup gates it.
+        """
+        mock_config.EVERGREEN_TASK_ID = None
+        mock_config.EVERGREEN_TASK_NAME = None
+        mock_config.EVERGREEN_VARIANT_NAME = None
+        mock_config.EVERGREEN_PROJECT_NAME = None
+        mock_config.EVERGREEN_VERSION_ID = None
+        mock_config.EVERGREEN_REVISION = None
+        mock_config.EVERGREEN_EXECUTION = 0
+        mock_config.EVERGREEN_REQUESTER = None
+        mock_get_expansion.return_value = None
+
+        self.assertEqual(cbr._evergreen_context_attributes(), {})
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_invalid_pr_number_is_omitted(self, mock_config, mock_get_expansion):
+        mock_config.EVERGREEN_TASK_ID = None
+        mock_config.EVERGREEN_TASK_NAME = None
+        mock_config.EVERGREEN_VARIANT_NAME = None
+        mock_config.EVERGREEN_PROJECT_NAME = None
+        mock_config.EVERGREEN_VERSION_ID = None
+        mock_config.EVERGREEN_REVISION = None
+        mock_config.EVERGREEN_EXECUTION = None
+        mock_config.EVERGREEN_REQUESTER = None
+        mock_get_expansion.return_value = "not-a-number"
+
+        self.assertEqual(cbr._evergreen_context_attributes(), {})
+
+
+class TestLogPerfError(unittest.TestCase):
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.trace")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_error_event_carries_message_and_context(
+        self, mock_config, mock_get_expansion, mock_trace
+    ):
+        mock_config.EVERGREEN_TASK_ID = "task_1"
+        mock_config.EVERGREEN_TASK_NAME = "benchmarks_sep"
+        mock_config.EVERGREEN_VARIANT_NAME = "variant_1"
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_VERSION_ID = "version_1"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_config.EVERGREEN_EXECUTION = "0"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.return_value = 0
+
+        mock_span = mock_trace.get_current_span.return_value
+        mock_span.is_recording.return_value = True
+
+        with self.assertLogs("hook_logger", level="ERROR"):
+            cbr._log_perf_error(
+                logging.getLogger("hook_logger"),
+                "some message",
+                code=cbr.PerfErrorCode.MISSING_RAW_PERF_RESULT,
+                extra_attributes={"test_name": "BM_Name1", "base_version_id": None},
+            )
+
+        mock_span.add_event.assert_called_once()
+        args, _ = mock_span.add_event.call_args
+        self.assertEqual(args[0], "generate_and_check_perf_results.error")
+        attributes = args[1]
+        self.assertEqual(attributes["error.code"], "missing_raw_perf_result")
+        self.assertEqual(attributes["error.category"], "internal_alert")
+        self.assertEqual(attributes["message"], "some message")
+        self.assertEqual(attributes["evergreen.task.id"], "task_1")
+        self.assertEqual(attributes["evergreen.project.identifier"], "mongodb-mongo-master")
+        self.assertEqual(attributes["evergreen.requester"], "github_pr")
+        self.assertEqual(attributes["test_name"], "BM_Name1")
+        self.assertNotIn("base_version_id", attributes)
+        mock_span.set_status.assert_called_once()
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.trace")
+    def test_error_event_not_recorded_when_span_not_recording(self, mock_trace):
+        mock_span = mock_trace.get_current_span.return_value
+        mock_span.is_recording.return_value = False
+
+        with self.assertLogs("hook_logger", level="ERROR"):
+            cbr._log_perf_error(
+                logging.getLogger("hook_logger"),
+                "some message",
+                code=cbr.PerfErrorCode.MISSING_RAW_PERF_RESULT,
+            )
+
+        mock_span.add_event.assert_not_called()
+        mock_span.set_status.assert_not_called()
+
+    def test_only_task_failing_errors_are_task_failures(self):
+        # Errors raised from the dynamic test case fail the task; everything else is
+        # silent (non-blocking) and is what alerts should target.
+        task_failures = {
+            code for code in cbr.PerfErrorCode if code.category is cbr.ErrorCategory.TASK_FAILURE
+        }
+        self.assertEqual(
+            task_failures,
+            {
+                cbr.PerfErrorCode.MISSING_REPORTED_METRIC,
+                cbr.PerfErrorCode.THRESHOLD_FAILED_LOWER,
+                cbr.PerfErrorCode.THRESHOLD_FAILED_UPPER,
+            },
+        )
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.trace")
+    def test_task_failure_errors_carry_category(self, mock_trace):
+        mock_span = mock_trace.get_current_span.return_value
+        mock_span.is_recording.return_value = True
+
+        for code in (
+            cbr.PerfErrorCode.MISSING_REPORTED_METRIC,
+            cbr.PerfErrorCode.THRESHOLD_FAILED_LOWER,
+            cbr.PerfErrorCode.THRESHOLD_FAILED_UPPER,
+        ):
+            with self.assertLogs("hook_logger", level="ERROR"):
+                cbr._log_perf_error(logging.getLogger("hook_logger"), "some message", code=code)
+            attributes = mock_span.add_event.call_args[0][1]
+            self.assertEqual(attributes["error.category"], "task_failure")
+            mock_span.add_event.reset_mock()
+
+
+class TestHookSpanContext(GenerateAndCheckPerfResultsFixture):
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.TRACER")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch.object(cbr.GenerateAndCheckPerfResults, "_after_test_impl")
+    def test_after_test_span_carries_context(
+        self, mock_after_test_impl, mock_config, mock_get_expansion, mock_tracer
+    ):
+        mock_config.EVERGREEN_TASK_ID = "task_1"
+        mock_config.EVERGREEN_TASK_NAME = "benchmarks_sep"
+        mock_config.EVERGREEN_VARIANT_NAME = "variant_1"
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_VERSION_ID = "version_1"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_config.EVERGREEN_EXECUTION = "0"
+        mock_config.EVERGREEN_REQUESTER = "github_pr"
+        mock_get_expansion.return_value = 0
+
+        self.cbr_hook.after_test(mock.MagicMock(), mock.MagicMock())
+        mock_after_test_impl.assert_called_once()
+
+        args, kwargs = mock_tracer.start_as_current_span.call_args
+        self.assertEqual(args[0], "generate_and_check_perf_results.after_test")
+        self.assertEqual(kwargs["attributes"]["evergreen.task.id"], "task_1")
+        self.assertEqual(
+            kwargs["attributes"]["evergreen.project.identifier"], "mongodb-mongo-master"
+        )
 
 
 if __name__ == "__main__":
