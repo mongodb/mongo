@@ -110,8 +110,22 @@ last-continuous:
       ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-133661
+    - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-134581
+    - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-135788
+    - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
+      ticket: SERVER-134581
+    - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
+      ticket: SERVER-135788
+    - test_file: jstests/change_streams/change_stream_update_lookup_resumes_on_optimization_disable.js
+      ticket: SERVER-135788
+    - test_file: jstests/change_streams/update_lookup_before_ddl.js
+      ticket: SERVER-134581
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134745
+    - test_file: jstests/change_streams/update_lookup_before_ddl.js
+      ticket: SERVER-135788
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
@@ -160,6 +174,12 @@ last-continuous:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-133661
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-134581
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-135788
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
       ticket: SERVER-131202
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
@@ -172,6 +192,10 @@ last-continuous:
       ticket: SERVER-134795
     - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_database.js
       ticket: SERVER-134795
+    - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
+      ticket: SERVER-134581
+    - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
+      ticket: SERVER-135789
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
@@ -211,12 +235,20 @@ last-lts:
       ticket: SERVER-133661
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-134581
+    - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-135788
     - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
       ticket: SERVER-134581
+    - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
+      ticket: SERVER-135788
+    - test_file: jstests/change_streams/change_stream_update_lookup_resumes_on_optimization_disable.js
+      ticket: SERVER-135788
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134581
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134745
+    - test_file: jstests/change_streams/update_lookup_before_ddl.js
+      ticket: SERVER-135788
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
       ticket: SERVER-121079
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_replica_set_write_block.js
@@ -269,6 +301,8 @@ last-lts:
       ticket: SERVER-133661
     - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-134581
+    - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
+      ticket: SERVER-135788
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
       ticket: SERVER-131202
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_sharded_insert_update.js
@@ -283,6 +317,8 @@ last-lts:
       ticket: SERVER-134795
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
+    - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
+      ticket: SERVER-135789
     - test_file: jstests/sharding/range_deleter_does_not_block_stepdown_with_prepare_conflict.js
       ticket: SERVER-131283
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
