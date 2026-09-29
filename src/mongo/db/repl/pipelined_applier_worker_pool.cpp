@@ -67,6 +67,12 @@ void PipelinedApplierWorkerPool::enqueue(size_t workerIdx, WorkItem item) {
     });
 }
 
+void PipelinedApplierWorkerPool::waitForIdle() {
+    for (auto& worker : _workers) {
+        worker.pool.waitForIdle();
+    }
+}
+
 void PipelinedApplierWorkerPool::shutdownAndJoin() {
     if (MONGO_unlikely(_isShutdown.swap(true))) {
         return;
@@ -79,9 +85,7 @@ void PipelinedApplierWorkerPool::shutdownAndJoin() {
     // task. Waiting for idle first keeps every work item's consumption on its owning worker
     // thread, preserving per-worker serialization through shutdown. _isShutdown rejects any
     // further enqueues, so the queues stay empty afterwards.
-    for (auto& worker : _workers) {
-        worker.pool.waitForIdle();
-    }
+    waitForIdle();
     for (auto& worker : _workers) {
         worker.pool.shutdown();
     }

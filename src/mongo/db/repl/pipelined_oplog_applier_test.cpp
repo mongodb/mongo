@@ -591,10 +591,10 @@ protected:
         ASSERT_TRUE(_buffer.isEmpty());
     }
 
-    // Waits for dispatcher exit to begin joining the advancer after all batches are dispatched.
-    void waitForAdvancerShutdownToBegin(const unittest::LogCaptureGuard& logs) {
+    // Waits for dispatcher exit to begin draining after all batches are dispatched.
+    void waitForDrainToBegin(const unittest::LogCaptureGuard& logs) {
         const auto deadline = Date_t::now() + Seconds(60);
-        while (logs.countTextContaining("Shutting down pipelined oplog applier advancer") == 0) {
+        while (logs.countTextContaining("Draining pipelined oplog applier") == 0) {
             ASSERT_LT(Date_t::now(), deadline);
             sleepmillis(1);
         }
@@ -891,6 +891,74 @@ TEST_F(PipelinedOplogApplierRunTest, PublishesWhileDispatcherIsWaitingForMoreDat
     finishApplier();
 }
 
+// A popped batch keeps drain blocked until the advancer finishes all publication side effects.
+TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationAfterTheLastBatchIsPopped) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto op = insertOp(kNss, BSON("_id" << 0));
+    {
+        // Hold the advancer after it pops the last batch, before it updates lastApplied.
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({op});
+        startApplier();
+        publishing->waitForTimesEntered(publishing.initialTimesEntered() + 1);
+        unittest::LogCaptureGuard logs;
+        {
+            // Pause drain after it sees the advancer is still busy, despite the empty FIFO queue.
+            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+            shutdownApplier();
+            beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+            ASSERT_FALSE(_finished->isReady());
+            ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
+                      0);
+            ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+            // The kNoTimestamp read sees the committed document without waiting for lastApplied.
+            assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+        }
+        // The idle-wait failpoint is now disabled; leaving this scope also releases publication.
+    }
+    _finished->get();
+    _finished.reset();
+    assertPublished(op);
+}
+
+// A zero-worker batch still needs publication even though every worker is already idle.
+TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationOfAZeroWorkerBatch) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto op = containerOp(createBytesContainer(),
+                          OpTypeEnum::kContainerInsert,
+                          packedInsertOf({}, BSONBinData("V", 1, BinDataGeneral)));
+    {
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({op});
+        startApplier();
+        publishing->waitForTimesEntered(publishing.initialTimesEntered() + 1);
+        unittest::LogCaptureGuard logs;
+        {
+            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+            shutdownApplier();
+            beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+            ASSERT_FALSE(_finished->isReady());
+            ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
+                      0);
+            ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+        }
+    }
+    _finished->get();
+    _finished.reset();
+    assertPublished(op);
+}
+
+// Draining without dispatched batches must finish without changing replication progress.
+TEST_F(PipelinedOplogApplierRunTest, DrainsAnEmptyPipeline) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    applyThroughBuffer({});
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+}
+
 TEST_F(PipelinedOplogApplierRunTest, ShutdownDoesNotPublishAnAbandonedBatchOrItsSuccessor) {
     createCollectionWithUuid(_opCtx.get(), kNss);
     setServerParameter("replBatchLimitOperations", 1);
@@ -1159,11 +1227,12 @@ TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIs
     waitForGate(later);
     ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
 
-    // Joining the advancer must wait for the held worker to finish and its batch to be published.
+    // Draining must wait for the held worker to finish and its batch to be published.
     unittest::LogCaptureGuard logs;
     shutdownApplier();
-    waitForAdvancerShutdownToBegin(logs);
+    waitForDrainToBegin(logs);
     ASSERT_FALSE(_finished->isReady());
+    ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"), 0);
     ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier workers"), 0);
     held.release.set();
     _finished->get();

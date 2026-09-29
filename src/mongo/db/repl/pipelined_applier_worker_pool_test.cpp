@@ -11,6 +11,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
@@ -222,6 +223,84 @@ TEST_F(PipelinedApplierWorkerPoolTest, ShutdownUnderLoadConsumesEveryItem) {
     // Every enqueued item must still be consumed, in FIFO order, before shutdown completes.
     for (size_t w = 0; w < kNumWorkers; ++w) {
         assertConsumedInOrder(w, enqueued[w]);
+    }
+}
+
+// waitForIdle() must wait for the blocked worker and its queued work even if other workers are
+// idle.
+TEST_F(PipelinedApplierWorkerPoolTest, WaitForIdleWaitsForEveryWorkerAndKeepsPoolReusable) {
+    constexpr size_t kNumWorkers = 3;
+    auto opCtx = makeOperationContext();
+    Notification<void> held;
+    Notification<void> release;
+    PipelinedApplierWorkerPool pool(kNumWorkers, [&](size_t workerIdx, const WorkItem&) {
+        // Block only worker 2; workers 0 and 1 can finish their work independently.
+        if (workerIdx == kNumWorkers - 1) {
+            // Signal once when worker 2 starts its first item. Its second item uses the same gate.
+            if (!held) {
+                held.set();
+            }
+            release.get();
+        }
+    });
+    Notification<void> waiterStarted;
+    Notification<void> drained;
+    stdx::thread waiter;
+    ON_BLOCK_EXIT([&] {
+        // Release the worker before joining the waiter, including when an assertion fails.
+        if (!release) {
+            release.set();
+        }
+        if (waiter.joinable()) {
+            waiter.join();
+        }
+    });
+
+    // Waiting on an unused pool must return, and leave the workers available for dispatch.
+    pool.waitForIdle();
+    // Issue two WorkItems per worker. Worker 2 will be blocked inside its first item with its
+    // second item still queued.
+    for (size_t workerIdx = 0; workerIdx < kNumWorkers; ++workerIdx) {
+        enqueueItem(pool, workerIdx);
+        enqueueItem(pool, workerIdx);
+    }
+    // Wait until worker 2 is inside its callback before starting the idle wait.
+    held.get();
+    // Run the blocking wait on another thread so this thread can release worker 2.
+    waiter = stdx::thread([&] {
+        waiterStarted.set();
+        pool.waitForIdle();
+        drained.set();
+    });
+    // Start the blocking check only after the waiter thread has been scheduled.
+    ASSERT_TRUE(waiterStarted.waitFor(opCtx.get(), Seconds(10)));
+    // The idle wait must not finish while worker 2 is still held.
+    ASSERT_FALSE(drained.waitFor(opCtx.get(), Milliseconds(100)));
+    // Opening the gate lets worker 2 finish both its active item and its queued item.
+    release.set();
+    ASSERT_TRUE(drained.waitFor(opCtx.get(), Seconds(10)));
+    waiter.join();
+
+    // Returning from waitForIdle() must mean both items on every worker have finished.
+    BSONObjBuilder bob;
+    pool.report(bob);
+    for (const auto& worker : bob.obj()) {
+        ASSERT_EQ(worker.Obj()["scheduled"].numberLong(), 2);
+        ASSERT_EQ(worker.Obj()["executed"].numberLong(), 2);
+    }
+
+    // A second dispatch/drain cycle uses the same workers without shutting them down.
+    for (size_t workerIdx = 0; workerIdx < kNumWorkers; ++workerIdx) {
+        enqueueItem(pool, workerIdx);
+    }
+    pool.waitForIdle();
+    // Waiting again with no new work must also return immediately.
+    pool.waitForIdle();
+    BSONObjBuilder afterReuse;
+    pool.report(afterReuse);
+    for (const auto& worker : afterReuse.obj()) {
+        ASSERT_EQ(worker.Obj()["scheduled"].numberLong(), 3);
+        ASSERT_EQ(worker.Obj()["executed"].numberLong(), 3);
     }
 }
 

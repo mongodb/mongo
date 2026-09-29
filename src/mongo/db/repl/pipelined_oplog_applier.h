@@ -55,6 +55,17 @@ private:
      */
     void _dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
+    // Waits for all queued and active worker tasks to finish. Returns true once all dispatched
+    // batches are fully published, meaning worker threads and the advancer are idle. Returns false
+    // if a worker abandoned work during shutdown; the pipeline is not fully drained.
+    [[nodiscard]] bool _drainWorkers();
+
+    // Waits for publication of all registered batches, including all publication side effects.
+    // Returns true when the FIFO is empty and the advancer has finished publishing.
+    // Returns false if a worker abandoned work during shutdown, without guaranteeing publication.
+    // Requires dispatch to be paused.
+    [[nodiscard]] bool _waitForAdvancerIdle();
+
     // Publishes a completed batch's replication progress and wakes oplog waiters.
     void _publishBatch(const PipelinedApplierBatchTracker::InflightBatch& batch);
 

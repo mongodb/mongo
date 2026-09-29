@@ -58,6 +58,10 @@ public:
      */
     void enqueue(size_t workerIdx, WorkItem item);
 
+    // Waits for all queued and active work items to finish. The caller must prevent concurrent
+    // enqueueing.
+    void waitForIdle();
+
     /**
      * Waits for all enqueued work items to be consumed, then shuts down and joins the worker
      * threads. Subsequent calls are no-ops.

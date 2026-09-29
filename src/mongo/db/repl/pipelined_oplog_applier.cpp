@@ -15,6 +15,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
@@ -25,6 +26,8 @@
 
 namespace mongo::repl {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierPublish);
 
 /**
  * Configures 'opCtx' for oplog application: no constraint enforcement, prepare conflicts ignored.
@@ -67,7 +70,11 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
     ON_BLOCK_EXIT([this] { _oplogBatcher->shutdown(); });
 
     _advancer.startup();
-    ON_BLOCK_EXIT([this] { _advancer.shutdownAndJoin(); });
+    ON_BLOCK_EXIT([this] {
+        // Abandoned work permits teardown, but cannot satisfy a successful drain barrier.
+        static_cast<void>(_drainWorkers());
+        _advancer.shutdownAndJoin();
+    });
 
     // Every batch must start after the last op dispatched before it. lastApplied sets the initial
     // bound: it trails dispatch, since batches still on the workers have not been published yet.
@@ -194,8 +201,22 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
     }
 }
 
+bool PipelinedOplogApplier::_drainWorkers() {
+    LOGV2(13469900, "Draining pipelined oplog applier workers");
+    _workerPool.waitForIdle();
+    // Publication may include deferred multikey writes after the batch is popped from the FIFO.
+    // Wait for all publication side effects to finish before allowing inline application to
+    // proceed.
+    return _waitForAdvancerIdle();
+}
+
+bool PipelinedOplogApplier::_waitForAdvancerIdle() {
+    return _batchTracker.waitUntilIdle();
+}
+
 void PipelinedOplogApplier::_publishBatch(
     const PipelinedApplierBatchTracker::InflightBatch& batch) {
+    hangBeforePipelinedApplierPublish.pauseWhileSet();
     _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(batch.lastOpTime);
     signalOplogWaiters();
 }
