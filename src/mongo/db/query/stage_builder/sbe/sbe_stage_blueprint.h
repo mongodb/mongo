@@ -38,6 +38,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -511,5 +512,63 @@ inline SbBlueprintNodeIdx addBlueprintNode(SbBlueprintNodeVector& nodes, SbBluep
     nodes.push_back(std::move(node));
     return SbBlueprintNodeIdx{static_cast<uint32_t>(nodes.size() - 1)};
 }
+
+/**
+ * The blueprint tree of a plan under construction, owned by StageBuilderState. Nodes are appended
+ * as the stage builders create stages and are referenced by index, so the node vector is
+ * append-only; lowering takes a node out and leaves SbBlueprintLowered in its place.
+ */
+class SbBlueprint {
+public:
+    SbBlueprintNodeIdx add(SbBlueprintNode node) {
+        return addBlueprintNode(_nodes, std::move(node));
+    }
+
+    size_t size() const {
+        return _nodes.size();
+    }
+
+    SbBlueprintNode& operator[](SbBlueprintNodeIdx idx) {
+        tassert(12703001, "Invalid blueprint node index", idx.value < _nodes.size());
+        return _nodes[idx.value];
+    }
+
+    const SbBlueprintNode& operator[](SbBlueprintNodeIdx idx) const {
+        tassert(12703002, "Invalid blueprint node index", idx.value < _nodes.size());
+        return _nodes[idx.value];
+    }
+
+    /**
+     * Moves the node at 'idx' out for lowering, leaving SbBlueprintLowered behind. A node can only
+     * be taken once.
+     */
+    SbBlueprintNode takeForLowering(SbBlueprintNodeIdx idx) {
+        tassert(12702000, "Invalid blueprint node index", idx.value < _nodes.size());
+        auto node = std::exchange(_nodes[idx.value], SbBlueprintLowered{});
+        tassert(12702001,
+                "Blueprint node has already been lowered",
+                !std::holds_alternative<SbBlueprintLowered>(node));
+        return node;
+    }
+
+    /**
+     * Asserts that every node added since the previous call has been lowered, i.e. was part of
+     * the tree that was just lowered rather than built and dropped. Each node is checked once.
+     */
+    void assertAddedNodesLowered() {
+        tassert(12702002,
+                "Expected every blueprint node to be part of the lowered tree",
+                std::all_of(_nodes.begin() + _loweredPrefix, _nodes.end(), [](const auto& node) {
+                    return std::holds_alternative<SbBlueprintLowered>(node);
+                }));
+        _loweredPrefix = _nodes.size();
+    }
+
+private:
+    SbBlueprintNodeVector _nodes;
+
+    // Every node before this index has been lowered.
+    size_t _loweredPrefix{0};
+};
 
 }  // namespace mongo::stage_builder
