@@ -1,0 +1,32 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "type_system",
+    srcs = [
+        "type.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_test",
+    srcs = [
+        "type_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":type_system",
+    ],
+)
