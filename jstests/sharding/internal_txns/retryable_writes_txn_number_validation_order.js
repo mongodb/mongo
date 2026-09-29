@@ -39,7 +39,7 @@ const kTestMode = {
     kFailover: 3,
 };
 
-if (TestData.doesNotSupportGracefulStepdown) {
+if (TestData.doesNotSupportGracefulPlannedStepdown) {
     delete kTestMode.kFailover;
 }
 

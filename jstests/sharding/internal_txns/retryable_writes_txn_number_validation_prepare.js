@@ -33,7 +33,7 @@ const kTestMode = {
     kFailoverNewPrimary: 4,
 };
 
-if (TestData.doesNotSupportGracefulStepdown) {
+if (TestData.doesNotSupportGracefulPlannedStepdown) {
     delete kTestMode.kFailoverOldPrimary;
     delete kTestMode.kFailoverNewPrimary;
 }

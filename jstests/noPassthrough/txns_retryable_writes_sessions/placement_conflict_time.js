@@ -188,8 +188,11 @@ describe("Test placementConflictTime", function () {
     // Verifies that a transaction gets aborted if a participant steps down.
     // This is important because the placementConflictTime is an in memory variable on each participant shard.
     it("Verify transaction gets aborted if a participant steps down", () => {
-        if (TestData.doesNotSupportGracefulStepdown) {
-            // TODO (SLS-1414): Enable once graceful stepdown is supported on disagg.
+        // TODO (SERVER-136017): Remove graceful stepdown gating.
+        if (
+            TestData.doesNotSupportGracefulPlannedStepdown ||
+            TestData.doesNotSupportGracefulUnplannedStepdown
+        ) {
             return;
         }
 

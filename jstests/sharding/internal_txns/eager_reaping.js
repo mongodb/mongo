@@ -174,7 +174,10 @@ function runTest(conn, shardConn) {
         numTransactionsCollEntries: numBeforeFailover,
     });
 
-    if (TestData.doesNotSupportGracefulStepdown) {
+    if (
+        TestData.doesNotSupportGracefulPlannedStepdown ||
+        TestData.doesNotSupportGracefulUnplannedStepdown
+    ) {
         // TODO (SLS-1414): Enable failover testing.
         return;
     }

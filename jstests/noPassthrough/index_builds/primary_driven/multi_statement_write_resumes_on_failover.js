@@ -38,7 +38,7 @@ const requiredFlags = [
 // written), and asserts the build resumed and completed on the new primary.
 function runScenario({failoverDuringLoad}) {
     const rst = new ReplSetTest({
-        nodes: TestData.doesNotSupportGracefulStepdown
+        nodes: TestData.doesNotSupportGracefulUnplannedStepdown
             ? [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}]
             : 2,
     });

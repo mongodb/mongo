@@ -56,7 +56,7 @@ assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
 // Retry on primary
 assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
 
-if (TestData.doesNotSupportGracefulStepdown) {
+if (TestData.doesNotSupportGracefulUnplannedStepdown) {
     jsTestLog("Skipping failover/restart portions.");
     replTest.stopSet();
     quit();

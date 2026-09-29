@@ -159,7 +159,7 @@ describe("is running", function () {
 
     it("after step down", function () {
         // TODO(SERVER-124385): Enable once graceful stepdown is supported.
-        if (TestData.doesNotSupportGracefulStepdown) {
+        if (TestData.doesNotSupportGracefulPlannedStepdown) {
             return;
         }
         this.rst.initiate();

@@ -55,7 +55,10 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
         })
         .then("best effort to step down node forever", function (conn) {
             // TODO(SERVER-112500): Remove this check.
-            if (TestData.doesNotSupportGracefulStepdown) {
+            if (
+                TestData.doesNotSupportGracefulPlannedStepdown ||
+                TestData.doesNotSupportGracefulUnplannedStepdown
+            ) {
                 jsTest.log.info("Skipping stepdown as it is not supported in this test");
                 return true;
             }

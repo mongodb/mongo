@@ -16,8 +16,8 @@ import {PrimaryDrivenResumableIndexBuildTest} from "jstests/noPassthrough/libs/i
 
 const rst = new ReplSetTest({
     // Ensure both nodes are electable (priority 1) so the failover can always step up the
-    // secondary. Suites that don't support graceful stepdown fail over by killing the primary, and
-    // a priority-0 secondary could never win the resulting election.
+    // secondary. Suites that don't support graceful unplanned stepdown fail over by killing the
+    // primary, and a priority-0 secondary could never win the resulting election.
     nodes: [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}],
     // Use a large oplog so the killed-and-restarted old primary can't become too stale to find a
     // sync source.
@@ -101,9 +101,9 @@ try {
 } catch (e) {
     jsTest.log.info("index build shell exited (expected after the failover)", {error: e});
 }
-if (!TestData.doesNotSupportGracefulStepdown) {
-    // When graceful stepdown isn't supported the failover kills and restarts the old primary, so
-    // the fail point is already gone (and this connection's server was replaced).
+if (!TestData.doesNotSupportGracefulUnplannedStepdown) {
+    // When graceful unplanned stepdown isn't supported the failover kills and restarts the old
+    // primary, so the fail point is already gone (and this connection's server was replaced).
     loadFp.off();
 }
 

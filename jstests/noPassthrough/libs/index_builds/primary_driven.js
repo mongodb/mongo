@@ -413,10 +413,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
 
-        // When graceful stepdown is not supported, fail over by checkpointing on the primary,
-        // waiting for the secondary to install that checkpoint, then killing the primary. 2 nodes
-        // is sufficient for this case.
-        if (TestData.doesNotSupportGracefulStepdown) {
+        // When graceful unplanned stepdown is not supported, fail over by checkpointing on the
+        // primary, waiting for the secondary to install that checkpoint, then killing the primary.
+        // 2 nodes is sufficient for this case.
+        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
             nodes = 2;
         }
 
@@ -722,11 +722,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             // Release the current fail point (cleanup; the build thread on the old primary has
             // already exited due to the state change). For restart modes the old mongod was
             // recycled, so its in-memory fail point is already gone and the handle's connection
-            // is stale — skip. When graceful stepdown isn't supported the failover always kills the
-            // old primary (see `_failOverWithCheckpointInstall`), so skip in that case too.
+            // is stale — skip. When graceful unplanned stepdown isn't supported the failover always
+            // kills the old primary (see `_failOverWithCheckpointInstall`), so skip in that case
+            // too.
             if (
                 failoverMode === PdibFailoverMode.NO_RESTART &&
-                !TestData.doesNotSupportGracefulStepdown
+                !TestData.doesNotSupportGracefulUnplannedStepdown
             ) {
                 currentFp.off();
             }
@@ -805,7 +806,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             loadIntervalKeys,
         } = PrimaryDrivenResumableIndexBuildTest._normalizeOptions(options);
 
-        if (TestData.doesNotSupportGracefulStepdown) {
+        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
             jsTest.log.info(
                 "PrimaryDrivenResumableIndexBuildTest: skipping runAcrossTwoFailovers because this " +
                     "configuration runs with two nodes and kill-based failover",
@@ -892,7 +893,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             secondPrimary,
             PdibFailoverMode.NO_RESTART,
         );
-        if (!TestData.doesNotSupportGracefulStepdown) {
+        if (!TestData.doesNotSupportGracefulUnplannedStepdown) {
             phaseFp.off();
         }
         awaitCreateIndexes({checkExitSuccess: false});
@@ -918,7 +919,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             thirdPrimary,
             PdibFailoverMode.NO_RESTART,
         );
-        if (!TestData.doesNotSupportGracefulStepdown) {
+        if (!TestData.doesNotSupportGracefulUnplannedStepdown) {
             afterFirstDrainFp.off();
         }
 
@@ -968,9 +969,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         );
         assert.gte(
             rst.nodes.length,
-            TestData.doesNotSupportGracefulStepdown ? 2 : 3,
-            "runSorterOrphanCleanup requires a 3-node set, or 2-node set when graceful stepdown " +
-                "is not supported)",
+            TestData.doesNotSupportGracefulUnplannedStepdown ? 2 : 3,
+            "runSorterOrphanCleanup requires a 3-node set, or 2-node set when unconditional " +
+                "stepdown is not supported)",
         );
 
         if (
@@ -1200,7 +1201,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // point (and the handle's connection) is already gone — skip.
         if (
             failoverMode === PdibFailoverMode.NO_RESTART &&
-            !TestData.doesNotSupportGracefulStepdown
+            !TestData.doesNotSupportGracefulUnplannedStepdown
         ) {
             hangBeforeBuildingIndexFp.off();
         }
@@ -1576,11 +1577,11 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // Release the phase fail point so it cannot pause a later build on this node. The build
         // thread on the old primary has already exited due to the state change. For restart modes
         // the old mongod was recycled, so its in-memory fail point is already gone and the handle's
-        // connection is stale; when graceful stepdown isn't supported the failover always kills the
-        // old primary, so skip in both cases.
+        // connection is stale; when graceful unplanned stepdown isn't supported the failover always
+        // kills the old primary, so skip in both cases.
         if (
             (options.failoverMode || PdibFailoverMode.NO_RESTART) === PdibFailoverMode.NO_RESTART &&
-            !TestData.doesNotSupportGracefulStepdown
+            !TestData.doesNotSupportGracefulUnplannedStepdown
         ) {
             phaseFp.off();
         }
@@ -1674,11 +1675,11 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // Release the phase fail point so it cannot pause a later build on this node. The build
         // thread on the old primary has already exited due to the state change. For restart modes
         // the old mongod was recycled, so its in-memory fail point is already gone and the handle's
-        // connection is stale; when graceful stepdown isn't supported the failover always kills the
-        // old primary, so skip in both cases.
+        // connection is stale; when graceful unplanned stepdown isn't supported the failover always
+        // kills the old primary, so skip in both cases.
         if (
             (options.failoverMode || PdibFailoverMode.NO_RESTART) === PdibFailoverMode.NO_RESTART &&
-            !TestData.doesNotSupportGracefulStepdown
+            !TestData.doesNotSupportGracefulUnplannedStepdown
         ) {
             phaseFp.off();
         }
@@ -1845,11 +1846,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // Release the now-stepped-down primary's fail point (cleanup; the build thread has already
         // exited due to the state change). For restart modes the old mongod was recycled, so its
         // in-memory fail point is already gone and the handle's connection is stale — skip. When
-        // graceful stepdown is not supported the old primary is always stopped during failover (see
-        // `_failOverWithCheckpointInstall`), so its fail point is gone too — skip there as well.
+        // graceful unplanned stepdown is not supported the old primary is always stopped during
+        // failover (see `_failOverWithCheckpointInstall`), so its fail point is gone too — skip
+        // there as well.
         if (
             failoverMode === PdibFailoverMode.NO_RESTART &&
-            !TestData.doesNotSupportGracefulStepdown
+            !TestData.doesNotSupportGracefulUnplannedStepdown
         ) {
             phaseFp.off();
         }
@@ -2149,7 +2151,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * Fails over to the replica set's secondary, returning the new primary.
      */
     static failover(rst) {
-        if (TestData.doesNotSupportGracefulStepdown) {
+        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
             return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(rst);
         }
         return rst.stepUp(rst.getSecondary());
@@ -2169,7 +2171,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @returns {Mongo} The new primary (may be a fresh connection if a restart was involved).
      */
     static _failover(rst, oldPrimary, nextPrimaryNode, failoverMode) {
-        if (TestData.doesNotSupportGracefulStepdown) {
+        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
             return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(rst, {
                 unclean: failoverMode === PdibFailoverMode.UNCLEAN_RESTART,
             });
