@@ -430,7 +430,13 @@ public:
     static const char* const kInvokeResult;
 
     static MozJSImplScope* getThreadScope();
+
+    /**
+     * Handles an out-of-memory condition this scope cannot come back from: marks the scope
+     * poisoned and interrupts execution.
+     */
     void setOOM();
+
     void setParentStack(std::string);
     const std::string& getParentStack() const;
 
@@ -579,6 +585,12 @@ private:
 
     static bool _interruptCallback(JSContext* cx);
     static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
+
+    /**
+     * Invoked when SpiderMonkey reports an out-of-memory condition it cannot recover from.
+     */
+    static void _outOfMemoryCallback(JSContext* cx, void* data);
+
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
     Status _checkForPendingException();
 

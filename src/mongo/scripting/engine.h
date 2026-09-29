@@ -235,6 +235,15 @@ public:
 
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
+
+    /**
+     * Whether to abort on an unrecoverable JavaScript out-of-memory condition, so that the kernel
+     * writes a core dump of the exhausted heap.
+     */
+    virtual bool getJSAbortOnOutOfMemory() const {
+        return false;
+    }
+    virtual void setJSAbortOnOutOfMemory(bool value) {}
     virtual bool getJSUseLegacyMemoryTracking() const = 0;
     virtual void setJSUseLegacyMemoryTracking(bool shouldUseLegacy) = 0;
 

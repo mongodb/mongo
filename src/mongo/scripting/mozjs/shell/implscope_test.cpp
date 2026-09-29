@@ -10,6 +10,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <string>
 
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <js/GCAPI.h>
@@ -21,6 +22,61 @@ namespace mozjs {
 namespace {
 
 class MozJSImplScopeTest : public unittest::Test {};
+
+std::string gCapturedJSStack;
+
+BSONObj captureJSStackHook(const BSONObj& args, void* data) {
+    auto* implscope = static_cast<mongo::mozjs::MozJSImplScope*>(data);
+    gCapturedJSStack = implscope->buildStackString();
+    return BSONObj();
+}
+
+TEST_F(MozJSImplScopeTest, JsThrownOutOfMemoryMessageIsNotTreatedAsRealOOM) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        ASSERT_THROWS(scope->exec("throw new Error('out of memory');",
+                                  "jsThrownOOM",
+                                  false /* printResult */,
+                                  true /* reportError */,
+                                  true /* assertOnError */),
+                      DBException);
+
+        // The message says "out of memory", but the engine never reported one.
+        ASSERT_FALSE(implscope->hasOutOfMemoryException());
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, BuildStackStringResolvesJSFramesDuringExecution) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        gCapturedJSStack.clear();
+        scope->injectNative("__captureJSStack", captureJSStackHook, implscope);
+        scope->exec(
+            "function aDistinctlyNamedFrame() { __captureJSStack(); }"
+            "aDistinctlyNamedFrame();",
+            "buildStackStringTest",
+            false /* printResult */,
+            true /* reportError */,
+            true /* assertOnError */);
+
+        // The captured stack must name the JS function that was on the stack; an empty or
+        // frameless string would make the OOM report no more useful than it is today.
+        ASSERT_FALSE(gCapturedJSStack.empty());
+        ASSERT_STRING_CONTAINS(gCapturedJSStack, "aDistinctlyNamedFrame");
+    }
+    setGlobalScriptEngine(nullptr);
+}
 
 TEST_F(MozJSImplScopeTest, JsExceptionToStatusOutOfMemoryCheck) {
     mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);

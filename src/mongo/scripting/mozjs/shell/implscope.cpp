@@ -23,6 +23,9 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -50,6 +53,7 @@
 #include <js/GCAPI.h>
 #include <js/GCVector.h>
 #include <js/Initialization.h>
+#include <js/MemoryCallbacks.h>
 #include <js/Modules.h>
 #include <js/Object.h>
 #include <js/Promise.h>
@@ -177,9 +181,40 @@ bool isLogFormatJson(MozJSScriptEngine* engine,
 }
 
 /**
+ * A snapshot of the shell's JavaScript memory accounting. Every field is a counter read, so
+ * collecting this allocates nothing and cannot fail -- which matters, because the reason to want
+ * it is usually that allocation has just started failing.
+ */
+struct JSMemoryStats {
+    size_t totalBytes;
+    size_t mallocBytes;
+    size_t mmapBytes;
+    size_t maxBytes;
+    uint64_t gcHeapBytes;
+};
+
+JSMemoryStats collectJSMemoryStats(JSContext* cx) {
+    return {mongo::sm::get_total_bytes(),
+            mongo::sm::get_malloc_bytes(),
+            mongo::sm::get_mmap_bytes(),
+            mongo::sm::get_max_bytes(),
+            js::GetGCHeapUsage(cx)};
+}
+
+/**
+ * Best-effort JavaScript stack, empty if one cannot be taken.
+ */
+std::string tryBuildJSStack(JSContext* cx) try {
+    auto* scope = getScope(cx);
+    return scope ? scope->buildStackString() : std::string{};
+} catch (...) {
+    return {};
+}
+
+/**
  * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
  */
-void logStatus(const Status& status, bool plainShell) {
+void logStatus(JSContext* cx, const Status& status, bool reportMemoryDiagnostics, bool plainShell) {
     if (plainShell) {
         str::stream ss;
         ss << redact(status.reason());
@@ -188,6 +223,17 @@ void logStatus(const Status& status, bool plainShell) {
                 ss << " : " << extraInfo->extraAttr;
             }
             ss << " :\n" << extraInfo->stack;
+        }
+
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            ss << " :: JS heap:"
+               << " totalBytes=" << mem.totalBytes << " mallocBytes=" << mem.mallocBytes
+               << " mmapBytes=" << mem.mmapBytes << " gcHeapBytes=" << mem.gcHeapBytes
+               << " maxBytes=" << mem.maxBytes;
+            if (const auto jsStack = tryBuildJSStack(cx); !jsStack.empty()) {
+                ss << " :\n" << jsStack;
+            }
         }
 
         LOGV2_INFO_OPTIONS(
@@ -212,6 +258,20 @@ void logStatus(const Status& status, bool plainShell) {
             }
             if (!extraInfo->extraAttr.isEmpty()) {
                 attrs.add("extra", extraInfo->extraAttr);
+            }
+        }
+
+        BSONArray jsStackArr;
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            attrs.add("totalBytes", mem.totalBytes);
+            attrs.add("mallocBytes", mem.mallocBytes);
+            attrs.add("mmapBytes", mem.mmapBytes);
+            attrs.add("gcHeapBytes", mem.gcHeapBytes);
+            attrs.add("maxBytes", mem.maxBytes);
+            if (const auto jsStack = tryBuildJSStack(cx); !jsStack.empty()) {
+                jsStackArr = splitToBSONArray(jsStack, '\n');
+                attrs.add("jsStack", jsStackArr);
             }
         }
         if (status.reason().starts_with(ErrorMessage::kUncaughtException)) {
@@ -357,6 +417,14 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     }
 
     return scope->_status.isOK();
+}
+
+void MozJSImplScope::_outOfMemoryCallback(JSContext* cx, void* data) {
+    // SpiderMonkey has exhausted its own recovery and is about to report the OOM, so this is
+    // unrecoverable; see setOOM().
+    if (auto* scope = getScope(cx)) {
+        scope->setOOM();
+    }
 }
 
 void MozJSImplScope::_gcCallback(JSContext* rt,
@@ -609,6 +677,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, static_cast<MozJSCommonRuntimeInterface*>(this));
+        JS::SetOutOfMemoryCallback(_context, _outOfMemoryCallback, nullptr);
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
@@ -1343,8 +1412,38 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     // expected to report and clear the errors before returning.
     JS_ClearPendingException(_context);
 
-    if (reportError)
-        logStatus(_status, !isLogFormatJson(_engine, _context, _global));
+    // Requiring _inOp keeps this to OOMs raised while JavaScript was executing
+    const bool abortForOOM = _hasOutOfMemoryException && _inOp > 0 &&
+        _engine->executionEnvironment() == ExecutionEnvironment::TestRunner &&
+        _engine->getJSAbortOnOutOfMemory();
+
+    if (reportError || abortForOOM) {
+        try {
+            logStatus(_context,
+                      _status,
+                      _hasOutOfMemoryException,
+                      !isLogFormatJson(_engine, _context, _global));
+        } catch (...) {
+            if (!abortForOOM) {
+                throw;
+            }
+        }
+    }
+
+    if (abortForOOM) {
+        LOGV2_FATAL_CONTINUE(13403900,
+                             "JavaScript out of memory; aborting to capture a core dump",
+                             "errmsg"_attr = redact(_status.reason()));
+
+        // TODO SERVER-100809: abort() on Windows reaches MiniDumpWriteDump() on this same
+        // process, which is a known deadlock. Re-enable once the dump is taken out of process.
+        // Until then Windows deliberately falls through to the normal reporting path below, so
+        // the out-of-memory still surfaces as a DBException exactly as it would with the option
+        // off. Returning early here instead would skip that and swallow the error.
+#ifndef _WIN32
+        std::abort();
+#endif
+    }
 
     // Clear the status state
     auto status = std::move(_status);
