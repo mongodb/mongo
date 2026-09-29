@@ -81,6 +81,7 @@ rules:
           - assigned_to_jira_team_server_networking_and_observability
           - assigned_to_jira_team_server_integration
           - assigned_to_jira_team_server_disagg
+          - assigned_to_jira_team_product_performance
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/devprod.yaml
           - assigned_to_jira_team_devprod_build
