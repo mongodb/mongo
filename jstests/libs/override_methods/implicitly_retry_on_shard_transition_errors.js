@@ -41,6 +41,7 @@ const kRetryableErrors = [
     {code: ErrorCodes.HostUnreachable},
     {code: ErrorCodes.ConnectionClosedByPeer},
     {code: ErrorCodes.ShutdownInProgress},
+    {code: ErrorCodes.InterruptedAtShutdown},
     {code: ErrorCodes.ShardNotFound},
     {code: ErrorCodes.AddOrRemoveShardInProgress},
 ];
