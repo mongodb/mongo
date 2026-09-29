@@ -722,8 +722,12 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         if (val == globalThis.DB?.prototype) continue;
         if (val == globalThis.DBCollection?.prototype) continue;
 
+        // JSON.stringify rather than `"${key}"`. The tojson's contract is that eval() of its output
+        // reproduces the input, and a key holding a backslash or a quote does not survive being
+        // interpolated raw.
         fieldStrings.push(
-            `${leadingPad}${indent}"${key}" : ` + tojson(val, indent, nolint, depth + 1, sortKeys),
+            `${leadingPad}${indent}${JSON.stringify(key)} : ` +
+                tojson(val, indent, nolint, depth + 1, sortKeys),
         );
     }
 
