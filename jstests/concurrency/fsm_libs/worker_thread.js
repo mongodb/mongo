@@ -212,6 +212,19 @@ export const workerThread = (function () {
                             "jstests/libs/override_methods/implicitly_retry_resharding.js"
                         );
                     }
+                } else if (TestData.runningWithStepdowns) {
+                    const newOptions = {
+                        alwaysInjectTransactionNumber: true,
+                        defaultReadConcernLevel: "majority",
+                        logRetryAttempts: true,
+                        overrideRetryAttempts: 3,
+                    };
+                    Object.assign(TestData, newOptions);
+
+                    if (!TestData.hasOwnProperty("networkErrorAndTxnOverrideConfig")) {
+                        TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
+                    }
+                    await import("jstests/libs/override_methods/network_error_and_txn_override.js");
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with

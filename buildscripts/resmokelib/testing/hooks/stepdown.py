@@ -47,6 +47,7 @@ class ContinuousStepdown(interface.Hook):
         auth_options=None,
         should_downgrade=False,
         use_stepdown_command=False,
+        secondaryCatchUpPeriodSecs=None,
     ):
         """Initialize the ContinuousStepdown.
 
@@ -67,6 +68,10 @@ class ContinuousStepdown(interface.Hook):
                 replSetStepDown and allow a new primary to be elected via handoff. When
                 false (default) we instead run replSetStepUp on a secondary and expect the
                 primary to realize it has been overtaken and step down.
+            secondaryCatchUpPeriodSecs: when set, passed as secondaryCatchUpPeriodSecs
+                to the replSetStepDown command, overriding the server default (10s). This
+                controls how long the primary waits for a secondary to catch up before
+                completing the step-down.
 
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
@@ -96,6 +101,7 @@ class ContinuousStepdown(interface.Hook):
         self._auth_options = auth_options
         self._should_downgrade = should_downgrade
         self._use_stepdown_command = use_stepdown_command
+        self._secondaryCatchUpPeriodSecs = secondaryCatchUpPeriodSecs
 
         # The action file names need to match the same construction as found in
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
@@ -141,6 +147,7 @@ class ContinuousStepdown(interface.Hook):
             self._auth_options,
             self._should_downgrade,
             self._use_stepdown_command,
+            self._secondaryCatchUpPeriodSecs,
         )
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
@@ -198,6 +205,7 @@ class _StepdownThread(threading.Thread):
         auth_options=None,
         should_downgrade=False,
         use_stepdown_command=False,
+        secondaryCatchUpPeriodSecs=None,
     ):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
@@ -219,6 +227,7 @@ class _StepdownThread(threading.Thread):
         self._auth_options = auth_options
         self._should_downgrade = should_downgrade
         self._use_stepdown_command = use_stepdown_command
+        self._secondaryCatchUpPeriodSecs = secondaryCatchUpPeriodSecs
 
         self._last_exec = time.time()
         self._pause_timeout_secs = fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
@@ -514,7 +523,10 @@ class _StepdownThread(threading.Thread):
         )
         client = self._create_client(old_primary)
         try:
-            client.admin.command({"replSetStepDown": self._stepdown_duration_secs})
+            cmd = {"replSetStepDown": self._stepdown_duration_secs}
+            if self._secondaryCatchUpPeriodSecs is not None:
+                cmd["secondaryCatchUpPeriodSecs"] = self._secondaryCatchUpPeriodSecs
+            client.admin.command(cmd)
         except pymongo.errors.AutoReconnect:
             pass
         except pymongo.errors.PyMongoError:
