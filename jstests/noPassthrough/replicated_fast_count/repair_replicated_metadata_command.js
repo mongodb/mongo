@@ -71,19 +71,41 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     assert.eq(entries[0].o2.uuid, uuid);
     assert.eq(entries[0].o2.m.sz, 100);
     assert.eq(entries[0].o2.m.ct, 5);
+    // Omitted subfields are not repaired, so a size/count repair must not carry a hash diff.
+    assert(!entries[0].o2.m.hasOwnProperty("h"));
+
+    // 'h' carries a collection validation hash diff.
+    const hash = NumberLong("81985529216486895"); // 0x0123456789abcdef
+    assert.commandWorked(
+        primary.getDB("admin").runCommand({
+            repairReplicatedMetadata: 1,
+            uuid: uuid,
+            metadata: {h: hash},
+            writeConcern: {w: "majority"},
+        }),
+    );
+    const hashEntries = primary
+        .getDB("local")
+        .oplog.rs.find({op: "n", "o2.type": "repairReplicatedMetadata", "o2.m.h": {$exists: true}})
+        .toArray();
+    assert.eq(hashEntries.length, 1);
+    assert.eq(hashEntries[0].o2.m.h, hash);
+    // A hash-only repair must not carry size/count diffs.
+    assert(!hashEntries[0].o2.m.hasOwnProperty("sz"));
+    assert(!hashEntries[0].o2.m.hasOwnProperty("ct"));
 
     // A collection that does not exist is a true no-op and writes no oplog entry.
     assert.commandWorked(
         primary
             .getDB("admin")
-            .runCommand({repairReplicatedMetadata: 1, uuid: UUID(), metadata: {sz: 100}}),
+            .runCommand({repairReplicatedMetadata: 1, uuid: UUID(), metadata: {sz: 100, h: hash}}),
     );
     assert.eq(
         primary
             .getDB("local")
             .oplog.rs.find({op: "n", "o2.type": "repairReplicatedMetadata"})
             .toArray().length,
-        1,
+        2,
     );
 
     assert.commandFailedWithCode(

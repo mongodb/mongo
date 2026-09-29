@@ -21,6 +21,12 @@ structs:
                 description: "Document count diff to persist."
                 type: safeInt64
                 optional: true
+            h:
+                description:
+                    "Collection validation hash diff. Folds into the collection's accumulated
+                    hash via XOR, so it can adjust a present hash but not repair an absent one."
+                type: safeInt64
+                optional: true
 
 commands:
     repairReplicatedMetadata:

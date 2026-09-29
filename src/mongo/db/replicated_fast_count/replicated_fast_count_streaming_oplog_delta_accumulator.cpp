@@ -162,7 +162,7 @@ enum class FastDecision {
 };
 
 // The `type` discriminator value carried in the o2 of a no-op oplog entry that repairs a
-// collection's replicated metadata with explicit size/count diffs.
+// collection's replicated metadata with explicit size/count/hash diffs.
 constexpr std::string_view kRepairReplicatedMetadataType = "repairReplicatedMetadata"sv;
 
 // True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
@@ -467,7 +467,7 @@ boost::optional<int> tryFastCommitTxn(const ScanFields& f,
 // Returns boost::none if the shape is malformed (missing/non-numeric fields, unparsable uuid).
 // Unlike CRUD's `m`, a no-op's o2 isn't otherwise validated by replication, so a malformed repair
 // entry is ignored (no delta) rather than treated as fatal.
-boost::optional<std::pair<UUID, CollectionSizeCount>> tryExtractNoopRepairDiff(
+boost::optional<std::pair<UUID, CollectionReplicatedMetadata>> tryExtractNoopRepairDiff(
     const BSONObj& o2Obj) {
     const auto uuidElem = o2Obj.getField("uuid"sv);
     const auto mElem = o2Obj.getField("m"sv);
@@ -477,21 +477,27 @@ boost::optional<std::pair<UUID, CollectionSizeCount>> tryExtractNoopRepairDiff(
     const auto mObj = mElem.Obj();
     const auto szElem = mObj.getField("sz"sv);
     const auto ctElem = mObj.getField("ct"sv);
-    if (szElem.eoo() && ctElem.eoo()) {
+    const auto hElem = mObj.getField("h"sv);
+    if (szElem.eoo() && ctElem.eoo() && hElem.eoo()) {
         return boost::none;
     }
-    // `sz` and `ct` are each optional but a present field must be numeric; malformed input
+    // `sz`, `ct`, and `h` are each optional but a present field must be numeric; malformed input
     // invalidates the whole entry rather than partially applying it.
-    if ((!szElem.eoo() && !szElem.isNumber()) || (!ctElem.eoo() && !ctElem.isNumber())) {
+    if ((!szElem.eoo() && !szElem.isNumber()) || (!ctElem.eoo() && !ctElem.isNumber()) ||
+        (!hElem.eoo() && !hElem.isNumber())) {
         return boost::none;
     }
     auto uuid = UUID::parse(uuidElem);
     if (!uuid.isOK()) {
         return boost::none;
     }
-    return std::make_pair(uuid.getValue(),
-                          CollectionSizeCount{.size = szElem.eoo() ? 0 : szElem.safeNumberLong(),
-                                              .count = ctElem.eoo() ? 0 : ctElem.safeNumberLong()});
+    // An absent `h` folds as the XOR identity so that the window's accumulated hash is preserved.
+    return std::make_pair(
+        uuid.getValue(),
+        CollectionReplicatedMetadata{
+            .sizeCount = CollectionSizeCount{.size = szElem.eoo() ? 0 : szElem.safeNumberLong(),
+                                             .count = ctElem.eoo() ? 0 : ctElem.safeNumberLong()},
+            .hash = hElem.eoo() ? kEmptyCollectionValidationHash : hElem.safeNumberLong()});
 }
 
 // Layer 2: handle a no-op entry whose o2 repairs a collection's replicated metadata. A malformed
@@ -500,12 +506,7 @@ int tryRecordFastNoopRepair(const ScanFields& f,
                             ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     if (auto diff = tryExtractNoopRepairDiff(f.o2.Obj())) {
         recordCollectionReplicatedMetadataDelta(
-            diff->first,
-            CollectionReplicatedMetadata{
-                .sizeCount =
-                    CollectionSizeCount{.size = diff->second.size, .count = diff->second.count},
-                .hash = kEmptyCollectionValidationHash},
-            replicatedMetadataDeltasOut);
+            diff->first, diff->second, replicatedMetadataDeltasOut);
         return 1;
     }
     return 0;

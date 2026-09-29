@@ -61,6 +61,20 @@ protected:
         return timestampStore->read(opCtx);
     }
 
+    // Writes a repairReplicatedMetadata no-op entry for 'coll' carrying 'metadata'.
+    void writeRepairNoop(Timestamp ts, const test_helpers::NsAndUUID& coll, BSONObj metadata) {
+        test_helpers::writeToOplog(
+            opCtx,
+            repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+                .opTime = repl::OpTime(ts, 1),
+                .opType = repl::OpTypeEnum::kNoop,
+                .nss = NamespaceString(),
+                .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+                .o2Field = BSON("type" << "repairReplicatedMetadata"
+                                       << "uuid" << coll.uuid << "m" << metadata),
+                .wallClockTime = Date_t::now()}}});
+    }
+
     OperationContext* opCtx;
     std::unique_ptr<SizeCountStore> sizeCountStore;
     std::unique_ptr<SizeCountTimestampStore> timestampStore;
@@ -83,6 +97,51 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InitialCheckpoint) {
     const auto tsStoreRes = readTimestamp();
     ASSERT_TRUE(tsStoreRes.has_value());
     EXPECT_EQ(ts1, *tsStoreRes);
+}
+
+// A repair noop's hash diff XORs into the persisted hash when an entry exists.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, RepairNoopHashCombinesWithPersistedHash) {
+    const Timestamp ts{1, 1};
+    const int64_t persistedHash = 0x0f0f0f0f0f0f0f0f;
+    const int64_t repairHash = 0x0123456789abcdef;
+    test_helpers::insertSizeCountEntry(
+        opCtx,
+        *sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(0, 1), .size = 1000, .count = 10, .hash = persistedHash});
+    writeRepairNoop(ts, collA, BSON("sz" << 100 << "ct" << 5 << "h" << repairHash));
+
+    EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 2);
+
+    const auto entry = readSizeCount(collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 1100);
+    EXPECT_EQ(entry->count, 15);
+    ASSERT_TRUE(entry->hash.has_value());
+    EXPECT_EQ(*entry->hash, persistedHash ^ repairHash);
+}
+
+// A repair noop's hash diff cannot seed a hash on an entry that has none: the hash stays absent
+// while the size and count diffs still apply.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, RepairNoopHashLeavesAbsentPersistedHashAbsent) {
+    test_helpers::insertSizeCountEntry(
+        opCtx,
+        *sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(0, 1), .size = 1000, .count = 10, .hash = boost::none});
+    writeRepairNoop(Timestamp(1, 1),
+                    collA,
+                    BSON("sz" << 100 << "ct" << 5 << "h" << int64_t{0x0123456789abcdef}));
+
+    EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 2);
+
+    const auto entry = readSizeCount(collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->size, 1100);
+    EXPECT_EQ(entry->count, 15);
+    EXPECT_FALSE(entry->hash.has_value());
 }
 
 // Test: `advanceCheckpoint` is a no-op for the `SizeCountStore` when both stores are empty and

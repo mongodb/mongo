@@ -588,6 +588,34 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashPersistedForCollectionCreated
     EXPECT_EQ(expectedEntry, *entry);
 }
 
+// A repair hash diff in the same checkpoint as the collection's creation folds into the
+// empty-collection hash like any other contribution. Creation establishes a present hash, so this
+// adjusts a known value rather than seeding an absent one.
+TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCollectionHash) {
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(Timestamp(1, 1), _collA));
+    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeOplogEntry(repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(Timestamp(1, 3), 1),
+        .opType = repl::OpTypeEnum::kNoop,
+        .nss = NamespaceString(),
+        .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+        .o2Field = BSON("type" << "repairReplicatedMetadata"
+                               << "uuid" << _collA.uuid << "m" << BSON("h" << kHashB)),
+        .wallClockTime = Date_t::now(),
+    }});
+
+    flush();
+
+    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 3),
+                                              .size = 10,
+                                              .count = 1,
+                                              .hash =
+                                                  kEmptyCollectionValidationHash ^ kHashA ^ kHashB};
+    const auto entry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
 // A collection created with no writes persists the hash of an empty collection, which later
 // contributions fold into.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, CreateWithoutWritesPersistsEmptyCollectionHash) {
