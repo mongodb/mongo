@@ -26,7 +26,7 @@ filters:
       - 10gen/query-execution
   - "icu*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/server-security
   - "pcre*":
     approvers:
       - 10gen/query-execution
