@@ -6,6 +6,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 
+#include <string>
+
 namespace mongo::pipeline::type_system {
 
 /**
@@ -52,6 +54,9 @@ public:
     /// A TypeSet covering every value of every type named by 'matcherTypeSet'.
     static TypeSet fromMatcherTypeSet(const MatcherTypeSet& matcherTypeSet);
 
+    /// A TypeSet covering all numeric types with the given extent.
+    static TypeSet numericTypes(Extent extent);
+
     /// A TypeSet covering all or some of the values within 'type'.
     TypeSet(BSONType type, Extent extent);
 
@@ -63,6 +68,12 @@ public:
 
     /// Returns true if 'other' covers the same types with the same extents.
     bool operator==(const TypeSet& other) const = default;
+
+    /**
+     * Renders the set in the debug syntax, such as 'any', 'never', 'number|string' or '~array'.
+     * A type covered as a subset carries a '(S)' suffix. Every set has exactly one rendering.
+     */
+    std::string toDebugString() const;
 
 private:
     friend TypeSet unionType(TypeSet lhs, TypeSet rhs);
@@ -115,6 +126,9 @@ public:
 
     /// Returns true if 'other' covers the same types with the same extents.
     bool operator==(const Type& other) const = default;
+
+    /// Renders the type in the debug syntax, such as 'any', 'number|string' or '~array'.
+    std::string toDebugString() const;
 
 private:
     TypeSet _typeSet;

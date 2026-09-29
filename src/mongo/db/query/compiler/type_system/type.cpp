@@ -6,6 +6,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
 
+#include <array>
+#include <string>
+#include <string_view>
+
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::pipeline::type_system {
@@ -101,6 +107,63 @@ constexpr std::array kNumericTypes{
 /// A bitmask containing all types in the 'number' alias.
 constexpr TypeMask kNumericTypesMask = typeMask(kNumericTypes.begin(), kNumericTypes.end());
 
+/// Every type in the order for printing, which is based on BSON sort order.
+constexpr std::array kTypesInPrintOrder{
+    BSONType::minKey,       BSONType::eoo,       BSONType::undefined,  BSONType::null,
+    BSONType::numberDouble, BSONType::numberInt, BSONType::numberLong, BSONType::numberDecimal,
+    BSONType::string,       BSONType::symbol,    BSONType::object,     BSONType::array,
+    BSONType::binData,      BSONType::oid,       BSONType::boolean,    BSONType::date,
+    BSONType::timestamp,    BSONType::regEx,     BSONType::dbRef,      BSONType::code,
+    BSONType::codeWScope,   BSONType::maxKey,
+};
+
+/**
+ * Returns true if the numeric types are covered in full as the 'number' alias covers them,
+ * which is when the alias can stand for all of them.
+ */
+bool canCollapseNumbers(const TypeSet& typeSet) {
+    const TypeSet allNumbers = TypeSet::numericTypes(Extent::kAll);
+    const TypeSet numbers = intersectType(typeSet, allNumbers);
+    return numbers == allNumbers || numbers == TypeSet::numericTypes(Extent::kSubset);
+}
+
+/// Returns true if 'type' is one of the types the 'number' alias stands for.
+bool isNumericType(BSONType type) {
+    return typeMask(type) & kNumericTypesMask;
+}
+
+/**
+ * Renders the types of 'typeSet' as a '|'-separated union in BSON sort order, suffixing the
+ * ones covered only as a subset.
+ */
+std::string renderUnion(const TypeSet& typeSet) {
+    const bool collapseNumbers = canCollapseNumbers(typeSet);
+    bool numberRendered = false;
+    std::string rendered;
+    for (auto type : kTypesInPrintOrder) {
+        if (!typeSet.hasType(type)) {
+            continue;
+        }
+        std::string_view name = typeName(type);
+        if (isNumericType(type) && collapseNumbers) {
+            // The 'number' alias stands for all four numeric types, so it is rendered once.
+            if (numberRendered) {
+                continue;
+            }
+            numberRendered = true;
+            name = "number";
+        }
+        if (!rendered.empty()) {
+            rendered += "|";
+        }
+        rendered += name;
+        if (isSubset(typeSet.getExtent(type))) {
+            rendered += "(S)";
+        }
+    }
+    return rendered;
+}
+
 }  // namespace
 
 TypeSet::TypeSet(TypeMask types, TypeMask subsetTypes)
@@ -135,12 +198,40 @@ TypeSet TypeSet::fromMatcherTypeSet(const MatcherTypeSet& matcherTypeSet) {
     return TypeSet(types, 0);
 }
 
+TypeSet TypeSet::numericTypes(Extent extent) {
+    return TypeSet(kNumericTypesMask, isSubset(extent) ? kNumericTypesMask : 0);
+}
+
 bool TypeSet::hasType(BSONType type) const {
     return (_types & typeMask(type));
 }
 
 Extent TypeSet::getExtent(BSONType type) const {
     return (_subsetTypes & typeMask(type)) ? Extent::kSubset : Extent::kAll;
+}
+
+std::string TypeSet::toDebugString() const {
+    if (*this == any()) {
+        return "any";
+    }
+    if (*this == never()) {
+        return "never";
+    }
+
+    // The complement of the union of the types that are not covered may be a shorter string.
+    // This will happen generally when more types are included than excluded.
+    // Since the four numeric types print as 'number' it is easier to produce this string and
+    // compare the length than to try to count how many types will be rendered.
+    const std::string negatedUnion = renderUnion(complement(*this));
+    std::string negative;
+    if (negatedUnion.find('|') == std::string::npos) {
+        negative = fmt::format("~{}", negatedUnion);
+    } else {
+        negative = fmt::format("~({})", negatedUnion);
+    }
+
+    const std::string positive = renderUnion(*this);
+    return negative.size() < positive.size() ? negative : positive;
 }
 
 TypeMask TypeSet::extentAllTypes() const {
@@ -201,6 +292,10 @@ bool Type::hasType(BSONType type) const {
 
 Extent Type::getExtent(BSONType type) const {
     return _typeSet.getExtent(type);
+}
+
+std::string Type::toDebugString() const {
+    return _typeSet.toDebugString();
 }
 
 Type unionType(Type lhs, Type rhs) {

@@ -298,6 +298,111 @@ TEST(TypeSetTest, ComplementOfComplementRestoresFullType) {
     ASSERT_TRUE(isAll(typeSet.getExtent(BSONType::string)));
 }
 
+TEST(TypeSetTest, AnyRendersAsAny) {
+    ASSERT_EQ(TypeSet::any().toDebugString(), "any");
+}
+
+TEST(TypeSetTest, NeverRendersAsNever) {
+    ASSERT_EQ(TypeSet::never().toDebugString(), "never");
+}
+
+TEST(TypeSetTest, ComplementOfAnyRendersAsNever) {
+    ASSERT_EQ(complement(TypeSet::any()).toDebugString(), "never");
+}
+
+TEST(TypeSetTest, FullTypeRendersItsName) {
+    ASSERT_EQ(TypeSet(BSONType::string, Extent::kAll).toDebugString(), "string");
+}
+
+TEST(TypeSetTest, SubsetTypeIsSuffixed) {
+    ASSERT_EQ(TypeSet(BSONType::string, Extent::kSubset).toDebugString(), "string(S)");
+}
+
+TEST(TypeSetTest, MissingTypeRendersAsMissing) {
+    ASSERT_EQ(TypeSet(BSONType::eoo, Extent::kAll).toDebugString(), "missing");
+}
+
+TEST(TypeSetTest, UnionRendersInSortOrder) {
+    auto typeSet = unionType(
+        TypeSet(BSONType::object, Extent::kAll),
+        unionType(TypeSet(BSONType::string, Extent::kAll), TypeSet(BSONType::null, Extent::kAll)));
+    ASSERT_EQ(typeSet.toDebugString(), "null|string|object");
+}
+
+TEST(TypeSetTest, EveryNumericTypeCollapsesToNumber) {
+    MatcherTypeSet matcherTypeSet;
+    matcherTypeSet.allNumbers = true;
+    ASSERT_EQ(TypeSet::fromMatcherTypeSet(matcherTypeSet).toDebugString(), "number");
+}
+
+TEST(TypeSetTest, SomeNumericTypesRenderIndividually) {
+    auto typeSet = unionType(TypeSet(BSONType::numberInt, Extent::kAll),
+                             TypeSet(BSONType::numberLong, Extent::kAll));
+    ASSERT_EQ(typeSet.toDebugString(), "int|long");
+}
+
+TEST(TypeSetTest, NumericTypesDisagreeingOnExtentRenderIndividually) {
+    auto typeSet = unionType(TypeSet(BSONType::numberDouble, Extent::kSubset),
+                             unionType(TypeSet(BSONType::numberInt, Extent::kAll),
+                                       unionType(TypeSet(BSONType::numberLong, Extent::kAll),
+                                                 TypeSet(BSONType::numberDecimal, Extent::kAll))));
+    ASSERT_EQ(typeSet.toDebugString(), "double(S)|int|long|decimal");
+}
+
+TEST(TypeSetTest, SubsetNumericTypeAmongFullOnesRendersIndividually) {
+    auto typeSet = unionType(TypeSet(BSONType::numberInt, Extent::kSubset),
+                             unionType(TypeSet(BSONType::numberDouble, Extent::kAll),
+                                       unionType(TypeSet(BSONType::numberLong, Extent::kAll),
+                                                 TypeSet(BSONType::numberDecimal, Extent::kAll))));
+    ASSERT_EQ(typeSet.toDebugString(), "double|int(S)|long|decimal");
+}
+
+TEST(TypeSetTest, EveryNumericTypeAsSubsetCollapsesToSubsetNumber) {
+    auto typeSet =
+        unionType(TypeSet(BSONType::numberDouble, Extent::kSubset),
+                  unionType(TypeSet(BSONType::numberInt, Extent::kSubset),
+                            unionType(TypeSet(BSONType::numberLong, Extent::kSubset),
+                                      TypeSet(BSONType::numberDecimal, Extent::kSubset))));
+    ASSERT_EQ(typeSet.toDebugString(), "number(S)");
+}
+
+TEST(TypeSetTest, ComplementOfOneTypeRendersAsNegation) {
+    auto typeSet = complement(TypeSet(BSONType::array, Extent::kAll));
+    ASSERT_EQ(typeSet.toDebugString(), "~array");
+}
+
+TEST(TypeSetTest, ComplementOfUnionIsParenthesised) {
+    auto typeSet = complement(
+        unionType(TypeSet(BSONType::null, Extent::kAll), TypeSet(BSONType::array, Extent::kAll)));
+    ASSERT_EQ(typeSet.toDebugString(), "~(null|array)");
+}
+
+TEST(TypeSetTest, ComplementOfSubsetTypeKeepsSuffix) {
+    auto typeSet = complement(TypeSet(BSONType::string, Extent::kSubset));
+    ASSERT_EQ(typeSet.toDebugString(), "~string(S)");
+}
+
+TEST(TypeSetTest, TypesSortingAtOrBelowNumbersRenderAsUnion) {
+    MatcherTypeSet matcherTypeSet;
+    matcherTypeSet.allNumbers = true;
+    auto typeSet =
+        unionType(TypeSet::fromMatcherTypeSet(matcherTypeSet),
+                  unionType(TypeSet(BSONType::minKey, Extent::kAll),
+                            unionType(TypeSet(BSONType::eoo, Extent::kAll),
+                                      unionType(TypeSet(BSONType::undefined, Extent::kAll),
+                                                TypeSet(BSONType::null, Extent::kAll)))));
+    ASSERT_EQ(typeSet.toDebugString(), "minKey|missing|undefined|null|number");
+}
+
+TEST(TypeTest, RendersItsTypeSet) {
+    ASSERT_EQ(Type(BSONType::string, Extent::kAll).toDebugString(), "string");
+}
+
+TEST(TypeTest, ComplementRendersAsNegation) {
+    auto type = complement(Type(BSONType::array, Extent::kAll));
+    ASSERT_EQ(type.toDebugString(), "~array");
+}
+
 }  // namespace
 
 }  // namespace mongo::pipeline::type_system
