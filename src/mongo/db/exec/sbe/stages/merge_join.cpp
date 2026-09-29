@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 
 #include <string_view>

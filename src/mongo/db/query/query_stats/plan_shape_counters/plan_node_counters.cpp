@@ -170,7 +170,6 @@ void QsnNodeCountAnalyzer::preVisit(const QuerySolutionNode& node) {
         case STAGE_UNWIND:
         case STAGE_UPDATE:
         case STAGE_VIRTUAL_SCAN:
-        case STAGE_WINDOW:
             break;
     }
 }

@@ -22,7 +22,6 @@ struct TraverseStats;
 struct HashAggStats;
 struct HashLookupStats;
 struct HashJoinStats;
-struct WindowStats;
 struct SearchStats;
 struct TsBucketToBlockStats;
 struct MergeJoinStats;
@@ -98,7 +97,6 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashAggStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashLookupStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashJoinStats> stats) = 0;
-    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::WindowStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::SearchStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TsBucketToBlockStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::MergeJoinStats> stats) = 0;
@@ -171,7 +169,6 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashAggStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashLookupStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashJoinStats> stats) override {}
-    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::WindowStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::SearchStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TsBucketToBlockStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::MergeJoinStats> stats) override {}

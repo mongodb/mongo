@@ -991,6 +991,8 @@ server_parameters:
         default: 0
         redact: false
 
+    # TODO SERVER-135771: Remove this parameter. It has been unused since the SBE window stage
+    # was deleted.
     internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast:
         mod_visibility: needs_replacement
         description: >-
@@ -1004,6 +1006,8 @@ server_parameters:
             gt: 0
         redact: false
 
+    # TODO SERVER-135771: Remove this parameter. It has been unused since the SBE window stage
+    # was deleted.
     internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast:
         mod_visibility: needs_replacement
         description: >-

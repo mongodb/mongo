@@ -391,31 +391,6 @@ struct HashJoinStats : public SpecificStats {
     uint64_t numProbeRecordsDiscarded = 0u;
 };
 
-struct WindowStats : public SpecificStats {
-    std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<WindowStats>(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const final {
-        return sizeof(*this);
-    }
-
-    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
-        visitor->visit(this);
-    }
-
-    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
-    // Whether the window buffer was spilled.
-    bool usedDisk{false};
-    SpillingStats spillingStats;
-
-    // The maximum amount of memory that was used.
-    uint64_t peakTrackedMemBytes = 0u;
-};
-
 /**
  * Visitor for calculating the number of storage reads during plan execution.
  */
