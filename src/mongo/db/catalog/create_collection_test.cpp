@@ -607,5 +607,38 @@ TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
             stdx::to_underlying(kInvalidFileTypeEnum));
     }
 }
+TEST_F(CreateCollectionTest, RejectClusteredIndexNameWithEmbeddedNullByte) {
+    using namespace std::literals;
+
+    auto opCtx = makeOpCtx();
+
+    // Creates a clustered collection whose implicit index carries 'indexName'.
+    const auto createClusteredCollection = [&](std::string_view indexName) {
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.BadClusteredIndexName");
+        ASSERT_FALSE(collectionExists(opCtx.get(), nss));
+
+        ClusteredIndexSpec indexSpec;
+        indexSpec.setKey(BSON("_id" << 1));
+        indexSpec.setUnique(true);
+        indexSpec.setName(std::string{indexName});
+
+        CollectionOptions options;
+        options.clusteredIndex =
+            ClusteredCollectionInfo(std::move(indexSpec), /*legacyFormat=*/false);
+        return createCollection(opCtx.get(), nss, options, /*idIndex=*/boost::none);
+    };
+
+    ASSERT_EQ(createClusteredCollection("\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("\0\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("\0trailing"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("leading\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("embedded\0null"sv), ErrorCodes::CannotCreateIndex);
+
+    // An empty name is likewise rejected, while an ordinary name succeeds.
+    ASSERT_EQ(createClusteredCollection(""sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_OK(createClusteredCollection("myClusteredIndex"sv));
+}
+
 }  // namespace
 }  // namespace mongo
