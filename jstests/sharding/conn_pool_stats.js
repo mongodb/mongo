@@ -22,6 +22,15 @@ printjson(stats);
 assert.commandWorked(stats);
 assert("replicaSets" in stats);
 assert("hosts" in stats);
+// This test is run on multiversion clusters but only newer versions have the "hello" stats.
+const mongosVersion = assert.commandWorked(st.s.adminCommand({buildInfo: 1})).version;
+if (MongoRunner.compareBinVersions(mongosVersion, "9.1") >= 0) {
+    assert("replicaSetMonitor" in stats);
+    assert("hello" in stats.replicaSetMonitor);
+    const helloStats = stats.replicaSetMonitor.hello;
+    assert("totalCalls" in helloStats);
+    assert("totalLatencyMicros" in helloStats);
+}
 assert("numClientConnections" in stats);
 assert("numAScopedConnections" in stats);
 assert("totalInUse" in stats);

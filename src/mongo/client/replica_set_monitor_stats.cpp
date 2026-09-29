@@ -20,11 +20,8 @@ ReplicaSetMonitorManagerStats::ReplicaSetMonitorManagerStats(Microseconds resetT
 }
 
 void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC) {
-    if (!forFTDC) {
-        return;
-    }
     BSONObjBuilder rsmStats(builder->subobjStart(kRSMPrefix));
-    {
+    if (forFTDC) {
         BSONObjBuilder getHostStats(rsmStats.subobjStart(kGetHostPrefix));
         getHostStats.appendNumber("totalCalls", _getHostAndRefreshTotal.get());
         getHostStats.appendNumber("currentlyActive", _getHostAndRefreshCurrent.get());
@@ -37,11 +34,13 @@ void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC
     {
         BSONObjBuilder helloStats(rsmStats.subobjStart(kHelloPrefix));
         helloStats.appendNumber("totalCalls", _helloTotal.get());
-        helloStats.appendNumber("currentlyActive", _helloCurrent.get());
         helloStats.appendNumber("totalLatencyMicros", _helloAggregateLatency.get());
-
-        std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
-        helloStats.appendNumber("maxLatencyMicros", durationCount<Microseconds>(_helloMaxLatency));
+        if (forFTDC) {
+            helloStats.appendNumber("currentlyActive", _helloCurrent.get());
+            std::lock_guard<ObservableMutex<std::mutex>> lk(_mutex);
+            helloStats.appendNumber("maxLatencyMicros",
+                                    durationCount<Microseconds>(_helloMaxLatency));
+        }
     }
 }
 
