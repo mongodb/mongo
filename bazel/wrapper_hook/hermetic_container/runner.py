@@ -60,6 +60,8 @@ from .cross.linux import (
     _linux_cross_rbe_host_args,
     _linux_cross_rbe_local_host_args,
     _linux_cross_rbe_process_env,
+    _linux_cross_release_local_exec_host_args,
+    _linux_cross_release_local_on_exec_host,
     _linux_host_container_action_args,
     _linux_host_container_config,
     _write_linux_container_actions_config_unlocked,
@@ -504,7 +506,22 @@ def run_hermetic_container(
         if cross_config is None:
             raise RuntimeError("Linux cross-RBE mode requires a linux-*-cross-rbe config")
         release_local = _remote_execution_disabled_by_args(args, env=env, repo_root=REPO_ROOT)
-        if release_local:
+        release_local_on_exec_host = release_local and _linux_cross_release_local_on_exec_host(
+            cross_config
+        )
+        if release_local_on_exec_host:
+            # There is no native IBM toolchain on the execution-architecture host, so keep
+            # the cross toolchain and run its compile and tool actions locally.
+            cross_process_env = _linux_cross_rbe_process_env(cross_config, env)
+            host_args = _linux_cross_release_local_exec_host_args(args, env, repo_root=REPO_ROOT)
+            local_container_env = _linux_cross_local_container_env(env, use_cross_image=False)
+            host_args = _linux_host_container_action_args(
+                host_args,
+                local_container_env,
+                remote_compile_only=False,
+                force_local=True,
+            )
+        elif release_local:
             # public-release-local is a complete local build policy. Do not first add
             # cross-RBE options: repository hydration and Bazel's last-option semantics
             # can otherwise leave a foreign selector active in a supposedly local build.
@@ -606,7 +623,12 @@ def run_hermetic_container(
                     return 1
 
             image_identifier = container_config["image"].rsplit("@", 1)[-1]
-            if release_local:
+            if release_local_on_exec_host:
+                _info(
+                    f"IBM release cross build runs locally in container {image_identifier}; "
+                    "remote execution and cache are disabled."
+                )
+            elif release_local:
                 _info(
                     f"IBM release actions use the native hermetic container {image_identifier}; "
                     "remote execution and cache are disabled."

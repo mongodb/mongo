@@ -902,6 +902,11 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 hermetic_container_integration.platform, "system", return_value="Linux"
             ),
             mock.patch.object(
+                hermetic_container_integration._cross_linux,
+                "normalize_arch",
+                return_value="s390x",
+            ),
+            mock.patch.object(
                 hermetic_container_integration,
                 "load_remote_execution_containers",
                 return_value=containers,
@@ -935,6 +940,83 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertNotIn("foreign@sha256:456", json.dumps(dry_run))
         self.assertNotIn("--override_module=protobuf=", json.dumps(dry_run))
         self.assertNotIn("--override_module=grpc=", json.dumps(dry_run))
+
+    def test_run_hermetic_container_release_cross_build_on_exec_host_stays_cross(self):
+        # Waterfall s390x release builds run on the ARM64 cross-compile distro. There is
+        # no native s390x toolchain there, so release-local must keep the cross
+        # toolchain and run every action locally instead of on RBE.
+        containers = {"rhel10": {"container-url": "docker://example.invalid/native@sha256:123"}}
+        stdout = StringIO()
+
+        with (
+            mock.patch.object(
+                hermetic_container_integration.platform, "system", return_value="Linux"
+            ),
+            mock.patch.object(
+                hermetic_container_integration._cross_linux,
+                "normalize_arch",
+                return_value="aarch64",
+            ),
+            mock.patch.object(
+                hermetic_container_integration,
+                "load_remote_execution_containers",
+                return_value=containers,
+            ),
+            redirect_stdout(stdout),
+        ):
+            rc = hermetic_container_integration.run_hermetic_container(
+                "/usr/bin/bazel",
+                [
+                    "build",
+                    "--config=linux-s390x-rhel10-cross-rbe-arm64",
+                    "--config=public-release-local",
+                    "archive-dist-test-stripped",
+                    # Cleared selectors injected by tools/bazel for native release-local
+                    # builds must not win over the cross selection.
+                    "--repo_env=MONGO_WASI_SDK_EXEC_ARCH=",
+                    "--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=",
+                    *hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+                ],
+                env={
+                    "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
+                    "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel10",
+                },
+            )
+
+        def last_value(prefix: str) -> str | None:
+            values = [arg.removeprefix(prefix) for arg in host_args if arg.startswith(prefix)]
+            return values[-1] if values else None
+
+        self.assertEqual(rc, 0)
+        dry_run = json.loads(stdout.getvalue().splitlines()[-1])
+        host_args = dry_run["linux_cross_host_rbe"]["args"]
+        self.assertNotIn("--platforms=//bazel/platforms:rhel10_s390x", host_args)
+        self.assertNotIn("--extra_toolchains=", host_args)
+        self.assertNotIn("--define=MONGO_IBM_CROSS=0", host_args)
+        self.assertIn("--extra_execution_platforms=//bazel/platforms:rhel10_arm64_cross", host_args)
+        self.assertEqual(
+            last_value("--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN="),
+            "rhel10_s390x_on_rhel10_aarch64",
+        )
+        self.assertEqual(last_value("--repo_env=MONGO_WASI_SDK_EXEC_ARCH="), "aarch64")
+        self.assertEqual(last_value("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH="), "aarch64")
+        self.assertEqual(last_value("--define=MONGO_IBM_CROSS="), "1")
+        self.assertTrue(any(arg.startswith("--override_module=protobuf=") for arg in host_args))
+        self.assertEqual(last_value("--remote_executor="), "")
+        self.assertEqual(last_value("--spawn_strategy="), "local")
+        self.assertEqual(last_value("--remote_download_outputs="), "all")
+        self.assertIn("--noremote_accept_cached", host_args)
+        self.assertIn("--modify_execution_info=.*=+no-cache", host_args)
+        for mnemonic in ("CppCompile", "Rustc", "IdlcGenerator", "Genrule", "CppLink"):
+            with self.subTest(mnemonic=mnemonic):
+                self.assertEqual(
+                    last_value(f"--strategy={mnemonic}="), "persistent-container,local"
+                )
+        self.assertFalse(any(arg.startswith("--strategy_regexp=") for arg in host_args))
+        self.assertEqual(
+            tuple(host_args[-len(hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX) :]),
+            hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+        )
 
     def test_run_hermetic_container_uses_native_container_for_linux_cross_link(self):
         containers = {"rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}}

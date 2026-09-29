@@ -355,6 +355,14 @@ grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64' "$arm64_cross_pyhost_ar
 grep -qx 'aarch64' "$arm64_cross_wasi_env_marker"
 grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64' "$marker"
 
+# Release-local cross handling depends on the host architecture; pin it with a
+# fake uname so the assertions do not depend on the machine running the test.
+for fake_arch in s390x aarch64; do
+    mkdir -p "$test_root/uname-$fake_arch"
+    printf '#!/bin/sh\necho %s\n' "$fake_arch" >"$test_root/uname-$fake_arch/uname"
+    chmod +x "$test_root/uname-$fake_arch/uname"
+done
+
 local_release_pyhost_args_marker="$test_root/local-release-pyhost-args"
 local_release_wasi_env_marker="$test_root/local-release-wasi-env"
 rm -f "$marker" "$repo_root/bazel-repo"
@@ -372,7 +380,7 @@ env \
     MONGO_LINUX_CROSS_TOOLCHAIN=rhel9_s390x_on_rhel9_x86_64 \
     MONGO_WASI_SDK_EXEC_ARCH=x86_64 \
     MONGO_BAZEL_USE_HERMETIC_CONTAINER=0 \
-    PATH="$test_root/empty-bin:/usr/bin:/bin" \
+    PATH="$test_root/uname-s390x:$test_root/empty-bin:/usr/bin:/bin" \
     "$repo_root/tools/bazel" \
     --config=linux-s390x-rhel9-cross-rbe \
     --config=public-release-local \
@@ -388,6 +396,37 @@ grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=' "$marker"
 grep -q -- '--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=' "$marker"
 if grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=x86_64' "$marker"; then
     echo "local release invocation must not forward a foreign WASI SDK selector" >&2
+    exit 1
+fi
+
+# On an ARM64 s390x compile host there is no native IBM toolchain: release-local
+# keeps the cross selectors so the wrapper hook can build with the cross toolchain.
+exec_host_release_pyhost_args_marker="$test_root/exec-host-release-pyhost-args"
+exec_host_release_wasi_env_marker="$test_root/exec-host-release-wasi-env"
+rm -f "$marker" "$repo_root/bazel-repo"
+env \
+    BAZELISK_SKIP_WRAPPER=1 \
+    BAZEL_REAL="$fake_bin/bazel-real" \
+    FAKE_BAZEL_EXECROOT="$test_root/bazel-output/execroot/_main" \
+    FAKE_BAZEL_MARKER="$marker" \
+    FAKE_BAZEL_SYMLINK="$repo_root/bazel-repo" \
+    FAKE_PYHOST="$pyhost" \
+    FAKE_PYTHON_BINARY="$fake_bin/python3" \
+    FAKE_PYHOST_ARGS_MARKER="$exec_host_release_pyhost_args_marker" \
+    FAKE_WASI_ENV_MARKER="$exec_host_release_wasi_env_marker" \
+    FAKE_PYTHON_VERSION_OK=0 \
+    MONGO_BAZEL_USE_HERMETIC_CONTAINER=0 \
+    PATH="$test_root/uname-aarch64:$test_root/empty-bin:/usr/bin:/bin" \
+    "$repo_root/tools/bazel" \
+    --config=linux-s390x-rhel10-cross-rbe-arm64 \
+    --config=public-release-local \
+    build //:format
+grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64' "$exec_host_release_pyhost_args_marker"
+grep -qx 'aarch64' "$exec_host_release_wasi_env_marker"
+grep -q -- '--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64' "$marker"
+if grep -q -- '--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=$' "$marker" ||
+    grep -q -- '--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN= ' "$marker"; then
+    echo "exec-host release invocation must not clear the cross toolchain selector" >&2
     exit 1
 fi
 

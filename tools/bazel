@@ -212,12 +212,34 @@ linux_cross_rbe_exec_arch_from_args() {
     fi
   done
 
-  if [[ "$local_release" == "0" && -n "$selected" ]]; then
+  if [[ -z "$selected" ]]; then
+    return 1
+  fi
+  # Returning 1 for a release-local build makes the caller clear the cross
+  # repository selectors, which is right on a native IBM host. On a host of the
+  # execution architecture (the ARM64 s390x compile distros) there is no native
+  # IBM toolchain; the wrapper hook builds with the cross toolchain, so report
+  # the exec arch and keep the selectors.
+  if [[ "$local_release" == "0" || "$(linux_host_arch)" == "$selected" ]]; then
     printf '%s\n' "$selected"
     return 0
   fi
 
   return 1
+}
+
+linux_host_arch() {
+  case "$(uname -m)" in
+    arm64|aarch64)
+      echo "aarch64"
+      ;;
+    amd64|x86_64)
+      echo "x86_64"
+      ;;
+    *)
+      uname -m
+      ;;
+  esac
 }
 
 linux_cross_rbe_local_release_requested() {

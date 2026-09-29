@@ -668,6 +668,62 @@ def _linux_cross_rbe_local_host_args(
     )
 
 
+def _linux_cross_release_local_on_exec_host(
+    config: LinuxCrossRBEConfig, machine: str | None = None
+) -> bool:
+    """Return whether a release-local cross build runs on its execution architecture.
+
+    s390x Evergreen variants compile on ARM64 hosts, which have no native IBM
+    toolchain. There, release-local mode keeps the cross toolchain and runs its
+    execution-platform tools locally instead of switching to the native toolchain.
+    """
+    return normalize_arch(machine) == config.exec_arch
+
+
+def _linux_cross_release_local_exec_host_args(
+    args: Sequence[str],
+    env: Mapping[str, str],
+    repo_root: pathlib.Path = REPO_ROOT,
+) -> list[str]:
+    """Force an IBM release cross build on an execution-architecture host fully local.
+
+    The cross platforms, toolchains, and module overlays match the cross-RBE build, but
+    remote execution and the action cache are disabled so release execution logs contain
+    only local spawns.
+    """
+    config = _linux_cross_rbe_config(args, env=env, repo_root=repo_root)
+    if config is None:
+        raise RuntimeError("Linux cross-RBE args require a linux-*-cross-rbe config")
+
+    host_args = _linux_cross_rbe_host_args(args, env, repo_root=repo_root)
+    host_args = _append_bazel_command_options_before_release_suffix(
+        host_args, _linux_cross_module_override_args(args, env, repo_root=repo_root)
+    )
+    return _append_bazel_command_options_before_release_suffix(
+        host_args,
+        [
+            # _linux_cross_rbe_host_args puts these selectors right after the command,
+            # but a release-local argv can already carry cleared selectors (for
+            # example from an older tools/bazel). Repeat them last so they win;
+            # otherwise the cross toolchain repository generates a no-op toolchain.
+            f"--repo_env={LINUX_CROSS_TOOLCHAIN_ENV}={_linux_cross_toolchain_selector(config)}",
+            f"--repo_env={WASI_SDK_EXEC_ARCH_ENV}={config.exec_arch}",
+            *_macos_cross_linux_python_options(config.exec_arch),
+            "--define=MONGO_IBM_CROSS=1",
+            "--remote_executor=",
+            # _linux_cross_rbe_host_args selects remote,local; every action must run on
+            # this host.
+            "--spawn_strategy=local",
+            # The cross configs set toplevel to keep RBE worker outputs lean;
+            # restore the repository default for the all-local release build.
+            "--remote_download_outputs=all",
+            "--remote_upload_local_results=false",
+            "--noremote_accept_cached",
+            "--modify_execution_info=.*=+no-cache",
+        ],
+    )
+
+
 def _linux_cross_rbe_host_args(
     args: Sequence[str],
     env: Mapping[str, str],

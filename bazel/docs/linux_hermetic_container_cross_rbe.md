@@ -162,16 +162,20 @@ actions use the execution-architecture compiler and follow the remote compile ro
 disabled for PPC64LE and s390x until target profiles and an IBM-compatible post-link pipeline are
 available.
 
-Waterfall release/provenance tasks use `public-release-local`: the wrapper resets the foreign
-execution platform/toolchain and cross repository selectors, clears remote execution, and marks all
-actions `no-cache` while retaining the gRPC cache endpoint required by Bazel's remote downloader. It
-uses the host-native `mongo_toolchain_v5` inside the host-native hermetic container. This keeps
-release execution logs free of remote runners and cache hits. Top-level target artifacts are
-downloaded, and `TestRunner` remains standalone on the host, so running target binaries still
-requires a native `s390x` or `ppc64le` host. Standalone cross tests prepend the target toolchain's
-`libstdc++` directories to `LD_LIBRARY_PATH`, so the host's older C++ runtime cannot override the
-one used to link the target binary. The execution architecture suffix describes the RBE workers, not
-the machine running the resulting binaries.
+Waterfall release/provenance tasks use `public-release-local`. On a native IBM host the wrapper
+resets the foreign execution platform/toolchain and cross repository selectors, clears remote
+execution, and marks all actions `no-cache` while retaining the gRPC cache endpoint required by
+Bazel's remote downloader. It uses the host-native `mongo_toolchain_v5` inside the host-native
+hermetic container. When the host architecture matches the config's execution architecture (the
+ARM64 s390x compile distros), there is no native IBM toolchain, so the wrapper keeps the cross
+platforms, toolchains, and module overlays and runs every action, including compiles and
+execution-platform tools, locally in the host-native container, with the same remote-execution and
+cache restrictions. Both modes keep release execution logs free of remote runners and cache hits.
+Top-level target artifacts are downloaded, and `TestRunner` remains standalone on the host, so
+running target binaries still requires a native `s390x` or `ppc64le` host. Standalone cross tests
+prepend the target toolchain's `libstdc++` directories to `LD_LIBRARY_PATH`, so the host's older C++
+runtime cannot override the one used to link the target binary. The execution architecture suffix
+describes the RBE workers, not the machine running the resulting binaries.
 
 PPC target links also pass `-static-libstdc++` through the cross toolchain for executables and
 shared libraries. This prevents a target `_solib` from retaining a `libstdc++.so.6` dependency that
