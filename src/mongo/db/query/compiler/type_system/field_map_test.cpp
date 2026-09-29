@@ -16,8 +16,36 @@ namespace {
 
 using Map = FieldMap<int>;
 using MapOfMap = FieldMap<FieldMap<int>>;
+using StringMap = FieldMap<std::string>;
 
-std::vector<std::string> keys(const Map& map) {
+/// Counts the copies made of the value.
+struct Copied {
+    Copied() = default;
+    explicit Copied(int value) : value(value) {}
+    Copied(const Copied& other) : value(other.value), copies(other.copies + 1) {}
+    Copied(Copied&&) = default;
+    Copied& operator=(const Copied& other) {
+        value = other.value;
+        copies = other.copies + 1;
+        return *this;
+    }
+    Copied& operator=(Copied&&) = default;
+
+    bool operator==(const Copied& other) const {
+        return value == other.value;
+    }
+
+    int value = 0;
+    int copies = 0;
+};
+
+/// Joins the two values, so that a test can see exactly which values were combined.
+std::string concat(const std::string& lhs, const std::string& rhs) {
+    return lhs + "," + rhs;
+}
+
+template <typename T>
+std::vector<std::string> keys(const FieldMap<T>& map) {
     std::vector<std::string> result;
     for (const auto& [key, value] : map) {
         result.push_back(key);
@@ -222,6 +250,233 @@ TEST(FieldMapTest, NestedMapsWork) {
     map.set("x", x);
     ASSERT_EQ(*map.find("x")->find("y"), 1);
 }
+
+TEST(FieldMapTest, OwnedMapIsNotShared) {
+    Map map;
+    map.set("x"sv, 1);
+    ASSERT_FALSE(map.isShared());
+}
+
+TEST(FieldMapTest, CopiedMapIsShared) {
+    Map map;
+    map.set("x"sv, 1);
+    auto copied = map;
+    ASSERT_TRUE(map.isShared());
+}
+
+TEST(FieldMapTest, UpdateTransformsValue) {
+    StringMap map;
+    map.set("x"sv, "number");
+    map.update("x"sv, "implied", [](std::string held) { return concat(held, "narrowed"); });
+    ASSERT_EQ(*map.find("x"sv), "number,narrowed");
+}
+
+TEST(FieldMapTest, UpdateUsesImpliedWhenThereIsNoValue) {
+    StringMap map;
+    map.set("x"sv, "number");
+    map.update("y"sv, "implied", [](std::string held) { return concat(held, "narrowed"); });
+    ASSERT_EQ(*map.find("y"sv), "implied,narrowed");
+}
+
+TEST(FieldMapTest, UpdateRemovesKeyWhenResultIsImplied) {
+    StringMap map;
+    map.set("x"sv, "number");
+    map.set("y"sv, "date");
+    map.update("x"sv, "implied", [](std::string) { return std::string{"implied"}; });
+    ASSERT_FALSE(map.find("x"sv));
+    ASSERT_EQ(*map.find("y"sv), "date");
+}
+
+TEST(FieldMapTest, UpdateDoesNotCloneWhenAbsentKeyStaysImplied) {
+    StringMap map;
+    map.set("x"sv, "number");
+    auto shared = map;
+    map.update("y"sv, "implied", [](std::string held) { return held; });
+    ASSERT_FALSE(map.find("y"sv));
+    ASSERT_TRUE(map.sameStorage(shared));
+}
+
+TEST(FieldMapTest, UpdateOnEmptyMapStaysEmptyWhenResultIsImplied) {
+    StringMap map;
+    map.update("x"sv, "implied", [](std::string held) { return held; });
+    ASSERT_TRUE(map.empty());
+    ASSERT_TRUE(map.sameStorage(StringMap{}));
+}
+
+TEST(FieldMapTest, UpdateOnSharedStorageClonesItAndLeavesOtherOwner) {
+    StringMap map;
+    map.set("x"sv, "number");
+    auto shared = map;
+    map.update("x"sv, "implied", [](std::string held) { return concat(held, "narrowed"); });
+    ASSERT_FALSE(map.sameStorage(shared));
+    ASSERT_EQ(*shared.find("x"sv), "number");
+    ASSERT_EQ(*map.find("x"sv), "number,narrowed");
+}
+
+TEST(FieldMapTest, UpdateOnOwnedStorageDoesNotCopy) {
+    StringMap map;
+    map.set("x"sv, "number");
+    const void* storage = map.getStorage_forTest();
+    map.update("x"sv, "implied", [](std::string held) { return concat(held, "narrowed"); });
+    ASSERT_EQ(map.getStorage_forTest(), storage);
+}
+
+TEST(FieldMapTest, UpdateRemovingLastValueReleasesStorage) {
+    StringMap map;
+    map.set("x"sv, "number");
+    map.update("x"sv, "implied", [](std::string) { return std::string{"implied"}; });
+    ASSERT_TRUE(map.empty());
+    ASSERT_TRUE(map.sameStorage(StringMap{}));
+}
+
+TEST(FieldMapTest, MergeCombinesValuesHeldByBothMaps) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    StringMap rhs;
+    rhs.set("x"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_EQ(*lhs.find("x"sv), "number,string");
+}
+
+TEST(FieldMapTest, MergeUsesImpliedValueOfWhicheverSideLacksKey) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    StringMap rhs;
+    rhs.set("y"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_EQ(*lhs.find("x"sv), "number,rhsImplied");
+    ASSERT_EQ(*lhs.find("y"sv), "lhsImplied,string");
+}
+
+TEST(FieldMapTest, MergeRemovesKeyWhoseResultIsMergedImplied) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    lhs.set("y"sv, "date");
+    StringMap rhs;
+    rhs.set("x"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "number,string", concat);
+    ASSERT_FALSE(lhs.find("x"sv));
+    ASSERT_EQ(*lhs.find("y"sv), "date,rhsImplied");
+}
+
+TEST(FieldMapTest, MergeKeepsKeysInOrder) {
+    StringMap lhs;
+    lhs.set("b"sv, "number");
+    lhs.set("d"sv, "number");
+    StringMap rhs;
+    rhs.set("a"sv, "number");
+    rhs.set("c"sv, "number");
+    rhs.set("e"sv, "number");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_EQ(keys(lhs), (std::vector<std::string>{"a", "b", "c", "d", "e"}));
+}
+
+TEST(FieldMapTest, MergeOnSharedStorageClonesItAndLeavesOtherOwner) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    auto shared = lhs;
+    StringMap rhs;
+    rhs.set("x"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_FALSE(lhs.sameStorage(shared));
+    ASSERT_EQ(*shared.find("x"sv), "number");
+    ASSERT_EQ(*lhs.find("x"sv), "number,string");
+}
+
+TEST(FieldMapTest, MergeOnOwnedStorageDoesNotCopy) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    const void* storage = lhs.getStorage_forTest();
+    StringMap rhs;
+    rhs.set("x"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_EQ(lhs.getStorage_forTest(), storage);
+}
+
+TEST(FieldMapTest, MergeEmptyingMapReleasesStorage) {
+    StringMap lhs;
+    lhs.set("x"sv, "number");
+    StringMap rhs;
+    rhs.set("x"sv, "string");
+    lhs.merge(rhs, "lhsImplied", "rhsImplied", "number,string", concat);
+    ASSERT_TRUE(lhs.empty());
+    ASSERT_TRUE(lhs.sameStorage(StringMap{}));
+}
+
+TEST(FieldMapTest, MergeOfEmptyMapsHoldsNothing) {
+    StringMap lhs;
+    lhs.merge(StringMap{}, "lhsImplied", "rhsImplied", "merged", concat);
+    ASSERT_TRUE(lhs.empty());
+    ASSERT_TRUE(lhs.sameStorage(StringMap{}));
+}
+
+TEST(FieldMapTest, MergeLeavesNoEmptyStorageWhenCombineThrows) {
+    StringMap lhs;
+    lhs.set("x"sv, "");
+    StringMap rhs;
+    rhs.set("y"sv, "");
+    // Combiner which results in the keys being erased (remove is the implied value).
+    auto combine = [](std::string l, const std::string& r) {
+        uassert(ErrorCodes::InternalError, "boom", l != "lhsImplied");
+        return std::string{"remove"};
+    };
+    ASSERT_THROWS_CODE(lhs.merge(rhs, "lhsImplied", "rhsImplied", "remove", combine),
+                       DBException,
+                       ErrorCodes::InternalError);
+    // The throw is at the second key (first one already erased).
+    // So the map should be empty at this point.
+    ASSERT_TRUE(lhs.empty());
+}
+
+TEST(FieldMapTest, MergeWithSelfCombinesEachValueWithItself) {
+    Map value;
+    value.set("y"sv, 1);
+    MapOfMap map;
+    map.set("x"sv, value);
+    map.merge(map, Map{}, Map{}, Map{}, [&value](Map lhs, const Map& rhs) {
+        ASSERT_EQ(lhs, rhs);
+        ASSERT_EQ(lhs, value);
+        ASSERT_EQ(rhs, value);
+        return value;
+    });
+}
+
+TEST(FieldMapTest, UpdateOnOwnedStorageHandsOverHeldValueWithoutCopying) {
+    FieldMap<Copied> map;
+    map.set("x"sv, Copied{1});
+    int copies = -1;
+    map.update("x"sv, Copied{0}, [&](Copied held) {
+        copies = held.copies;
+        return Copied{2};
+    });
+    ASSERT_EQ(copies, 0);
+}
+
+TEST(FieldMapTest, UpdateOnSharedStorageCopiesHeldValueExactlyOnce) {
+    FieldMap<Copied> map;
+    map.set("x"sv, Copied{1});
+    auto shared = map;
+    int copies = -1;
+    map.update("x"sv, Copied{0}, [&](Copied held) {
+        copies = held.copies;
+        return Copied{2};
+    });
+    ASSERT_EQ(copies, 1);
+}
+
+TEST(FieldMapTest, MergeHandsOverHeldValueWithoutCopying) {
+    FieldMap<Copied> lhs;
+    lhs.set("x"sv, Copied{1});
+    FieldMap<Copied> rhs;
+    rhs.set("x"sv, Copied{2});
+    int copies = -1;
+    lhs.merge(rhs, Copied{0}, Copied{0}, Copied{-1}, [&](Copied l, Copied r) {
+        copies = l.copies;
+        return Copied{3};
+    });
+    ASSERT_EQ(copies, 0);
+}
+
 
 }  // namespace
 
