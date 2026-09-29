@@ -22,6 +22,17 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "field_map_test",
+    srcs = [
+        "field_map_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":type_system",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "type_test",
     srcs = [
         "type_test.cpp",
