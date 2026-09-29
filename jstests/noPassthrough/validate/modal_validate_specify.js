@@ -23,7 +23,7 @@ function setupCollections(db) {
 // The "validating collection" log line reports the options validation actually resolved to, which
 // may differ from those the caller specified.
 function parseValidationOptionsFromLogs() {
-    return rawMongoProgramOutput("(20303)")
+    return rawMongoProgramOutput('"id":20303')
         .split("\n")
         .filter((line) => line.trim() !== "")
         .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
