@@ -43,6 +43,11 @@
 
 namespace mongo {
 
+namespace {
+auto& numCommandsTargetingSystemBuckets =
+    *MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
+}  // namespace
+
 // This is a list of commands that do not support rawData, hence it is allowed to target
 // system.buckets.
 // getMore command can be called on system.buckets even if the user didn't target
@@ -57,10 +62,6 @@ static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"_sd,
                                                               "configureCollectionBalancing"_sd,
                                                               "balancerCollectionStatus"_sd,
                                                               "getMore"_sd};
-
-SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
-    _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
-}
 
 // TODO SERVER-121176: Remove system.buckets metrics once 9.0 becomes last LTS
 void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
@@ -108,7 +109,7 @@ void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
                     "connId"_attr = opCtx->getClient()->getConnectionId(),
                     "appName"_attr = appName,
                     "driverName"_attr = driverName);
-        _commandsExecuted->increment();
+        numCommandsTargetingSystemBuckets.increment();
     }
 
     if (isRouter) {
