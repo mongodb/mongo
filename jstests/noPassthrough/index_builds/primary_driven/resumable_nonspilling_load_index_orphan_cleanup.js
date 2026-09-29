@@ -101,7 +101,7 @@ try {
 } catch (e) {
     jsTest.log.info("index build shell exited (expected after the failover)", {error: e});
 }
-if (!TestData.doesNotSupportGracefulUnplannedStepdown) {
+if (!PrimaryDrivenResumableIndexBuildTest.failoverStopsOldPrimary()) {
     // When graceful unplanned stepdown isn't supported the failover kills and restarts the old
     // primary, so the fail point is already gone (and this connection's server was replaced).
     loadFp.off();
