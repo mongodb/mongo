@@ -14,9 +14,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replicated_fast_count/repair_replicated_metadata_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -27,8 +29,11 @@
 namespace mongo {
 namespace {
 
-void _writeNoopOplogEntry(OperationContext* opCtx, const UUID& uuid, const BSONObj& metadata) {
-    if (metadata.isEmpty()) {
+void _writeNoopOplogEntry(OperationContext* opCtx,
+                          const CollectionAcquisition& collection,
+                          const RepairReplicatedMetadataSpec& metadata) {
+    const BSONObj metadataObj = metadata.toBSON();
+    if (metadataObj.isEmpty()) {
         return;
     }
 
@@ -40,13 +45,21 @@ void _writeNoopOplogEntry(OperationContext* opCtx, const UUID& uuid, const BSONO
         opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
             opCtx,
             NamespaceString::kEmpty,
-            uuid,
+            collection.uuid(),
             BSON("msg" << "Repairing collection's replicated metadata with diffs"),
-            BSON("type" << "repairReplicatedMetadata" << "uuid" << uuid << "m" << metadata),
+            BSON("type" << "repairReplicatedMetadata" << "uuid" << collection.uuid() << "m"
+                        << metadataObj),
             boost::none,
             boost::none,
             boost::none,
             boost::none);
+        UncommittedFastCountChanges::getForWrite(opCtx).record(
+            collection.nss(),
+            collection.uuid(),
+            UncommittedFastCountChange{.delta = {.size = metadata.getSz().value_or(0),
+                                                 .count = metadata.getCt().value_or(0)},
+                                       .recordStore =
+                                           collection.getCollectionPtr()->getRecordStore()});
         wuow.commit();
     });
 }
@@ -101,7 +114,7 @@ public:
                                           opCtx, *nss, AcquisitionPrerequisites::kWrite),
                                       MODE_IX);
                 if (collection.exists() && collection.uuid() == uuid) {
-                    _writeNoopOplogEntry(opCtx, uuid, request().getMetadata().toBSON());
+                    _writeNoopOplogEntry(opCtx, collection, request().getMetadata());
                     return;
                 }
             }

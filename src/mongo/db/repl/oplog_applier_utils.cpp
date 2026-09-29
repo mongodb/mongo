@@ -23,6 +23,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
+#include "mongo/db/replicated_fast_count/repair_replicated_metadata_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -630,6 +632,52 @@ NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
     return nss;
 }
 
+namespace {
+
+// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
+bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
+    const auto typeElem = o2.getField("type");
+    return typeElem.type() == BSONType::string &&
+        typeElem.valueStringData() == "repairReplicatedMetadata";
+}
+
+void applyRepairReplicatedMetadataNoop(OperationContext* opCtx, const BSONObj& o2) {
+    // Replication does not otherwise validate a no-op's o2, so a malformed repair entry is
+    // ignored rather than surfaced as an error, mirroring the fast-count oplog scan.
+    boost::optional<RepairReplicatedMetadataO2> parsed;
+    try {
+        parsed = RepairReplicatedMetadataO2::parse(o2);
+    } catch (const DBException&) {
+        return;
+    }
+
+    boost::optional<NamespaceString> nss;
+    {
+        Lock::GlobalLock globalLock(opCtx, MODE_IS);
+        nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, parsed->getUuid());
+    }
+    if (!nss) {
+        return;
+    }
+
+    auto collection = acquireCollection(opCtx,
+                                        {*nss,
+                                         parsed->getUuid(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+                                        MODE_IX);
+    if (!collection.exists() || collection.uuid() != parsed->getUuid()) {
+        return;
+    }
+
+    const auto& metadata = parsed->getM();
+    collection.getCollectionPtr()->getRecordStore()->adjustAccurateSizeCount(
+        metadata.getSz().value_or(0), metadata.getCt().value_or(0));
+}
+
+}  // namespace
+
 Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OperationContext* opCtx,
     const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
@@ -665,6 +713,10 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     }
 
     if (opType == OpTypeEnum::kNoop) {
+        const auto& o2 = op->getObject2();
+        if (o2 && isRepairReplicatedMetadataO2(*o2)) {
+            applyRepairReplicatedMetadataNoop(opCtx, *o2);
+        }
         incrementOpsAppliedStats(1);
         return Status::OK();
     } else if (opType == OpTypeEnum::kKeyMaterial || opType == OpTypeEnum::kCMKRotation) {

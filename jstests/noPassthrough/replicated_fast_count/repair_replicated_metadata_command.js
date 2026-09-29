@@ -8,6 +8,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -117,6 +118,26 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     );
 
     rst.awaitReplication();
+
+    // The repair updates the in-memory size/count on the primary and, once replicated, on the
+    // secondary.
+    const secondary = rst.getSecondary();
+    const usesReplicatedFastCount =
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            primary.getDB("admin"),
+            "shouldUseReplicatedFastCount",
+            true,
+            [primary, secondary],
+        ) || FeatureFlagUtil.isEnabled(db, "ReplicatedFastCount");
+    if (usesReplicatedFastCount) {
+        assert.eq(db.t.stats().count, 5);
+        assert.eq(db.t.stats().size, 100);
+
+        secondary.getDB(jsTestName()).getMongo().setSecondaryOk();
+        const secondaryDb = secondary.getDB(jsTestName());
+        assert.eq(secondaryDb.t.stats().count, 5);
+        assert.eq(secondaryDb.t.stats().size, 100);
+    }
 
     rst.stopSet();
 }

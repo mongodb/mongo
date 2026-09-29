@@ -75,12 +75,25 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "repair_replicated_metadata_command",
+    name = "repair_replicated_metadata_idl",
     srcs = [
-        "repair_replicated_metadata_command.cpp",
         ":repair_replicated_metadata_gen",
     ],
     deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "repair_replicated_metadata_command",
+    srcs = [
+        "repair_replicated_metadata_command.cpp",
+    ],
+    deps = [
+        "repair_replicated_metadata_idl",
+        "replicated_fast_count_uncommitted_changes",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
