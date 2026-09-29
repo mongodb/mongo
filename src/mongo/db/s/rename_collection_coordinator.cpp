@@ -59,6 +59,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -286,6 +287,71 @@ void checkCatalogConsistencyAcrossShards(OperationContext* opCtx,
 
     if (!dropTarget) {
         checkTargetCollectionDoesNotExistInCluster(opCtx, toNss, participants, executor);
+    }
+}
+
+/**
+ * Best-effort check that no index builds are in progress on the given namespaces across all
+ * participant shards. This mirrors the replica-set behavior where renameCollection fails
+ * immediately with BackgroundOperationInProgressForNamespace if an index build is ongoing.
+ * The check is best-effort because an index build could start after this check.
+ */
+void checkForInProgressIndexBuildsAcrossShards(
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& nsses,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
+    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+    for (const auto& nss : nsses) {
+        ListIndexes listIndexesCmd(nss);
+        listIndexesCmd.setIncludeIndexBuildInfo(true);
+        listIndexesCmd.setDbName(nss.dbName());
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListIndexes>>(
+            **executor, token, listIndexesCmd);
+        auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
+            opCtx, opts, shardIds, /*throwOnError=*/false);
+
+        for (const auto& cmdResponse : responses) {
+            // Best-effort: skip shards where the collection doesn't exist or is a view (the
+            // collection is unsharded and only lives on the primary shard; views don't have
+            // indexes). Re-throw unexpected errors.
+            const auto status = AsyncRequestsSender::Response::getEffectiveStatus(cmdResponse);
+            if (!status.isOK()) {
+                if (status.code() == ErrorCodes::NamespaceNotFound ||
+                    status.code() == ErrorCodes::CommandNotSupportedOnView) {
+                    continue;
+                }
+                uassertStatusOK(status);
+            }
+
+            const auto& replyData = cmdResponse.swResponse.getValue().data;
+
+            // The listIndexes reply contains a cursor subdocument with firstBatch and id.
+            // The storage engine allows at most 64 indexes per collection, the total should be
+            // well under the 16MB batch limit. In the off-chance it is not, log a warning and
+            // proceed with firstBatch only, given that the check is best-effort.
+            const auto cursorObj = replyData["cursor"];
+            const auto cursorId = cursorObj["id"].numberLong();
+            if (cursorId != 0) {
+                LOGV2_WARNING(11762400,
+                              "listIndexes reply has unexhausted cursor; "
+                              "index build check may be incomplete",
+                              "nss"_attr = nss,
+                              "shard"_attr = cmdResponse.shardId,
+                              "cursorId"_attr = cursorId);
+            }
+
+            for (const auto& indexEntry : cursorObj["firstBatch"].Array()) {
+                if (indexEntry["indexBuildInfo"].type() != mongo::EOO) {
+                    uasserted(ErrorCodes::BackgroundOperationInProgressForNamespace,
+                              str::stream()
+                                  << "cannot perform rename: an index build is currently "
+                                  << "running for collection " << nss.toStringForErrorMsg()
+                                  << " on shard " << cmdResponse.shardId.toString());
+                }
+            }
+        }
     }
 }
 
@@ -830,7 +896,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -959,6 +1025,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     checkCatalogConsistencyAcrossShards(
                         opCtx, fromNss, optSourceCollType, toNss, _doc.getDropTarget(), executor);
+
+                    // Best-effort check for in-progress index builds on the source and target
+                    // (when dropTarget is true) across all shards, mirroring replica-set behavior.
+                    // This prevents acquiring the critical section and then retrying indefinitely
+                    // while CRUD is blocked (SERVER-117624).
+                    auto nssesToCheck = std::vector<NamespaceString>{fromNss};
+                    if (_doc.getDropTarget()) {
+                        nssesToCheck.push_back(toNss);
+                    }
+
+                    checkForInProgressIndexBuildsAcrossShards(opCtx, nssesToCheck, executor, token);
 
                     // Check that the target collection is not sharded, if requested.
                     if (_doc.getRenameCollectionRequest().getTargetMustNotBeSharded().get_value_or(
