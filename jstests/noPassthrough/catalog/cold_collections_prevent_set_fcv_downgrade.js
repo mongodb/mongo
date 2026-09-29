@@ -11,6 +11,8 @@
  * TODO (SERVER-122670) Remove this test once the feature flag is removed.
  * @tags: [
  *     featureFlagCreateSupportsStorageTierOptions,
+ *     featureFlagColdCollectionsRollout,
+ *     requires_fcv_91,
  *   ]
  */
 

@@ -403,6 +403,10 @@ CollectionOptions CollectionOptions::fromCreateCommand(OperationContext* opCtx,
                 "featureFlagCreateSupportsStorageTierOptions enabled",
                 gFeatureFlagCreateSupportsStorageTierOptions.isEnabled(
                     VersionContext::getDecoration(opCtx)));
+        uassert(ErrorCodes::InvalidOptions,
+                "Cold collections are not available in this deployment.",
+                storageTier->getCollection() != StorageTierLevelEnum::cold ||
+                    gFeatureFlagColdCollectionsRollout.isEnabled());
 
         // Only set `storage_tier` upon creation when the collection is cold (hot is the default)
         if (storageTier->getCollection() == StorageTierLevelEnum::cold) {
