@@ -36,6 +36,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -226,9 +227,14 @@ public:
 
         appendPrimaryOnlyServiceInfo(opCtx->getServiceContext(), &result);
 
-        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
-        if (ReplicationProcess::kUninitializedRollbackId != rbid) {
-            result.append("rbid", rbid);
+        // Only look up the rollback ID if we actually have one.
+        // DSC never sets it up, so this check is expected to be false for DSC.
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        if (provider.supportsLegacyReplSetCommands()) {
+            auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
+            if (ReplicationProcess::kUninitializedRollbackId != rbid) {
+                result.append("rbid", rbid);
+            }
         }
         {
             auto state = UserWriteBlockState::kUnknown;

@@ -1209,6 +1209,7 @@ mongo_cc_library(
         "//src/mongo/db/repl/hello:hello_auth",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/repl/split_horizon",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",
     ],
