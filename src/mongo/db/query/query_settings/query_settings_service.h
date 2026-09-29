@@ -91,8 +91,8 @@ public:
      * namespace 'nss'. Query settings are not eligible for IDHACK/Express queries, encrypted
      * queries and queries run on internal or system collections.
      */
-    static bool isEligbleForQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          const NamespaceString& nss);
+    static bool isEligibleForQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const NamespaceString& nss);
 
     /**
      * Applies 'settings.maxTimeMS' (if set) to the current operation's deadline. A no-op during
@@ -153,7 +153,7 @@ public:
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
         // Ineligible queries (IDHACK/Express, FLE, internal/system namespaces) never receive query
         // settings, whether from persisted settings or supplied directly by the user.
-        if (!isEligbleForQuerySettings(expCtx, nss)) {
+        if (!isEligibleForQuerySettings(expCtx, nss)) {
             return QuerySettings();
         }
 

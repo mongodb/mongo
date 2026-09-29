@@ -832,7 +832,7 @@ void QuerySettingsService::applyMaxTimeMSFromSettings(
         duration_cast<Microseconds>(Milliseconds(*maxTimeMS)), ErrorCodes::MaxTimeMSExpired);
 }
 
-bool QuerySettingsService::isEligbleForQuerySettings(
+bool QuerySettingsService::isEligibleForQuerySettings(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) {
     // Query settings can not be set for IDHACK queries.
     if (expCtx->isIdHackQuery()) {
