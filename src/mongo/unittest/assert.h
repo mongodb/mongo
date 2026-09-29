@@ -49,12 +49,16 @@
  */
 #define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
+#define EXPECT_OK(EXPRESSION) EXPECT_EQ(::mongo::Status::OK(), (EXPRESSION))
+
 /**
  * Asserts that a status code is anything but OK.
  * TODO(gtest) Try expressing as `ASSERT_THAT(EXRESSION, Not(IsOk()))` which should accept Status
  * and StatusWith (and maybe ErrorCode).
  */
 #define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
+
+#define EXPECT_NOT_OK(EXPRESSION) EXPECT_NE(::mongo::Status::OK(), (EXPRESSION))
 
 /*
  * Binary comparison assertions.
@@ -200,12 +204,21 @@
 #define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS) \
     ASSERT_THAT(BIG_STRING, ::testing::HasSubstr(CONTAINS))
 
+#define EXPECT_STRING_CONTAINS(BIG_STRING, CONTAINS) \
+    EXPECT_THAT(BIG_STRING, ::testing::HasSubstr(CONTAINS))
+
 #define ASSERT_STRING_OMITS(BIG_STRING, CONTAINS) \
     ASSERT_THAT(BIG_STRING, ::testing::Not(::testing::HasSubstr(CONTAINS)))
+
+#define EXPECT_STRING_OMITS(BIG_STRING, CONTAINS) \
+    EXPECT_THAT(BIG_STRING, ::testing::Not(::testing::HasSubstr(CONTAINS)))
 
 /** TODO(gtest) Consider using a PCRE2 matcher to better match existing behavior. */
 #define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX) \
     ASSERT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
+
+#define EXPECT_STRING_SEARCH_REGEX(BIG_STRING, REGEX) \
+    EXPECT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
 
 namespace mongo::unittest {
 namespace assert_details {
