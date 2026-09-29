@@ -90,6 +90,12 @@ public:
     /// Returns true if 'type' is contained in the set.
     bool hasType(BSONType type) const;
 
+    /// Returns true if 'type' is the only type contained in the set, whatever its extent.
+    bool hasOnlyType(BSONType type) const;
+
+    /// Returns true if the set covers no values at all.
+    bool isNever() const;
+
     /// Returns the extent of 'type'. A type absent from the set is covered in full.
     Extent getExtent(BSONType type) const;
 
@@ -181,6 +187,12 @@ public:
 
     /// Returns true if 'type' is one of the types covered.
     bool hasType(BSONType type) const;
+
+    /// Returns true if 'type' is the only type contained in the set, whatever its extent.
+    bool hasOnlyType(BSONType type) const;
+
+    /// Returns true if no value at all is covered.
+    bool isNever() const;
 
     /// Returns the extent of 'type'. A type which is not covered is covered in full.
     Extent getExtent(BSONType type) const;

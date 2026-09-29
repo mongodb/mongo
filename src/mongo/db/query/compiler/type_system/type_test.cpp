@@ -102,6 +102,26 @@ TEST(TypeSetTest, NeverCoversNoType) {
     assertCoversNoType(TypeSet::never());
 }
 
+TEST(TypeSetTest, HasOnlyTypeIgnoresExtent) {
+    ASSERT_TRUE(TypeSet(BSONType::object, Extent::kAll).hasOnlyType(BSONType::object));
+    ASSERT_TRUE(TypeSet(BSONType::object, Extent::kSubset).hasOnlyType(BSONType::object));
+}
+
+TEST(TypeSetTest, HasOnlyTypeRejectsSetsCoveringOtherTypes) {
+    ASSERT_FALSE(TypeSet::any().hasOnlyType(BSONType::object));
+    ASSERT_FALSE(TypeSet::never().hasOnlyType(BSONType::object));
+    ASSERT_FALSE(TypeSet(BSONType::string, Extent::kAll).hasOnlyType(BSONType::object));
+    ASSERT_FALSE(
+        unionType(TypeSet(BSONType::object, Extent::kAll), TypeSet(BSONType::array, Extent::kAll))
+            .hasOnlyType(BSONType::object));
+}
+
+TEST(TypeSetTest, IsNeverHoldsOnlyForEmptySet) {
+    ASSERT_TRUE(TypeSet::never().isNever());
+    ASSERT_FALSE(TypeSet::any().isNever());
+    ASSERT_FALSE(TypeSet(BSONType::object, Extent::kAll).isNever());
+}
+
 TEST(TypeSetTest, SetsCoveringTheSameValuesCompareEqual) {
     ASSERT_EQ(TypeSet(BSONType::string, Extent::kAll), TypeSet(BSONType::string, Extent::kAll));
 }

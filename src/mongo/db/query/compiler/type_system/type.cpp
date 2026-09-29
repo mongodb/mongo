@@ -327,6 +327,14 @@ bool TypeSet::hasType(BSONType type) const {
     return (_types & typeMask(type));
 }
 
+bool TypeSet::hasOnlyType(BSONType type) const {
+    return _types == typeMask(type);
+}
+
+bool TypeSet::isNever() const {
+    return _types == 0;
+}
+
 Extent TypeSet::getExtent(BSONType type) const {
     return (_subsetTypes & typeMask(type)) ? Extent::kSubset : Extent::kAll;
 }
@@ -444,6 +452,14 @@ const detail::Shape& Type::getShape_forTest() const {
 
 bool Type::hasType(BSONType type) const {
     return _typeSet.hasType(type);
+}
+
+bool Type::hasOnlyType(BSONType type) const {
+    return _typeSet.hasOnlyType(type);
+}
+
+bool Type::isNever() const {
+    return _typeSet.isNever();
 }
 
 Extent Type::getExtent(BSONType type) const {
