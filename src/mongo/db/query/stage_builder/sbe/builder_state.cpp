@@ -8,44 +8,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
 
 namespace mongo::stage_builder {
-
-StageBuilderState::StageBuilderState(OperationContext* opCtx,
-                                     Environment& env,
-                                     PlanStageStaticData* data,
-                                     const Variables& variables,
-                                     PlanYieldPolicySBE* yieldPolicy,
-                                     sbe::value::SlotIdGenerator* slotIdGenerator,
-                                     sbe::value::FrameIdGenerator* frameIdGenerator,
-                                     sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                                     InListsMap* inListsMap,
-                                     CollatorsMap* collatorsMap,
-                                     SortSpecMap* sortSpecMap,
-                                     boost::intrusive_ptr<ExpressionContext> expCtx,
-                                     bool needsMerge,
-                                     bool allowDiskUse,
-                                     IncrementalFeatureRolloutContext& ifrContext)
-    : slotIdGenerator{slotIdGenerator},
-      frameIdGenerator{frameIdGenerator},
-      spoolIdGenerator{spoolIdGenerator},
-      inListsMap{inListsMap},
-      collatorsMap{collatorsMap},
-      sortSpecMap{sortSpecMap},
-      opCtx{opCtx},
-      env{env},
-      data{data},
-      variables{variables},
-      yieldPolicy{yieldPolicy},
-      expCtx{expCtx},
-      needsMerge{needsMerge},
-      allowDiskUse{allowDiskUse},
-      legacyDottedPathNullSemantics{internalQueryLegacyDottedPathNullSemantics.loadRelaxed()},
-      ifrContext(ifrContext),
-      _blueprint(std::make_unique<SbBlueprint>()) {}
-
-StageBuilderState::~StageBuilderState() = default;
 using namespace std::literals::string_view_literals;
 sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variableId) {
     if (auto it = data->variableIdToSlotMap.find(variableId);

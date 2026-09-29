@@ -18,14 +18,13 @@ namespace mongo::stage_builder {
 
 /**
  * Lowers the blueprint subtree rooted at 'root' to a concrete sbe::PlanStage tree. Each node of
- * the subtree is moved out of 'blueprint' and replaced by SbBlueprintLowered. Every node of
- * 'blueprint' that is not already lowered must be reachable from 'root' and is reached exactly
- * once.
+ * the subtree is moved out of 'nodes' and replaced by SbBlueprintLowered. Every node in 'nodes'
+ * must be reachable from 'root' and must be reached exactly once.
  *
  * 'varTypes' is passed to SbExpr::lower() for the expressions within the subtree, enabling
  * type-based optimizations (e.g. traverseF elimination).
  */
-SbStage lowerSbeBlueprint(SbBlueprint& blueprint,
+SbStage lowerSbeBlueprint(SbBlueprintNodeVector& nodes,
                           SbBlueprintNodeIdx root,
                           StageBuilderState& state,
                           const VariableTypes* varTypes = nullptr);

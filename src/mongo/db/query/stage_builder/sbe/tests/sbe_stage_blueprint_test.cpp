@@ -12,7 +12,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <string>
-#include <variant>
 
 namespace mongo::stage_builder {
 namespace {
@@ -25,24 +24,27 @@ protected:
     }
 };
 
-TEST(SbBlueprintTest, AddReturnsIndexOfNewNode) {
-    SbBlueprint blueprint;
-    ASSERT_EQ(blueprint.add(SbBlueprintCoScan{}).value, 0u);
-    ASSERT_EQ(blueprint.add(SbBlueprintCoScan{}).value, 1u);
-    ASSERT_EQ(blueprint.size(), 2u);
-    ASSERT_TRUE(std::holds_alternative<SbBlueprintCoScan>(blueprint[SbBlueprintNodeIdx{1}]));
+TEST(SbBlueprintNodeVectorTest, AddReturnsIndexOfNewNode) {
+    SbBlueprintNodeVector nodes;
+    ASSERT_EQ(addBlueprintNode(nodes, SbBlueprintCoScan{}).value, 0u);
+    ASSERT_EQ(addBlueprintNode(nodes, SbBlueprintCoScan{}).value, 1u);
+    ASSERT_EQ(nodes.size(), 2u);
 }
 
 TEST_F(SbBlueprintLoweringTest, LowerTreeWithIndexChildren) {
-    SbBlueprint blueprint;
-    auto left = blueprint.add(SbBlueprintCoScan{.nodeId = 1});
-    auto unwind = blueprint.add(
+    SbBlueprintNodeVector nodes;
+    auto left = addBlueprintNode(nodes, SbBlueprintCoScan{.nodeId = 1});
+    auto unwind = addBlueprintNode(
+        nodes,
         SbBlueprintUnwind{.child = left, .nodeId = 2, .inSlot = 10, .outSlot = 11, .idxSlot = 12});
-    auto right = blueprint.add(SbBlueprintPassthrough{sbe::makeS<sbe::CoScanStage>(3)});
-    auto root = blueprint.add(SbBlueprintUnion{
-        .nodeId = 4, .children = {unwind, right}, .inputSlots = {{11}, {10}}, .outputSlots = {20}});
+    auto right = addBlueprintNode(nodes, SbBlueprintPassthrough{sbe::makeS<sbe::CoScanStage>(3)});
+    auto root = addBlueprintNode(nodes,
+                                 SbBlueprintUnion{.nodeId = 4,
+                                                  .children = {unwind, right},
+                                                  .inputSlots = {{11}, {10}},
+                                                  .outputSlots = {20}});
 
-    auto stage = lowerSbeBlueprint(blueprint, root, *_state);
+    auto stage = lowerSbeBlueprint(nodes, root, *_state);
     ASSERT_EQ(print(stage),
               "[4] union [s20] \n"
               "    branch0 [s11] \n"
@@ -71,24 +73,25 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderLowersEachStageImmediately) {
 class SbBlueprintLoweringDeathTest : public SbBlueprintLoweringTest {};
 
 DEATH_TEST_F(SbBlueprintLoweringDeathTest, LowerOutOfRangeIndexFails, "12702000") {
-    SbBlueprint blueprint;
-    blueprint.add(SbBlueprintCoScan{});
-    lowerSbeBlueprint(blueprint, SbBlueprintNodeIdx{1}, *_state);
+    SbBlueprintNodeVector nodes;
+    addBlueprintNode(nodes, SbBlueprintCoScan{});
+    lowerSbeBlueprint(nodes, SbBlueprintNodeIdx{1}, *_state);
 }
 
 DEATH_TEST_F(SbBlueprintLoweringDeathTest, LowerSharedChildFails, "12702001") {
-    SbBlueprint blueprint;
-    auto child = blueprint.add(SbBlueprintCoScan{});
-    auto root = blueprint.add(
+    SbBlueprintNodeVector nodes;
+    auto child = addBlueprintNode(nodes, SbBlueprintCoScan{});
+    auto root = addBlueprintNode(
+        nodes,
         SbBlueprintUnion{.children = {child, child}, .inputSlots = {{}, {}}, .outputSlots = {}});
-    lowerSbeBlueprint(blueprint, root, *_state);
+    lowerSbeBlueprint(nodes, root, *_state);
 }
 
 DEATH_TEST_F(SbBlueprintLoweringDeathTest, LowerWithUnreachableNodeFails, "12702002") {
-    SbBlueprint blueprint;
-    blueprint.add(SbBlueprintCoScan{});
-    auto root = blueprint.add(SbBlueprintCoScan{});
-    lowerSbeBlueprint(blueprint, root, *_state);
+    SbBlueprintNodeVector nodes;
+    addBlueprintNode(nodes, SbBlueprintCoScan{});
+    auto root = addBlueprintNode(nodes, SbBlueprintCoScan{});
+    lowerSbeBlueprint(nodes, root, *_state);
 }
 
 }  // namespace

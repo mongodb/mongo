@@ -46,16 +46,20 @@ namespace {
  * calling makeS<T>() for each node. Each node is moved out of the vector as it is lowered.
  */
 struct Lowerer {
-    SbBlueprint& _blueprint;
+    SbBlueprintNodeVector& _nodes;
     StageBuilderState& _state;
     const VariableTypes* _varTypes = nullptr;
 
     // ----------------------------------------------------------------
     // Recursive entry point: lower the subtree rooted at 'idx'. The node is replaced by
-    // SbBlueprintLowered in the blueprint.
+    // SbBlueprintLowered in '_nodes'.
     // ----------------------------------------------------------------
     std::unique_ptr<sbe::PlanStage> lower(SbBlueprintNodeIdx idx) {
-        auto node = _blueprint.takeForLowering(idx);
+        tassert(12702000, "Invalid blueprint node index", idx.value < _nodes.size());
+        auto node = std::exchange(_nodes[idx.value], SbBlueprintLowered{});
+        tassert(12702001,
+                "Blueprint node has already been lowered",
+                !std::holds_alternative<SbBlueprintLowered>(node));
         return std::visit(
             [&](auto&& n) -> std::unique_ptr<sbe::PlanStage> { return (*this)(std::move(n)); },
             std::move(node));
@@ -542,13 +546,17 @@ struct Lowerer {
 
 }  // namespace
 
-SbStage lowerSbeBlueprint(SbBlueprint& blueprint,
+SbStage lowerSbeBlueprint(SbBlueprintNodeVector& nodes,
                           SbBlueprintNodeIdx root,
                           StageBuilderState& state,
                           const VariableTypes* varTypes) {
-    Lowerer lowerer{blueprint, state, varTypes};
+    Lowerer lowerer{nodes, state, varTypes};
     auto stage = lowerer.lower(root);
-    blueprint.assertAddedNodesLowered();
+    tassert(12702002,
+            "Expected every blueprint node to be part of the lowered tree",
+            std::all_of(nodes.begin(), nodes.end(), [](const SbBlueprintNode& node) {
+                return std::holds_alternative<SbBlueprintLowered>(node);
+            }));
     return stage;
 }
 

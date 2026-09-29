@@ -8,8 +8,6 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/modules.h"
 
-#include <memory>
-
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <boost/optional/optional.hpp>
@@ -25,8 +23,6 @@ class InList;
 }
 
 namespace stage_builder {
-
-class SbBlueprint;
 using namespace std::literals::string_view_literals;
 struct Environment;
 struct PlanStageStaticData;
@@ -56,20 +52,25 @@ struct StageBuilderState {
                       boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
                       bool allowDiskUse,
-                      IncrementalFeatureRolloutContext& ifrContext);
-    // The constructor and destructor are defined out of line so that this header does not need
-    // the full SbBlueprint definition.
-    ~StageBuilderState();
+                      IncrementalFeatureRolloutContext& ifrContext)
+        : slotIdGenerator{slotIdGenerator},
+          frameIdGenerator{frameIdGenerator},
+          spoolIdGenerator{spoolIdGenerator},
+          inListsMap{inListsMap},
+          collatorsMap{collatorsMap},
+          sortSpecMap{sortSpecMap},
+          opCtx{opCtx},
+          env{env},
+          data{data},
+          variables{variables},
+          yieldPolicy{yieldPolicy},
+          expCtx{expCtx},
+          needsMerge{needsMerge},
+          allowDiskUse{allowDiskUse},
+          legacyDottedPathNullSemantics{internalQueryLegacyDottedPathNullSemantics.loadRelaxed()},
+          ifrContext(ifrContext) {}
 
     StageBuilderState(const StageBuilderState& other) = delete;
-
-    /**
-     * Returns the blueprint tree of the plan under construction. SbBuilder appends the blueprint
-     * of every stage it creates to it.
-     */
-    SbBlueprint& blueprint() {
-        return *_blueprint;
-    }
 
     sbe::value::SlotId getGlobalVariableSlot(Variables::Id variableId);
 
@@ -156,9 +157,6 @@ struct StageBuilderState {
     IncrementalFeatureRolloutContext& ifrContext;
 
     SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
-
-private:
-    std::unique_ptr<SbBlueprint> _blueprint;
 };  // struct StageBuilderState
 }  // namespace stage_builder
 }  // namespace mongo
