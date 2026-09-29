@@ -423,6 +423,13 @@ feature_flags:
         default: true
         incremental_rollout_phase: release
 
+    featureFlagQueryTypeInference:
+        description: "Feature flag to enable query type inference"
+        cpp_varname: gFeatureFlagQueryTypeInference
+        fcv_gated: false
+        default: false
+        incremental_rollout_phase: in_development
+
     featureFlagSbeTransformStages:
         description: "Feature flag to enable transform stages in SBE, including $addFields, $replaceRoot, $replaceWith, $project."
         cpp_varname: gFeatureFlagSbeTransformStages
