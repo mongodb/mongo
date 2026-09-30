@@ -32,6 +32,9 @@ mongo_cc_library(
         "supplemental_metrics_stats.cpp",
         "vector_search_stats_entry.cpp",
     ],
+    hdrs = [
+        "query_stats_top_k_metrics.h",
+    ],
     deps = [
         ":key",
         ":rate_limiting",

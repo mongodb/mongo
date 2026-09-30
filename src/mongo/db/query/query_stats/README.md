@@ -521,7 +521,9 @@ following way:
 - `asOf`: UTC time when $queryStats read this entry from the store. This will not return the same
   UTC time for each result. The data structure used for the store is partitioned, and each partition
   will be read at a snapshot individually. You may see up to the number of partitions in unique
-  timestamps returned by one $queryStats cursor.
+  timestamps returned by one $queryStats cursor. One exception: when the top-K sort optimization
+  applies, entries are copied out of the store during a single scan and all results report the
+  timestamp captured at the start of that scan.
 - `metrics`: the metrics collected; these may be flawed due to:
   - Server restarts, which will reset metrics.
   - LRU eviction, which will reset metrics.
@@ -682,6 +684,7 @@ queryStats: {
     numQueryStatsStoreWriteErrors: NumberLong(0),
     numRateLimitedRequests: NumberLong(0),
     queryStatsStoreSizeEstimateBytes: NumberLong(0)
+    numTopKOptimizations: NumberLong(0)
 }
 ```
 

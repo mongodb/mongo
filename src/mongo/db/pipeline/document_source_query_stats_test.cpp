@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -19,10 +20,16 @@
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/find_key.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <algorithm>
+#include <string_view>
+#include <vector>
 
 #include <absl/hash/hash.h>
 #include <boost/none.hpp>
@@ -115,6 +122,35 @@ public:
         ASSERT_TRUE(doc["asOf"].coercibleToDate());
 
         return std::string(filterObj.fieldName());
+    }
+
+    void populateStoreWithExecCounts(QueryStatsStore& queryStatsStore, int numEntries) {
+        for (int i = 0; i < numEntries; ++i) {
+            BSONObjBuilder filter;
+            filter.append("field" + std::to_string(i), i);
+            queryStatsStore.put(i, QueryStatsEntry{makeFindKeyFromQuery(filter.obj())});
+            queryStatsStore.lookup(i).getValue()->execCount = i;
+        }
+    }
+
+    boost::intrusive_ptr<exec::agg::Stage> buildTopKExecCountStage(long long limit) {
+        const auto source =
+            DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+        static_cast<DocumentSourceQueryStats*>(source.get())
+            ->setTopKSortSpec(
+                query_stats::TopKSortSpec{"metrics.execCount", false /* isAscending */, limit});
+        return exec::agg::buildStage(source);
+    }
+
+    static std::vector<long long> drainExecCounts(boost::intrusive_ptr<exec::agg::Stage> stage) {
+        std::vector<long long> execCounts;
+        for (auto result = stage->getNext(); !result.isEOF(); result = stage->getNext()) {
+            ASSERT_TRUE(result.isAdvanced());
+            execCounts.push_back(
+                result.getDocument().getNestedField({"metrics.execCount"}).coerceToLong());
+        }
+        std::sort(execCounts.begin(), execCounts.end(), std::greater<>());
+        return execCounts;
     }
 
     static const BSONObj kQueryStatsStage;
@@ -404,6 +440,57 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
     auto stage = exec::agg::buildStage(source);
     // This should raise an user assertion.
     ASSERT_THROWS_CODE(stage->getNext(), DBException, ErrorCodes::QueryStatsFailedToRecord);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, TopKReturnsOnlyCandidatesWhenAllMaterialize) {
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    populateStoreWithExecCounts(queryStatsStore, 10);
+
+    // With no materialization failures the stage emits only the top-K candidates and never falls
+    // back to scanning the rest of the store.
+    const std::vector<long long> expected{9, 8, 7};
+    ASSERT(drainExecCounts(buildTopKExecCountStage(3)) == expected);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, TopKFallsBackToFullScanWhenCandidateFailsToMaterialize) {
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    populateStoreWithExecCounts(queryStatsStore, 10);
+
+    // The candidates are execCounts {7, 8, 9}. Fail the first materialization, which hits one of
+    // them, so the top-K pass alone would emit only 2 documents for a limit of 3.
+    FailPointEnableBlock fp("queryStatsGenerateQueryFeatureNotAllowedError",
+                            FailPoint::ModeOptions{FailPoint::nTimes, 1, {}});
+    const auto execCounts = drainExecCounts(buildTopKExecCountStage(3));
+
+    // The stage falls back to the full scan, which emits every entry that wasn't already a
+    // candidate: the 2 surviving candidates plus the 7 non-candidates, with no duplicates.
+    ASSERT_EQ(execCounts.size(), 9);
+    ASSERT(std::adjacent_find(execCounts.begin(), execCounts.end()) == execCounts.end());
+    const auto numCandidatesEmitted =
+        std::count_if(execCounts.begin(), execCounts.end(), [](long long c) { return c >= 7; });
+    ASSERT_EQ(numCandidatesEmitted, 2);
+    for (long long nonCandidate = 0; nonCandidate <= 6; ++nonCandidate) {
+        ASSERT(std::find(execCounts.begin(), execCounts.end(), nonCandidate) != execCounts.end())
+            << "missing non-candidate execCount " << nonCandidate;
+    }
+}
+
+TEST_F(DocumentSourceQueryStatsTest, ClonePreservesTopKSortSpec) {
+    auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    static_cast<DocumentSourceQueryStats*>(source.get())
+        ->setTopKSortSpec(
+            query_stats::TopKSortSpec{"metrics.execCount", false /* isAscending */, 3});
+
+    auto clone = source->clone(getExpCtx());
+    query_shape::SerializationOptions explainOpts;
+    explainOpts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    Value topKSort =
+        clone->serialize(explainOpts).getDocument()["$queryStats"]["topKSortOptimization"];
+    ASSERT_FALSE(topKSort.missing()) << "clone dropped the top-K sort spec";
+    ASSERT_BSONOBJ_EQ(
+        BSON("path" << "metrics.execCount" << "limit" << 3LL << "isAscending" << false),
+        topKSort.getDocument().toBson());
 }
 
 TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {

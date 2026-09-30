@@ -157,6 +157,18 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryStatsTopKSortOptimizationEnabled:
+        description: >-
+            Whether the $queryStats top-K sort optimization is enabled. When enabled, a
+            [$queryStats, $sort on a supported metric, $limit] pipeline performs a bounded heap
+            scan of the query stats store and only materializes candidate entries, instead of
+            materializing every entry.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryStatsTopKSortOptimizationEnabled"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+
     internalQueryGlobalProfilingFilter:
         description: "Enables the setProfilingFilterGlobally command."
         set_at: [startup, runtime]

@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "qi_rules",
     srcs = [
         "internal_document_results_and_metadata_rules.cpp",
+        "query_stats_rules.cpp",
     ],
     deps = [
         "//src/mongo/db/pipeline",
@@ -34,5 +35,22 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_mock",
         "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_stats_rules_test",
+    srcs = [
+        "query_stats_rules_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":qi_rules",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+        "//src/mongo/db/query/query_shape:query_shape_common",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

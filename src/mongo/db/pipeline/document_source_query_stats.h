@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
@@ -135,7 +136,14 @@ public:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    void setTopKSortSpec(boost::optional<query_stats::TopKSortSpec> spec) {
+        _topKSortSpec = std::move(spec);
+    }
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceQueryStatsToStageFn(
@@ -149,6 +157,14 @@ private:
           _algorithm(algorithm),
           _hmacKey(hmacKey) {}
 
+    DocumentSourceQueryStats(const DocumentSourceQueryStats& other,
+                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+        : DocumentSource(kStageName, newExpCtx),
+          _transformIdentifiers(other._transformIdentifiers),
+          _algorithm(other._algorithm),
+          _hmacKey(other._hmacKey),
+          _topKSortSpec(other._topKSortSpec) {}
+
     // When true, apply hmac to field names from returned query shapes.
     bool _transformIdentifiers;
 
@@ -161,6 +177,9 @@ private:
      * Key used for SHA-256 HMAC application on field names.
      */
     std::string _hmacKey;
+
+    // If set, enables the top-k sort optimization during execution.
+    boost::optional<query_stats::TopKSortSpec> _topKSortSpec;
 };
 
 }  // namespace mongo

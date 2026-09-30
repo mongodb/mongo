@@ -6,11 +6,14 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
 #include <deque>
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 
@@ -24,7 +27,8 @@ public:
                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     TransformAlgorithmEnum algorithm,
                     std::string hmacKey,
-                    BSONObj serializedForDebug);
+                    BSONObj serializedForDebug,
+                    boost::optional<query_stats::TopKSortSpec> topKSortSpec = boost::none);
 
 private:
     /*
@@ -49,7 +53,9 @@ private:
 
         const Date_t& getReadTimestamp() const;
 
-        void load(QueryStatsStore& queryStatsStore);
+        // Copies every entry in the partition whose key is not in 'skipKeys'.
+        void load(QueryStatsStore& queryStatsStore,
+                  const stdx::unordered_set<std::size_t>& skipKeys);
 
         std::deque<QueryStatsEntry> statsEntries;
 
@@ -79,6 +85,22 @@ private:
     BSONObj computeQueryStatsKey(std::shared_ptr<const Key> key,
                                  const SerializationContext& serializationContext) const;
 
+    /**
+     * Scans all partitions (locking one partition at a time) to select and copy the top-K
+     * candidate entries, requesting exactly 'K' candidates equal to the sort limit.
+     */
+    void computeTopKCandidates(const QueryStatsStore& queryStatsStore, const TopKSortSpec& spec);
+
+    /**
+     * Returns the document for the next top-K candidate, recording its key in '_topKConsumedKeys'
+     * whether or not it materializes. Returns boost::none once the candidates are exhausted.
+     */
+    boost::optional<Document> nextTopKDocument(QueryStatsStore& queryStatsStore,
+                                               const TopKSortSpec& spec);
+
+    // Returns the next document of the full scan over every partition.
+    GetNextResult nextFullScanDocument(QueryStatsStore& queryStatsStore);
+
     // The current partition copied from query stats store to avoid holding lock during reads.
     CopiedPartition _currentCopiedPartition;
 
@@ -94,6 +116,20 @@ private:
 
     // For-debug serialization of the corresponding 'DocumentSourceQueryStats' instance.
     BSONObj _serializedForDebug;
+
+    // Top-K optimization set during optimization if the pattern is recognized.
+    boost::optional<query_stats::TopKSortSpec> _topKSortSpec;
+
+    // Candidate entries copied out of the store by the top-K scan, populated lazily on the first
+    // doGetNext() call and popped from the back as they are materialized. Owning copies means
+    // materialization never touches the store and cannot lose entries to eviction.
+    boost::optional<std::vector<std::pair<std::size_t, QueryStatsEntry>>> _topKCandidateEntries;
+    Date_t _topKScanTimestamp;
+
+    // Keys of the top-K candidates already processed, whether they were emitted or failed in
+    // 'toDocument'. If any candidate fails, we fall back to the full scan, skipping these keys.
+    stdx::unordered_set<std::size_t> _topKConsumedKeys;
+    bool _topKCandidateFailed{false};
 };
 
 }  // namespace exec::agg

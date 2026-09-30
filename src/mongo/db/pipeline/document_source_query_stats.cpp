@@ -14,8 +14,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <cstddef>
-
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -109,12 +107,26 @@ Value DocumentSourceQueryStats::serialize(const query_shape::SerializationOption
         hmacKey =
             Value(BSONBinData("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 32, BinDataType::Sensitive));
     }
-    return Value{Document{
-        {kStageName,
-         _transformIdentifiers
-             ? Document{{"transformIdentifiers",
-                         Document{{"algorithm", idl::serialize(_algorithm)}, {"hmacKey", hmacKey}}}}
-             : Document{}}}};
+
+    MutableDocument spec(
+        _transformIdentifiers
+            ? Document{{"transformIdentifiers",
+                        Document{{"algorithm", idl::serialize(_algorithm)}, {"hmacKey", hmacKey}}}}
+            : Document{});
+
+    if (opts.isSerializingForExplain() && _topKSortSpec) {
+        // Include the optimization hint in explain output so jstests can assert it fired.
+        spec.addField("topKSortOptimization",
+                      Value{Document{{"path", _topKSortSpec->dottedMetricsPath},
+                                     {"limit", _topKSortSpec->limit},
+                                     {"isAscending", _topKSortSpec->isAscending}}});
+    }
+
+    return Value{Document{{kStageName, spec.freeze()}}};
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::clone(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    return new DocumentSourceQueryStats(*this, expCtx);
+}
 }  // namespace mongo
