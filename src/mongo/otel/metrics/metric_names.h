@@ -627,7 +627,7 @@ public:
     static constexpr MetricName kGetLastErrorDefaultUnsatisfiable =
         MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.default.unsatisfiable");
 
-    // Query Integration Team Metrics
+    // DB Integration & Observability Team Metrics
 
     // System Health
     static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.system.cpu.time");

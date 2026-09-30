@@ -12,22 +12,22 @@
   - Product Security
 10gen/query:
   - Query Execution
-  - Query Integration
+  - DB Integration & Observability
   - Query Optimization
 10gen/query-execution:
   - Query Execution
 10gen/query-integration:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-integration-features:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-integration-observability:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-integration-search:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-integration-staff-leads:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-integration-timeseries:
-  - Query Integration
+  - DB Integration & Observability
 10gen/query-optimization:
   - Query Optimization
 10gen/query-optimization-cost-based-ranker:

@@ -133,9 +133,9 @@ groups:
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
       - "<@U0B71RRMBN1>" # andrey.gorelov@mongodb.com - Director
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
-  - name: "Database Architecture and Interfaces"
+  - name: "Database Interfaces and Architecture"
     teams:
-      - "Query Integration"
+      - "DB Integration & Observability"
       - "Networking & Observability"
       - "Server Programmability"
       - "Server Security"
@@ -272,11 +272,11 @@ teams:
       - "<@U0B71RRMBN1>" # andrey.gorelov@mongodb.com - Director
       - "<!subteam^S08K9JHA36C>" # @leads-query-optimization
 
-  # Database Architecture and Interfaces teams
-  - name: "Query Integration"
+  # Database Interfaces and Architecture teams
+  - name: "DB Integration & Observability"
     slack_tags:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
-      - "<!subteam^S080PEJEYUW>" # @leads-staff-query-integration - Leads + Staff
+      - "<!subteam^S080PEJEYUW>" # @leads-staff-dino - Leads + Staff
     thresholds:
       hot: 3
       cold: 5
