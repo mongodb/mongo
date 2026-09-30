@@ -133,6 +133,22 @@ public:
     }
 
 private:
+    // Advances the scope's generation counter when it leaves the scope. Used to ensure
+    // user-written JavaScript doesn't retain unowned BSON wrappers past the lifetime of the C++
+    // buffer it views.
+    class GenerationGuard {
+    public:
+        explicit GenerationGuard(Scope& scope) : _scope(scope) {}
+        GenerationGuard(const GenerationGuard&) = delete;
+        GenerationGuard& operator=(const GenerationGuard&) = delete;
+        ~GenerationGuard() {
+            _scope.advanceGeneration();
+        }
+
+    private:
+        Scope& _scope;
+    };
+
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
     bool _storedProceduresLoaded = false;

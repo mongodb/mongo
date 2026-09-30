@@ -376,5 +376,61 @@ TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitRejectsMalformedBSONCol
                        AssertionException,
                        ErrorCodes::InvalidBSONFromJavaScript);
 }
+
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitInvalidatesRetainedBsonWrapper) {
+    // A prior $function evaluation in the same operation stashes a non-owning wrapper for its
+    // argument in a JS global; the backing builder buffer is freed when the evaluation returns.
+    auto functionExpr =
+        BSON("expr" << BSON("body" << "function(arg) { globalThis.__savedArg = arg; return 1; };"
+                                   << "args" << BSON_ARRAY("$$ROOT") << "lang"
+                                   << ExpressionFunction::kJavaScript));
+    auto stashExpr =
+        ExpressionFunction::parse(getExpCtxRaw(), functionExpr.firstElement(), getVPS());
+    stashExpr->evaluate(Document{BSON("x" << 1)}, getVariables());
+
+    // The $internalJsEmit map function reads the retained wrapper on re-entry into the same
+    // operation-cached scope; it must be rejected rather than read as stale memory.
+    auto bsonExpr =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { return globalThis.__savedArg.x; };"));
+    auto emitExpr =
+        ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_WITH_CHECK(emitExpr->evaluate(Document{BSON("x" << 1)}, getVariables()),
+                             AssertionException,
+                             [](const AssertionException& ex) {
+                                 ASSERT_STRING_CONTAINS(
+                                     ex.toString(),
+                                     "Attempt to access an invalidated BSON Object in JS scope");
+                             });
+}
+
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionInvalidatesRetainedBsonWrapperAtCompileTime) {
+    // A prior $function evaluation stashes a non-owning wrapper for its argument in a JS global;
+    // the backing builder buffer is freed when the evaluation returns.
+    auto functionExpr =
+        BSON("expr" << BSON("body" << "function(arg) { globalThis.__savedArg = arg; return 1; };"
+                                   << "args" << BSON_ARRAY("$$ROOT") << "lang"
+                                   << ExpressionFunction::kJavaScript));
+    auto stashExpr =
+        ExpressionFunction::parse(getExpCtxRaw(), functionExpr.firstElement(), getVPS());
+    stashExpr->evaluate(Document{BSON("x" << 1)}, getVariables());
+
+    // The second $function's body begins with an anonymous function(){} so createFunction
+    // evaluates it as a comma expression; its middle operand dereferences the retained wrapper
+    // during compilation. The read must be rejected there.
+    auto bsonExpr =
+        BSON("expr" << BSON(
+                 "body" << "function(){}, globalThis.__savedArg.x, function() { return 0; }"
+                        << "args" << BSON_ARRAY(1) << "lang" << ExpressionFunction::kJavaScript));
+    auto readExpr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
+    ASSERT_THROWS_WITH_CHECK(readExpr->evaluate({}, getVariables()),
+                             AssertionException,
+                             [](const AssertionException& ex) {
+                                 ASSERT_STRING_CONTAINS(
+                                     ex.toString(),
+                                     "Attempt to access an invalidated BSON Object in JS scope");
+                             });
+}
 }  // namespace
 }  // namespace mongo

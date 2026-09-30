@@ -85,6 +85,9 @@ JsExecution* JsExecution::getCached(OperationContext* opCtx, bool loadStoredProc
 Value JsExecution::callFunction(ScriptingFunction func,
                                 const BSONObj& params,
                                 const BSONObj& thisObj) {
+    // Invalidate any unowned BSON wrappers retained by JS globals upon exiting.
+    GenerationGuard generationGuard(*_scope);
+
     int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, false);
     uassert(
         31439, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
@@ -103,6 +106,9 @@ Value JsExecution::callFunction(ScriptingFunction func,
 void JsExecution::callFunctionWithoutReturn(ScriptingFunction func,
                                             const BSONObj& params,
                                             const BSONObj& thisObj) {
+    // Invalidate any unowned BSON wrappers retained by JS globals upon exiting.
+    GenerationGuard generationGuard(*_scope);
+
     int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, true);
     uassert(
         31470, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
