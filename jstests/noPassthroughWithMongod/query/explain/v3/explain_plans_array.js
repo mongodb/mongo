@@ -6,10 +6,16 @@
  * plannerStats; plannerChoice, which renders the same shape with every statistic withheld, has its
  * own case. For each resulting explain it asserts:
  *
- * - The per-plan object layout: {isCached, solutionHashUnstable, multiPlanStats, planStages}.
- * - The per-node "statistics" grouping: {costBased, multiPlan}. The grouping is sparse - a
- *   group is present iff the corresponding statistic was computed for that node, and the
- *   "statistics" wrapper is absent when both groups are.
+ * - The per-plan object layout: {isCached, solutionHashUnstable, multiPlanEstimateStats,
+ *   multiPlanFinalizeStats, planStages}.
+ * - The per-node "statistics" grouping: {costBased, multiPlanEstimate, multiPlanFinalize}. The
+ *   grouping is sparse - a group is present iff the corresponding statistic was computed for that
+ *   node, and the "statistics" wrapper is absent when all groups are absent.
+ * - The multi-planner groups are split per trial phase: a capped (estimate) phase emits
+ *   multiPlanEstimate(Stats), the deciding uncapped phase multiPlanFinalize(Stats), each present
+ *   iff the plan did work in that phase; the finalize counters are increments over the estimate
+ *   phase, and 'score' and the plan's final 'stopCondition' are emitted inside the last present
+ *   group.
  * - The ordering of the plans after the winner: by the deciding ranker's metric (trial score
  *   descending when the multi-planner decided, cost ascending when the cost-based ranker did).
  */
@@ -31,6 +37,8 @@ import {
     forEachNode,
     hasCostBasedGroup,
     hasMultiPlanGroup,
+    hasNodeGroup,
+    kPlanPhaseGroups,
     rootCostEstimate,
 } from "jstests/libs/query/explain_v3_helpers.js";
 
@@ -89,7 +97,7 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         );
     });
 
-    it("pure multi-planning: trial groups and score-descending order", function () {
+    it("pure multi-planning: finalize-only trial groups and score-descending order", function () {
         setPlanRankerConfig(db, {internalQueryPlanRanker: "multiPlanning"});
         const explain = explainFind(matchingFilter);
         assertChosenRanker(
@@ -102,13 +110,29 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         const scores = [];
         for (const plan of plans) {
             assertWellFormedPlan(plan);
-            // Every candidate ran a trial: node-level multiPlan groups and plan-level
-            // multiPlanStats with a score; the cost-based ranker never ran, so no costBased.
-            assert(hasMultiPlanGroup(plan), "expected multiPlan node group", {plan});
+            // Every candidate ran one uncapped trial: the classic trial is the deciding trial, so
+            // only the finalize phase exists - node-level multiPlanFinalize groups and plan-level
+            // multiPlanFinalizeStats with a score, and no estimate groups anywhere. The
+            // cost-based ranker never ran, so no costBased either.
+            assert(hasNodeGroup(plan, "multiPlanFinalize"), "expected multiPlanFinalize group", {
+                plan,
+            });
+            assert(!hasNodeGroup(plan, "multiPlanEstimate"), "unexpected multiPlanEstimate group", {
+                plan,
+            });
             assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan});
-            assert(plan.multiPlanStats, "expected plan-level multiPlanStats", {plan});
-            assert(plan.multiPlanStats.hasOwnProperty("score"), "expected trial score", {plan});
-            scores.push(plan.multiPlanStats.score);
+            assert(plan.multiPlanFinalizeStats, "expected plan-level multiPlanFinalizeStats", {
+                plan,
+            });
+            assert(
+                !plan.hasOwnProperty("multiPlanEstimateStats"),
+                "unexpected plan-level multiPlanEstimateStats",
+                {plan},
+            );
+            assert(plan.multiPlanFinalizeStats.hasOwnProperty("score"), "expected trial score", {
+                plan,
+            });
+            scores.push(plan.multiPlanFinalizeStats.score);
         }
         // The plans after the winner are in score-descending order (the multi-planner decided).
         assertDescending(scores.slice(1), plans);
@@ -131,8 +155,13 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         }
         // CBR-rejected plans never ran a trial.
         for (const plan of plans.slice(1)) {
-            assert(!hasMultiPlanGroup(plan), "unexpected multiPlan group", {plan});
-            assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {plan});
+            assert(!hasMultiPlanGroup(plan), "unexpected multi-planner group", {plan});
+            for (const group of kPlanPhaseGroups) {
+                assert(!plan.hasOwnProperty(group), "unexpected plan-level phase group", {
+                    plan,
+                    group,
+                });
+            }
         }
         // The plans after the winner are in cost-ascending order (the cost-based ranker decided).
         assertAscending(costs.slice(1), plans);
@@ -158,9 +187,13 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         }
     });
 
-    it("mixed (default), multi-planner wins: trial groups, score-descending order", function () {
+    it("mixed (default), multi-planner wins: estimate-only groups carry the score", function () {
         setPlanRankerConfig(db); // Defaults: mixed ranking, sampling CE.
-        // The trial produces results, so the multi-planner decides before CBR runs.
+        // The capped trial produces results, so the multi-planner decides before CBR runs and the
+        // capped phase is never resumed: every plan is scored on its capped-phase work alone.
+        // This is the zero-work-finalize case - a phase group exists only for a phase the plan
+        // did work in, so each plan carries the estimate group only, and that group holds the
+        // score and the plan's final stop condition.
         const explain = explainFind(matchingFilter);
         assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExit);
         const plans = getV3Plans(explain);
@@ -168,9 +201,21 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         const scores = [];
         for (const plan of plans) {
             assertWellFormedPlan(plan);
-            assert(hasMultiPlanGroup(plan), "expected multiPlan node group", {plan});
-            assert(plan.multiPlanStats, "expected plan-level multiPlanStats", {plan});
-            scores.push(plan.multiPlanStats.score);
+            assert(hasNodeGroup(plan, "multiPlanEstimate"), "expected multiPlanEstimate group", {
+                plan,
+            });
+            assert(!hasNodeGroup(plan, "multiPlanFinalize"), "unexpected multiPlanFinalize group", {
+                plan,
+            });
+            assert(plan.multiPlanEstimateStats, "expected plan-level multiPlanEstimateStats", {
+                plan,
+            });
+            assert(
+                !plan.hasOwnProperty("multiPlanFinalizeStats"),
+                "unexpected plan-level multiPlanFinalizeStats",
+                {plan},
+            );
+            scores.push(plan.multiPlanEstimateStats.score);
         }
         assertDescending(scores.slice(1), plans);
     });
@@ -190,15 +235,60 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         // Each logical plan appears exactly once: the multi-planner's capped-trial tree and the
         // cost-based ranker's costed record of the same solution are merged into a single entry
         // whose statistics document carries both families - costBased (remapped estimates) and
-        // multiPlan (the capped/abandoned trial counters; the winner shows its finishing trial).
+        // the multi-planner phase groups. Every plan ran the capped phase, so every plan carries
+        // the estimate group; only the winner ran the finishing-up trial afterwards, so it alone
+        // carries the finalize group as well (with its score and final stop condition), while the
+        // abandoned candidates stay estimate-only with the capped phase's budget exhaustion as
+        // their final condition.
         assert.gte(plans.length, 3, "expected one entry per candidate plan", {plans});
         const costs = [];
         for (const plan of plans) {
             assertWellFormedPlan(plan);
             assert(hasCostBasedGroup(plan), "expected costBased on every plan", {plan});
-            assert(hasMultiPlanGroup(plan), "expected merged trial statistics", {plan});
-            assert(plan.multiPlanStats, "expected plan-level multiPlanStats", {plan});
+            assert(hasNodeGroup(plan, "multiPlanEstimate"), "expected merged trial statistics", {
+                plan,
+            });
+            assert(plan.multiPlanEstimateStats, "expected plan-level multiPlanEstimateStats", {
+                plan,
+            });
             costs.push(rootCostEstimate(plan));
+        }
+        // The winner: estimate + finalize, the capped phase having exhausted its budget (that is
+        // what engaged CBR) and the finishing-up trial reporting the final condition.
+        const winner = plans[0];
+        assert(winner.multiPlanFinalizeStats, "expected the winner's finishing-up trial group", {
+            winner,
+        });
+        assert(
+            winner.multiPlanFinalizeStats.hasOwnProperty("score"),
+            "expected the score in the winner's last group",
+            {winner},
+        );
+        assert(
+            !winner.multiPlanEstimateStats.hasOwnProperty("score"),
+            "score must appear only in the last present group",
+            {winner},
+        );
+        assertStopCondition(
+            winner,
+            MultiPlannerStopCondition.kExhaustedBudget,
+            "multiPlanEstimateStats",
+        );
+        // The finalize subobject reports the finishing-up trial that collects the winner's works
+        // for the plan cache. The filter matches nothing, so that trial too runs out its budget.
+        assertStopCondition(
+            winner,
+            MultiPlannerStopCondition.kExhaustedBudget,
+            "multiPlanFinalizeStats",
+        );
+        // The abandoned candidates: estimate-only, ended by the capped phase's budget.
+        for (const plan of plans.slice(1)) {
+            assert(
+                !plan.hasOwnProperty("multiPlanFinalizeStats"),
+                "abandoned candidates never resume",
+                {plan},
+            );
+            assertStopCondition(plan, MultiPlannerStopCondition.kExhaustedBudget, "final");
         }
         // The plans after the winner are in cost-ascending order (the cost-based ranker decided).
         assertAscending(costs.slice(1), plans);
@@ -206,9 +296,9 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
 
     it("plannerChoice: same plans[] shape, structure only", function () {
         // plannerChoice renders the same plans[] shape as the stats-rich modes but withholds every
-        // statistic: no per-node "statistics" grouping of either family and no plan-level
-        // "multiPlanStats". Asserted under both mixed-mode outcomes, since what is excluded must not
-        // depend on which ranker did the deciding - only the plan *order* does.
+        // statistic: no per-node "statistics" grouping of either family and neither plan-level
+        // multi-planner group. Asserted under both mixed-mode outcomes, since what is excluded
+        // must not depend on which ranker did the deciding - only the plan *order* does.
         for (const [name, filter] of [
             ["multi-planner decided", matchingFilter],
             ["cost-based ranker decided", cbrWinFilter],
@@ -225,10 +315,9 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
                 assertWellFormedPlan(plan);
                 assert(!hasMultiPlanGroup(plan), "unexpected multiPlan group", {plan, name});
                 assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan, name});
-                assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {
-                    plan,
-                    name,
-                });
+                for (const field of ["multiPlanEstimateStats", "multiPlanFinalizeStats"]) {
+                    assert(!plan.hasOwnProperty(field), "unexpected " + field, {plan, name});
+                }
                 forEachNode(plan.planStages, (node) => {
                     assert(!node.hasOwnProperty("statistics"), "unexpected statistics", {
                         node,
@@ -251,6 +340,204 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         }
     });
 
+    it("mixed (default), multi-planner resumes: disjoint estimate and finalize groups", function () {
+        setPlanRankerConfig(db); // Defaults: mixed ranking, sampling CE.
+        // No plan produces results within the capped phase (so CBR is engaged), but $returnKey
+        // makes every plan inestimable (RETURN_KEY), so the multi-planner resumes the capped
+        // trial with the remaining budget and decides. Every surviving plan therefore did work in
+        // both phases and carries both groups, whose counters are disjoint: the estimate group
+        // holds the capped phase's counters, the finalize group only the increments accumulated
+        // after the capped phase.
+        const explain = assert.commandWorked(
+            db.runCommand({
+                explain: {find: collName, filter: cbrWinFilter, returnKey: true},
+                verbosity: "plannerStats",
+            }),
+        );
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kMultiPlanning,
+            PlanRankerReason.kCBRInestimableNode,
+        );
+        const plans = getV3Plans(explain);
+        assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
+        for (const plan of plans) {
+            assertWellFormedPlan(plan);
+            assert(plan.multiPlanEstimateStats, "expected plan-level multiPlanEstimateStats", {
+                plan,
+            });
+            assert(plan.multiPlanFinalizeStats, "expected plan-level multiPlanFinalizeStats", {
+                plan,
+            });
+            // The capped phase ended for every plan by exhausting its budget - that is what
+            // engaged CBR - regardless of how the resumed phase ended (the final condition,
+            // reported in the finalize group).
+            assertStopCondition(
+                plan,
+                MultiPlannerStopCondition.kExhaustedBudget,
+                "multiPlanEstimateStats",
+            );
+            // The finalize subobject reports the resumed trial. The filter matches nothing, so
+            // it too runs out its (remaining) budget.
+            assertStopCondition(
+                plan,
+                MultiPlannerStopCondition.kExhaustedBudget,
+                "multiPlanFinalizeStats",
+            );
+            // Disjointness at plan level: both phases examined keys, so the totals are split,
+            // not repeated.
+            assert.gt(plan.multiPlanEstimateStats.totalKeysExamined, 0, {plan});
+            assert.gt(plan.multiPlanFinalizeStats.totalKeysExamined, 0, {plan});
+            // Disjointness at node level: the root carries both groups, and the finalize works
+            // are an increment (positive: the resume ran), not a cumulative repeat (it is smaller
+            // than or comparable to the estimate works would make it if repeated; the exact
+            // values are budget-dependent, so assert only positivity here - the exact
+            // estimate + finalize == cumulative identity is unit-tested in plan_explainer_test).
+            const rootStatistics = plan.planStages.statistics;
+            assert(rootStatistics && rootStatistics.multiPlanEstimate, {plan});
+            assert(rootStatistics && rootStatistics.multiPlanFinalize, {plan});
+            assert.gt(rootStatistics.multiPlanEstimate.works, 0, {plan});
+            assert.gt(rootStatistics.multiPlanFinalize.works, 0, {plan});
+            // The capped phase produced no results (that is what engaged CBR); returned rows,
+            // shown on the candidate's root node, are all finalize-phase increments.
+            assert.eq(rootStatistics.multiPlanEstimate.nReturned, 0, "capped phase found results", {
+                plan,
+            });
+            // The score appears only in the last present group.
+            assert(
+                !plan.multiPlanEstimateStats.hasOwnProperty("score"),
+                "score must appear only in the last present group",
+                {plan},
+            );
+        }
+    });
+
+    it("a stage that adds children after the capped phase serializes them finalize-only", function () {
+        // Regression test for the phase-split alignment: a GEO_NEAR stage appends one child per
+        // search interval it opens, so its stats tree can gain children between the capped-phase
+        // snapshot and the final read - the snapshot's children are only a prefix of the final
+        // ones. The explain must not reject that (it tripped tassert 13312306 before the fix),
+        // and a child born after the capped phase must carry only the finalize group.
+        //
+        // The EstimateRankingEffort strategy provides the phase split: its estimation trial is
+        // capped at internalQueryNumWorksPerPlanForMPEstimation works (squeezed to the knob's
+        // minimum), and $near's GEO_NEAR_2DSPHERE stage is inestimable, so the multi-planner
+        // resumes with the remaining budget. The data pins the intervals: a cluster of docs a few
+        // hundred meters from the query point makes the first interval small (its radius derives
+        // from the distance to the nearest docs) and keeps the capped trial inside it - scanning
+        // the cluster needs several times more works than the cap. Only 30 cluster docs pass the
+        // f1 filter, fewer than the trial's result target, so the resumed phase cannot fill its
+        // batch from the first interval and must keep doubling the search radius - opening
+        // interval after interval - until it reaches the far docs 1000+ km away, which all pass.
+        const geoColl = db[collName + "_geo"];
+        geoColl.drop();
+        const docs = [];
+        for (let i = 0; i < 400; ++i) {
+            // ~300m east of the query point, jittered so the docs don't coincide.
+            docs.push({_id: i, loc: {type: "Point", coordinates: [0.003 + i * 1e-7, 0]}, f1: i});
+        }
+        for (let i = 400; i < 800; ++i) {
+            // Spread 1000-4000km away.
+            docs.push({_id: i, loc: {type: "Point", coordinates: [10 + (i % 30), 0]}, f1: i});
+        }
+        assert.commandWorked(geoColl.insert(docs));
+        assert.commandWorked(geoColl.createIndex({loc: "2dsphere"}));
+        assert.commandWorked(geoColl.createIndex({f1: 1}));
+
+        setPlanRankerConfig(db, {internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort"});
+        const estimationWorksParam = assert.commandWorked(
+            db.adminCommand({getParameter: 1, internalQueryNumWorksPerPlanForMPEstimation: 1}),
+        ).internalQueryNumWorksPerPlanForMPEstimation;
+        try {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryNumWorksPerPlanForMPEstimation: 101,
+                }),
+            );
+            // Passes the last 30 cluster docs and every far doc.
+            const explain = assert.commandWorked(
+                db.runCommand({
+                    explain: {
+                        find: geoColl.getName(),
+                        filter: {
+                            loc: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}},
+                            f1: {$gte: 370},
+                        },
+                    },
+                    verbosity: "plannerStats",
+                }),
+            );
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kMultiPlanning,
+                PlanRankerReason.kInestimableMP,
+            );
+            // Find the GEO_NEAR node of a plan that ran both phases.
+            let geoNearNode = null;
+            for (const plan of getV3Plans(explain)) {
+                assertWellFormedPlan(plan);
+                forEachNode(plan.planStages, (node) => {
+                    if (
+                        node.stage === "GEO_NEAR_2DSPHERE" &&
+                        node.statistics &&
+                        node.statistics.multiPlanEstimate
+                    ) {
+                        geoNearNode = node;
+                    }
+                });
+            }
+            assert(geoNearNode, "expected a two-phase GEO_NEAR_2DSPHERE node", {explain});
+            // The resumed phase opened intervals the snapshot never saw: those children carry
+            // the finalize group only. At least one child predates the capped phase's end and carries the
+            // estimate group (the capped trial ran inside the first interval).
+            const children = geoNearNode.inputStages || [];
+            const bornBefore = children.filter(
+                (c) => c.statistics && c.statistics.multiPlanEstimate,
+            );
+            const bornAfter = children.filter(
+                (c) =>
+                    c.statistics &&
+                    !c.statistics.multiPlanEstimate &&
+                    c.statistics.multiPlanFinalize,
+            );
+            assert.gte(
+                bornBefore.length,
+                1,
+                "expected an interval opened during the capped phase",
+                {
+                    geoNearNode,
+                },
+            );
+            assert.gte(bornAfter.length, 1, "expected an interval opened after the capped phase", {
+                geoNearNode,
+            });
+            // The two phases of the winner's trial ended differently, and each phase group
+            // reports its own condition: the capped estimation trial ran out of its works budget
+            // (which is why the multi-planner resumed at all), while the resumed phase ended by
+            // filling the result batch from the far documents.
+            const winner = getV3Plans(explain)[0];
+            assertStopCondition(
+                winner,
+                MultiPlannerStopCondition.kExhaustedBudget,
+                "multiPlanEstimateStats",
+            );
+            assertStopCondition(
+                winner,
+                MultiPlannerStopCondition.kFullBatch,
+                "multiPlanFinalizeStats",
+            );
+        } finally {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryNumWorksPerPlanForMPEstimation: estimationWorksParam,
+                }),
+            );
+            geoColl.drop();
+        }
+    });
+
     it("featureFlagCostBasedRanker off behaves as pure multi-planning", function () {
         setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
         const explain = explainFind(matchingFilter);
@@ -263,7 +550,13 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         assert.gte(plans.length, 2, "expected multiple candidate plans", {plans});
         for (const plan of plans) {
             assertWellFormedPlan(plan);
-            assert(hasMultiPlanGroup(plan), "expected multiPlan node group", {plan});
+            // Pure multi-planning behavior: one uncapped (deciding) trial, so finalize-only.
+            assert(hasNodeGroup(plan, "multiPlanFinalize"), "expected multiPlanFinalize group", {
+                plan,
+            });
+            assert(!hasNodeGroup(plan, "multiPlanEstimate"), "unexpected multiPlanEstimate group", {
+                plan,
+            });
             assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan});
         }
     });
@@ -275,7 +568,11 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         // EOF within it, so the trial ends on a full batch of results.
         const fullBatchPlans = getV3Plans(explainFind(matchingFilter));
         assert.gte(fullBatchPlans.length, 2, {fullBatchPlans});
-        assertStopCondition(fullBatchPlans[0], MultiPlannerStopCondition.kFullBatch);
+        assertStopCondition(
+            fullBatchPlans[0],
+            MultiPlannerStopCondition.kFullBatch,
+            "multiPlanFinalizeStats",
+        );
 
         // 'a: 0' matches 100 documents, fewer than the trial's result target, so the winning
         // candidate exhausts its results and ends its trial at EOF. Other candidates may reach EOF
@@ -283,7 +580,7 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         // case only pins the winner.
         const eofPlans = getV3Plans(explainFind({a: 0, b: 0}));
         assert.gte(eofPlans.length, 2, {eofPlans});
-        assertStopCondition(eofPlans[0], MultiPlannerStopCondition.kEof);
+        assertStopCondition(eofPlans[0], MultiPlannerStopCondition.kEof, "multiPlanFinalizeStats");
 
         // No document has 'a: 0' and 'b: 5' ('a % 100 === 0' implies 'b % 10 === 0'), so the
         // a_1_b_1 index scan has empty bounds and reaches EOF on its first work, winning on the EOF
@@ -293,9 +590,17 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         // 'trialEndedEarly', not 'exhaustedBudget'.
         const cutShortPlans = getV3Plans(explainFind({a: 0, b: 5}));
         assert.gte(cutShortPlans.length, 2, {cutShortPlans});
-        assertStopCondition(cutShortPlans[0], MultiPlannerStopCondition.kEof);
+        assertStopCondition(
+            cutShortPlans[0],
+            MultiPlannerStopCondition.kEof,
+            "multiPlanFinalizeStats",
+        );
         for (const plan of cutShortPlans.slice(1)) {
-            assertStopCondition(plan, MultiPlannerStopCondition.kTrialEndedEarly);
+            assertStopCondition(
+                plan,
+                MultiPlannerStopCondition.kTrialEndedEarly,
+                "multiPlanFinalizeStats",
+            );
         }
 
         // With the trial's work budget squeezed to a single work per plan, no candidate can meet
@@ -325,7 +630,11 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
             const exhaustedPlans = getV3Plans(explainFind(matchingFilter));
             assert.gte(exhaustedPlans.length, 2, {exhaustedPlans});
             for (const plan of exhaustedPlans) {
-                assertStopCondition(plan, MultiPlannerStopCondition.kExhaustedBudget);
+                assertStopCondition(
+                    plan,
+                    MultiPlannerStopCondition.kExhaustedBudget,
+                    "multiPlanFinalizeStats",
+                );
             }
         } finally {
             assert.commandWorked(
@@ -384,24 +693,26 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
             }
             // Every candidate that cannot use the c_1 index has to sort and so fails; only the
             // number of such candidates depends on the index set, not the behavior under test.
+            // This is a pure multi-planning trial, so each plan's single group is the
+            // finalize-named one.
             const failedPlans = plans.filter(
                 (plan) =>
-                    plan.multiPlanStats &&
-                    plan.multiPlanStats.stopCondition === MultiPlannerStopCondition.kFailed,
+                    plan.multiPlanFinalizeStats &&
+                    plan.multiPlanFinalizeStats.stopCondition === MultiPlannerStopCondition.kFailed,
             );
             assert.gte(failedPlans.length, 1, "expected a failed candidate", {plans});
             assert.lt(failedPlans.length, plans.length, "expected a surviving candidate", {plans});
             for (const failedPlan of failedPlans) {
                 // A failed candidate is never scored, so it carries counters but no score.
                 assert(
-                    !failedPlan.multiPlanStats.hasOwnProperty("score"),
+                    !failedPlan.multiPlanFinalizeStats.hasOwnProperty("score"),
                     "unexpected score on a failed candidate",
                     {failedPlan},
                 );
             }
             // It never wins: failed candidates are excluded from the ranking.
             assert.neq(
-                plans[0].multiPlanStats.stopCondition,
+                plans[0].multiPlanFinalizeStats.stopCondition,
                 MultiPlannerStopCondition.kFailed,
                 "a failed candidate must not be the winning plan",
                 {plans},
@@ -426,15 +737,22 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         const plans = getV3Plans(explain);
         assert.eq(plans.length, 1, "expected a single plan", {plans});
         assertWellFormedPlan(plans[0]);
-        assert(!hasMultiPlanGroup(plans[0]), "unexpected multiPlan group", {plans});
-        assert(!plans[0].hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {plans});
+        assert(!hasMultiPlanGroup(plans[0]), "unexpected multi-planner group", {plans});
+        for (const group of kPlanPhaseGroups) {
+            assert(!plans[0].hasOwnProperty(group), "unexpected plan-level phase group", {
+                plans,
+                group,
+            });
+        }
         // At execStats the tree must still show no counters: no trial ran, and the real-execution
         // counters live in the retained executionStats section, not in plans[].
         const execStatsPlans = getV3Plans(explainFind({nonexistent: 1}, "execStats"));
         assert.eq(execStatsPlans.length, 1, {execStatsPlans});
-        assert(!hasMultiPlanGroup(execStatsPlans[0]), "unexpected multiPlan group at execStats", {
-            execStatsPlans,
-        });
+        assert(
+            !hasMultiPlanGroup(execStatsPlans[0]),
+            "unexpected multi-planner group at execStats",
+            {execStatsPlans},
+        );
     });
 
     it("cached plan: isCached on the matching entry", function () {
@@ -450,7 +768,7 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
         );
     });
 
-    it("count command rides the find shape", function () {
+    it("count command uses the find plans[] shape", function () {
         setPlanRankerConfig(db); // Defaults.
         // Single-plan count: the winner's tree is the executor's (no trial ran), so the COUNT
         // root stage is visible.
@@ -509,10 +827,9 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
             const plan = plans[0];
             assertWellFormedPlan(plan);
             assert.eq(plan.isCached, false, {plan, verbosity});
-            assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {
-                plan,
-                verbosity,
-            });
+            for (const field of ["multiPlanEstimateStats", "multiPlanFinalizeStats"]) {
+                assert(!plan.hasOwnProperty(field), "unexpected " + field, {plan, verbosity});
+            }
             assert.eq(plan.planStages.stage, "EXPRESS_IXSCAN", {plan, verbosity});
             assert.eq(plan.planStages.indexName, "_id_", {plan, verbosity});
             // Neither statistics family applies: no trial ran and the cost-based ranker never

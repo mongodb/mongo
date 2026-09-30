@@ -359,7 +359,9 @@ void forEachV3Node(const BSONObj& node, const std::function<void(const BSONObj&)
 TEST_F(PlanExplainerTest, GetPlanEntriesV3MultiPlannerNodeGrouping) {
     // The V3 node shape for a multi-planned query (default knobs; the trial produces results, so
     // the multi-planner decides): structural fields stay flat on the node, the trial counters are
-    // regrouped under statistics.multiPlan.
+    // regrouped under the per-node multi-planner group. This is not an explain-planned query, so
+    // no capped-phase stats exist and each node carries the single (finalize-named) group
+    // with the cumulative counters.
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
@@ -376,19 +378,20 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3MultiPlannerNodeGrouping) {
         ASSERT(entry.summary.has_value()) << entry.planStatsTree;
 
         forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
-            // Counters moved into statistics.multiPlan; never flat on the node.
+            // Counters moved into statistics.multiPlanFinalize; never flat on the node.
             ASSERT_FALSE(node.hasField("works")) << node;
             ASSERT_FALSE(node.hasField("nReturned")) << node;
-            auto multiPlan = node["statistics"]["multiPlan"];
-            ASSERT(multiPlan.isABSONObj()) << node;
-            ASSERT(multiPlan.Obj().hasField("works")) << node;
-            ASSERT(multiPlan.Obj().hasField("nReturned")) << node;
-            ASSERT(multiPlan.Obj().hasField("isEOF")) << node;
+            auto multiPlanFinalize = node["statistics"]["multiPlanFinalize"];
+            ASSERT(multiPlanFinalize.isABSONObj()) << node;
+            ASSERT(multiPlanFinalize.Obj().hasField("works")) << node;
+            ASSERT(multiPlanFinalize.Obj().hasField("nReturned")) << node;
+            ASSERT(multiPlanFinalize.Obj().hasField("isEOF")) << node;
+            ASSERT_FALSE(node["statistics"].Obj().hasField("multiPlanEstimate")) << node;
             // Structural fields stay flat on the node.
             if (node["stage"].String() == "IXSCAN") {
                 ASSERT(node.hasField("keyPattern")) << node;
                 ASSERT(node.hasField("indexBounds")) << node;
-                ASSERT(multiPlan.Obj().hasField("keysExamined")) << node;
+                ASSERT(multiPlanFinalize.Obj().hasField("keysExamined")) << node;
                 ASSERT_FALSE(node.hasField("keysExamined")) << node;
             }
             // planNodeId appears only on nodes with a known QSN mapping; the pure-multiplanning
@@ -515,7 +518,7 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3PlannerChoiceIsStructureOnly) {
 
     for (const auto& entry : entries) {
         // The plans did run a trial - that is what 'hasTrialStats' records - but this verbosity
-        // reports none of it: no plan-level summary, hence no "multiPlanStats" and no
+        // reports none of it: no plan-level summary, hence neither multi-planner group and no
         // "stopCondition" in the assembled output.
         ASSERT(entry.hasTrialStats) << entry.planStatsTree;
         ASSERT_FALSE(entry.summary.has_value()) << entry.planStatsTree;
@@ -630,13 +633,17 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3SBEMultiPlanner) {
         forEachV3Node(entry.planStatsTree, [&](const BSONObj& node) {
             ASSERT_FALSE(node.hasField("works")) << node;
             ASSERT_FALSE(node.hasField("nReturned")) << node;
-            auto multiPlan = node["statistics"]["multiPlan"];
-            ASSERT(multiPlan.isABSONObj()) << node;
-            ASSERT(multiPlan.Obj().hasField("works")) << node;
+            // The SBE candidates were ranked by the classic runtime planner under the default
+            // mixed ranker: the capped trial produced results, so it decided without a resumed
+            // phase and each node carries the estimate subobject only.
+            auto multiPlanEstimate = node["statistics"]["multiPlanEstimate"];
+            ASSERT(multiPlanEstimate.isABSONObj()) << node;
+            ASSERT(multiPlanEstimate.Obj().hasField("works")) << node;
+            ASSERT_FALSE(node["statistics"].Obj().hasField("multiPlanFinalize")) << node;
             if (node["stage"].String() == "IXSCAN") {
                 ASSERT(node.hasField("keyPattern")) << node;
                 ASSERT_FALSE(node.hasField("keysExamined")) << node;
-                ASSERT(multiPlan.Obj().hasField("keysExamined")) << node;
+                ASSERT(multiPlanEstimate.Obj().hasField("keysExamined")) << node;
             }
         });
     }
@@ -789,9 +796,12 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3CostBasedRankerOrdering) {
         ASSERT(costBased.Obj().hasField("cardinalityEstimate")) << entry.planStatsTree;
 
         if (i != 0) {
-            // CBR-rejected plans never ran a trial: no multiPlan group, no plan-level trial stats.
+            // CBR-rejected plans never ran a trial: no multi-planner groups, no plan-level trial
+            // stats.
             ASSERT_FALSE(entry.hasTrialStats) << entry.planStatsTree;
-            ASSERT_FALSE(entry.planStatsTree["statistics"].Obj().hasField("multiPlan"))
+            ASSERT_FALSE(entry.planStatsTree["statistics"].Obj().hasField("multiPlanEstimate"))
+                << entry.planStatsTree;
+            ASSERT_FALSE(entry.planStatsTree["statistics"].Obj().hasField("multiPlanFinalize"))
                 << entry.planStatsTree;
 
             const double cost = costBased.Obj()["costEstimate"].numberDouble();
@@ -801,6 +811,108 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3CostBasedRankerOrdering) {
             previousCost = cost;
         }
     }
+}
+
+// Walks the fused legacy node tree (single child as 'inputStage', multiple as 'inputStages') in
+// lockstep with a V3 node tree (children always as 'inputStages'), invoking 'callback' on each
+// node pair.
+void forEachLegacyV3NodePair(const BSONObj& legacyNode,
+                             const BSONObj& v3Node,
+                             const std::function<void(const BSONObj&, const BSONObj&)>& callback) {
+    callback(legacyNode, v3Node);
+    std::vector<BSONObj> legacyChildren;
+    if (auto inputStage = legacyNode["inputStage"]; !inputStage.eoo()) {
+        legacyChildren.push_back(inputStage.Obj());
+    } else if (auto inputStages = legacyNode["inputStages"]; !inputStages.eoo()) {
+        for (auto&& child : inputStages.Array()) {
+            legacyChildren.push_back(child.Obj());
+        }
+    }
+    std::vector<BSONObj> v3Children;
+    if (auto inputStages = v3Node["inputStages"]; !inputStages.eoo()) {
+        for (auto&& child : inputStages.Array()) {
+            v3Children.push_back(child.Obj());
+        }
+    }
+    ASSERT_EQ(legacyChildren.size(), v3Children.size()) << legacyNode << v3Node;
+    for (size_t i = 0; i < legacyChildren.size(); ++i) {
+        forEachLegacyV3NodePair(legacyChildren[i], v3Children[i], callback);
+    }
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesV3PhaseGroupsAreDisjoint) {
+    // Forces a two-phase trial to pin the disjointness invariant: for every monotonic counter,
+    // estimate + finalize == the fused legacy value. With the trial budget squeezed to 250 works,
+    // the capped estimation phase (125 works per plan) can neither produce a result ('c' matches
+    // nothing) nor reach EOF (the full-range index scans need ~200 works), so every plan exhausts
+    // the capped budget and CBR is engaged; sampling CE can cost these FETCH+IXSCAN plans, so CBR
+    // picks the single winner, whose finishing-up trial resumes the same tree with the remaining
+    // 125 works and reaches EOF. The winner therefore did work in both phases, with the two stop
+    // conditions differing as the flow dictates; the abandoned candidate keeps its capped-phase
+    // counters and condition.
+    unittest::ServerParameterGuard worksGuard("internalQueryPlanEvaluationWorks", 250);
+    unittest::ServerParameterGuard collFractionGuard("internalQueryPlanEvaluationCollFraction",
+                                                     0.0);
+    unittest::ServerParameterGuard totalCollFractionGuard(
+        "internalQueryPlanTotalEvaluationCollFraction", 0.0);
+    unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");
+    expCtx->setExplain(ExplainOptions::Verbosity::kPlannerStats);
+
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}, c: 1}"));
+    auto& explainer = exec->getPlanExplainer();
+
+    const auto policy = explainPolicyFor(ExplainOptions::Verbosity::kPlannerStats);
+    auto entries = explainer.getPlanEntries(
+        policy, PlanStatsFormat::kV3, PlanSelectionStrategy::kCostBasedRanker);
+    ASSERT_GTE(entries.size(), 2u);
+
+    // The winner ran both phases: the capped phase exhausted its budget (which is what engaged
+    // CBR), the finishing-up trial ran the winner's tree out to EOF.
+    const auto& winner = entries[0];
+    ASSERT(winner.hasTrialStats) << winner.planStatsTree;
+    ASSERT(winner.estimateSummary.has_value()) << winner.planStatsTree;
+    ASSERT(winner.finalizeSummary.has_value()) << winner.planStatsTree;
+    ASSERT_EQ(winner.estimateStopCondition, MultiPlannerStopCondition::kExhaustedBudget)
+        << winner.planStatsTree;
+    ASSERT_EQ(winner.stopCondition, MultiPlannerStopCondition::kEof) << winner.planStatsTree;
+
+    // Per-node disjointness against the fused legacy tree, which reports the same trial's
+    // cumulative counters: estimate + finalize == cumulative, on every node of the winner's tree.
+    auto&& [legacyWinner, _] = explainer.getWinningPlanTrialStats();
+    forEachLegacyV3NodePair(
+        legacyWinner, winner.planStatsTree, [](const BSONObj& legacyNode, const BSONObj& v3Node) {
+            auto estimate = v3Node["statistics"]["multiPlanEstimate"];
+            auto finalize = v3Node["statistics"]["multiPlanFinalize"];
+            ASSERT(estimate.isABSONObj()) << v3Node;
+            ASSERT(finalize.isABSONObj()) << v3Node;
+            for (auto&& counter :
+                 {"works", "advanced", "needTime", "keysExamined", "docsExamined"}) {
+                if (!legacyNode.hasField(counter)) {
+                    continue;
+                }
+                ASSERT_EQ(estimate.Obj()[counter].safeNumberLong() +
+                              finalize.Obj()[counter].safeNumberLong(),
+                          legacyNode[counter].safeNumberLong())
+                    << counter << " " << legacyNode << v3Node;
+            }
+            // State fields are per-phase values, not diffs: isEOF in the estimate group is the
+            // capped-phase value (that phase left the winner mid-scan), in the finalize group the
+            // final value (the finishing-up trial reached EOF).
+            ASSERT_EQ(estimate.Obj()["isEOF"].safeNumberLong(), 0) << v3Node;
+            ASSERT_EQ(finalize.Obj()["isEOF"].safeNumberLong(), 1) << v3Node;
+        });
+
+    // The abandoned candidate never resumed: estimate-only, ended by the capped phase's budget.
+    const auto& abandoned = entries[1];
+    ASSERT(abandoned.hasTrialStats) << abandoned.planStatsTree;
+    ASSERT(abandoned.estimateSummary.has_value()) << abandoned.planStatsTree;
+    ASSERT_FALSE(abandoned.finalizeSummary.has_value()) << abandoned.planStatsTree;
+    ASSERT_EQ(abandoned.stopCondition, MultiPlannerStopCondition::kExhaustedBudget)
+        << abandoned.planStatsTree;
+    forEachV3Node(abandoned.planStatsTree, [](const BSONObj& node) {
+        ASSERT(node["statistics"]["multiPlanEstimate"].isABSONObj()) << node;
+        ASSERT_FALSE(node["statistics"].Obj().hasField("multiPlanFinalize")) << node;
+    });
 }
 
 TEST_F(PlanExplainerTest, LegacyAccessorsMatchPlanEntriesAcrossVerbosities) {

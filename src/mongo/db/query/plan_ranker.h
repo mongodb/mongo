@@ -201,6 +201,13 @@ struct BaseCandidatePlan {
     // named, at which point 'exitedEarly' becomes derivable from this field everywhere and should
     // be removed.
     boost::optional<MultiPlannerStopCondition> stopCondition;
+    // Snapshot of this candidate's stats tree taken at the end of a capped trial phase, before a
+    // resumed phase keeps adding to the same counters. Captured only for explain-planned queries,
+    // and only by a capped-phase runTrials().
+    std::unique_ptr<PlanStageStats> estimatePhaseStats;
+    // Multiplanner stop condition recorded for the capped trial phase. Snapshotted together with
+    // 'estimatePhaseStats' before a resumed phase can overwrite 'stopCondition'.
+    boost::optional<MultiPlannerStopCondition> estimatePhaseStopCondition;
     // If the candidate plan has failed in a recoverable fashion during the trial run, contains a
     // non-OK status.
     Status status{Status::OK()};

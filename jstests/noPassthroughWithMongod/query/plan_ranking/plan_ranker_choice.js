@@ -123,7 +123,7 @@ function checkRanker({
         // How the winning plan's own trial period ended. The winner is plans[0]. This is the
         // per-plan counterpart of the ranker's reason: the reason says why a ranker was chosen for
         // the query, the stop condition says what the winning plan's trial actually did.
-        assertStopCondition(getV3Plans(explain)[0], stopCondition);
+        assertStopCondition(getV3Plans(explain)[0], stopCondition, "final");
     }
 }
 

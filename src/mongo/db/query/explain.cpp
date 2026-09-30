@@ -416,7 +416,7 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
         planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
     } else {
         // A strategy decided, so it must have recorded why (it populated the same explain data
-        // this value rides on). Express plans are single plans that no strategy ranks, so they
+        // this value comes from). Express plans are single plans that no strategy ranks, so they
         // always take the branch above.
         // TODO SERVER-134550 Remove the condition on SBE explainer and the extra bool parameter.
         tassert(13237700,
@@ -431,6 +431,28 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
 }
 
 /**
+ * Appends to 'planBob' the plan-level trial subobject 'name' ("multiPlanEstimateStats" or
+ * "multiPlanFinalizeStats"): the optional 'score' and 'stopCondition', then the totals of that
+ * trial phase. The plan's nReturned and execution time are not emitted here: they equal the
+ * candidate root node's values, already shown in that node's "statistics" subobject.
+ */
+void appendPlanPhaseStats(BSONObjBuilder& planBob,
+                          std::string_view name,
+                          boost::optional<double> score,
+                          boost::optional<MultiPlannerStopCondition> stopCondition,
+                          const PlanSummaryStats& totals) {
+    BSONObjBuilder bob(planBob.subobjStart(name));
+    if (score) {
+        bob.appendNumber("score", *score);
+    }
+    if (stopCondition) {
+        bob.append("stopCondition", toStringView(*stopCondition));
+    }
+    bob.appendNumber("totalKeysExamined", static_cast<long long>(totals.totalKeysExamined));
+    bob.appendNumber("totalDocsExamined", static_cast<long long>(totals.totalDocsExamined));
+}
+
+/**
  * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for
  * plannerChoice and the stats-rich V3 verbosities (plannerStats, execStats) - the
  * version-independent general block followed by one uniform "plans" array of per-plan objects
@@ -440,8 +462,9 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
  * The shape is uniform across those modes; what varies is which statistics each plan carries, and
  * that is decided by the ExplainPolicy alone. At plannerChoice both ranking-statistics families are
  * off, so plans[] holds structure only: no per-node "statistics" subobject and no plan-level
- * "multiPlanStats". The plans are still *ordered* by the deciding ranker's metric - ordering reads
- * the metric without displaying it, so the ranking that happened stays visible in the sequence.
+ * multi-planner group ("multiPlanEstimateStats"/"multiPlanFinalizeStats"). The plans are still
+ * *ordered* by the deciding ranker's metric - ordering reads the metric without displaying it, so
+ * the ranking that happened stays visible in the sequence.
  *
  * planSummary mode still renders legacy-shaped output under explainVersion "3".
  *   TODO SERVER-133235 (the remaining reduction) closes that window.
@@ -506,26 +529,24 @@ void generatePlannerInfoV3(PlanExecutor* exec,
             planBob.append("solutionHashUnstable", static_cast<long long>(*entry.solutionHash));
         }
         if (entry.hasTrialStats && entry.summary) {
-            // Plan-level multi-planning trial totals - present for every plan that ran a trial,
-            // regardless of which ranker decided.
-            BSONObjBuilder multiPlanStatsBob(planBob.subobjStart("multiPlanStats"));
-            if (entry.summary->score) {
-                multiPlanStatsBob.appendNumber("score", *entry.summary->score);
+            // Plan-level trial totals, one subobject per trial phase the plan did work in,
+            // regardless of which ranker decided. 'score' and the plan's final 'stopCondition'
+            // are emitted inside the last subobject present.
+            const bool finalizeIsLast = entry.finalizeSummary.has_value();
+            if (entry.estimateSummary) {
+                appendPlanPhaseStats(planBob,
+                                     "multiPlanEstimateStats",
+                                     finalizeIsLast ? boost::none : entry.summary->score,
+                                     entry.estimateStopCondition,
+                                     *entry.estimateSummary);
             }
-            if (entry.stopCondition) {
-                // How this plan's trial period ended. Sourced from the trial itself rather than
-                // from 'summary', which is why it is optional independently of the totals.
-                // TODO SERVER-134444: unify the trial stop condition with the summary, so that this
-                // field is always present when the totals are present.
-                multiPlanStatsBob.append("stopCondition", toStringView(*entry.stopCondition));
+            if (entry.finalizeSummary) {
+                appendPlanPhaseStats(planBob,
+                                     "multiPlanFinalizeStats",
+                                     entry.summary->score,
+                                     entry.stopCondition,
+                                     *entry.finalizeSummary);
             }
-            multiPlanStatsBob.appendNumber("nReturned",
-                                           static_cast<long long>(entry.summary->nReturned));
-            appendExecutionTimeFields(multiPlanStatsBob, entry.summary->executionTime);
-            multiPlanStatsBob.appendNumber(
-                "totalKeysExamined", static_cast<long long>(entry.summary->totalKeysExamined));
-            multiPlanStatsBob.appendNumber(
-                "totalDocsExamined", static_cast<long long>(entry.summary->totalDocsExamined));
         }
         planBob.append("planStages", entry.planStatsTree);
         // SBE-only, winner-only content: the compiled SBE tree behind this plan, or the warning

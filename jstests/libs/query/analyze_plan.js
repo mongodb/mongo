@@ -119,8 +119,8 @@ export function isV3QueryPlanner(queryPlanner) {
 
 /**
  * Presents one V3 "plans" array entry in the legacy plan shape this library's accessors consume:
- * the plan's stage tree, with the plan-level fields (isCached, multiPlanStats, ...) kept on the
- * root - the place the legacy winningPlan/rejectedPlans entries carry them.
+ * the plan's stage tree, with the plan-level fields (isCached, multiPlanEstimateStats, ...) kept
+ * on the root - the place the legacy winningPlan/rejectedPlans entries carry them.
  *
  * When the winner carries "executedPlanStages" (a pipeline pushed down to SBE after ranking), that
  * tree is used instead of the ranked "planStages".
@@ -390,20 +390,47 @@ export const MultiPlannerStopCondition = {
 /**
  * Asserts that 'plan', one entry of a V3 explain's queryPlanner.plans[], ran a multi-planning trial
  * that ended with the 'expected' condition, one of 'MultiPlannerStopCondition'. A plan that ran a
- * trial is equivalently one carrying plan-level 'multiPlanStats'; a plan that never ran one (e.g. a
- * CBR-rejected plan) has no stop condition to report and fails here.
+ * trial carries at least one of the plan-level subobjects 'multiPlanEstimateStats' /
+ * 'multiPlanFinalizeStats'. A plan that never ran a trial fails here: under strict cost-based
+ * ranking (the queryPlanRanker knob) no plan runs one, and neither does a single plan. In the
+ * mixed modes every candidate runs at least the capped trial, so every candidate passes.
  *
+ * 'phase' names the subobject whose stopCondition to check:
+ * - "multiPlanEstimateStats": how the capped trial phase of the mixed rankers ended. A later
+ *   trial may have ended differently; this is the capped phase's own value.
+ * - "multiPlanFinalizeStats": how the trial that this subobject reports ended. It reports one of
+ *   three trials, whichever the plan ran:
+ *   (1) the capped trial resumed with the remaining budget, after the cost-based ranker could
+ *       not decide (e.g. an inestimable plan): every surviving plan carries both subobjects;
+ *   (2) pure multiplanning's single uncapped trial: no capped phase ran, so this is the plan's
+ *       only subobject;
+ *   (3) the finishing-up trial of the plan the cost-based ranker chose, which collects the works
+ *       the plan cache needs: only the winner carries this subobject, next to its estimate one.
+ * - "final": the stop condition of the last phase the plan ran, i.e. of the last subobject
+ *   present. Use it when the caller does not care which phases the plan ran.
  */
-export function assertStopCondition(plan, expected) {
+export function assertStopCondition(plan, expected, phase) {
     assert(Object.values(MultiPlannerStopCondition).includes(expected), "Unknown stop condition", {
         expected,
     });
-    assert(
-        plan.hasOwnProperty("multiPlanStats"),
-        "expected a plan that ran a multi-planning trial",
-        {plan},
+    const presentGroups = ["multiPlanEstimateStats", "multiPlanFinalizeStats"].filter((name) =>
+        plan.hasOwnProperty(name),
     );
-    assert.eq(plan.multiPlanStats.stopCondition, expected, {plan});
+    assert.gte(presentGroups.length, 1, "expected a plan that ran a multi-planning trial", {plan});
+    if (phase === "final") {
+        phase = presentGroups[presentGroups.length - 1];
+    } else {
+        assert(
+            ["multiPlanEstimateStats", "multiPlanFinalizeStats"].includes(phase),
+            "Unknown trial phase subobject",
+            {phase},
+        );
+        assert(plan.hasOwnProperty(phase), "expected the plan to have run the phase", {
+            plan,
+            phase,
+        });
+    }
+    assert.eq(plan[phase].stopCondition, expected, {plan, phase});
 }
 
 /**
@@ -464,7 +491,8 @@ export function normalizePlan(plan, flatten = true) {
         "costEstimate",
         "estimatesMetadata",
         "statistics",
-        "multiPlanStats",
+        "multiPlanEstimateStats",
+        "multiPlanFinalizeStats",
         "solutionHashUnstable",
     ];
 
@@ -1861,7 +1889,8 @@ export function canonicalizePlan(p) {
     delete p.estimatesMetadata;
     // The V3 explain shape's per-node statistics grouping and plan-level fields.
     delete p.statistics;
-    delete p.multiPlanStats;
+    delete p.multiPlanEstimateStats;
+    delete p.multiPlanFinalizeStats;
     delete p.solutionHashUnstable;
     if (p.hasOwnProperty("inputStage")) {
         canonicalizePlan(p.inputStage);

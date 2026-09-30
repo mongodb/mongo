@@ -116,22 +116,28 @@ private:
 };
 
 /**
- * Converts the stats tree 'stats' into a BSON object in the V3 explain node shape:
- * structural fields (stage, planNodeId, keyPattern, indexBounds, filter, ...) stay flat on the
- * node, children always nest as the "inputStages" array (no single-child "inputStage" object,
- * unlike the legacy shape), and the statistics are grouped per node under a sparse "statistics"
- * subobject -
- * "costBased" holds the cost-based ranker's estimates (present iff the estimate map has an entry
- * for the node's QSN) and "multiPlan" holds the multi-planning trial counters (present iff
- * 'isTrialTree' and the policy requests per-candidate statistics). 'isTrialTree' states whether
- * this stats tree carries multi-planning trial counters; it applies to the whole tree. If there is
- * a MultiPlanStage node, it is skipped, following the subplan at 'planIdx' (like the legacy
- * serializer). 'topLevelBob' tracks the size of the overall explain object for the size guard;
- * it is only read.
+ * Serializes the stats tree 'stats' into 'bob' in the V3 explain node shape: structural fields
+ * (stage, planNodeId, keyPattern, filter, ...) stay flat on the node, children always nest as the
+ * "inputStages" array, and a MultiPlanStage node is skipped by following its 'planIdx' child (like
+ * the legacy serializer).
+ *
+ * Per-node statistics go under a sparse "statistics" subobject:
+ * - "costBased": the cost-based ranker's estimates; present iff 'estimates' has an entry for the
+ *   node's QSN.
+ * - "multiPlanEstimate"/"multiPlanFinalize": the multi-planning trial counters, split per trial
+ *   phase; emitted iff 'isTrialTree' and 'explainPolicy' requests per-candidate statistics.
+ *   'estimateStats' is the plan's candidate-rooted capped-phase stats, nullptr when the trial
+ *   had no capped phase. Without it, a single "multiPlanFinalize" carries the cumulative
+ *   counters. With it, "multiPlanEstimate"  carries the snapshot's counters and
+ *   "multiPlanFinalize" the increments accumulated after the boundary, emitted only for nodes
+ *   that did work then.
+ *
+ * 'topLevelBob' is only read: it tracks the size of the whole explain object for the size guard.
  */
 void statsToBsonV3(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                    const cost_based_ranker::EstimateMap& estimates,
                    const PlanStageStats& stats,
+                   const PlanStageStats* estimateStats,
                    const ExplainPolicy& explainPolicy,
                    bool isTrialTree,
                    boost::optional<size_t> planIdx,

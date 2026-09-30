@@ -13,13 +13,14 @@ import {
     assertWellFormedPlan,
     hasCostBasedGroup,
     hasMultiPlanGroup,
-    stageNames,
+    kPlanPhaseGroups,
     stagesByNodeId,
+    stageNames,
 } from "jstests/libs/query/explain_v3_helpers.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
-// With featureFlagSbeFull the SBE runtime planner ranks the candidates, which changes the ranked
-// tree asserted below.
+// With featureFlagSbeFull the SBE runtime planner ranks the candidates instead of the classic
+// multi-planner's capped trial, which changes the trial-phase output asserted below.
 const sbeFull = checkSbeFullFeatureFlagEnabled(db);
 
 const collName = jsTestName();
@@ -107,9 +108,17 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
         const plans = getV3Plans(explain);
         assert.gte(plans.length, 2, {plans});
 
+        // With featureFlagSbeFull the SBE runtime planner runs the trial in one uncapped phase,
+        // so each plan carries only 'multiPlanFinalizeStats'. Otherwise the default mixed
+        // ranker's capped trial produces results and decides without a resumed phase, so each
+        // plan carries only 'multiPlanEstimateStats'.
+        const [phaseGroup, absentGroup] = sbeFull
+            ? ["multiPlanFinalizeStats", "multiPlanEstimateStats"]
+            : ["multiPlanEstimateStats", "multiPlanFinalizeStats"];
         for (const plan of plans) {
             assertWellFormedPlan(plan);
-            assert(plan.hasOwnProperty("multiPlanStats"), "expected multiPlanStats", {plan});
+            assert(plan.hasOwnProperty(phaseGroup), "expected " + phaseGroup, {plan});
+            assert(!plan.hasOwnProperty(absentGroup), "unexpected " + absentGroup, {plan});
             assert(hasMultiPlanGroup(plan), "expected a per-node multiPlan group", {plan});
         }
 
@@ -129,7 +138,7 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
         // descending.
         assertChosenRanker(explain, ChosenRanker.kMultiPlanning);
         assertDescending(
-            plans.slice(1).map((plan) => plan.multiPlanStats.score),
+            plans.slice(1).map((plan) => plan[phaseGroup].score),
             "SBE score order",
         );
     });
@@ -139,7 +148,9 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
         const plans = getV3Plans(explain);
         assert.eq(plans.length, 1, {plans});
         assertWellFormedPlan(plans[0]);
-        assert(!plans[0].hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {plans});
+        for (const group of kPlanPhaseGroups) {
+            assert(!plans[0].hasOwnProperty(group), "unexpected plan-level phase group", {plans});
+        }
         assert(!hasMultiPlanGroup(plans[0]), "unexpected multiPlan group", {plans});
         assert(plans[0].hasOwnProperty("slotBasedPlan"), "winner must carry slotBasedPlan", {
             plans,
@@ -186,15 +197,15 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
 
             // Node ids are assigned post-order, so extending the plan and rewriting it leave the
             // find part's ids untouched: the nodes the two trees share are correlatable by id.
-            const rankedStages = stagesByNodeId(plans[0].planStages);
-            const executedStages = stagesByNodeId(plans[0].executedPlanStages);
-            const sharedIds = Object.keys(rankedStages).filter((id) => id in executedStages);
-            assert.gt(sharedIds.length, 0, "expected the two trees to share a node", context);
-            for (const id of sharedIds) {
+            const rankedIds = stagesByNodeId(plans[0].planStages);
+            const executedIds = stagesByNodeId(plans[0].executedPlanStages);
+            const shared = Object.keys(rankedIds).filter((s) => s in executedIds);
+            assert.gt(shared.length, 0, "expected the two trees to share a node", context);
+            for (const stage of shared) {
                 assert.eq(
-                    rankedStages[id],
-                    executedStages[id],
-                    `stage disagrees between the ranked and executed tree for planNodeId ${id}`,
+                    rankedIds[stage],
+                    executedIds[stage],
+                    `planNodeId disagrees between the ranked and executed tree for ${stage}`,
                     context,
                 );
             }
@@ -248,7 +259,9 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
         assert.gte(plans.length, 2, {plans});
         for (const plan of plans) {
             assertWellFormedPlan(plan);
-            assert(!plan.hasOwnProperty("multiPlanStats"), "unexpected multiPlanStats", {plan});
+            for (const group of kPlanPhaseGroups) {
+                assert(!plan.hasOwnProperty(group), "unexpected plan-level phase group", {plan});
+            }
             assert(!hasMultiPlanGroup(plan), "unexpected multiPlan group", {plan});
             assert(!hasCostBasedGroup(plan), "unexpected costBased group", {plan});
         }

@@ -344,20 +344,36 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         const auto noEarlyExitCondition = moreToDo ? MultiPlannerStopCondition::kExhaustedBudget
                                                    : MultiPlannerStopCondition::kTrialEndedEarly;
 
+        // Count the results this trial phase produced and set the stop condition of each
+        // candidate that ran it. This loop and the capped-phase-stats loop below cover only
+        // _candidates[0..childrenSize) - the non-rejected set workAllPlans() iterates; a candidate
+        // rejected before this phase (e.g. abandoned when CBR chose the winner) keeps the stop
+        // condition its own trial ended with.
         size_t numDocsFound = 0;
-        for (auto& candidate : _candidates) {
+        for (size_t i = 0; i < childrenSize; ++i) {
+            auto& candidate = _candidates[i];
             numDocsFound += candidate.results.size();
-            // Every candidate has now run a trial, so each one has a stop condition. A candidate
-            // that did exit early keeps the reason recorded by workAllPlans(). In the capped
-            // trial flow this may set a no-early-exit condition for a candidate that a
-            // later trial phase resumes and exits early - that phase overwrites it with the real
-            // reason. A candidate that failed in a recoverable fashion already recorded kFailed at
-            // the moment it failed - its trial was ended by the failure, not by any of the trial's
-            // own bounds - so the status check preserves that reason rather than overwriting it.
-            // TODO SERVER-133123 Reconsider the override logic for when a candidate is resumed
-            // after the initial capped trial, where the stopCondition is potentially already set.
+            // Every candidate of this phase now has a stop condition. A candidate that did exit
+            // early keeps the reason recorded by workAllPlans(). In the capped trial flow this
+            // may set a no-early-exit condition for a candidate that a later trial phase resumes
+            // and exits early - that phase overwrites it with the real reason. The capped phase's
+            // own value is saved below ('estimatePhaseStopCondition'). A candidate that failed in
+            // a recoverable fashion already recorded kFailed at the moment it failed - so the
+            // status check preserves that reason rather than overwriting it.
             if (!candidate.exitedEarly && candidate.status.isOK()) {
                 candidate.stopCondition = noEarlyExitCondition;
+            }
+        }
+
+        // At the end of a capped trial phase, save a copy of each candidate's stats and stop
+        // condition before a resumed phase keeps adding to the same counters. V3 explain reports
+        // the capped phase's stats as the estimate phase and computes the finalize phase as the
+        // cumulative counters minus the capped phase's.
+        if (trialConfig.isCappedTrialPhase && _query->getExplain()) {
+            for (size_t i = 0; i < childrenSize; ++i) {
+                auto& candidate = _candidates[i];
+                candidate.estimatePhaseStats = candidate.root->getStats();
+                candidate.estimatePhaseStopCondition = candidate.stopCondition;
             }
         }
 
@@ -669,6 +685,11 @@ bool MultiPlanStage::hasBackupPlan() const {
         planExplainerData.multiPlannerWinningPlanScore = getCandidateScore(_bestPlanIdx);
         planExplainerData.multiPlannerWinningPlanStopCondition =
             _candidates[_bestPlanIdx].stopCondition;
+        // The capped phase's stats are moved, not cloned: this extraction is their only consumer.
+        planExplainerData.multiPlannerWinningPlanEstimateStats =
+            std::move(_candidates[_bestPlanIdx].estimatePhaseStats);
+        planExplainerData.multiPlannerWinningPlanEstimateStopCondition =
+            _candidates[_bestPlanIdx].estimatePhaseStopCondition;
     }
 
     for (size_t i = 0; i < _rejected.size(); ++i) {
@@ -676,11 +697,14 @@ bool MultiPlanStage::hasBackupPlan() const {
         // See _candidates and _rejected. These stage trees ran a multi-planning trial, so
         // their counters are trial statistics ('ranTrial').
         auto& candidate = _candidates[i + _children.size()];
-        planExplainerData.rejectedPlansWithStages.push_back({std::move(candidate.solution),
-                                                             std::move(_rejected[i]),
-                                                             /*ranTrial*/ true,
-                                                             candidate.adjustedScore,
-                                                             candidate.stopCondition});
+        planExplainerData.rejectedPlansWithStages.push_back(
+            {std::move(candidate.solution),
+             std::move(_rejected[i]),
+             /*ranTrial*/ true,
+             candidate.adjustedScore,
+             candidate.stopCondition,
+             std::move(candidate.estimatePhaseStats),
+             candidate.estimatePhaseStopCondition});
     }
     _rejected.clear();
     return planExplainerData;

@@ -191,8 +191,8 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 /**
  * Appends the execution counters common to every stage (nReturned, works, needTime, ...). Called
  * by the legacy serializer when the policy requests execution stats, and by the V3 serializer
- * inside the per-node "statistics.multiPlan" group. The per-stage-specific counters are handled
- * separately by appendStageCounters() below.
+ * inside the per-node "statistics.multiPlanEstimate"/"multiPlanFinalize" subobjects. The
+ * per-stage-specific counters are handled separately by appendStageCounters() below.
  */
 void appendCommonExecStats(const PlanStageStats& stats, BSONObjBuilder* bob) {
     bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
@@ -803,13 +803,101 @@ boost::optional<double> rootCostOf(const cost_based_ranker::EstimateMap& estimat
 
 namespace {
 /**
+ * Returns the node of 'stats' that describes the same PlanStage the capped-phase stats
+ * 'estimateRoot' were cloned from, or nullptr if there is none. Descends through a MultiPlanStage
+ * node (into its 'planIdx' child) and through non-matching single-child wrapper stages. The match
+ * may have more children than 'estimateRoot': a stage can add children after the capped phase
+ * (e.g. a NearStage appends one child per search interval it opens), so the clone's children are
+ * an index-aligned prefix of the final ones.
+ */
+const PlanStageStats* findMatchingEstimateNode(const PlanStageStats* stats,
+                                               boost::optional<size_t> planIdx,
+                                               const PlanStageStats& estimateRoot) {
+    for (const auto* node = stats; node;
+         node = node->children.size() == 1 ? node->children[0].get() : nullptr) {
+        if (STAGE_MULTI_PLAN == node->stageType) {
+            tassert(
+                13312300, "Invalid child plan index", planIdx && *planIdx < node->children.size());
+            node = node->children[*planIdx].get();
+        }
+        // The snapshot's node, found: same stage type, and at least as many children - the stage
+        // may have added children after the snapshot was taken (see above), never removed any.
+        if (node->stageType == estimateRoot.stageType &&
+            node->children.size() >= estimateRoot.children.size()) {
+            return node;
+        }
+    }
+    return nullptr;
+}
+
+/**
+ * Returns whether 'name' is a cumulative counter that can be subtracted to obtain per-phase
+ * values, as opposed to point-in-time state.
+ */
+bool isCounterField(std::string_view name) {
+    return name != "isEOF" && name != "failed" && name != "usedDisk" && name != "memLimit" &&
+        name != "memUsage" && name != "peakTrackedMemBytes";
+}
+
+/**
+ * Serializes the execution counters of one stats node - the common counters plus the
+ * stage-specific ones - exactly the content of a node's multi-planner statistics subobject.
+ */
+BSONObj serializeNodeCounters(const PlanStageStats& stats) {
+    BSONObjBuilder bob;
+    appendCommonExecStats(stats, &bob);
+    appendStageCounters(stats, &bob);
+    return bob.obj();
+}
+
+/**
+ * Appends to 'bob' the finalize-phase view of a node's counters: for every field of the
+ * cumulative 'finalObj', its increment over the capped-phase 'estimateObj' (a field missing
+ * from the snapshot counts from zero). Fields that are not numbers (e.g. GEO_NEAR's
+ * searchIntervals) and fields that are not counters (see isCounterField()) take their final value
+ * as-is.
+ */
+void appendNodeCounterDiff(const BSONObj& finalObj,
+                           const BSONObj& estimateObj,
+                           BSONObjBuilder* bob) {
+    for (auto&& el : finalObj) {
+        const std::string_view name = el.fieldNameStringData();
+        if (!el.isNumber() || !isCounterField(name)) {
+            bob->append(el);
+            continue;
+        }
+        const BSONElement estimateEl = estimateObj[name];
+        // A counter missing from the snapshot is EOO, which fails isNumber(): its capped-phase
+        // value is taken as 0, so the whole final value is attributed to the finalize phase.
+        const long long estimateValue = estimateEl.isNumber() ? estimateEl.safeNumberLong() : 0;
+        const long long increment = el.safeNumberLong() - estimateValue;
+        tassert(13312305,
+                str::stream() << "negative finalize-phase increment for counter '" << name << "'",
+                increment >= 0);
+        bob->appendNumber(name, increment);
+    }
+}
+
+/**
  * The recursive core of statsToBsonV3(). 'topLevelBob' is const: it is only read - to track the
  * size of the overall explain object for the size guard. Nodes cannot accidentally be appended to
  * it instead of 'bob'.
+ *
+ * The estimate-tree parameters implement the trial phase split of the multi-planner statistics:
+ * 'estimateRoot' is the plan's candidate-rooted capped-phase stats (nullptr when the trial
+ * had no capped phase), 'estimateAlignTarget' the node of the displayed tree it pairs with (see
+ * findMatchingEstimateNode()), and 'estimateNode' the snapshot node paired with 'stats' - non-null
+ * exactly on the aligned subtree, where the walk descends both trees in lockstep (they are clones
+ * of the same PlanStage tree, so the snapshot's children are an index-aligned prefix of the final
+ * ones; children the stage added after the capped phase have no capped-phase node and serialize as
+ * finalize-only).
  */
 void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                        const cost_based_ranker::EstimateMap& estimates,
                        const PlanStageStats& stats,
+                       const PlanStageStats* estimateRoot,
+                       const PlanStageStats* estimateAlignTarget,
+                       const PlanStageStats* estimateNode,
                        const ExplainPolicy& explainPolicy,
                        bool isTrialTree,
                        boost::optional<size_t> planIdx,
@@ -829,6 +917,9 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         statsToBsonV3Impl(planStageQsnMap,
                           estimates,
                           *childStage,
+                          estimateRoot,
+                          estimateAlignTarget,
+                          childStage == estimateAlignTarget ? estimateRoot : estimateNode,
                           explainPolicy,
                           isTrialTree,
                           planIdx,
@@ -862,9 +953,10 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         bob.append("filter", stats.common.filter);
     }
 
-    // The per-node statistics grouping, deliberately emitted after the node's structure: a reader
-    // sees what the stage is before what it measured, and the statistics are the one part of the
-    // node that varies with the explain policy.
+    // The per-node "statistics" subobject holds two kinds of statistics: the cost-based ranker's
+    // estimates ("costBased") and the multi-planner's trial counters ("multiPlanEstimate",
+    // "multiPlanFinalize"). Each is present iff the policy requests that kind and it was computed
+    // for this node. plannerChoice requests neither kind.
     const bool hasCostBased = explainPolicy.hasCostBasedStats() && querySolutionNode &&
         estimates.contains(querySolutionNode);
     const bool hasMultiPlan = explainPolicy.hasAllPlansStats() && isTrialTree;
@@ -875,9 +967,40 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 stats.stageType, *estimates.at(querySolutionNode), statisticsBob);
         }
         if (hasMultiPlan) {
-            BSONObjBuilder multiPlanBob(statisticsBob.subobjStart("multiPlan"));
-            appendCommonExecStats(stats, &multiPlanBob);
-            appendStageCounters(stats, &multiPlanBob);
+            if (!estimateNode) {
+                // One-phase node: the trial had no capped phase, this is a wrapper stage above
+                // the candidate's own tree (an in-tree MultiPlanStage's parents, or the CountStage
+                // explain stacks onto stored rejected count plans), or a child its parent stage
+                // added after the capped phase - its counters accumulated entirely in the
+                // finalize phase. The single subobject carries the cumulative counters, exactly
+                // the content of the pre-split "statistics.multiPlan".
+                BSONObjBuilder multiPlanFinalizeBob(statisticsBob.subobjStart("multiPlanFinalize"));
+                appendCommonExecStats(stats, &multiPlanFinalizeBob);
+                appendStageCounters(stats, &multiPlanFinalizeBob);
+            } else {
+                tassert(13312306,
+                        "capped-phase stats node does not match the displayed stats tree",
+                        estimateNode->stageType == stats.stageType &&
+                            estimateNode->children.size() <= stats.children.size());
+                tassert(13312307,
+                        "estimate-phase works exceed the node's cumulative works",
+                        stats.common.works >= estimateNode->common.works);
+                const BSONObj estimateObj = serializeNodeCounters(*estimateNode);
+                {
+                    BSONObjBuilder multiPlanEstimateBob(
+                        statisticsBob.subobjStart("multiPlanEstimate"));
+                    multiPlanEstimateBob.appendElements(estimateObj);
+                }
+                // A phase's subobject exists only when the node did work in that phase:
+                // "multiPlanFinalize" is suppressed when the node was not worked after the capped
+                // phase.
+                if (stats.common.works > estimateNode->common.works) {
+                    BSONObjBuilder multiPlanFinalizeBob(
+                        statisticsBob.subobjStart("multiPlanFinalize"));
+                    appendNodeCounterDiff(
+                        serializeNodeCounters(stats), estimateObj, &multiPlanFinalizeBob);
+                }
+            }
         }
     }
 
@@ -891,11 +1014,21 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     // node shape always uses the array: one uniform traversal rule for consumers, even for the
     // common single-child chain.
     BSONArrayBuilder childrenBob(bob.subarrayStart("inputStages"));
-    for (auto& child : stats.children) {
+    for (size_t i = 0; i < stats.children.size(); ++i) {
+        const PlanStageStats* child = stats.children[i].get();
+        // Below the aligned subtree the two trees descend in lockstep; above it, the pairing
+        // starts exactly at the alignment target. A child beyond the snapshot's (prefix-aligned)
+        // children was added after the capped phase and has no capped-phase node.
+        const PlanStageStats* childEstimate = estimateNode
+            ? (i < estimateNode->children.size() ? estimateNode->children[i].get() : nullptr)
+            : (child == estimateAlignTarget ? estimateRoot : nullptr);
         BSONObjBuilder childBob(childrenBob.subobjStart());
         statsToBsonV3Impl(planStageQsnMap,
                           estimates,
                           *child,
+                          estimateRoot,
+                          estimateAlignTarget,
+                          childEstimate,
                           explainPolicy,
                           isTrialTree,
                           planIdx,
@@ -909,6 +1042,7 @@ void statsToBsonV3Impl(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 void statsToBsonV3(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                    const cost_based_ranker::EstimateMap& estimates,
                    const PlanStageStats& stats,
+                   const PlanStageStats* estimateStats,
                    const ExplainPolicy& explainPolicy,
                    bool isTrialTree,
                    boost::optional<size_t> planIdx,
@@ -916,8 +1050,24 @@ void statsToBsonV3(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                    const BSONObjBuilder* topLevelBob) {
     tassert(13052900, "encountered unexpected nullptr for BSONObjBuilder", bob);
     tassert(13052901, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
-    statsToBsonV3Impl(
-        planStageQsnMap, estimates, stats, explainPolicy, isTrialTree, planIdx, *bob, *topLevelBob);
+    const PlanStageStats* estimateAlignTarget = nullptr;
+    if (estimateStats) {
+        estimateAlignTarget = findMatchingEstimateNode(&stats, planIdx, *estimateStats);
+        tassert(13312304,
+                "no counterpart of the capped-phase stats in the displayed stats tree",
+                estimateAlignTarget);
+    }
+    statsToBsonV3Impl(planStageQsnMap,
+                      estimates,
+                      stats,
+                      estimateStats,
+                      estimateAlignTarget,
+                      &stats == estimateAlignTarget ? estimateStats : nullptr,
+                      explainPolicy,
+                      isTrialTree,
+                      planIdx,
+                      *bob,
+                      *topLevelBob);
 }
 
 PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
@@ -1083,6 +1233,16 @@ PlanExplainerImpl::PlanExplainerImpl(PlanStage* root,
         _explainData.multiPlannerWinningPlanTrialStats = _root->getStats();
         _explainData.multiPlannerWinningPlanScore = getWinningPlanScore(_root);
         _explainData.multiPlannerWinningPlanStopCondition = getWinningPlanStopCondition(_root);
+        // The winner's capped-phase stats, when its trial had a capped phase. Cloned, not
+        // moved: the candidate stays inside the in-tree MultiPlanStage.
+        const auto mps = getMultiPlanStage(_root);
+        const auto& winnerCandidate = mps->getCandidate(*mps->bestPlanIdx());
+        if (winnerCandidate.estimatePhaseStats) {
+            _explainData.multiPlannerWinningPlanEstimateStats =
+                std::unique_ptr<PlanStageStats>(winnerCandidate.estimatePhaseStats->clone());
+            _explainData.multiPlannerWinningPlanEstimateStopCondition =
+                winnerCandidate.estimatePhaseStopCondition;
+        }
     }
 }
 
@@ -1371,6 +1531,11 @@ struct NormalizedPlanInfo {
     bool ranTrial = false;
     // How the plan's trial period ended, for plans that ran one.
     boost::optional<MultiPlannerStopCondition> stopCondition;
+    // The plan's capped-phase stats and stop condition (SolutionWithPlanStage::estimateStats /
+    // estimateStopCondition); null when its trial had no capped phase. Unlike 'stats' the
+    // snapshot's root excludes the MultiPlanStage.
+    std::unique_ptr<PlanStageStats> estimateStats;
+    boost::optional<MultiPlannerStopCondition> estimateStopCondition;
     // The displayed trial score (QuerySolution::score; no tie-breaking bonuses).
     boost::optional<double> score;
     // The final ranking score (trial score plus tie-breaking bonuses): sorting by it descending
@@ -1503,6 +1668,54 @@ ExplainPlanEntry makeV3PlanEntry(const NormalizedPlanInfo& plan,
         if (policy.hasAllPlansStats() && plan.score) {
             entry.summary->score = *plan.score;
         }
+        if (plan.estimateStats) {
+            // Two-phase trial: the estimate totals come from the capped-phase stats. The
+            // finalize totals are the increments the plan accumulated after the capped phase,
+            // computed over the snapshot's counterpart node in the final tree.
+            // 'finalizeSummary' is set only if the plan did work after the capped phase. The
+            // candidate root's works counter is the criterion, since in a classic tree all work
+            // flows through the root's work() calls.
+            const auto* candidateRoot =
+                findMatchingEstimateNode(plan.stats.get(), plan.planIdx, *plan.estimateStats);
+            tassert(13312301,
+                    "no counterpart of the capped-phase stats in the displayed stats tree",
+                    candidateRoot);
+            tassert(13312302,
+                    "estimate-phase works exceed the cumulative works",
+                    candidateRoot->common.works >= plan.estimateStats->common.works);
+            entry.estimateSummary =
+                collectExecutionStatsSummary(plan.estimateStats.get(), boost::none);
+            entry.estimateStopCondition = plan.estimateStopCondition;
+            if (candidateRoot->common.works > plan.estimateStats->common.works) {
+                const PlanSummaryStats finalTotals =
+                    collectExecutionStatsSummary(candidateRoot, boost::none);
+                const PlanSummaryStats& estimateTotals = *entry.estimateSummary;
+                tassert(13312303,
+                        "estimate-phase totals exceed the cumulative totals",
+                        finalTotals.nReturned >= estimateTotals.nReturned &&
+                            finalTotals.totalKeysExamined >= estimateTotals.totalKeysExamined &&
+                            finalTotals.totalDocsExamined >= estimateTotals.totalDocsExamined &&
+                            finalTotals.executionTime.executionTimeEstimate >=
+                                estimateTotals.executionTime.executionTimeEstimate);
+                PlanSummaryStats finalizeTotals;
+                finalizeTotals.nReturned = finalTotals.nReturned - estimateTotals.nReturned;
+                finalizeTotals.totalKeysExamined =
+                    finalTotals.totalKeysExamined - estimateTotals.totalKeysExamined;
+                finalizeTotals.totalDocsExamined =
+                    finalTotals.totalDocsExamined - estimateTotals.totalDocsExamined;
+                finalizeTotals.executionTime =
+                    QueryExecTime{finalTotals.executionTime.precision,
+                                  finalTotals.executionTime.executionTimeEstimate -
+                                      estimateTotals.executionTime.executionTimeEstimate};
+                // A state, not a counter: the finalize phase reports the final value.
+                finalizeTotals.planFailed = finalTotals.planFailed;
+                entry.finalizeSummary = std::move(finalizeTotals);
+            }
+        } else if (plan.ranTrial) {
+            // One-phase trial (no capped phase): the whole trial is the finalize phase, so its
+            // totals are the plan's cumulative totals.
+            entry.finalizeSummary = *entry.summary;
+        }
     }
 
     boost::optional<cost_based_ranker::EstimateMap> remappedEstimates;
@@ -1516,6 +1729,7 @@ ExplainPlanEntry makeV3PlanEntry(const NormalizedPlanInfo& plan,
     statsToBsonV3(explainData.planStageQsnMap,
                   remappedEstimates ? *remappedEstimates : explainData.estimates,
                   *plan.stats,
+                  plan.estimateStats.get(),
                   policy,
                   plan.ranTrial,
                   plan.planIdx,
@@ -1552,15 +1766,28 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
         winner.score = _explainData.multiPlannerWinningPlanScore;
         winner.ranTrial = true;
         winner.stopCondition = _explainData.multiPlannerWinningPlanStopCondition;
+        if (_explainData.multiPlannerWinningPlanEstimateStats) {
+            winner.estimateStats = std::unique_ptr<PlanStageStats>(
+                _explainData.multiPlannerWinningPlanEstimateStats->clone());
+            winner.estimateStopCondition =
+                _explainData.multiPlannerWinningPlanEstimateStopCondition;
+        }
     } else {
         winner.stats = _root->getStats();
         winner.score = getWinningPlanScore(_root);
         winner.ranTrial = winner.planIdx.has_value();
         // The winner is still a candidate of the in-tree MultiPlanStage, which is also the only way
-        // 'ranTrial' can be true here, so its stop condition is read from the candidate itself.
+        // 'ranTrial' can be true here, so its stop condition and capped-phase stats are read
+        // from the candidate itself.
         if (winner.ranTrial) {
             if (auto mps = getMultiPlanStage(_root)) {
-                winner.stopCondition = mps->getCandidate(*winner.planIdx).stopCondition;
+                const auto& candidate = mps->getCandidate(*winner.planIdx);
+                winner.stopCondition = candidate.stopCondition;
+                if (candidate.estimatePhaseStats) {
+                    winner.estimateStats =
+                        std::unique_ptr<PlanStageStats>(candidate.estimatePhaseStats->clone());
+                    winner.estimateStopCondition = candidate.estimatePhaseStopCondition;
+                }
             }
         }
     }
@@ -1580,17 +1807,23 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
                 continue;
             }
             const auto& candidate = mps->getCandidate(i);
-            // Non-winner subtrees do not accumulate work after plan selection.
-            candidates.push_back(
-                NormalizedPlanInfo{_root->getStats(),
-                                   i,
-                                   /*ranTrial*/ true,
-                                   candidate.stopCondition,
-                                   mps->getCandidateScore(i),
-                                   candidate.adjustedScore,
-                                   rootCostOf(_explainData.estimates, candidate.solution->root()),
-                                   candidate.solution->hash(),
-                                   candidate.solution->root()});
+            // Non-winner subtrees do not accumulate work after plan selection. The candidate's
+            // capped-phase stats are cloned: the candidate stays inside the stage and the
+            // enumeration must be repeatable.
+            candidates.push_back(NormalizedPlanInfo{
+                _root->getStats(),
+                i,
+                /*ranTrial*/ true,
+                candidate.stopCondition,
+                candidate.estimatePhaseStats
+                    ? std::unique_ptr<PlanStageStats>(candidate.estimatePhaseStats->clone())
+                    : nullptr,
+                candidate.estimatePhaseStopCondition,
+                mps->getCandidateScore(i),
+                candidate.adjustedScore,
+                rootCostOf(_explainData.estimates, candidate.solution->root()),
+                candidate.solution->hash(),
+                candidate.solution->root()});
         }
     }
 
@@ -1598,16 +1831,20 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesV3(
     // never ran (e.g. CBR-rejected) carry an unexecuted display tree and, since
     // QuerySolution::score is only ever written by the multi-planner's scorer, no score either.
     for (auto&& rejected : _explainData.rejectedPlansWithStages) {
-        candidates.push_back(
-            NormalizedPlanInfo{rejected.planStage->getStats(),
-                               boost::none,
-                               rejected.ranTrial,
-                               rejected.ranTrial ? rejected.stopCondition : boost::none,
-                               rejected.ranTrial ? rejected.solution->score : boost::none,
-                               rejected.ranTrial ? rejected.adjustedScore : boost::none,
-                               rootCostOf(_explainData.estimates, rejected.solution->root()),
-                               rejected.solution->hash(),
-                               rejected.solution->root()});
+        candidates.push_back(NormalizedPlanInfo{
+            rejected.planStage->getStats(),
+            boost::none,
+            rejected.ranTrial,
+            rejected.ranTrial ? rejected.stopCondition : boost::none,
+            rejected.estimateStats
+                ? std::unique_ptr<PlanStageStats>(rejected.estimateStats->clone())
+                : nullptr,
+            rejected.estimateStopCondition,
+            rejected.ranTrial ? rejected.solution->score : boost::none,
+            rejected.ranTrial ? rejected.adjustedScore : boost::none,
+            rootCostOf(_explainData.estimates, rejected.solution->root()),
+            rejected.solution->hash(),
+            rejected.solution->root()});
     }
 
     // TODO SERVER-132011: move this duplicate-plan pairing and estimate remapping into the

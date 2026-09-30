@@ -51,6 +51,10 @@ struct SolutionWithPlanStage {
     // How this plan's multi-planner trial period ended. Set exactly when 'ranTrial' is true; a plan
     // that never ran has no stop condition to report.
     boost::optional<MultiPlannerStopCondition> stopCondition;
+    // This plan's BaseCandidatePlan::estimatePhaseStats / estimatePhaseStopCondition, moved out
+    // of the candidate.
+    std::unique_ptr<PlanStageStats> estimateStats;
+    boost::optional<MultiPlannerStopCondition> estimateStopCondition;
 };
 
 struct PlanExplainerData {
@@ -61,6 +65,11 @@ struct PlanExplainerData {
     // How the winning plan's trial period ended. Populated alongside
     // 'multiPlannerWinningPlanTrialStats', i.e. only when the multi-planner chose the winner.
     boost::optional<MultiPlannerStopCondition> multiPlannerWinningPlanStopCondition;
+    // The winning plan's BaseCandidatePlan::estimatePhaseStats / estimatePhaseStopCondition,
+    // moved out of the candidate. Null when the trial had no capped phase or the query is not
+    // an explain.
+    std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanEstimateStats;
+    boost::optional<MultiPlannerStopCondition> multiPlannerWinningPlanEstimateStopCondition;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
     // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
@@ -144,7 +153,8 @@ enum class PlanStatsFormat {
     // after the winner in enumeration order. Exactly the semantics of the legacy winning/rejected
     // accessors.
     kLegacy,
-    // The V3 node shape: per-node statistics{costBased, multiPlan} grouping, the
+    // The V3 node shape: per-node statistics{costBased, multiPlanEstimate, multiPlanFinalize}
+    // subobjects, the
     // winner's tree sourced from the pre-execution trial snapshot (trial statistics, never
     // final-execution statistics), plans after the winner ordered by the deciding ranker's metric.
     kV3,
@@ -165,7 +175,8 @@ struct ExplainPlanEntry {
     boost::optional<PlanSummaryStats> summary;
     // True when this plan ran a multi-planning trial: its stats tree carries trial counters and
     // 'summary' holds the plan-level trial totals. This is the output-side contract the V3
-    // queryPlanner assembler consumes to emit the plan-level "multiPlanStats" (it cannot be
+    // queryPlanner assembler consumes to emit the plan-level "multiPlanEstimateStats" /
+    // "multiPlanFinalizeStats" subobjects (it cannot be
     // inferred from 'summary', which is also collected for never-ran plans). The enumeration
     // derives it from one of three provenance sources per plan: the winner's trial snapshot,
     // membership in an in-tree MultiPlanStage, or SolutionWithPlanStage::ranTrial for stored
@@ -180,13 +191,22 @@ struct ExplainPlanEntry {
     // The plan's QuerySolution hash, when known. Emitted as "solutionHashUnstable" at plan level
     // in the V3 output when the forced-plan-by-hash knob is enabled.
     boost::optional<size_t> solutionHash;
-    // How this plan's multi-planner trial period ended, when it ran one. Present exactly when
-    // 'hasTrialStats' is true and the trial recorded a condition, and drawn from the same three
-    // provenance sources as 'hasTrialStats'. Emitted by the V3 assembler inside the plan-level
-    // "multiPlanStats" alongside the trial totals, as "stopCondition". Being optional
-    // independently of those totals, it can be absent from a multiPlanStats that is otherwise
-    // populated.
+    // How this plan's multi-planner trial ended. Set exactly when 'hasTrialStats' is true. Emitted
+    // as "stopCondition" inside the last plan-level phase subobject present (see below).
     boost::optional<MultiPlannerStopCondition> stopCondition;
+    // The plan-level totals of the capped (estimate) trial phase, when the trial had one and the
+    // policy requests execution statistics. Emitted as the "multiPlanEstimateStats" subobject.
+    boost::optional<PlanSummaryStats> estimateSummary;
+    // How the capped (estimate) trial phase ended; set together with 'estimateSummary'.
+    boost::optional<MultiPlannerStopCondition> estimateStopCondition;
+    // The plan-level totals of the finalize trial phase, when the plan did work in it and the
+    // policy requests execution statistics. Emitted as the "multiPlanFinalizeStats" subobject.
+    // For a trial with a capped phase these are the increments accumulated after it (over the
+    // candidate's own subtree; 'summary' may also cover wrapper stages stacked above it for
+    // display). For a trial without one (pure multiplanning's single uncapped trial, or the
+    // finishing-up trial of a CBR-chosen plan) the whole trial is the finalize phase and these are
+    // the plan's cumulative totals.
+    boost::optional<PlanSummaryStats> finalizeSummary;
     // The SBE virtual machine's view of this plan: the slot bindings and the stringified SBE stage
     // tree (optionally with bytecode).
     boost::optional<BSONObj> slotBasedPlan;
