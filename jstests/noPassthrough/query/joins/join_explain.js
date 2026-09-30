@@ -21,7 +21,7 @@ let conn = MongoRunner.runMongod({
 
 const db = conn.getDB("test");
 
-// TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+// TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
 if (!FeatureFlagUtil.isEnabled(db, "PersistentStats")) {
     jsTest.log.info(`Skipping ${jsTestName()}: featureFlagPersistentStats is not enabled`);
     MongoRunner.stopMongod(conn);
