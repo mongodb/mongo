@@ -158,10 +158,19 @@ public:
         _errMsg = errMsg;
     }
 
+    void recordEnabledAtRoundStart(bool enabled) {
+        _enabledAtRoundStart = enabled;
+    }
+
     BSONObj toBSON() const {
         BSONObjBuilder builder;
         builder.append("executionTimeMillis", _executionTimer.millis());
         builder.append("errorOccurred", _errMsg.has_value());
+        if (_enabledAtRoundStart) {
+            builder.append("balancerEnabledAtRoundStart", *_enabledAtRoundStart);
+            // balancerEnabledAtRoundStart is ommitted from the config.actionlog
+            // entry if the balancer's enabled status was unobtainable
+        }
 
         if (_errMsg) {
             builder.append("errmsg", *_errMsg);
@@ -182,6 +191,7 @@ public:
 
 private:
     const Timer _executionTimer;
+    boost::optional<bool> _enabledAtRoundStart;
     Milliseconds _selectionTime;
     Milliseconds _throttleTime;
     Milliseconds _migrationTime;
@@ -1109,10 +1119,13 @@ void Balancer::_mainThread() {
                 continue;
             }
 
+            const bool balancerEnabled = balancerConfig->shouldBalance(opCtx.get());
+            roundDetails.recordEnabledAtRoundStart(balancerEnabled);
+
             // Warn before we skip the iteration due to balancing being disabled.
             balancerWarning.warnIfRequired(opCtx.get(), balancerConfig->getBalancerMode());
 
-            if (!balancerConfig->shouldBalance(opCtx.get()) || _terminationRequested()) {
+            if (!balancerEnabled || _terminationRequested()) {
                 _autoMergerPolicy->disable(opCtx.get());
 
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
