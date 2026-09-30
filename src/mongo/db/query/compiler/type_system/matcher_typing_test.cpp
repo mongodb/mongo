@@ -42,6 +42,10 @@ ElementPath traversedPath(std::string_view path) {
     return ElementPath(path, ElementPath::LeafArrayBehavior::kTraverse);
 }
 
+ElementPath noLeafTraversalPath(std::string_view path) {
+    return ElementPath(path, ElementPath::LeafArrayBehavior::kNoTraversal);
+}
+
 /// Narrows the 'inputType' by 'expr' and returns the result.
 std::string narrowedDebugString(const MatchExpression* expr,
                                 Type inputType,
@@ -138,14 +142,11 @@ TEST(MatcherPathTypingTest, UnsupportedLeafArrayNarrowsNothing) {
     auto input =
         openObject({{"x", unionType(allValues(BSONType::numberInt), allValues(BSONType::string))}});
     auto constraint = allValues(BSONType::numberInt);
-    for (auto leafBehaviour : {ElementPath::LeafArrayBehavior::kNoTraversal,
-                               ElementPath::LeafArrayBehavior::kTraverseOmitArray}) {
-        auto path = ElementPath("x", leafBehaviour);
-        ASSERT_EQ(matcher::narrowPath(input, path, constraint, true).toDebugString(),
-                  input.toDebugString());
-        ASSERT_EQ(matcher::narrowPath(input, path, constraint, false).toDebugString(),
-                  input.toDebugString());
-    }
+    auto path = ElementPath("x", ElementPath::LeafArrayBehavior::kTraverseOmitArray);
+    ASSERT_EQ(matcher::narrowPath(input, path, constraint, true).toDebugString(),
+              input.toDebugString());
+    ASSERT_EQ(matcher::narrowPath(input, path, constraint, false).toDebugString(),
+              input.toDebugString());
 }
 
 TEST(MatcherPathTypingTest, UnsupportedDottedPathNarrowsNothing) {
@@ -293,6 +294,112 @@ TEST(MatcherPathTypingTest, NegatedNarrowPathToNumberSetLeavesNoDocumentForNumer
     auto numbers = Type(TypeSet::numericTypes(Extent::kAll));
     ASSERT_EQ(matcher::narrowPath(input, traversedPath("x"), numbers, false).toDebugString(),
               "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalAddsNoArrays) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), noLeafTraversalPath("x"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{x: int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowPathWithoutLeafTraversalKeepsArrays) {
+    ASSERT_EQ(
+        matcher::narrowPath(
+            Type::anyObject(), noLeafTraversalPath("x"), allValues(BSONType::numberInt), false)
+            .toDebugString(),
+        "{x: ~int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToArrayCoversWholeBracket) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), noLeafTraversalPath("x"), allValues(BSONType::array), true)
+                  .toDebugString(),
+              "{x: array, ...}");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowPathWithoutLeafTraversalToArrayRemovesWholeBracket) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), noLeafTraversalPath("x"), allValues(BSONType::array), false)
+                  .toDebugString(),
+              "{x: ~array, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToMissingOrValueAddsNoArrays) {
+    auto constraint = unionType(Type::missing(), allValues(BSONType::numberInt));
+    ASSERT_EQ(matcher::narrowPath(Type::anyObject(), noLeafTraversalPath("x"), constraint, true)
+                  .toDebugString(),
+              "{x: missing|int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToNeverLeavesNoDocument) {
+    ASSERT_EQ(matcher::narrowPath(Type::anyObject(), noLeafTraversalPath("x"), Type::never(), true)
+                  .toDebugString(),
+              "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalDropsArrayFromField) {
+    auto input =
+        openObject({{"x", unionType(allValues(BSONType::numberInt), allValues(BSONType::array))}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), allValues(BSONType::numberInt), true)
+            .toDebugString(),
+        "{x: int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalOnArrayFieldLeavesNoDocument) {
+    auto input = openObject({{"x", allValues(BSONType::array)}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), allValues(BSONType::numberInt), true)
+            .toDebugString(),
+        "never");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowPathWithoutLeafTraversalKeepsArrayField) {
+    auto input =
+        openObject({{"x", unionType(allValues(BSONType::numberInt), allValues(BSONType::array))}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), allValues(BSONType::numberInt), false)
+            .toDebugString(),
+        "{x: array, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToDisjointTypeLeavesNoDocument) {
+    auto input = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), allValues(BSONType::numberInt), true)
+            .toDebugString(),
+        "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalKeepsKnownFieldsOfNarrowedField) {
+    auto input = openObject({{"x", openObject({{"a", allValues(BSONType::numberInt)}})}});
+    ASSERT_EQ(matcher::narrowPath(input, noLeafTraversalPath("x"), Type::anyObject(), true)
+                  .toDebugString(),
+              "{x: {a: int, ...}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalOnMissingFieldLeavesNoDocument) {
+    auto input = closedObject({});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), allValues(BSONType::numberInt), true)
+            .toDebugString(),
+        "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToMissingOnPresentFieldLeavesNoDocument) {
+    auto input = openObject({{"x", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, noLeafTraversalPath("x"), Type::missing(), true).toDebugString(),
+        "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathWithoutLeafTraversalToNumberSetKeepsOnlyOverlappingType) {
+    auto input = openObject(
+        {{"x", unionType(allValues(BSONType::numberDouble), allValues(BSONType::string))}});
+    auto numbers = Type(TypeSet::numericTypes(Extent::kAll));
+    ASSERT_EQ(matcher::narrowPath(input, noLeafTraversalPath("x"), numbers, true).toDebugString(),
+              "{x: double, ...}");
 }
 
 TEST(MatcherTypingTest, TypeNarrowsFieldToTypeOrArrayHoldingIt) {

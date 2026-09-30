@@ -199,8 +199,10 @@ Type narrowPath(Type inputType, const ElementPath& path, Type constraint, bool a
             matched = addMatchingArrays(std::move(matched));
             break;
         case ElementPath::LeafArrayBehavior::kNoTraversal:
+            // Arrays are not traversed, so the value itself is the only candidate.
+            break;
         case ElementPath::LeafArrayBehavior::kTraverseOmitArray:
-            // TODO(SERVER-134936): Handle these LeafArrayBehavior cases.
+            // Not implemented, since MatchExpressions do not specify it.
             return inputType;
     }
 
