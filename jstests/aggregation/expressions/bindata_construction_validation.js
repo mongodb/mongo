@@ -1,5 +1,10 @@
 /**
  * Asserts that aggregation operators cannot produce malformed BinData values.
+ *
+ * @tags: [
+ *   # Most cases go through $function, $accumulator or mapReduce.
+ *   requires_scripting,
+ * ]
  */
 import {describe, it} from "jstests/libs/mochalite.js";
 
