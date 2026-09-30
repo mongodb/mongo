@@ -817,7 +817,7 @@ TEST_F(BlockingResultsMergerTestFixture,
     // NOTE: don't call 'runScheduledTasks()' here - see warning in that function's comment for
     // details. The BRM self-drives the baton; advanceTime() + runReadyCallbacks() below are all it
     // needs.
-    retryScheduledFp->waitForTimesEntered(retryScheduledFp.initialTimesEntered() + 1);
+    retryScheduledFp.waitForOneNewEntry();
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
 
@@ -884,9 +884,10 @@ TEST_F(BlockingResultsMergerTestFixture,
 
     // Deterministically wait for the detached retry (scheduled via 'sleepFor' on the *network*
     // clock) to be armed. The deadline is fixed at networkClock(0) + kBackoffDelayMs before we
-    // touch the clock below, so the negative assertion is meaningful. The count is relative to
-    // 'initialTimesEntered()' for the same cross-test counter reason as the attached test above.
-    retryScheduledFp->waitForTimesEntered(retryScheduledFp.initialTimesEntered() + 1);
+    // touch the clock below, so the negative assertion is meaningful. Wait relative to when the
+    // block enabled the fail point, since the fail point's absolute counter accumulates across
+    // tests in this binary.
+    retryScheduledFp.waitForOneNewEntry();
     ASSERT_FALSE(networkHasReadyRequests());
 
     // Advancing the network clock partway is still before the deadline: no retry yet.

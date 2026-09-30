@@ -38,12 +38,39 @@ Users can also wait until a fail point has been evaluated a certain number of ti
 lifetime_**. A `waitForFailPoint` command request will send a response back when the fail point has
 been evaluated the given number of times. For ease of use, the `configureFailPoint` JavaScript
 helper returns an object that can be used to wait a certain amount of times **_from when the fail
-point was enabled_**. In C++ tests, users can invoke `FailPoint::waitForTimesEntered()` for similar
-behavior. `FailPointEnableBlock` records the amount of times the fail point had been evaluated when
-it was constructed, accessible via `FailPointEnableBlock::initialTimesEntered()`.
+point was enabled_**.
 
 For JavaScript examples, see the [fail point JavaScript test][fail_point_javascript_test]. For the
 command implementations, see [here][fail_point_commands].
+
+### Waiting on Fail Points in C++
+
+If you hold a `FailPointEnableBlock`, use `waitForOneNewEntry()` / `waitForNNewEntries(n)`. Never
+pass an absolute count.
+
+```cpp
+FailPointEnableBlock fpb("myFailPoint");
+startBackgroundWork();
+
+// Each call counts from when `fpb` enabled the fail point, not from the previous call. Pick one:
+fpb.waitForOneNewEntry();          // At least 1 entry since enable.
+fpb.waitForNNewEntries(3);         // At least 3 entries since enable.
+fpb.waitForOneNewEntry(opCtx);     // Interruptible overloads take an `Interruptible*` first.
+fpb.waitForNNewEntries(opCtx, 3);
+```
+
+A fail point's `timesEntered` count is cumulative over the lifetime of the process, so an absolute
+count passed to `FailPoint::waitForTimesEntered()` can already be satisfied by earlier tests in the
+same unittest binary. Never hand-roll the relative count with
+`fpb->waitForTimesEntered(fpb.initialTimesEntered() + n)` either; use the methods above.
+
+Each method returns the number of entries since the block enabled the fail point, so you can assert
+an exact count: `ASSERT_EQ(1, fpb.waitForOneNewEntry());`
+
+If you enable a fail point with `FailPoint::setMode()` rather than a `FailPointEnableBlock`, use the
+count `setMode()` returns as the base: `auto n = fp->setMode(...); fp->waitForTimesEntered(n + 1);`.
+
+A lint rule may enforce this in the future.
 
 ## The `failCommand` Fail Point
 

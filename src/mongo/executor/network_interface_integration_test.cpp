@@ -404,7 +404,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
                                     .getNoThrow(interruptible()));
             });
 
-        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+        fpb.waitForOneNewEntry();
 
         cancellationSource.cancel();
 
@@ -530,7 +530,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
         cancellationSource.cancel();
 
         // Wait for _killOperations for 'echo' to time out.
-        cmdFailedFpb->waitForTimesEntered(interruptible(), cmdFailedFpb.initialTimesEntered() + 1);
+        cmdFailedFpb.waitForOneNewEntry(interruptible());
 
         return deferred;
     }();
@@ -561,7 +561,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelBeforeConnection) {
     });
     ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    fpb->waitForOneNewEntry();
     cancellationSource.cancel();
     fpb.reset();
 
@@ -978,7 +978,7 @@ TEST_F(NetworkInterfaceTest, NumRequestsTimedOutBeforeSentToRemoteMetric) {
 
     // Wait for the command to enter the failpoint, then reset it. The failpoint sleeps
     // internally for kDeadline+1ms, so by the time it exits the deadline is guaranteed expired.
-    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    fpb->waitForOneNewEntry();
     fpb.reset();
 
     auto result = fut.get(interruptible());
@@ -1254,7 +1254,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TearDownWaitsForInProgress) 
         });
 
         // Wait for the completion of the command
-        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+        fpb.waitForOneNewEntry();
 
         tearDownThread = stdx::thread([this, promise = std::move(tearDownPF.promise)]() mutable {
             tearDown();
@@ -1354,7 +1354,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     });
 
     // Once the command thread has reached the failpoint, begin shutdown.
-    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    fpb->waitForOneNewEntry();
 
     Notification<void> shutdownComplete;
     auto shutdownThread = stdx::thread([&]() {
@@ -1364,7 +1364,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
 
     // Wait for the shutdown thread to start draining operations in shutdown.
-    shutdownFp.get()->waitForTimesEntered(shutdownFp->initialTimesEntered() + 1);
+    shutdownFp->waitForOneNewEntry();
 
     // Disable the failpoint so the reactor can proceed and attempt to send the request.
     // Shutdown and draining should then complete despite the blocking failCommand, since the

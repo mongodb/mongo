@@ -902,13 +902,13 @@ TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationAfterTheLastBatchIs
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({op});
         startApplier();
-        publishing->waitForTimesEntered(publishing.initialTimesEntered() + 1);
+        publishing.waitForOneNewEntry();
         unittest::LogCaptureGuard logs;
         {
             // Pause drain after it sees the advancer is still busy, despite the empty FIFO queue.
             FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
             shutdownApplier();
-            beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+            beforeWait.waitForOneNewEntry();
             ASSERT_FALSE(_finished->isReady());
             ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
                       0);
@@ -934,12 +934,12 @@ TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationOfAZeroWorkerBatch)
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({op});
         startApplier();
-        publishing->waitForTimesEntered(publishing.initialTimesEntered() + 1);
+        publishing.waitForOneNewEntry();
         unittest::LogCaptureGuard logs;
         {
             FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
             shutdownApplier();
-            beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+            beforeWait.waitForOneNewEntry();
             ASSERT_FALSE(_finished->isReady());
             ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
                       0);

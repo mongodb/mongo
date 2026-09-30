@@ -283,7 +283,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
     future.default_timed_get();
 
     // This ensures the fail point has been hit exactly once.
-    failPoint->waitForTimesEntered(failPoint.initialTimesEntered() + 1);
+    failPoint.waitForOneNewEntry();
 }
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) {

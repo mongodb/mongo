@@ -592,7 +592,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelChannelEstablishment) {
     });
     ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    fpb->waitForOneNewEntry();
     cancellationSource.cancel();
     fpb.reset();
 
@@ -630,7 +630,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
         });
         ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-        fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+        fpb->waitForOneNewEntry();
         cancellationSource.cancel();
         fpb.reset();
 

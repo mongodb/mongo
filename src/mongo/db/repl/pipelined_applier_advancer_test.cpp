@@ -74,7 +74,7 @@ TEST_F(PipelinedApplierAdvancerTest, PublishesInFifoOrderAfterEveryWorkerComplet
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         advancer.startup();
         // first is not complete, so the failpoint is entered without pulling first off the tracker.
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
         ASSERT_TRUE(published().empty());
     }
     // This marks the first batch as complete, as it had two workers.
@@ -101,7 +101,7 @@ TEST_F(PipelinedApplierAdvancerTest, PublishesReadyBatchesThenStopsAtTheFirstInc
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         advancer.startup();
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
         ASSERT_EQ(published(), (std::vector<OpTimeAndWallTime>{batchTime(1)}));
     }
     tracker.onWorkerCompletion(middle);
@@ -127,7 +127,7 @@ TEST_F(PipelinedApplierAdvancerTest, BackstopPublishesCompletionWithoutNotificat
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         advancer.startup();
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
         // Simulate completion without its notification after the predicate observed an incomplete
         // batch.
         remaining->store(0, std::memory_order_release);
@@ -183,7 +183,7 @@ TEST_F(PipelinedApplierAdvancerTest, PublicationDoesNotHoldTrackerMutexAndShutdo
             shutdownFinished.store(true);
             shutdownFinished.notifyAll();
         });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
         // The failpoint confirms shutdown reached its idle wait, not just that it was scheduled.
         ASSERT_FALSE(shutdownFinished.load());
     }
@@ -217,7 +217,7 @@ TEST_F(PipelinedApplierAdvancerTest, AbandonmentStopsShutdownWithoutPublishingPa
             shutdownFinished.store(true);
             shutdownFinished.notifyAll();
         });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
     }
     tracker.onWorkerAbandonment();
     ASSERT_EQ(shutdownFinished.waitFor(false, Seconds(10)), boost::optional<bool>{true});

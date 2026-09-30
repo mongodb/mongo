@@ -932,7 +932,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                 return decision;
             }(),
             kDummyAffectedNamespaces);
-        failpoint->waitForTimesEntered(failpoint.initialTimesEntered() + 1);
+        failpoint.waitForOneNewEntry();
         _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
     }
 
@@ -2608,7 +2608,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
                     "hangBeforeWaitingForParticipantListWriteConcern",
                     ErrorCodes::TransactionCoordinatorReachedAbortDecision);
     participantListFp->setMode(FailPoint::off);
-    decisionFp->waitForTimesEntered(decisionFp.initialTimesEntered() + 1);
+    decisionFp.waitForOneNewEntry();
 
     // We now expect the "currentInSteps" metric for kWritingParticipantList to be 0, and for it to
     // be 1 for "kWritingDecision". All other steps, including "kWaitingForVotes" should be 0.

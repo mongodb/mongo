@@ -1786,11 +1786,9 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
     SorterStats sorterStats{nullptr};
 
     std::unique_ptr<FailPointEnableBlock> writeConflict;
-    FailPoint::EntryCountT wceCountBefore = 0;
     EXPECT_CALL(callbacksRef, onSpill).WillOnce([&] {
         writeConflict = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        wceCountBefore = writeConflict->initialTimesEntered();
     });
 
     spiller.mergeSpills(SortOptions{},
@@ -1800,7 +1798,7 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
                         /*numTargetedSpills=*/1,
                         /*maxSpillsPerMerge=*/3);
 
-    ASSERT_EQ((*writeConflict)->waitForTimesEntered(wceCountBefore + 1), wceCountBefore + 1)
+    ASSERT_EQ(writeConflict->waitForOneNewEntry(), 1)
         << "Expected exactly one WCE to fire inside mergeSpills_remove";
 
     ASSERT_EQ(spiller.iterators().size(), 1);

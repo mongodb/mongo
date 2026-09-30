@@ -106,7 +106,7 @@ TEST(PipelinedApplierBatchTrackerTest, LastWorkerWakesConsumer) {
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
     }
     // The consumer holds the mutex with a false predicate until it enters the wait.
     tracker.onWorkerCompletion(counter);
@@ -132,7 +132,7 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
     }
     tracker.addBatch(batchTime(1), 0);
     ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
@@ -161,7 +161,7 @@ TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFini
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
         waiter = stdx::thread([&] { promise.set_value(tracker.waitUntilIdle()); });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
         // The only batch is already popped, but the waiter must still see the advancer as busy.
         ASSERT_EQ(idle.wait_for(Milliseconds(0).toSystemDuration()), std::future_status::timeout);
     }
@@ -186,7 +186,7 @@ TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutComplet
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
         waiter = stdx::thread([&] { promise.set_value(tracker.waitUntilIdle()); });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
     }
     tracker.onWorkerAbandonment();
     ASSERT_EQ(idle.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
@@ -210,7 +210,7 @@ TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesConsumerWithoutPoppingWork) 
     {
         FailPointEnableBlock beforeWait("hangBeforePipelinedApplierBatchWait");
         consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
-        beforeWait->waitForTimesEntered(beforeWait.initialTimesEntered() + 1);
+        beforeWait.waitForOneNewEntry();
     }
     tracker.shutdown();
     ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);

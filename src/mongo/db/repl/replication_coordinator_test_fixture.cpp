@@ -509,7 +509,7 @@ void ReplCoordTest::shutdown(OperationContext* opCtx) {
     auto shutdownThread =
         stdx::thread([&] { _repl->shutdown(opCtx, nullptr /* shutdownTimeElapsedBuilder */); });
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
-    (*fp)->waitForTimesEntered(fp->initialTimesEntered() + 1);
+    fp->waitForOneNewEntry();
     NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
     fp.reset();
     _callShutdown = false;

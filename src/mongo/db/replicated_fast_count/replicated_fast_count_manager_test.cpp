@@ -227,7 +227,7 @@ TEST_F(ReplicatedFastCountManagerRebindContainerTest,
         test_helpers::makeOplogEntry(Timestamp(1, 1), _coll, repl::OpTypeEnum::kInsert, 10));
     FailPointEnableBlock hangFp("hangAfterReplicatedFastCountSnapshot");
     manager->flushAsync();
-    hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
+    hangFp.waitForOneNewEntry();
 
     // The flusher is now parked holding pointers to the bound stores. A repeated
     // initializeContainerStores() returns immediately without touching the stores or the

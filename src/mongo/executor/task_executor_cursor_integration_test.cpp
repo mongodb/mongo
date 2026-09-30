@@ -232,11 +232,10 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
     // Enable the failpoint in the integration test process.
     {
         FailPointEnableBlock fpb("blockBeforePinnedExecutorIsDestroyedOnUnderlying");
-        auto initialTimesEntered = fpb.initialTimesEntered();
         // Destroy the TEC and ensure we reach the code block that will destroy the pinned executor.
         tec.reset();
         LOGV2(7361301, "Waiting for TaskExecutorCursor to destroy its pinning executor.");
-        fpb->waitForTimesEntered(initialTimesEntered + 1);
+        fpb.waitForOneNewEntry();
     }
     // Allow the pinned executor's destruction to proceed.
 }

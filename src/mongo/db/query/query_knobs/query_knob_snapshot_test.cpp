@@ -265,12 +265,11 @@ TEST(QueryKnobSnapshotCacheTest, WritersAreSerializedByIntentLock) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
-    const auto initial = fp->initialTimesEntered();
 
     auto aFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
     });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto bFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{1}, QueryKnobValue{2}, KnobSource::kSetParameter);
@@ -293,10 +292,9 @@ TEST(QueryKnobSnapshotCacheTest, HeldReadLockBlocksWriterInstall) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
-    const auto initial = fp->initialTimesEntered();
 
     auto readerFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
@@ -315,12 +313,11 @@ TEST(QueryKnobSnapshotCacheTest, WriterBuildPhaseDoesNotBlockReaders) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
-    const auto initial = fp->initialTimesEntered();
 
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{2}, KnobSource::kSetParameter);
     });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     // Writer is parked after building, before taking the write lock. A concurrent reader
     // must see the pre-write value without blocking.
@@ -336,13 +333,12 @@ TEST(QueryKnobSnapshotCacheTest, ConcurrentReadersDontBlockEachOther) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
-    const auto initial = fp->initialTimesEntered();
 
     auto readerAFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto readerBFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 2);
+    fp->waitForNNewEntries(2);
 
     fp.reset();
     readerAFut.get();

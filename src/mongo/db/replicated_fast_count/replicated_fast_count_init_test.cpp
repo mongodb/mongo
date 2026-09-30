@@ -564,11 +564,10 @@ protected:
 TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesOnWriteConflict) {
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     ASSERT_OK(createContainers());
 
-    ASSERT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    ASSERT_EQ(1, failPoint->waitForOneNewEntry());
 
     assertContainersExistAndAreEmpty();
     ASSERT_EQ(countInitOplogEntries(), 1);
@@ -577,11 +576,10 @@ TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesOnWriteConflict)
 TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesRepeatedlyOnWriteConflict) {
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 3});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     ASSERT_OK(createContainers());
 
-    ASSERT_EQ(initialTimesEntered + 3, (*failPoint)->waitForTimesEntered(initialTimesEntered + 3));
+    ASSERT_EQ(3, failPoint->waitForNNewEntries(3));
 
     assertContainersExistAndAreEmpty();
     ASSERT_EQ(countInitOplogEntries(), 1);
@@ -590,11 +588,10 @@ TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesRepeatedlyOnWrit
 TEST_F(ReplicatedFastCountInitOplogTest, SetUpReplicatedFastCountDoesNotCrashOnWriteConflict) {
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     setUpReplicatedFastCount(_opCtx);
 
-    ASSERT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    ASSERT_EQ(1, failPoint->waitForOneNewEntry());
 
     assertContainersExistAndAreEmpty();
 }

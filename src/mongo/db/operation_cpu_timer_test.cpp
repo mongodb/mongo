@@ -111,9 +111,9 @@ TEST_F(OperationCPUTimerTest, TestTimerDetachAndAttachHandlers) {
         {
             FailPointEnableBlock fpDetach("hangCPUTimerAfterOnThreadDetach");
             failPointsReady.countDownAndWait();
-            fpDetach->waitForTimesEntered(fpDetach.initialTimesEntered() + 1);
+            fpDetach.waitForOneNewEntry();
         }
-        fpAttach->waitForTimesEntered(fpAttach.initialTimesEntered() + 1);
+        fpAttach.waitForOneNewEntry();
     });
 
     auto timer1 = makeTimer();

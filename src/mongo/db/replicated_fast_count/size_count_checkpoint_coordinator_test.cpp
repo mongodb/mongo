@@ -124,7 +124,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushFailureIncrementsFlushF
             sleepmillis(10);
         }
     });
-    failFp->waitForTimesEntered(failFp.initialTimesEntered() + 1);
+    failFp.waitForOneNewEntry();
     stop.store(true);
     driver.join();
 
@@ -191,7 +191,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, DestructorDuringFlushCycleInterruptsA
         FailPointEnableBlock hangFp("hangAfterReplicatedFastCountSnapshot");
 
         _coordinator->requestFlush();
-        hangFp->waitForTimesEntered(hangFp.initialTimesEntered() + 1);
+        hangFp.waitForOneNewEntry();
 
         // Destroy the coordinator while the flush thread is stalled inside flush().
         // The destructor interrupts the flush thread's opCtx, but the thread cannot unblock

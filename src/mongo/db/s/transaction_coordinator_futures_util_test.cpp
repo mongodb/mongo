@@ -653,7 +653,7 @@ TEST_F(AsyncWorkSchedulerTest, NoDeadlockWhenExecutorShutsDownWhileSchedulingUnd
 
         // Wait until the scheduling thread is blocked holding '_mutex', just past the shutdown
         // check.
-        fpBlock->waitForTimesEntered(fpBlock.initialTimesEntered() + 1);
+        fpBlock.waitForOneNewEntry();
 
         // Shut the executor down while the scheduling thread holds '_mutex' mid-schedule.
         shutdownExecutorPool();
@@ -692,7 +692,7 @@ TEST_F(AsyncWorkSchedulerTest, SchedulerStaysAliveUntilRemoteCommandCompletes) {
     });
 
     // Wait until the worker is parked: targeting done, command handle not yet registered.
-    fp->waitForTimesEntered(fpBlock.initialTimesEntered() + 1);
+    fpBlock.waitForOneNewEntry();
 
     // Release the worker so the command can be sent, then service it.
     fp->setMode(FailPoint::off);

@@ -5808,10 +5808,10 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineWhileDetac
 
     // The 'sleepFor' timer is now armed with a deadline fixed at networkClock(0) + backOffDelayMs.
     // Wait for that arming deterministically, then assert no retry is dispatched: the network clock
-    // has not advanced past the deadline. Use a count relative to 'initialTimesEntered()' rather
-    // than an absolute 1, because 'armRetryScheduledForTesting' is a global fail point whose entry
-    // counter persists across tests in this binary.
-    retryScheduledFp->waitForTimesEntered(retryScheduledFp.initialTimesEntered() + 1);
+    // has not advanced past the deadline. Use a count relative to when the block enabled the fail
+    // point rather than an absolute 1, because 'armRetryScheduledForTesting' is a global fail point
+    // whose entry counter persists across tests in this binary.
+    retryScheduledFp.waitForOneNewEntry();
     ASSERT_FALSE(networkHasReadyRequests());
 
     // Advancing the network clock to just before the deadline must not dispatch the retry.

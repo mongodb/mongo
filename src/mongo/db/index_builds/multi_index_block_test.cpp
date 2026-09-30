@@ -350,10 +350,8 @@ TEST_F(MultiIndexBlockResumableTest, DuplicateKeyRecordingSurvivesWriteConflict)
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        const auto initialTimesEntered = failPoint->initialTimesEntered();
         ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, getNSS()));
-        EXPECT_EQ(initialTimesEntered + 1,
-                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1))
+        EXPECT_EQ(1, failPoint->waitForOneNewEntry())
             << "Expected exactly one WCE during the duplicate-key recording retry";
     }
 
@@ -3893,9 +3891,8 @@ TEST_F(MultiIndexBlockTest, SeedWriteSurvivesWriteConflict) {
     // Inject a single WCE — the seed write's `writeConflictRetry` must absorb it and retry.
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
     ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     // After the retry, the table contains exactly 1 + numIndexes records.
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);

@@ -1177,7 +1177,6 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        const auto initialTimesEntered = failPoint->initialTimesEntered();
         // The drain must succeed via writeConflictRetry, even though one WCE fires during
         // applySingleBatch.
         ASSERT_OK(
@@ -1189,8 +1188,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
         // Exactly one WCE fired during the drain.
-        EXPECT_EQ(initialTimesEntered + 1,
-                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+        EXPECT_EQ(1, failPoint->waitForOneNewEntry());
     }
 
     // The index has exactly kNumKeys keys — no duplicates from a double-applied batch, no losses
@@ -1281,7 +1279,6 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        const auto initialTimesEntered = failPoint->initialTimesEntered();
         // The first qualifying WUOW commit during the drain (the first batch's apply) hits the
         // WCE. writeConflictRetry must roll it back, re-run the batch, then the loop must proceed
         // to the second batch cleanly.
@@ -1293,8 +1290,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                               /*onMultikeyPathsRecovered=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
-        EXPECT_EQ(initialTimesEntered + 1,
-                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+        EXPECT_EQ(1, failPoint->waitForOneNewEntry());
     }
 
     // Both batches landed exactly once: no records lost from the rolled-back batch and no records
@@ -1369,11 +1365,10 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
     // its onRollback handler, while the batch's WriteUnitOfWork has not yet committed.
     FailPointEnableBlock fp("hangIndexBuildDuringDrainWritesPhase",
                             BSON("iteration" << 1 << "indexNames" << BSON_ARRAY("a_1")));
-    const auto initialTimesEntered = fp.initialTimesEntered();
 
     auto* opCtx = operationContext();
     unittest::JoinThread killer([&] {
-        fp->waitForTimesEntered(initialTimesEntered + 1);
+        fp.waitForOneNewEntry();
         ClientLock lk(opCtx->getClient());
         opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
     });
@@ -1418,10 +1413,9 @@ TEST_F(IndexBuilderInterceptorTest, CheckDuplicateKeyConstraintsSurvivesWriteCon
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        auto initialTimesEntered = failPoint->initialTimesEntered();
         ASSERT_OK(interceptor->checkDuplicateKeyConstraints(
             operationContext(), _coll->getCollectionPtr(), entry));
-        EXPECT_EQ((*failPoint)->waitForTimesEntered(initialTimesEntered), initialTimesEntered + 1);
+        EXPECT_EQ(failPoint->waitForNNewEntries(0), 1);
     }
     EXPECT_EQ(getDuplicateKeyTableContents(indexBuildInfo).size(), 0);
 }

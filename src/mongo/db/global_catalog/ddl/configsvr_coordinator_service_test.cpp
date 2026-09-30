@@ -140,7 +140,7 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
             opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 
         // Ensure all instances start before we disable the failpoint.
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 5);
+        fp.waitForNNewEntries(5);
         instances = {coord1, coord2, coord3};
     }
 

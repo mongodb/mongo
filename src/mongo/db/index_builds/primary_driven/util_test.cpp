@@ -881,12 +881,11 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLess
 
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys < 6.
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
@@ -931,12 +930,11 @@ TEST_F(UtilTest,
 
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys >= 11.
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);

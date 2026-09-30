@@ -513,10 +513,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, CommitSurvivesWriteConflictOnBucketInsert
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        const auto initialTimesEntered = failPoint->initialTimesEntered();
         result = commitTimeseriesBucketForBatch(
             _opCtx, batch, request, preConditions, errors, opTime, electionId, retryAttemptsForDup);
-        EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered))
+        EXPECT_EQ(1, failPoint->waitForNNewEntries(0))
             << "Expected exactly one injected write conflict during the bucket insert";
     }
 

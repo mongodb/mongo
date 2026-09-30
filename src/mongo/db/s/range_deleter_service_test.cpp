@@ -915,8 +915,7 @@ TEST_F(RangeDeleterServiceTest, ProcessingFlagIsSetWhenRangeDeletionExecutionSta
         // Mark ongoing queries as drained and check the `ongoing` flag is present
         taskWithOngoingQueries->drainOngoingQueries();
 
-        hangBeforeDoingDeletionFp->waitForTimesEntered(
-            hangBeforeDoingDeletionFp.initialTimesEntered() + 1);
+        hangBeforeDoingDeletionFp.waitForOneNewEntry();
         verifyProcessingFlag(opCtx,
                              uuidCollA,
                              rangeDeletionTask0ForCollA->getTask().getRange(),

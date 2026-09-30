@@ -259,11 +259,10 @@ TEST_F(FeatureCompatibilityVersionTestFixture, FindFCVDocumentRetriesWriteConfli
     // scan and return the document successfully.
     auto failPoint = enableWriteConflictForReads(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     auto fcvDocument =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
     ASSERT_OK(fcvDocument);
     ASSERT_EQ(FeatureCompatibilityVersionDocument::parse(fcvDocument.getValue()).getVersion(),
               multiversion::GenericFCV::kLatest);
