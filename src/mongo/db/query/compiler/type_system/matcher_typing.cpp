@@ -4,6 +4,8 @@
 #include "mongo/db/query/compiler/type_system/matcher_typing.h"
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/util/assert_util.h"
 
@@ -21,6 +23,25 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
 
     NarrowTypeMatchExpressionVisitor(Type inputType, bool assumeTrue)
         : type(std::move(inputType)), assumeTrue(assumeTrue) {}
+
+    void visit(const TypeMatchExpression* expr) override {
+        type = matcher::narrowPath(std::move(type),
+                                   *expr->elementPath(),
+                                   Type::fromMatcherTypeSet(expr->typeSet()),
+                                   assumeTrue);
+    }
+
+    void visit(const NotMatchExpression* expr) override {
+        type = narrowType(std::move(type), expr->getChild(0), !assumeTrue);
+    }
+
+    void visit(const AndMatchExpression* expr) override {
+        if (expr->numChildren() != 1) {
+            // TODO(SERVER-134934): Handle this case.
+            return;
+        }
+        type = narrowType(std::move(type), expr->getChild(0), assumeTrue);
+    }
 
     /// The input type, narrowed by every expression which carries type information so far.
     Type type;
