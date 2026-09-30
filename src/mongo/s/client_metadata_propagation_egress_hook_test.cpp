@@ -162,7 +162,7 @@ TEST_F(ClientMetadataPropagationEgressHookTest, ShardWireInstalledForwardsSender
     setFcv(multiversion::GenericFCV::kLatest);
     ensureTestIfrFlagRegistered();
 
-    std::vector<BSONObj> emptyFlags;
+    std::vector<IFRFlagWireEntry> emptyFlags;
     // Fabricate a distinct sender version so the test can prove byte-identical forwarding.
     // Snapshot its BSON before transferring ownership into fromWire, since the unique_ptr is
     // moved-from below.
@@ -201,7 +201,7 @@ TEST_F(ClientMetadataPropagationEgressHookTest,
     senderVersion->setPatch(0);
     senderVersion->setExtra(0);
 
-    std::vector<BSONObj> emptyFlags;
+    std::vector<IFRFlagWireEntry> emptyFlags;
     auto ifrCtx = IncrementalFeatureRolloutContext::fromWire(emptyFlags, std::move(senderVersion));
     auto opCtx = makeOperationContext();
     IncrementalFeatureRolloutContext::set(opCtx.get(), ifrCtx);
@@ -223,7 +223,7 @@ TEST_F(ClientMetadataPropagationEgressHookTest, ShardWireInstalledMissingSenderO
     setShardOnly();
     ensureTestIfrFlagRegistered();
 
-    std::vector<BSONObj> emptyFlags;
+    std::vector<IFRFlagWireEntry> emptyFlags;
     auto ifrCtx = IncrementalFeatureRolloutContext::fromWire(emptyFlags, /*senderVersion=*/nullptr);
     auto opCtx = makeOperationContext();
     IncrementalFeatureRolloutContext::set(opCtx.get(), ifrCtx);

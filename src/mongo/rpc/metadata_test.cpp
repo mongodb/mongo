@@ -154,7 +154,7 @@ public:
 
     static GenericArguments argsWithIfrFlags() {
         GenericArguments args;
-        args.setIfrFlags(std::vector<BSONObj>{});
+        args.setIfrFlags(std::vector<IFRFlagWireEntry>{});
         return args;
     }
 
@@ -248,7 +248,7 @@ TEST_F(InstallIfrContextFromWireTest, WireFlagValueSurvivesNestedDirectClientGet
     // the parent's wire install was not masked.
     auto& flag = feature_flags::gFeatureFlagReleaseForTest;
     GenericArguments args;
-    args.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << false)});
+    args.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), false}});
 
     _opCtx->getClient()->setInDirectClient(true);
     (void)IncrementalFeatureRolloutContext::get(_opCtx.get());

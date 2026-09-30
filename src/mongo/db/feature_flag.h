@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/feature_flag_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/platform/atomic.h"
@@ -537,13 +538,13 @@ public:
      * field). It may be null (as it will be for v8.3 senders)
      */
     static std::shared_ptr<IncrementalFeatureRolloutContext> fromWire(
-        std::span<const BSONObj> flags, std::unique_ptr<IFRSenderVersion> senderVersion);
+        std::span<const IFRFlagWireEntry> flags, std::unique_ptr<IFRSenderVersion> senderVersion);
 
     /**
      * Like above, but provides a default 'senderVersion' - the current version.
      */
     static std::shared_ptr<IncrementalFeatureRolloutContext> fromWireForTest(
-        std::span<const BSONObj> flags);
+        std::span<const IFRFlagWireEntry> flags);
 
     /**
      * Builds an IFRContext for a request that arrived without any `ifrFlags` payload, and installs
@@ -575,7 +576,7 @@ public:
      * value without exercising the full wire path.
      */
     static std::shared_ptr<IncrementalFeatureRolloutContext> forTest(
-        std::span<const BSONObj> flags);
+        std::span<const IFRFlagWireEntry> flags);
 
     /**
      * Returns a deep copy of this context: copies the saved flag values and (if present) the
@@ -661,9 +662,9 @@ private:
     /**
      *  Constructor for the 'from wire' case. 'senderVersion' must not be null.
      */
-    IncrementalFeatureRolloutContext(std::span<const BSONObj> flags,
+    IncrementalFeatureRolloutContext(std::span<const IFRFlagWireEntry> flags,
                                      std::unique_ptr<IFRSenderVersion> senderVersion);
-    explicit IncrementalFeatureRolloutContext(std::span<const BSONObj> flags);
+    explicit IncrementalFeatureRolloutContext(std::span<const IFRFlagWireEntry> flags);
 
     // Process-wide template for the shard-server "arrived without ifrFlags" case: every release
     // flag introduced since the last LTS pinned to false. Populated once at startup by

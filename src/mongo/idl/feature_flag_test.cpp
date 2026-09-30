@@ -588,7 +588,8 @@ TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsTrue) {
 // ---- fromWire tests ----
 
 TEST(IDLFeatureFlag, FromWireContextIsMarkedFromWire) {
-    auto wireCtx = IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
     ASSERT_TRUE(wireCtx->isInstalledFromWire());
 
     IncrementalFeatureRolloutContext localCtx;
@@ -596,15 +597,15 @@ TEST(IDLFeatureFlag, FromWireContextIsMarkedFromWire) {
 }
 
 TEST(IDLFeatureFlag, FromWireEmptyPayload) {
-    auto ctx = IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    auto ctx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
     ASSERT_TRUE(ctx->isInstalledFromWire());
 }
 
 TEST(IDLFeatureFlag, FromWireRecognizedFlagStoredAtWireValue) {
     feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(false);
 
-    std::vector<BSONObj> payload = {
-        BSON("name" << "featureFlagSerializeForTest" << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"featureFlagSerializeForTest", true}};
     auto ctx = IncrementalFeatureRolloutContext::fromWireForTest(payload);
 
     ASSERT_TRUE(ctx->isInstalledFromWire());
@@ -621,16 +622,16 @@ TEST(IDLFeatureFlag, FromWireRecognizedFlagStoredAtWireValue) {
 DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  FromWireUnknownFlagSameSenderVersionErrors,
                  "Tripwire assertion.*Received unknown IFR flag 'unknownIfrFlagForTest9'") {
-    std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
 
 DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  FromWireMultipleUnknownFlagsReportsAll,
                  "Tripwire assertion.*Received 2 unknown IFR flags") {
-    std::vector<BSONObj> payload = {
-        BSON("name" << "unknownIfrFlagForTest9" << "value" << true),
-        BSON("name" << "anotherUnknownIfrFlagForTest" << "value" << false),
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", true},
+        IFRFlagWireEntry{"anotherUnknownIfrFlagForTest", false},
     };
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
@@ -641,9 +642,9 @@ DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
 DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  FromWireDuplicateUnknownFlagTasserts,
                  "Tripwire assertion.*specified IFR flag 'unknownIfrFlagForTest9' more than once") {
-    std::vector<BSONObj> payload = {
-        BSON("name" << "unknownIfrFlagForTest9" << "value" << true),
-        BSON("name" << "unknownIfrFlagForTest9" << "value" << false),
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", true},
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", false},
     };
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
@@ -652,7 +653,7 @@ DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  WireInstallCounterIncrementsEvenOnProtocolError,
                  "Tripwire assertion") {
     const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
-    std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
     try {
         IncrementalFeatureRolloutContext::fromWireForTest(payload);
         FAIL("Expected exception");
@@ -668,7 +669,7 @@ DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
                  UnknownWireFlagErrorsIncrementsOnProtocolError,
                  "Tripwire assertion") {
     const auto before = IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount();
-    std::vector<BSONObj> payload = {BSON("name" << "unknownIfrFlagForTest9" << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
     try {
         IncrementalFeatureRolloutContext::fromWireForTest(payload);
         FAIL("Expected exception");
@@ -681,24 +682,30 @@ DEATH_TEST_REGEX(
     IDLFeatureFlagDeathTests,
     FromWireDuplicateRecognizedFlagTasserts,
     "Tripwire assertion.*specified IFR flag 'featureFlagSerializeForTest' more than once") {
-    std::vector<BSONObj> payload = {
-        BSON("name" << "featureFlagSerializeForTest" << "value" << true),
-        BSON("name" << "featureFlagSerializeForTest" << "value" << false),
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"featureFlagSerializeForTest", true},
+        IFRFlagWireEntry{"featureFlagSerializeForTest", false},
     };
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
 }
 
 TEST(IDLFeatureFlag, FromWireMalformedNonStringName) {
-    std::vector<BSONObj> payload = {BSON("name" << 42 << "value" << true)};
-    ASSERT_THROWS_CODE(
-        IncrementalFeatureRolloutContext::fromWireForTest(payload), AssertionException, 11565102);
+    // Wire-form type validation now lives in the generated IFRFlagWireEntry parser (fromWire
+    // consumes already-parsed entries), so a non-string 'name' is rejected at parse time.
+    ASSERT_THROWS_CODE(IFRFlagWireEntry::parse(BSON("name" << 42 << "value" << true),
+                                               IDLParserContext{"ifrFlags"}),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(IDLFeatureFlag, FromWireMalformedNonBoolValue) {
-    std::vector<BSONObj> payload = {
-        BSON("name" << "featureFlagSerializeForTest" << "value" << "yes")};
+    // Wire-form type validation now lives in the generated IFRFlagWireEntry parser (fromWire
+    // consumes already-parsed entries), so a non-bool 'value' is rejected at parse time.
     ASSERT_THROWS_CODE(
-        IncrementalFeatureRolloutContext::fromWireForTest(payload), AssertionException, 11565103);
+        IFRFlagWireEntry::parse(BSON("name" << "featureFlagSerializeForTest" << "value" << "yes"),
+                                IDLParserContext{"ifrFlags"}),
+        DBException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(IDLFeatureFlag, FromWireAbsentFlagOlderSenderDisabled) {
@@ -707,7 +714,7 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagOlderSenderDisabled) {
     // (Generic FCV reference): Used for testing — simulates an older sender that predates the
     // flag.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
-    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                           std::move(senderVersion));
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
@@ -721,8 +728,8 @@ TEST(IDLFeatureFlag, FromWireOmittedOutgoingFlagDisabledWhenSenderPredatesIntro)
     feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
     feature_flags::gFeatureFlagReleaseForTest.setForServerParameter(true);
 
-    std::vector<BSONObj> payload = {
-        BSON("name" << feature_flags::gFeatureFlagReleaseForTest.getName() << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{feature_flags::gFeatureFlagReleaseForTest.getName(), true}};
     // (Generic FCV reference): Used for testing — sender predates the kLatest-introduced flag.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
     auto ctx = IncrementalFeatureRolloutContext::fromWire(payload, std::move(senderVersion));
@@ -738,7 +745,7 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagSameSenderUsesLocalDefault) {
 
     // (Generic FCV reference): Used for testing — sender is at the same FCV as the receiver.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLatest);
-    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                           std::move(senderVersion));
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
@@ -752,7 +759,7 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagPatchNewerSenderUsesLocalDefault) {
 
     auto senderVersion = std::make_unique<IFRSenderVersion>(makeLocalIFRSenderVersion());
     senderVersion->setPatch(senderVersion->getPatch() + 1);
-    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                           std::move(senderVersion));
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
@@ -767,7 +774,7 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagPreReleaseSenderUsesLocalDefault) {
     // series.
     auto senderVersion = std::make_unique<IFRSenderVersion>(makeLocalIFRSenderVersion());
     senderVersion->setExtra(-23);
-    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                           std::move(senderVersion));
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
@@ -778,7 +785,8 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagNoSenderVersionDisabled) {
     // know about must resolve to false.
     feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
 
-    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{}, nullptr);
+    auto ctx =
+        IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{}, nullptr);
     ASSERT_TRUE(ctx->isInstalledFromWire());
     ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
 }
@@ -787,14 +795,14 @@ TEST(IDLFeatureFlag, FromWireAbsentFlagNoSenderVersionDisabled) {
 
 TEST(IDLFeatureFlag, WireInstallCounterIncrementsOnSuccess) {
     const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
-    IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
     ASSERT_EQ(IncrementalRolloutFeatureFlag::getWireInstallsCount(), before + 1);
 }
 
 TEST(IDLFeatureFlag, TrueWireInstallsIncrementsOnTrueWireValue) {
     auto& flag = feature_flags::gFeatureFlagSerializeForTest;
     const auto before = readStatsFromFlag(flag);
-    std::vector<BSONObj> payload = {BSON("name" << flag.getName() << "value" << true)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{flag.getName(), true}};
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
     const auto after = readStatsFromFlag(flag);
     ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
@@ -806,7 +814,7 @@ TEST(IDLFeatureFlag, TrueWireInstallsIncrementsOnTrueWireValue) {
 TEST(IDLFeatureFlag, FalseWireInstallsIncrementsOnFalseWireValue) {
     auto& flag = feature_flags::gFeatureFlagSerializeForTest;
     const auto before = readStatsFromFlag(flag);
-    std::vector<BSONObj> payload = {BSON("name" << flag.getName() << "value" << false)};
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{flag.getName(), false}};
     IncrementalFeatureRolloutContext::fromWireForTest(payload);
     const auto after = readStatsFromFlag(flag);
     ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
@@ -823,7 +831,7 @@ TEST(IDLFeatureFlag, AbsentFlagDoesNotIncrementWireInstalls) {
     // per-flag wire install.
     // (Generic FCV reference): Used for testing — an older sender predating the flags.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
-    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                std::move(senderVersion));
     const auto after = readStatsFromFlag(flag);
     ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
@@ -840,7 +848,7 @@ TEST(IDLFeatureFlag, AbsentFlagIncrementsConservativeFalseCounter) {
     const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount();
     // (Generic FCV reference): Used for testing — an older sender predating the flags.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
-    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                std::move(senderVersion));
     ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount(),
               before + expectedDelta);
@@ -854,7 +862,7 @@ TEST(IDLFeatureFlag, AbsentFlagIncrementsLocalDefaultCounter) {
     const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount();
     // (Generic FCV reference): Used for testing — a same-version sender.
     auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLatest);
-    IncrementalFeatureRolloutContext::fromWire(std::span<const BSONObj>{},
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
                                                std::move(senderVersion));
     ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount(),
               before + expectedDelta);
@@ -947,7 +955,8 @@ TEST_F(IFRContextOpCtxTest, GetOnFreshOpCtxMakesTryGetNonNull) {
 }
 
 TEST_F(IFRContextOpCtxTest, SetAndGetRoundTrip) {
-    auto wireCtx = IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
     IncrementalFeatureRolloutContext::set(_opCtx.get(), wireCtx);
 
     auto retrieved = IncrementalFeatureRolloutContext::get(_opCtx.get());
@@ -956,7 +965,8 @@ TEST_F(IFRContextOpCtxTest, SetAndGetRoundTrip) {
 }
 
 TEST_F(IFRContextOpCtxTest, TryGetAfterSetReturnsSameContext) {
-    auto wireCtx = IncrementalFeatureRolloutContext::fromWireForTest(std::span<const BSONObj>{});
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
     IncrementalFeatureRolloutContext::set(_opCtx.get(), wireCtx);
 
     ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), wireCtx);

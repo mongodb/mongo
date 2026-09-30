@@ -67,8 +67,8 @@ protected:
         registration.setPrimaryParser(std::move(primaryParser));
         LiteParserOptions options;
         if (ifrFlagValue) {
-            std::vector<BSONObj> flagValues{
-                BSON("name" << mockFlag.getName() << "value" << *ifrFlagValue)};
+            std::vector<IFRFlagWireEntry> flagValues{
+                IFRFlagWireEntry{mockFlag.getName(), *ifrFlagValue}};
             options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
         }
         return {std::move(registration), std::move(options)};
@@ -568,9 +568,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // Build an ifrContext with featureFlagExtensionsInsideHybridSearch = true so that
     // LiteParsedLookUp::parse sets _noUserPipeline=true and leaves _pipelines empty.
-    std::vector<BSONObj> flagValues{
-        BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
-                    << true)};
+    std::vector<IFRFlagWireEntry> flagValues{
+        IFRFlagWireEntry{feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName(), true}};
     LiteParserOptions options;
     options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
@@ -630,9 +629,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     const NamespaceString kBackingNss =
         NamespaceString::createNamespaceString_forTest("test", "backingColl");
 
-    std::vector<BSONObj> flagValues{
-        BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
-                    << true)};
+    std::vector<IFRFlagWireEntry> flagValues{
+        IFRFlagWireEntry{feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName(), true}};
     LiteParserOptions options;
     options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 

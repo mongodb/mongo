@@ -6,6 +6,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/feature_flag_gen.h"
 #include "mongo/db/ifr_unrecognized_flag_info.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
@@ -466,7 +467,7 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext() = default;
 IncrementalFeatureRolloutContext::~IncrementalFeatureRolloutContext() = default;
 
 std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::fromWire(
-    std::span<const BSONObj> flags, std::unique_ptr<IFRSenderVersion> senderVersion) {
+    std::span<const IFRFlagWireEntry> flags, std::unique_ptr<IFRSenderVersion> senderVersion) {
     return std::shared_ptr<IncrementalFeatureRolloutContext>(new IncrementalFeatureRolloutContext(
         flags,
         senderVersion ? std::move(senderVersion)
@@ -476,7 +477,7 @@ std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutConte
 
 // static
 std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::fromWireForTest(
-    std::span<const BSONObj> flags) {
+    std::span<const IFRFlagWireEntry> flags) {
     // (Generic FCV Reference): For Testing.
     return std::shared_ptr<IncrementalFeatureRolloutContext>(new IncrementalFeatureRolloutContext(
         flags, std::make_unique<IFRSenderVersion>(localSenderVersion())));
@@ -484,7 +485,7 @@ std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutConte
 
 // static
 std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::forTest(
-    std::span<const BSONObj> flags) {
+    std::span<const IFRFlagWireEntry> flags) {
     return std::shared_ptr<IncrementalFeatureRolloutContext>(
         new IncrementalFeatureRolloutContext(flags));
 }
@@ -521,7 +522,7 @@ void IncrementalFeatureRolloutContext::initShardServerDefaultTemplate() {
 
 // Constructor for IFRContext sent from wire.
 IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
-    std::span<const BSONObj> flags, std::unique_ptr<IFRSenderVersion> senderVersion)
+    std::span<const IFRFlagWireEntry> flags, std::unique_ptr<IFRSenderVersion> senderVersion)
     : _senderVersion(std::move(senderVersion)) {
     tassert(13013608,
             "Expected sender version to be resolved by this point",
@@ -541,23 +542,14 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
     // Keyed by name so a payload that repeats an unknown flag collapses to a single entry.
     UnrecognizedIFRFlagInfo::FlagMap unknownFlags;
 
-    for (const auto& flagObj : flags) {
-        const auto& nameElem = flagObj["name"];
-        uassert(
-            11565102, "Expected 'name' field to be a string", nameElem.type() == BSONType::string);
-
-        const auto& valueElem = flagObj["value"];
-        uassert(11565103,
-                "Expected 'value' field to be a boolean",
-                valueElem.type() == BSONType::boolean);
-
-        const auto flagName = nameElem.valueStringData();
+    for (const auto& wireEntry : flags) {
+        const auto flagName = wireEntry.getName();
+        const bool wireValue = wireEntry.getValue();
         auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
 
         if (flag != nullptr) {
             // Scenario 1: recognized flag — store the sender's value. A flag appearing twice in one
             // payload is a malformed request from the sender; treat it as a protocol error.
-            const bool wireValue = valueElem.boolean();
             _savedFlagValues[flag] = wireValue;
             tassert(13024005,
                     str::stream() << "Sender specified IFR flag '" << flagName
@@ -576,7 +568,7 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
             tassert(13024006,
                     str::stream() << "Sender specified IFR flag '" << flagName
                                   << "' more than once",
-                    unknownFlags.emplace(std::string(flagName), valueElem.boolean()).second);
+                    unknownFlags.emplace(std::string(flagName), wireValue).second);
         } else {
             // Sender is newer than this binary (or no version info was provided). A flag unknown to
             // us was added after our binary — silently drop with a rate-limited log so
@@ -627,22 +619,15 @@ IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
     }
 }
 
-IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(std::span<const BSONObj> flags) {
-    for (const auto& flagObj : flags) {
-        const auto& nameElem = flagObj["name"];
-        uassert(
-            11565104, "Expected 'name' field to be a string", nameElem.type() == BSONType::string);
-
-        const auto& valueElem = flagObj["value"];
-        uassert(11565105,
-                "Expected 'value' field to be a boolean",
-                valueElem.type() == BSONType::boolean);
-
-        auto* flag = IncrementalRolloutFeatureFlag::findByName(nameElem.valueStringData());
+IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
+    std::span<const IFRFlagWireEntry> flags) {
+    for (const auto& wireEntry : flags) {
+        const auto flagName = wireEntry.getName();
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
         tassert(11565106,
-                str::stream() << "Unknown IFR flag name in test: " << nameElem.valueStringData(),
+                str::stream() << "Unknown IFR flag name in test: " << flagName,
                 flag != nullptr);
-        _savedFlagValues[flag] = valueElem.boolean();
+        _savedFlagValues[flag] = wireEntry.getValue();
     }
 }
 
@@ -658,9 +643,8 @@ bool IncrementalFeatureRolloutContext::getSavedFlagValue(IncrementalRolloutFeatu
 
 void IncrementalFeatureRolloutContext::appendSavedFlagValues(BSONArrayBuilder& builder) const {
     for (auto&& [flag, savedValue] : _savedFlagValues) {
-        BSONObjBuilder flagBuilder(builder.subobjStart());
-        flagBuilder.append("name", flag->getName());
-        flagBuilder.appendBool("value", savedValue);
+        BSONObjBuilder entryBuilder(builder.subobjStart());
+        IFRFlagWireEntry{flag->getName(), savedValue}.serialize(&entryBuilder);
     }
 }
 
@@ -696,10 +680,9 @@ void IncrementalFeatureRolloutContext::appendToEgressMetadata(BSONObjBuilder* bo
             for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
                 if (const auto versionIntroduced = flag->getSerializeOnOutgoingRequestsVersion()) {
                     if (toFullVersion(*versionIntroduced) <= outgoingSenderVersion) {
-                        arr << (BSONObjBuilder{}
-                                    .append("name", flag->getName())
-                                    .append("value", getSavedFlagValue(*flag))
-                                    .obj());
+                        BSONObjBuilder entryBuilder(arr.subobjStart());
+                        IFRFlagWireEntry{flag->getName(), getSavedFlagValue(*flag)}.serialize(
+                            &entryBuilder);
                     }
                 }
             }

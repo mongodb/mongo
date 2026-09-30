@@ -158,6 +158,14 @@ idl_generator(
     src = "server_feature_flags.idl",
 )
 
+idl_generator(
+    name = "feature_flag_gen",
+    src = "feature_flag.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "server_feature_flags",
     srcs = [
@@ -1419,6 +1427,7 @@ mongo_cc_library(
         "database_name_util.cpp",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
+        "feature_flag_gen",
         "feature_flag_server_parameter.cpp",
         "generic_argument_util.cpp",
         "ifr_flag_retry_info.cpp",

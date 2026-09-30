@@ -55,8 +55,7 @@ protected:
         AggregateCommandRequest request(std::move(nss));
         request.setPipeline({});
         auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
-        request.setIfrFlags(
-            std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+        request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
         return request;
     }
 
@@ -635,7 +634,7 @@ TEST_F(RunAggregateTest, IFRRetryResetsPartiallyBuiltExplainReply) {
     NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test"));
     AggregateCommandRequest request(std::move(nss));
-    request.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+    request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
     request.setPipeline({BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetry" << flag.getName())))});
     LiteParsedPipeline liteParsedPipeline(request, false);
     const BSONObj cmdObj = request.toBSON();
@@ -671,7 +670,7 @@ DEATH_TEST_F(RunAggregateDeathTest,
     NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test"));
     AggregateCommandRequest request(std::move(nss));
-    request.setIfrFlags(std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+    request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
     request.setPipeline(
         {BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetryUnknown" << "noSuchFlag")))});
     LiteParsedPipeline liteParsedPipeline(request, false);

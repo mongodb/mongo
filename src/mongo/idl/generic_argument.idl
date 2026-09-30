@@ -12,6 +12,7 @@ imports:
     - "mongo/client/read_preference_setting.idl"
     - "mongo/db/admission/execution_control/execution_admission_type.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/feature_flag.idl"
     - "mongo/db/repl/read_concern.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
@@ -445,7 +446,7 @@ structs:
             # Records IFR flags from the router's IFRContext. This ensures consistent view of feature flag across nodes
             # throughout the query's execution. Currently, used only in Agg command pipeline.
             ifrFlags:
-                type: array<object_owned>
+                type: array<IFRFlagWireEntry>
                 # This is manually forwarded on appropriate operations.
                 forward_to_shards: false
                 optional: true

@@ -17,6 +17,7 @@ idl_generator(
         "//src/mongo/client:read_preference_gen",
         "//src/mongo/client:read_preference_setting_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:feature_flag_gen",
         "//src/mongo/db:version_context_gen",
         "//src/mongo/db:write_concern_options_gen",
         "//src/mongo/db/admission/execution_control:execution_admission_type_gen",

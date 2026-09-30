@@ -1179,8 +1179,8 @@ TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages
 TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {
     // When featureFlagExtensionsInsideHybridSearch is on, the stage-params dispatch path is taken
     // instead of createFromBson, and must equally reject a user-supplied $_internalIsHybridSearch.
-    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
-        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
 
     // A client with a transport session and no internal tag is an external (user) client.
     auto client = getServiceContext()->getService()->makeClient(
@@ -1205,8 +1205,8 @@ TEST_F(DocumentSourceLookUpTest,
        BansLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOff) {
     // With the featureFlagExtensionsInsideHybridSearch flag off, $lookup with a hybrid search
     // subpipeline rejects localField/foreignField syntax.
-    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
-        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << false)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", false}});
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(getOpCtx())
                       .ns(getExpCtx()->getNamespaceString())
@@ -1227,8 +1227,8 @@ TEST_F(DocumentSourceLookUpTest,
        AllowsLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOn) {
     // With the featureFlagExtensionsInsideHybridSearch flag on, the localField/foreignField
     // restriction is lifted for $lookup with a hybrid search subpipeline.
-    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
-        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(getOpCtx())
                       .ns(getExpCtx()->getNamespaceString())
@@ -1258,8 +1258,8 @@ TEST_F(DocumentSourceLookUpTest,
     // Enable featureFlagExtensionsInsideHybridSearch so the stage-params dispatch path is used
     // instead of the BSON-only fallback. The view pipeline is already stitched into the StageParams
     // during lite-parsing, so re-applying the view definition is incorrect.
-    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{
-        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
     auto expCtx =
         ExpressionContextBuilder{}.opCtx(getOpCtx()).ns(mainNss).ifrContext(ifrCtx).build();
     expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(

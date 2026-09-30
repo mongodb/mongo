@@ -73,8 +73,8 @@ struct SerializeGraphLookupWithResolvedViewOptions {
 BSONObj serializeGraphLookupWithResolvedView(
     const boost::intrusive_ptr<ExpressionContext>& testExpCtx,
     const SerializeGraphLookupWithResolvedViewOptions& options = {}) {
-    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<BSONObj>{BSON(
-        "name" << "featureFlagExtensionsInsideHybridSearch" << "value" << options.flagEnabled)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", options.flagEnabled}});
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(testExpCtx->getOperationContext())
                       .ns(testExpCtx->getNamespaceString())
