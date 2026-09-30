@@ -26,6 +26,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {describe, it, before, beforeEach, afterEach, after} from "jstests/libs/mochalite.js";
 import {getPreImages, getPreImagesCollection} from "jstests/libs/query/change_stream_util.js";
+import {systemUsesReplicatedTruncates} from "jstests/libs/query/replicated_truncates_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // kChangeStreamPostUncleanShutdownExpiryExtensionSeconds from startup_recovery.h.
@@ -62,6 +63,19 @@ describe("change stream pre-image truncation persists across crash + recovery", 
 
     beforeEach(function () {
         primary = rst.getPrimary();
+
+        // Make sure every node that runs the remover has finished (re)initializing its pre-image
+        // truncate markers before inserting the pre-images for this test case. Otherwise an insert
+        // can race with marker initialization and be permanently missed by the remover (see
+        // waitForRemoverPass()). With replicated truncates only the primary runs the remover.
+        const replicatedTruncates = systemUsesReplicatedTruncates(primary);
+        for (const node of rst.nodes) {
+            if (replicatedTruncates && node.host !== primary.host) {
+                continue;
+            }
+            waitForRemoverPass(node);
+        }
+
         const testDB = primary.getDB(dbName);
         const collName = "test_" + caseCounter++;
         coll = testDB[collName];
@@ -201,13 +215,51 @@ describe("change stream pre-image truncation persists across crash + recovery", 
     }
 
     /**
+     * Waits until the pre-images removal job has completed at least one full pass on `node`.
+     *
+     * A pass (re)initializes the in-memory truncate markers. A node that was restarted (e.g. by a
+     * crash test) rebuilds its markers on the first pass after startup, and pre-images inserted
+     * while the markers are being rebuilt can be missed by the remover. Such a pre-image is then
+     * never truncated until a newer pre-image expires and a partial marker covers it, which never
+     * happens here because the remover time is frozen. Waiting for a pass before inserting the
+     * pre-images a test relies on makes truncation deterministic.
+     */
+    function waitForRemoverPass(node) {
+        assert.soon(
+            () => {
+                const failPoint = configureFailPoint(
+                    node,
+                    "changeStreamPreImagesRemoverInvocationCounter",
+                );
+                return failPoint.timesEntered >= 2 && failPoint.timesEntered % 2 === 0;
+            },
+            () => "timed out waiting for the pre-images remover to complete a pass on " + node.host,
+        );
+    }
+
+    /**
      * Shuts down the node, restarts with the remover time failpoint set, and returns
-     * the restarted connection. If the primary was shut down, steps up the surviving
-     * node (ReplSetTest uses 24h electionTimeoutMillis, so no auto-election occurs).
+     * the restarted connection. If the primary was shut down, ensures the surviving node
+     * is primary so the restarted node can re-fetch its truncate oplog entries.
+     *
+     * Unlike ReplSetTest.initiate(), the disaggregated storage fixture does not set a high
+     * electionTimeoutMillis, so the surviving node auto-elects itself primary roughly
+     * electionTimeoutMillis (10s) after the primary goes away. We must therefore freeze the
+     * surviving node's remover before the crash and tolerate it already being primary.
      */
     function crashAndRestart(nodeToTest, {cleanShutdown, removerCurrentTime}) {
         const nodeId = rst.getNodeId(nodeToTest);
         const nodeWasPrimary = nodeToTest.host === rst.getPrimary().host;
+        const otherNode = rst.nodes[1 - nodeId];
+
+        if (nodeWasPrimary) {
+            // Freeze the surviving node's remover BEFORE the primary goes away.
+            // onStepUpComplete() starts the remover, which would otherwise expire pre-images
+            // using real wall-clock time and replicate those deletions to the restarted node.
+            // With replicated truncates the remover only runs on the primary, so freezing it
+            // here is sufficient.
+            freezePreImageTruncationJob(otherNode);
+        }
 
         if (cleanShutdown) {
             jsTest.log.info("Performing clean shutdown of node", {host: nodeToTest.host});
@@ -241,15 +293,16 @@ describe("change stream pre-image truncation persists across crash + recovery", 
         restarted.setSecondaryOk();
 
         if (nodeWasPrimary) {
-            const otherNodeId = 1 - nodeId;
-            const otherNode = rst.nodes[otherNodeId];
-
-            // Freeze the surviving node's remover BEFORE step-up. onStepUpComplete() starts
-            // the remover, which would expire all pre-images with real wall-clock time and
-            // replicate those deletions to the restarted secondary.
-            freezePreImageTruncationJob(otherNode);
-
+            // The surviving node may have already auto-elected itself primary. Calling
+            // replSetFreeze on a primary fails with NotSecondary, so only explicitly step it up
+            // when it is not already primary.
             assert.soonNoExcept(() => {
+                const st = assert.commandWorked(
+                    otherNode.adminCommand({replSetGetStatus: 1}),
+                ).myState;
+                if (st === ReplSetTest.State.PRIMARY) {
+                    return true;
+                }
                 assert.commandWorked(otherNode.adminCommand({replSetFreeze: 0}));
                 assert.commandWorked(otherNode.adminCommand({replSetStepUp: 1}));
                 return true;
