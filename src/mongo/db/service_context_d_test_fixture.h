@@ -18,6 +18,7 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -141,6 +142,16 @@ public:
             return std::move(*this);
         }
 
+        /**
+         * Registers a hook which is called after the ServiceContext and TransportLayer are set up,
+         * but before the storage engine is started. Can be used to set up storage engine
+         * dependencies which need a service context.
+         */
+        Options preStorageEngineStartupHook(std::function<void(ServiceContext*)> hook) {
+            _preStorageEngineStartupHook = std::move(hook);
+            return std::move(*this);
+        }
+
     private:
         friend class MongoDScopedGlobalServiceContextForTest;
 
@@ -164,6 +175,7 @@ public:
         std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
         std::vector<unittest::ServerParameterGuard> _parameters;
         std::unique_ptr<rss::PersistenceProvider> _persistenceProvider;
+        std::function<void(ServiceContext*)> _preStorageEngineStartupHook;
     };
 
     MongoDScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);

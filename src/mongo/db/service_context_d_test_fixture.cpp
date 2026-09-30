@@ -148,6 +148,10 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
             .setPersistenceProvider(std::move(options._persistenceProvider));
     }
 
+    if (options._preStorageEngineStartupHook) {
+        options._preStorageEngineStartupHook(serviceContext);
+    }
+
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.
     catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc(), options._initFlags);
