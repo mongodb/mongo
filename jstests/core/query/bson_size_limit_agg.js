@@ -1,5 +1,6 @@
 /**
  * Test that different agg stages respect BSON size limits.
+ * Also verifies that SBE's trial-run stash rejects oversized results.
  *
  * @tags: [
  *     # Overflows WT cache on in-memory variants.
@@ -23,6 +24,10 @@
  *     resource_intensive,
  * ]
  */
+
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {it} from "jstests/libs/mochalite.js";
 
 const collName = jsTestName();
 const collExact = db[collName + "_exact"];
@@ -69,7 +74,7 @@ function assertAggSucceedsWithUserRangeBSON(coll, pipeline, msg) {
 }
 
 /** Runs an aggregation on `coll` and asserts it fails with BSONObjectTooLarge. */
-function assertAggFailsBSONTooLarge(coll, pipeline, msg) {
+function assertAggFailsBSONTooLarge(coll, pipeline, msg = "") {
     assert.throwsWithCode(
         () => coll.aggregate(pipeline).toArray(),
         ErrorCodes.BSONObjectTooLarge,
@@ -180,8 +185,59 @@ function testProject() {
     );
 }
 
-// Run all scenarios
-testGroupPush();
-testGroupNonLastStage();
-testAddFields();
-testProject();
+function testSbeToClassicSplit() {
+    // This query must work in all variants. But we're particularly interested in the
+    // case where the first $project is pushed down to SBE and the second $project stays
+    // in classic, where we expect SBE be able to return an overlarge document to the
+    // classic portion of the query instead of checking the size limit.
+    const pipeline = [
+        {$project: {b: "$x"}},
+        {$_internalInhibitOptimization: {}},
+        {$project: {_id: 1}},
+    ];
+    assertAggSucceedsWithUserRangeBSON(collExact, pipeline);
+    const explain = collExact.explain().aggregate(pipeline);
+    if (checkSbeFullyEnabled(db)) {
+        // First $project is in SBE, and the second one should run in classic.
+        const stages = getAggPlanStages(explain, "$project");
+        assert(stages[0].$project.hasOwnProperty("_id"));
+        assert.eq(stages.length, 1);
+    }
+}
+
+function testTrialRun() {
+    const coll = db[collName + "_trial_run"];
+    coll.drop();
+
+    // Prepare the collection: a small document + two indexes, to trigger multi-planning.
+    assert.commandWorked(coll.insertOne({_id: 1, a: 1, b: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({b: 1}));
+
+    // Run a query that adds a 200 KB field to the document.
+    const pipeline = [{$match: {a: 1, b: 1}}, {$addFields: {extra: "x".repeat(200 * 1024)}}];
+
+    // Activate cache entry.
+    coll.aggregate(pipeline).toArray();
+    coll.aggregate(pipeline).toArray();
+    coll.aggregate(pipeline).toArray();
+
+    // Replace with a near-limit document.
+    const bsonUserLimit = 16 * 1024 * 1024;
+    const paddingSize = bsonUserLimit - 4000;
+    assert.commandWorked(
+        coll.replaceOne({_id: 1}, {_id: 1, a: 1, b: 1, padding: "y".repeat(paddingSize)}),
+    );
+
+    // Hit the active cache entry and execute the trial run. Under SBE, this will
+    // read some documents and stash them, which triggers a different branch for
+    // returning documents to the user. This branch must do its own validation.
+    assertAggFailsBSONTooLarge(coll, pipeline);
+}
+
+it("$group + $push", testGroupPush);
+it("$group + $push (non-last stage)", testGroupNonLastStage);
+it("$addFields", testAddFields);
+it("$project", testProject);
+it("SBE to classic split", testSbeToClassicSplit);
+it("Plan cache trial run", testTrialRun);

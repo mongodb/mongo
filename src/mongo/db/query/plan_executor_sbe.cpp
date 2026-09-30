@@ -241,7 +241,11 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();
         if constexpr (isBson) {
+            // Stashed objects may be overlarge (e.g. the SBE trial executor relaxes the
+            // size restriction and stores the returned objects on the stash), so we validate
+            // the size of those objects before returning them to the user.
             *out = std::move(doc);
+            uassertStatusOK(out->validateBSONObjSize(BSONObj::DefaultSizeTrait::MaxSize));
         } else {
             *out = Document{doc};
         }

@@ -476,6 +476,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections.yml",
     shard_count = 22,
     tags = [
