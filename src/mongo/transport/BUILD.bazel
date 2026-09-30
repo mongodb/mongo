@@ -342,6 +342,7 @@ mongo_cc_unit_test(
         ":message_compressor",
         ":message_compressor_options_server_idl",
         "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/rpc",
         "//src/mongo/rpc:message",
     ],
