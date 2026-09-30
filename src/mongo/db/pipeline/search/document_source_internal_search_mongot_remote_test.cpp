@@ -20,6 +20,7 @@ class InternalSearchMongotRemoteTest : service_context_test::WithSetupTransportL
     }
 
     void tearDown() override {
+        executor::beginSearchExecutorShutdown(getServiceContext());
         executor::shutdownSearchExecutorsIfNeeded(getServiceContext());
     }
 };

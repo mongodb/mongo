@@ -466,6 +466,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, true /* isMongos */);
         }
 
+        // Reject new search cursors before shutting down the search executors, mirroring mongod.
+        executor::beginSearchExecutorShutdown(serviceContext);
+
         {
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                            TimedSectionId::shutDownSearchTaskExecutors,

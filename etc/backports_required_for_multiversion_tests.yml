@@ -206,6 +206,8 @@ last-continuous:
       ticket: SERVER-126814
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
       ticket: SERVER-130544
+    - test_file: jstests/with_mongot/search_mocked/search_executor_shutdown_rejects_new_cursor.js
+      ticket: SERVER-135154
   suites: null
 last-lts:
   all:
@@ -329,4 +331,6 @@ last-lts:
       ticket: SERVER-126814
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
       ticket: SERVER-130544
+    - test_file: jstests/with_mongot/search_mocked/search_executor_shutdown_rejects_new_cursor.js
+      ticket: SERVER-135154
   suites: null

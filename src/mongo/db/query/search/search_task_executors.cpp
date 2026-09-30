@@ -17,8 +17,10 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/timer.h"
 
@@ -92,11 +94,19 @@ struct State {
 
     synchronized_value<std::shared_ptr<TaskExecutor>> mongotExecutor;
     synchronized_value<std::shared_ptr<TaskExecutor>> searchIndexMgmtExecutor;
+
+    // Set before shutdown-time cursor draining begins, so that no new search cursor (and therefore
+    // no new PinnedConnectionTaskExecutor) can be established during the whole shutdown window.
+    Atomic<bool> shuttingDown{false};
 };
 
 const auto getExecutorHolder = ServiceContext::declareDecoration<State>();
 
 Rarely _shutdownLogSampler;
+
+// Pauses shutdown after draining the PinnedConnectionTaskExecutors but before shutting down the
+// underlying executor. Used by tests to establish a cursor in that window and verify it is refused.
+MONGO_FAIL_POINT_DEFINE(pauseBeforeShuttingDownSearchTaskExecutor);
 
 void destroyTaskExecutor(synchronized_value<std::shared_ptr<TaskExecutor>>& executor) {
     // We have just shut down this TaskExecutor, so it should start rejecting all new requests and
@@ -143,6 +153,10 @@ void shutdownTaskExecutor(ServiceContext* svc,
         // The underlying TaskExecutor must outlive any PinnedConnectionTaskExecutor that uses it,
         // so we must drain PCTEs first and then shut down the executor.
         shutdownPinnedExecutors(svc, execPtr);
+        if (MONGO_unlikely(pauseBeforeShuttingDownSearchTaskExecutor.shouldFail())) {
+            LOGV2(13515400, "pausing at pauseBeforeShuttingDownSearchTaskExecutor fail point");
+            pauseBeforeShuttingDownSearchTaskExecutor.pauseWhileSet();
+        }
         execPtr->shutdown();
         execPtr->join();
     }
@@ -196,19 +210,27 @@ const auto& searchTaskExecutorSection =
 }  // namespace
 
 StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(ServiceContext* svc) {
-    if (auto mongotExec = getExecutorHolder(svc).mongotExecutor.get()) {
-        return mongotExec;
+    auto& holder = getExecutorHolder(svc);
+    auto mongotExec = holder.mongotExecutor.get();
+    if (holder.shuttingDown.load() || !mongotExec) {
+        return {ErrorCodes::ShutdownInProgress, "mongot task executor is shutting down"};
     }
-    return {ErrorCodes::ShutdownInProgress, "mongot task executor is shutting down"};
+    return mongotExec;
 }
 
 StatusWith<std::shared_ptr<TaskExecutor>> getSearchIndexManagementTaskExecutor(
     ServiceContext* svc) {
-    if (auto indexMgmtExec = getExecutorHolder(svc).searchIndexMgmtExecutor.get()) {
-        return indexMgmtExec;
+    auto& holder = getExecutorHolder(svc);
+    auto indexMgmtExec = holder.searchIndexMgmtExecutor.get();
+    if (holder.shuttingDown.load() || !indexMgmtExec) {
+        return {ErrorCodes::ShutdownInProgress,
+                "search index management task executor is shutting down"};
     }
-    return {ErrorCodes::ShutdownInProgress,
-            "search index management task executor is shutting down"};
+    return indexMgmtExec;
+}
+
+void beginSearchExecutorShutdown(ServiceContext* svc) {
+    getExecutorHolder(svc).shuttingDown.store(true);
 }
 
 void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
@@ -226,6 +248,12 @@ void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
 
 void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
     auto& state = getExecutorHolder(svc);
+
+    // New search cursors must already be rejected by the time we get here, so that no request can
+    // establish a cursor (and therefore a PCTE) against an executor we are about to shut down. Both
+    // mongod and mongos call beginSearchExecutorShutdown() before this.
+    invariant(state.shuttingDown.load());
+
     if (!globalMongotParams.host.empty()) {
         LOGV2_INFO(10026102, "Shutting down mongot task executor.");
         shutdownTaskExecutor(svc, state.mongotExecutor);

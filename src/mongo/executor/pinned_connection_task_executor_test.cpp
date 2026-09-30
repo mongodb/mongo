@@ -10,7 +10,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/pinned_connection_task_executor_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
@@ -447,6 +449,54 @@ TEST_F(PinnedConnectionTaskExecutorTest, EnsureStreamDestroyedBeforeCommandCompl
 
     auto localErr = pf.future.getNoThrow();
     ASSERT_EQ(localErr, testFailure);
+}
+
+/**
+ * A registry entry can outlive its pinned executor: the entry is erased asynchronously by the
+ * cursor's PinnedExecutorRegistryToken, so shutdownPinnedExecutors can observe an expired `pinned`
+ * weak_ptr while the underlying executor is still alive. It must skip such entries rather than
+ * dereferencing a null shared_ptr.
+ */
+TEST_F(PinnedConnectionTaskExecutorTest, ShutdownPinnedExecutorsSkipsExpiredPinnedExecutor) {
+    ServiceContext::UniqueServiceContext serviceCtx = ServiceContext::make();
+    auto pinned = makePinnedConnTaskExecutor();
+    auto underlying = getExecutorPtr();
+
+    // Register a (pinned, underlying) pair directly, then release our reference to the pinned
+    // executor so the registry's weak_ptr to it expires while the entry itself and the underlying
+    // executor stay alive.
+    auto token =
+        std::make_unique<PinnedExecutorRegistryToken>(serviceCtx.get(), pinned, underlying);
+    pinned.reset();
+
+    ASSERT_NO_THROW(shutdownPinnedExecutors(serviceCtx.get(), underlying));
+    token.reset();
+}
+
+/**
+ * Once shutdownPinnedExecutors() has begun for an underlying executor, registering a new
+ * PinnedConnectionTaskExecutor for it must be refused. Otherwise a request that obtained the
+ * executor just before shutdown could register its PCTE after the drain and outlive the executor.
+ */
+TEST_F(PinnedConnectionTaskExecutorTest, ShutdownPinnedExecutorsRejectsLateRegistration) {
+    ServiceContext::UniqueServiceContext serviceCtx = ServiceContext::make();
+    auto underlying = getExecutorPtr();
+
+    // Registration succeeds before shutdown.
+    auto earlyPinned = makePinnedConnTaskExecutor();
+    auto earlyToken =
+        std::make_unique<PinnedExecutorRegistryToken>(serviceCtx.get(), earlyPinned, underlying);
+    earlyToken.reset();
+
+    // Shutdown drains the registry and closes it for this underlying executor.
+    shutdownPinnedExecutors(serviceCtx.get(), underlying);
+
+    // A token constructed after shutdown began is refused.
+    auto latePinned = makePinnedConnTaskExecutor();
+    ASSERT_THROWS_CODE(
+        std::make_unique<PinnedExecutorRegistryToken>(serviceCtx.get(), latePinned, underlying),
+        DBException,
+        ErrorCodes::ShutdownInProgress);
 }
 
 }  // namespace

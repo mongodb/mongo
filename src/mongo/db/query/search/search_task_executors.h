@@ -33,6 +33,17 @@ namespace executor {
  */
 [[MONGO_MOD_PUBLIC]] void startupSearchExecutorsIfNeeded(ServiceContext* svc);
 
+/**
+ * Marks the search executors as shutting down, so that getMongotTaskExecutor() and
+ * getSearchIndexManagementTaskExecutor() reject new work (ErrorCodes::ShutdownInProgress).
+ *
+ * This must be called before any shutdown-time draining of cursors, so that no new $search cursor
+ * (and therefore no new PinnedConnectionTaskExecutor) can be established during the whole shutdown
+ * window. Otherwise a cursor created after the drain can keep the underlying executor's completion
+ * path alive past executor shutdown.
+ */
+[[MONGO_MOD_PUBLIC]] void beginSearchExecutorShutdown(ServiceContext* svc);
+
 [[MONGO_MOD_PUBLIC]] void shutdownSearchExecutorsIfNeeded(ServiceContext* svc);
 
 }  // namespace executor

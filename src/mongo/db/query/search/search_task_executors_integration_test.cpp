@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/pinned_connection_task_executor_factory.h"
@@ -88,6 +89,23 @@ TEST(SearchTaskExecutors, NotUsingIsNonFatal) {
     // can construct and destruct a service context (which is decorated with the search executors)
     // even if we never call startup().
     ServiceContext::make();
+}
+
+TEST(SearchTaskExecutors, BeginShutdownRejectsNewCursors) {
+    auto serviceCtx = ServiceContext::make();
+
+    // Before shutdown begins, both executors are handed out.
+    ASSERT_OK(getMongotTaskExecutor(serviceCtx.get()));
+    ASSERT_OK(getSearchIndexManagementTaskExecutor(serviceCtx.get()));
+
+    beginSearchExecutorShutdown(serviceCtx.get());
+
+    // Once shutdown begins, new search cursors must be refused even though the executors still
+    // exist, so that no PCTE can be created against an executor that is about to be shut down.
+    ASSERT_EQ(getMongotTaskExecutor(serviceCtx.get()).getStatus().code(),
+              ErrorCodes::ShutdownInProgress);
+    ASSERT_EQ(getSearchIndexManagementTaskExecutor(serviceCtx.get()).getStatus().code(),
+              ErrorCodes::ShutdownInProgress);
 }
 
 TEST_F(PinnedMongotTaskExecutorTest, RunSingleCommandOverPinnedConnection) {

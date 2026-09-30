@@ -1724,6 +1724,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         globalConnPool.shutdown();
     }
 
+    // Reject new search cursors before draining existing ones, so that no cursor (and therefore no
+    // PinnedConnectionTaskExecutor) can be established during the shutdown window.
+    executor::beginSearchExecutorShutdown(serviceContext);
+
     if (auto cursorManager = CursorManager::get(serviceContext)) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::disposeIdleMongotCursors,
