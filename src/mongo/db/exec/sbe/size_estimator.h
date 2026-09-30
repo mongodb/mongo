@@ -7,7 +7,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_size.h"
@@ -98,28 +97,6 @@ inline size_t estimate(const BlockAggExprTuple& tuple) {
 
     size += tuple.agg->estimateSize();
 
-    return size;
-}
-
-inline size_t estimate(const WindowStage::Window& window) {
-    size_t size = sizeof(window);
-    if (window.lowBoundExpr) {
-        size += size_estimator::estimate(window.lowBoundExpr);
-    }
-    if (window.highBoundExpr) {
-        size += size_estimator::estimate(window.highBoundExpr);
-    }
-    for (size_t i = 0; i < window.initExprs.size(); ++i) {
-        if (window.initExprs[i]) {
-            size += size_estimator::estimate(window.initExprs[i]);
-        }
-        if (window.addExprs[i]) {
-            size += size_estimator::estimate(window.addExprs[i]);
-        }
-        if (window.removeExprs[i]) {
-            size += size_estimator::estimate(window.removeExprs[i]);
-        }
-    }
     return size;
 }
 
