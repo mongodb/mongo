@@ -35,7 +35,7 @@ struct MockReactor::WaitState {
         return true;
     }
 
-    void fulfil() {
+    void fulfill() {
         settle([](Promise<void>& p) { p.emplaceValue(); });
     }
 
@@ -57,7 +57,7 @@ struct MockReactor::WaitState {
 
 /**
  * A ReactorTimer with at most one outstanding wait. The wait itself lives in a WaitState shared
- * with the clock alarm that fulfils it and with the owning reactor, so that any of the three can
+ * with the clock alarm that fulfills it and with the owning reactor, so that any of the three can
  * settle it exactly once.
  */
 class MockReactorTimer final : public ReactorTimer {
@@ -197,7 +197,7 @@ void MockReactor::_arm(Date_t deadline, std::shared_ptr<WaitState> state) {
     // "the reactor thread".
     _clock.setAlarm(deadline, [weakSelf = weak_from_this(), state = std::move(state)]() mutable {
         if (auto self = std::static_pointer_cast<MockReactor>(weakSelf.lock())) {
-            self->_runAsReactorThread([&] { state->fulfil(); });
+            self->_runAsReactorThread([&] { state->fulfill(); });
         }
         // Else ~MockReactor has already failed this wait with CallbackCanceled.
     });

@@ -21,7 +21,15 @@ namespace mongo::transport {
 
 /**
  * A Reactor whose timers are alarms on the process-global mock clock (see ClockSourceMock), for
- * unit-testing Reactor-based code without real threads or wall-clock waits.
+ * unit testing Reactor-based code without real threads or wall-clock waits.
+ * MockReactor has no thread of its own: run() parks the caller until stop().
+ * Everything runs inline on the calling thread. schedule() invokes the task before returning,
+ * always with Status::OK(); a timer's wait completes inside whichever call moves the shared mock
+ * clock to its deadline. onReactorThread() is true during that inline work, nested calls
+ * included, and no lock is held while user code runs, so continuations may schedule() and arm or
+ * cancel timers freely. A test therefore observes every effect synchronously. Each wait is
+ * settled exactly once (alarm, cancel(), or ~MockReactor, whichever is first), so multi-threaded
+ * use is memory-safe but unordered; the intended driver is a single test thread.
  */
 class [[MONGO_MOD_PUBLIC]] MockReactor : public Reactor {
 public:
