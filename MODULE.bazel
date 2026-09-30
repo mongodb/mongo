@@ -52,6 +52,16 @@ spidermonkey_wasi_repo(
     ] * 5,
 )
 
+# SCIP C++ indexer (patched build with aarch64-linux support)
+http_file(
+    name = "scip-clang",
+    executable = True,
+    sha256 = "f303e3a1501b0c669c193b67f594a321843f9e9acec381eb3b4df09dd2177a59",
+    urls = [
+        "https://github.com/rakiz/cppgraph/releases/download/scip-clang-patched-v0.4.0-p6/scip-clang-patched-aarch64-linux",
+    ] * 5,
+)
+
 bazel_dep(name = "rules_cc", version = "0.2.18")
 
 # rules_cc's built-in resource estimate for link actions is roughly 8x below what

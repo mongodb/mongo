@@ -532,6 +532,20 @@ mongo_install(
     ],
 )
 
+sh_binary(
+    name = "scip-clang",
+    srcs = ["//bazel:run_under_working_dir.sh"],
+    data = ["@scip-clang//file"],
+    env = {
+        "BINARY_PATH": "$(location @scip-clang//file)",
+    },
+    # The downloaded binary is aarch64 Linux only.
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
 # This sets up targets for install-compass and archive-compass
 mongo_install(
     name = "compass",
