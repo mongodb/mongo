@@ -105,7 +105,7 @@ TEST_F(UniversalKeyTest, SizeOfUniversalComponents) {
                                                  BSONObj(),
                                                  std::move(apiParams),
                                                  query_shape::CollectionType::kUnknown,
-                                                 true);
+                                                 true /* maxTimeMS */);
 
     const auto minimumUniversalKeyComponentSize = sizeof(std::unique_ptr<query_shape::Shape>) +
         (6 * sizeof(BSONObj)) + sizeof(std::unique_ptr<APIParameters>) + sizeof(BSONElement) +

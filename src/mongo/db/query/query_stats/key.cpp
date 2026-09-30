@@ -71,7 +71,8 @@ UniversalKeyComponents::UniversalKeyComponents(
     std::unique_ptr<APIParameters> apiParams,
     query_shape::CollectionType collectionType,
     bool maxTimeMS,
-    boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash)
+    boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash,
+    bool inTransaction)
     : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
@@ -84,6 +85,7 @@ UniversalKeyComponents::UniversalKeyComponents(
       _clientMetaDataHash(clientMetadata ? clientMetadata->hashWithoutMongosInfo()
                                          : simpleHash(BSONObj())),
       _collectionType(collectionType),
+      _inTransaction(inTransaction),
       _tenantId{getTenantId(_queryShape.get()).value_or(kNotSetTenantId)},
       _originalQueryShapeHash(originalQueryShapeHash.value_or(query_shape::QueryShapeHash{})),
       _hasField{
@@ -180,6 +182,9 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob,
     if (_collectionType > query_shape::CollectionType::kUnknown) {
         bob.append("collectionType", toStringData(_collectionType));
     }
+    if (_inTransaction) {
+        bob.append("inTransaction", true);
+    }
     if (!_hintObj.isEmpty()) {
         bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
     }
@@ -212,7 +217,8 @@ Key::Key(OperationContext* opCtx,
           std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           collectionType,
           hasMaxTimeMS,
-          originalQueryShapeHash) {}
+          originalQueryShapeHash,
+          opCtx->inMultiDocumentTransaction()) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
                     const query_shape::SerializationOptions& opts,

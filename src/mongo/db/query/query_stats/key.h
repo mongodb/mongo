@@ -46,7 +46,8 @@ struct UniversalKeyComponents {
         std::unique_ptr<APIParameters> apiParams,
         query_shape::CollectionType collectionType,
         bool maxTimeMS,
-        boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash = boost::none);
+        boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash = boost::none,
+        bool inTransaction = false);
     /**
      * Returns a copy of the read concern object. If there is an "afterClusterTime" or
      * "atClusterTime" component, the timestamp is shapified according to 'opts'.
@@ -89,6 +90,9 @@ struct UniversalKeyComponents {
     // This value is not known when run a query is run on mongos over an unsharded collection, so it
     // is not set through that code path.
     query_shape::CollectionType _collectionType;
+
+    // Whether the query is executing within a multi-document transaction.
+    bool _inTransaction = false;
 
     // The tenant id associated with the collection targeted by the query if '_hasField.tenantId' is
     // set.
@@ -159,6 +163,7 @@ H AbslHashValue(H h, const UniversalKeyComponents& components) {
                    simpleHash(components._shapifiedReadConcern),
                    components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
                    components._collectionType,
+                   components._inTransaction,
                    components._hasField);
     if (components._hasField.originalQueryShapeHash) {
         // QueryShapeHash is var-length block (32 bytes). Use `combine_contiguous` instead of

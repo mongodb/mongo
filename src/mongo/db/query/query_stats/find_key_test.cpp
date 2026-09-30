@@ -178,5 +178,54 @@ TEST_F(FindKeyTest, DifferentOriginalQueryShapeHashesProduceDifferentKeys) {
     ASSERT_NE(absl::HashOf(*keyA), absl::HashOf(*keyB));
 }
 
+TEST_F(FindKeyTest, InTransactionAppearsInKey) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    expCtx->getOperationContext()->setInMultiDocumentTransaction();
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setFilter(BSON("x" << 1));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+    auto key =
+        std::make_unique<FindKey>(expCtx,
+                                  *parsedFind->findCommandRequest,
+                                  std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+                                  collectionType);
+
+    const auto keyBson = key->toBson(
+        expCtx->getOperationContext(),
+        query_shape::SerializationOptions(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        {});
+    ASSERT_TRUE(keyBson["inTransaction"].booleanSafe());
+}
+
+TEST_F(FindKeyTest, InTransactionAbsentWhenNotInTransaction) {
+    const auto key = makeFindKeyFromQuery(BSON("x" << 1));
+    const auto keyBson = key->toBson(
+        make_intrusive<ExpressionContextForTest>()->getOperationContext(),
+        query_shape::SerializationOptions(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        {});
+    ASSERT_TRUE(keyBson["inTransaction"].eoo());
+}
+
+TEST_F(FindKeyTest, InTransactionProducesDifferentKeys) {
+    auto makeKey = [](bool inTransaction) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        if (inTransaction) {
+            expCtx->getOperationContext()->setInMultiDocumentTransaction();
+        }
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(BSON("x" << 1));
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        return std::make_unique<FindKey>(
+            expCtx,
+            *parsedFind->findCommandRequest,
+            std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+            collectionType);
+    };
+
+    ASSERT_NE(absl::HashOf(*makeKey(true)), absl::HashOf(*makeKey(false)));
+}
+
 }  // namespace
 }  // namespace mongo::query_stats
