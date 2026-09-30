@@ -57,6 +57,8 @@ include:
   # - filename: etc/evergreen_yml_components/variants/release/release.yml
 
   - filename: src/mongo/db/modules/atlas/atlas_release.yml
+  ### TODO(SERVER-136019): Revert SERVER-136018 (reenable DSC release fuzzers)
+  - filename: src/mongo/db/modules/atlas/atlas_release_fuzzers.yml
   ### Comment out when using this file for a release branch. ###
   - filename: etc/evergreen_yml_components/variants/amazon/streams/streams_release.yml
 
