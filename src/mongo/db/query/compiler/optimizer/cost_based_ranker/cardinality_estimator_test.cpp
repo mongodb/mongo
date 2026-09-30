@@ -356,6 +356,95 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
     ASSERT_EQ(e1, makeCard(21.0504));
 }
 
+TEST(CardinalityEstimator, IntersectionOfUnionsFallback) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
+    // IXSCAN over 'a' with bounds a: [0, 10].
+    std::vector<std::string> indexFieldsA = {"a"};
+    auto indexScanA =
+        makeIndexScan(testNss,
+                      makeRangeIntervalBounds(BSON("" << 0 << " " << 10),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys,
+                                              indexFieldsA[0]),
+                      indexFieldsA);
+
+    // IXSCAN over 'b' with bounds b: [13, 13].
+    std::vector<std::string> indexFieldsB = {"b"};
+    auto indexScanB =
+        makeIndexScan(testNss, makePointIntervalBounds(13.0, indexFieldsB[0]), indexFieldsB);
+
+    // Build a union of the two index scans, either as an OR or as a merge-sort (a union which
+    // provides a sort).
+    auto makeUnionNode = [&](bool mergeSort) {
+        std::unique_ptr<QuerySolutionNode> unionNode;
+        if (mergeSort) {
+            auto mergeSortNode = std::make_unique<MergeSortNode>();
+            mergeSortNode->sort = BSON("a" << 1 << "b" << 1);
+            mergeSortNode->dedup = true;
+            mergeSortNode->children.push_back(indexScanA->clone());
+            mergeSortNode->children.push_back(indexScanB->clone());
+            unionNode = std::move(mergeSortNode);
+        } else {
+            auto orNode = std::make_unique<OrNode>();
+            orNode->children.push_back(indexScanA->clone());
+            orNode->children.push_back(indexScanB->clone());
+            unionNode = std::move(orNode);
+        }
+        return unionNode;
+    };
+
+    const auto collInfo = buildCollectionInfo({}, makeCollStats(1000.0));
+
+    // Build plans of the shape FETCH -> AND_HASH -> [<union>, IXSCAN] where the union may be an
+    // OR or a SORT_MERGE node in either position of the intersection. All of them must be
+    // rejected, as intersections of unions are unsupported by CBR.
+    auto makePlan = [&](const QuerySolutionNode& unionNode, bool unionFirst) {
+        auto andHash = std::make_unique<AndHashNode>();
+        andHash->children.push_back(unionFirst ? unionNode.clone() : indexScanA->clone());
+        andHash->children.push_back(unionFirst ? indexScanA->clone() : unionNode.clone());
+        auto plan = std::make_unique<QuerySolution>();
+        plan->setRoot(std::make_unique<FetchNode>(std::move(andHash), testNss));
+        return plan;
+    };
+
+    for (bool mergeSort : {false, true}) {
+        auto unionNode = makeUnionNode(mergeSort);
+        for (bool unionFirst : {false, true}) {
+            auto plan = makePlan(*unionNode, unionFirst);
+            const auto ceRes = getPlanCE(*plan, collInfo, QueryCBRCEModeEnum::kHeuristicCE);
+            ASSERT_EQ(ceRes.getStatus(), ErrorCodes::UnsupportedCbrNode);
+        }
+    }
+}
+
+TEST(CardinalityEstimator, TopLevelUnionIsCosted) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    std::vector<std::string> indexFields = {"a"};
+    auto indexScan1 =
+        makeIndexScan(testNss,
+                      makeRangeIntervalBounds(BSON("" << 0 << " " << 10),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys,
+                                              indexFields[0]),
+                      indexFields);
+    auto indexScan2 =
+        makeIndexScan(testNss,
+                      makeRangeIntervalBounds(BSON("" << 20 << " " << 30),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys,
+                                              indexFields[0]),
+                      indexFields);
+
+    // FETCH -> OR -> [IXSCAN, IXSCAN]
+    auto orNode = std::make_unique<OrNode>();
+    orNode->children.push_back(std::move(indexScan1));
+    orNode->children.push_back(std::move(indexScan2));
+    auto fetch = std::make_unique<FetchNode>(std::move(orNode), testNss);
+
+    auto plan = std::make_unique<QuerySolution>();
+    plan->setRoot(std::move(fetch));
+
+    ASSERT_TRUE(approxGt(getPlanHeuristicCE(*plan, 1000.0), zeroCE));
+}
+
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinality) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     // Plan 1: Ixscan(a: (5, inf]) -> Fetch

@@ -12,6 +12,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <absl/container/flat_hash_map.h>
@@ -835,6 +836,18 @@ CEResult CardinalityEstimator::limitNodeCard(const QuerySolutionNode* node, size
 template <IntersectionType T>
 CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     tassert(9586703, "Index intersection nodes are not expected to have filters.", !node->filter);
+
+    // The planner can generate plans that contain an intersection of unions, e.g.
+    // AND_HASH -> [ OR -> [ IXSCAN, IXSCAN ], IXSCAN ], which are currently unsupported by CBR.
+    // TODO(SERVER-99091): Support intersections of unions.
+    bool hasOrStage =
+        std::any_of(node->children.begin(), node->children.end(), [](const auto& child) {
+            return child->getType() == StageType::STAGE_OR ||
+                child->getType() == StageType::STAGE_SORT_MERGE;
+        });
+    if (hasOrStage) {
+        return Status(ErrorCodes::UnsupportedCbrNode, "intersections of unions are unsupported");
+    }
 
     QSNEstimate est;
     // Ignore selectivities pushed by other operators up to this point.
