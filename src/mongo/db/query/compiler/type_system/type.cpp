@@ -420,6 +420,10 @@ Type Type::missing() {
     return Type(BSONType::eoo, Extent::kAll);
 }
 
+Type Type::anyObject() {
+    return Type(BSONType::object, Extent::kAll);
+}
+
 Type Type::fromValue(const Value& value) {
     return Type(TypeSet::fromValue(value));
 }

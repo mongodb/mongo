@@ -161,6 +161,9 @@ public:
     /// A type covering BSONType::eoo (missing).
     static Type missing();
 
+    /// A type covering BSONType::object.
+    static Type anyObject();
+
     /// A type covering the type of 'value'. Generally a kSubset, except for singleton types.
     static Type fromValue(const Value& value);
 
