@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/type_system/matcher_typing.h"
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
@@ -13,6 +14,81 @@
 
 namespace mongo::pipeline::type_system {
 namespace {
+
+/// Returns the type to assume when the predicate is always true.
+Type narrowByAlwaysTrue(Type inputType, bool assumeTrue) {
+    // Under negation nothing matches.
+    return assumeTrue ? std::move(inputType) : Type::never();
+}
+
+/// Returns the type to assume when the predicate is always false.
+Type narrowByAlwaysFalse(Type inputType, bool assumeTrue) {
+    // An always false predicate is the negation of an always true one.
+    return narrowByAlwaysTrue(std::move(inputType), !assumeTrue);
+}
+
+/**
+ * Returns the type to assume when every child matches. This is represented by the intersection of
+ * their constraints. 'expr' must have at least 1 child.
+ */
+Type narrowByEveryChild(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+    tassert(13493401, "Expression must have a child", expr->numChildren() > 0);
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        // Repeatedly narrow the input using every child.
+        inputType = narrowType(std::move(inputType), expr->getChild(i), assumeTrue);
+    }
+    return inputType;
+}
+
+/**
+ * Returns the type to assume when at least one child matches. This is represented by the union of
+ * their constraints. 'expr' must have at least 1 child.
+ */
+Type narrowBySomeChild(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+    tassert(13493402, "Expression must have a child", expr->numChildren() > 0);
+    if (expr->numChildren() == 1) {
+        // When we have a single child we can std::move the input to avoid copying.
+        return narrowType(std::move(inputType), expr->getChild(0), assumeTrue);
+    }
+    // We union all of the types of the children here, starting with nothing matching.
+    Type narrowed = Type::never();
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        // Independently evaluate the type that would match at this branch.
+        Type childType = narrowType(inputType, expr->getChild(i), assumeTrue);
+        narrowed = unionType(std::move(narrowed), std::move(childType));
+    }
+    return narrowed;
+}
+
+/// Returns the type to assume when the conjunction of the children of 'expr' is 'assumeTrue'.
+Type narrowByConjunction(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+    if (expr->numChildren() == 0) {
+        // An empty conjunction matches every document. This is $and: [] and $alwaysTrue which is
+        // what the $and case rewrites into.
+        return narrowByAlwaysTrue(std::move(inputType), assumeTrue);
+    }
+    if (assumeTrue) {
+        // Under conjunction, every child must match.
+        return narrowByEveryChild(std::move(inputType), expr, true);
+    }
+    // De Morgan: not (A and B) = (not A) or (not B)
+    return narrowBySomeChild(std::move(inputType), expr, false);
+}
+
+/// Returns the type to assume when the disjunction of the children of 'expr' is 'assumeTrue'.
+Type narrowByDisjunction(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+    if (expr->numChildren() == 0) {
+        // An empty disjunction matches no document. This is $or: [] and $alwaysFalse which is what
+        // the $or case rewrites into.
+        return narrowByAlwaysFalse(std::move(inputType), assumeTrue);
+    }
+    if (assumeTrue) {
+        // Under disjunction, at least one child must match, and we do not know which one.
+        return narrowBySomeChild(std::move(inputType), expr, true);
+    }
+    // De Morgan: not (A or B) = (not A) and (not B)
+    return narrowByEveryChild(std::move(inputType), expr, false);
+}
 
 /**
  * Narrows the input type by every expression which carries type information.
@@ -35,12 +111,25 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
         type = narrowType(std::move(type), expr->getChild(0), !assumeTrue);
     }
 
+    void visit(const AlwaysTrueMatchExpression* expr) override {
+        type = narrowByAlwaysTrue(std::move(type), assumeTrue);
+    }
+
+    void visit(const AlwaysFalseMatchExpression* expr) override {
+        type = narrowByAlwaysFalse(std::move(type), assumeTrue);
+    }
+
     void visit(const AndMatchExpression* expr) override {
-        if (expr->numChildren() != 1) {
-            // TODO(SERVER-134934): Handle this case.
-            return;
-        }
-        type = narrowType(std::move(type), expr->getChild(0), assumeTrue);
+        type = narrowByConjunction(std::move(type), expr, assumeTrue);
+    }
+
+    void visit(const OrMatchExpression* expr) override {
+        type = narrowByDisjunction(std::move(type), expr, assumeTrue);
+    }
+
+    void visit(const NorMatchExpression* expr) override {
+        // $nor is just a negated $or.
+        type = narrowByDisjunction(std::move(type), expr, !assumeTrue);
     }
 
     /// The input type, narrowed by every expression which carries type information so far.
