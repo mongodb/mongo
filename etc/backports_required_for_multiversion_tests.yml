@@ -35,6 +35,8 @@ last-patch:
       ticket: SERVER-121079
     - test_file: jstests/core/administrative/block_replica_set_writes.js
       ticket: SERVER-121079
+    - test_file: jstests/core/ddl/dbcase2.js
+      ticket: SERVER-135615
     - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
@@ -53,8 +55,6 @@ last-patch:
       ticket: SERVER-130247
     - test_file: jstests/core/query/where/where_system_js.js
       ticket: SERVER-130167
-    - test_file: jstests/core/repro/dbcase2.js
-      ticket: SERVER-135615
     - test_file: jstests/core/timeseries/ddl/reindex_timeseries.js
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/ddl/timeseries_split_vector.js
@@ -134,6 +134,8 @@ last-continuous:
       ticket: SERVER-131302
     - test_file: jstests/core/administrative/block_replica_set_writes.js
       ticket: SERVER-121079
+    - test_file: jstests/core/ddl/dbcase2.js
+      ticket: SERVER-135615
     - test_file: jstests/core/query/boolean_simplifier_tautology.js
       ticket: SERVER-131802
     - test_file: jstests/core/query/bson_size_limit_agg.js
@@ -142,8 +144,6 @@ last-continuous:
       ticket: SERVER-112940
     - test_file: jstests/core/query/sbe/sbe_prepare_for_decimal123_invalidation.js
       ticket: SERVER-130247
-    - test_file: jstests/core/repro/dbcase2.js
-      ticket: SERVER-135615
     - test_file: jstests/core/timeseries/query/timeseries_bucket_level_filter.js
       ticket: SERVER-131544
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
@@ -259,6 +259,8 @@ last-lts:
       ticket: SERVER-131302
     - test_file: jstests/core/administrative/block_replica_set_writes.js
       ticket: SERVER-121079
+    - test_file: jstests/core/ddl/dbcase2.js
+      ticket: SERVER-135615
     - test_file: jstests/core/query/boolean_simplifier_tautology.js
       ticket: SERVER-131802
     - test_file: jstests/core/query/bson_size_limit_agg.js
@@ -267,8 +269,6 @@ last-lts:
       ticket: SERVER-112940
     - test_file: jstests/core/query/sbe/sbe_prepare_for_decimal123_invalidation.js
       ticket: SERVER-130247
-    - test_file: jstests/core/repro/dbcase2.js
-      ticket: SERVER-135615
     - test_file: jstests/core/timeseries/query/timeseries_bucket_level_filter.js
       ticket: SERVER-131544
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
