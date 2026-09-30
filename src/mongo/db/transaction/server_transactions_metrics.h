@@ -59,13 +59,19 @@ public:
     void incrementTotalCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPrepared() const;
-    void incrementTotalPrepared();
+    unsigned long long getTotalPreparedInternal() const;
+    unsigned long long getTotalPreparedExternal() const;
+    void incrementTotalPrepared(bool isServerInitiated);
 
     unsigned long long getTotalPreparedThenCommitted() const;
-    void incrementTotalPreparedThenCommitted();
+    unsigned long long getTotalPreparedThenCommittedInternal() const;
+    unsigned long long getTotalPreparedThenCommittedExternal() const;
+    void incrementTotalPreparedThenCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPreparedThenAborted() const;
-    void incrementTotalPreparedThenAborted();
+    unsigned long long getTotalPreparedThenAbortedInternal() const;
+    unsigned long long getTotalPreparedThenAbortedExternal() const;
+    void incrementTotalPreparedThenAborted(bool isServerInitiated);
 
     unsigned long long getCurrentPrepared() const;
     void incrementCurrentPrepared();
@@ -113,13 +119,16 @@ private:
     Atomic<unsigned long long> _totalCommittedExternal{0};
 
     // The total number of prepared transactions since the last server startup.
-    Atomic<unsigned long long> _totalPrepared{0};
+    Atomic<unsigned long long> _totalPreparedInternal{0};
+    Atomic<unsigned long long> _totalPreparedExternal{0};
 
     // The total number of prepared transaction commits.
-    Atomic<unsigned long long> _totalPreparedThenCommitted{0};
+    Atomic<unsigned long long> _totalPreparedThenCommittedInternal{0};
+    Atomic<unsigned long long> _totalPreparedThenCommittedExternal{0};
 
     // The total number of prepared transaction aborts.
-    Atomic<unsigned long long> _totalPreparedThenAborted{0};
+    Atomic<unsigned long long> _totalPreparedThenAbortedInternal{0};
+    Atomic<unsigned long long> _totalPreparedThenAbortedExternal{0};
 
     // The current number of transactions in the prepared state.
     Atomic<unsigned long long> _currentPrepared{0};

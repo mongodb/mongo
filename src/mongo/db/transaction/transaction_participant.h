@@ -608,7 +608,8 @@ public:
                              boost::optional<bool> autocommit,
                              TransactionActions action,
                              const boost::optional<TransactionRuntimeContext>&
-                                 transactionRuntimeContext = boost::none);
+                                 transactionRuntimeContext = boost::none,
+                             boost::optional<bool> isServerInitiatedTransaction = boost::none);
 
         /**
          * Used only by the secondary oplog application logic. Similar to 'beginOrContinue' without
@@ -1172,7 +1173,8 @@ public:
             OperationContext* opCtx,
             const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
             const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext =
-                boost::none);
+                boost::none,
+            boost::optional<bool> isServerInitiatedTransaction = boost::none);
 
         // Attempt to continue an in-progress multi document transaction at the given transaction
         // number and transaction retry counter.

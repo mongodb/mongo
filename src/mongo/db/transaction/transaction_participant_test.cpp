@@ -2881,6 +2881,25 @@ protected:
         executionAdmission.setTotalTimeQueuedMicros_forTest(micros);
         return executionAdmission;
     }
+
+    /**
+     * Like checkOutSession(), but starts the transaction explicitly classified as external. The
+     * fixture's client has no transport session, so without an explicit classification every
+     * transaction would fall back to being counted as server-initiated.
+     */
+    std::unique_ptr<MongoDSessionCatalog::Session> checkOutSessionAsExternal() {
+        opCtx()->setInMultiDocumentTransaction();
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
+        TransactionParticipant::get(opCtx()).beginOrContinue(
+            opCtx(),
+            {*opCtx()->getTxnNumber()},
+            false /* autocommit */,
+            TransactionParticipant::TransactionActions::kStart,
+            boost::none /* transactionRuntimeContext */,
+            false /* isServerInitiatedTransaction */);
+        return opCtxSession;
+    }
 };
 
 TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
@@ -2906,15 +2925,62 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
               beforeStartedExternal);
 }
 
+TEST_F(TransactionsMetricsTest, ForwardedClassificationOverridesClientSessionFallback) {
+    unsigned long long beforeStartedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalStartedInternal();
+    unsigned long long beforeStartedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalStartedExternal();
+
+    // Without an explicit value this participant would fall back to classifying the transaction as
+    // server-initiated. Starting it as external checks that an explicit classification takes
+    // precedence over the fallback.
+    auto sessionCheckout = checkOutSessionAsExternal();
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStartedExternal(),
+              beforeStartedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStartedInternal(),
+              beforeStartedInternal);
+}
+
 TEST_F(TransactionsMetricsTest, IncrementPreparedTransaction) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     unsigned long long beforePrepareCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalPrepared();
+    unsigned long long beforePreparedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedInternal();
+    unsigned long long beforePreparedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedExternal();
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant.prepareTransaction(opCtx(), {});
 
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforePrepareCount + 1U);
+
+    // The test fixture's client has no transport session, so the transaction was classified as
+    // server-initiated when it started and must be counted out of the same bucket on prepare.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedInternal(),
+              beforePreparedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedExternal(),
+              beforePreparedExternal);
+}
+
+TEST_F(TransactionsMetricsTest, IncrementPreparedTransactionExternal) {
+    auto sessionCheckout = checkOutSessionAsExternal();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    unsigned long long beforePrepareCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPrepared();
+    unsigned long long beforePreparedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedInternal();
+    unsigned long long beforePreparedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedExternal();
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant.prepareTransaction(opCtx(), {});
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforePrepareCount + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedExternal(),
+              beforePreparedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedInternal(),
+              beforePreparedInternal);
 }
 
 TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
@@ -2942,6 +3008,28 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
               beforeCommittedExternal);
 }
 
+TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommitExternal) {
+    auto sessionCheckout = checkOutSessionAsExternal();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    unsigned long long beforeCommitCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommitted();
+    unsigned long long beforeCommittedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommittedInternal();
+    unsigned long long beforeCommittedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommittedExternal();
+
+    txnParticipant.commitUnpreparedTransaction(opCtx());
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommitted(), beforeCommitCount + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommittedExternal(),
+              beforeCommittedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommittedInternal(),
+              beforeCommittedInternal);
+}
+
 TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommitted) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2951,12 +3039,48 @@ TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommitted) {
 
     unsigned long long beforePreparedThenCommittedCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
+    unsigned long long beforePreparedThenCommittedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedInternal();
+    unsigned long long beforePreparedThenCommittedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedExternal();
 
     txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
 
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
               beforePreparedThenCommittedCount + 1U);
+
+    // The test fixture's client has no transport session, so the transaction was classified as
+    // server-initiated when it started and must be counted out of the same bucket on commit.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedInternal(),
+              beforePreparedThenCommittedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedExternal(),
+              beforePreparedThenCommittedExternal);
+}
+
+TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommittedExternal) {
+    auto sessionCheckout = checkOutSessionAsExternal();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+    const auto [prepareTimestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
+
+    unsigned long long beforePreparedThenCommittedCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
+    unsigned long long beforePreparedThenCommittedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedInternal();
+    unsigned long long beforePreparedThenCommittedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedExternal();
+
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
+
+    ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
+              beforePreparedThenCommittedCount + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedExternal(),
+              beforePreparedThenCommittedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommittedInternal(),
+              beforePreparedThenCommittedInternal);
 }
 
 
@@ -2985,9 +3109,34 @@ TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
               beforeAbortedExternal);
 }
 
+TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbortExternal) {
+    auto sessionCheckout = checkOutSessionAsExternal();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    unsigned long long beforeAbortCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
+    unsigned long long beforeAbortedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalAbortedInternal();
+    unsigned long long beforeAbortedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalAbortedExternal();
+
+    txnParticipant.abortTransaction(opCtx());
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAbortedExternal(),
+              beforeAbortedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAbortedInternal(),
+              beforeAbortedInternal);
+}
+
 TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAborted) {
     unsigned long long beforePreparedThenAbortedCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted();
+    unsigned long long beforePreparedThenAbortedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedInternal();
+    unsigned long long beforePreparedThenAbortedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedExternal();
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2998,6 +3147,36 @@ TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAborted) {
     ASSERT(txnParticipant.transactionIsAborted());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted(),
               beforePreparedThenAbortedCount + 1U);
+
+    // The test fixture's client has no transport session, so the transaction was classified as
+    // server-initiated when it started and must be counted out of the same bucket on abort.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedInternal(),
+              beforePreparedThenAbortedInternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedExternal(),
+              beforePreparedThenAbortedExternal);
+}
+
+TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAbortedExternal) {
+    unsigned long long beforePreparedThenAbortedCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted();
+    unsigned long long beforePreparedThenAbortedInternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedInternal();
+    unsigned long long beforePreparedThenAbortedExternal =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedExternal();
+
+    auto sessionCheckout = checkOutSessionAsExternal();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant.prepareTransaction(opCtx(), {});
+
+    txnParticipant.abortTransaction(opCtx());
+    ASSERT(txnParticipant.transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted(),
+              beforePreparedThenAbortedCount + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedExternal(),
+              beforePreparedThenAbortedExternal + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAbortedInternal(),
+              beforePreparedThenAbortedInternal);
 }
 
 TEST_F(TransactionsMetricsTest, IncrementCurrentPreparedWithCommit) {

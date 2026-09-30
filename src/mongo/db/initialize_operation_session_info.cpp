@@ -186,6 +186,13 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
                 osi.getStartTransaction().value());
     }
 
+    if (osi.getIsServerInitiatedTransaction().has_value()) {
+        uassert(ErrorCodes::Unauthorized,
+                "'isServerInitiatedTransaction' is only allowed for internal clients",
+                isAuthorizedForInternalClusterAction(
+                    opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
+    }
+
     if (osi.getStartOrContinueTransaction()) {
         invariant(osi.getAutocommit());
         uassert(ErrorCodes::InvalidOptions,

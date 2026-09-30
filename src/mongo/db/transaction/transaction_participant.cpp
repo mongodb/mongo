@@ -1071,7 +1071,8 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
 void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     OperationContext* opCtx,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext,
+    const boost::optional<bool> isServerInitiatedTransaction) {
     auto limit = gMaxConcurrentMultiDocumentTransactions.load();
     if (limit > 0 && !isProcessInternalClient(*opCtx->getClient())) {
         auto currentOpen =
@@ -1114,7 +1115,9 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
         auto tickSource = opCtx->getServiceContext()->getTickSource();
 
         o(lk).transactionExpireDate = now + Seconds(gTransactionLifetimeLimitSeconds.load());
-        bool isServerInitiatedTransaction = !opCtx->getClient()->session();
+
+        bool isServerInitiatedTransactionResolved =
+            isServerInitiatedTransaction.value_or(!opCtx->getClient()->session());
 
         o(lk).transactionMetricsObserver.onStart(
             ServerTransactionsMetrics::get(opCtx->getServiceContext()),
@@ -1122,7 +1125,7 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
             tickSource,
             now,
             *o().transactionExpireDate,
-            isServerInitiatedTransaction);
+            isServerInitiatedTransactionResolved);
         o(lk).readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
         if (o(lk).transactionRuntimeContext.has_value() &&
@@ -1157,7 +1160,8 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     TransactionActions action,
-    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext,
+    const boost::optional<bool> isServerInitiatedTransaction) {
     opCtx->setActiveTransactionParticipant();
 
     if (_isInternalSessionForRetryableWrite()) {
@@ -1288,7 +1292,8 @@ void TransactionParticipant::Participant::beginOrContinue(
         return;
     }
 
-    _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter, transactionRuntimeContext);
+    _beginMultiDocumentTransaction(
+        opCtx, txnNumberAndRetryCounter, transactionRuntimeContext, isServerInitiatedTransaction);
 
     // Remember whether or not this operation is starting a transaction, in case something later
     // in the execution needs to adjust its behavior based on this.

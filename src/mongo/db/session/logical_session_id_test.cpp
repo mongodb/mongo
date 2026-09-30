@@ -601,6 +601,48 @@ TEST_F(LogicalSessionIdTest,
 }
 
 TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_IsServerInitiatedTransactionRequiresInternalClient) {
+    addSimpleUser(UserName("simple", "test"));
+
+    // Supplying any value for isServerInitiatedTransaction must be rejected, since either value
+    // would let a client choose its own metrics classification.
+    for (bool isServerInitiated : {true, false}) {
+        LogicalSessionFromClient lsid;
+        lsid.setId(UUID::gen());
+
+        ASSERT_THROWS_CODE(
+            initializeOpSessionInfoWithRequestBody(
+                _opCtx.get(),
+                BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                               << "autocommit" << false << "startTransaction" << true
+                               << "isServerInitiatedTransaction" << isServerInitiated),
+                true /* requiresAuth */,
+                true /* attachToOpCtx */,
+                true /* isReplSetMemberOrMongos */),
+            AssertionException,
+            ErrorCodes::Unauthorized);
+    }
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_IsServerInitiatedTransactionAllowedForInternalClient) {
+    addClusterUser(UserName("cluster", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    auto sessionInfo = initializeOpSessionInfoWithRequestBody(
+        _opCtx.get(),
+        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "autocommit"
+                       << false << "startTransaction" << true << "isServerInitiatedTransaction"
+                       << true),
+        true /* requiresAuth */,
+        true /* attachToOpCtx */,
+        true /* isReplSetMemberOrMongos */);
+    ASSERT(sessionInfo.getIsServerInitiatedTransaction());
+    ASSERT_TRUE(sessionInfo.getIsServerInitiatedTransaction().value());
+}
+
+TEST_F(LogicalSessionIdTest,
        InitializeOperationSessionInfo_CannotSpecifyBothStartTransactionAndStartOrContinue) {
     addSimpleUser(UserName("simple", "test"));
     LogicalSessionFromClient lsid;

@@ -1004,7 +1004,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},
                     sessionOptions.getAutocommit(),
                     transactionAction,
-                    sessionOptions.getTransactionRuntimeContext());
+                    sessionOptions.getTransactionRuntimeContext(),
+                    sessionOptions.getIsServerInitiatedTransaction());
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
                 auto prevTxnExitedPrepare = txnParticipant.onExitPrepare();

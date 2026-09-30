@@ -106,10 +106,28 @@ structs:
             totalPrepared:
                 type: long
                 default: 0
+            totalPreparedInternal:
+                type: long
+                default: 0
+            totalPreparedExternal:
+                type: long
+                default: 0
             totalPreparedThenCommitted:
                 type: long
                 default: 0
+            totalPreparedThenCommittedInternal:
+                type: long
+                default: 0
+            totalPreparedThenCommittedExternal:
+                type: long
+                default: 0
             totalPreparedThenAborted:
+                type: long
+                default: 0
+            totalPreparedThenAbortedInternal:
+                type: long
+                default: 0
+            totalPreparedThenAbortedExternal:
                 type: long
                 default: 0
             currentPrepared:

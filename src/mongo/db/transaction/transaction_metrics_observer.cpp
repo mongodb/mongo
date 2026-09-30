@@ -123,7 +123,8 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
     serverTransactionsMetrics->decrementCurrentActive();
 
     if (_singleTransactionStats.isPrepared()) {
-        serverTransactionsMetrics->incrementTotalPreparedThenCommitted();
+        serverTransactionsMetrics->incrementTotalPreparedThenCommitted(
+            _singleTransactionStats.isServerInitiatedTransaction());
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
@@ -241,7 +242,8 @@ void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
     serverTransactionsMetrics->decrementCurrentOpen();
 
     if (_singleTransactionStats.isPrepared()) {
-        serverTransactionsMetrics->incrementTotalPreparedThenAborted();
+        serverTransactionsMetrics->incrementTotalPreparedThenAborted(
+            _singleTransactionStats.isServerInitiatedTransaction());
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
@@ -262,7 +264,8 @@ void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTran
     _singleTransactionStats.setPreparedStartTime(curTick);
 
     serverTransactionsMetrics->incrementCurrentPrepared();
-    serverTransactionsMetrics->incrementTotalPrepared();
+    serverTransactionsMetrics->incrementTotalPrepared(
+        _singleTransactionStats.isServerInitiatedTransaction());
 }
 
 }  // namespace mongo
