@@ -11,16 +11,14 @@
 
 namespace mongo {
 /**
- * This class supports writing and reading named pipes in the mongo test shell.
+ * Native shell callbacks used by JavaScript tests to write and read named pipes.
+ *
+ * Exceptions occurring on the calling thread will be propagated back to the JavaScript shell as
+ * JavaScript exceptions. Exceptions occurring asynchronously on detached threads will be logged.
  */
 class NamedPipeHelper {
 public:
     static BSONObj readFromPipes(const std::vector<std::string>& pipeRelativePaths);
-    static void writeToPipe(std::string pipeDir,
-                            std::string pipeRelativePath,
-                            long objects,
-                            long stringMinSize,
-                            long stringMaxSize) noexcept;
     static void writeToPipeAsync(std::string pipeDir,
                                  std::string pipeRelativePath,
                                  long objects,
@@ -30,7 +28,7 @@ public:
                                    std::string pipeRelativePath,
                                    long objects,
                                    std::vector<BSONObj> bsonObjs,
-                                   bool persistPipe = false) noexcept;
+                                   bool persistPipe = false);
     static void writeToPipeObjectsAsync(std::string pipeDir,
                                         std::string pipeRelativePath,
                                         long objects,

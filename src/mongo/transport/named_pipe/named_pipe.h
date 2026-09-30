@@ -42,6 +42,9 @@ public:
     void open();
     int write(const char* data, int size);
     void close();
+    const std::string& getAbsolutePath() const {
+        return _pipeAbsolutePath;
+    }
 
 private:
     std::string _pipeAbsolutePath;

@@ -3,11 +3,9 @@
 
 #include "mongo/shell/named_pipe_test_helper.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
-#include "mongo/db/query/virtual_collection/input_stream.h"
 #include "mongo/db/query/virtual_collection/multi_bson_stream_cursor.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_data.h"
@@ -24,7 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <new>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -53,6 +51,82 @@ std::vector<size_t> randomLengths(size_t n, size_t min, size_t max) {
         vec.push_back(min + random.nextInt64(max - min + 1));
     return vec;
 }
+
+template <typename Function>
+void runAndLogExceptions(const char* method, Function&& function) noexcept {
+    try {
+        std::forward<Function>(function)();
+    } catch (...) {
+        LOGV2_ERROR(13212600,
+                    "Caught exception",
+                    "method"_attr = method,
+                    "error"_attr = exceptionToStatus());
+    }
+}
+
+/**
+ * Opens 'pipeWriter' (blocking until a reader attaches), writes 'objects' random BSON objects with
+ * stringMinSize <= "string".length() <= stringMaxSize, then closes it. 'pipeWriter' must have
+ * already been constructed, i.e. the pipe itself must already exist. Absorbs exceptions because
+ * this is called by an async detached thread, so escaping exceptions will cause fuzzer tests to
+ * fail as its try blocks are only around the main thread.
+ */
+void writeToPipeAsyncImpl(std::unique_ptr<NamedPipeOutput> pipeWriter,
+                          long objects,
+                          long stringMinSize,
+                          long stringMaxSize) noexcept {
+    const char* method = "NamedPipeHelper::writeToPipeAsync";
+    runAndLogExceptions(method, [&] {
+        pipeWriter->open();
+        for (size_t length : randomLengths(objects, stringMinSize, stringMaxSize)) {
+            auto bsonObj = BSONObjBuilder{}
+                               .append("length", static_cast<int>(length))
+                               .append("string", std::string(length, 'a'))
+                               .obj();
+            pipeWriter->write(bsonObj.objdata(), bsonObj.objsize());
+        }
+        pipeWriter->close();
+        LOGV2_INFO(13212601,
+                   "pipeWriter closed",
+                   "method"_attr = method,
+                   "pipe"_attr = pipeWriter->getAbsolutePath());
+    });
+}
+
+/**
+ * Opens 'pipeWriter' (blocking until a reader attaches), writes 'objects' BSON objects
+ * round-robinned from 'bsonObjs', then closes it. 'pipeWriter' must have already been constructed,
+ * i.e. the pipe itself must already exist.
+ */
+void writeObjectsToPipe(NamedPipeOutput& pipeWriter,
+                        long objects,
+                        const std::vector<BSONObj>& bsonObjs) {
+    uassert(13212602, "bsonObjs must not be empty", !bsonObjs.empty());
+    const int kNumBsonObjs = bsonObjs.size();
+    pipeWriter.open();
+    for (long i = 0; i < objects; ++i) {
+        BSONObj bsonObj{bsonObjs[i % kNumBsonObjs]};
+        pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
+    }
+    pipeWriter.close();
+}
+
+/**
+ * Detached-thread entry point for writing 'objects' BSON objects round-robinned from 'bsonObjs'.
+ */
+void writeObjectsToPipeAsyncImpl(std::unique_ptr<NamedPipeOutput> pipeWriter,
+                                 long objects,
+                                 std::vector<BSONObj> bsonObjs) noexcept {
+    const char* method = "NamedPipeHelper::writeToPipeObjectsAsync";
+    runAndLogExceptions(method, [&] {
+        writeObjectsToPipe(*pipeWriter, objects, bsonObjs);
+        LOGV2_INFO(13212603,
+                   "pipeWriter closed",
+                   "method"_attr = method,
+                   "pipe"_attr = pipeWriter->getAbsolutePath());
+    });
+}
+
 }  // namespace
 
 /**
@@ -123,43 +197,6 @@ BSONObj NamedPipeHelper::readFromPipes(const std::vector<std::string>& pipeRelat
 }
 
 /**
- * Synchronously writes 'objects' random BSON objects to named pipe 'pipeRelativePath'. The "string"
- * field of these objects will have stringMinSize <= string.length() <= stringMaxSize. Note that
- * the open() call itself will block until a pipe reader attaches to the same pipe. Absorbs
- * exceptions because this is called by an async detached thread, so escaping exceptions will cause
- * fuzzer tests to fail as its try blocks are only around the main thread.
- */
-void NamedPipeHelper::writeToPipe(std::string pipeDir,
-                                  std::string pipeRelativePath,
-                                  long objects,
-                                  long stringMinSize,
-                                  long stringMaxSize) noexcept {
-    const std::string method = "NamedPipeHelper::writeToPipe";
-
-    try {
-        NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath);  // producer
-
-        pipeWriter.open();
-        for (size_t length : randomLengths(objects, stringMinSize, stringMaxSize)) {
-            auto bsonObj = BSONObjBuilder{}
-                               .append("length", static_cast<int>(length))
-                               .append("string", std::string(length, 'a'))
-                               .obj();
-            pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
-        }
-        pipeWriter.close();
-    } catch (const DBException& ex) {
-        LOGV2_ERROR(
-            7001104, "Caught DBException", "method"_attr = method, "error"_attr = ex.toString());
-    } catch (const std::exception& ex) {
-        LOGV2_ERROR(
-            7001105, "Caught STL exception", "method"_attr = method, "error"_attr = ex.what());
-    } catch (...) {
-        LOGV2_ERROR(7001106, "Caught unknown exception", "method"_attr = method);
-    }
-}
-
-/**
  * Asynchronously writes 'objects' random BSON objects to named pipe 'pipeRelativePath'. The
  * "string" field of these objects will have stringMinSize <= string.length() <= stringMaxSize.
  */
@@ -168,53 +205,32 @@ void NamedPipeHelper::writeToPipeAsync(std::string pipeDir,
                                        long objects,
                                        long stringMinSize,
                                        long stringMaxSize) {
-    stdx::thread thread(writeToPipe,
-                        std::move(pipeDir),
-                        std::move(pipeRelativePath),
-                        objects,
-                        stringMinSize,
-                        stringMaxSize);
+    // NamedPipeOutput's constructor may throw; exceptions on this calling thread propagate through
+    // the shell binding and appear in the JavaScript test log.
+    auto pipeWriter = std::make_unique<NamedPipeOutput>(pipeDir, pipeRelativePath);  // producer
+
+    LOGV2_INFO(13212604,
+               "Starting pipe writer thread",
+               "method"_attr = "NamedPipeHelper::writeToPipeAsync",
+               "pipe"_attr = pipeWriter->getAbsolutePath());
+    stdx::thread thread(
+        writeToPipeAsyncImpl, std::move(pipeWriter), objects, stringMinSize, stringMaxSize);
     thread.detach();
 }
 
 /**
  * Synchronously writes 'objects' BSON objects round-robinned from 'bsonObjs' to named pipe
  * 'pipeRelativePath'. Note that the open() call itself will block until a pipe reader attaches to
- * the same pipe. Absorbs exceptions because this is called by an async detached thread, so escaping
- * exceptions will cause fuzzer tests to fail as its try blocks are only around the main thread.
+ * the same pipe. Exceptions on the calling thread propagate through the shell binding and appear
+ * in the JS test log.
  */
 void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
                                          std::string pipeRelativePath,
                                          long objects,
                                          std::vector<BSONObj> bsonObjs,
-                                         bool persistPipe) noexcept {
-    const std::string method = "NamedPipeHelper::writeToPipeObjects";
-    // This is a test-only function. Adding a log message to help debug test failures. Same comment
-    // on other log messages here.
-    LOGV2_INFO(8206001, "The pipe writer thread starts running", "pipe"_attr = pipeRelativePath);
-
-    try {
-        const int kNumBsonObjs = bsonObjs.size();
-        NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath, persistPipe);  // producer
-        LOGV2_INFO(8206002, "The pipe writer thread: pipe cleanup complete");
-
-        pipeWriter.open();
-        LOGV2_INFO(9211500, "The pipe writer thread: pipe opened", "pipe"_attr = pipeRelativePath);
-        for (long i = 0; i < objects; ++i) {
-            BSONObj bsonObj{bsonObjs[i % kNumBsonObjs]};
-            pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
-        }
-        LOGV2_INFO(8206003, "The pipe writer thread: writing done", "pipe"_attr = pipeRelativePath);
-        pipeWriter.close();
-    } catch (const DBException& ex) {
-        LOGV2_ERROR(
-            7001107, "Caught DBException", "method"_attr = method, "error"_attr = ex.toString());
-    } catch (const std::exception& ex) {
-        LOGV2_ERROR(
-            7001108, "Caught STL exception", "method"_attr = method, "error"_attr = ex.what());
-    } catch (...) {
-        LOGV2_ERROR(7001109, "Caught unknown exception", "method"_attr = method);
-    }
+                                         bool persistPipe) {
+    NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath, persistPipe);
+    writeObjectsToPipe(pipeWriter, objects, bsonObjs);
 }
 
 /**
@@ -226,14 +242,15 @@ void NamedPipeHelper::writeToPipeObjectsAsync(std::string pipeDir,
                                               long objects,
                                               std::vector<BSONObj> bsonObjs,
                                               bool persistPipe) {
-    // This is a test-only function. Adding a log message to help debug test failures.
-    LOGV2_INFO(8206000, "Launching the pipe writer thread", "pipe"_attr = pipeRelativePath);
-    stdx::thread thread(writeToPipeObjects,
-                        std::move(pipeDir),
-                        std::move(pipeRelativePath),
-                        objects,
-                        std::move(bsonObjs),
-                        persistPipe);
+    // NamedPipeOutput's constructor may throw; exceptions on this calling thread propagate through
+    // the shell binding and appear in the JavaScript test log.
+    auto pipeWriter = std::make_unique<NamedPipeOutput>(pipeDir, pipeRelativePath, persistPipe);
+    LOGV2_INFO(13212605,
+               "Starting pipe writer thread",
+               "method"_attr = "NamedPipeHelper::writeToPipeObjectsAsync",
+               "pipe"_attr = pipeWriter->getAbsolutePath());
+    stdx::thread thread(
+        writeObjectsToPipeAsyncImpl, std::move(pipeWriter), objects, std::move(bsonObjs));
     thread.detach();
 }
 }  // namespace mongo

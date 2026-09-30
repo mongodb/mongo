@@ -129,6 +129,22 @@ void ExternalRecordStoreTest::createNamedPipe(PipeWaiter* pw,
     pipeWriter.close();
 }
 
+TEST_F(ExternalRecordStoreTest, NamedPipeOutputGetAbsolutePath) {
+    const auto pipeName = createPipeFilename("NamedPipeOutputGetAbsolutePathPipe");
+
+    // The default pipe directory is prepended to the relative path.
+    NamedPipeOutput defaultDirWriter(std::string{kDefaultPipePath}, pipeName, true /*persistPipe*/);
+    ASSERT_EQ(defaultDirWriter.getAbsolutePath(), std::string{kDefaultPipePath} + pipeName);
+
+#ifndef _WIN32
+    // A custom pipe directory is prepended to the relative path. Windows ignores the pipe directory
+    // and always uses kDefaultPipePath, so this is POSIX-only.
+    const std::string pipeDir = "/tmp/named-pipe-test-dir/";
+    NamedPipeOutput customDirWriter(pipeDir, pipeName, true /*persistPipe*/);
+    ASSERT_EQ(customDirWriter.getAbsolutePath(), pipeDir + pipeName);
+#endif
+}
+
 TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
