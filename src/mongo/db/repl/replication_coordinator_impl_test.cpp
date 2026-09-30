@@ -64,6 +64,8 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/replication_metrics.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -77,6 +79,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -309,6 +312,47 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(3, countTextFormatLogLinesContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+}
+
+TEST_F(ReplCoordTest, RSNodeHandlesInterruptedAtShutdownDuringStartupRecovery) {
+    // Simulate InterruptedAtShutdown thrown during oplog recovery.
+    init();
+    dynamic_cast<ReplicationRecoveryMock*>(
+        ReplicationProcess::get(getServiceContext())->getReplicationRecovery())
+        ->recoverFromOplogFn = [&](OperationContext*, boost::optional<Timestamp>) {
+        uasserted(ErrorCodes::InterruptedAtShutdown, "Simulated shutdown during oplog recovery");
+    };
+    startCapturingLogMessages();
+    start(BSON("_id"
+               << "mySet"
+               << "version" << 2 << "members"
+               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                        << "node1:12345"))),
+          HostAndPort("node1", 12345));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("Interrupted loading local replica set config"));
+    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+}
+
+TEST_F(ReplCoordTest, StandaloneNodeHandlesInterruptedAtShutdownDuringStartupRecovery) {
+    // Create standalone node.
+    init(ReplSettings());
+    // Enable standalone oplog recovery.
+    RAIIServerParameterControllerForTest standaloneModeGuard("recoverFromOplogAsStandalone", true);
+    // Simulate InterruptedAtShutdown thrown during oplog recovery.
+    dynamic_cast<ReplicationRecoveryMock*>(
+        ReplicationProcess::get(getServiceContext())->getReplicationRecovery())
+        ->recoverFromOplogFn = [&](OperationContext*, boost::optional<Timestamp>) {
+        uasserted(ErrorCodes::InterruptedAtShutdown, "Simulated shutdown during oplog recovery");
+    };
+    startCapturingLogMessages();
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->startup(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1,
+        countTextFormatLogLinesContaining("Interrupted standalone oplog recovery due to shutdown"));
 }
 
 const auto defaultConfigOneNode = BSON("_id"

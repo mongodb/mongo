@@ -1659,6 +1659,8 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":repl_server_parameters_idl",
+        ":replication_process",
+        ":replmocks",
         "//src/mongo/db:common_request_args_idl",
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db/repl:isself",

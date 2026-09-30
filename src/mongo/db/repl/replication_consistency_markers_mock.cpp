@@ -124,6 +124,9 @@ void ReplicationConsistencyMarkersMock::clearAppliedThrough(OperationContext* op
 }
 
 OpTime ReplicationConsistencyMarkersMock::getAppliedThrough(OperationContext* opCtx) const {
+    if (getAppliedThroughFn) {
+        getAppliedThroughFn(opCtx);
+    }
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
     return _appliedThrough;
 }

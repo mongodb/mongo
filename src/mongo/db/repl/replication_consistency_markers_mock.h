@@ -38,6 +38,8 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/platform/mutex.h"
 
+#include <functional>
+
 namespace mongo {
 
 class BSONObj;
@@ -82,6 +84,7 @@ public:
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     void clearAppliedThrough(OperationContext* opCtx) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
+    mutable std::function<void(OperationContext*)> getAppliedThroughFn;
 
     Status createInternalCollections(OperationContext* opCtx) override;
 
