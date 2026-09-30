@@ -144,7 +144,7 @@ schema_op_execute(WORKLOAD_STATE *state, WT_SESSION *session, const SCHEMA_EVENT
         const char *err_msg;
 
         /* Leader is gone, so no one produces checkpoints to unblock this operation. */
-        if (!state->generates && !state->cfg->peer_alive) {
+        if (!state->generates && !node_peer_alive(state->cfg)) {
             session->get_last_error(session, &err, &sub_err, &err_msg);
             println("Node %" PRIu32 ": abandoning follower %s %s (peer left): %s",
               state->cfg->node_id, is_create ? "CREATE" : "DROP", ev->uri, err_msg);

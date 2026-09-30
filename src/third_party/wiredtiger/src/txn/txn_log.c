@@ -529,6 +529,7 @@ __wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN 
             for (i = 0; i < txn->snapshot_data.snapshot_count; i++)
                 WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot_data.snapshot[i]));
         }
+        txn->ckpt_snapshot->size = WT_PTRDIFF(p, txn->ckpt_snapshot->mem);
         break;
     case WT_TXN_LOG_CKPT_STOP:
         /*

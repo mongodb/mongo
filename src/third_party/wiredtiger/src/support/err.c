@@ -810,25 +810,6 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 }
 
 /*
- * __wt_counter_backoff --
- *     Return true only when the leading two digits of 'v' change, so the reporting interval grows
- *     with 'v' and avoids excessive logging.
- */
-bool
-__wt_counter_backoff(uint64_t v, uint64_t accuracy)
-{
-    /*
-     * Using v - 1 causes unsigned underflow when v == 0, resulting in v_last/base being very large.
-     * This makes the function return true for v == 0, which is acceptable since the first call
-     * should always trigger.
-     */
-    uint64_t base, v_last = v - 1;
-    for (base = 1; v / base > accuracy; base *= 10)
-        ;
-    return (v / base != v_last / base);
-}
-
-/*
  * __wt_inmem_unsupported_op --
  *     Print a standard error message for an operation that's not supported for in-memory
  *     configurations.

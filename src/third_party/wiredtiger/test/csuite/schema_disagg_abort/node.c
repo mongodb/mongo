@@ -95,6 +95,17 @@ node_is_lone(const TEST_CONFIG *cfg)
 }
 
 /*
+ * node_peer_alive --
+ *     Whether this node still has a live peer. The reader and the relaying workers clear it when
+ *     the peer dies, so it can change while the node's threads run.
+ */
+bool
+node_peer_alive(TEST_CONFIG *cfg)
+{
+    return (__wt_atomic_load_bool(&cfg->peer_alive));
+}
+
+/*
  * disagg_opts_init --
  *     Point the test options at the shared PALite page log: the single source of truth for the
  *     disaggregated configuration, used by the nodes and by the parent's recovery opens.
@@ -168,7 +179,7 @@ node_trigger_wait(WORKLOAD_STATE *state)
         if (__wt_atomic_load_bool(&state->handover_received))
             return (TRIGGER_SWITCH);
 
-        const bool abandoned_follower = !state->generates && !state->cfg->peer_alive;
+        const bool abandoned_follower = !state->generates && !node_peer_alive(state->cfg);
         if (abandoned_follower && node_switch_request_consume())
             return (TRIGGER_SWITCH);
 
@@ -261,7 +272,7 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->worker_count = cfg->thread_count;
     state->leads = as_leader;
     /* A leader feeds itself; so does a follower with no peer. Snapshot it: peer_alive can flip. */
-    state->generates = as_leader || !cfg->peer_alive;
+    state->generates = as_leader || !node_peer_alive(cfg);
     state->stop_stage = STAGE_NONE;
     state->handover_received = false;
     state->emitted = state->applied = 0;
@@ -335,7 +346,7 @@ node_step_down(WORKLOAD_STATE *state, uint64_t final_ts)
     ev.event_ts = final_ts;
     /* Peer death is the only reason a hand-over may go undelivered; the write itself detects it. */
     if (!pipe_relay_event(state->cfg, &ev)) {
-        testutil_assert(!state->cfg->peer_alive);
+        testutil_assert(!node_peer_alive(state->cfg));
         println("Node %" PRIu32 ": no peer to hand over to; continuing alone", state->cfg->node_id);
     }
 
@@ -413,7 +424,7 @@ node_run(TEST_CONFIG *cfg, WORKLOAD_STATE *state, const NODE_ROLE *role)
             role = node_role(!role->leads);
             println("Node %" PRIu32 ": now %s", cfg->node_id, role->name);
             /* The swap-completing transition: entering leadership, or a lone node's only one. */
-            node_transition_done(cfg, state, role->leads || !cfg->peer_alive);
+            node_transition_done(cfg, state, role->leads || !node_peer_alive(cfg));
         }
     } while (trigger != TRIGGER_STOP);
 

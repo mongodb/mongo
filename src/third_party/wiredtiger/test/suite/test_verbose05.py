@@ -28,15 +28,13 @@
 #
 
 from test_verbose01 import test_verbose_base
-from wtscenario import make_scenarios
 import wttest
-from wiredtiger import stat
-from helper import WiredTigerCursor, statistic_uri
-import re
-import math
+from helper import WiredTigerCursor
+import re, time
 
-# Verify checkpoint progress verbose logging emits intermediate progress messages for
-# short checkpoints when page-write backoff thresholds are crossed.
+# Verify checkpoint progress verbose logging gates intermediate progress messages on a time
+# interval: a checkpoint that completes within WT_PROGRESS_MSG_PERIOD logs none, and a
+# checkpoint forced to run longer logs at least one.
 @wttest.skip_for_hook("disagg", "Checkpoint progress output is different under disagg")
 class test_verbose05(test_verbose_base):
 
@@ -45,44 +43,62 @@ class test_verbose05(test_verbose_base):
     create_config = 'key_format=S,value_format=S,allocation_size=4KB,leaf_page_max=4KB,memory_page_max=4KB'
     conn_config = 'statistics=(all),verbose=[checkpoint_progress:0]'
 
-    size_scenarios = [
-        ('small_db', dict(initial_rows=100)),
-        ('large_db', dict(initial_rows=200000)),
-    ]
-    scenarios = make_scenarios(size_scenarios)
+    # Force a checkpoint to run past WT_PROGRESS_MSG_PERIOD: the stressors add a 10 second
+    # delay up front, then a 2 second delay per table, so with 20 tables the checkpoint is
+    # still writing pages past two message periods.
+    slow_checkpoint_config = 'timing_stress_for_test=[checkpoint_slow,checkpoint_handle]'
+    slow_checkpoint_tables = 20
 
-    def populate(self, session, row_count, seed):
-        with WiredTigerCursor(session, self.uri) as cursor:
+    # Mirror of WT_PROGRESS_MSG_PERIOD: progress messages are gated on whole multiples of it.
+    progress_msg_period = 20
+
+    progress_pattern = re.compile(
+        r'WT_VERB_CHECKPOINT_PROGRESS.*Checkpoint has been running for \d+ seconds, wrote \d+' \
+        r' pages \(\d+ MB\), walked \d+ pages and checkpointed \d+ files')
+
+    def populate(self, session, uri, row_count, seed):
+        with WiredTigerCursor(session, uri) as cursor:
             for key in range(row_count):
                 # Use long string to increase the pages
                 cursor[str(key)] = seed*4000
 
-
-    def test_checkpoint_progress_log_count(self):
+    def checkpoint_and_count_progress(self, table_count):
         session = self.session
-        session.create(self.uri, self.create_config)
-        self.populate(session, self.initial_rows, 'x')
+        for i in range(table_count):
+            uri = self.uri if i == 0 else '{}_{}'.format(self.uri, i)
+            session.create(uri, self.create_config)
+            self.populate(session, uri, 50, 'x')
+        start = time.monotonic()
         session.checkpoint()
+        elapsed = time.monotonic() - start
+        return len(self.progress_pattern.findall(self.readStdout(100000))), elapsed
 
-        with WiredTigerCursor(session, statistic_uri()) as stat_cursor:
-            # This can be used as an estimated upper bound for
-            # the number of progress messages we expect to see
-            checkpoint_pages_upper_bound = stat_cursor[stat.conn.checkpoint_pages_reconciled][2]
-
-        # Leave headroom beyond the page-progress messages for the fixed-size checkpoint
-        # prepare/snapshot messages that always precede them.
-        output = self.readStdout(checkpoint_pages_upper_bound * 100 + 2000)
-        progress_pattern = re.compile(
-            r'WT_VERB_CHECKPOINT_PROGRESS.*Checkpoint has been running for \d+ seconds, wrote \d+' \
-            r' pages \(\d+ MB\), walked \d+ pages and checkpointed \d+ files')
-        log_count = len(progress_pattern.findall(output))
-        upper_limit = 10 * math.log(checkpoint_pages_upper_bound, 10)
-        self.assertLess(log_count, upper_limit, "Too many progress logs emitted: {}".format(log_count))
-        lower_limit = max(1, math.log(checkpoint_pages_upper_bound, 10))
-        self.assertGreater(log_count, lower_limit, "Less than expected progress logs emitted")
+    def finish_and_clean_output(self):
         # Checkpoint prepare always logs a final progress message, and closing the connection
         # runs its own checkpoint; ignore that expected output, which isn't what this test checks.
         self.ignoreStdoutPattern(
             r'WT_VERB_CHECKPOINT_PROGRESS.*(Checkpoint (prepare )?ran|saving checkpoint snapshot)')
         self.cleanStdout()
         self.conn.reconfigure('verbose=[]')
+
+    def test_checkpoint_progress_fast_checkpoint(self):
+        log_count, _ = self.checkpoint_and_count_progress(1)
+        self.assertEqual(log_count, 0,
+            "Intermediate progress messages emitted for a checkpoint shorter than the progress " \
+            "message period: {}".format(log_count))
+        self.finish_and_clean_output()
+
+    def test_checkpoint_progress_slow_checkpoint(self):
+        self.conn.reconfigure(self.slow_checkpoint_config)
+        log_count, elapsed = self.checkpoint_and_count_progress(self.slow_checkpoint_tables)
+        # Clear the timing stress so the checkpoint at connection close isn't delayed.
+        self.conn.reconfigure('timing_stress_for_test=[]')
+        # The final checkpoint prepare message always logs and uses up the first message period,
+        # so the first intermediate progress message can't appear until two periods have passed.
+        self.assertGreaterEqual(elapsed, 2 * self.progress_msg_period,
+            "Timing stress didn't stretch the checkpoint past two progress message periods: "
+            "{:.1f} seconds".format(elapsed))
+        self.assertGreaterEqual(log_count, 1,
+            "No intermediate progress messages emitted for a checkpoint running past the "
+            "progress message period")
+        self.finish_and_clean_output()

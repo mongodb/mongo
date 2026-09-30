@@ -76,7 +76,7 @@ thread_reader_run(void *arg)
         if (!pipe_event_read(src_fd, &ev)) {
             /* EOF: the peer died. Keep the role; the node continues as a lone follower. */
             testutil_assert(!state->leads); /* The self-pipe's writer lives in this process. */
-            cfg->peer_alive = false;
+            __wt_atomic_store_bool(&cfg->peer_alive, false);
             println("Node %" PRIu32 ": peer died; continuing as a lone follower", cfg->node_id);
             running = false;
             continue;

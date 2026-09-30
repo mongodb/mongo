@@ -24,22 +24,21 @@
  *     there is no peer, leaving the caller to decide whether delivery is optional (the workload
  *     relay) or mandatory (the hand-over).
  *
- * This owns the write side of peer death: a write that finds the pipe gone closes the descriptor
- *     and clears peer_alive, so the node continues alone. The read side is the reader's pipe EOF.
+ * This owns the write side of peer death: a write that finds the pipe gone clears peer_alive, so
+ *     the node continues alone. The read side is the reader's pipe EOF. The descriptor is never
+ *     closed: other workers may still be writing to it.
  */
 bool
 pipe_relay_event(TEST_CONFIG *cfg, const SCHEMA_EVENT *ev)
 {
-    if (cfg->pipe_write_fd < 0)
+    if (cfg->pipe_write_fd < 0 || !node_peer_alive(cfg))
         return (false);
 
     const ssize_t nw = write(cfg->pipe_write_fd, ev, sizeof(*ev));
     if (nw < 0) {
-        if (errno != EPIPE && errno != EBADF)
+        if (errno != EPIPE)
             testutil_die(errno, "write event pipe");
-        close(cfg->pipe_write_fd);
-        cfg->pipe_write_fd = -1;
-        cfg->peer_alive = false;
+        __wt_atomic_store_bool(&cfg->peer_alive, false);
         return (false);
     }
     testutil_assert(nw == (ssize_t)sizeof(*ev));

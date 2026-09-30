@@ -26,8 +26,6 @@ extern bool __wt_config_get_choice(const char **choices, WT_CONFIG_ITEM *item)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_conn_is_disagg(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern bool __wt_counter_backoff(uint64_t v, uint64_t accuracy)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_disagg_has_picked_up_checkpoint(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_fsync_background_chk(WT_SESSION_IMPL *session)

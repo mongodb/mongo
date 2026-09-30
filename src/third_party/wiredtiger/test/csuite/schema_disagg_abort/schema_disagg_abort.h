@@ -163,7 +163,7 @@ typedef struct {
     bool with_follower; /* parent: the -r topology */
     uint32_t node_id;   /* this node's id (namespace, homes, records); parent: unused */
     bool start_leader;  /* this node's parent-assigned starting role */
-    bool peer_alive;    /* this node has a live peer; cleared on pipe EOF/EPIPE */
+    bool peer_alive;    /* this node has a live peer; cleared on pipe EOF/EPIPE; atomic access */
     char home[PATH_MAX];
     char page_log_home[PATH_MAX];
     uint32_t thread_count;
@@ -312,6 +312,7 @@ void parent_main(TEST_CONFIG *cfg, const char *self_path);
 int node_main(TEST_CONFIG *cfg);
 const NODE_ROLE *node_role(bool leads);
 bool node_is_lone(const TEST_CONFIG *cfg);
+bool node_peer_alive(TEST_CONFIG *cfg);
 void disagg_opts_init(const TEST_CONFIG *cfg);
 bool node_switch_request_consume(void);
 bool workload_active(WORKLOAD_STATE *state, uint32_t stage);

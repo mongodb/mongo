@@ -48,7 +48,7 @@ generator_slot_droppable(WORKLOAD_STATE *state, uint32_t t, uint32_t slot)
         return (false);
 
     /* Legacy mode has no epochs to cover, and a lone node or a dead peer has nobody to protect. */
-    if (state->cfg->epoch_less || node_is_lone(state->cfg) || !state->cfg->peer_alive)
+    if (state->cfg->epoch_less || node_is_lone(state->cfg) || !node_peer_alive(state->cfg))
         return (true);
 
     const uint64_t create_epoch =
@@ -254,7 +254,7 @@ generator_stepdown_ended(WORKLOAD_STATE *state, GENERATOR_PACING *pacing)
     const bool lone = node_is_lone(state->cfg);
 
     /* A dead peer cannot adopt the checkpoint. */
-    if (ckpt_lsn != 0 && !lone && !state->cfg->peer_alive)
+    if (ckpt_lsn != 0 && !lone && !node_peer_alive(state->cfg))
         return (true);
 
     struct timespec now;
@@ -351,7 +351,7 @@ thread_generator_run(void *arg)
             break;
         case GEN_STEPDOWN:
             /* A dead peer cannot carry the operations, so stop adding them. */
-            progressed = (node_is_lone(state->cfg) || state->cfg->peer_alive) &&
+            progressed = (node_is_lone(state->cfg) || node_peer_alive(state->cfg)) &&
               generator_round(state, pacing.lead_max, GEN_STEPDOWN);
             if (generator_stepdown_ended(state, &pacing)) {
                 struct timespec now;
