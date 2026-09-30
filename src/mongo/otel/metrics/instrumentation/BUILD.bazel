@@ -160,6 +160,40 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "replication_session_metrics",
+    hdrs = ["replication_session_metrics.h"],
+    srcs_select = [{
+        "@platforms//os:linux": ["replication_session_metrics_linux.cpp"],
+        "//conditions:default": ["replication_session_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:fail_point",
+            "//src/mongo/util:periodic_runner",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "replication_session_metrics_test",
+    srcs = ["replication_session_metrics_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":replication_session_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/util:fail_point",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
     name = "process_health_metrics",
     hdrs = ["process_health_metrics.h"],
     srcs_select = [{
@@ -321,6 +355,7 @@ mongo_cc_library(
         ":observable_mutex_metrics",
         ":process_health_metrics",
         ":query_memory_metrics",
+        ":replication_session_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
         ":wiredtiger_metrics",

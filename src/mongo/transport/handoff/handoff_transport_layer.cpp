@@ -187,6 +187,12 @@ bool HandoffTransportLayer::isEgress() const {
     return false;
 }
 
+std::optional<std::vector<SessionStats>> HandoffTransportLayer::collectReplicationSessionStats() {
+    return {};
+}
+
+void HandoffTransportLayer::registerReplicationSession(std::shared_ptr<Session>) {}
+
 #ifdef MONGO_CONFIG_SSL
 Status HandoffTransportLayer::rotateCertificates(std::shared_ptr<SSLManagerInterface>, bool) {
     // Certification rotation is not applicable to this transport layer, but the transport layer

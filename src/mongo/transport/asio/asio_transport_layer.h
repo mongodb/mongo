@@ -232,6 +232,8 @@ public:
 
     ExecutorPtr tlsHandshakePool() const;
 
+    std::optional<std::vector<SessionStats>> collectReplicationSessionStats() override;
+    void registerReplicationSession(std::shared_ptr<Session>) override;
 #ifdef __linux__
     BatonHandle makeBaton(OperationContext* opCtx) const override;
 #endif
@@ -456,6 +458,10 @@ private:
 
     // Statistics on dns resolution latency in milliseconds.
     RollingStats _dnsResolveStatsMillis;
+
+    // Guards vector of replication sessions
+    std::mutex _replicationSessionLock;
+    std::vector<std::weak_ptr<AsioSession>> _replicationSessions;
 };
 
 }  // namespace transport

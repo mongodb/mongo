@@ -14,6 +14,7 @@
 #include "mongo/otel/metrics/instrumentation/observable_mutex_metrics.h"
 #include "mongo/otel/metrics/instrumentation/process_health_metrics.h"
 #include "mongo/otel/metrics/instrumentation/query_memory_metrics.h"
+#include "mongo/otel/metrics/instrumentation/replication_session_metrics.h"
 #include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
 #include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
 #include "mongo/otel/metrics/instrumentation/wiredtiger_metrics.h"
@@ -32,6 +33,7 @@ void installCommonOtelMetrics(ServiceContext* svcCtx) {
     installSystemHealthOtelMetrics(svcCtx);
     installObservableMutexMetrics(svcCtx);
     installMongoDBBuildInfoMetrics();
+    installReplicationSessionOtelMetrics(svcCtx);
     installQueryMemoryOtelMetrics(svcCtx);
     admission::IngressRequestRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);
     admission::EgressResponseRateLimiter::get(svcCtx).installOtelMetrics(svcCtx);

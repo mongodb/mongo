@@ -45,6 +45,14 @@ using namespace std::literals::string_view_literals;
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
 
+struct SessionStats {
+    int64_t congestionWindowSizeBytes{0};
+    // size of the receive network buffer, in bytes.
+    int64_t receiveBufferSizeBytes{0};
+    // number of bytes currently in the receive network buffer.
+    int64_t receiveBufferBytes{0};
+};
+
 inline std::string_view connectSSLModeToString(ConnectSSLMode mode) {
     switch (mode) {
         case kGlobalSSLMode:
@@ -171,7 +179,15 @@ public:
      * Please convert to `std::weak_ptr` if a long term, non-owning reference is needed.
      */
     virtual std::shared_ptr<SessionManager> getSharedSessionManager() const = 0;
-
+    /**
+     * Returns the collected stats of current replication sessions.
+     */
+    virtual std::optional<std::vector<SessionStats>> collectReplicationSessionStats() = 0;
+    /**
+     * Should be called whenever a new replication session gets created. This ensures
+     * that replication metrics are accurate.
+     */
+    virtual void registerReplicationSession(std::shared_ptr<Session>) = 0;
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

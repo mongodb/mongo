@@ -1737,6 +1737,50 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
+std::optional<std::vector<SessionStats>> AsioTransportLayer::collectReplicationSessionStats() {
+    std::scoped_lock lock(_replicationSessionLock);
+    std::vector<SessionStats> stats;
+    std::erase_if(_replicationSessions,
+                  [](const std::weak_ptr<AsioSession>& wp) { return wp.expired(); });
+    stats.reserve(_replicationSessions.size());
+#ifdef __linux__
+    for (const auto& wp : _replicationSessions) {
+        if (const auto sp = wp.lock()) {
+            try {
+                auto& socket = sp->getSocket();
+                TcpInfoOption tcpi;
+                asio::socket_base::receive_buffer_size rcvSize;
+                asio::socket_base::bytes_readable rcvBytes;
+                socket.get_option(tcpi);
+                socket.io_control(rcvBytes);
+                socket.get_option(rcvSize);
+                stats.push_back({.congestionWindowSizeBytes = tcpi->tcpi_snd_cwnd,
+                                 .receiveBufferSizeBytes = rcvSize.value(),
+                                 .receiveBufferBytes = static_cast<int64_t>(rcvBytes.get())});
+            } catch (const asio::system_error& e) {
+                static logv2::SeveritySuppressor suppressor{
+                    Seconds(10), logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+                LOGV2_DEBUG(13510401,
+                            suppressor().toInt(),
+                            "Error getting replication socket information",
+                            "error"_attr = e.what());
+                return {};
+            }
+        }
+    }
+    return stats;
+#else
+    return {};
+#endif
+}
+
+void AsioTransportLayer::registerReplicationSession(std::shared_ptr<Session> session) {
+    std::scoped_lock lock(_replicationSessionLock);
+    const auto asioSession = dynamic_pointer_cast<AsioSession>(session);
+    invariant(asioSession, "All replication sessions should be AsioSessions");
+    _replicationSessions.push_back(std::move(asioSession));
+}
+
 void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) {
 #ifdef __linux__
     try {

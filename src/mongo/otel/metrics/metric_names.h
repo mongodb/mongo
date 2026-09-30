@@ -99,6 +99,14 @@ public:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kReplicationSecondaryReceiveQueueBytes =
+        MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue");
+    static constexpr MetricName kReplicationSecondaryReceiveQueueSize =
+        MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue_size");
+    static constexpr MetricName kReplicationSecondaryCollectErrors =
+        MetricNameMaker::make("mongodb.network.repl.secondary.collect_errors");
+    static constexpr MetricName kReplicationSecondaryTcpCongestionWindowSize =
+        MetricNameMaker::make("mongodb.network.repl.secondary.tcp_congestion_window_size");
     static constexpr MetricName kReplicationSecondaryLogicalBytesIn =
         MetricNameMaker::make("mongodb.network.repl.secondary.bytes_in");
     static constexpr MetricName kReplicationSecondaryPhysicalBytesIn =

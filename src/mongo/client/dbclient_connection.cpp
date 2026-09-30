@@ -90,7 +90,15 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
             _socketTimeout.value_or(Milliseconds(5000)),
             transientSSLParams);
     if (swSession.isOK()) {
-        mongo::getConnectionPurpose(swSession.getValue().get()) = getConnectionPurpose();
+        const auto& session = swSession.getValue();
+        const ConnectionPurpose purpose = getConnectionPurpose();
+        mongo::getConnectionPurpose(session.get()) = purpose;
+        if (purpose == ConnectionPurpose::kReplication) {
+            getGlobalServiceContext()
+                ->getTransportLayerManager()
+                ->getDefaultEgressLayer()
+                ->registerReplicationSession(session);
+        }
     }
     return swSession;
 }

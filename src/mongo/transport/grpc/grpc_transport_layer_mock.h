@@ -117,6 +117,11 @@ public:
         return _options.enableEgress;
     }
 
+    std::optional<std::vector<SessionStats>> collectReplicationSessionStats() override {
+        return {};
+    }
+    void registerReplicationSession(std::shared_ptr<Session>) override {}
+
 private:
     enum class StartupState { kNotStarted, kSetup, kStarted, kShutDown };
 
