@@ -300,6 +300,7 @@ mongo_cc_library(
         "//src/mongo/transport:transport_layer_manager",
         "//src/mongo/util:background_job",
         "//src/mongo/util:md5",
+        "//src/mongo/util/net:connection_purpose",
         "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_manager",
     ] + select({

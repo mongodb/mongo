@@ -224,8 +224,10 @@ InitialSyncer::InitialSyncer(
       _storage(storage),
       _replicationProcess(replicationProcess),
       _onCompletion(onCompletion),
-      _createClientFn(
-          [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
+      _createClientFn([] {
+          return std::make_unique<DBClientConnection>(DBClientConnectionOptions{
+              .autoReconnect = true, .connectionPurpose = ConnectionPurpose::kReplication});
+      }),
       _createOplogFetcherFn(CreateOplogFetcherFn::get()),
       _currentPhase(Phase::kNotStarted) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);

@@ -34,7 +34,7 @@ using std::vector;
 namespace mongo {
 using namespace std::literals::string_view_literals;
 MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect)
-    : DBClientConnection(autoReconnect),
+    : DBClientConnection({.autoReconnect = autoReconnect}),
       _remoteServer(remoteServer),
       _sockCreationTime(mongo::curTimeMicros64()) {
     invariant(remoteServer);

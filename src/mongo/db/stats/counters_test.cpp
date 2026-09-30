@@ -55,6 +55,22 @@ TEST(NetworkCounterOtelTest, IngressCountersAreExported) {
     EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkIngressNumRequests));
 }
 
+TEST(NetworkCounterOtelTest, ReplicationEgressCountersAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kReplicationSecondaryLogicalBytesIn));
+    // replication metrics should still be counted towards total
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
+    EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
+}
+
 TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
@@ -66,6 +82,8 @@ TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200);
     nc.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, 80);
 
+    // ensure that the replication counters aren't affected by regular connections
+    EXPECT_EQ(0, capturer.readInt64Counter(MetricNames::kReplicationSecondaryLogicalBytesIn));
     EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
     EXPECT_EQ(80, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesOut));
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
@@ -132,6 +150,20 @@ TEST(NetworkCounterBsonTest, EgressSubObject) {
     EXPECT_EQ(400, egress["bytesIn"].numberLong());
     EXPECT_EQ(100, egress["bytesOut"].numberLong());
     EXPECT_EQ(1, egress["numRequests"].numberLong());
+}
+
+TEST(NetworkCounterBsonTest, ReplSecondarySubObject) {
+    NetworkCounter nc;
+    nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+
+    BSONObj obj = getNetworkBson(nc);
+    ASSERT_TRUE(obj.hasField("repl"));
+    BSONObj repl = obj["repl"].Obj();
+    ASSERT_TRUE(repl.hasField("secondary"));
+    BSONObj replSecondary = repl["secondary"].Obj();
+    EXPECT_EQ(200, replSecondary["physicalBytesIn"].numberLong());
+    EXPECT_EQ(200, replSecondary["bytesIn"].numberLong());
 }
 
 TEST(NetworkCounterBsonTest, NumSlowDNSOperations) {

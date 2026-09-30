@@ -21,6 +21,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -44,17 +45,22 @@ struct RemoteCommandResponse;
 
 class DBClientCursor;
 
+struct [[MONGO_MOD_PUBLIC]] DBClientConnectionOptions {
+    bool autoReconnect = false;
+    double soTimeout = 0;
+    MongoURI uri = {};
+    const DBClientSession::HandshakeValidationHook hook =
+        DBClientSession::HandshakeValidationHook();
+    const ClientAPIVersionParameters* apiParameters = nullptr;
+    ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault;
+};
 /**
  *  A basic connection to the database.
  *  This is the main entry point for talking to a simple Mongo setup
  */
 class [[MONGO_MOD_OPEN]] DBClientConnection : public DBClientSession {
 public:
-    DBClientConnection(bool autoReconnect = false,
-                       double soTimeout = 0,
-                       MongoURI uri = {},
-                       const HandshakeValidationHook& hook = HandshakeValidationHook(),
-                       const ClientAPIVersionParameters* apiParameters = nullptr);
+    DBClientConnection(DBClientConnectionOptions options = DBClientConnectionOptions{});
 
     ~DBClientConnection() override {
         _numConnections.fetchAndAdd(-1);

@@ -10,19 +10,23 @@ namespace mongo {
 class DBClientConnectionFixture : public unittest::Test {};
 
 TEST_F(DBClientConnectionFixture, TestTimeOutCtor) {
-    ASSERT_EQUALS(DBClientConnection(true, 10).getSoTimeout(), 10);
-    ASSERT_EQUALS(DBClientConnection(true, 0).getSoTimeout(), 0);
-    ASSERT_EQUALS(DBClientConnection(true, -1).getSoTimeout(), 0);
+    ASSERT_EQUALS(DBClientConnection({.autoReconnect = true, .soTimeout = 10}).getSoTimeout(), 10);
+    ASSERT_EQUALS(DBClientConnection({.autoReconnect = true}).getSoTimeout(), 0);
+    ASSERT_EQUALS(DBClientConnection({.autoReconnect = true, .soTimeout = -1}).getSoTimeout(), 0);
 
     auto timeoutMx = Milliseconds::max().count() / 1000;
-    ASSERT_EQUALS(DBClientConnection(true, timeoutMx).getSoTimeout(), timeoutMx);
+    ASSERT_EQUALS(
+        DBClientConnection({.autoReconnect = true, .soTimeout = static_cast<double>(timeoutMx)})
+            .getSoTimeout(),
+        timeoutMx);
 
     auto timeout = timeoutMx + 1.0;
-    ASSERT_EQUALS(DBClientConnection(true, timeout).getSoTimeout(), timeoutMx);
+    ASSERT_EQUALS(DBClientConnection({.autoReconnect = true, .soTimeout = timeout}).getSoTimeout(),
+                  timeoutMx);
 }
 
 TEST_F(DBClientConnectionFixture, TestTimeOutSetter) {
-    auto session = DBClientConnection(true);
+    auto session = DBClientConnection({.autoReconnect = true});
 
     session.setSoTimeout(10);
     ASSERT_EQUALS(session.getSoTimeout(), 10);

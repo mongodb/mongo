@@ -24,6 +24,7 @@
 #include "mongo/util/active_exception_witness.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/socket_utils.h"
 
 #include <string_view>
@@ -693,7 +694,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                                               : NetworkCounter::ConnectionType::kEgress;
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
-                globalNetworkCounter().hitPhysicalIn(connectionType, msgLen);
+                globalNetworkCounter().hitPhysicalIn(
+                    connectionType, msgLen, getConnectionPurpose(this));
                 return Future<Message>::makeReady(Message(std::move(headerBuffer)));
             }
 
@@ -703,7 +705,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
             MsgData::View msgView(buffer.get());
             return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
                 .then([this, buffer = std::move(buffer), connectionType, msgLen]() mutable {
-                    globalNetworkCounter().hitPhysicalIn(connectionType, msgLen);
+                    globalNetworkCounter().hitPhysicalIn(
+                        connectionType, msgLen, getConnectionPurpose(this));
                     return Message(std::move(buffer));
                 });
         })

@@ -70,12 +70,12 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                 } else
 #endif
                 {
-                    c = std::make_unique<DBClientConnection>(
-                        /* autoReconnect */ true,
-                        /* socket timeout */ 0,
-                        newURI,
-                        DBClientConnection::HandshakeValidationHook(),
-                        apiParameters);
+                    c = std::make_unique<DBClientConnection>(DBClientConnectionOptions{
+                        .autoReconnect = true,
+                        .uri = newURI,
+                        .apiParameters = apiParameters,
+                    });
+
                     c->setSoTimeout(socketTimeout);
                 }
 

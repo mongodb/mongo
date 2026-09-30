@@ -80,7 +80,8 @@ std::unique_ptr<DBClientConnection> buildConn(const std::string& uriString,
                 str::stream{} << "URI Parsing failed with message "
                               << mongoURI.getStatus().reason(),
                 mongoURI.isOK());
-        auto conn = std::make_unique<DBClientConnection>(false, 0, mongoURI.getValue());
+        auto conn = std::make_unique<DBClientConnection>(
+            DBClientConnectionOptions{.uri = mongoURI.getValue()});
         auto hostAndPortVec = mongoURI.getValue().getServers();
         uassert(
             9670412, "Expected exactly one host/port in the given URI", hostAndPortVec.size() == 1);

@@ -29,7 +29,12 @@ using ::mongo::otel::metrics::MetricUnit;
 using ::mongo::otel::metrics::ServerStatusOptions;
 
 NetworkCounter::NetworkCounter()
-    : _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
+    : _replicationSecondaryPhysicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kReplicationSecondaryPhysicalBytesIn,
+          "Total number of physical bytes received as a secondary over replication "
+          "connections",
+          MetricUnit::kBytes)),
+      _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkIngressBytesIn,
           "Total number of logical bytes received from ingress (wire-protocol) clients.",
           MetricUnit::kBytes)),
@@ -44,6 +49,10 @@ NetworkCounter::NetworkCounter()
       _egressLogicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressBytesIn,
           "Total number of logical bytes received on egress (outbound client) connections.",
+          MetricUnit::kBytes)),
+      _replicationSecondaryLogicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kReplicationSecondaryLogicalBytesIn,
+          "Total number of logical bytes received as a secondary over replication connections",
           MetricUnit::kBytes)),
       _egressNumRequests(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressNumRequests,
@@ -62,8 +71,18 @@ NetworkCounter::NetworkCounter()
           "Total number of slow SSL handshake operations.",
           MetricUnit::kCount)) {}
 
-void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long bytes) {
+
+void NetworkCounter::hitPhysicalIn(ConnectionType connectionType,
+                                   long long bytes,
+                                   ConnectionPurpose connectionPurpose) {
     static const int64_t MAX = 1ULL << 60;
+    // since this counter is hooked into otel, it cannot be nicely integrated with the
+    // rest of this function's logic
+    if (connectionType == ConnectionType::kEgress &&
+        connectionPurpose == ConnectionPurpose::kReplication) {
+        _replicationSecondaryPhysicalBytesIn.add(bytes);
+    }
+
     auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesIn
                                                            : _egressPhysicalBytesIn;
 
@@ -92,7 +111,9 @@ void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long byt
     }
 }
 
-void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitLogicalIn(ConnectionType connectionType,
+                                  long long bytes,
+                                  ConnectionPurpose connectionPurpose) {
     // The requests field only gets incremented here (and not in hitPhysical) because
     // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
     // functions would double-count the number of operations.
@@ -100,6 +121,9 @@ void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes
         _ingressLogicalBytesIn.add(bytes);
         _ingressNumRequests.add(1);
     } else {
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            _replicationSecondaryLogicalBytesIn.add(bytes);
+        }
         _egressLogicalBytesIn.add(bytes);
         _egressNumRequests.add(1);
     }
@@ -140,6 +164,14 @@ void NetworkCounter::append(BSONObjBuilder& b) {
                          static_cast<long long>(_egressPhysicalBytesOut->loadRelaxed()));
     egressBuilder.append("numRequests", _egressNumRequests.valueForLegacyUse());
     egressBuilder.done();
+
+    BSONObjBuilder replBuilder(b.subobjStart("repl"));
+    BSONObjBuilder replSecondaryBuilder(replBuilder.subobjStart("secondary"));
+    replSecondaryBuilder.append("physicalBytesIn",
+                                _replicationSecondaryPhysicalBytesIn.valueForLegacyUse());
+    replSecondaryBuilder.append("bytesIn", _replicationSecondaryLogicalBytesIn.valueForLegacyUse());
+    replSecondaryBuilder.done();
+    replBuilder.done();
 
     b.append("numSlowDNSOperations", _numSlowDNSOperations.valueForLegacyUse());
     b.append("numSlowSSLOperations", _numSlowSSLOperations.valueForLegacyUse());

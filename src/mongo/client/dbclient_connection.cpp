@@ -37,6 +37,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -66,12 +67,13 @@ namespace mongo {
 
 using std::string;
 
-DBClientConnection::DBClientConnection(bool autoReconnect,
-                                       double soTimeout,
-                                       MongoURI uri,
-                                       const HandshakeValidationHook& hook,
-                                       const ClientAPIVersionParameters* apiParameters)
-    : DBClientSession(autoReconnect, soTimeout, std::move(uri), hook, apiParameters),
+DBClientConnection::DBClientConnection(DBClientConnectionOptions options)
+    : DBClientSession(options.autoReconnect,
+                      options.soTimeout,
+                      std::move(options.uri),
+                      options.hook,
+                      options.apiParameters,
+                      options.connectionPurpose),
       _autoReconnectBackoff(Seconds(1), Seconds(2)) {
     _numConnections.fetchAndAdd(1);
 }
@@ -87,6 +89,9 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
             transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
             _socketTimeout.value_or(Milliseconds(5000)),
             transientSSLParams);
+    if (swSession.isOK()) {
+        mongo::getConnectionPurpose(swSession.getValue().get()) = getConnectionPurpose();
+    }
     return swSession;
 }
 

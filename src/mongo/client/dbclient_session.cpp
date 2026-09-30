@@ -466,8 +466,10 @@ DBClientSession::DBClientSession(bool autoReconnect,
                                  double soTimeout,
                                  MongoURI uri,
                                  const HandshakeValidationHook& hook,
-                                 const ClientAPIVersionParameters* apiParameters)
+                                 const ClientAPIVersionParameters* apiParameters,
+                                 ConnectionPurpose connectionPurpose)
     : DBClientBase(apiParameters),
+      _connectionPurpose(connectionPurpose),
       _socketTimeout(clampTimeout(soTimeout)),
       _autoReconnect(autoReconnect),
       _hook(hook),
@@ -506,6 +508,8 @@ Message DBClientSession::recv(int lastRequestId) {
     }
 
     killSessionOnError.dismiss();
+    globalNetworkCounter().hitLogicalIn(
+        NetworkCounter::ConnectionType::kEgress, m.dataSize(), getConnectionPurpose());
     return m;
 }
 
@@ -556,7 +560,8 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
     if (response.operation() == dbCompressed) {
         response = uassertStatusOK(_compressorManager.decompressMessage(response));
     }
-    globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kEgress, response.size());
+    globalNetworkCounter().hitLogicalIn(
+        NetworkCounter::ConnectionType::kEgress, response.size(), getConnectionPurpose());
 
     killSessionOnError.dismiss();
     return response;

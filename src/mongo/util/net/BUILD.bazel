@@ -24,6 +24,16 @@ filegroup(
 )
 
 mongo_cc_library(
+    name = "connection_purpose",
+    srcs = [
+        "connection_purpose.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "ssl_options",
     srcs = [
         "ssl_options.cpp",

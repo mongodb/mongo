@@ -99,6 +99,10 @@ public:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kReplicationSecondaryLogicalBytesIn =
+        MetricNameMaker::make("mongodb.network.repl.secondary.bytes_in");
+    static constexpr MetricName kReplicationSecondaryPhysicalBytesIn =
+        MetricNameMaker::make("mongodb.network.repl.secondary.physical_bytes_in");
     static constexpr MetricName kNetworkIngressBytesIn =
         MetricNameMaker::make("mongodb.serverStatus.network.bytesIn");
     static constexpr MetricName kNetworkIngressBytesOut =

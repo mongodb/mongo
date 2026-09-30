@@ -28,6 +28,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
@@ -84,7 +85,8 @@ public:
                     double soTimeout,
                     MongoURI uri,
                     const HandshakeValidationHook& hook,
-                    const ClientAPIVersionParameters* apiParameters);
+                    const ClientAPIVersionParameters* apiParameters,
+                    ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
 
     ~DBClientSession() override {}
 
@@ -201,6 +203,10 @@ public:
         return _authenticatedDuringConnect;
     }
 
+    ConnectionPurpose getConnectionPurpose() const {
+        return _connectionPurpose;
+    }
+
     const MongoURI& getURI() const {
         return _uri;
     }
@@ -244,6 +250,8 @@ protected:
     bool _isReplicaSetMember = false;
     bool _isMongos = false;
 
+    // used for purpose-specific metrics, such as replication
+    ConnectionPurpose _connectionPurpose;
     // The session mutex must be held to shutdown the _session from a non-owning thread, or to
     // rebind the handle from the owning thread. The thread that owns this DBClientSession is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to

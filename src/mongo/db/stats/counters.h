@@ -18,6 +18,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -46,12 +47,18 @@ public:
     NetworkCounter& operator=(const NetworkCounter&) = delete;
 
     // Increment the counters for the number of bytes read directly off the wire
-    void hitPhysicalIn(ConnectionType connectionType, long long bytes);
+    // connectionPurpose is used for purpose-specific metrics such as replication
+    void hitPhysicalIn(ConnectionType connectionType,
+                       long long bytes,
+                       ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
     void hitPhysicalOut(ConnectionType connectionType, long long bytes);
 
     // Increment the counters for the number of bytes passed out of the TransportLayer to the
     // server
-    void hitLogicalIn(ConnectionType connectionType, long long bytes);
+    // connectionPurpose is used for purpose-specific metrics such as replication
+    void hitLogicalIn(ConnectionType connectionType,
+                      long long bytes,
+                      ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
     void hitLogicalOut(ConnectionType connectionType, long long bytes);
 
     // Increment the counter for the number of slow dns resolution operations.
@@ -85,6 +92,8 @@ private:
     CacheExclusive<Atomic<long long>> _egressPhysicalBytesIn{0};
     CacheExclusive<Atomic<long long>> _egressPhysicalBytesOut{0};
 
+    // Physical byte counter for replication connections
+    otel::metrics::Counter<int64_t>& _replicationSecondaryPhysicalBytesIn;
     // Logical ingress counters.
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _ingressNumRequests;
@@ -92,6 +101,7 @@ private:
 
     // Logical egress counters.
     otel::metrics::Counter<int64_t>& _egressLogicalBytesIn;
+    otel::metrics::Counter<int64_t>& _replicationSecondaryLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _egressNumRequests;
     otel::metrics::Counter<int64_t>& _egressLogicalBytesOut;
 
