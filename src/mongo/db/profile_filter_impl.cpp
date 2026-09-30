@@ -60,7 +60,12 @@ namespace mongo {
 
 ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
                                      boost::intrusive_ptr<ExpressionContext> parserExpCtx)
-    : _matcher(expr.getOwned(), parserExpCtx) {
+    : _matcher(expr.getOwned(), [&] {
+          // Mark the context as a profile filter before parsing so unsafe expressions reject
+          // themselves.
+          parserExpCtx->setIsProfileFilter(true);
+          return parserExpCtx;
+      }()) {
 
     DepsTracker deps;
     dependency_analysis::addDependencies(_matcher.getMatchExpression(), &deps);
@@ -77,8 +82,6 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
     // Remember a list of functions we'll call whenever we need to build BSON from CurOp.
     _makeBSON = OpDebug::appendStaged(
         parserExpCtx->getOperationContext(), _dependencies, _needWholeDocument);
-
-    parserExpCtx->setIsProfileFilter(true);
 
     // The operation context is necessary for parsing, but should not be used for the rest of the
     // lifetime of the filter, since the filter exists for longer than a single operation.
