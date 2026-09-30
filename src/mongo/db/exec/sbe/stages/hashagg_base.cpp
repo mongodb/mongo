@@ -135,17 +135,20 @@ int64_t HashAggBaseStage<Derived>::spillRowToDisk(const value::MaterializedRow& 
 
 template <class Derived>
 void HashAggBaseStage<Derived>::spill() {
+    auto& ht = derived().ht();
+    auto& htIt = derived().htIt();
+
     // The stage returns results using an iterator '_htIt' over the hashTable '_ht'. At any moment
     // '_htIt' points to the record that should be returned in the next getNext() invocation. When
     // we spill, we want to spill only the records in '_ht' that have not been already returned to
     // the caller.
-    if (_htIt == _ht->end()) {
+    if (htIt == ht->end()) {
         LOGV2_DEBUG(9915700,
                     2,
                     "All in memory data has been consumed. HashAgg stage has nothing to spill. "
                     "Clearing memory.");
-        _ht->clear();
-        _htIt = _ht->end();
+        ht->clear();
+        htIt = ht->end();
         _memoryTracker.value().set(0);
         return;
     }
@@ -161,17 +164,10 @@ void HashAggBaseStage<Derived>::spill() {
         makeInternalRecordStore();
     }
 
-    int64_t spilledBytes = 0;
-    int64_t spilledRecords = 0;
+    auto [spilledBytes, spilledRecords] = derived().spillImpl(_recordStore.get());
 
-    // Spill only the records that have not been already consumed.
-    for (; _htIt != _ht->end(); ++_htIt) {
-        spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
-        spilledRecords++;
-    }
-
-    _ht->clear();
-    _htIt = _ht->end();
+    ht->clear();
+    htIt = ht->end();
     _memoryTracker.value().set(0);
 
     auto spilledDataStorageIncrease =
@@ -194,7 +190,7 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
 template <class Derived>
 void HashAggBaseStage<Derived>::doForceSpill() {
     // The state has already finished (_ht is set in open and unset in close)
-    if (!_ht) {
+    if (!derived().ht()) {
         LOGV2_DEBUG(9915601, 2, "HashAggStage has finished its execution");
         return;
     }
@@ -234,7 +230,9 @@ void HashAggBaseStage<Derived>::doForceSpill() {
 // spilling.
 template <class Derived>
 void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
-    if (_ht->empty()) {
+    auto& ht = derived().ht();
+
+    if (ht->empty()) {
         // Simply nothing to spill.
         return;
     }
@@ -247,9 +245,8 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
     }
 
     const long lastEstimatedMemoryUsage = _memoryTracker.value().inUseTrackedMemoryBytes();
-    const long estimatedRowSize =
-        _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
-    _memoryTracker.value().set(_ht->size() * estimatedRowSize);
+    const long estimatedRowSize = derived().estimatedEntrySizeInBytes();
+    _memoryTracker.value().set(ht->size() * estimatedRowSize);
     static_cast<Derived*>(this)->getHashAggStats()->peakTrackedMemBytes =
         _memoryTracker.value().peakTrackedMemoryBytes();
 
@@ -257,7 +254,7 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         // It is safe to set this to the begining because spilling outside the releaseMemory only
         // happens before any results have been consumed and every time data is spilled the _ht is
         // cleared.
-        _htIt = _ht->begin();
+        derived().htIt() = ht->begin();
         spill(mcd);
     } else {
         // Calculate the next memory checkpoint. We estimate it based on the prior growth of the

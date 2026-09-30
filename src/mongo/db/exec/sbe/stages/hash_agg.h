@@ -138,6 +138,21 @@ protected:
     }
 
 private:
+    friend class HashAggBaseStage<HashAggStage>;
+
+    boost::optional<TableType>& ht() {
+        return _ht;
+    }
+    TableType::iterator& htIt() {
+        return _htIt;
+    }
+
+    std::pair<int64_t, int64_t> spillImpl(SpillingStore* recordStore);
+
+    int64_t estimatedEntrySizeInBytes() const {
+        return _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
+    }
+
     /**
      * Given a 'record' from the record store and a 'collator', decodes it into a pair of
      * materialized rows (one for the group-by key and another one for the agg value).
@@ -147,6 +162,10 @@ private:
         const Record& record, const CollatorInterface& collator);
 
     PlanState getNextSpilled();
+
+    // Hash table where we'll map groupby key to the accumulators.
+    boost::optional<TableType> _ht;
+    TableType::iterator _htIt;
 
     const value::SlotVector _gbs;
 

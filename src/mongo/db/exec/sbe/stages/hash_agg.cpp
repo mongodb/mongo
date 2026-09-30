@@ -326,6 +326,19 @@ HashAggBaseStage<HashAggStage>::SpilledRow HashAggStage::deserializeSpilledRecor
     return {std::move(key), std::move(val)};
 }
 
+std::pair<int64_t, int64_t> HashAggStage::spillImpl(SpillingStore* recordStore) {
+    int64_t spilledBytes = 0;
+    int64_t spilledRecords = 0;
+
+    // Spill only the records that have not been already consumed.
+    for (; _htIt != _ht->end(); ++_htIt) {
+        spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
+        spilledRecords++;
+    }
+
+    return {spilledBytes, spilledRecords};
+}
+
 PlanState HashAggStage::getNextSpilled() {
     CollatorInterface* collator = nullptr;
     if (_collatorAccessor) {

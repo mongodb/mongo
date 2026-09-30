@@ -120,10 +120,6 @@ protected:
 
     void doForceSpill() final;
 
-    // Hash table where we'll map groupby key to the accumulators.
-    boost::optional<TableType> _ht;
-    TableType::iterator _htIt;
-
     // Only set if collator slot provided on construction.
     value::SlotAccessor* _collatorAccessor = nullptr;
 
@@ -148,6 +144,10 @@ private:
 
     Derived& derived() {
         return static_cast<Derived&>(*this);
+    }
+
+    const Derived& derived() const {
+        return static_cast<const Derived&>(*this);
     }
 };
 

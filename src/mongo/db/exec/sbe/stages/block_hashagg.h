@@ -104,6 +104,21 @@ protected:
     }
 
 private:
+    friend class HashAggBaseStage<BlockHashAggStage>;
+
+    boost::optional<TableType>& ht() {
+        return _ht;
+    }
+    TableType::iterator& htIt() {
+        return _htIt;
+    }
+
+    std::pair<int64_t, int64_t> spillImpl(SpillingStore* recordStore);
+
+    int64_t estimatedEntrySizeInBytes() const {
+        return _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
+    }
+
     /*
      * Given the groupby key, looks up the entry in our hash table and runs the block and row
      * accumulators. Assumes that our input slots to these accumulators are already setup.
@@ -231,6 +246,10 @@ private:
 
     // Hash table where we'll map groupby key to the accumulators.
     std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
+
+    // Hash table where we'll map groupby key to the accumulators.
+    boost::optional<TableType> _ht;
+    TableType::iterator _htIt;
 
     size_t _currentBlockSize = 0;
     value::ValueBlock* _bitmapBlock = nullptr;
