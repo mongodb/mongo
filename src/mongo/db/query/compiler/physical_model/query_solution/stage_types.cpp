@@ -48,6 +48,8 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief
             return "GEO_NEAR_2DSPHERE"sv;
         case STAGE_GROUP:
             return "GROUP"sv;
+        case STAGE_STREAMING_GROUP:
+            return "STREAMING_GROUP"sv;
         case STAGE_IDHACK:
             return "IDHACK"sv;
         case STAGE_IXSCAN:

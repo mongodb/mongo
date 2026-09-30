@@ -1867,7 +1867,7 @@ std::unique_ptr<QuerySolutionNode> TextMatchNode::clone() const {
  */
 void GroupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "GROUP\n";
+    *ss << nodeStageTypeToString(this) << '\n';
     addIndent(ss, indent + 1);
     *ss << "key = ";
     auto idx = 0;
@@ -1898,6 +1898,7 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
             << "}}";
     }
     *ss << "]" << '\n';
+    appendSpecificToString(ss, indent);
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -1911,6 +1912,27 @@ std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
                                             doingMerge,
                                             willBeMerged,
                                             shouldProduceBson);
+    return copy;
+}
+
+/**
+ * StreamingGroupNode.
+ */
+void StreamingGroupNode::appendSpecificToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent + 1);
+    *ss << "streamingKey = [";
+    for (size_t idx = 0; idx < streamingKey.size(); ++idx) {
+        if (idx > 0) {
+            *ss << ", ";
+        }
+        *ss << streamingKey[idx].fullPath();
+    }
+    *ss << "]" << '\n';
+}
+
+std::unique_ptr<QuerySolutionNode> StreamingGroupNode::clone() const {
+    auto copy = std::make_unique<StreamingGroupNode>(
+        children[0]->clone(), groupByExpression, accumulators, shouldProduceBson, streamingKey);
     return copy;
 }
 

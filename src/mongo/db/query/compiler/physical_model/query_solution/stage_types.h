@@ -115,6 +115,7 @@ enum [[MONGO_MOD_NEEDS_REPLACEMENT]] StageType {
 
     // Stages for DocumentSources.
     STAGE_GROUP,
+    STAGE_STREAMING_GROUP,
     STAGE_EQ_LOOKUP,
     STAGE_EQ_LOOKUP_UNWIND,
     STAGE_SEARCH,

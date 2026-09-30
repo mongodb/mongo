@@ -212,6 +212,16 @@ public:
                                            false /* shouldProduceBson */);
     }
 
+    std::unique_ptr<StreamingGroupNode> makeStreamingGroup(
+        std::unique_ptr<QuerySolutionNode> child) {
+        return std::make_unique<StreamingGroupNode>(
+            std::move(child),
+            ExpressionConstant::create(_expCtx.get(), Value(1)),
+            std::vector<AccumulationStatement>{},
+            false /* shouldProduceBson */,
+            std::vector<FieldPath>{FieldPath("a")});
+    }
+
     std::unique_ptr<UnpackTsBucketNode> makeUnpackTsBucket(
         std::unique_ptr<QuerySolutionNode> child) {
         return std::make_unique<UnpackTsBucketNode>(
@@ -362,6 +372,8 @@ public:
         add(std::make_unique<ReplaceRootNode>(makeCollScan(), nullptr),
             {QsnNodeCounter::kReplaceRoot, QsnNodeCounter::kCollscanNoFilter});
         add(makeGroup(makeCollScan()), {QsnNodeCounter::kGroup, QsnNodeCounter::kCollscanNoFilter});
+        add(makeStreamingGroup(makeCollScan()),
+            {QsnNodeCounter::kStreamingGroup, QsnNodeCounter::kCollscanNoFilter});
         add(makeUnpackTsBucket(makeCollScan()),
             {QsnNodeCounter::kUnpackTsBucket, QsnNodeCounter::kCollscanNoFilter});
         addExtended(makeEqLookup(false /* withUnwind */),

@@ -701,7 +701,8 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             return;
         }
-        case STAGE_GROUP: {
+        case STAGE_GROUP:
+        case STAGE_STREAMING_GROUP: {
             auto groupNode = static_cast<const GroupNode*>(qsNode);
 
             // Build a list of $group's output fields.

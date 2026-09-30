@@ -1776,4 +1776,10 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
                                 std::move(accumulatorList),
                                 *groupNode);
 }  // SlotBasedStageBuilder::buildGroupImplScalar
+
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildStreamingGroup(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    tassert(13600700, "buildStreamingGroup() is not implemented yet", false);
+    MONGO_UNREACHABLE;
+}
 }  // namespace mongo::stage_builder

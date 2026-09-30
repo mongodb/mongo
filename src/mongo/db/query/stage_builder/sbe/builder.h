@@ -1043,6 +1043,9 @@ private:
     std::pair<SbStage, PlanStageSlots> buildGroup(const QuerySolutionNode* root,
                                                   const PlanStageReqs& reqs);
 
+    std::pair<SbStage, PlanStageSlots> buildStreamingGroup(const QuerySolutionNode* root,
+                                                           const PlanStageReqs& reqs);
+
     MONGO_COMPILER_NOINLINE
     std::pair<SbStage, PlanStageSlots> buildGroupFinalizeOutputs(const PlanStageReqs& reqs,
                                                                  const GroupNode* groupNode,

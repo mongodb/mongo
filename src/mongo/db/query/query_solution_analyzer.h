@@ -81,6 +81,7 @@ void visit(F&& f, const QuerySolutionNode& node) {
             f(static_cast<const EqLookupNode&>(node));
             break;
         case STAGE_GROUP:
+        case STAGE_STREAMING_GROUP:
             f(static_cast<const GroupNode&>(node));
             break;
         case STAGE_COLLSCAN:

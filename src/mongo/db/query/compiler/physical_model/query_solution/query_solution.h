@@ -1747,11 +1747,11 @@ struct GroupNode : public QuerySolutionNode {
         return false;
     }
 
-    const ProvidedSortSet& providedSorts() const final {
+    const ProvidedSortSet& providedSorts() const override {
         return kEmptySet;
     }
 
-    std::unique_ptr<QuerySolutionNode> clone() const final;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
 
     bool metadataExhausted() const final {
         return true;
@@ -1772,6 +1772,43 @@ struct GroupNode : public QuerySolutionNode {
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.
     bool shouldProduceBson;
+
+protected:
+    virtual void appendSpecificToString(str::stream* ss, int indent) const {}
+};
+
+// Group node that processes input clustered by the group key.
+struct StreamingGroupNode : public GroupNode {
+    StreamingGroupNode(std::unique_ptr<QuerySolutionNode> child,
+                       boost::intrusive_ptr<Expression> groupByExpression,
+                       std::vector<AccumulationStatement> accs,
+                       bool shouldProduceBson,
+                       std::vector<FieldPath> streamingKey)
+        : GroupNode(std::move(child),
+                    std::move(groupByExpression),
+                    std::move(accs),
+                    false /* doingMerge */,
+                    false /* willBeMerged */,
+                    shouldProduceBson),
+          streamingKey(std::move(streamingKey)) {}
+
+    StageType getType() const override {
+        return STAGE_STREAMING_GROUP;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    void appendSpecificToString(str::stream* ss, int indent) const override;
+
+    void hash(absl::HashState h) const override {
+        for (const auto& path : streamingKey) {
+            h = absl::HashState::combine(std::move(h), path.fullPath());
+        }
+        GroupNode::hash(std::move(h));
+    }
+
+    // Field paths by which the child is clustered.
+    std::vector<FieldPath> streamingKey;
 };
 
 /**

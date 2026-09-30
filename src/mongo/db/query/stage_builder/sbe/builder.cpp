@@ -3934,6 +3934,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         {STAGE_AND_SORTED, &SlotBasedStageBuilder::buildAndSorted},
         {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
         {STAGE_GROUP, &SlotBasedStageBuilder::buildGroup},
+        {STAGE_STREAMING_GROUP, &SlotBasedStageBuilder::buildStreamingGroup},
         {STAGE_EQ_LOOKUP, &SlotBasedStageBuilder::buildEqLookup},
         {STAGE_EQ_LOOKUP_UNWIND, &SlotBasedStageBuilder::buildEqLookup},
         {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter},
